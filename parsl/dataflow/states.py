@@ -1,0 +1,27 @@
+from enum import IntEnum
+
+
+class States(IntEnum):
+    """Map states for tasks to an int."""
+    unsched = -1
+    pending = 0
+    runnable = 1
+    running = 2
+    done = 3
+    failed = 4
+    dep_fail = 5
+    retry = 6
+    launched = 7
+
+
+# states from which we will never move to another state
+FINAL_STATES = [States.done, States.failed, States.dep_fail]
+
+# states which are final and which indicate a failure. This must
+# be a subset of FINAL_STATES
+FINAL_FAILURE_STATES = [States.failed, States.dep_fail]
+
+if __name__ == "__main__":
+    print(States.pending)
+    print(States.done)
+    print(3 == States.done)
