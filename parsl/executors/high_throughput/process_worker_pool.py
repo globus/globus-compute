@@ -320,7 +320,7 @@ class Manager(object):
             if self.mode.startswith("singularity"):
                 try:
                     os.mkdir("NAMESPACE/{}".format(worker_id))
-                    shutil.copyfile(worker_py_path, "NAMESPACE/{}/funcx_worker.py".format(worker_id))
+                    # shutil.copyfile(worker_py_path, "NAMESPACE/{}/funcx_worker.py".format(worker_id))
                 except Exception:
                     pass  # Assuming the directory already exists.
 
