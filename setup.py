@@ -11,7 +11,7 @@ setup(
     name='funcx_sdk',
     version=version,
     packages=find_packages(),
-    description='Python interface and utilities for FuncX',
+    description='Python interface and utilities for funcX',
     long_description=("funcX SDK contains a Python interface to the funcX "
                       "Service."),
     install_requires=[
@@ -28,12 +28,12 @@ setup(
         "Topic :: Scientific/Engineering"
     ],
     keywords=[
-        "FuncX",
+        "funcX",
         "FaaS",
         "Function Serving"
     ],
     author='Ryan Chard',
     author_email='rchard@anl.gov',
     license="Apache License, Version 2.0",
-    url="https://github.com/ryanchard/funcx_sdk"
+    url="https://github.com/funcx-faas/funcx_sdk"
 )
