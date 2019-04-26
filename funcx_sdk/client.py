@@ -106,11 +106,11 @@ class funcXClient(BaseClient):
         return r.data
 
 
-    def register_site(self, sitename, description=None):
-        """Register a site manager with the service.
+    def register_endpoint(self, name, description=None):
+        """Register an endpoint with the funcX service.
 
         Args:
-            sitename: str name of the site
+            name: str name of the endpoint
             description: str describing the site
         Returns:
             The port to connect to
@@ -125,3 +125,5 @@ class funcXClient(BaseClient):
 
         # Return the result
         return r.data['port']
+
+
