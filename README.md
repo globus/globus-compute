@@ -1,1 +1,1 @@
-# funcx_sdk
+# funcx-sdk

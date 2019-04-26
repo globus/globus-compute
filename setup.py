@@ -12,7 +12,7 @@ setup(
     version=version,
     packages=find_packages(),
     description='Python interface and utilities for FuncX',
-    long_description=("FuncX SDK contains a Python interface to the FuncX "
+    long_description=("funcX SDK contains a Python interface to the funcX "
                       "Service."),
     install_requires=[
         "pandas", "requests", "jsonschema", "globus_sdk", "configobj"
