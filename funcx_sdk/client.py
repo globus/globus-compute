@@ -1,6 +1,7 @@
 from funcx_sdk.utils.auth import do_login_flow, make_authorizer, logout
-from funcx_sdk.config import check_logged_in, FUNCX_SERVICE_ADDRESS
+from funcx_sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID)
 from globus_sdk.base import BaseClient, slash_join
+from mdf_toolbox import login, logout
 from tempfile import mkstemp
 import pickle as pkl
 import pandas as pd
@@ -9,7 +10,7 @@ import codecs
 import json
 import os
 
-# jsonpickle_numpy.register_handlers()
+_token_dir = os.path.expanduser("~/.funcx/credentials")
 
 
 class funcXClient(BaseClient):
@@ -18,47 +19,35 @@ class funcXClient(BaseClient):
     Holds helper operations for performing common tasks with the funcX service.
     """
 
-    def __init__(self, authorizer, http_timeout=None, **kwargs):
+    def __init__(self, fx_authorizer=None, http_timeout=None,
+                 force_login=False, **kwargs):
         """Initialize the client
-
         Args:
-            authorizer (:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`):
-                An authorizer instance used to communicate with funcX
+            fx_authorizer (:class:`GlobusAuthorizer
+                            <globus_sdk.authorizers.base.GlobusAuthorizer>`):
+                An authorizer instance used to communicate with funcX.
+                If ``None``, will be created.
             http_timeout (int): Timeout for any call to service in seconds. (default is no timeout)
-        Keyword arguments are the same as for BaseClient
+            force_login (bool): Whether to force a login to get new credentials.
+                A login will always occur if ``fx_authorizer`` 
+                are not provided.
+        Keyword arguments are the same as for BaseClient.
         """
-        super(funcXClient, self).__init__("funcX", environment='funcx', authorizer=authorizer,
+        if force_login or not fx_authorizer or not search_client:
+            fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
+            auth_res = login(services=[fx_scope], 
+                             app_name="funcX_Client",
+                             client_id=CLIENT_ID, clear_old_tokens=force_login,
+                             token_dir=_token_dir)
+            dlh_authorizer = auth_res['funcx_service']
+
+        super(funcXClient, self).__init__("funcX", environment='funcx', authorizer=dlh_authorizer,
                                           http_timeout=http_timeout, base_url=FUNCX_SERVICE_ADDRESS,
                                           **kwargs)
 
-    @classmethod
-    def login(cls, force=False, **kwargs):
-        """Create a funcXlient with credentials
-
-        Either uses the credentials already saved on the system or, if no credentials are present
-        or ``force=True``, runs a login procedure to get new credentials
-
-        Keyword arguments are passed to the funcXClient constructor
-
-        Args:
-            force (bool): Whether to force a login to get new credentials
-        Returns:
-            (funcXClient) A client complete with proper credentials
-        """
-
-        # If not logged in or `force`, get credentials
-        if force or not check_logged_in():
-            # Revoke existing credentials
-            if check_logged_in():
-                logout()
-
-            # Ask for user credentials, save the resulting Auth tokens to disk
-            do_login_flow()
-
-        # Makes an authorizer
-        rf_authorizer = make_authorizer()
-
-        return funcXClient(rf_authorizer, **kwargs)
+    def logout(self):
+        """Remove credentials from your local system"""
+        logout()
 
     def get_task_status(self, task_id):
         """Get the status of a funcX task.
@@ -70,9 +59,8 @@ class funcXClient(BaseClient):
         """
 
         r = self.get("{task_id}/status".format(task_id=task_id))
-        print (r)
         return r.text
-        # return r.json()
+
 
     def run(self, inputs, input_type='json'):
         """Initiate an invocation
@@ -115,9 +103,9 @@ class funcXClient(BaseClient):
         Returns:
             The port to connect to
         """
-        registration_path = 'register_site'
+        registration_path = 'register_endpoint'
 
-        data = {"sitename": sitename, "description": description}
+        data = {"endpoint_name": name, "description": description}
 
         r = self.post(registration_path, json_body=data)
         if r.http_status is not 200:
