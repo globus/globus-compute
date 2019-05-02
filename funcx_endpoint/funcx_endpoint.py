@@ -144,11 +144,16 @@ def yadu_executor(cmd, task_uuid):
         print('task done! updating things.')
         # _update_task(task_uuid, "SUCCEEDED")
         print(fut_result)
-        print('that was the fut_result, this is the result function')
-        print(fut_result.result())
-        return json.dumps({"status": "SUCCESS", "result": fut_result.result()})
+        print('that was the future, this is the result function')
+        x = fut_result.result()
+        print(type(x))
+
+        return json.dumps({"status": "SUCCESS", "result": x})
     return json.dumps({"status": "PROCESSING"})
 
 
+# yadu_executor("echo TYLER WON A THING", 'thisisauuid')
+
 if __name__ == "__main__":
     server('funcX.org', 50001)
+    
