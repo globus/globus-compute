@@ -114,6 +114,6 @@ class funcXClient(BaseClient):
             raise Exception(r)
 
         # Return the result
-        return r.data['port']
+        return r.data['endpoint_uuid']
 
 
