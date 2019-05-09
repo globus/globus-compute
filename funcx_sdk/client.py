@@ -118,3 +118,25 @@ class funcXClient(BaseClient):
         return r.data['endpoint_uuid']
 
 
+    def register_function(self, name, code, description=None):
+        """Register a function code with the funcX service.
+
+        Args:
+            name: str name of the endpoint
+            description: str describing the site
+            code: str containing function code
+        Returns:
+            The name of the function
+        """
+        registration_path = 'register_function'
+
+        data = {"function_name": name, "function_code": code, "description": description}
+
+        r = self.post(registration_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r.data['function_name']
+
+
