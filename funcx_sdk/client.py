@@ -64,7 +64,7 @@ class funcXClient(BaseClient):
         return r.text
 
 
-    def run(self, inputs, input_type='json'):
+    def run(self, inputs, endpoint, func_id, input_type='json'):
         """Initiate an invocation
 
         Args:
@@ -76,17 +76,18 @@ class funcXClient(BaseClient):
             Reply from the service
         """
         servable_path = 'execute'
+        data = {'endpoint': endpoint, 'func': func_id}
 
         # Prepare the data to be sent to funcX
         if input_type == 'python':
-            data = {'python': codecs.encode(pkl.dumps(inputs), 'base64').decode()}
+            data['python'] = codecs.encode(pkl.dumps(inputs), 'base64').decode()
         elif input_type == 'json':
-            data = {'data': inputs}
+            data['data'] = inputs
         elif input_type == 'files':
             raise NotImplementedError('Files support is not yet implemented')
         else:
             raise ValueError('Input type not recognized: {}'.format(input_type))
-
+        
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
         if r.http_status is not 200:
