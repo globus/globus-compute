@@ -8,7 +8,7 @@ import time
 import json
 
 from funcx_sdk.client import funcXClient
-from utils.zmq_client import ZmqClient
+from funcx_endpoint.utils.zmq_worker import ZMQWorker
 from config import (_get_parsl_config, _load_auth_client)
 
 from parsl.executors import HighThroughputExecutor
@@ -39,21 +39,20 @@ def server(ip, port):
     fx = funcXClient()
 
     # Register this endpoint with funcX
-    fx.register_endpoint(platform.node())
+    uuid = fx.register_endpoint(platform.node())
+    print(uuid)
 
-    threads = []
-    for i in range(10):
-        thread = threading.Thread(target=worker, args=(ip, port,))
-        thread.daemon = True
-        threads.append(thread)
-        thread.start()
-
-    import time
+    endpoint_worker = ZMQWorker("tcp://{}:{}".format(ip, port), uuid)
+    reply = None
     while True:
-        time.sleep(1)
+        request = endpoint_worker.recv(reply, uuid)
+        print(request)
+        if request is None:
+            break # Worker was interrupted
+        reply = request
 
 
-def worker(ip, port):
+def worker(ip, port, identity):
     """
     Worker threads to process requests
 
@@ -61,7 +60,7 @@ def worker(ip, port):
     """
 
     # TODO: Make the zmq_client kinda match the server -> threads -> clients.
-    serv = ZmqClient(ip, port)
+    serv = ZmqClient(ip, port, identity)
     count = 0
 
     while True:
