@@ -9,7 +9,7 @@ import json
 
 from funcx_sdk.client import FuncXClient
 from funcx_endpoint.utils.zmq_worker import ZMQWorker
-from config import (_get_parsl_config, _load_auth_client)
+from funcx_endpoint.config import (_get_parsl_config, _load_auth_client)
 
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
@@ -159,5 +159,9 @@ def yadu_executor(cmd, task_uuid):
     return json.dumps({"status": "PROCESSING"})
 
 
-if __name__ == "__main__":
+def main():
     server('funcX.org', 50001)
+
+if __name__ == "__main__":
+    main()
+
