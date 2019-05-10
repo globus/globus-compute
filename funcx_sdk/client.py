@@ -15,7 +15,7 @@ import os
 _token_dir = os.path.expanduser("~/.funcx/credentials")
 
 
-class funcXClient(BaseClient):
+class FuncXClient(BaseClient):
     """Main class for interacting with the funcX service
 
     Holds helper operations for performing common tasks with the funcX service.
@@ -118,7 +118,7 @@ class funcXClient(BaseClient):
         return r.data['endpoint_uuid']
 
 
-    def register_function(self, name, code, description=None):
+    def register_function(self, name, code, entry_point='funcx_handler', description=None):
         """Register a function code with the funcX service.
 
         Args:
@@ -130,7 +130,7 @@ class funcXClient(BaseClient):
         """
         registration_path = 'register_function'
 
-        data = {"function_name": name, "function_code": code, "description": description}
+        data = {"function_name": name, "function_code": code, "entry_point": entry_point, "description": description}
 
         r = self.post(registration_path, json_body=data)
         if r.http_status is not 200:
