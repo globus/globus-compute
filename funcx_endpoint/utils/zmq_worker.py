@@ -82,17 +82,18 @@ class ZMQWorker(object):
             dump(msg)
         self.worker.send_multipart(msg)
 
-    def recv(self, reply=None, service=None):
+
+    def send(self, reply, reply_to):
+        """ Send a reply to the broker.
+        """
+        assert reply_to is not None
+        reply = [reply_to, b''] + reply
+        self.send_to_broker(MDP.W_REPLY, msg=reply)
+
+
+    def recv(self):
         """Send reply, if any, to broker and wait for next request."""
         # Format and send the reply if we were provided one
-        assert reply is not None or not self.expect_reply
-
-        if reply is not None:
-            assert self.reply_to is not None
-            reply = [self.reply_to, b''] + reply
-            self.send_to_broker(MDP.W_REPLY, msg=reply)
-
-        self.expect_reply = True
 
         while True:
             # Poll socket for a reply, with timeout
@@ -100,10 +101,10 @@ class ZMQWorker(object):
                 items = self.poller.poll(self.timeout)
             except KeyboardInterrupt:
                 break # Interrupted
-
+            print(items)
             if items:
                 msg = self.worker.recv_multipart()
-                print("Received {} at service {}".format(msg, service))
+                print("received {}".format(msg))
                 if self.verbose:
                     logging.info("I: received message from broker: ")
                     dump(msg)
@@ -122,12 +123,12 @@ class ZMQWorker(object):
                 if command == MDP.W_REQUEST:
                     # We should pop and save as many addresses as there are
                     # up to a null part, but for now, just save one…
-                    self.reply_to = msg.pop(0)
+                    reply_to = msg.pop(0)
                     # pop empty
                     empty = msg.pop(0)
                     assert empty == b''
 
-                    return msg # We have a request to process
+                    return msg, reply_to # We have a request to process
                 elif command == MDP.W_HEARTBEAT:
                     # Do nothing for heartbeats
                     pass
@@ -159,27 +160,3 @@ class ZMQWorker(object):
     def destroy(self):
         # context.destroy depends on pyzmq >= 2.1.10
         self.ctx.destroy(0)
-
-
-def main(service='echo'):
-    verbose = '-v' in sys.argv
-    worker = ZMQWorker("tcp://funcx.org:50001", service, verbose)
-    reply = None
-    while True:
-        request = worker.recv(reply, service)
-        if request is None:
-            break # Worker was interrupted
-        reply = request # Echo is complex… :-)
-
-if __name__ == '__main__':
-    import multiprocessing
-    import threading
-    num_workers = 5
-    procs = []
-    for i in range(num_workers):
-        p = multiprocessing.Process(target=main, args=('echo'+str(i), ))
-        #p = threading.Thread(target=main, args=('echo'+str(i), ))
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join()

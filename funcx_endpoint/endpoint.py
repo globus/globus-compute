@@ -6,6 +6,7 @@ import pickle
 import parsl
 import time
 import json
+import queue
 
 from funcx_sdk.client import FuncXClient
 from funcx_endpoint.utils.zmq_worker import ZMQWorker
@@ -49,18 +50,45 @@ def server(ip, port):
 
     endpoint_worker = ZMQWorker("tcp://{}:{}".format(ip, port), uuid)
     reply = None
-    while True:
-        request = endpoint_worker.recv(reply, uuid)
-        to_do = pickle.loads(request[0])
-        code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-        print(code, entry_point, event)
-        result = pickle.dumps(run_code(code, entry_point, event=event).result())
-        print("result is {}".format(result))
-        request = [result]
-        if request is None:
-            break # Worker was interrupted
-        reply = request
+    task_q = queue.Queue()
+    result_q = queue.Queue()
+    threads = []
+    for i in range(1):
+        thread = threading.Thread(target=parsl_worker, args=(task_q, result_q,))
+        thread.daemon = True
+        threads.append(thread)
+        thread.start()
 
+    thread = threading.Thread(target=result_worker, args=(endpoint_worker, result_q, ))
+    thread.daemon = True
+    threads.append(thread)
+    thread.start()
+
+    while True:
+        print("receiving requests")
+        (request, reply_to) = endpoint_worker.recv()
+        print(request, reply_to)
+        task_q.put((request, reply_to))
+        #if request is None:
+        #    break # Worker was interrupted
+
+def result_worker(endpoint_worker, result_q):
+    """Worker thread to send results back to broker"""
+    while True:
+        (result, reply_to)= result_q.get()
+        print(result, reply_to)
+        endpoint_worker.send(result, reply_to)
+
+def parsl_worker(task_q, result_q):
+    while True:
+        if task_q:
+            request, reply_to = task_q.get()
+            to_do = pickle.loads(request[0])
+            code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
+            print(code, entry_point, event)
+            result = pickle.dumps(run_code(code, entry_point, event=event).result())
+            print("result is {}".format(result))
+            result_q.put(([result], reply_to))
 
 def worker(ip, port, identity):
     """
