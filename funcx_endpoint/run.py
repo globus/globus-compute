@@ -15,12 +15,17 @@ from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 from parsl.channels import LocalChannel
 from parsl.config import Config
-
+from parsl.app.app import python_app
 
 parsl.load(_get_parsl_config())
 
 dfk = parsl.dfk()
 ex = dfk.executors['htex_local']
+
+@python_app
+def run_code(code, entry_point, event=None):
+    exec(code)
+    return eval(entry_point)(event)
 
 
 def send_request(serving_url, inputs):
@@ -46,7 +51,12 @@ def server(ip, port):
     reply = None
     while True:
         request = endpoint_worker.recv(reply, uuid)
-        print(request)
+        to_do = pickle.loads(request[0])
+        code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
+        print(code, entry_point, event)
+        result = pickle.dumps(run_code(code, entry_point, event=event).result())
+        print("result is {}".format(result))
+        request = [result]
         if request is None:
             break # Worker was interrupted
         reply = request

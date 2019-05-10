@@ -48,6 +48,7 @@ def _get_parsl_config():
                 label="htex_local",
                 worker_debug=False,
                 cores_per_worker=1,
+                max_workers=1,
                 provider=LocalProvider(
                     channel=LocalChannel(),
                     init_blocks=1,
