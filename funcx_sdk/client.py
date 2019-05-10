@@ -43,7 +43,7 @@ class FuncXClient(BaseClient):
                              token_dir=_token_dir)
             dlh_authorizer = auth_res['funcx_service']
 
-        super(funcXClient, self).__init__("funcX", environment='funcx', authorizer=dlh_authorizer,
+        super(FuncXClient, self).__init__("funcX", environment='funcx', authorizer=dlh_authorizer,
                                           http_timeout=http_timeout, base_url=FUNCX_SERVICE_ADDRESS,
                                           **kwargs)
 
