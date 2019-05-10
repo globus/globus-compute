@@ -7,7 +7,7 @@ import parsl
 import time
 import json
 
-from funcx_sdk.client import funcXClient
+from funcx_sdk.client import FuncXClient
 from funcx_endpoint.utils.zmq_worker import ZMQWorker
 from config import (_get_parsl_config, _load_auth_client)
 
@@ -41,7 +41,7 @@ def server(ip, port):
     """
 
     # Log into funcX via globus
-    fx = funcXClient()
+    fx = FuncXClient()
 
     # Register this endpoint with funcX
     uuid = fx.register_endpoint(platform.node())
