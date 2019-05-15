@@ -101,7 +101,6 @@ class ZMQWorker(object):
                 items = self.poller.poll(self.timeout)
             except KeyboardInterrupt:
                 break # Interrupted
-            print(items)
             if items:
                 msg = self.worker.recv_multipart()
                 print("received {}".format(msg))
