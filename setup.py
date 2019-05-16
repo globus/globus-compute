@@ -17,6 +17,11 @@ setup(
     install_requires=[
         "pandas", "requests", "jsonschema", "globus_sdk", "configobj"
     ],
+
+    entry_points={
+        'console_scripts': ['funcx_endpoint = funcx_endpoint.endpoint:main']
+    },
+
     python_requires=">=3.4",
     classifiers=[
         "Development Status :: 3 - Alpha",

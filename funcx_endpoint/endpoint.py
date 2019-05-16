@@ -6,21 +6,27 @@ import pickle
 import parsl
 import time
 import json
+import queue
 
-from funcx_sdk.client import funcXClient
-from utils.zmq_client import ZmqClient
-from config import (_get_parsl_config, _load_auth_client)
+from funcx_sdk.client import FuncXClient
+from funcx_endpoint.utils.zmq_worker import ZMQWorker
+from funcx_endpoint.config import (_get_parsl_config, _load_auth_client)
 
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 from parsl.channels import LocalChannel
 from parsl.config import Config
-
+from parsl.app.app import python_app
 
 parsl.load(_get_parsl_config())
 
 dfk = parsl.dfk()
 ex = dfk.executors['htex_local']
+
+@python_app
+def run_code(code, entry_point, event=None):
+    exec(code)
+    return eval(entry_point)(event)
 
 
 def send_request(serving_url, inputs):
@@ -36,24 +42,55 @@ def server(ip, port):
     """
 
     # Log into funcX via globus
-    fx = funcXClient()
+    fx = FuncXClient()
 
     # Register this endpoint with funcX
-    fx.register_endpoint(platform.node())
+    uuid = fx.register_endpoint(platform.node())
+    print(uuid)
 
+    endpoint_worker = ZMQWorker("tcp://{}:{}".format(ip, port), uuid)
+    reply = None
+    task_q = queue.Queue()
+    result_q = queue.Queue()
     threads = []
-    for i in range(10):
-        thread = threading.Thread(target=worker, args=(ip, port,))
+    for i in range(1):
+        thread = threading.Thread(target=parsl_worker, args=(task_q, result_q,))
         thread.daemon = True
         threads.append(thread)
         thread.start()
 
-    import time
+    thread = threading.Thread(target=result_worker, args=(endpoint_worker, result_q, ))
+    thread.daemon = True
+    threads.append(thread)
+    thread.start()
+
     while True:
-        time.sleep(1)
+        print("receiving requests")
+        (request, reply_to) = endpoint_worker.recv()
+        print(request, reply_to)
+        task_q.put((request, reply_to))
+        #if request is None:
+        #    break # Worker was interrupted
 
+def result_worker(endpoint_worker, result_q):
+    """Worker thread to send results back to broker"""
+    while True:
+        (result, reply_to)= result_q.get()
+        print(result, reply_to)
+        endpoint_worker.send(result, reply_to)
 
-def worker(ip, port):
+def parsl_worker(task_q, result_q):
+    while True:
+        if task_q:
+            request, reply_to = task_q.get()
+            to_do = pickle.loads(request[0])
+            code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
+            print(code, entry_point, event)
+            result = pickle.dumps(run_code(code, entry_point, event=event).result())
+            print("result is {}".format(result))
+            result_q.put(([result], reply_to))
+
+def worker(ip, port, identity):
     """
     Worker threads to process requests
 
@@ -61,7 +98,7 @@ def worker(ip, port):
     """
 
     # TODO: Make the zmq_client kinda match the server -> threads -> clients.
-    serv = ZmqClient(ip, port)
+    serv = ZmqClient(ip, port, identity)
     count = 0
 
     while True:
@@ -150,5 +187,9 @@ def yadu_executor(cmd, task_uuid):
     return json.dumps({"status": "PROCESSING"})
 
 
-if __name__ == "__main__":
+def main():
     server('funcX.org', 50001)
+
+if __name__ == "__main__":
+    main()
+
