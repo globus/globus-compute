@@ -103,7 +103,7 @@ class ZMQWorker(object):
                 break # Interrupted
             if items:
                 msg = self.worker.recv_multipart()
-                print("received {}".format(msg))
+                # print("received {}".format(msg))
                 if self.verbose:
                     logging.info("I: received message from broker: ")
                     dump(msg)

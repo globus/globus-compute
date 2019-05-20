@@ -1,3 +1,4 @@
+import statistics
 import threading
 import platform
 import requests
@@ -46,7 +47,7 @@ def server(ip, port):
 
     # Register this endpoint with funcX
     uuid = fx.register_endpoint(platform.node())
-    print(uuid)
+    # print(uuid)
 
     endpoint_worker = ZMQWorker("tcp://{}:{}".format(ip, port), uuid)
     reply = None
@@ -65,30 +66,63 @@ def server(ip, port):
     thread.start()
 
     while True:
-        print("receiving requests")
+        # print("receiving requests")
         (request, reply_to) = endpoint_worker.recv()
-        print(request, reply_to)
+        # print(request, reply_to)
         task_q.put((request, reply_to))
         #if request is None:
         #    break # Worker was interrupted
 
 def result_worker(endpoint_worker, result_q):
     """Worker thread to send results back to broker"""
+    counter = 0
     while True:
+        ta = time.time()
         (result, reply_to)= result_q.get()
-        print(result, reply_to)
+        #print(result, reply_to)
         endpoint_worker.send(result, reply_to)
+        tb = time.time()
+        counter += 1
+
+        if counter >= 19:
+            print(tb-ta)
 
 def parsl_worker(task_q, result_q):
+
+    exec_times = []
+    endpoint_times = []
     while True:
+         
         if task_q:
+            t0 = time.time()
             request, reply_to = task_q.get()
             to_do = pickle.loads(request[0])
             code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-            print(code, entry_point, event)
+            # print(code, entry_point, event)
+            ###################
+            ## TIMER THIS FOR CODE EXECUTION TIME ##
+            #t0 = time.time()
             result = pickle.dumps(run_code(code, entry_point, event=event).result())
-            print("result is {}".format(result))
+            #t1 = time.time()
+
+            # exec_times.append(t1-t0)
+
+            #if len(exec_times) > 5:
+            #    print("Exec number: {}".format(len(exec_times)))
+            #    print("Execution time: {}".format(t1-t0))
+            #    print("Mean/STDEV: {}/{}".format(statistics.mean(exec_times), statistics.stdev(exec_times)))
+
+            ####################
+
+            # print("result is {}".format(result))
             result_q.put(([result], reply_to))
+            t1 = time.time()
+
+            endpoint_times.append(t1-t0)
+
+            if len(endpoint_times) > 19:
+                print("Mean/STDEV: {}".format(statistics.mean(endpoint_times), statistics.stdev(endpoint_times)))
+            
 
 def worker(ip, port, identity):
     """
@@ -101,7 +135,9 @@ def worker(ip, port, identity):
     serv = ZmqClient(ip, port, identity)
     count = 0
 
+    endpoint_times = []
     while True:
+        t0 = time.time()
         msg = serv.recv()
         count += 1
         (msg_type, site_id, task_inputs) = pickle.loads(msg)
@@ -138,6 +174,13 @@ def worker(ip, port, identity):
             print("Flushing dfk tasks... ")
             parsl.dfk().tasks = {}
             count = 0
+        t1 = time.time()
+        endpoint_times.append(t1-t0)
+
+        if count > 20:
+            with open('/home/ubuntu/endpoint_time.csv', 'w') as f:
+                f.write("Mean/STDEV: {}/{}".format(statistics.mean(endpoint_times), statistics.stdev(endpoint_times)))
+                exit()
 
 
 class NullHandler(logging.Handler):
@@ -166,7 +209,7 @@ def run_command(command):
 
 def yadu_executor(cmd, task_uuid):
 
-    print("Runner: Executing Command: " + str(cmd))
+    # print("Runner: Executing Command: " + str(cmd))
 
     # TODO: Take actual arg here.
     is_async = False
