@@ -84,8 +84,8 @@ def result_worker(endpoint_worker, result_q):
         tb = time.time()
         counter += 1
 
-        if counter >= 19:
-            print(tb-ta)
+        #if counter >= 19:
+        #    print(tb-ta)
 
 def parsl_worker(task_q, result_q):
 
@@ -94,8 +94,9 @@ def parsl_worker(task_q, result_q):
     while True:
          
         if task_q:
-            t0 = time.time()
+            #t0 = time.time()
             request, reply_to = task_q.get()
+            t0 = time.time()
             to_do = pickle.loads(request[0])
             code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
             # print(code, entry_point, event)
