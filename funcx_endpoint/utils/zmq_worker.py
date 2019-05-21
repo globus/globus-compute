@@ -40,8 +40,8 @@ class ZMQWorker(object):
         self.verbose = verbose
         self.ctx = zmq.Context()
         self.poller = zmq.Poller()
-        logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
-                level=logging.INFO)
+        #logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
+        #        level=logging.INFO)
         self.reconnect_to_broker()
 
     def reconnect_to_broker(self):
@@ -153,7 +153,7 @@ class ZMQWorker(object):
                 self.send_to_broker(MDP.W_HEARTBEAT)
                 self.heartbeat_at = time.time() + 1e-3*self.heartbeat
 
-        logging.warn("W: interrupt received, killing worker…")
+        #logging.warn("W: interrupt received, killing worker…")
         return None
 
     def destroy(self):
