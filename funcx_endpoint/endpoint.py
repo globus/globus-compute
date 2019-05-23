@@ -122,7 +122,7 @@ def parsl_worker(task_q, result_q):
             endpoint_times.append(t1-t0)
 
             if len(endpoint_times) > 19:
-                print("Mean/STDEV: {}".format(statistics.mean(endpoint_times), statistics.stdev(endpoint_times)))
+                print("Mean/STDEV: {}/{}".format(statistics.mean(endpoint_times), statistics.stdev(endpoint_times)))
             
 
 def worker(ip, port, identity):
