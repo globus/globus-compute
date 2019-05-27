@@ -3,13 +3,9 @@ from funcx_sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID)
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
-from tempfile import mkstemp
 
 import pickle as pkl
-import pandas as pd
-import requests
 import codecs
-import json
 import os
 
 _token_dir = os.path.expanduser("~/.funcx/credentials")
@@ -63,8 +59,7 @@ class FuncXClient(BaseClient):
         r = self.get("{task_id}/status".format(task_id=task_id))
         return r.text
 
-
-    def run(self, inputs, endpoint, func_id, input_type='json'):
+    def run(self, inputs, endpoint, func_id, is_async = False, input_type='json'):
         """Initiate an invocation
 
         Args:
@@ -76,7 +71,7 @@ class FuncXClient(BaseClient):
             Reply from the service
         """
         servable_path = 'execute'
-        data = {'endpoint': endpoint, 'func': func_id}
+        data = {'endpoint': endpoint, 'func': func_id, 'is_async': is_async}
 
         # Prepare the data to be sent to funcX
         if input_type == 'python':
@@ -95,7 +90,6 @@ class FuncXClient(BaseClient):
 
         # Return the result
         return r.data
-
 
     def register_endpoint(self, name, description=None):
         """Register an endpoint with the funcX service.
@@ -117,7 +111,6 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['endpoint_uuid']
 
-
     def register_function(self, name, code, entry_point='funcx_handler', description=None):
         """Register a function code with the funcX service.
 
@@ -138,5 +131,3 @@ class FuncXClient(BaseClient):
 
         # Return the result
         return r.data['function_name']
-
-
