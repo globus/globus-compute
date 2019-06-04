@@ -186,7 +186,15 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
+<<<<<<< HEAD
    Copyright [yyyy] [name of copyright owner]
+=======
+<<<<<<< HEAD
+   Copyright [yyyy] [name of copyright owner]
+=======
+   Copyright [2019] [The University of Chicago]
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
