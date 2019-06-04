@@ -1,0 +1,10 @@
+requests==2.20.0
+jsonschema==2.6.0
+sphinx_rtd_theme
+nbsphinx
+configobj
+globus_sdk
+<<<<<<< HEAD
+=======
+mdf_toolbox
+>>>>>>> funcx-sdk-master
