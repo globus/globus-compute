@@ -4,3 +4,7 @@ sphinx_rtd_theme
 nbsphinx
 configobj
 globus_sdk
+<<<<<<< HEAD
+=======
+mdf_toolbox
+>>>>>>> funcx-sdk-master

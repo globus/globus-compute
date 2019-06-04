@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> funcx-sdk-master
 *~
 *.pyc
 parsl.egg-info/*
@@ -12,9 +16,14 @@ web/*
 api/*
 .idea/*
 
+<<<<<<< HEAD
 #Parsl
 runinfo/
 
+=======
+=======
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -25,7 +34,14 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+<<<<<<< HEAD
 env/
+=======
+<<<<<<< HEAD
+env/
+=======
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
 build/
 develop-eggs/
 dist/
@@ -41,6 +57,13 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+MANIFEST
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -62,6 +85,13 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+.pytest_cache/
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
 
 # Translations
 *.mo
@@ -70,6 +100,13 @@ coverage.xml
 # Django stuff:
 *.log
 local_settings.py
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+db.sqlite3
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
 
 # Flask stuff:
 instance/
@@ -96,6 +133,10 @@ celerybeat-schedule
 # SageMath parsed files
 *.sage.py
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> funcx-sdk-master
 # dotenv
 .env
 
@@ -103,6 +144,19 @@ celerybeat-schedule
 .venv
 venv/
 ENV/
+<<<<<<< HEAD
+=======
+=======
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
 
 # Spyder project settings
 .spyderproject
@@ -116,6 +170,15 @@ ENV/
 
 # mypy
 .mypy_cache/
+<<<<<<< HEAD
 
 # emacs buffers
 \#*
+=======
+<<<<<<< HEAD
+
+# emacs buffers
+\#*
+=======
+>>>>>>> funcx-master
+>>>>>>> funcx-sdk-master
