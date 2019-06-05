@@ -1,0 +1,3 @@
+export PATH=$PWD:$PATH
+PARSL=$PWD/../../
+export PYTHONPATH=$PARSL:$PYTHONPATH

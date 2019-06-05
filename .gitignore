@@ -1,7 +1,10 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 >>>>>>> funcx-sdk-master
+=======
+>>>>>>> squashed-parsl
 *~
 *.pyc
 parsl.egg-info/*
@@ -17,6 +20,7 @@ api/*
 .idea/*
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #Parsl
 runinfo/
 
@@ -24,6 +28,8 @@ runinfo/
 =======
 >>>>>>> funcx-master
 >>>>>>> funcx-sdk-master
+=======
+>>>>>>> squashed-parsl
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -35,6 +41,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 <<<<<<< HEAD
+<<<<<<< HEAD
 env/
 =======
 <<<<<<< HEAD
@@ -42,6 +49,9 @@ env/
 =======
 >>>>>>> funcx-master
 >>>>>>> funcx-sdk-master
+=======
+env/
+>>>>>>> squashed-parsl
 build/
 develop-eggs/
 dist/
@@ -58,12 +68,15 @@ wheels/
 .installed.cfg
 *.egg
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 =======
 MANIFEST
 >>>>>>> funcx-master
 >>>>>>> funcx-sdk-master
+=======
+>>>>>>> squashed-parsl
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -86,12 +99,15 @@ coverage.xml
 *.cover
 .hypothesis/
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 =======
 .pytest_cache/
 >>>>>>> funcx-master
 >>>>>>> funcx-sdk-master
+=======
+>>>>>>> squashed-parsl
 
 # Translations
 *.mo
@@ -101,12 +117,15 @@ coverage.xml
 *.log
 local_settings.py
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 =======
 db.sqlite3
 >>>>>>> funcx-master
 >>>>>>> funcx-sdk-master
+=======
+>>>>>>> squashed-parsl
 
 # Flask stuff:
 instance/
@@ -134,9 +153,12 @@ celerybeat-schedule
 *.sage.py
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 >>>>>>> funcx-sdk-master
+=======
+>>>>>>> squashed-parsl
 # dotenv
 .env
 
@@ -144,6 +166,7 @@ celerybeat-schedule
 .venv
 venv/
 ENV/
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 =======
@@ -157,6 +180,8 @@ env.bak/
 venv.bak/
 >>>>>>> funcx-master
 >>>>>>> funcx-sdk-master
+=======
+>>>>>>> squashed-parsl
 
 # Spyder project settings
 .spyderproject
@@ -171,6 +196,7 @@ venv.bak/
 # mypy
 .mypy_cache/
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 # emacs buffers
 \#*
@@ -182,3 +208,8 @@ venv.bak/
 =======
 >>>>>>> funcx-master
 >>>>>>> funcx-sdk-master
+=======
+
+# emacs buffers
+\#*
+>>>>>>> squashed-parsl
