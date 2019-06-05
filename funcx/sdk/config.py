@@ -3,7 +3,7 @@ import sys
 import json
 import globus_sdk
 from configobj import ConfigObj
-from funcx_sdk import version
+from funcx.sdk import version
 
 __all__ = (
     # option name constants

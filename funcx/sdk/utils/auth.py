@@ -5,7 +5,7 @@ import platform
 import globus_sdk
 
 from globus_sdk import RefreshTokenAuthorizer
-from funcx_sdk.config import (internal_auth_client, safeprint, lookup_option, write_option,
+from funcx.sdk.config import (internal_auth_client, safeprint, lookup_option, write_option,
                               remove_option, check_logged_in,
                               FUNCX_RT_OPTNAME, FUNCX_AT_OPTNAME, FUNCX_AT_EXPIRES_OPTNAME)
 

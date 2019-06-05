@@ -4,9 +4,9 @@ import zmq
 import sys
 import pickle
 
-from funcx_endpoint.utils.zhelpers import dump
+from funcx.endpoint.utils.zhelpers import dump
 # MajorDomo protocol constants:
-from funcx_endpoint.utils import MDP
+from funcx.endpoint.utils import MDP
 
 class ZMQWorker(object):
     """Majordomo Protocol Worker API, Python version

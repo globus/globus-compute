@@ -16,7 +16,7 @@ setup(
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
     entry_points={
-        'console_scripts': ['endpoint = funcx_endpoint.endpoint:main']
+        'console_scripts': ['endpoint = funcx.endpoint.endpoint:main']
     },
     python_requires=">=3.4",
     classifiers=[

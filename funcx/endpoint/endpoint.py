@@ -9,9 +9,9 @@ import time
 import json
 import queue
 
-from funcx_sdk.client import FuncXClient
-from funcx_endpoint.utils.zmq_worker import ZMQWorker
-from funcx_endpoint.config import (_get_parsl_config, _load_auth_client)
+from funcx.sdk.client import FuncXClient
+from funcx.endpoint.utils.zmq_worker import ZMQWorker
+from funcx.endpoint.config import (_get_parsl_config, _load_auth_client)
 
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
