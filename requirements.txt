@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 requests==2.20.0
 jsonschema==2.6.0
 sphinx_rtd_theme
@@ -8,3 +9,13 @@ globus_sdk
 =======
 mdf_toolbox
 >>>>>>> funcx-sdk-master
+=======
+pyzmq>=17.1.2
+ipyparallel
+globus-sdk
+dill
+tblib
+ipykernel
+requests
+paramiko
+>>>>>>> squashed-parsl
