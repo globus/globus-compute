@@ -1,3 +1,0 @@
-include LICENSE
-include parsl/monitoring/viz_app/templates/*
-include parsl/monitoring/viz_app/static/*
