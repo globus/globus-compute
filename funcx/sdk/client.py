@@ -138,13 +138,15 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['endpoint_uuid']
 
-    def get_containers(self, endpoint_uuid):
+    def get_containers(self, endpoint_uuid, container_type):
         """Get a dict of containers an endpoint should deploy.
 
         Parameters
         ----------
         endpoint_uuid : str
             UUID of the endpoint
+        container_type : str
+            The type of containers that will be used (Singularity, Shifter, Docker)
 
         Returns
         -------
@@ -153,7 +155,9 @@ class FuncXClient(BaseClient):
         """
         container_path = f'{endpoint_uuid}/get_containers'
 
-        r = self.get(container_path)
+        payload = {"container_type": container_type}
+
+        r = self.post(container_path, json=payload)
         if r.http_status is not 200:
             raise Exception(r)
 

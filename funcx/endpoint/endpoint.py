@@ -40,134 +40,143 @@ def execute_function(code, entry_point, event=None):
     return eval(entry_point)(event)
 
 
-def endpoint_worker(ip="funcx.org", port=50001, worker_threads=1):
-    """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
-    1. receive ZMQ messages (zmq_worker)
-    2. perform function executions (execution_workers)
-    3. return results (result_worker)
+class FuncXEndpoint:
 
-    We have two loops, one that persistently listens for tasks
-    and the other that waits for task completion and send results
+    def __init__(self, ip="funcx.org", port=50001, worker_threads=1, container_type="Singularity"):
+        """Initiate a funcX endpoint
 
-    Parameters
-    ----------
-    ip : str
-        The IP address of the service to receive tasks
-    port : int
-        The port to connect to the service
-    worker_threads : int
-        The number of worker threads to start.
+        Parameters
+        ----------
+        ip : int
+            IP address of the service to receive tasks
+        port : int
+            Port of the service to receive tasks
+        worker_threads : int
+            Number of concurrent workers to receive and process tasks
+        container_type : str
+            The virtualization type to use (Singularity, Shifter, Docker)
+        """
 
-    Returns
-    -------
-    None
-    """
+        # Log in and start a client
+        self.fx = FuncXClient()
 
-    # Log into funcX via globus
-    fx = FuncXClient()
+        self.ip = ip
+        self.port = port
+        self.worker_threads = worker_threads
+        self.container_type = container_type
 
-    # Register this endpoint with funcX
-    endpoint_uuid = fx.register_endpoint(platform.node())
-    logging.info(f"Endpoint ID: {endpoint_uuid}")
+        # Register this endpoint with funcX
+        self.endpoint_uuid = self.fx.register_endpoint(platform.node())
 
-    endpoint_containers = fx.get_containers(endpoint_uuid)
+        # Get the list of containers for this endpoint to run
+        self.containers = self.fx.get_containers(self.endpoint_uuid,
+                                                 container_type=self.container_type)
 
-    # Stage containers locally for use
-    _stage_containers(endpoint_containers)
+    def endpoint_worker(self):
+        """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
+        1. receive ZMQ messages (zmq_worker)
+        2. perform function executions (execution_workers)
+        3. return results (result_worker)
 
-    # Start parsl
-    parsl.load(_get_parsl_config(endpoint_containers))
+        We have two loops, one that persistently listens for tasks
+        and the other that waits for task completion and send results
 
-    zmq_worker = ZMQWorker("tcp://{}:{}".format(ip, port), endpoint_uuid)
-    task_q = queue.Queue()
-    result_q = queue.Queue()
-    threads = []
-    for i in range(worker_threads):
-        thread = threading.Thread(target=execution_worker, args=(task_q, result_q,))
+        Returns
+        -------
+        None
+        """
+
+        logging.info(f"Endpoint ID: {self.endpoint_uuid}")
+
+
+
+        # Stage containers locally for use
+        self._stage_containers(endpoint_containers)
+
+        # Start parsl
+        parsl.load(_get_parsl_config(endpoint_containers))
+
+        zmq_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
+        task_q = queue.Queue()
+        result_q = queue.Queue()
+        threads = []
+        for i in range(self.worker_threads):
+            thread = threading.Thread(target=self.execution_worker, args=(task_q, result_q,))
+            thread.daemon = True
+            threads.append(thread)
+            thread.start()
+
+        thread = threading.Thread(target=self.result_worker, args=(zmq_worker, result_q, ))
         thread.daemon = True
         threads.append(thread)
         thread.start()
 
-    thread = threading.Thread(target=result_worker, args=(zmq_worker, result_q, ))
-    thread.daemon = True
-    threads.append(thread)
-    thread.start()
+        while True:
+            (request, reply_to) = zmq_worker.recv()
+            task_q.put((request, reply_to))
 
-    while True:
-        (request, reply_to) = zmq_worker.recv()
-        task_q.put((request, reply_to))
+    def _stage_containers(self, endpoint_containers):
+        """Stage the set of containers for local use.
 
+        Parameters
+        ----------
+        endpoint_containers : dict
+            A dictionary of containers to have locally for deployment
 
-def _stage_containers(endpoint_containers):
-    """Stage the set of containers for local use.
+        Returns
+        -------
+        None
+        """
+        pass
 
-    Parameters
-    ----------
-    endpoint_containers : dict
-        A dictionary of containers to have locally for deployment
+    def execution_worker(self, task_q, result_q):
+        """A worker thread to process tasks and place results on the
+        result queue.
 
-    Returns
-    -------
-    None
-    """
-    pass
+        Parameters
+        ----------
+        task_q : queue.Queue
+            A queue of tasks to process.
+        result_q : queue.Queue
+            A queue to put return queues.
 
+        Returns
+        -------
+        None
+        """
 
-def execution_worker(task_q, result_q):
-    """A worker thread to process tasks and place results on the
-    result queue.
+        while True:
+            if task_q:
+                request, reply_to = task_q.get()
 
-    Parameters
-    ----------
-    task_q : queue.Queue
-        A queue of tasks to process.
-    result_q : queue.Queue
-        A queue to put return queues.
+                to_do = pickle.loads(request[0])
+                code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
 
-    Returns
-    -------
-    None
-    """
+                result = pickle.dumps(execute_function(code, entry_point, event=event).result())
 
-    while True:
-        if task_q:
-            request, reply_to = task_q.get()
+                result_q.put(([result], reply_to))
 
-            to_do = pickle.loads(request[0])
-            code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
+    def result_worker(self, zmq_worker, result_q):
+        """Worker thread to send results back to funcX service via the broker.
 
-            result = pickle.dumps(execute_function(code, entry_point, event=event).result())
+        Parameters
+        ----------
+        zmq_worker : Thread
+            The worker thread
+        result_q : queue.Queue
+            The queue to add results to.
 
-            result_q.put(([result], reply_to))
+        Returns
+        -------
+        None
+        """
 
-
-def result_worker(zmq_worker, result_q):
-    """Worker thread to send results back to funcX service via the broker.
-
-    Parameters
-    ----------
-    zmq_worker : Thread
-        The worker thread
-    result_q : queue.Queue
-        The queue to add results to.
-
-    Returns
-    -------
-    None
-    """
-
-    counter = 0
-    while True:
-        (result, reply_to) = result_q.get()
-        zmq_worker.send(result, reply_to)
-        counter += 1
-
-
-def funcx_endpoint():
-    logging.debug("Starting endpoint")
-    endpoint_worker('funcX.org', 50001)
+        while True:
+            (result, reply_to) = result_q.get()
+            zmq_worker.send(result, reply_to)
 
 
 if __name__ == "__main__":
-    funcx_endpoint()
+    logging.debug("Starting endpoint")
+    ep = FuncXEndpoint('funcX.org', 50001)
 
