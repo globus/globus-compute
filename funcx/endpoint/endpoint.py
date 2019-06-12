@@ -11,13 +11,11 @@ import queue
 
 from funcx.sdk.client import FuncXClient
 from funcx.endpoint.utils.zmq_worker import ZMQWorker
-from funcx.endpoint.config import (_get_parsl_config, _load_auth_client)
+from funcx.endpoint.config import (_get_parsl_config)
 
-from parsl.executors import HighThroughputExecutor
-from parsl.providers import LocalProvider
-from parsl.channels import LocalChannel
-from parsl.config import Config
 from parsl.app.app import python_app
+
+import logging
 
 parsl.load(_get_parsl_config())
 
@@ -26,20 +24,62 @@ ex = dfk.executors['htex_local']
 
 @python_app
 def run_code(code, entry_point, event=None):
+    """Run the function. First it exec's the function code
+    to load it into the current context and then eval's the function
+    using the entry point
+
+    Parameters
+    ----------
+    code : string
+        The function code in a string format.
+    entry_point : string
+        The name of the function's entry point.
+    event : dict
+        The event context
+
+    Returns
+    -------
+    json
+        The result of running the function
+    """
     exec(code)
     return eval(entry_point)(event)
 
 
 def send_request(serving_url, inputs):
+    """Send an http POST request to the URL.
+
+    Parameters
+    ----------
+    serving_url : string
+        The url to send the request to
+    inputs : dict
+        A dictionary of input data to send as the request payload
+
+    Returns
+    -------
+    dict
+        The response of the request
+    """
     headers = {"content-type": "application/json"}
     r = requests.post(serving_url, data=json.dumps(inputs), headers=headers)
     return json.loads(r.content)
 
 
 def server(ip, port):
-    """
-    We have two loops, one that persistently listens for tasks
+    """We have two loops, one that persistently listens for tasks
     and the other that waits for task completion and send results
+
+    Parameters
+    ----------
+    ip : string
+        The IP address of the service to receive tasks
+    port : int
+        The port to connect to the service
+
+    Returns
+    -------
+    None
     """
 
     # Log into funcX via globus
@@ -66,15 +106,24 @@ def server(ip, port):
     thread.start()
 
     while True:
-        # print("receiving requests")
         (request, reply_to) = endpoint_worker.recv()
-        # print(request, reply_to)
         task_q.put((request, reply_to))
-        #if request is None:
-        #    break # Worker was interrupted
 
 def result_worker(endpoint_worker, result_q):
-    """Worker thread to send results back to broker"""
+    """Worker thread to send results back to broker
+
+    Parameters
+    ----------
+    endpoint_worker : Thread
+        The worker thread
+    result_q : list
+        The queue to add results to.
+
+    Returns
+    -------
+    None
+    """
+
     counter = 0
     while True:
         ta = time.time()
@@ -84,10 +133,19 @@ def result_worker(endpoint_worker, result_q):
         tb = time.time()
         counter += 1
 
-        #if counter >= 19:
-        #    print(tb-ta)
 
 def parsl_worker(task_q, result_q):
+    """
+
+    Parameters
+    ----------
+    task_q
+    result_q
+
+    Returns
+    -------
+
+    """
 
     exec_times = []
     endpoint_times = []
@@ -235,6 +293,7 @@ def yadu_executor(cmd, task_uuid):
 
 def main():
     server('funcX.org', 50001)
+
 
 if __name__ == "__main__":
     main()

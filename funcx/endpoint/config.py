@@ -3,10 +3,7 @@ import parsl
 import os
 
 from parsl.config import Config
-from parsl.app.app import python_app, bash_app
-from parsl.launchers import SingleNodeLauncher
 from parsl.channels import LocalChannel
-from parsl.channels import SSHInteractiveLoginChannel
 from parsl.providers import LocalProvider
 from parsl.executors import HighThroughputExecutor
 
@@ -23,9 +20,14 @@ def _load_auth_client():
 
     No credentials are used if the server is not production
 
-    Returns:
-        (globus_sdk.ConfidentialAppAuthClient): Client used to perform GlobusAuth actions
+    Returns
+    -------
+    globus_sdk.ConfidentialAppAuthClient
+        Client used to perform GlobusAuth actions
     """
+
+    _prod = True
+
     if _prod:
         app = globus_sdk.ConfidentialAppAuthClient(GLOBUS_CLIENT,
                                                    GLOBUS_KEY)
@@ -35,11 +37,12 @@ def _load_auth_client():
 
 
 def _get_parsl_config():
-    """
-    Get the parsl config.
+    """Get the Parsl config.
 
-    Returns:
-        (parsl.config.Config): Parsl config to execute tasks.
+    Returns
+    -------
+    parsl.config.Config
+        Parsl config to execute tasks.
     """
 
     config = Config(
