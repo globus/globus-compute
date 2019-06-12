@@ -2,14 +2,7 @@ requests==2.20.0
 jsonschema==2.6.0
 sphinx_rtd_theme
 nbsphinx
-configobj
 mdf_toolbox
-pyzmq>=17.1.2
-ipyparallel
 globus-sdk
-dill
-tblib
-ipykernel
-paramiko
-pandas
+parsl
 configobj

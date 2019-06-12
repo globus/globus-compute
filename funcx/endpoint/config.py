@@ -36,8 +36,12 @@ def _load_auth_client():
     return app
 
 
-def _get_parsl_config():
+def _get_parsl_config(endpoint_containers={}):
     """Get the Parsl config.
+
+    Parameters
+    endpoint_containers : dict
+        A list of containers to start executors for
 
     Returns
     -------
