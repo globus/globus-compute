@@ -18,7 +18,7 @@ setup(
     entry_points={
         'console_scripts': ['endpoint = funcx.endpoint.endpoint:main']
     },
-    python_requires=">=3.4",
+    python_requires=">=3.6",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
