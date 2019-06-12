@@ -1,7 +1,5 @@
-import statistics
 import threading
 import platform
-import requests
 import logging
 import pickle
 import parsl
@@ -15,10 +13,8 @@ from funcx.endpoint.config import (_get_parsl_config)
 
 from parsl.app.app import python_app
 
-
-parsl.load(_get_parsl_config())
-
 logging.basicConfig(filename='funcx_endpoint.log', level=logging.DEBUG)
+
 
 @python_app
 def execute_function(code, entry_point, event=None):
@@ -28,9 +24,9 @@ def execute_function(code, entry_point, event=None):
 
     Parameters
     ----------
-    code : string
+    code : str
         The function code in a string format.
-    entry_point : string
+    entry_point : str
         The name of the function's entry point.
     event : dict
         The event context
@@ -44,8 +40,8 @@ def execute_function(code, entry_point, event=None):
     return eval(entry_point)(event)
 
 
-def funcx_endpoint(ip="funcx.org", port=50001, worker_threads=1):
-    """The funcX endpoint. This initiates a funcX client and starts worker threads to:
+def endpoint_worker(ip="funcx.org", port=50001, worker_threads=1):
+    """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
     1. receive ZMQ messages (zmq_worker)
     2. perform function executions (execution_workers)
     3. return results (result_worker)
@@ -55,7 +51,7 @@ def funcx_endpoint(ip="funcx.org", port=50001, worker_threads=1):
 
     Parameters
     ----------
-    ip : string
+    ip : str
         The IP address of the service to receive tasks
     port : int
         The port to connect to the service
@@ -73,6 +69,14 @@ def funcx_endpoint(ip="funcx.org", port=50001, worker_threads=1):
     # Register this endpoint with funcX
     endpoint_uuid = fx.register_endpoint(platform.node())
     logging.info(f"Endpoint ID: {endpoint_uuid}")
+
+    endpoint_containers = fx.get_containers(endpoint_uuid)
+
+    # Stage containers locally for use
+    _stage_containers(endpoint_containers)
+
+    # Start parsl
+    parsl.load(_get_parsl_config(endpoint_containers))
 
     zmq_worker = ZMQWorker("tcp://{}:{}".format(ip, port), endpoint_uuid)
     task_q = queue.Queue()
@@ -92,6 +96,21 @@ def funcx_endpoint(ip="funcx.org", port=50001, worker_threads=1):
     while True:
         (request, reply_to) = zmq_worker.recv()
         task_q.put((request, reply_to))
+
+
+def _stage_containers(endpoint_containers):
+    """Stage the set of containers for local use.
+
+    Parameters
+    ----------
+    endpoint_containers : dict
+        A dictionary of containers to have locally for deployment
+
+    Returns
+    -------
+    None
+    """
+    pass
 
 
 def execution_worker(task_q, result_q):
@@ -144,10 +163,11 @@ def result_worker(zmq_worker, result_q):
         counter += 1
 
 
-def main():
-    funcx_endpoint('funcX.org', 50001)
+def funcx_endpoint():
+    logging.debug("Starting endpoint")
+    endpoint_worker('funcX.org', 50001)
 
 
 if __name__ == "__main__":
-    main()
+    funcx_endpoint()
 

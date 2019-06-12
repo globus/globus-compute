@@ -44,34 +44,54 @@ class FuncXClient(BaseClient):
                                           **kwargs)
 
     def logout(self):
-        """Remove credentials from your local system"""
+        """Remove credentials from your local system
+        """
         logout()
 
     def get_task_status(self, task_id):
         """Get the status of a funcX task.
 
-        Args:
-            task_id (string): UUID of the task
-        Returns:
-            (dict) status block containing "status" key.
+        Parameters
+        ----------
+        task_id : str
+            UUID of the task
+
+        Returns
+        -------
+        dict
+            Status block containing "status" key.
         """
 
         r = self.get("{task_id}/status".format(task_id=task_id))
         return r.text
 
-    def run(self, inputs, endpoint, func_id, is_async=False, input_type='json'):
+    def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json'):
         """Initiate an invocation
 
-        Args:
-            inputs: Data to be used as input to the function. Can be a string of file paths or URLs
-            input_type (string): How to send the data to funcX. Can be "python" (which pickles
-                the data), "json" (which uses JSON to serialize the data), or "files" (which
-                sends the data as files).
-        Returns:
+        Parameters
+        ----------
+        inputs : list
+            Data to be used as input to the function. Can be a string of file paths or URLs
+        input_type : str
+            How to send the data to funcX. Can be "python" (which pickles
+            the data), "json" (which uses JSON to serialize the data), or "files" (which
+            sends the data as files).
+        endpoint : str
+            The uuid of the endpoint
+        func_id : str
+            The uuid of the function
+        asynchronous : bool
+            Whether or not to run the function asynchronously
+        input_type : str
+            Input type to use: json, python, files
+
+        Returns
+        -------
+        dict
             Reply from the service
         """
         servable_path = 'execute'
-        data = {'endpoint': endpoint, 'func': func_id, 'is_async': is_async}
+        data = {'endpoint': endpoint, 'func': func_id, 'is_async': asynchronous}
 
         # Prepare the data to be sent to funcX
         if input_type == 'python':
@@ -95,10 +115,16 @@ class FuncXClient(BaseClient):
     def register_endpoint(self, name, description=None):
         """Register an endpoint with the funcX service.
 
-        Args:
-            name: str name of the endpoint
-            description: str describing the site
-        Returns:
+        Parameters
+        ----------
+        name : str
+            Name of the endpoint
+        description : str
+            Description of the endpoint
+
+        Returns
+        -------
+        int
             The port to connect to
         """
         registration_path = 'register_endpoint'
@@ -112,14 +138,45 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['endpoint_uuid']
 
+    def get_containers(self, endpoint_uuid):
+        """Get a dict of containers an endpoint should deploy.
+
+        Parameters
+        ----------
+        endpoint_uuid : str
+            UUID of the endpoint
+
+        Returns
+        -------
+        dict
+            The details of the containers to deploy
+        """
+        container_path = f'{endpoint_uuid}/get_containers'
+
+        r = self.get(container_path)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r.data['containers']
+
     def register_function(self, name, code, entry_point='funcx_handler', description=None):
         """Register a function code with the funcX service.
 
-        Args:
-            name: str name of the endpoint
-            description: str describing the site
-            code: str containing function code
-        Returns:
+        Parameters
+        ----------
+        name : str
+            Name of the endpoint
+        description : str
+            Description of the file
+        code : str
+            Function code
+        entry_point : str
+            The entry point (function name) of the function
+
+        Returns
+        -------
+        str
             The name of the function
         """
         registration_path = 'register_function'
