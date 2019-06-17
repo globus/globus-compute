@@ -68,10 +68,6 @@ class FuncXEndpoint:
         # Register this endpoint with funcX
         self.endpoint_uuid = self.fx.register_endpoint(platform.node())
 
-        # Get the list of containers for this endpoint to run
-        self.containers = self.fx.get_containers(self.endpoint_uuid,
-                                                 container_type=self.container_type)
-
     def endpoint_worker(self):
         """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
         1. receive ZMQ messages (zmq_worker)
@@ -88,13 +84,8 @@ class FuncXEndpoint:
 
         logging.info(f"Endpoint ID: {self.endpoint_uuid}")
 
-
-
-        # Stage containers locally for use
-        self._stage_containers(endpoint_containers)
-
         # Start parsl
-        parsl.load(_get_parsl_config(endpoint_containers))
+        parsl.load(_get_parsl_config())
 
         zmq_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
         task_q = queue.Queue()

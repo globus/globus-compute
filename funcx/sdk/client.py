@@ -138,13 +138,13 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['endpoint_uuid']
 
-    def get_containers(self, endpoint_uuid, container_type):
-        """Get a dict of containers an endpoint should deploy.
+    def get_container(self, container_id, container_type):
+        """Get the details of a container for staging it locally.
 
         Parameters
         ----------
-        endpoint_uuid : str
-            UUID of the endpoint
+        container_id : str
+            UUID of the container in question
         container_type : str
             The type of containers that will be used (Singularity, Shifter, Docker)
 
@@ -153,16 +153,14 @@ class FuncXClient(BaseClient):
         dict
             The details of the containers to deploy
         """
-        container_path = f'{endpoint_uuid}/get_containers'
+        container_path = f'containers/{container_id}/{container_type}'
 
-        payload = {"container_type": container_type}
-
-        r = self.post(container_path, json=payload)
+        r = self.get(container_path)
         if r.http_status is not 200:
             raise Exception(r)
 
         # Return the result
-        return r.data['containers']
+        return r.data['container']
 
     def register_function(self, name, code, entry_point='funcx_handler', description=None):
         """Register a function code with the funcX service.
