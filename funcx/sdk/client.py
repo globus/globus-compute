@@ -138,6 +138,32 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['endpoint_uuid']
 
+    def get_containers(self, name, description=None):
+        """Register a DLHub endpoint with the funcX service and get the containers to launch.
+
+        Parameters
+        ----------
+        name : str
+            Name of the endpoint
+        description : str
+            Description of the endpoint
+
+        Returns
+        -------
+        int
+            The port to connect to and a list of containers
+        """
+        registration_path = 'get_containers'
+
+        data = {"endpoint_name": name, "description": description}
+
+        r = self.post(registration_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r.data['endpoint_uuid'], r.data['endpoint_containers']
+
     def get_container(self, container_id, container_type):
         """Get the details of a container for staging it locally.
 
