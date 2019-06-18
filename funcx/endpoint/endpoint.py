@@ -16,7 +16,6 @@ from parsl.app.app import python_app
 logging.basicConfig(filename='funcx_endpoint.log', level=logging.DEBUG)
 
 
-@python_app
 def execute_function(code, entry_point, event=None):
     """Run the function. First it exec's the function code
     to load it into the current context and then eval's the function
@@ -42,7 +41,13 @@ def execute_function(code, entry_point, event=None):
 
 class FuncXEndpoint:
 
-    def __init__(self, ip="funcx.org", port=50001, worker_threads=1, container_type="Singularity"):
+    def __init__(self,
+                 ip="funcx.org",
+                 port=50001,
+                 worker_threads=1,
+                 container_type="Singularity",
+                 endpoint_type="FuncX",
+        ):
         """Initiate a funcX endpoint
 
         Parameters
@@ -68,6 +73,8 @@ class FuncXEndpoint:
         # Register this endpoint with funcX
         self.endpoint_uuid = self.fx.register_endpoint(platform.node())
 
+        self.staged_containers = {}
+
     def endpoint_worker(self):
         """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
         1. receive ZMQ messages (zmq_worker)
@@ -85,7 +92,7 @@ class FuncXEndpoint:
         logging.info(f"Endpoint ID: {self.endpoint_uuid}")
 
         # Start parsl
-        parsl.load(_get_parsl_config())
+        self.dfk = parsl.load(_get_parsl_config())
 
         zmq_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
         task_q = queue.Queue()
@@ -106,7 +113,7 @@ class FuncXEndpoint:
             (request, reply_to) = zmq_worker.recv()
             task_q.put((request, reply_to))
 
-    def _stage_containers(self, endpoint_containers):
+    def _stage_containers(self, container_id, container_type):
         """Stage the set of containers for local use.
 
         Parameters
@@ -118,6 +125,9 @@ class FuncXEndpoint:
         -------
         None
         """
+        container = self.fx.get_container(container_id=container_id, container_type=container_type)
+        print(container)
+        # self.staged_containers[container['type']] = container['container_id']
         pass
 
     def execution_worker(self, task_q, result_q):
@@ -142,8 +152,14 @@ class FuncXEndpoint:
 
                 to_do = pickle.loads(request[0])
                 code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
+                container_id = to_do[-1]['container_id']
+                if container_id not in self.staged_containers:
+                    container = self._stage_containers(container_id)
+                    executor = _get_executor(container)
+                    self.dfk.add_executors(executor)
 
-                result = pickle.dumps(execute_function(code, entry_point, event=event).result())
+                app = python_app(execute_function, executors=[container_id]) 
+                result = pickle.dumps(app(code, entry_point, event=event).result())
 
                 result_q.put(([result], reply_to))
 
@@ -170,4 +186,5 @@ class FuncXEndpoint:
 if __name__ == "__main__":
     logging.debug("Starting endpoint")
     ep = FuncXEndpoint('funcX.org', 50001)
+    ep._stage_container('a', 'b')
 
