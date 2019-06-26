@@ -9,7 +9,7 @@ import queue
 
 from funcx.sdk.client import FuncXClient
 from funcx.endpoint.utils.zmq_worker import ZMQWorker
-from funcx.endpoint.config import (_get_parsl_config)
+from funcx.endpoint.config import (_get_parsl_config, _get_executor)
 
 from parsl.app.app import python_app
 
@@ -73,7 +73,7 @@ class FuncXEndpoint:
         # Register this endpoint with funcX
         self.endpoint_uuid = self.fx.register_endpoint(platform.node())
 
-        self.staged_containers = {}
+        self.staged_containers = set()
 
     def endpoint_worker(self):
         """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
@@ -113,7 +113,7 @@ class FuncXEndpoint:
             (request, reply_to) = zmq_worker.recv()
             task_q.put((request, reply_to))
 
-    def _stage_containers(self, container_id, container_type):
+    def _stage_container(self, container_id, container_type):
         """Stage the set of containers for local use.
 
         Parameters
@@ -127,8 +127,12 @@ class FuncXEndpoint:
         """
         container = self.fx.get_container(container_id=container_id, container_type=container_type)
         print(container)
-        # self.staged_containers[container['type']] = container['container_id']
-        pass
+        if container['type'] == 'docker':      # docker container -- kubernetes will handle that
+            container['local'] = None
+        else:                                  # singularity or shifter
+           pass
+        self.staged_containers.add(container['container_id'])
+        return container
 
     def execution_worker(self, task_q, result_q):
         """A worker thread to process tasks and place results on the
@@ -148,19 +152,26 @@ class FuncXEndpoint:
 
         while True:
             if task_q:
-                request, reply_to = task_q.get()
+                #request, reply_to = task_q.get()
 
-                to_do = pickle.loads(request[0])
-                code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-                container_id = to_do[-1]['container_id']
+                #to_do = pickle.loads(request[0])
+                #code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
+                #container_id = to_do[-1]['container_id']
+                #code = """
+#def test(event):
+#    return 1
+#"""
+#                entry_point = "test"
+#                event = None
+#                container_id = 1
                 if container_id not in self.staged_containers:
-                    container = self._stage_containers(container_id)
+                    container = self._stage_container(container_id, self.container_type)
                     executor = _get_executor(container)
                     self.dfk.add_executors(executor)
 
-                app = python_app(execute_function, executors=[container_id]) 
+                app = python_app(execute_function, executors=[str(container_id)]) 
                 result = pickle.dumps(app(code, entry_point, event=event).result())
-
+                print(pickle.loads(result))
                 result_q.put(([result], reply_to))
 
     def result_worker(self, zmq_worker, result_q):
@@ -185,6 +196,7 @@ class FuncXEndpoint:
 
 if __name__ == "__main__":
     logging.debug("Starting endpoint")
-    ep = FuncXEndpoint('funcX.org', 50001)
-    ep._stage_container('a', 'b')
+    ep = FuncXEndpoint('funcX.org', 50001, container_type='docker')
+    #ep._stage_container(1, 'docker')
+    ep.endpoint_worker()
 
