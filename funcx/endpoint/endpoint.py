@@ -13,7 +13,8 @@ from funcx.sdk.client import FuncXClient
 from funcx.endpoint.utils.zmq_worker import ZMQWorker
 from funcx.endpoint.config import (_get_parsl_config, _load_auth_client)
 
-from parsl.executors import HighThroughputExecutor
+# from parsl.executors import HighThroughputExecutor
+from funcx.executor.high_throughput.executor import HighThroughputExecutor
 from parsl.providers import LocalProvider
 from parsl.channels import LocalChannel
 from parsl.config import Config
