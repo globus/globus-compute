@@ -47,9 +47,10 @@ def server(ip, port):
     fx = FuncXClient()
 
     # Register this endpoint with funcX
-    uuid = fx.register_endpoint(platform.node())
+    endpoint_uuid = fx.register_endpoint(platform.node())
+    print(f"Endpoint UUID: {endpoint_uuid}")
 
-    endpoint_worker = ZMQWorker("tcp://{}:{}".format(ip, port), uuid)
+    endpoint_worker = ZMQWorker("tcp://{}:{}".format(ip, port), endpoint_uuid)
     reply = None
     task_q = queue.Queue()
     result_q = queue.Queue()
