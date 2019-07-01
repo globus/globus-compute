@@ -77,7 +77,6 @@ class FuncXClient(BaseClient):
         if input_type == 'python':
             data['python'] = codecs.encode(pkl.dumps(inputs), 'base64').decode()
         elif input_type == 'json':
-            print(data)
             data['data'] = inputs
         elif input_type == 'files':
             raise NotImplementedError('Files support is not yet implemented')
@@ -131,4 +130,4 @@ class FuncXClient(BaseClient):
             raise Exception(r)
 
         # Return the result
-        return r.data['function_name']
+        return r.data['function_uuid']
