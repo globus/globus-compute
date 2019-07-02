@@ -123,6 +123,7 @@ def check_logged_in():
     res = native_client.oauth2_validate_token(search_rt)
     return res['active']
 
+
 def safeprint(s):
     """
     Catch print errors.
@@ -135,6 +136,7 @@ def safeprint(s):
         sys.stdout.flush()
     except IOError:
         pass
+
 
 def format_output(dataobject):
     """

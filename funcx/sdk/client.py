@@ -31,7 +31,7 @@ class FuncXClient(BaseClient):
                 are not provided.
         Keyword arguments are the same as for BaseClient.
         """
-        if force_login or not fx_authorizer or not search_client:
+        if force_login or not fx_authorizer:
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
             auth_res = login(services=[fx_scope], 
                              app_name="funcX_Client",
@@ -44,16 +44,22 @@ class FuncXClient(BaseClient):
                                           **kwargs)
 
     def logout(self):
-        """Remove credentials from your local system"""
+        """Remove credentials from your local system
+        """
         logout()
 
     def get_task_status(self, task_id):
         """Get the status of a funcX task.
 
-        Args:
-            task_id (string): UUID of the task
-        Returns:
-            (dict) status block containing "status" key.
+        Parameters
+        ----------
+        task_id : str
+            UUID of the task
+
+        Returns
+        -------
+        dict
+            Status block containing "status" key.
         """
 
         r = self.get("{task_id}/status".format(task_id=task_id))
@@ -70,19 +76,34 @@ class FuncXClient(BaseClient):
         endpoint_uuid = lookup_option("endpoint_uuid")
         return endpoint_uuid
 
-    def run(self, inputs, endpoint, func_id, is_async=False, input_type='json'):
+    def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json'):
+
         """Initiate an invocation
 
-        Args:
-            inputs: Data to be used as input to the function. Can be a string of file paths or URLs
-            input_type (string): How to send the data to funcX. Can be "python" (which pickles
-                the data), "json" (which uses JSON to serialize the data), or "files" (which
-                sends the data as files).
-        Returns:
+        Parameters
+        ----------
+        inputs : list
+            Data to be used as input to the function. Can be a string of file paths or URLs
+        input_type : str
+            How to send the data to funcX. Can be "python" (which pickles
+            the data), "json" (which uses JSON to serialize the data), or "files" (which
+            sends the data as files).
+        endpoint : str
+            The uuid of the endpoint
+        func_id : str
+            The uuid of the function
+        asynchronous : bool
+            Whether or not to run the function asynchronously
+        input_type : str
+            Input type to use: json, python, files
+
+        Returns
+        -------
+        dict
             Reply from the service
         """
         servable_path = 'execute'
-        data = {'endpoint': endpoint, 'func': func_id, 'is_async': is_async}
+        data = {'endpoint': endpoint, 'func': func_id, 'is_async': asynchronous}
 
         # Prepare the data to be sent to funcX
         if input_type == 'python':
@@ -105,17 +126,19 @@ class FuncXClient(BaseClient):
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
 
-        Args:
-            name : str
-                name of the endpoint
-            endpoint_uuid : str
+        Parameters
+        ----------
+        name : str
+            Name of the endpoint
+        endpoint_uuid : str
                 The uuid of the endpoint
-            description : str
-                The describion of the endpoint
+        description : str
+            Description of the endpoint
 
-        Returns:
-            str
-                The uuid of the endpoint
+        Returns
+        -------
+        int
+            The uuid of the endpoint
         """
         registration_path = 'register_endpoint'
 
@@ -128,14 +151,47 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['endpoint_uuid']
 
+    def get_container(self, container_id, container_type):
+        """Get the details of a container for staging it locally.
+
+        Parameters
+        ----------
+        container_id : str
+            UUID of the container in question
+        container_type : str
+            The type of containers that will be used (Singularity, Shifter, Docker)
+
+        Returns
+        -------
+        dict
+            The details of the containers to deploy
+        """
+        container_path = f'containers/{container_id}/{container_type}'
+
+        r = self.get(container_path)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r.data['container']
+
     def register_function(self, name, code, entry_point='funcx_handler', description=None):
         """Register a function code with the funcX service.
 
-        Args:
-            name: str name of the endpoint
-            description: str describing the site
-            code: str containing function code
-        Returns:
+        Parameters
+        ----------
+        name : str
+            Name of the endpoint
+        description : str
+            Description of the file
+        code : str
+            Function code
+        entry_point : str
+            The entry point (function name) of the function
+
+        Returns
+        -------
+        str
             The name of the function
         """
         registration_path = 'register_function'
