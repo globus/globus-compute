@@ -21,3 +21,5 @@ QuickStart
 
 funcX is in an alpha state and no quickstart is available yet.
 
+Documentation for funcX is available `here <funcx.readthedocs.io>`_
+
