@@ -12,7 +12,7 @@ from funcx.endpoint.utils.zmq_worker import ZMQWorker
 from funcx.endpoint.config import (_get_parsl_config, _load_auth_client)
 from funcx.sdk.config import lookup_option, write_option
 
-from funcx.executor.high_throughput.executor import HighThroughputExecutor
+from funcx.executor import HighThroughputExecutor
 from parsl.providers import LocalProvider
 from parsl.channels import LocalChannel
 from parsl.config import Config
