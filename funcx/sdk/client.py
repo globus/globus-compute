@@ -1,5 +1,5 @@
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
-from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID)
+from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID, lookup_option)
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
@@ -58,6 +58,17 @@ class FuncXClient(BaseClient):
 
         r = self.get("{task_id}/status".format(task_id=task_id))
         return r.text
+
+    def get_local_endpoint(self):
+        """Get the local endpoint if it exists.
+
+        Returns:
+            (str) the uuid of the endpoint
+        -------
+        """
+
+        endpoint_uuid = lookup_option("endpoint_uuid")
+        return endpoint_uuid
 
     def run(self, inputs, endpoint, func_id, is_async=False, input_type='json'):
         """Initiate an invocation
