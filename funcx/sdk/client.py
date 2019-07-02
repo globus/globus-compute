@@ -1,5 +1,5 @@
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
-from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID)
+from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID, lookup_option)
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
@@ -59,6 +59,17 @@ class FuncXClient(BaseClient):
         r = self.get("{task_id}/status".format(task_id=task_id))
         return r.text
 
+    def get_local_endpoint(self):
+        """Get the local endpoint if it exists.
+
+        Returns:
+            (str) the uuid of the endpoint
+        -------
+        """
+
+        endpoint_uuid = lookup_option("endpoint_uuid")
+        return endpoint_uuid
+
     def run(self, inputs, endpoint, func_id, is_async=False, input_type='json'):
         """Initiate an invocation
 
@@ -91,18 +102,24 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data
 
-    def register_endpoint(self, name, description=None):
+    def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
 
         Args:
-            name: str name of the endpoint
-            description: str describing the site
+            name : str
+                name of the endpoint
+            endpoint_uuid : str
+                The uuid of the endpoint
+            description : str
+                The describion of the endpoint
+
         Returns:
-            The port to connect to
+            str
+                The uuid of the endpoint
         """
         registration_path = 'register_endpoint'
 
-        data = {"endpoint_name": name, "description": description}
+        data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
 
         r = self.post(registration_path, json_body=data)
         if r.http_status is not 200:
