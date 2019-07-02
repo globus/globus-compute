@@ -181,6 +181,11 @@ class FuncXEndpoint:
             zmq_worker.send(result, reply_to)
 
 
+def start_endpoint():
+    logging.debug("Starting endpoint")
+    ep = FuncXEndpoint(ip='funcX.org', port=50001)
+
+
 if __name__ == "__main__":
     logging.debug("Starting endpoint")
     ep = FuncXEndpoint(ip='funcX.org', port=50001)
