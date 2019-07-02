@@ -12,8 +12,8 @@ import queue
 from funcx.sdk.client import FuncXClient
 from funcx.endpoint.utils.zmq_worker import ZMQWorker
 from funcx.endpoint.config import (_get_parsl_config, _load_auth_client)
+from funcx.sdk.config import lookup_option, write_option
 
-# from parsl.executors import HighThroughputExecutor
 from funcx.executor.high_throughput.executor import HighThroughputExecutor
 from parsl.providers import LocalProvider
 from parsl.channels import LocalChannel
@@ -25,10 +25,14 @@ parsl.load(_get_parsl_config())
 dfk = parsl.dfk()
 ex = dfk.executors['htex_local']
 
+
 @python_app
 def run_code(code, entry_point, event=None):
-    exec(code)
-    return eval(entry_point)(event)
+    try:
+        exec(code)
+        return eval(entry_point)(event)
+    except Exception as e:
+        return str(e)
 
 
 def send_request(serving_url, inputs):
@@ -46,12 +50,16 @@ def server(ip, port):
     # Log into funcX via globus
     fx = FuncXClient()
 
+    endpoint_uuid = lookup_option("endpoint_uuid")
+
     # Register this endpoint with funcX
-    endpoint_uuid = fx.register_endpoint(platform.node())
+    endpoint_uuid = fx.register_endpoint(platform.node(), endpoint_uuid)
+
     print(f"Endpoint UUID: {endpoint_uuid}")
 
+    write_option("endpoint_uuid", endpoint_uuid)
+
     endpoint_worker = ZMQWorker("tcp://{}:{}".format(ip, port), endpoint_uuid)
-    reply = None
     task_q = queue.Queue()
     result_q = queue.Queue()
     threads = []
@@ -78,13 +86,13 @@ def result_worker(endpoint_worker, result_q):
         (result, reply_to)= result_q.get()
         endpoint_worker.send(result, reply_to)
 
+
 def parsl_worker(task_q, result_q):
     exec_times = []
     endpoint_times = []
     while True:
         if task_q:
             request, reply_to = task_q.get()
-            t0 = time.time()
             to_do = pickle.loads(request[0])
             code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
             result = pickle.dumps(run_code(code, entry_point, event=event).result())
@@ -93,6 +101,7 @@ def parsl_worker(task_q, result_q):
 
 def main():
     server('funcX.org', 50001)
+
 
 if __name__ == "__main__":
     main()
