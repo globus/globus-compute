@@ -91,18 +91,24 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data
 
-    def register_endpoint(self, name, description=None):
+    def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
 
         Args:
-            name: str name of the endpoint
-            description: str describing the site
+            name : str
+                name of the endpoint
+            endpoint_uuid : str
+                The uuid of the endpoint
+            description : str
+                The describion of the endpoint
+
         Returns:
-            The port to connect to
+            str
+                The uuid of the endpoint
         """
         registration_path = 'register_endpoint'
 
-        data = {"endpoint_name": name, "description": description}
+        data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
 
         r = self.post(registration_path, json_body=data)
         if r.http_status is not 200:

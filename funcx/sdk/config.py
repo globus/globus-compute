@@ -46,10 +46,10 @@ if GLOBUS_ENV:
     }.get(GLOBUS_ENV, CLIENT_ID)
 
 
-def get_config_obj(file_error=False):
-    path = os.path.expanduser("~/.globus.cfg")
+def get_config_obj():
+    path = os.path.expanduser("~/.funcx/funcx.cfg")
 
-    return ConfigObj(path, encoding='utf-8', file_error=file_error)
+    return ConfigObj(path, encoding='utf-8', create_empty=True)
 
 
 def lookup_option(option):
