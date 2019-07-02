@@ -9,7 +9,13 @@ import queue
 
 from funcx.sdk.client import FuncXClient
 from funcx.endpoint.utils.zmq_worker import ZMQWorker
-from funcx.endpoint.config import (_get_parsl_config)
+from funcx.endpoint.config import (_get_parsl_config, _load_auth_client)
+from funcx.sdk.config import lookup_option, write_option
+
+from funcx.executor.high_throughput.executor import HighThroughputExecutor
+from parsl.providers import LocalProvider
+from parsl.channels import LocalChannel
+from parsl.config import Config
 
 from parsl.app.app import python_app
 
@@ -36,8 +42,11 @@ def execute_function(code, entry_point, event=None):
     json
         The result of running the function
     """
-    exec(code)
-    return eval(entry_point)(event)
+    try:
+        exec(code)
+        return eval(entry_point)(event)
+    except Exception as e:
+        return str(e)
 
 
 class FuncXEndpoint:
@@ -66,7 +75,17 @@ class FuncXEndpoint:
         self.container_type = container_type
 
         # Register this endpoint with funcX
-        self.endpoint_uuid = self.fx.register_endpoint(platform.node())
+        self.endpoint_uuid = lookup_option("endpoint_uuid")
+        self.endpoint_uuid = self.fx.register_endpoint(platform.node(), self.endpoint_uuid)
+        print(f"Endpoint UUID: {self.endpoint_uuid}")
+        write_option("endpoint_uuid", self.endpoint_uuid)
+
+        parsl.load(_get_parsl_config())
+        self.dfk = parsl.dfk()
+        self.ex = self.dfk.executors['htex_local']
+
+        # Start the endpoint
+        self.endpoint_worker()
 
     def endpoint_worker(self):
         """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
@@ -82,28 +101,23 @@ class FuncXEndpoint:
         None
         """
 
-        logging.info(f"Endpoint ID: {self.endpoint_uuid}")
-
-        # Start parsl
-        parsl.load(_get_parsl_config())
-
-        zmq_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
+        endpoint_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
         task_q = queue.Queue()
         result_q = queue.Queue()
         threads = []
-        for i in range(self.worker_threads):
+        for i in range(1):
             thread = threading.Thread(target=self.execution_worker, args=(task_q, result_q,))
             thread.daemon = True
             threads.append(thread)
             thread.start()
 
-        thread = threading.Thread(target=self.result_worker, args=(zmq_worker, result_q, ))
+        thread = threading.Thread(target=self.result_worker, args=(endpoint_worker, result_q,))
         thread.daemon = True
         threads.append(thread)
         thread.start()
 
         while True:
-            (request, reply_to) = zmq_worker.recv()
+            (request, reply_to) = endpoint_worker.recv()
             task_q.put((request, reply_to))
 
     def _stage_containers(self, endpoint_containers):
@@ -169,5 +183,5 @@ class FuncXEndpoint:
 
 if __name__ == "__main__":
     logging.debug("Starting endpoint")
-    ep = FuncXEndpoint('funcX.org', 50001)
+    ep = FuncXEndpoint(ip='funcX.org', port=50001)
 
