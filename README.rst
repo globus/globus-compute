@@ -12,8 +12,8 @@ on existing infrastructure including clouds, clusters, and supercomputers.
 .. |build-status| image:: https://travis-ci.com/funcx-faas/funcX.svg?branch=master
    :target: https://travis-ci.com/funcx-faas/funcX
    :alt: Build status
-.. |docs| image:: https://readthedocs.org/projects/funcx/badge/?version=stable
-   :target: http://funcx.readthedocs.io/en/stable/?badge=stable
+.. |docs| image:: https://readthedocs.org/projects/funcx/badge/?version=latest
+   :target: http://funcx.readthedocs.io/en/stable/?badge=latest
    :alt: Documentation Status
 
 QuickStart
