@@ -6,3 +6,4 @@ mdf_toolbox
 globus-sdk
 parsl
 configobj
+parsl

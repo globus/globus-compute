@@ -1,5 +1,5 @@
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
-from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID)
+from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID, lookup_option)
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
@@ -31,7 +31,7 @@ class FuncXClient(BaseClient):
                 are not provided.
         Keyword arguments are the same as for BaseClient.
         """
-        if force_login or not fx_authorizer or not search_client:
+        if force_login or not fx_authorizer:
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
             auth_res = login(services=[fx_scope], 
                              app_name="funcX_Client",
@@ -65,7 +65,19 @@ class FuncXClient(BaseClient):
         r = self.get("{task_id}/status".format(task_id=task_id))
         return r.text
 
+    def get_local_endpoint(self):
+        """Get the local endpoint if it exists.
+
+        Returns:
+            (str) the uuid of the endpoint
+        -------
+        """
+
+        endpoint_uuid = lookup_option("endpoint_uuid")
+        return endpoint_uuid
+
     def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json'):
+
         """Initiate an invocation
 
         Parameters
@@ -97,7 +109,6 @@ class FuncXClient(BaseClient):
         if input_type == 'python':
             data['python'] = codecs.encode(pkl.dumps(inputs), 'base64').decode()
         elif input_type == 'json':
-            print(data)
             data['data'] = inputs
         elif input_type == 'files':
             raise NotImplementedError('Files support is not yet implemented')
@@ -112,24 +123,26 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data
 
-    def register_endpoint(self, name, description=None):
+    def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
 
         Parameters
         ----------
         name : str
             Name of the endpoint
+        endpoint_uuid : str
+                The uuid of the endpoint
         description : str
             Description of the endpoint
 
         Returns
         -------
         int
-            The port to connect to
+            The uuid of the endpoint
         """
         registration_path = 'register_endpoint'
 
-        data = {"endpoint_name": name, "description": description}
+        data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
 
         r = self.post(registration_path, json_body=data)
         if r.http_status is not 200:
@@ -190,4 +203,4 @@ class FuncXClient(BaseClient):
             raise Exception(r)
 
         # Return the result
-        return r.data['function_name']
+        return r.data['function_uuid']
