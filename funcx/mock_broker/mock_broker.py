@@ -1,5 +1,5 @@
-from bottle import post, run, request
-import cherrypy
+import bottle
+from bottle import post, run, request, app
 import argparse
 import json
 import uuid
@@ -14,15 +14,20 @@ def register():
     """
 
     print("Request: ", request)
+    print("foo: ", request.app.ep_mapping)
     print(json.load(request.body))
     endpoint_details = json.load(request.body)
     print(endpoint_details)
 
-    return {'endpoint_id': str(uuid.uuid4()),
-            'python_v': "{}.{}.{}".format(sys.version_info.major,
-                                          sys.version_info.minor,
-                                          sys.version_info.micro),
-    }
+
+    endpoint_id = str(uuid.uuid4())
+    ret_package = {'endpoint_id': endpoint_id,
+                   'task_url': '',
+                   'result_url': '',
+                   'command_port': ''}
+    print("Ep_id: ", endpoint_id)
+    request.app.ep_mapping[endpoint_id] = ret_package
+    return ret_package
 
 
 if __name__ == '__main__':
@@ -35,5 +40,7 @@ if __name__ == '__main__':
                         help="Enables debug logging")
 
     args = parser.parse_args()
+    app = bottle.default_app()
+    app.ep_mapping = {}
 
-    run(host='localhost', port=int(args.port), debug=True)
+    run(host='localhost', app=app, port=int(args.port), debug=True)
