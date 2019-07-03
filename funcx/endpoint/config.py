@@ -4,8 +4,9 @@ import os
 
 from parsl.config import Config
 from parsl.channels import LocalChannel
-from parsl.providers import LocalProvider
+from parsl.providers import LocalProvider, KubernetesProvider
 from parsl.executors import HighThroughputExecutor
+from parsl.addresses import address_by_route
 
 # GlobusAuth-related secrets
 SECRET_KEY = os.environ.get('secret_key')
@@ -64,3 +65,43 @@ def _get_parsl_config():
         strategy=None
     )
     return config
+
+
+def _get_executor(container):
+    """
+    Get the Parsl executor from the container
+    
+    Returns
+    -----------
+    executor
+    """
+
+    executor = HighThroughputExecutor(
+                   label=container['container_uuid'],
+                   cores_per_worker=1,
+                   max_workers=1,
+                   poll_period=10,
+                   # launch_cmd="ls; sleep 3600",
+                   worker_logdir_root='runinfo',
+                   # worker_debug=True,
+                   address=address_by_route(),
+                   provider=KubernetesProvider(
+                       namespace="dlhub-privileged",
+                       image=container['location'],
+                       nodes_per_block=1,
+                       init_blocks=1,
+                       max_blocks=1,
+                       parallelism=1,
+                       worker_init="""pip install git+https://github.com/Parsl/parsl;
+                                   pip install git+https://github.com/funcx-faas/funcX;
+                                   export PYTHONPATH=$PYTHONPATH:/home/ubuntu:/app""",
+                       #security=None,
+                       secret="ryan-kube-secret",
+                       pod_name=container['name'].replace('.', '-').replace("_", '-').replace('/', '-').lower(),
+                       #secret="minikube-aws-ecr",
+                       #user_id=32781,
+                       #group_id=10253,
+                       #run_as_non_root=True
+                   ),
+               )
+    return [executor]
