@@ -177,12 +177,12 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['endpoint_uuid'], r.data['endpoint_containers']
 
-    def get_container(self, container_id, container_type):
+    def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
 
         Parameters
         ----------
-        container_id : str
+        container_uuid : str
             UUID of the container in question
         container_type : str
             The type of containers that will be used (Singularity, Shifter, Docker)
@@ -192,7 +192,7 @@ class FuncXClient(BaseClient):
         dict
             The details of the containers to deploy
         """
-        container_path = f'containers/{container_id}/{container_type}'
+        container_path = f'containers/{container_uuid}/{container_type}'
 
         r = self.get(container_path)
         if r.http_status is not 200:

@@ -78,6 +78,8 @@ class FuncXEndpoint:
         self.port = port
         self.worker_threads = worker_threads
         self.container_type = container_type
+        # Keep track of staged containers
+        self.staged_containers = set()
 
         # Register this endpoint with funcX
         self.endpoint_uuid = lookup_option("endpoint_uuid")
@@ -85,18 +87,11 @@ class FuncXEndpoint:
         print(f"Endpoint UUID: {self.endpoint_uuid}")
         write_option("endpoint_uuid", self.endpoint_uuid)
 
-        parsl.load(_get_parsl_config())
-        self.dfk = parsl.dfk()
-        self.ex = self.dfk.executors['htex_local']
-
         # Start parsl
         self.dfk = parsl.load(_get_parsl_config())
 
         # Start the endpoint
         self.endpoint_worker()
-
-        # Keep track of staged containers
-        self.staged_containers = set()
 
     def endpoint_worker(self):
         """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
@@ -145,7 +140,6 @@ class FuncXEndpoint:
         None
         """
         container = self.fx.get_container(container_uuid=container_uuid, container_type=container_type)
-        print(container)
         if container['type'] == 'docker':      # docker container -- kubernetes will handle that
             container['local'] = None
         else:                                  # singularity or shifter
@@ -176,12 +170,16 @@ class FuncXEndpoint:
                 to_do = pickle.loads(request[0])
                 code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
                 container_uuid = to_do[-1]['container_uuid']
-                if container_uuid not in self.staged_containers:
-                    container = self._stage_container(container_uuid, self.container_type)
-                    executor = _get_executor(container)
-                    self.dfk.add_executors(executor)
-
-                app = python_app(execute_function, executors=[container_uuid]) 
+                if container_uuid:
+                    if container_uuid not in self.staged_containers:
+                        container = self._stage_container(container_uuid, self.container_type)
+                        print("Staged container {}".format(container))
+                        executor = _get_executor(container)
+                        self.dfk.add_executors(executor)
+                        print("added new executors")
+                    app = python_app(execute_function, executors=[container_uuid]) 
+                else:
+                    app = python_app(execute_function, executors=['htex_local'])
                 result = pickle.dumps(app(code, entry_point, event=event).result())
                 print(pickle.loads(result))
                 result_q.put(([result], reply_to))
