@@ -2,8 +2,5 @@ requests==2.20.0
 jsonschema==2.6.0
 sphinx_rtd_theme
 nbsphinx
-mdf_toolbox
-globus-sdk
 parsl
 configobj
-parsl
