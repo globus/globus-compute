@@ -1,192 +1,110 @@
-import threading
-import platform
+import requests
+import argparse
 import logging
-import pickle
-import parsl
-import time
-import json
-import queue
+import os
+import grp
+import signal
+import daemon
+import lockfile
+import uuid
+from funcx import __version__
 
-from funcx.sdk.client import FuncXClient
-from funcx.endpoint.utils.zmq_worker import ZMQWorker
-from funcx.endpoint.config import (_get_parsl_config, _load_auth_client)
-from funcx.sdk.config import lookup_option, write_option
+def reload_and_restart():
+    print("Restarting funcX endpoint")
 
-from funcx.executor.high_throughput.executor import HighThroughputExecutor
-from parsl.providers import LocalProvider
-from parsl.channels import LocalChannel
-from parsl.config import Config
+def foo():
+    print("Start endpoint")
+    import time
+    for i in range(120):
+        time.sleep(1)
+        print("Running ep")
 
-from parsl.app.app import python_app
+def start_endpoint(args):
+    """Start an endpoint
 
-logging.basicConfig(filename='funcx_endpoint.log', level=logging.DEBUG)
-
-
-@python_app
-def execute_function(code, entry_point, event=None):
-    """Run the function. First it exec's the function code
-    to load it into the current context and then eval's the function
-    using the entry point
-
-    Parameters
-    ----------
-    code : str
-        The function code in a string format.
-    entry_point : str
-        The name of the function's entry point.
-    event : dict
-        The event context
-
-    Returns
-    -------
-    json
-        The result of running the function
+    This function will do:
+    1. Connect to the broker service, and register itself
+    2. Get connection info from broker service
+    3. Start the interchange as a daemon
     """
+
+    print("Address: ", args.address)
+    print("config_file: ", args.config_file)
+    print("logdir: ", args.logdir)
+
+    optionals = {}
+    optionals['logdir'] = args.logdir
+    optionals['address'] = args.address
+
+    if args.debug:
+        optionals['logging_level'] = logging.DEBUG
+    """
+    with daemon.DaemonContext():
+        ic = Interchange(**optionals)
+    ic.start()
+    """
+
+    os.makedirs(args.logdir, exist_ok=True)
+
     try:
-        exec(code)
-        return eval(entry_point)(event)
+        context = daemon.DaemonContext(working_directory=args.logdir,
+                                       umask=0o002,
+                                       pidfile=lockfile.FileLock(
+                                           os.path.join(args.logdir,
+                                                        'funcx.{}.pid'.format(uuid.uuid4()))
+                                       )
+
+        )
     except Exception as e:
-        return str(e)
+        print("Caught exception while trying to setup endpoint context dirs")
+        print("Exception : ",e)
+
+    context.signal_map = {signal.SIGTERM: stop_endpoint,
+                          signal.SIGHUP: 'terminate',
+                          signal.SIGUSR1: reload_and_restart}
+
+    with context:
+        foo()
 
 
-class FuncXEndpoint:
-
-    def __init__(self, ip="funcx.org", port=50001, worker_threads=1, container_type="Singularity"):
-        """Initiate a funcX endpoint
-
-        Parameters
-        ----------
-        ip : int
-            IP address of the service to receive tasks
-        port : int
-            Port of the service to receive tasks
-        worker_threads : int
-            Number of concurrent workers to receive and process tasks
-        container_type : str
-            The virtualization type to use (Singularity, Shifter, Docker)
-        """
-
-        # Log in and start a client
-        self.fx = FuncXClient()
-
-        self.ip = ip
-        self.port = port
-        self.worker_threads = worker_threads
-        self.container_type = container_type
-
-        # Register this endpoint with funcX
-        self.endpoint_uuid = lookup_option("endpoint_uuid")
-        self.endpoint_uuid = self.fx.register_endpoint(platform.node(), self.endpoint_uuid)
-        print(f"Endpoint UUID: {self.endpoint_uuid}")
-        write_option("endpoint_uuid", self.endpoint_uuid)
-
-        parsl.load(_get_parsl_config())
-        self.dfk = parsl.dfk()
-        self.ex = self.dfk.executors['htex_local']
-
-        # Start the endpoint
-        self.endpoint_worker()
-
-    def endpoint_worker(self):
-        """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
-        1. receive ZMQ messages (zmq_worker)
-        2. perform function executions (execution_workers)
-        3. return results (result_worker)
-
-        We have two loops, one that persistently listens for tasks
-        and the other that waits for task completion and send results
-
-        Returns
-        -------
-        None
-        """
-
-        endpoint_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
-        task_q = queue.Queue()
-        result_q = queue.Queue()
-        threads = []
-        for i in range(1):
-            thread = threading.Thread(target=self.execution_worker, args=(task_q, result_q,))
-            thread.daemon = True
-            threads.append(thread)
-            thread.start()
-
-        thread = threading.Thread(target=self.result_worker, args=(endpoint_worker, result_q,))
-        thread.daemon = True
-        threads.append(thread)
-        thread.start()
-
-        while True:
-            (request, reply_to) = endpoint_worker.recv()
-            task_q.put((request, reply_to))
-
-    def _stage_containers(self, endpoint_containers):
-        """Stage the set of containers for local use.
-
-        Parameters
-        ----------
-        endpoint_containers : dict
-            A dictionary of containers to have locally for deployment
-
-        Returns
-        -------
-        None
-        """
-        pass
-
-    def execution_worker(self, task_q, result_q):
-        """A worker thread to process tasks and place results on the
-        result queue.
-
-        Parameters
-        ----------
-        task_q : queue.Queue
-            A queue of tasks to process.
-        result_q : queue.Queue
-            A queue to put return queues.
-
-        Returns
-        -------
-        None
-        """
-
-        while True:
-            if task_q:
-                request, reply_to = task_q.get()
-
-                to_do = pickle.loads(request[0])
-                code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-
-                result = pickle.dumps(execute_function(code, entry_point, event=event).result())
-
-                result_q.put(([result], reply_to))
-
-    def result_worker(self, zmq_worker, result_q):
-        """Worker thread to send results back to funcX service via the broker.
-
-        Parameters
-        ----------
-        zmq_worker : Thread
-            The worker thread
-        result_q : queue.Queue
-            The queue to add results to.
-
-        Returns
-        -------
-        None
-        """
-
-        while True:
-            (result, reply_to) = result_q.get()
-            zmq_worker.send(result, reply_to)
+def stop_endpoint():
+    print("Terminating")
 
 
-def start_endpoint():
-    logging.debug("Starting endpoint")
-    ep = FuncXEndpoint(ip='funcX.org', port=50001)
+def cli_run():
 
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='command')
+    parser.add_argument("-v", "--version",
+                        help="Print Endpoint version information")
+    parser.add_argument("-d", "--debug", action='store_true',
+                        help="Enables debug logging")
 
-if __name__ == "__main__":
-    logging.debug("Starting endpoint")
-    ep = FuncXEndpoint(ip='funcX.org', port=50001)
+    start = subparsers.add_parser('start', help='Starts an endpoint') #, dest='command')
+    start.add_argument("-a", "--address", default="127.0.0.1:8888",
+                        help="Address of the hub to which the endpoint should connect")
+    start.add_argument("-l", "--logdir", default="endpoint_logs",
+                        help="Path to endpoint log directory")
+    start.add_argument("-c", "--config_file", default=None,
+                        help="Path to config file")
 
+    stop = subparsers.add_parser('stop', help='Stops an endpoint') # , dest='command')
+
+    _list = subparsers.add_parser('list', help='Lists all active endpoints') #, dest='command')
+
+    args = parser.parse_args()
+
+    if args.version:
+        print("FuncX version: {}".format(__version__))
+
+    print("Command: ", args.command)
+
+    if args.command == "start":
+        start_endpoint(args)
+    elif args.command == "stop":
+        stop_endpoint(args)
+    elif args.command == "list":
+        list_endpoints(args)
+
+if __name__ == '__main__':
+    cli_run()
