@@ -16,9 +16,6 @@ setup(
     packages=find_packages(),
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
-    entry_points={
-        'console_scripts': ['funcx_endpoint = funcx.endpoint.endpoint:start_endpoint']
-    },
     python_requires=">=3.6",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -34,6 +31,10 @@ setup(
         "FaaS",
         "Function Serving"
     ],
+    entry_points={'console_scripts':
+                  ['funcx-endpoint=funcx.endpoint.endpoint:cli_run',
+                  ]
+    },
     author='funcX team',
     author_email='labs@globus.org',
     license="Apache License, Version 2.0",
