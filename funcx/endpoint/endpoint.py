@@ -89,9 +89,13 @@ class FuncXEndpoint:
         self.dfk = parsl.dfk()
         self.ex = self.dfk.executors['htex_local']
 
+        # Start parsl
+        self.dfk = parsl.load(_get_parsl_config())
+
         # Start the endpoint
         self.endpoint_worker()
 
+        # Keep track of staged containers
         self.staged_containers = set()
 
     def endpoint_worker(self):
@@ -109,10 +113,6 @@ class FuncXEndpoint:
         """
 
         logging.info(f"Endpoint ID: {self.endpoint_uuid}")
-
-        # Start parsl
-        self.dfk = parsl.load(_get_parsl_config())
-
         endpoint_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
         task_q = queue.Queue()
         result_q = queue.Queue()
@@ -132,7 +132,7 @@ class FuncXEndpoint:
             (request, reply_to) = endpoint_worker.recv()
             task_q.put((request, reply_to))
 
-    def _stage_container(self, container_id, container_type):
+    def _stage_container(self, container_uuid, container_type):
         """Stage the set of containers for local use.
 
         Parameters
@@ -144,13 +144,13 @@ class FuncXEndpoint:
         -------
         None
         """
-        container = self.fx.get_container(container_id=container_id, container_type=container_type)
+        container = self.fx.get_container(container_uuid=container_uuid, container_type=container_type)
         print(container)
         if container['type'] == 'docker':      # docker container -- kubernetes will handle that
             container['local'] = None
         else:                                  # singularity or shifter
            pass
-        self.staged_containers.add(container['container_id'])
+        self.staged_containers.add(container['container_uuid'])
         return container
 
     def execution_worker(self, task_q, result_q):
@@ -171,24 +171,17 @@ class FuncXEndpoint:
 
         while True:
             if task_q:
-                #request, reply_to = task_q.get()
+                request, reply_to = task_q.get()
 
-                #to_do = pickle.loads(request[0])
-                #code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-                #container_id = to_do[-1]['container_id']
-                #code = """
-#def test(event):
-#    return 1
-#"""
-#                entry_point = "test"
-#                event = None
-#                container_id = 1
-                if container_id not in self.staged_containers:
-                    container = self._stage_container(container_id, self.container_type)
+                to_do = pickle.loads(request[0])
+                code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
+                container_uuid = to_do[-1]['container_uuid']
+                if container_uuid not in self.staged_containers:
+                    container = self._stage_container(container_uuid, self.container_type)
                     executor = _get_executor(container)
                     self.dfk.add_executors(executor)
 
-                app = python_app(execute_function, executors=[str(container_id)]) 
+                app = python_app(execute_function, executors=[container_uuid]) 
                 result = pickle.dumps(app(code, entry_point, event=event).result())
                 print(pickle.loads(result))
                 result_q.put(([result], reply_to))

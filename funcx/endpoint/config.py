@@ -76,7 +76,7 @@ def _get_executor(container):
     """
 
     executor = HighThroughputExecutor(
-                   label=str(container['container_id']),
+                   label=container['container_uuid'],
                    cores_per_worker=1,
                    max_workers=1,
                    poll_period=10,
@@ -95,7 +95,7 @@ def _get_executor(container):
                                    export PYTHONPATH=$PYTHONPATH:/app""",
                        #security=None,
                        secret="ryan-kube-secret",
-                       #pod_name=container['container_id'].replace('.', '-').replace("_", '-').replace('/', '-').lower(),
+                       pod_name=container['container_name'].replace('.', '-').replace("_", '-').replace('/', '-').lower(),
                        #secret="minikube-aws-ecr",
                        #user_id=32781,
                        #group_id=10253,
