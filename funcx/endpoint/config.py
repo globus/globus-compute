@@ -6,6 +6,7 @@ from parsl.config import Config
 from parsl.channels import LocalChannel
 from parsl.providers import LocalProvider, KubernetesProvider
 from parsl.executors import HighThroughputExecutor
+from parsl.addresses import address_by_route
 
 # GlobusAuth-related secrets
 SECRET_KEY = os.environ.get('secret_key')
@@ -83,7 +84,7 @@ def _get_executor(container):
                    # launch_cmd="ls; sleep 3600",
                    worker_logdir_root='runinfo',
                    # worker_debug=True,
-                   address='140.221.68.108',
+                   address=address_by_route(),
                    provider=KubernetesProvider(
                        namespace="dlhub-privileged",
                        image=container['location'],
@@ -92,10 +93,11 @@ def _get_executor(container):
                        max_blocks=1,
                        parallelism=1,
                        worker_init="""pip install git+https://github.com/Parsl/parsl;
-                                   export PYTHONPATH=$PYTHONPATH:/app""",
+                                   pip install git+https://github.com/funcx-faas/funcX;
+                                   export PYTHONPATH=$PYTHONPATH:/home/ubuntu:/app""",
                        #security=None,
                        secret="ryan-kube-secret",
-                       pod_name=container['container_name'].replace('.', '-').replace("_", '-').replace('/', '-').lower(),
+                       pod_name=container['name'].replace('.', '-').replace("_", '-').replace('/', '-').lower(),
                        #secret="minikube-aws-ecr",
                        #user_id=32781,
                        #group_id=10253,
