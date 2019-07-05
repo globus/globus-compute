@@ -45,7 +45,7 @@ def execute_function(code, entry_point, event=None):
         exec(code)
         return eval(entry_point)(event)
     except Exception as e:
-        return str(e)
+        return e
 
 
 class FuncXEndpoint:
