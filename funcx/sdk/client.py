@@ -1,11 +1,13 @@
-from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
 from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID, lookup_option)
+from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
+from funcx.sdk.utils.futures import FuncXFuture
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
 
 import pickle as pkl
 import codecs
+import json
 import os
 
 _token_dir = os.path.expanduser("~/.funcx/credentials")
@@ -63,7 +65,7 @@ class FuncXClient(BaseClient):
         """
 
         r = self.get("{task_id}/status".format(task_id=task_id))
-        return r.text
+        return json.loads(r.text)
 
     def get_local_endpoint(self):
         """Get the local endpoint if it exists.
@@ -76,7 +78,7 @@ class FuncXClient(BaseClient):
         endpoint_uuid = lookup_option("endpoint_uuid")
         return endpoint_uuid
 
-    def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json'):
+    def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json', async_poll=5):
 
         """Initiate an invocation
 
@@ -96,14 +98,16 @@ class FuncXClient(BaseClient):
             Whether or not to run the function asynchronously
         input_type : str
             Input type to use: json, python, files
+        async_poll : float
+            How often to poll for task status
 
         Returns
         -------
-        dict
-            Reply from the service
+        FuncXFuture
+            Future representing the task
         """
         servable_path = 'execute'
-        data = {'endpoint': endpoint, 'func': func_id, 'is_async': asynchronous}
+        data = {'endpoint': endpoint, 'func': func_id}
 
         # Prepare the data to be sent to funcX
         if input_type == 'python':
@@ -120,8 +124,20 @@ class FuncXClient(BaseClient):
         if r.http_status is not 200:
             raise Exception(r)
 
+        task_id = None
+        try:
+            task_id = r['task_id']
+        except:
+            pass
+
+        # Create a future to deal with the result
+        funcx_future = FuncXFuture(self, task_id, async_poll)
+
+        if not asynchronous:
+            return funcx_future.result()
+
         # Return the result
-        return r.data
+        return funcx_future
 
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
