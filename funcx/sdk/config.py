@@ -25,6 +25,9 @@ __all__ = (
 FUNCX_URL = "https://funcx.org/"
 FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
 
+FUNCX_URL = "http://funcx-service-env.uieigizvtj.us-east-1.elasticbeanstalk.com/"
+FUNCX_SERVICE_ADDRESS = "http://funcx-service-env.uieigizvtj.us-east-1.elasticbeanstalk.com/api/v1/"
+
 CONF_SECTION_NAME = 'funcx'
 
 CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
