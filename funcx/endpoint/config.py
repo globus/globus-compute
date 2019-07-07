@@ -14,6 +14,7 @@ GLOBUS_KEY = os.environ.get('globus_key')
 GLOBUS_CLIENT = os.environ.get('globus_client')
 
 FUNCX_URL = "https://funcx.org/"
+FUNCX_HUB_URL = "3.88.81.131"
 
 
 def _load_auth_client():

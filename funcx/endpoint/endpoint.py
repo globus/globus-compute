@@ -9,7 +9,7 @@ import queue
 
 from funcx.sdk.client import FuncXClient
 from funcx.endpoint.utils.zmq_worker import ZMQWorker
-from funcx.endpoint.config import (_get_parsl_config, _load_auth_client, _get_executor)
+from funcx.endpoint.config import (_get_parsl_config, _load_auth_client, _get_executor, FUNCX_HUB_URL)
 from funcx.sdk.config import lookup_option, write_option
 
 from funcx.executor import HighThroughputExecutor
@@ -51,7 +51,7 @@ def execute_function(code, entry_point, event=None):
 class FuncXEndpoint:
 
     def __init__(self,
-                 ip="funcx.org",
+                 ip=FUNCX_HUB_URL,
                  port=50001,
                  worker_threads=1,
                  container_type="Singularity",
@@ -169,7 +169,10 @@ class FuncXEndpoint:
 
                 to_do = pickle.loads(request[0])
                 code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-                container_uuid = to_do[-1]['container_uuid']
+                try:
+                    container_uuid = to_do[-1]['container_uuid']
+                except:
+                    container_uuid = None 
                 if container_uuid:
                     if container_uuid not in self.staged_containers:
                         container = self._stage_container(container_uuid, self.container_type)
@@ -206,7 +209,7 @@ class FuncXEndpoint:
 
 def start_endpoint():
     logging.debug("Starting endpoint")
-    ep = FuncXEndpoint(ip='funcX.org', port=50001, container_type='docker')
+    ep = FuncXEndpoint(ip=FUNCX_HUB_URL, port=50001, container_type='docker')
 
 
 if __name__ == "__main__":
