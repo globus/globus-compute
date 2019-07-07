@@ -41,13 +41,14 @@ class FuncXFuture(Future):
 
     def _ping_server(self):
         while True:
-            sleep(self.ping_interval)
             try:
                 if not self.running():
                     break
             except GlobusAPIError:
                 # Keep pinging even if the results fail
+                sleep(self.ping_interval)
                 continue
+            sleep(self.ping_interval)
 
     def running(self):
         if super().running():
