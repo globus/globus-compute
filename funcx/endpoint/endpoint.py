@@ -169,7 +169,10 @@ class FuncXEndpoint:
 
                 to_do = pickle.loads(request[0])
                 code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-                container_uuid = to_do[-1]['container_uuid']
+                try:
+                    container_uuid = to_do[-1]['container_uuid']
+                except:
+                    container_uuid = None 
                 if container_uuid:
                     if container_uuid not in self.staged_containers:
                         container = self._stage_container(container_uuid, self.container_type)
