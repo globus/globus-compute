@@ -69,7 +69,7 @@ class TasksOutgoing(object):
         self.poller = zmq.Poller()
         self.poller.register(self.zmq_socket, zmq.POLLOUT)
 
-    def put(self, message):
+    def put(self, message, max_timeout=1000):
         """ This function needs to be fast at the same time aware of the possibility of
         ZMQ pipes overflowing.
 
@@ -77,9 +77,24 @@ class TasksOutgoing(object):
         We could set copy=False and get slightly better latency but this results
         in ZMQ sockets reaching a broken state once there are ~10k tasks in flight.
         This issue can be magnified if each the serialized buffer itself is larger.
+
+        Parameters
+        ----------
+
+        message : py object
+             Python object to send
+        max_timeout : int
+             Max timeout in milliseconds that we will wait for before raising an exception
+
+        Raises
+        ------
+
+        zmq.EAGAIN if the send failed.
+
         """
         timeout_ms = 0
-        while True:
+        current_wait = 0
+        while current_wait < max_timeout:
             socks = dict(self.poller.poll(timeout=timeout_ms))
             if self.zmq_socket in socks and socks[self.zmq_socket] == zmq.POLLOUT:
                 # The copy option adds latency but reduces the risk of ZMQ overflow
@@ -88,6 +103,11 @@ class TasksOutgoing(object):
             else:
                 timeout_ms += 1
                 logger.debug("Not sending due to full zmq pipe, timeout: {} ms".format(timeout_ms))
+            current_wait += timeout_ms
+
+        # Send has failed.
+        logger.debug("Remote side has been unresponsive for {}".format(current_wait))
+        raise zmq.EAGAIN
 
     def close(self):
         self.zmq_socket.close()
