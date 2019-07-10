@@ -49,7 +49,9 @@ class Forwarder(Process):
              logdir: str
                 Path to logdir
 
-             logging_level: int
+             logging_level : int
+                Logging level as defined in the logging module. Default: logging.INFO (20)
+
         """
         super().__init__()
         self.logdir = logdir
@@ -90,16 +92,18 @@ class Forwarder(Process):
         """
         logger.info("[TASKS] Loop starting")
         logger.info("[TASKS] Executor: {}".format(self.executor))
-        client_ports = self.executor.start()
-        self.internal_q.put(client_ports)
-        logger.info("[TASKS] Client ports: {}".format(client_ports))
+        self.executor.start()
+        conn_info = self.executor.connection_info
+        self.internal_q.put(conn_info)
+        logger.info("[TASKS] Endpoint connection info: {}".format(conn_info))
 
         while True:
             try:
-                task = self.task_q.get(timeout=1)
+                task = self.task_q.get(timeout=10)
             except queue.Empty:
                 # This exception catching isn't very general,
                 # Essentially any timeout exception should be caught and ignored
+                logger.debug("[TASKS] Waiting for tasks")
                 pass
             else:
                 # TODO: We are piping down a mock task. This needs to be fixed.
@@ -124,8 +128,21 @@ class Forwarder(Process):
         return self.client_ports
 
 
-def spawn_forwarder(address):
+def spawn_forwarder(address, executor=None, endpoint_id=uuid.uuid4(), logging_level=logging.INFO):
     """ Spawns a forwarder and returns the forwarder process for tracking.
+
+    Params:
+         address : str
+            IP Address to which the endpoint must connect
+
+         executor : Executor object. Optional
+            Executor object to be instantiated.
+
+         logging_level : int
+            Logging level as defined in the logging module. Default: logging.INFO (20)
+
+         endpoint_id : uuid string
+            Endpoint id for which the forwarder is being spawned.
 
     Returns:
          A Forwarder object
@@ -135,23 +152,22 @@ def spawn_forwarder(address):
     from parsl.providers import LocalProvider
     from parsl.channels import LocalChannel
 
-    import time
     task_q = Queue()
     result_q = Queue()
     info_q = Queue()
-    executor = HTEX(label='htex',
-                    provider=LocalProvider(
-                        channel=LocalChannel),
-                    address=address)
+    if not executor:
+        executor = HTEX(label='htex',
+                        provider=LocalProvider(
+                            channel=LocalChannel),
+                        address=address)
 
-    fw = Forwarder(task_q, result_q, executor, "Endpoint_{}".format(uuid.uuid4()))
+    fw = Forwarder(task_q, result_q, executor,
+                   "Endpoint_{}".format(endpoint_id),
+                   logging_level=logging_level)
     fw.start()
-    print("Test done")
     return fw
 
 
 if __name__ == "__main__":
 
     test()
-
-
