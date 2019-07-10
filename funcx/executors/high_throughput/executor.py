@@ -1,4 +1,7 @@
 """HighThroughputExecutor builds on the Swift/T EMEWS architecture to use MPI for fast task distribution
+
+There's a slow but sure deviation from Parsl's Executor interface here, that needs
+to be addressed.
 """
 
 from concurrent.futures import Future
@@ -541,6 +544,19 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
         # Return the future
         return self.tasks[task_id]
+
+    @property
+    def connection_info(self):
+        """ All connection info necessary for the endpoint to connect back
+
+        Returns:
+              Dict with connection info
+        """
+        return {'address': self.address,
+                'client_ports': '{},{},{}'.format(self.incoming_q.port,
+                                                  self.outgoing_q.port,
+                                                  self.command_client.port)
+        }
 
     @property
     def scaling_enabled(self):
