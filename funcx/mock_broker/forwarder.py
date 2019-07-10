@@ -4,6 +4,7 @@ from functools import partial
 import uuid
 import os
 import queue
+from multiprocessing import Queue
 
 from multiprocessing import Process
 from parsl.app.errors import RemoteExceptionWrapper
@@ -35,14 +36,19 @@ class Forwarder(Process):
         Params:
              task_q : A queue object
                 Any queue object that has get primitives. This must be a thread-safe queue.
+
              result_q : A queue object
                 Any queue object that has put primitives. This must be a thread-safe queue.
+
              executor: Executor object
                 Executor to which tasks are to be forwarded
+
              endpoint_id: str
                 Usually a uuid4 as string that identifies the executor
+
              logdir: str
                 Path to logdir
+
              logging_level: int
         """
         super().__init__()
@@ -58,6 +64,8 @@ class Forwarder(Process):
         self.result_q = result_q
         self.executor = executor
         self.endpoint_id = endpoint_id
+        self.internal_q = Queue()
+        self.client_ports = None
 
     def handle_app_update(self, task_id, future):
         """ Triggered when the executor sees a task complete.
@@ -82,7 +90,10 @@ class Forwarder(Process):
         """
         logger.info("[TASKS] Loop starting")
         logger.info("[TASKS] Executor: {}".format(self.executor))
-        self.executor.start()
+        client_ports = self.executor.start()
+        self.internal_q.put(client_ports)
+        logger.info("[TASKS] Client ports: {}".format(client_ports))
+
         while True:
             try:
                 task = self.task_q.get(timeout=1)
@@ -102,95 +113,36 @@ class Forwarder(Process):
         return
 
 
-    def start_as_thread(self):
-        logger.info("[Broker] Attempting start as threads")
-        self._kill_event = threading.Event()
-        self.threaded_self = threading.Thread(target=self.run,
-                                              args=(self._kill_event,))
-        self.threaded_self.start()
+    @property
+    def connection_info(self):
+        """Get the client ports to which the interchange must connect to
+        """
 
-    def stop_thread(self):
-        logger.info("[Broker] Setting kill event")
-        self._kill_event.set()
-        self.threaded_self.join()
+        if not self.client_ports:
+            self.client_ports = self.internal_q.get()
+
+        return self.client_ports
 
 
-def test_1():
-
-
-    from parsl.executors import ThreadPoolExecutor
-    import queue
-    import time
-
-    task_q = queue.Queue()
-    result_q = queue.Queue()
-    executor = ThreadPoolExecutor(max_threads=4)
-
-    fw = Forwarder(task_q, result_q, executor, "Endpoint_01")
-    fw.start()
-    """
-    kill_event = threading.Event()
-
-    fw_thread = threading.Thread(target=fw.start_threaded,
-                                 args=(kill_event,))
-    fw_thread.start()
-    """
-    for i in range(100):
-        print("Putting task onto task_q")
-        task_q.put(b'fooooo')
-        if not result_q.empty():
-            result = result_q.get()
-            print("Got this back from result_q: ", result)
-
-    print(fw)
-    print("Test done")
-
-
-def test(ident=None):
-
-    from multiprocessing import Queue
-    from parsl.executors import ThreadPoolExecutor
-    import time
-    task_q = Queue()
-    result_q = Queue()
-    executor = ThreadPoolExecutor(max_threads=4)
-
-    fw = Forwarder(task_q, result_q, executor, "Endpoint_{}".format(uuid.uuid4()))
-    fw.start()
-
-    """
-    kill_event = threading.Event()
-
-    fw_thread = threading.Thread(target=fw.start_threaded,
-                                 args=(kill_event,))
-    fw_thread.start()
-    """
-    for i in range(100):
-        print("Putting task onto task_q")
-        task_q.put(b'fooooo')
-        if not result_q.empty():
-            result = result_q.get()
-            print("Got this back from result_q: ", result)
-
-    print(fw)
-    print(fw.terminate())
-    print("Test done")
-
-
-
-def spawn_forwarder():
+def spawn_forwarder(address):
     """ Spawns a forwarder and returns the forwarder process for tracking.
 
     Returns:
          A Forwarder object
     """
     from multiprocessing import Queue
-    from parsl.executors import ThreadPoolExecutor
+    from funcx.executors import HighThroughputExecutor as HTEX
+    from parsl.providers import LocalProvider
+    from parsl.channels import LocalChannel
 
     import time
     task_q = Queue()
     result_q = Queue()
-    executor = ThreadPoolExecutor(max_threads=4)
+    info_q = Queue()
+    executor = HTEX(label='htex',
+                    provider=LocalProvider(
+                        channel=LocalChannel),
+                    address=address)
 
     fw = Forwarder(task_q, result_q, executor, "Endpoint_{}".format(uuid.uuid4()))
     fw.start()
