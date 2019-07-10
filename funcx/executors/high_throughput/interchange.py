@@ -75,6 +75,9 @@ class Interchange(object):
                  client_ports=(50055, 50056, 50057),
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
+                 cores_per_worker=1.0,
+                 worker_debug=False,
+                 launch_cmd=None,
                  heartbeat_threshold=60,
                  logdir=".",
                  logging_level=logging.INFO,
@@ -93,12 +96,22 @@ class Interchange(object):
         client_ports : triple(int, int, int)
              The ports at which the client can be reached
 
+        launch_cmd : str
+             TODO : update
+
         worker_ports : tuple(int, int)
              The specific two ports at which workers will connect to the Interchange. Default: None
 
         worker_port_range : tuple(int, int)
              The interchange picks ports at random from the range which will be used by workers.
              This is overridden when the worker_ports option is set. Defauls: (54000, 55000)
+
+        cores_per_worker : float
+             cores to be assigned to each worker. Oversubscription is possible
+             by setting cores_per_worker < 1.0. Default=1
+
+        worker_debug : Bool
+             Enables worker debug logging.
 
         heartbeat_threshold : int
              Number of seconds since the last heartbeat after which worker is considered lost.
@@ -177,6 +190,20 @@ class Interchange(object):
         self._ready_manager_queue = {}
 
         self.heartbeat_threshold = heartbeat_threshold
+
+        self.launch_cmd = launch_cmd
+        if not launch_cmd:
+            self.launch_cmd = ("process_worker_pool.py {debug} {max_workers} "
+                               "-c {cores_per_worker} "
+                               "--poll {poll_period} "
+                               "--task_url={task_url} "
+                               "--result_url={result_url} "
+                               "--logdir={logdir} "
+                               "--hb_period={heartbeat_period} "
+                               "--hb_threshold={heartbeat_threshold} "
+                               "--mode={worker_mode} "
+                               "--container_image={container_image} ")
+
 
         self.current_platform = {'parsl_v': PARSL_VERSION,
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
@@ -465,6 +492,63 @@ class Interchange(object):
         logger.info("Processed {} tasks in {} seconds".format(count, delta))
         logger.warning("Exiting")
 
+
+    def compose_worker_launch_cmd(self):
+        """ Compose the launch command
+        """
+        debug_opts = "--debug" if self.worker_debug else ""
+        max_workers = "" if self.max_workers == float('inf') else "--max_workers={}".format(self.max_workers)
+
+        l_cmd = self.launch_cmd.format(debug=debug_opts,
+                                       task_url=self.worker_task_url,
+                                       result_url=self.worker_result_url,
+                                       cores_per_worker=self.cores_per_worker,
+                                       max_workers=max_workers,
+                                       nodes_per_block=self.provider.nodes_per_block,
+                                       heartbeat_period=self.heartbeat_period,
+                                       heartbeat_threshold=self.heartbeat_threshold,
+                                       poll_period=self.poll_period,
+                                       logdir="{}/{}".format(self.run_dir, self.label),
+                                       worker_mode=self.worker_mode,
+                                       container_image=self.container_image)
+        self.launch_cmd = l_cmd
+        logger.debug("Launch command: {}".format(self.launch_cmd))
+
+
+    def scale_out(self, blocks=1):
+        """Scales out the number of blocks by "blocks"
+
+        Raises:
+             NotImplementedError
+        """
+        r = []
+        for i in range(blocks):
+            if self.provider:
+                block = self.provider.submit(self.launch_cmd, 1, 1)
+                logger.debug("Launched block {}:{}".format(i, block))
+                if not block:
+                    raise(ScalingFailed(self.provider.label,
+                                        "Attempts to provision nodes via provider has failed"))
+                self.blocks.extend([block])
+            else:
+                logger.error("No execution provider available")
+                r = None
+        return r
+
+    def scale_in(self, blocks):
+        """Scale in the number of active blocks by specified amount.
+
+        The scale in method here is very rude. It doesn't give the workers
+        the opportunity to finish current tasks or cleanup. This is tracked
+        in issue #530
+
+        Raises:
+             NotImplementedError
+        """
+        to_kill = self.blocks[:blocks]
+        if self.provider:
+            r = self.provider.cancel(to_kill)
+        return r
 
 def start_file_logger(filename, name='interchange', level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
