@@ -2,12 +2,20 @@ import requests
 import argparse
 import logging
 import os
+import pathlib
 import grp
 import signal
 import daemon
 import lockfile
 import uuid
-from funcx import __version__
+import json
+import sys
+import platform
+import getpass
+import shutil
+
+import funcx
+from funcx.executors.high_throughput import sample_config
 
 def reload_and_restart():
     print("Restarting funcX endpoint")
@@ -19,6 +27,39 @@ def foo():
         time.sleep(1)
         print("Running ep")
 
+def init_endpoint(args):
+    """ Setup funcx dirs and config files
+    """
+
+    if os.path.exists(args.config_file):
+        logger.debug("Config file exists at {}".format(args.config_file))
+        if not args.force:
+           return
+
+    funcx_dir = os.path.dirname(args.config_file)
+    print("Funcx dir: ", funcx_dir)
+    try:
+        os.makedirs(funcx_dir, exist_ok=True)
+    except Exception as e:
+        print("[FuncX] Caught exception during registration {}".format(e))
+
+    shutil.copyfile(sample_config.__file__, args.config_file)
+
+def register_with_hub(address):
+    r = requests.post(address + '/register',
+                      json={'python_v': "{}.{}".format(sys.version_info.major,
+                                                       sys.version_info.minor),
+                            'os': platform.system(),
+                            'hname': platform.node(),
+                            'username': getpass.getuser(),
+                            'funcx_v': str(funcx.__version__)
+                      }
+    )
+    if r.status_code != 200:
+        print("Caught an issue with the registration: ", r)
+
+    return r.json()
+
 def start_endpoint(args):
     """Start an endpoint
 
@@ -26,11 +67,22 @@ def start_endpoint(args):
     1. Connect to the broker service, and register itself
     2. Get connection info from broker service
     3. Start the interchange as a daemon
+
+    +-------------+            +-------------+
+    |             |            |             |
+    |   /register |<-----------|     start   |
+    |  Broker     |--reg_info->|   Endpoint  |
+    |             |            |             |----> start interchange
+    |             |            |             |
+    +-------------+            +-------------+
     """
 
     print("Address: ", args.address)
     print("config_file: ", args.config_file)
     print("logdir: ", args.logdir)
+
+    reg_info = register_with_hub(args.address)
+    print("Reg_info: ", reg_info)
 
     optionals = {}
     optionals['logdir'] = args.logdir
@@ -71,6 +123,9 @@ def stop_endpoint():
     print("Terminating")
 
 
+def register_endpoint(args):
+    print("Register args : ", args)
+
 def cli_run():
 
     parser = argparse.ArgumentParser()
@@ -79,27 +134,49 @@ def cli_run():
                         help="Print Endpoint version information")
     parser.add_argument("-d", "--debug", action='store_true',
                         help="Enables debug logging")
-
-    start = subparsers.add_parser('start', help='Starts an endpoint') #, dest='command')
-    start.add_argument("-a", "--address", default="127.0.0.1:8888",
-                        help="Address of the hub to which the endpoint should connect")
-    start.add_argument("-l", "--logdir", default="endpoint_logs",
-                        help="Path to endpoint log directory")
-    start.add_argument("-c", "--config_file", default=None,
+    parser.add_argument("-c", "--config_file",
+                        default='{}/.funcx/config.py'.format(pathlib.Path.home()),
                         help="Path to config file")
 
-    stop = subparsers.add_parser('stop', help='Stops an endpoint') # , dest='command')
+    setup = subparsers.add_parser('init',
+                                  help='Sets up starter config files to help start running endpoints')
+    setup.add_argument("-f", "--force", action='store_true',
+                       help="Force re-initialization of config with this flag.\nWARNING: This will wipe your current config")
 
-    _list = subparsers.add_parser('list', help='Lists all active endpoints') #, dest='command')
+    register = subparsers.add_parser('register',
+                                     help='Registers an endpoint with the web frontend')
+    register.add_argument("-l", "--label", help="Label for the endpoint")
+
+    start = subparsers.add_parser('start', help='Starts an endpoint')
+    start.add_argument("-l", "--label", help="Label for the endpoint")
+
+    stop = subparsers.add_parser('stop', help='Stops an active endpoint')
+
+    _list = subparsers.add_parser('list', help='Lists all registered endpoints')
 
     args = parser.parse_args()
 
+    funcx.set_stream_logger(level = logging.DEBUG if args.debug else logging.INFO)
+    global logger
+    logger = logging.getLogger('funcx')
+
     if args.version:
-        print("FuncX version: {}".format(__version__))
+        logger.info("FuncX version: {}".format(__version__))
 
-    print("Command: ", args.command)
+    logger.debug("Command: {}".format(args.command))
 
-    if args.command == "start":
+    if args.command == "init":
+        init_endpoint(args)
+
+    if not os.path.exists(args.config_file):
+        logger.critical("Missing a config file at {}. Critical error. Exiting.".format(args.config_file))
+        exit(-1)
+    else:
+        logger.debug("Using config file at {}".format(args.config_file))
+
+    if args.command == "register":
+        register_endpoint(args)
+    elif args.command == "start":
         start_endpoint(args)
     elif args.command == "stop":
         stop_endpoint(args)
@@ -107,4 +184,5 @@ def cli_run():
         list_endpoints(args)
 
 if __name__ == '__main__':
+
     cli_run()
