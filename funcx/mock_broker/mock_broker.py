@@ -1,9 +1,18 @@
+""" The broker service
+
+This REST service fields incoming registration requests from endpoints,
+creates an appropriate forwarder to which the endpoint can connect up.
+"""
+
+
 import bottle
 from bottle import post, run, request, app
 import argparse
 import json
 import uuid
 import sys
+
+from funcx.mock_broker.forwarder import Forwarder
 
 @post('/register')
 def register():
@@ -20,6 +29,12 @@ def register():
     print(endpoint_details)
 
 
+    # Here we want to start an executor client.
+    # Make sure to not put anything into the client, until after an interchange has
+    # connected to avoid clogging up the pipe. Submits will block if the client has
+    # no endpoint connected.
+
+
     endpoint_id = str(uuid.uuid4())
     ret_package = {'endpoint_id': endpoint_id,
                    'task_url': '',
@@ -29,6 +44,10 @@ def register():
     request.app.ep_mapping[endpoint_id] = ret_package
     return ret_package
 
+
+@route('/list_mappings')
+def list_mappings():
+    return request.app.ep_mapping
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
