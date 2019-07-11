@@ -5,7 +5,9 @@ import os
 import pathlib
 import grp
 import signal
+import time
 import daemon
+import daemon.pidfile
 import lockfile
 import uuid
 import json
@@ -14,6 +16,7 @@ import platform
 import getpass
 import shutil
 import tarfile
+import signal
 
 import funcx
 from funcx.executors.high_throughput import global_config, default_config
@@ -119,7 +122,7 @@ def register_with_hub(address):
 
     return r.json()
 
-def start_endpoint(args):
+def start_endpoint(args, global_config=None):
     """Start an endpoint
 
     This function will do:
@@ -134,18 +137,26 @@ def start_endpoint(args):
     |             |            |             |----> start interchange
     |             |            |             |
     +-------------+            +-------------+
+
+    Parameters
+    ----------
+    args : args object
+       Args object from the arg parsing
+
+    global_config : dict
+       Global config dict
     """
+    """
+    reg_info = register_with_hub('http://{}:{}'.format(global_config['broker_address'],
+                                                       global_config['broker_port']))
 
-    print("Address: ", args.address)
-    print("config_file: ", args.config_file)
-    print("logdir: ", args.logdir)
-
-    reg_info = register_with_hub(args.address)
     print("Reg_info: ", reg_info)
-
+    """
     optionals = {}
-    optionals['logdir'] = args.logdir
-    optionals['address'] = args.address
+    optionals['logdir'] = args.config_dir
+    optionals['address'] = global_config['broker_address']
+
+    endpoint_dir = os.path.join(args.config_dir, args.name)
 
     if args.debug:
         optionals['logging_level'] = logging.DEBUG
@@ -155,14 +166,11 @@ def start_endpoint(args):
     ic.start()
     """
 
-    os.makedirs(args.logdir, exist_ok=True)
-
     try:
-        context = daemon.DaemonContext(working_directory=args.logdir,
+        context = daemon.DaemonContext(working_directory=endpoint_dir,
                                        umask=0o002,
-                                       pidfile=lockfile.FileLock(
-                                           os.path.join(args.logdir,
-                                                        'funcx.{}.pid'.format(uuid.uuid4()))
+                                       pidfile=daemon.pidfile.PIDLockFile( #lockfile.FileLock(
+                                           os.path.join(endpoint_dir,'daemon.pid')
                                        )
 
         )
@@ -170,16 +178,49 @@ def start_endpoint(args):
         print("Caught exception while trying to setup endpoint context dirs")
         print("Exception : ",e)
 
-    context.signal_map = {signal.SIGTERM: stop_endpoint,
-                          signal.SIGHUP: 'terminate',
-                          signal.SIGUSR1: reload_and_restart}
+    #context.signal_map = {signal.SIGTERM: stop_endpoint,
+    #                      signal.SIGHUP: 'terminate',
+    #                      signal.SIGUSR1: reload_and_restart}
 
     with context:
         foo()
 
+    print("Done")
 
-def stop_endpoint():
-    print("Terminating")
+
+def stop_endpoint(args, global_config=None):
+    """ Stops an endpoint using the pidfile
+
+    Parameters
+    ----------
+
+    args
+    global_config
+
+    """
+
+    endpoint_dir = os.path.join(args.config_dir, args.name)
+    pid_file = os.path.join(endpoint_dir, "daemon.pid")
+
+    if os.path.exists(pid_file):
+        logger.debug("{} has a daemon.pid file".format(args.name))
+        with open(pid_file, 'r') as f:
+            pid = int(f.read())
+            # Attempt terminating
+            try:
+                logger.debug("Signalling process: {}".format(pid))
+                os.kill(pid, signal.SIGTERM)
+                time.sleep(0.1)
+                # Wait to confirm that the pid file disappears
+                if not os.path.exists(pid_file):
+                    logger.info("Endpoint <{}> is now stopped".format(args.name))
+
+            except OSError:
+                logger.warning("Endpoint {} could not be terminated".format(args.name))
+                sys.exit(-1)
+    else:
+        logger.info("Endpoint <{}> is not active.".format(args.name))
+
 
 
 def register_endpoint(args):
@@ -206,11 +247,11 @@ def cli_run():
     # Start an endpoint
     start = subparsers.add_parser('start',
                                   help='Starts an endpoint')
-    start.add_argument("label", help="Label for the endpoint")
+    start.add_argument("name", help="Name of the endpoint to start")
 
     # Stop an endpoint
     stop = subparsers.add_parser('stop', help='Stops an active endpoint')
-    stop.add_argument("label", help="Label for the endpoint")
+    stop.add_argument("name", help="Name of the endpoint to stop")
 
     # List all endpoints
     enum = subparsers.add_parser('list', help='Lists all endpoints')
@@ -241,14 +282,14 @@ def cli_run():
     import importlib.machinery
     global_config = importlib.machinery.SourceFileLoader('global_config',
                                                          args.config_file).load_module()
-    print(global_config)
 
+    print("Global options : ", global_config.global_options)
     if args.command == "start":
-        start_endpoint(args, global_config=global_config)
+        start_endpoint(args, global_config=global_config.global_options)
     elif args.command == "stop":
-        stop_endpoint(args, global_config=global_config)
+        stop_endpoint(args, global_config=global_config.global_options)
     elif args.command == "list":
-        list_endpoints(args, global_config=global_config)
+        list_endpoints(args, global_config=global_config.global_options)
 
 if __name__ == '__main__':
 
