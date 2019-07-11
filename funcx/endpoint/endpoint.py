@@ -77,6 +77,7 @@ def init_endpoint_dir(funcx_dir, endpoint_name):
     os.makedirs(endpoint_dir, exist_ok=True)
     shutil.copyfile(default_config.__file__,
                     os.path.join(endpoint_dir, 'config.py'))
+    return endpoint_dir
 
 def init_endpoint(args):
     """ Setup funcx dirs and config files including a default endpoint config
@@ -159,6 +160,13 @@ def start_endpoint(args, global_config=None):
 
     if not os.path.exists(endpoint_dir):
         init_endpoint_dir(args.config_dir, args.name)
+        print('''A default profile has been create for <{}> at {}
+Configure this file and try restarting with:
+    $ funcx-endpoint start {}'''.format(args.name,
+                                        os.path.join(endpoint_dir, 'config.py'),
+                                        args.name))
+        return
+
 
     if os.path.exists(endpoint_json):
         with open(endpoint_json, 'r') as fp:
