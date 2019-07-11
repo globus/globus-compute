@@ -5,11 +5,13 @@ import parsl
 import time
 parsl.set_stream_logger()
 
+
 def double(x):
-    return x*2
+    return x * 2
+
 
 def fail(x):
-    return x/0
+    return x / 0
 
 
 def test_1():
@@ -61,5 +63,7 @@ def test_3():
     time.sleep(120)
     print("Terminating")
     fw.terminate()
+
+
 if __name__ == '__main__':
     test_3()

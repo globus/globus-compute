@@ -211,7 +211,6 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                               "{suppress_failure} "
                               "--hb_threshold={heartbeat_threshold} ")
 
-
     def initialize_scaling(self):
         """ Compose the launch command and call the scale_out
 
@@ -262,8 +261,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         # the endpoint.
         # self._start_local_interchange_process()
         print("Attempting remote start")
-        #self._start_remote_interchange_process()
-
+        # self._start_remote_interchange_process()
 
         logger.debug("Created management thread: {}".format(self._queue_management_thread))
 
@@ -642,8 +640,7 @@ def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
         print("cwd: ", os.getcwd())
         logger = set_file_logger(os.path.join(logdir, "executor.{}.log".format(endpoint_id)),
                                  level=logging_level)
-        #htex.start()
+        htex.start()
 
     stdout.close()
     stderr.close()
-

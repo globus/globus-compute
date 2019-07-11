@@ -35,7 +35,9 @@ class RedisQueue(FuncxQueue):
             if not self.redis_client:
                 self.redis_client = redis.StrictRedis(host=self.hostname, port=self.port, decode_responses=True)
         except redis.exceptions.ConnectionError:
-            print(f"ConnectionError while trying to connect to Redis@{self.hostname}:{self.port}")
+            print("ConnectionError while trying to connect to Redis@{}:{}".format(self.hostname,
+                                                                                  self.port))
+
             raise
 
     def get(self, timeout=1):
@@ -58,7 +60,6 @@ class RedisQueue(FuncxQueue):
 
         return task_id, task_info
 
-
     def put(self, key, payload):
         """ Put's the key:payload into a dict and pushes the key onto a queue
         Parameters
@@ -75,20 +76,22 @@ class RedisQueue(FuncxQueue):
         except AttributeError:
             raise NotConnected(self)
         except redis.exceptions.ConnectionError:
-            print(f"ConnectionError while trying to connect to Redis@{self.hostname}:{self.port}")
+            print("ConnectionError while trying to connect to Redis@{}:{}".format(self.hostname,
+                                                                                  self.port))
             raise
 
     @property
     def is_connected(self):
-        return self.redis_client != None
+        return self.redis_client is not None
 
 
 def test():
     rq = RedisQueue('task', '127.0.0.1')
     rq.connect()
-    rq.put("01", {'a':1, 'b':2})
+    rq.put("01", {'a': 1, 'b': 2})
     res = rq.get(timeout=1)
     print("Result : ", res)
+
 
 if __name__ == '__main__':
     test()
