@@ -6,6 +6,7 @@ import pathlib
 import grp
 import signal
 import time
+import json
 import daemon
 import daemon.pidfile
 import lockfile
@@ -20,6 +21,7 @@ import signal
 
 import funcx
 from funcx.executors.high_throughput import global_config, default_config
+from funcx.executors.high_throughput.interchange import Interchange
 
 def reload_and_restart():
     print("Restarting funcX endpoint")
@@ -130,13 +132,18 @@ def start_endpoint(args, global_config=None):
     2. Get connection info from broker service
     3. Start the interchange as a daemon
 
-    +-------------+            +-------------+
-    |             |            |             |
-    |   /register |<-----------|     start   |
-    |  Broker     |--reg_info->|   Endpoint  |
-    |             |            |             |----> start interchange
-    |             |            |             |
-    +-------------+            +-------------+
+
+    |                      Broker service       |
+    |               -----2----> Forwarder       |
+    |    /register <-----3----+   ^             |
+    +-----^-----------------------+-------------+
+          |     |                 |
+          1     4                 6
+          |     v                 |
+    +-----+-----+-----+           v
+    |      Start      |---5---> Interchange
+    |     Endpoint    |        daemon
+    +-----------------+
 
     Parameters
     ----------
@@ -146,44 +153,56 @@ def start_endpoint(args, global_config=None):
     global_config : dict
        Global config dict
     """
-    """
-    reg_info = register_with_hub('http://{}:{}'.format(global_config['broker_address'],
-                                                       global_config['broker_port']))
-
-    print("Reg_info: ", reg_info)
-    """
-    optionals = {}
-    optionals['logdir'] = args.config_dir
-    optionals['address'] = global_config['broker_address']
 
     endpoint_dir = os.path.join(args.config_dir, args.name)
+    endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
+
+    if os.path.exists(endpoint_json):
+        with open(endpoint_json, 'r') as fp:
+            logger.debug("Connection info loaded from prior registration record")
+            reg_info = json.load(fp)
+    else:
+        logger.debug("Endpoint prior connection record not available. Attempting registration")
+        reg_info = register_with_hub('http://{}:{}'.format(global_config['broker_address'],
+                                                           global_config['broker_port']))
+
+        logger.info("Registration info from broker: {}".format(reg_info))
+        with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w') as fp:
+            json.dump(reg_info, fp)
+            logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
+
+
+    optionals = {}
+    optionals['client_address'] = reg_info['address']
+    optionals['client_ports'] = reg_info['client_ports'].split(',')
+
+    optionals['logdir'] = endpoint_dir
+    #optionals['debug'] = True
 
     if args.debug:
         optionals['logging_level'] = logging.DEBUG
-    """
-    with daemon.DaemonContext():
-        ic = Interchange(**optionals)
-    ic.start()
-    """
 
+    stdout = open('./interchange.stdout', 'w+')
+    stderr = open('./interchange.stderr', 'w+')
     try:
         context = daemon.DaemonContext(working_directory=endpoint_dir,
                                        umask=0o002,
-                                       pidfile=daemon.pidfile.PIDLockFile( #lockfile.FileLock(
-                                           os.path.join(endpoint_dir,'daemon.pid')
-                                       )
+                                       #lockfile.FileLock(
+                                       pidfile=daemon.pidfile.PIDLockFile(os.path.join(endpoint_dir,'daemon.pid')),
+                                       stdout=stdout,
+                                       stderr=stderr,
 
         )
     except Exception as e:
         print("Caught exception while trying to setup endpoint context dirs")
         print("Exception : ",e)
 
-    #context.signal_map = {signal.SIGTERM: stop_endpoint,
-    #                      signal.SIGHUP: 'terminate',
-    #                      signal.SIGUSR1: reload_and_restart}
-
     with context:
-        foo()
+        ic = Interchange(**optionals)
+        ic.start()
+
+    stdout.close()
+    stderr.close()
 
     print("Done")
 
@@ -283,7 +302,6 @@ def cli_run():
     global_config = importlib.machinery.SourceFileLoader('global_config',
                                                          args.config_file).load_module()
 
-    print("Global options : ", global_config.global_options)
     if args.command == "start":
         start_endpoint(args, global_config=global_config.global_options)
     elif args.command == "stop":
