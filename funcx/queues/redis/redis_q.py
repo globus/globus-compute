@@ -20,12 +20,13 @@ class RedisQueue(FuncxQueue):
 
     """
 
-    def __init__(self, hostname, port=6379):
+    def __init__(self, prefix, hostname, port=6379):
         """ Initialize
         """
         self.hostname = hostname
         self.port = port
         self.redis_client = None
+        self.prefix = prefix
 
     def connect(self):
         """ Connects to the Redis server
@@ -46,8 +47,8 @@ class RedisQueue(FuncxQueue):
            Timeout for the blocking get in seconds
         """
         try:
-            task_list, task_id = self.redis_client.blpop('task_list', timeout=timeout)
-            jtask_info = self.redis_client.get(f'task:{task_id}')
+            task_list, task_id = self.redis_client.blpop(f'{self.prefix}_list', timeout=timeout)
+            jtask_info = self.redis_client.get(f'{self.prefix}:{task_id}')
             task_info = json.loads(jtask_info)
         except AttributeError:
             raise NotConnected(self)
@@ -69,8 +70,8 @@ class RedisQueue(FuncxQueue):
             Dict of task information to be stored
         """
         try:
-            self.redis_client.set(f'task:{key}', json.dumps(payload))
-            self.redis_client.rpush('task_list', key)
+            self.redis_client.set(f'{self.prefix}:{key}', json.dumps(payload))
+            self.redis_client.rpush(f'{self.prefix}_list', key)
         except AttributeError:
             raise NotConnected(self)
         except redis.exceptions.ConnectionError:
@@ -83,7 +84,7 @@ class RedisQueue(FuncxQueue):
 
 
 def test():
-    rq = RedisQueue('127.0.0.1')
+    rq = RedisQueue('task', '127.0.0.1')
     rq.connect()
     rq.put("01", {'a':1, 'b':2})
     res = rq.get(timeout=1)
