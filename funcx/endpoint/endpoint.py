@@ -157,6 +157,9 @@ def start_endpoint(args, global_config=None):
     endpoint_dir = os.path.join(args.config_dir, args.name)
     endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
 
+    if not os.path.exists(endpoint_dir):
+        init_endpoint_dir(args.config_dir, args.name)
+
     if os.path.exists(endpoint_json):
         with open(endpoint_json, 'r') as fp:
             logger.debug("Connection info loaded from prior registration record")
@@ -167,7 +170,7 @@ def start_endpoint(args, global_config=None):
                                                            global_config['broker_port']))
 
         logger.info("Registration info from broker: {}".format(reg_info))
-        with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w') as fp:
+        with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
             json.dump(reg_info, fp)
             logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
 
