@@ -22,9 +22,12 @@ import signal
 import funcx
 from funcx.executors.high_throughput import global_config, default_config
 from funcx.executors.high_throughput.interchange import Interchange
+from funcx.endpoint.list_endpoints import list_endpoints
+
 
 def reload_and_restart():
     print("Restarting funcX endpoint")
+
 
 def foo():
     print("Start endpoint")
@@ -32,6 +35,7 @@ def foo():
     for i in range(120):
         time.sleep(1)
         print("Running ep")
+
 
 def load_endpoint(endpoint_dir):
     """
@@ -52,11 +56,6 @@ def load_endpoint(endpoint_dir):
     logger.debug("Loaded config for {}".format(endpoint_name))
     return config.config
 
-def list_endpoints(args):
-    """ List all available endpoints
-    """
-    funcx_dir = os.path.basename(args.config_file)
-    print("List endpoint --- NOT DEFINED")
 
 def init_endpoint_dir(funcx_dir, endpoint_name):
     """ Initialize a clean endpoint dir
@@ -79,6 +78,7 @@ def init_endpoint_dir(funcx_dir, endpoint_name):
                     os.path.join(endpoint_dir, 'config.py'))
     return endpoint_dir
 
+
 def init_endpoint(args):
     """ Setup funcx dirs and config files including a default endpoint config
 
@@ -92,9 +92,9 @@ def init_endpoint(args):
     if args.force and os.path.exists(funcx_dir):
         logger.warning("Wiping all current configs in {}".format(funcx_dir))
         try:
-            logger.debug("Removing old backups in {}".format(funcx_dir+'.bak'))
+            logger.debug("Removing old backups in {}".format(funcx_dir + '.bak'))
             shutil.rmtree(funcx_dir + '.bak')
-        except:
+        except Exception:
             pass
         os.renames(funcx_dir, funcx_dir + '.bak')
 
@@ -110,6 +110,7 @@ def init_endpoint(args):
     shutil.copyfile(global_config.__file__, args.config_file)
     init_endpoint_dir(funcx_dir, "default")
 
+
 def register_with_hub(address):
     r = requests.post(address + '/register',
                       json={'python_v': "{}.{}".format(sys.version_info.major,
@@ -124,6 +125,7 @@ def register_with_hub(address):
         print("Caught an issue with the registration: ", r)
 
     return r.json()
+
 
 def start_endpoint(args, global_config=None):
     """Start an endpoint
@@ -167,7 +169,6 @@ Configure this file and try restarting with:
                                         args.name))
         return
 
-
     if os.path.exists(endpoint_json):
         with open(endpoint_json, 'r') as fp:
             logger.debug("Connection info loaded from prior registration record")
@@ -182,13 +183,12 @@ Configure this file and try restarting with:
             json.dump(reg_info, fp)
             logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
 
-
     optionals = {}
     optionals['client_address'] = reg_info['address']
     optionals['client_ports'] = reg_info['client_ports'].split(',')
 
     optionals['logdir'] = endpoint_dir
-    #optionals['debug'] = True
+    # optionals['debug'] = True
 
     if args.debug:
         optionals['logging_level'] = logging.DEBUG
@@ -198,15 +198,16 @@ Configure this file and try restarting with:
     try:
         context = daemon.DaemonContext(working_directory=endpoint_dir,
                                        umask=0o002,
-                                       #lockfile.FileLock(
-                                       pidfile=daemon.pidfile.PIDLockFile(os.path.join(endpoint_dir,'daemon.pid')),
+                                       # lockfile.FileLock(
+                                       pidfile=daemon.pidfile.PIDLockFile(os.path.join(endpoint_dir,
+                                                                                       'daemon.pid')),
                                        stdout=stdout,
                                        stderr=stderr,
 
         )
     except Exception as e:
         print("Caught exception while trying to setup endpoint context dirs")
-        print("Exception : ",e)
+        print("Exception : ", e)
 
     with context:
         ic = Interchange(**optionals)
@@ -252,12 +253,13 @@ def stop_endpoint(args, global_config=None):
         logger.info("Endpoint <{}> is not active.".format(args.name))
 
 
-
 def register_endpoint(args):
     print("Register args : ", args)
 
-def cli_run():
 
+def cli_run():
+    """ Entry point for funcx-endpoint
+    """
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
     parser.add_argument("-v", "--version",
@@ -270,7 +272,7 @@ def cli_run():
 
     # Init Endpoint
     init = subparsers.add_parser('init',
-                                  help='Sets up starter config files to help start running endpoints')
+                                 help='Sets up starter config files to help start running endpoints')
     init.add_argument("-f", "--force", action='store_true',
                       help="Force re-initialization of config with this flag.\nWARNING: This will wipe your current config")
 
@@ -284,16 +286,16 @@ def cli_run():
     stop.add_argument("name", help="Name of the endpoint to stop")
 
     # List all endpoints
-    enum = subparsers.add_parser('list', help='Lists all endpoints')
+    subparsers.add_parser('list', help='Lists all endpoints')
 
     args = parser.parse_args()
 
-    funcx.set_stream_logger(level = logging.DEBUG if args.debug else logging.INFO)
+    funcx.set_stream_logger(level=logging.DEBUG if args.debug else logging.INFO)
     global logger
     logger = logging.getLogger('funcx')
 
     if args.version:
-        logger.info("FuncX version: {}".format(__version__))
+        logger.info("FuncX version: {}".format(funcx.__version__))
 
     logger.debug("Command: {}".format(args.command))
 
@@ -318,8 +320,8 @@ def cli_run():
     elif args.command == "stop":
         stop_endpoint(args, global_config=global_config.global_options)
     elif args.command == "list":
-        list_endpoints(args, global_config=global_config.global_options)
+        list_endpoints(args)
+
 
 if __name__ == '__main__':
-
     cli_run()
