@@ -5,6 +5,7 @@ import sys
 import platform
 import getpass
 
+
 def test(address):
     r = requests.post(address + '/register',
                       json={'python_v': "{}.{}".format(sys.version_info.major,

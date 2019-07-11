@@ -33,6 +33,7 @@ setup(
     ],
     entry_points={'console_scripts':
                   ['funcx-endpoint=funcx.endpoint.endpoint:cli_run',
+                   'funcx-interchange=funcx.executors.high_throughput.interchange:cli_run',
                   ]
     },
     author='funcX team',

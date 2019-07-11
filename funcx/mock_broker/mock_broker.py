@@ -14,6 +14,7 @@ import sys
 
 from funcx.mock_broker.forwarder import Forwarder, spawn_forwarder
 
+
 @post('/register')
 def register():
     """ Register an endpoint request
@@ -27,7 +28,6 @@ def register():
     print(json.load(request.body))
     endpoint_details = json.load(request.body)
     print(endpoint_details)
-
 
     # Here we want to start an executor client.
     # Make sure to not put anything into the client, until after an interchange has
@@ -48,6 +48,7 @@ def register():
 @route('/list_mappings')
 def list_mappings():
     return request.app.ep_mapping
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

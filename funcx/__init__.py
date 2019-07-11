@@ -7,8 +7,8 @@ from funcx.version import VERSION
 __author__ = "The funcX team"
 __version__ = VERSION
 
-def set_file_logger(filename: str, name: str = 'funcx',
-                    level: int = logging.DEBUG, format_string=None):
+
+def set_file_logger(filename, name='funcx', level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
 
     Args:
@@ -32,8 +32,8 @@ def set_file_logger(filename: str, name: str = 'funcx',
     logger.addHandler(handler)
     return logger
 
-def set_stream_logger(name = 'funcx',
-                      level = logging.DEBUG, format_string = None):
+
+def set_stream_logger(name='funcx', level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
 
     Args:

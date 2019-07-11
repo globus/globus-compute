@@ -209,7 +209,6 @@ class Interchange(object):
                                "--mode={worker_mode} "
                                "--container_image={container_image} ")
 
-
         self.current_platform = {'parsl_v': PARSL_VERSION,
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
                                                                sys.version_info.minor,
@@ -497,7 +496,6 @@ class Interchange(object):
         logger.info("Processed {} tasks in {} seconds".format(count, delta))
         logger.warning("Exiting")
 
-
     def compose_worker_launch_cmd(self):
         """ Compose the launch command
         """
@@ -518,7 +516,6 @@ class Interchange(object):
                                        container_image=self.container_image)
         self.launch_cmd = l_cmd
         logger.debug("Launch command: {}".format(self.launch_cmd))
-
 
     def scale_out(self, blocks=1):
         """Scales out the number of blocks by "blocks"
@@ -554,6 +551,7 @@ class Interchange(object):
         if self.provider:
             r = self.provider.cancel(to_kill)
         return r
+
 
 def start_file_logger(filename, name='interchange', level=logging.DEBUG, format_string=None):
     """Add a stream log handler.

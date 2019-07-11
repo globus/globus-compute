@@ -10,11 +10,14 @@ from multiprocessing import Process
 from parsl.app.errors import RemoteExceptionWrapper
 from funcx import set_file_logger
 
+
 def double(x):
-    return x*2
+    return x * 2
+
 
 def failer(x):
-    return x/0
+    return x / 0
+
 
 class Forwarder(Process):
     """ Forwards tasks/results between the executor and the queues
@@ -59,7 +62,7 @@ class Forwarder(Process):
 
         global logger
         logger = set_file_logger(os.path.join(self.logdir, "forwarder.{}.log".format(endpoint_id)),
-                        level=logging_level)
+                                 level=logging_level)
 
         logger.info("Initializing forwarder for endpoint:{}".format(endpoint_id))
         self.task_q = task_q
@@ -86,7 +89,6 @@ class Forwarder(Process):
         else:
             logger.debug("Task:{} succeeded".format(task_id))
 
-
     def run(self):
         """ Process entry point.
         """
@@ -96,7 +98,7 @@ class Forwarder(Process):
         try:
             self.task_q.connect()
             self.result_q.connect()
-        except:
+        except Exception:
             logger.exception("Connecting to the queues have failed")
 
         self.executor.start()
@@ -107,6 +109,7 @@ class Forwarder(Process):
         while True:
             try:
                 task = self.task_q.get(timeout=10)
+                logger.debug("[TASKS] Not doing {}".format(task))
             except queue.Empty:
                 # This exception catching isn't very general,
                 # Essentially any timeout exception should be caught and ignored
@@ -122,7 +125,6 @@ class Forwarder(Process):
 
         logger.info("[TASKS] Terminating self due to user requested kill")
         return
-
 
     @property
     def connection_info(self):
@@ -164,13 +166,11 @@ def spawn_forwarder(address,
     Returns:
          A Forwarder object
     """
-    from multiprocessing import Queue
     from funcx.queues.redis import RedisQueue
     from funcx.executors import HighThroughputExecutor as HTEX
     from parsl.providers import LocalProvider
     from parsl.channels import LocalChannel
 
-    info_q = Queue()
     task_q = RedisQueue('task', '127.0.0.1')
     result_q = RedisQueue('result', '127.0.0.1')
 
@@ -190,4 +190,4 @@ def spawn_forwarder(address,
 if __name__ == "__main__":
 
     pass
-    #test()
+    # test()
