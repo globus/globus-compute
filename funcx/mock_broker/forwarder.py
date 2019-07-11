@@ -78,7 +78,7 @@ class Forwarder(Process):
         logger.debug("[RESULTS] Updating result")
         try:
             res = future.result()
-            self.result_q.put(res)
+            self.result_q.put(task_id, res)
         except Exception as e:
             logger.debug("Task:{} failed".format(task_id))
             # Todo : Since we caught an exception, we should wrap it here, and send it
@@ -92,6 +92,13 @@ class Forwarder(Process):
         """
         logger.info("[TASKS] Loop starting")
         logger.info("[TASKS] Executor: {}".format(self.executor))
+
+        try:
+            self.task_q.connect()
+            self.result_q.connect()
+        except:
+            logger.exception("Connecting to the queues have failed")
+
         self.executor.start()
         conn_info = self.executor.connection_info
         self.internal_q.put(conn_info)
@@ -128,33 +135,45 @@ class Forwarder(Process):
         return self.client_ports
 
 
-def spawn_forwarder(address, executor=None, endpoint_id=uuid.uuid4(), logging_level=logging.INFO):
+def spawn_forwarder(address,
+                    executor=None,
+                    task_q=None,
+                    result_q=None,
+                    endpoint_id=uuid.uuid4(),
+                    logging_level=logging.INFO):
     """ Spawns a forwarder and returns the forwarder process for tracking.
 
-    Params:
-         address : str
-            IP Address to which the endpoint must connect
+    Parameters
+    ----------
 
-         executor : Executor object. Optional
-            Executor object to be instantiated.
+    address : str
+       IP Address to which the endpoint must connect
 
-         logging_level : int
-            Logging level as defined in the logging module. Default: logging.INFO (20)
+    executor : Executor object. Optional
+       Executor object to be instantiated.
 
-         endpoint_id : uuid string
-            Endpoint id for which the forwarder is being spawned.
+    task_q : Queue object
+       Queue object matching funcx.queues.base.FuncxQueue interface
+
+    logging_level : int
+       Logging level as defined in the logging module. Default: logging.INFO (20)
+
+    endpoint_id : uuid string
+       Endpoint id for which the forwarder is being spawned.
 
     Returns:
          A Forwarder object
     """
     from multiprocessing import Queue
+    from funcx.queues.redis import RedisQueue
     from funcx.executors import HighThroughputExecutor as HTEX
     from parsl.providers import LocalProvider
     from parsl.channels import LocalChannel
 
-    task_q = Queue()
-    result_q = Queue()
     info_q = Queue()
+    task_q = RedisQueue('task', '127.0.0.1')
+    result_q = RedisQueue('result', '127.0.0.1')
+
     if not executor:
         executor = HTEX(label='htex',
                         provider=LocalProvider(
