@@ -82,6 +82,7 @@ class Interchange(object):
                  logdir=".",
                  logging_level=logging.INFO,
                  poll_period=10,
+                 endpoint_id=None,
                  suppress_failure=False,
              ):
         """
@@ -122,6 +123,9 @@ class Interchange(object):
         logging_level : int
              Logging level as defined in the logging module. Default: logging.INFO (20)
 
+        endpoint_id : str
+             Identity string that identifies the endpoint to the broker
+
         poll_period : int
              The main thread polling period, in milliseconds. Default: 10ms
 
@@ -136,7 +140,7 @@ class Interchange(object):
             pass
 
         start_file_logger("{}/interchange.log".format(self.logdir), level=logging_level)
-        logger.debug("Initializing Interchange process")
+        logger.debug("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
 
         self.client_address = client_address
         self.interchange_address = interchange_address
@@ -169,6 +173,7 @@ class Interchange(object):
         self.results_incoming = self.context.socket(zmq.ROUTER)
         self.results_incoming.set_hwm(0)
 
+        self.endpoint_id = endpoint_id
         if self.worker_ports:
             self.worker_task_port = self.worker_ports[0]
             self.worker_result_port = self.worker_ports[1]
@@ -612,6 +617,8 @@ def cli_run():
                         help="OPTIONAL, pair of workers ports to listen on, eg --worker_ports=50001,50005")
     parser.add_argument("--suppress_failure", action='store_true',
                         help="Enables suppression of failures")
+    parser.add_argument("--endpoint_id", default=None,
+                        help="Endpoint ID, used to identify the endpoint to the remote broker")
     parser.add_argument("--hb_threshold",
                         help="Heartbeat threshold in seconds")
     parser.add_argument("-d", "--debug", action='store_true',
@@ -625,6 +632,7 @@ def cli_run():
     optionals['logdir'] = os.path.abspath(args.logdir)
     optionals['client_address'] = args.client_address
     optionals['client_ports'] = [int(i) for i in args.client_ports.split(',')]
+    optionals['endpoint_id'] = args.endpoint_id
 
     if args.debug:
         optionals['logging_level'] = logging.DEBUG
