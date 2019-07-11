@@ -621,6 +621,8 @@ def cli_run():
                         help="Endpoint ID, used to identify the endpoint to the remote broker")
     parser.add_argument("--hb_threshold",
                         help="Heartbeat threshold in seconds")
+    parser.add_argument("--config", default=None,
+                        help="Configuration object that describes provisioning")
     parser.add_argument("-d", "--debug", action='store_true',
                         help="Enables debug logging")
 
@@ -633,6 +635,7 @@ def cli_run():
     optionals['client_address'] = args.client_address
     optionals['client_ports'] = [int(i) for i in args.client_ports.split(',')]
     optionals['endpoint_id'] = args.endpoint_id
+    optionals['config'] = args.config
 
     if args.debug:
         optionals['logging_level'] = logging.DEBUG
