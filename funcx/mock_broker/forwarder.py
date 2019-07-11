@@ -170,4 +170,5 @@ def spawn_forwarder(address, executor=None, endpoint_id=uuid.uuid4(), logging_le
 
 if __name__ == "__main__":
 
-    test()
+    pass
+    #test()

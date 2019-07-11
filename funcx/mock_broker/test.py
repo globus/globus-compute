@@ -2,6 +2,7 @@ from funcx.executors import HighThroughputExecutor as HTEX
 from parsl.providers import LocalProvider
 from parsl.channels import LocalChannel
 import parsl
+import time
 parsl.set_stream_logger()
 
 def double(x):
@@ -40,7 +41,7 @@ def test_1():
     x.shutdown()
 
 
-if __name__ == '__main__':
+def test_2():
 
     from funcx.executors.high_throughput.executor import executor_starter
 
@@ -51,3 +52,14 @@ if __name__ == '__main__':
     print("Foo")
     executor_starter(htex, "forwarder", "ep_01")
     print("Here")
+
+
+def test_3():
+    from funcx.mock_broker.forwarder import Forwarder, spawn_forwarder
+    fw = spawn_forwarder("127.0.0.1", endpoint_id="0001")
+    print("Spawned forwarder")
+    time.sleep(120)
+    print("Terminating")
+    fw.terminate()
+if __name__ == '__main__':
+    test_3()
