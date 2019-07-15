@@ -70,6 +70,7 @@ class Interchange(object):
     TODO: We most likely need a PUB channel to send out global commands, like shutdown
     """
     def __init__(self,
+                 config,
                  client_address="127.0.0.1",
                  interchange_address="127.0.0.1",
                  client_ports=(50055, 50056, 50057),
@@ -88,6 +89,9 @@ class Interchange(object):
         """
         Parameters
         ----------
+        config : funcx.Config object
+             Funcx config object that describes how compute should be provisioned
+
         client_address : str
              The ip address at which the parsl client can be reached. Default: "127.0.0.1"
 
