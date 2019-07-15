@@ -193,6 +193,12 @@ Configure this file and try restarting with:
     if args.debug:
         optionals['logging_level'] = logging.DEBUG
 
+    import importlib.machinery
+    endpoint_config = importlib.machinery.SourceFileLoader(
+        'config',
+        os.path.join(endpoint_dir,'config.py')).load_module()
+    # TODO : we need to load the config ? maybe not. This needs testing
+
     stdout = open('./interchange.stdout', 'w+')
     stderr = open('./interchange.stderr', 'w+')
     try:
@@ -210,7 +216,7 @@ Configure this file and try restarting with:
         print("Exception : ", e)
 
     with context:
-        ic = Interchange(**optionals)
+        ic = Interchange(endpoint_config.config, **optionals)
         ic.start()
 
     stdout.close()
