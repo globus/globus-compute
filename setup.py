@@ -16,7 +16,7 @@ setup(
     packages=find_packages(),
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
-    python_requires=">=3.6",
+    python_requires="==3.6",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
