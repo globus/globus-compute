@@ -16,10 +16,34 @@ on existing infrastructure including clouds, clusters, and supercomputers.
    :target: http://funcx.readthedocs.io/en/stable/?badge=latest
    :alt: Documentation Status
 
-QuickStart
+Quickstart
 ==========
 
-funcX is in an alpha state and no quickstart is available yet.
+funcX is in alpha state and is not available on PyPI yet. To install funcX,
+we recommend installing from source into a conda environment.
 
-Documentation for funcX is available `here <https://funcx.readthedocs.io>`_
+
+1. Install Conda and set up python3.6 following the instructions `here <https://conda.io/docs/user-guide/install/macos.html>`_::
+
+   $ conda create --name funcx_py36 python=3.6
+   $ source activate funcx_py36
+
+2. Download funcX::
+
+   $ git clone https://github.com/funcx-faas/funcX
+
+3. Install from source::
+
+   $ cd funcX
+   $ pip install .
+
+4. Use funcX!
+
+.. note:: funcX currently only support Python3.6 functions and environment for execution.
+
+
+Documentation
+=============
+
+Complete documentation for funcX is available `here <https://funcx.readthedocs.io>`_
 
