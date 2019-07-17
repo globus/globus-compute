@@ -491,6 +491,11 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Sent hold request to worker: {}".format(worker_id))
         return c
 
+    def wait_for_endpoint(self):
+        heartbeat = self.command_client.run('HEARTBEAT')
+        logger.debug("Attempting heartbeat to interchange")
+        return heartbeat
+
     @property
     def outstanding(self):
         outstanding_c = self.command_client.run("OUTSTANDING_C")
