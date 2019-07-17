@@ -145,6 +145,8 @@ class Interchange(object):
 
         start_file_logger("{}/interchange.log".format(self.logdir), level=logging_level)
         logger.debug("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
+        self.config = config
+        logger.debug("Got config : {}".format(config))
 
         self.client_address = client_address
         self.interchange_address = interchange_address
@@ -202,7 +204,7 @@ class Interchange(object):
 
         self.launch_cmd = launch_cmd
         if not launch_cmd:
-            self.launch_cmd = ("process_worker_pool.py {debug} {max_workers} "
+            self.launch_cmd = ("funcx-worker {debug} {max_workers} "
                                "-c {cores_per_worker} "
                                "--poll {poll_period} "
                                "--task_url={task_url} "
@@ -222,6 +224,55 @@ class Interchange(object):
                                  'dir': os.getcwd()}
 
         logger.info("Platform info: {}".format(self.current_platform))
+        try:
+            self.load_config()
+        except Exception as e:
+            logger.exception("Caught exception")
+            raise
+
+
+    def load_config(self):
+        """ Load the config
+        """
+        logger.info("Loading endpoint local config")
+        working_dir = self.config.working_dir
+        if self.config.working_dir is None:
+            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+        logger.info("Setting working_dir: {}".format(working_dir))
+
+        self.config.provider.script_dir = working_dir
+        self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
+        self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
+        os.makedirs(self.config.provider.script_dir, exist_ok=True)
+
+        debug_opts = "--debug" if self.config.worker_debug else ""
+        max_workers = "" if self.config.max_workers_per_node == float('inf') \
+                      else "--max_workers={}".format(self.config.max_workers_per_node)
+
+        worker_task_url = f"tcp://127.0.0.1:{self.worker_task_port}"
+        worker_result_url = f"tcp://127.0.0.1:{self.worker_result_port}"
+
+        l_cmd = self.launch_cmd.format(debug=debug_opts,
+                                       max_workers=max_workers,
+                                       cores_per_worker=self.config.cores_per_worker,
+                                       #mem_per_worker=self.config.mem_per_worker,
+                                       prefetch_capacity=self.config.prefetch_capacity,
+                                       task_url=worker_task_url,
+                                       result_url=worker_result_url,
+                                       nodes_per_block=self.config.provider.nodes_per_block,
+                                       heartbeat_period=self.config.heartbeat_period,
+                                       heartbeat_threshold=self.config.heartbeat_threshold,
+                                       poll_period=self.config.poll_period,
+                                       worker_mode=self.config.worker_mode,
+                                       container_image=None,
+                                       logdir=working_dir)
+        self.config.launch_cmd = l_cmd
+        logger.info("Launch command: {}".format(self.config.launch_cmd))
+
+        if self.config.scaling_enabled:
+            logger.info("Scaling ...")
+            self.config.provider.submit(self.config.launch_cmd, 1, 1)
+
 
     def get_tasks(self, count):
         """ Obtains a batch of tasks from the internal pending_task_queue
