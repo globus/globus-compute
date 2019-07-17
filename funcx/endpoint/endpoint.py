@@ -23,7 +23,7 @@ import funcx
 from funcx.executors.high_throughput import global_config, default_config
 from funcx.executors.high_throughput.interchange import Interchange
 from funcx.endpoint.list_endpoints import list_endpoints
-
+from funcx.errors import *
 
 def reload_and_restart():
     print("Restarting funcX endpoint")
@@ -112,17 +112,21 @@ def init_endpoint(args):
 
 
 def register_with_hub(address):
+    """ This currently registers directly with the Forwarder micro service.
+
+    Can be used as an example of how to make calls this it, while the main API
+    is updated to do this calling on behalf of the endpoint in the second iteration.
+    """
     r = requests.post(address + '/register',
-                      json={'python_v': "{}.{}".format(sys.version_info.major,
-                                                       sys.version_info.minor),
-                            'os': platform.system(),
-                            'hname': platform.node(),
-                            'username': getpass.getuser(),
-                            'funcx_v': str(funcx.__version__)
+                      json={'endpoint_id': str(uuid.uuid4()),
+                            'redis_address': 'funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com',
+
                       }
     )
     if r.status_code != 200:
-        print("Caught an issue with the registration: ", r)
+        print(dir(r))
+        print(r)
+        raise RegistrationError(r.reason)
 
     return r.json()
 
