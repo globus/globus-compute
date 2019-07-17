@@ -29,6 +29,10 @@ class Config(RepresentationMixin):
         Select the mode of operation from no_container, singularity_reuse, singularity_single_use
         Default: no_container
 
+    scaling_enabled : Bool
+        Allow Interchange to manage resource provisioning. If set to False, interchange
+        will not do any scaling.
+        Default: True
     """
 
     def __init__(self,
