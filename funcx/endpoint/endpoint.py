@@ -250,7 +250,7 @@ def stop_endpoint(args, global_config=None):
             # Attempt terminating
             try:
                 logger.debug("Signalling process: {}".format(pid))
-                os.kill(pid, signal.SIGTERM)
+                os.kill(pid, signal.SIGKILL)
                 time.sleep(0.1)
                 # Wait to confirm that the pid file disappears
                 if not os.path.exists(pid_file):
