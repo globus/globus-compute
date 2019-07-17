@@ -360,6 +360,10 @@ class Interchange(object):
                     else:
                         reply = False
 
+                elif command_req == "HEARTBEAT":
+                    logger.info("[CMD] Received heartbeat message from hub")
+                    reply = "HBT,{}".format(self.endpoint_id)
+                    
                 elif command_req == "SHUTDOWN":
                     logger.info("[CMD] Received SHUTDOWN command")
                     kill_event.set()
