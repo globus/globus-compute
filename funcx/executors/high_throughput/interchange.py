@@ -144,9 +144,9 @@ class Interchange(object):
             pass
 
         start_file_logger("{}/interchange.log".format(self.logdir), level=logging_level)
-        logger.debug("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
+        logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
-        logger.debug("Got config : {}".format(config))
+        logger.info("Got config : {}".format(config))
 
         self.client_address = client_address
         self.interchange_address = interchange_address
@@ -159,13 +159,17 @@ class Interchange(object):
         self.task_incoming = self.context.socket(zmq.DEALER)
         self.task_incoming.set_hwm(0)
         self.task_incoming.RCVTIMEO = 10  # in milliseconds
+        logger.info("Task incoming on tcp://{}:{}".format(client_address, client_ports[0]))
         self.task_incoming.connect("tcp://{}:{}".format(client_address, client_ports[0]))
+
         self.results_outgoing = self.context.socket(zmq.DEALER)
         self.results_outgoing.set_hwm(0)
+        logger.info("Results outgoing on tcp://{}:{}".format(client_address, client_ports[1]))
         self.results_outgoing.connect("tcp://{}:{}".format(client_address, client_ports[1]))
 
         self.command_channel = self.context.socket(zmq.REP)
         self.command_channel.RCVTIMEO = 1000  # in milliseconds
+        logger.info("Command channel on tcp://{}:{}".format(client_address, client_ports[2]))
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
         logger.info("Connected to client")
 
@@ -363,7 +367,7 @@ class Interchange(object):
                 elif command_req == "HEARTBEAT":
                     logger.info("[CMD] Received heartbeat message from hub")
                     reply = "HBT,{}".format(self.endpoint_id)
-                    
+
                 elif command_req == "SHUTDOWN":
                     logger.info("[CMD] Received SHUTDOWN command")
                     kill_event.set()
@@ -535,7 +539,7 @@ class Interchange(object):
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
 
-            logger.debug("[MAIN] entering bad_managers section")
+            # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [manager for manager in self._ready_manager_queue if
                             time.time() - self._ready_manager_queue[manager]['last'] > self.heartbeat_threshold]
             for manager in bad_managers:
@@ -548,7 +552,6 @@ class Interchange(object):
                     self.results_outgoing.send(pkl_package)
                     logger.warning("[MAIN] Sent failure reports, unregistering manager")
                 self._ready_manager_queue.pop(manager, 'None')
-            logger.debug("[MAIN] leaving bad_managers section")
             logger.debug("[MAIN] ending one main loop iteration")
 
         delta = time.time() - start
