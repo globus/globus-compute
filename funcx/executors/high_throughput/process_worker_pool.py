@@ -498,7 +498,8 @@ def set_stream_logger(name='parsl', level=logging.DEBUG, format_string=None):
     logger.addHandler(handler)
 
 
-if __name__ == "__main__":
+
+def cli_run():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", action='store_true',
@@ -546,6 +547,8 @@ if __name__ == "__main__":
         logger.info("cores_per_worker: {}".format(args.cores_per_worker))
         logger.info("task_url: {}".format(args.task_url))
         logger.info("result_url: {}".format(args.result_url))
+        logger.info("hb_period: {}".format(args.hb_period))
+        logger.info("hb_threshold: {}".format(args.hb_threshold))
         logger.info("max_workers: {}".format(args.max_workers))
         logger.info("poll_period: {}".format(args.poll))
         logger.info("mode: {}".format(args.mode))
@@ -572,3 +575,7 @@ if __name__ == "__main__":
     else:
         logger.info("process_worker_pool exiting")
         print("PROCESS_WORKER_POOL exiting")
+
+
+if __name__ == "__main__":
+    cli_run()
