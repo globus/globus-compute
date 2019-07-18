@@ -16,7 +16,6 @@ from multiprocessing import Process, Queue
 from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
 from ipyparallel.serialize import deserialize_object  # ,serialize_object
 
-from parsl.executors.high_throughput import zmq_pipes
 from parsl.executors.high_throughput import interchange
 from parsl.executors.errors import *
 from parsl.executors.base import ParslExecutor
@@ -25,10 +24,15 @@ from parsl.dataflow.error import ConfigurationError
 from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
 
+
+from funcx.executors.high_throughput import zmq_pipes
+
 logger = logging.getLogger(__name__)
 
 BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
+
+
 
 
 class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
@@ -247,9 +251,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     def start(self):
         """Create the Interchange process and connect to it.
         """
-        self.outgoing_q = zmq_pipes.TasksOutgoing("127.0.0.1", self.interchange_port_range)
-        self.incoming_q = zmq_pipes.ResultsIncoming("127.0.0.1", self.interchange_port_range)
-        self.command_client = zmq_pipes.CommandClient("127.0.0.1", self.interchange_port_range)
+        self.outgoing_q = zmq_pipes.TasksOutgoing("0.0.0.0", self.interchange_port_range)
+        self.incoming_q = zmq_pipes.ResultsIncoming("0.0.0.0", self.interchange_port_range)
+        self.command_client = zmq_pipes.CommandClient("0.0.0.0", self.interchange_port_range)
 
         self.is_alive = True
 
@@ -556,8 +560,10 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
               Dict with connection info
         """
         return {'address': self.address,
-                'client_ports': '{},{},{}'.format(self.incoming_q.port,
-                                                  self.outgoing_q.port,
+                # A memorial to the ungodly amount of time and effort spent,
+                # troubleshooting the order of these ports.
+                'client_ports': '{},{},{}'.format(self.outgoing_q.port,
+                                                  self.incoming_q.port,
                                                   self.command_client.port)
         }
 
