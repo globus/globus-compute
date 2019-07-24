@@ -27,13 +27,13 @@ class FuncXClient(BaseClient):
                 If ``None``, will be created.
             http_timeout (int): Timeout for any call to service in seconds. (default is no timeout)
             force_login (bool): Whether to force a login to get new credentials.
-                A login will always occur if ``fx_authorizer`` 
+                A login will always occur if ``fx_authorizer``
                 are not provided.
         Keyword arguments are the same as for BaseClient.
         """
         if force_login or not fx_authorizer:
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
-            auth_res = login(services=[fx_scope], 
+            auth_res = login(services=[fx_scope],
                              app_name="funcX_Client",
                              client_id=CLIENT_ID, clear_old_tokens=force_login,
                              token_dir=_token_dir)
@@ -114,7 +114,7 @@ class FuncXClient(BaseClient):
             raise NotImplementedError('Files support is not yet implemented')
         else:
             raise ValueError('Input type not recognized: {}'.format(input_type))
-        
+
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
         if r.http_status is not 200:
