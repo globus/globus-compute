@@ -1,5 +1,4 @@
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
-from funcx.sdk.config import (check_logged_in, lookup_option)
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
