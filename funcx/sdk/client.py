@@ -1,5 +1,5 @@
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
-from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID, lookup_option)
+from funcx.sdk.config import (check_logged_in, lookup_option)
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
@@ -8,14 +8,16 @@ import pickle as pkl
 import codecs
 import os
 
-_token_dir = os.path.expanduser("~/.funcx/credentials")
-
 
 class FuncXClient(BaseClient):
     """Main class for interacting with the funcX service
 
     Holds helper operations for performing common tasks with the funcX service.
     """
+
+    TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
+    CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
+    FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
 
     def __init__(self, fx_authorizer=None, http_timeout=None,
                  force_login=False, **kwargs):
@@ -35,12 +37,16 @@ class FuncXClient(BaseClient):
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
             auth_res = login(services=[fx_scope],
                              app_name="funcX_Client",
-                             client_id=CLIENT_ID, clear_old_tokens=force_login,
-                             token_dir=_token_dir)
+                             client_id=self.CLIENT_ID,
+                             clear_old_tokens=force_login,
+                             token_dir=self.TOKEN_DIR)
             dlh_authorizer = auth_res['funcx_service']
 
-        super(FuncXClient, self).__init__("funcX", environment='funcx', authorizer=dlh_authorizer,
-                                          http_timeout=http_timeout, base_url=FUNCX_SERVICE_ADDRESS,
+        super(FuncXClient, self).__init__("funcX",
+                                          environment='funcx',
+                                          authorizer=dlh_authorizer,
+                                          http_timeout=http_timeout,
+                                          base_url=self.FUNCX_SERVICE_ADDRESS,
                                           **kwargs)
 
     def logout(self):
@@ -64,17 +70,6 @@ class FuncXClient(BaseClient):
 
         r = self.get("{task_id}/status".format(task_id=task_id))
         return r.text
-
-    def get_local_endpoint(self):
-        """Get the local endpoint if it exists.
-
-        Returns:
-            (str) the uuid of the endpoint
-        -------
-        """
-
-        endpoint_uuid = lookup_option("endpoint_uuid")
-        return endpoint_uuid
 
     def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json'):
 
