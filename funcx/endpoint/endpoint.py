@@ -1,10 +1,10 @@
+import traceback
 import threading
 import platform
 import logging
 import pickle
+import codecs
 import parsl
-import time
-import json
 import queue
 
 from funcx.sdk.client import FuncXClient
@@ -38,14 +38,38 @@ def execute_function(code, entry_point, event=None):
 
     Returns
     -------
-    json
-        The result of running the function
+    dict
+        The result of running the function. Keys
+            success: (bool) Whether the execution was successful
+            data: (str) On success, a base64-encoded Python pickle string of the output
+            stacktrace: (str) On failure, ready-to-print stack trace
     """
+
+    # Make a shallow copy of the event
+    new_event = dict(event)
+
+    # Deserialize the data from the actual event
+    data_type = event['data']['type']
+    if data_type == 'python':
+        new_event['data'] = pickle.loads(codecs.decode(event['data']['data'].encode(), 'base64'))
+    elif data_type == 'json':
+        new_event['data'] = event['data']['data']
+
+    # Run the function
     try:
-        exec(code)
-        return eval(entry_point)(event)
+        exec(code)  # This effectively imports the users "function"
+        output = eval(entry_point)(new_event)
     except Exception as e:
-        return str(e)
+        # TODO (wardlt): Pass a stack trace?
+        return {
+            'success': False,
+        }
+
+    # Serialize the output data
+    return {
+        'success': True,
+        'data': codecs.encode(pickle.dumps(output), 'base64')
+    }
 
 
 class FuncXEndpoint:
@@ -112,6 +136,7 @@ class FuncXEndpoint:
         task_q = queue.Queue()
         result_q = queue.Queue()
         threads = []
+        # TODO (wardlt): Should we be using `self.worker_threads` here?
         for i in range(1):
             thread = threading.Thread(target=self.execution_worker, args=(task_q, result_q,))
             thread.daemon = True
@@ -167,12 +192,13 @@ class FuncXEndpoint:
             if task_q:
                 request, reply_to = task_q.get()
 
+                # Unpack the function information and event details (e.g., input data)
                 to_do = pickle.loads(request[0])
                 code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-                try:
-                    container_uuid = to_do[-1]['container_uuid']
-                except:
-                    container_uuid = None 
+
+                # Check if a container ID was provided
+                container_uuid = to_do[-1].get('container_uuid', None)
+
                 if container_uuid:
                     if container_uuid not in self.staged_containers:
                         container = self._stage_container(container_uuid, self.container_type)

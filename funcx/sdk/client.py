@@ -65,7 +65,16 @@ class FuncXClient(BaseClient):
         """
 
         r = self.get("{task_id}/status".format(task_id=task_id))
-        return json.loads(r.text)
+
+        # Get the result dictionary
+        output = r.data
+
+        # Deserialize the result object
+        if 'result' in output:
+            if output['result'].get('success', False):
+                output['result'] = pkl.loads(codecs.decode(output['result']['data'].encode(), 'base64'))
+
+        return output
 
     def get_local_endpoint(self):
         """Get the local endpoint if it exists.
@@ -111,9 +120,9 @@ class FuncXClient(BaseClient):
 
         # Prepare the data to be sent to funcX
         if input_type == 'python':
-            data['python'] = codecs.encode(pkl.dumps(inputs), 'base64').decode()
+            data['data'] = {'type': 'python', 'data': codecs.encode(pkl.dumps(inputs), 'base64').decode()}
         elif input_type == 'json':
-            data['data'] = inputs
+            data['data'] = {'type': 'json', 'data': inputs}
         elif input_type == 'files':
             raise NotImplementedError('Files support is not yet implemented')
         else:
