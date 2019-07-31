@@ -18,24 +18,32 @@ import getpass
 import shutil
 import tarfile
 import signal
+import psutil
 
 import funcx
 from funcx.executors.high_throughput import global_config, default_config
 from funcx.executors.high_throughput.interchange import Interchange
 from funcx.endpoint.list_endpoints import list_endpoints
+from funcx.sdk.client import FuncXClient
 from funcx.errors import *
 
-def reload_and_restart():
-    print("Restarting funcX endpoint")
 
+def check_pidfile(filepath, match_name, endpoint_name):
+    """ Helper function to identify possible dead endpoints
+    """
+    if not os.path.exists(filepath):
+        return
 
-def foo():
-    print("Start endpoint")
-    import time
-    for i in range(120):
-        time.sleep(1)
-        print("Running ep")
+    older_pid = int(open(filepath, 'r').read().strip())
 
+    try:
+        proc = psutil.Process(older_pid)
+        if proc.name() == match_name:
+            logger.info("Endpoint is already active")
+    except psutil.NoSuchProcess:
+        logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
+        logger.info('''Please cleanup using:
+    $ funcx-endpoint stop {}'''.format(endpoint_name))
 
 def load_endpoint(endpoint_dir):
     """
@@ -111,7 +119,7 @@ def init_endpoint(args):
     init_endpoint_dir(funcx_dir, "default")
 
 
-def register_with_hub(address):
+def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
     """ This currently registers directly with the Forwarder micro service.
 
     Can be used as an example of how to make calls this it, while the main API
@@ -119,7 +127,7 @@ def register_with_hub(address):
     """
     r = requests.post(address + '/register',
                       json={'endpoint_id': str(uuid.uuid4()),
-                            'redis_address': 'funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com',
+                            'redis_address': redis_host,
 
                       }
     )
@@ -173,14 +181,27 @@ Configure this file and try restarting with:
                                         args.name))
         return
 
+    # If pervious registration info exists, use that
     if os.path.exists(endpoint_json):
         with open(endpoint_json, 'r') as fp:
             logger.debug("Connection info loaded from prior registration record")
             reg_info = json.load(fp)
     else:
         logger.debug("Endpoint prior connection record not available. Attempting registration")
-        reg_info = register_with_hub('http://{}:{}'.format(global_config['broker_address'],
-                                                           global_config['broker_port']))
+
+        if global_config['broker_test'] is True:
+            logger.warning("**************** BROKER DEBUG MODE *******************")
+            reg_info = register_with_hub(global_config['broker_address'],
+                                         global_config['redis_host'])
+
+        else:
+            funcx_client = FuncXClient()
+
+            logger.debug("Attempting registration")
+            eid = str(uuid.uuid4())
+            logger.debug(f"Trying with eid : {eid}")
+            reg_info = funcx_client.register_endpoint(args.name, eid)
+            logger.debug("Got endpoint info : {}".format(reg_info))
 
         logger.info("Registration info from broker: {}".format(reg_info))
         with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
@@ -219,6 +240,8 @@ Configure this file and try restarting with:
         print("Caught exception while trying to setup endpoint context dirs")
         print("Exception : ", e)
 
+    check_pidfile(context.pidfile.path, "funcx-endpoint", args.name)
+
     with context:
         ic = Interchange(endpoint_config.config, **optionals)
         ic.start()
@@ -245,20 +268,23 @@ def stop_endpoint(args, global_config=None):
 
     if os.path.exists(pid_file):
         logger.debug("{} has a daemon.pid file".format(args.name))
+        pid = None
         with open(pid_file, 'r') as f:
             pid = int(f.read())
-            # Attempt terminating
-            try:
-                logger.debug("Signalling process: {}".format(pid))
-                os.kill(pid, signal.SIGKILL)
-                time.sleep(0.1)
-                # Wait to confirm that the pid file disappears
-                if not os.path.exists(pid_file):
-                    logger.info("Endpoint <{}> is now stopped".format(args.name))
+        # Attempt terminating
+        try:
+            logger.debug("Signalling process: {}".format(pid))
+            os.kill(pid, signal.SIGKILL)
+            time.sleep(0.1)
+            # Wait to confirm that the pid file disappears
+            if not os.path.exists(pid_file):
+                logger.info("Endpoint <{}> is now stopped".format(args.name))
 
-            except OSError:
-                logger.warning("Endpoint {} could not be terminated".format(args.name))
-                sys.exit(-1)
+        except OSError:
+            logger.warning("Endpoint {} could not be terminated".format(args.name))
+            logger.warning("Attempting Endpoint {} cleanup".format(args.name))
+            os.remove(pid_file)
+            sys.exit(-1)
     else:
         logger.info("Endpoint <{}> is not active.".format(args.name))
 
@@ -312,11 +338,22 @@ def cli_run():
     args.config_file = os.path.join(args.config_dir, 'config.py')
 
     if args.command == "init":
+        if args.force:
+            logger.debug("Forcing re-authentication via GlobusAuth")
+        funcx_client = FuncXClient(force_login=args.force)
         init_endpoint(args)
+        return
 
     if not os.path.exists(args.config_file):
         logger.critical("Missing a config file at {}. Critical error. Exiting.".format(args.config_file))
         logger.info("Please run the following to create the appropriate config files : \n $> funcx-endpoint init")
+        exit(-1)
+    else:
+        logger.debug("Using config files from {}".format(args.config_dir))
+
+    if args.command == "init":
+
+        init_endpoint(args)
         exit(-1)
     else:
         logger.debug("Using config files from {}".format(args.config_dir))
@@ -327,8 +364,10 @@ def cli_run():
 
     if args.command == "start":
         start_endpoint(args, global_config=global_config.global_options)
+
     elif args.command == "stop":
         stop_endpoint(args, global_config=global_config.global_options)
+
     elif args.command == "list":
         list_endpoints(args)
 
