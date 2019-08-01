@@ -1,12 +1,13 @@
-from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
+import codecs
+import os
+import logging
+import pickle as pkl
 
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
+from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
 
-import pickle as pkl
-import codecs
-import os
-
+logger = logging.getLogger(__name__)
 
 class FuncXClient(BaseClient):
     """Main class for interacting with the funcX service
@@ -16,7 +17,8 @@ class FuncXClient(BaseClient):
 
     TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
-    FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
+    # FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
+    FUNCX_SERVICE_ADDRESS = "https://dev.funcx.org/api/v1"
 
     def __init__(self, fx_authorizer=None, http_timeout=None,
                  force_login=False, **kwargs):
@@ -32,6 +34,8 @@ class FuncXClient(BaseClient):
                 are not provided.
         Keyword arguments are the same as for BaseClient.
         """
+        self.ep_registration_path = 'register_endpoint_2'
+
         if force_login or not fx_authorizer:
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
             auth_res = login(services=[fx_scope],
@@ -131,19 +135,20 @@ class FuncXClient(BaseClient):
 
         Returns
         -------
-        int
-            The uuid of the endpoint
+        A dict
+            {'endopoint_id' : <>,
+             'address' : <>,
+             'client_ports': <>}
         """
-        registration_path = 'register_endpoint'
-
         data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
 
-        r = self.post(registration_path, json_body=data)
+        r = self.post(self.ep_registration_path, json_body=data)
         if r.http_status is not 200:
             raise Exception(r)
 
         # Return the result
-        return r.data['endpoint_uuid']
+        logger.info("Data returned : {}".format(r.data))
+        return r.data
 
     def get_container(self, container_id, container_type):
         """Get the details of a container for staging it locally.
