@@ -15,6 +15,10 @@ on existing infrastructure including clouds, clusters, and supercomputers.
 .. |docs| image:: https://readthedocs.org/projects/funcx/badge/?version=latest
    :target: http://funcx.readthedocs.io/en/stable/?badge=latest
    :alt: Documentation Status
+.. |launch| image:: https://mybinder.org/badge_logo.svg
+   :target: https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2Fintroduction.ipynb
+   :alt: Launch in Binder
+
 
 QuickStart
 ==========
