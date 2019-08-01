@@ -1,6 +1,6 @@
 funcX - Fast Function Serving
 =============================
-|licence| |build-status| |docs|
+|licence| |build-status| |docs| |launch|
 
 funcX is a high-performance function-as-a-service (FaaS) platform that enables
 intuitive, flexible, efficient, scalable, and performant remote function execution
