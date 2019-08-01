@@ -208,7 +208,7 @@ class Interchange(object):
 
         self.launch_cmd = launch_cmd
         if not launch_cmd:
-            self.launch_cmd = ("funcx-worker {debug} {max_workers} "
+            self.launch_cmd = ("funcx-manager {debug} {max_workers} "
                                "-c {cores_per_worker} "
                                "--poll {poll_period} "
                                "--task_url={task_url} "
