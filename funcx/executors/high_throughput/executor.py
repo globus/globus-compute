@@ -13,8 +13,10 @@ import pickle
 import daemon
 from multiprocessing import Process, Queue
 
-from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
+#from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
 from ipyparallel.serialize import deserialize_object  # ,serialize_object
+from funcx.serialize import FuncXSerializer
+fx_serializer = FuncXSerializer()
 
 from parsl.executors.high_throughput import interchange
 from parsl.executors.errors import *
@@ -539,9 +541,16 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
         self.tasks[task_id] = Future()
 
+        """
         fn_buf = pack_apply_message(func, args, kwargs,
                                     buffer_threshold=1024 * 1024,
                                     item_threshold=1024)
+
+        """
+        # This needs to be a byte buffer
+        fn_buf = [fx_serializer.serialize(func).encode(),
+                  fx_serializer.serialize(args).encode(),
+                  fx_serializer.serialize(kwargs).encode()]
 
         msg = {"task_id": task_id,
                "buffer": fn_buf}
