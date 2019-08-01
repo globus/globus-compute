@@ -39,7 +39,8 @@ class pickle_base64(fxPicker_shared):
         return self.identifier + x
 
     def deserialize(self, payload):
-        data = pickle.loads(codecs.decode(payload.encode(), 'base64'))
+        chomped = self.chomp(payload)
+        data = pickle.loads(codecs.decode(chomped.encode(), 'base64'))
         return data
 
 class code_pickle(fxPicker_shared):
@@ -89,7 +90,7 @@ class code_text_inspect(fxPicker_shared):
     is then returned by name.
     """
 
-    _identifier = '03\n'
+    _identifier = '04\n'
     _for_code = True
 
     def __init__(self):
