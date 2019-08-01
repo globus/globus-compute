@@ -5,3 +5,5 @@ nbsphinx
 parsl
 configobj
 texttable
+psutil
+mdf_toolbox
