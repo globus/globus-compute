@@ -6,172 +6,191 @@ import zmq
 import os
 import sys
 import pickle
-from ipyparallel.serialize import serialize_object, unpack_apply_message
 
+
+from ipyparallel.serialize import serialize_object, unpack_apply_message
 from parsl.app.errors import RemoteExceptionWrapper
 
+from funcx import set_file_logger
 
-def funcx_worker(worker_id, pool_id, task_url, reg_url, no_reuse, logdir, debug=False):
-    """
+
+class FuncXWorker(object):
+    """ The FuncX worker
+    Parameters
+    ----------
+
+    worker_id : str
+     Worker id string
+
+    address : str
+     Address at which the manager might be reached. This is usually 127.0.0.1
+
+    port : int
+     Port at which the manager can be reached
+
+    logdir : str
+     Logging directory
+
+    debug : Bool
+     Enables debug logging
+
+
     Funcx worker will use the REP sockets to:
          task = recv ()
          result = execute(task)
          send(result)
+
+
     """
 
-    #print("Exiting worker. Container will not be reused")
-    #print("Exited with code: {}".format(exit()))
+    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW'):
+
+        self.worker_id = worker_id
+        self.address = address
+        self.port = port
+        self.logdir = logdir
+        self.debug = debug
+        self.worker_type = worker_type
+
+        global logger
+        logger = set_file_logger('{}/funcx_worker_{}.log'.format(logdir, worker_id),
+                                 name="worker_log",
+                                 level=logging.DEBUG if debug else logging.INFO)
+
+        logger.info('Initializing worker {}'.format(worker_id))
+        if debug:
+            logger.debug('Debug logging enabled')
+
+        self.context = zmq.Context()
+        self.poller = zmq.Poller()
+        self.identity = worker_id.encode()
 
 
+        self.task_socket = self.context.socket(zmq.DEALER)
+        self.task_socket.setsockopt(zmq.IDENTITY, self.identity)
 
-    try:
-        os.makedirs("{}/{}".format(logdir, pool_id))
-    except Exception:
-        pass
-
-    start_file_logger('{}/{}/funcx_worker_{}.log'.format(logdir, pool_id, worker_id),
-                      worker_id,
-                      name="worker_log",
-                      level=logging.DEBUG if debug else logging.INFO)
-
-    # Sync worker with master
-    logger.info('Worker {} started'.format(worker_id))
-    if debug:
-        logger.debug("Debug logging enabled")
-
-    context = zmq.Context()
-
-    registration_socket = context.socket(zmq.REQ)
-    registration_socket.RCVTIMEO=1000
-    registration_socket.connect(reg_url)
-    logger.info("Connecting to {} for registration".format(reg_url))
-    registration_socket.send_pyobj(worker_id)
-    try:
-        msg = registration_socket.recv_pyobj()
-    except zmq.Again:
-        logger.critical("Registered with manager failed")
-    else:
-        logger.info("Registered with manager successful")
+        logger.info('Trying to connect to : tcp://{}:{}'.format(self.address, self.port))
+        self.task_socket.connect('tcp://{}:{}'.format(self.address, self.port))
+        self.poller.register(self.task_socket, zmq.POLLIN)
 
 
-    funcx_worker_socket = context.socket(zmq.REP)
-    funcx_worker_socket.connect(task_url)
-    logger.info("Connecting to {}".format(task_url))
-    logger.info("Container will exit after single task: {}".format(no_reuse))
+    def registration_message(self):
+        return {'worker_id': self.worker_id,
+                'worker_type': self.worker_type}
 
-    while True:
-        # This task receiver socket is blocking.
+    def start(self):
+
+        logger.info("Starting worker")
+
+        result = self.registration_message()
+        task_type = b'REGISTER'
+
+        while True:
+
+            logger.debug("Sending result")
+            # TODO : Swap for our serialization methods
+            self.task_socket.send_multipart([task_type, # Byte encoded
+                                             pickle.dumps(result)])
+
+            logger.debug("Waiting for task")
+            p_task_id, *msg = self.task_socket.recv_multipart()
+            task_id = pickle.loads(p_task_id)
+            logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
+
+            if task_id == "KILL":
+                logger.info("KILLING -- Kill message received! ")
+                task_type = b'WRKR_DIE'
+                result = None
+                continue
+
+            logger.debug("Executing task...")
+
+            try:
+                result = self.execute_task(msg)
+                logger.debug("Executed result: {}".format(result))
+                serialized_result = serialize_object(result)
+            except Exception:
+                logger.exception("Caught an exception {}")
+                result_package = {'task_id': task_id, 'exception': serialize_object(RemoteExceptionWrapper(*sys.exc_info()))}
+            else:
+                logger.debug("Execution completed without exception")
+                result_package = {'task_id': task_id, 'result': serialized_result}
+
+
+            # TODO: Change this to serialize_object to match IX?
+            result = result_package
+            task_type = b'TASK_RET'
+
+        logger.warning("Broke out of the loop... dying")
+
+
+    def execute_task(self, bufs):
+        """Deserialize the buffer and execute the task.
+
+        Returns the result or throws exception.
+        """
+
+        logger.debug("Inside execute_task function")
+        user_ns = locals()
+        user_ns.update({'__builtins__': __builtins__})
+
+        f, args, kwargs = unpack_apply_message(bufs, user_ns, copy=False)
+
+        logger.debug("Message unpacked")
+
+        # We might need to look into callability of the function from itself
+        # since we change it's name in the new namespace
+        """
+        prefix = "parsl_"
+        fname = prefix + "f"
+        argname = prefix + "args"
+        kwargname = prefix + "kwargs"
+        resultname = prefix + "result"
+
+        user_ns.update({fname: f,
+                        argname: args,
+                        kwargname: kwargs,
+                        resultname: resultname})
+
+        logger.debug("Namespace updated")
+
+        code = "{0} = {1}(*{2}, **{3})".format(resultname, fname,
+                                               argname, kwargname)
+
         try:
-            b_task_id, *buf = funcx_worker_socket.recv_multipart()
+            exec(code, user_ns, user_ns)
+
         except Exception as e:
-            logger.debug(e)
-        # msg = task_socket.recv_pyobj()
-        logger.debug("Got buffer : {}".format(buf))
+            raise e
 
-        task_id = int.from_bytes(b_task_id, "little")
-        logger.info("Received task {}".format(task_id))
-
-        try:
-            result = execute_task(buf)
-            serialized_result = serialize_object(result)
-
-        except Exception:
-            result_package = {'task_id': task_id, 'exception': serialize_object(RemoteExceptionWrapper(*sys.exc_info()))}
-            logger.debug("Got exception something")
         else:
-            result_package = {'task_id': task_id, 'result': serialized_result}
+            return user_ns.get(resultname)
 
-        logger.info("Completed task {}".format(task_id))
-        pkl_package = pickle.dumps(result_package)
-
-        funcx_worker_socket.send_multipart([pkl_package])
-
-        if no_reuse:
-            logger.info("Exiting worker. Container will not be reused, breaking...")
-            funcx_worker_socket.close()
-            context.term()
-            return None
+        """
+        return f(*args, **kwargs)
 
 
-def execute_task(bufs):
-    """Deserialize the buffer and execute the task.
-
-    Returns the result or throws exception.
-    """
-
-    logger.debug("Inside execute_task function")
-    user_ns = locals()
-    user_ns.update({'__builtins__': __builtins__})
-
-    f, args, kwargs = unpack_apply_message(bufs, user_ns, copy=False)
-
-    logger.debug("Message unpacked")
-
-    # We might need to look into callability of the function from itself
-    # since we change it's name in the new namespace
-    prefix = "parsl_"
-    fname = prefix + "f"
-    argname = prefix + "args"
-    kwargname = prefix + "kwargs"
-    resultname = prefix + "result"
-
-    user_ns.update({fname: f,
-                    argname: args,
-                    kwargname: kwargs,
-                    resultname: resultname})
-
-    logger.debug("Namespace updated")
-
-    code = "{0} = {1}(*{2}, **{3})".format(resultname, fname,
-                                           argname, kwargname)
-
-    try:
-        exec(code, user_ns, user_ns)
-
-    except Exception as e:
-        raise e
-
-    else:
-        return user_ns.get(resultname)
-
-
-def start_file_logger(filename, rank, name='parsl', level=logging.DEBUG, format_string=None):
-    """Add a stream log handler.
-
-    Args:
-        - filename (string): Name of the file to write logs to
-        - name (string): Logger name
-        - level (logging.LEVEL): Set the logging level.
-        - format_string (string): Set the format string
-
-    Returns:
-       -  None
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d Rank:{0} [%(levelname)s]  %(message)s".format(rank)
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-    handler = logging.FileHandler(filename)
-    handler.setLevel(level)
-    formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-
-if __name__ == "__main__":
-    # no_reuse = False
-    # open('my_file.txt', 'a').close()
-    # exit()
+def cli_run():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--worker_id", help="ID of worker from process_worker_pool", required=True)
-    parser.add_argument("--pool_id", help="ID of our process_worker_pool", required=True)
-    parser.add_argument("--task_url", help="URL from which we receive tasks and send replies", required=True)
-    parser.add_argument("--reg_url", help="URL for registering the worker", required=True)
-    parser.add_argument("--logdir", help="Directory path where worker log files written", required=True)
-    parser.add_argument("--no_reuse", help="If exists, run in no_reuse mode on containers", action="store_true", required=False)
+    parser.add_argument("-w", "--worker_id", required=True,
+                        help="ID of worker from process_worker_pool")
+    parser.add_argument("-a", "--address", required=True,
+                        help="Address for the manager, eg X,Y,")
+    parser.add_argument("-p", "--port", required=True,
+                        help="Internal port at which the worker connects to the manager")
+    parser.add_argument("--logdir", required=True,
+                        help="Directory path where worker log files written")
+    parser.add_argument("-d", "--debug", action='store_true',
+                        help="Directory path where worker log files written")
 
     args = parser.parse_args()
-    worker = funcx_worker(args.worker_id, args.pool_id, args.task_url, args.reg_url, args.no_reuse, args.logdir)
-    
+    worker = FuncXWorker(args.worker_id,
+                         args.address,
+                         int(args.port),
+                         args.logdir,
+                         debug=args.debug)
+    worker.start()
+    return
+
+if __name__ == "__main__":
+    cli_run()
