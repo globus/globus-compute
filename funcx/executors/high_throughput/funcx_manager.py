@@ -247,9 +247,7 @@ class Manager(object):
                     logger.warning(f"Got registration message")
                     if m_type == b'REGISTER':
                         reg_info = pickle.loads(message)
-                        logger.info("Registration received from worker:{} {}".format(
-                            w_id,
-                            reg_info))
+                        logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
 
                         # Increment worker_type count by 1
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
@@ -322,9 +320,10 @@ class Manager(object):
                 if task_type == 'slots':
                     continue
                 else:
+                    logger.debug("Looking for tasks of type : {}".format(task_type))
                     available_workers = current_worker_map[task_type]
                     for i in range(available_workers):
-                        if not self.task_queues[task_type].empty():
+                        if task_type in self.task_queues and not self.task_queues[task_type].empty():
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
                             logger.info("Sending task {} to {}".format(task, worker_id))
@@ -605,7 +604,7 @@ class Manager(object):
         self.result_outgoing.close()
         self.context.term()
         delta = time.time() - start
-        logger.info("process_worker_pool ran for {} seconds".format(delta))
+        logger.info("FuncX Manager ran for {} seconds".format(delta))
         return
 
 
