@@ -16,7 +16,7 @@ setup(
     packages=find_packages(),
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
-    python_requires="==3.6",
+    python_requires="==3.6.*",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
@@ -34,6 +34,8 @@ setup(
     entry_points={'console_scripts':
                   ['funcx-endpoint=funcx.endpoint.endpoint:cli_run',
                    'funcx-interchange=funcx.executors.high_throughput.interchange:cli_run',
+                   'funcx-manager=funcx.executors.high_throughput.funcx_manager:cli_run',
+                   'funcx-worker=funcx.executors.high_throughput.funcx_worker:cli_run',
                   ]
     },
     author='funcX team',
