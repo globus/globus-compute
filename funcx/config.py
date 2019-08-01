@@ -50,12 +50,12 @@ class Config(RepresentationMixin):
                  # Tuning info
                  worker_mode='no_container',
                  prefetch_capacity=10,
-                 heartbeat_period=60,
-                 heartbeat_threshold=120,
+                 heartbeat_period=2,
+                 heartbeat_threshold=10,
                  poll_period=10,
                  # Logging info
                  working_dir=None,
-                 worker_debug=False):
+                 worker_debug=True):
 
         # Scaling mechanics
         self.provider = provider
