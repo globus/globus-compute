@@ -42,6 +42,7 @@ class WorkerMap(object):
         if worker_type not in self.worker_queues:
             self.worker_queues[worker_type] = Queue()
 
+        self.worker_counts[worker_type] += 1
         self.worker_queues[worker_type].put(worker)
 
     def get_worker(self, worker_type):
