@@ -514,19 +514,16 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Got managers: {}".format(workers))
         return workers
 
-    def submit(self, func, *args, **kwargs):
+    def submit(self, bufs):
         """Submits work to the the outgoing_q.
 
         The outgoing_q is an external process listens on this
         queue for new work. This method behaves like a
         submit call as described here `Python docs: <https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor>`_
 
-        Args:
-            - func (callable) : Callable function
-            - *args (list) : List of arbitrary positional arguments.
-
-        Kwargs:
-            - **kwargs (dict) : A dictionary of arbitrary keyword args for func.
+        Parameters
+        ----------
+        Bufs - Pickled buffer with (b'<Function>', b'<args>', b'<kwargs>')
 
         Returns:
               Future
@@ -537,23 +534,13 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self._task_counter += 1
         task_id = self._task_counter
 
-        logger.debug("Pushing function {} to queue with args {}".format(func, args))
-
         self.tasks[task_id] = Future()
 
-        """
-        fn_buf = pack_apply_message(func, args, kwargs,
-                                    buffer_threshold=1024 * 1024,
-                                    item_threshold=1024)
-
-        """
         # This needs to be a byte buffer
-        fn_buf = [fx_serializer.serialize(func).encode(),
-                  fx_serializer.serialize(args).encode(),
-                  fx_serializer.serialize(kwargs).encode()]
-
+        # We want a cleaner header to the task here for the downstream systems
+        # to appropriately route tasks
         msg = {"task_id": task_id,
-               "buffer": fn_buf}
+               "buffer": bufs}
 
         # Post task to the the outgoing queue
         self.outgoing_q.put(msg)
