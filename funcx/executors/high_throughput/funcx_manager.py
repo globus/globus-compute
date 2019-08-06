@@ -227,6 +227,8 @@ class Manager(object):
             logger.debug("[TASK_PULL_THREAD] Loop start")
             pending_task_count = task_recv_counter - task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
+            logger.debug("[TASK_PULL_THREAD pending_task_count: {} Ready_worker_count: {}".format(
+                pending_task_count, ready_worker_count))
 
             if time.time() > last_beat + self.heartbeat_period:
                 self.heartbeat()
@@ -257,6 +259,7 @@ class Manager(object):
                         logger.info("Result received from worker:{}".format(w_id))
                         logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
                         self.pending_result_queue.put(message)
+                        self.worker_map.put_worker(w_id)
                         task_done_counter += 1
 
                 except Exception as e:
@@ -320,16 +323,16 @@ class Manager(object):
                 if task_type == 'slots':
                     continue
                 else:
-                    logger.debug("Looking for tasks of type : {}".format(task_type))
                     available_workers = current_worker_map[task_type]
+                    logger.debug("Available workers of type {}: {}".format(task_type,
+                                                                           available_workers))
                     for i in range(available_workers):
                         if task_type in self.task_queues and not self.task_queues[task_type].empty():
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
-                            logger.info("Sending task {} to {}".format(task, worker_id))
-                            self.funcx_task_socket.send_multipart([worker_id,
-                                                                   pickle.dumps(task['task_id']),
-                                                                   *task['buffer']])
+                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))
+                            to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
+                            self.funcx_task_socket.send_multipart(to_send)
                             logger.debug("Sending done")
 
 
