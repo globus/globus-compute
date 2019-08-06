@@ -112,18 +112,16 @@ class code_text_inspect(fxPicker_shared):
 def bar(x, y={'a':3}):
     return x * y['a']
 
+
 if __name__ == '__main__' :
 
-    def foo(x, y={'a':3}):
-        return x * y['a']
 
-
-    foo(29)
+    bar(29)
     #print(json_base64.identifier)
     #print(pickle_base64.identifier)
     ct = code_text_inspect()
-    f = ct.serialize(foo)
+    f = ct.serialize(bar)
     # print("Serialized : ", f)
-    new_foo = ct.deserialize(f)
-    print("After deserialization : ", new_foo)
-    print("FN() : ", new_foo(10))
+    new_bar = ct.deserialize(f)
+    print("After deserialization : ", new_bar)
+    print("FN() : ", new_bar(10))
