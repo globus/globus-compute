@@ -12,6 +12,7 @@ from ipyparallel.serialize import serialize_object, unpack_apply_message
 from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx import set_file_logger
+from funcx.serialize import FuncXSerializer
 
 
 class FuncXWorker(object):
@@ -51,6 +52,10 @@ class FuncXWorker(object):
         self.logdir = logdir
         self.debug = debug
         self.worker_type = worker_type
+        serializer = FuncXSerializer()
+        self.serialize = serializer.serialize
+        self.deserialize = serializer.deserialize
+
 
         global logger
         logger = set_file_logger('{}/funcx_worker_{}.log'.format(logdir, worker_id),
@@ -93,7 +98,7 @@ class FuncXWorker(object):
                                              pickle.dumps(result)])
 
             logger.debug("Waiting for task")
-            p_task_id, *msg = self.task_socket.recv_multipart()
+            p_task_id, msg = self.task_socket.recv_multipart()
             task_id = pickle.loads(p_task_id)
             logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
 
@@ -124,7 +129,7 @@ class FuncXWorker(object):
         logger.warning("Broke out of the loop... dying")
 
 
-    def execute_task(self, bufs):
+    def execute_task(self, message):
         """Deserialize the buffer and execute the task.
 
         Returns the result or throws exception.
@@ -134,7 +139,20 @@ class FuncXWorker(object):
         user_ns = locals()
         user_ns.update({'__builtins__': __builtins__})
 
-        f, args, kwargs = unpack_apply_message(bufs, user_ns, copy=False)
+        logger.info("Trying to pickle load the message {}".format(message))
+        p_loaded_message =  pickle.loads(message)
+        logger.info("Pickle loaded message : {}".format(p_loaded_message))
+        s_fn, s_args, s_kwargs = p_loaded_message
+        logger.info("Loaded message fn : {}".format(s_fn))
+        logger.info("Loaded message args : {}".format(s_args))
+        logger.info("Loaded message kwargs : {}".format(s_kwargs))
+
+
+        # [TODO] We need a clean way to chomp pieces off from the buffer
+        # Split isn't working too well
+        f = self.deserialize(s_fn)
+        args = self.deserialize(s_args)
+        kwargs = self.deserialize(s_kwargs)
 
         logger.debug("Message unpacked")
 
