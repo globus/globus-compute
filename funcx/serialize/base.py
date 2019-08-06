@@ -6,6 +6,18 @@ import logging
 METHODS_MAP_CODE = {}
 METHODS_MAP_DATA = {}
 
+class DeserializationError(Exception):
+    """ Base class for all deserialization errors
+    """
+    def __init__(self, reason):
+        self.reason = reason
+
+    def __repr__(self):
+        return "Deserialization failed due to {}".format(self.reason)
+
+    def __str__(self):
+        return self.__repr__()
+
 
 class fxPicker_enforcer(metaclass=ABCMeta):
     """ Ensure that any concrete class will have the serialize and deserialize methods
@@ -52,8 +64,10 @@ class fxPicker_shared(object):
         payload : str
             Payload blob
         """
-        if payload.startswith(self.identifier):
-            return payload[len(self.identifier):]
+        s_id, payload = payload.split('\n', 1)
+        if (s_id + '\n') != self.identifier:
+            raise DeserializationError("Buffer does not start with identifier:{}".format(self.identifier))
+        return payload
 
     def check(self, payload):
 
