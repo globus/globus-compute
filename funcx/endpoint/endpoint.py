@@ -125,12 +125,15 @@ def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.am
     Can be used as an example of how to make calls this it, while the main API
     is updated to do this calling on behalf of the endpoint in the second iteration.
     """
-    r = requests.post(address + '/register',
-                      json={'endpoint_id': str(uuid.uuid4()),
-                            'redis_address': redis_host,
+    try:
+        r = requests.post(address + '/register',
+                          json={'endpoint_id': str(uuid.uuid4()),
+                                'redis_address': redis_host})
+    except requests.exceptions.ConnectionError:
+        logger.critical("Unable to reach the funcX hub at {}".format(address))
+        exit(-1)
+        # raise FuncXUnreachable(str(address))
 
-                      }
-    )
     if r.status_code != 200:
         print(dir(r))
         print(r)
