@@ -43,6 +43,7 @@ class FuncXSerializer(object):
     def _list_methods(self):
         return self.methods_for_code, self.methods_for_data
 
+
     def serialize(self, data):
         serialized = None
 
@@ -85,3 +86,49 @@ class FuncXSerializer(object):
         print("Result: ", result)
         return result
 
+
+    def pack_buffers(self, buffers):
+        """
+        Parameters
+        ----------
+        buffers : list of \n terminated strings
+        """
+        packed = ''
+        for buf in buffers:
+            s_length = str(len(buf)) + '\n'
+            packed += s_length + buf
+
+        return packed
+
+    def unpack_buffers(self, packed_buffer):
+        """
+        Parameters
+        ----------
+        packed_buffers : packed buffer as string
+        """
+        unpacked = []
+        while packed_buffer:
+            s_length, buf = packed_buffer.split('\n', 1)
+            i_length = int(s_length)
+            current, packed_buffer = buf[:i_length], buf[i_length:]
+            unpacked.extend([current])
+
+        return unpacked
+
+    def unpack_and_deserialize(self, packed_buffer):
+        """ Unpacks a packed buffer and returns the deserialized contents
+        Parameters
+        ----------
+        packed_buffers : packed buffer as string
+        """
+        unpacked = []
+        while packed_buffer:
+            s_length, buf = packed_buffer.split('\n', 1)
+            i_length = int(s_length)
+            current, packed_buffer = buf[:i_length], buf[i_length:]
+            deserialized = self.deserialize(current)
+            unpacked.extend([deserialized])
+
+        assert len(unpacked) == 3, "Unpack expects 3 buffers, got {}".format(len(unpacked))
+
+        return unpacked
