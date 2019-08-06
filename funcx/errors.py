@@ -17,3 +17,12 @@ class RegistrationError(FuncxError):
     def __repr__(self):
         return "Endpoint registration failed due to {}".format(self.reason)
 
+
+class FuncXUnreachable(FuncxError):
+    """ FuncX remote service is unreachable
+    """
+    def __init__(self, address):
+        self.address = address
+
+    def __repr__(self):
+        return "FuncX remote service is un-reachable at {}".format(self.address)
