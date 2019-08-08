@@ -97,6 +97,9 @@ class FuncXWorker(object):
             self.task_socket.send_multipart([task_type, # Byte encoded
                                              pickle.dumps(result)])
 
+            if task_type == b'WRKR_DIE':
+                exit()  # Kill the worker after accepting death in message to manager. 
+
             logger.debug("Waiting for task")
             p_task_id, msg = self.task_socket.recv_multipart()
             task_id = pickle.loads(p_task_id)
@@ -106,7 +109,9 @@ class FuncXWorker(object):
                 logger.info("KILLING -- Kill message received! ")
                 task_type = b'WRKR_DIE'
                 result = None
-                continue
+
+                # TODO: Send 'I DO INTEND ON DYING' message back to the manager. Manager will handle the worker_pool.  
+                
 
             logger.debug("Executing task...")
 
