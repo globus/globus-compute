@@ -154,6 +154,7 @@ class Manager(object):
         logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
 
         self.task_queues = {'RAW': queue.Queue()}
+        
         self.pending_result_queue = multiprocessing.Queue()
 
         self.max_queue_size = max_queue_size + self.worker_count
@@ -262,6 +263,10 @@ class Manager(object):
                         self.worker_map.put_worker(w_id)
                         task_done_counter += 1
 
+                    
+                    elif m_type == b'WRKR_DIE':
+                        self.worker_map.scrub_worker(w_id)
+
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
@@ -322,7 +327,12 @@ class Manager(object):
             for task_type in current_worker_map:
                 if task_type == 'slots':
                     continue
+
+
                 else:
+
+                    # TODO: TYLER -- in here, make KILL actually kill. 
+
                     available_workers = current_worker_map[task_type]
                     logger.debug("Available workers of type {}: {}".format(task_type,
                                                                            available_workers))
@@ -330,7 +340,7 @@ class Manager(object):
                         if task_type in self.task_queues and not self.task_queues[task_type].empty():
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
-                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))
+                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))                            
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
                             logger.debug("Sending done")
@@ -421,6 +431,20 @@ class Manager(object):
 
         return proc
 
+
+    def kill(self, worker_type):
+        """
+            Kill a worker of a given worker_type. 
+
+            Add a kill message to the task_type queue.
+
+            Assumption : All workers of the same type are uniform, and therefore are killed. 
+        """
+        
+        self.dead_workers.add(worker_type)
+        # self.available_workers[worker_type] -= 1  # COMMENTED OUT because messes with assigning the KILL task to the worker...
+        self.task_queues[worker_type].put({"task_id": "KILL", "buffer": "KILL"})
+        
 
     def start(self):
         """
