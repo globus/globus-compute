@@ -14,7 +14,8 @@ on campus clusters, clouds and supercomputers.
 
    quickstart
    endpoints
-   foo
+   debugging
+
 
 Indices and tables
 ==================
