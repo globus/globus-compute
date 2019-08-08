@@ -192,11 +192,10 @@ Configure this file and try restarting with:
     else:
         logger.debug("Endpoint prior connection record not available. Attempting registration")
 
-        if global_config['broker_test'] is True:
+        if global_config.get('broker_test', False) is True:
             logger.warning("**************** BROKER DEBUG MODE *******************")
             reg_info = register_with_hub(global_config['broker_address'],
                                          global_config['redis_host'])
-
         else:
             funcx_client = FuncXClient()
 
