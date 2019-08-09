@@ -81,24 +81,24 @@ class WorkerMap(object):
         return sum(self.worker_counts.values())
 
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
 
-    from funcx import set_stream_logger
-    logger = set_stream_logger(level=logging.DEBUG)
+#    from funcx import set_stream_logger
+#    logger = set_stream_logger(level=logging.DEBUG)
 
-    worker_map = WorkerMap(8)
+#    worker_map = WorkerMap(8)
 
-    worker_map.register_worker(1, 'DEFAULT')
-    worker_map.register_worker(2, 'CONT_1')
+#    worker_map.register_worker(1, 'DEFAULT')
+#    worker_map.register_worker(2, 'CONT_1')
 
-    worker_map.put_worker(1)
-    worker_map.put_worker(2)
+#    worker_map.put_worker(1)
+#    worker_map.put_worker(2)
 
-    print("Counts : ", worker_map.get_worker_counts())
+#    print("Counts : ", worker_map.get_worker_counts())
 
-    x = worker_map.get_worker('DEFAULT')
-    print("Took worker of type {} : {}".format('DEFAULT', x))
+#    x = worker_map.get_worker('DEFAULT')
+#    print("Took worker of type {} : {}".format('DEFAULT', x))
 
-    print("Counts : ", worker_map.get_worker_counts())
+#    print("Counts : ", worker_map.get_worker_counts())
 
-    print("Here")
+#    print("Here")
