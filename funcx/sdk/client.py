@@ -6,6 +6,7 @@ import pickle as pkl
 from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
+from funcx.serialize import FuncXSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ class FuncXClient(BaseClient):
                                           http_timeout=http_timeout,
                                           base_url=self.FUNCX_SERVICE_ADDRESS,
                                           **kwargs)
+        self.fx_serializer = FuncXSerializer()
 
     def logout(self):
         """Remove credentials from your local system
@@ -74,44 +76,39 @@ class FuncXClient(BaseClient):
         r = self.get("{task_id}/status".format(task_id=task_id))
         return r.text
 
-    def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json'):
+    def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
 
         """Initiate an invocation
 
         Parameters
         ----------
-        inputs : list
-            Data to be used as input to the function. Can be a string of file paths or URLs
-        input_type : str
-            How to send the data to funcX. Can be "python" (which pickles
-            the data), "json" (which uses JSON to serialize the data), or "files" (which
-            sends the data as files).
-        endpoint : str
-            The uuid of the endpoint
-        func_id : str
-            The uuid of the function
+        *args : Any
+            Args as specified by the function signature
+        endpoint_id : uuid str
+            Endpoint UUID string. Required
+        function_id : uuid str
+            Function UUID string. Required
         asynchronous : bool
             Whether or not to run the function asynchronously
-        input_type : str
-            Input type to use: json, python, files
 
         Returns
         -------
         dict
             Reply from the service
         """
-        servable_path = 'execute'
-        data = {'endpoint': endpoint, 'func': func_id, 'is_async': asynchronous}
+        servable_path = 'submit'
+        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
+        assert function_id is not None, "function_id key-word argument must be set"
 
-        # Prepare the data to be sent to funcX
-        if input_type == 'python':
-            data['python'] = codecs.encode(pkl.dumps(inputs), 'base64').decode()
-        elif input_type == 'json':
-            data['data'] = inputs
-        elif input_type == 'files':
-            raise NotImplementedError('Files support is not yet implemented')
-        else:
-            raise ValueError('Input type not recognized: {}'.format(input_type))
+        ser_args = self.fx_serializer.serialize(args)
+        ser_kwargs = self.fx_serializer.serialize(kwargs)
+        payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
+        print("Payload : ", payload)
+
+        data = {'endpoint': endpoint_id,
+                'func': function_id,
+                'payload': payload,
+                'is_async': asynchronous}
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
@@ -174,28 +171,36 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['container']
 
-    def register_function(self, name, code, entry_point='funcx_handler', description=None):
+    def register_function(self, function, endpoint_uuid, entry_point=None, description=None):
         """Register a function code with the funcX service.
 
         Parameters
         ----------
-        name : str
-            Name of the endpoint
+        function : Python Function
+            The function to be registered for remote execution
+        endpoint_uuid : str
+            Endpoint UUID to which the function must be sent to.
         description : str
             Description of the file
-        code : str
-            Function code
         entry_point : str
-            The entry point (function name) of the function
+            The entry point (function name) of the function. Default: None
 
         Returns
         -------
-        str
-            The name of the function
+        function uuid : str
+            UUID identifier for the registered function
         """
         registration_path = 'register_function'
 
-        data = {"function_name": name, "function_code": code, "entry_point": entry_point, "description": description}
+        serialized_fn = self.fx_serializer.serialize(function)
+        packed_code = self.fx_serializer.pack_buffers([serialized_fn])
+
+        data = {"function_name": function.__name__,
+                "function_code": packed_code,
+                "entry_point": entry_point if entry_point else function.__name__,
+                "description": description}
+
+        logger.info("Registering function : {}".format(data))
 
         r = self.post(registration_path, json_body=data)
         if r.http_status is not 200:
