@@ -263,8 +263,11 @@ class Manager(object):
                         self.worker_map.put_worker(w_id)
                         task_done_counter += 1
 
+                        # UNCOMMENT to kill workers. 
+                        # self.kill_worker(1)
                     
                     elif m_type == b'WRKR_DIE':
+                        logger.debug("[KILL] Scrubbing the worker from the map!")
                         self.worker_map.scrub_worker(w_id)
 
                 except Exception as e:
@@ -402,7 +405,7 @@ class Manager(object):
 
         debug = ' --debug' if self.debug else ''
         # TODO : This should assign some meaningful worker_id rather than random
-        worker_id = ' --worker_id {}'.format(5)
+        worker_id = ' --worker_id {}'.format(worker_id)
 
         cmd = (f'funcx-worker {debug}{worker_id} '
                f'-a {self.address} '
@@ -432,19 +435,21 @@ class Manager(object):
         return proc
 
 
-    def kill(self, worker_type):
+    def kill_worker(self, worker_type):
         """
             Kill a worker of a given worker_type. 
 
             Add a kill message to the task_type queue.
 
-            Assumption : All workers of the same type are uniform, and therefore are killed. 
+            Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing. 
         """
         
-        self.dead_workers.add(worker_type)
+        # self.dead_workers.add(worker_type)
         # self.available_workers[worker_type] -= 1  # COMMENTED OUT because messes with assigning the KILL task to the worker...
+        logger.debug("[KILL] Appending KILL message to worker queue")
         self.task_queues[worker_type].put({"task_id": "KILL", "buffer": "KILL"})
-        
+        # self.worker_map.scrub_worker(worker_type)
+
 
     def start(self):
         """
@@ -462,7 +467,7 @@ class Manager(object):
         # Keep track of workers to whom we've sent kill messages
         self.dead_worker_set = set()
 
-        self.workers = [self.launch_worker(worker_id=1)]
+        self.workers = [self.launch_worker(worker_id=5)]
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
