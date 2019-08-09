@@ -52,10 +52,9 @@ class FuncXWorker(object):
         self.logdir = logdir
         self.debug = debug
         self.worker_type = worker_type
-        serializer = FuncXSerializer()
-        self.serialize = serializer.serialize
-        self.deserialize = serializer.deserialize
-
+        self.serializer = FuncXSerializer()
+        self.serialize = self.serializer.serialize
+        self.deserialize = self.serializer.deserialize
 
         global logger
         logger = set_file_logger('{}/funcx_worker_{}.log'.format(logdir, worker_id),
@@ -143,20 +142,8 @@ class FuncXWorker(object):
         user_ns.update({'__builtins__': __builtins__})
 
         logger.info("Trying to pickle load the message {}".format(message))
-        p_loaded_message =  pickle.loads(message)
-        logger.info("Pickle loaded message : {}".format(p_loaded_message))
-        s_fn, s_args, s_kwargs = p_loaded_message
-        logger.info("Loaded message fn : {}".format(s_fn))
-        logger.info("Loaded message args : {}".format(s_args))
-        logger.info("Loaded message kwargs : {}".format(s_kwargs))
-
-
-        # [TODO] We need a clean way to chomp pieces off from the buffer
-        # Split isn't working too well
-        f = self.deserialize(s_fn)
-        args = self.deserialize(s_args)
-        kwargs = self.deserialize(s_kwargs)
-
+        decoded = message.decode()
+        f, args, kwargs = self.serializer.unpack_and_deserialize(decoded)
         logger.debug("Message unpacked")
 
         # We might need to look into callability of the function from itself
