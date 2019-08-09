@@ -171,15 +171,13 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['container']
 
-    def register_function(self, function, endpoint_uuid, entry_point=None, description=None):
+    def register_function(self, function, entry_point=None, description=None):
         """Register a function code with the funcX service.
 
         Parameters
         ----------
         function : Python Function
             The function to be registered for remote execution
-        endpoint_uuid : str
-            Endpoint UUID to which the function must be sent to.
         description : str
             Description of the file
         entry_point : str
