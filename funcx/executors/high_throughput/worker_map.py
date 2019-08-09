@@ -34,6 +34,20 @@ class WorkerMap(object):
         self.worker_counts['slots'] -= 1
         self.worker_queues[worker_type].put(worker_id)
 
+    def scrub_worker(self, worker_id):
+        """ Remove the worker from the WorkerMap
+
+            Should already be KILLed by this point. 
+        """
+
+        worker_type = self.worker_types[worker_id]
+
+        logger.debug("In KILL worker worker_id: {} type: {}".format(worker_id, worker_type))
+        self.worker_counts[worker_type] -= 1
+        self.worker_counts[slots] += 1
+        del self.worker_types[worker_id]  # Remove this worker type from our map. 
+
+
     def put_worker(self, worker):
         """ Adds worker to the list of waiting workers
         """
