@@ -7,6 +7,7 @@ from funcx.version import VERSION
 __author__ = "The funcX team"
 __version__ = VERSION
 
+from funcx.sdk.client import FuncXClient
 
 def set_file_logger(filename, name='funcx', level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
