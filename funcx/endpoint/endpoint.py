@@ -64,7 +64,6 @@ def load_endpoint(endpoint_dir):
     logger.debug("Loaded config for {}".format(endpoint_name))
     return config.config
 
-
 def init_endpoint_dir(funcx_dir, endpoint_name):
     """ Initialize a clean endpoint dir
 
