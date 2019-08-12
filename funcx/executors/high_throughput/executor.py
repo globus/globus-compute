@@ -514,7 +514,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Got managers: {}".format(workers))
         return workers
 
-    def submit(self, bufs):
+    def submit(self, bufs, task_id=None):
         """Submits work to the the outgoing_q.
 
         The outgoing_q is an external process listens on this
@@ -532,7 +532,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
             raise self._executor_exception
 
         self._task_counter += 1
-        task_id = self._task_counter
+        if not task_id:
+            task_id = self._task_counter
 
         self.tasks[task_id] = Future()
 
