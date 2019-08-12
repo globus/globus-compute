@@ -1,4 +1,5 @@
 import codecs
+import json
 import os
 import logging
 import pickle as pkl
@@ -74,7 +75,7 @@ class FuncXClient(BaseClient):
         """
 
         r = self.get("{task_id}/status".format(task_id=task_id))
-        return r.text
+        return json.loads(r.text)
 
     def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
 
@@ -93,8 +94,8 @@ class FuncXClient(BaseClient):
 
         Returns
         -------
-        dict
-            Reply from the service
+        FuncXFuture
+            Future representing the task
         """
         servable_path = 'submit'
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
@@ -115,8 +116,20 @@ class FuncXClient(BaseClient):
         if r.http_status is not 200:
             raise Exception(r)
 
+        task_id = None
+        try:
+            task_id = r['task_id']
+        except:
+            pass
+
+        # Create a future to deal with the result
+        funcx_future = FuncXFuture(self, task_id, async_poll)
+
+        if not asynchronous:
+            return funcx_future.result()
+
         # Return the result
-        return r.data
+        return funcx_future
 
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
@@ -147,12 +160,38 @@ class FuncXClient(BaseClient):
         logger.info("Data returned : {}".format(r.data))
         return r.data
 
-    def get_container(self, container_id, container_type):
+    def get_containers(self, name, description=None):
+        """Register a DLHub endpoint with the funcX service and get the containers to launch.
+
+        Parameters
+        ----------
+        name : str
+            Name of the endpoint
+        description : str
+            Description of the endpoint
+
+        Returns
+        -------
+        int
+            The port to connect to and a list of containers
+        """
+        registration_path = 'get_containers'
+
+        data = {"endpoint_name": name, "description": description}
+
+        r = self.post(registration_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r.data['endpoint_uuid'], r.data['endpoint_containers']
+
+    def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
 
         Parameters
         ----------
-        container_id : str
+        container_uuid : str
             UUID of the container in question
         container_type : str
             The type of containers that will be used (Singularity, Shifter, Docker)
@@ -162,7 +201,7 @@ class FuncXClient(BaseClient):
         dict
             The details of the containers to deploy
         """
-        container_path = f'containers/{container_id}/{container_type}'
+        container_path = f'containers/{container_uuid}/{container_type}'
 
         r = self.get(container_path)
         if r.http_status is not 200:
