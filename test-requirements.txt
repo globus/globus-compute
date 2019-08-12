@@ -1,5 +1,5 @@
 bottle
 cherrypy
 nbsphinx
-flask>=1.0.2,
+Flask>=1.0.2
 sphinx_rtd_theme
