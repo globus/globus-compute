@@ -53,7 +53,7 @@ extensions = [
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-nbsphinx_allow_errors = True
+nbsphinx_execute = 'never'
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
