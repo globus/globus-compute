@@ -1,2 +1,4 @@
 bottle
 cherrypy
+nbsphinx
+sphinx_rtd_theme
