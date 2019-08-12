@@ -1,3 +1,5 @@
+*stderr
+*stdout
 *~
 *.pyc
 parsl.egg-info/*
