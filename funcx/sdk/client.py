@@ -8,6 +8,7 @@ from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
 from funcx.serialize import FuncXSerializer
+from funcx.sdk.utils.futures import FuncXFuture
 
 logger = logging.getLogger(__name__)
 
