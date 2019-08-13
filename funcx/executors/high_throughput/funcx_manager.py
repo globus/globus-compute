@@ -297,7 +297,8 @@ class Manager(object):
 
                     for task in tasks:
                         # In the FuncX model we forward tasks received directly via a DEALER socket.
-                        b_task_id = (task['task_id']).to_bytes(4, "little")
+                        b_task_id = task['task_id'].encode()
+
                         # Set default type to raw
                         task_type = task.get('task_type', 'RAW')
                         if task_type not in self.task_queues:
