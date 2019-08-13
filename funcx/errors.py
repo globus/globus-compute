@@ -1,4 +1,3 @@
-
 class FuncxError(Exception):
     """ Base class for all funcx exceptions
     """
@@ -26,3 +25,13 @@ class FuncXUnreachable(FuncxError):
 
     def __repr__(self):
         return "FuncX remote service is un-reachable at {}".format(self.address)
+
+class MalformedResponse(FuncxError):
+    """ FuncX remote service responded with a Malformed Response
+    """
+    def __init__(self, task_id, response):
+        self.response = response
+
+    def __repr__(self):
+        return "FuncX remote service responded with Malformed Response {}".format(self.response)
+
