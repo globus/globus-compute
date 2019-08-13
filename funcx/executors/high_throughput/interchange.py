@@ -12,6 +12,7 @@ import logging
 import queue
 import threading
 import json
+import daemon
 
 from parsl.version import VERSION as PARSL_VERSION
 from ipyparallel.serialize import serialize_object
@@ -69,20 +70,28 @@ class Interchange(object):
     TODO: We most likely need a PUB channel to send out global commands, like shutdown
     """
     def __init__(self,
+                 config,
                  client_address="127.0.0.1",
                  interchange_address="127.0.0.1",
                  client_ports=(50055, 50056, 50057),
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
+                 cores_per_worker=1.0,
+                 worker_debug=False,
+                 launch_cmd=None,
                  heartbeat_threshold=60,
                  logdir=".",
                  logging_level=logging.INFO,
                  poll_period=10,
+                 endpoint_id=None,
                  suppress_failure=False,
              ):
         """
         Parameters
         ----------
+        config : funcx.Config object
+             Funcx config object that describes how compute should be provisioned
+
         client_address : str
              The ip address at which the parsl client can be reached. Default: "127.0.0.1"
 
@@ -92,12 +101,22 @@ class Interchange(object):
         client_ports : triple(int, int, int)
              The ports at which the client can be reached
 
+        launch_cmd : str
+             TODO : update
+
         worker_ports : tuple(int, int)
              The specific two ports at which workers will connect to the Interchange. Default: None
 
         worker_port_range : tuple(int, int)
              The interchange picks ports at random from the range which will be used by workers.
              This is overridden when the worker_ports option is set. Defauls: (54000, 55000)
+
+        cores_per_worker : float
+             cores to be assigned to each worker. Oversubscription is possible
+             by setting cores_per_worker < 1.0. Default=1
+
+        worker_debug : Bool
+             Enables worker debug logging.
 
         heartbeat_threshold : int
              Number of seconds since the last heartbeat after which worker is considered lost.
@@ -107,6 +126,9 @@ class Interchange(object):
 
         logging_level : int
              Logging level as defined in the logging module. Default: logging.INFO (20)
+
+        endpoint_id : str
+             Identity string that identifies the endpoint to the broker
 
         poll_period : int
              The main thread polling period, in milliseconds. Default: 10ms
@@ -122,7 +144,9 @@ class Interchange(object):
             pass
 
         start_file_logger("{}/interchange.log".format(self.logdir), level=logging_level)
-        logger.debug("Initializing Interchange process")
+        logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
+        self.config = config
+        logger.info("Got config : {}".format(config))
 
         self.client_address = client_address
         self.interchange_address = interchange_address
@@ -135,13 +159,17 @@ class Interchange(object):
         self.task_incoming = self.context.socket(zmq.DEALER)
         self.task_incoming.set_hwm(0)
         self.task_incoming.RCVTIMEO = 10  # in milliseconds
+        logger.info("Task incoming on tcp://{}:{}".format(client_address, client_ports[0]))
         self.task_incoming.connect("tcp://{}:{}".format(client_address, client_ports[0]))
+
         self.results_outgoing = self.context.socket(zmq.DEALER)
         self.results_outgoing.set_hwm(0)
+        logger.info("Results outgoing on tcp://{}:{}".format(client_address, client_ports[1]))
         self.results_outgoing.connect("tcp://{}:{}".format(client_address, client_ports[1]))
 
         self.command_channel = self.context.socket(zmq.REP)
         self.command_channel.RCVTIMEO = 1000  # in milliseconds
+        logger.info("Command channel on tcp://{}:{}".format(client_address, client_ports[2]))
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
         logger.info("Connected to client")
 
@@ -155,6 +183,7 @@ class Interchange(object):
         self.results_incoming = self.context.socket(zmq.ROUTER)
         self.results_incoming.set_hwm(0)
 
+        self.endpoint_id = endpoint_id
         if self.worker_ports:
             self.worker_task_port = self.worker_ports[0]
             self.worker_result_port = self.worker_ports[1]
@@ -177,6 +206,19 @@ class Interchange(object):
 
         self.heartbeat_threshold = heartbeat_threshold
 
+        self.launch_cmd = launch_cmd
+        if not launch_cmd:
+            self.launch_cmd = ("funcx-manager {debug} {max_workers} "
+                               "-c {cores_per_worker} "
+                               "--poll {poll_period} "
+                               "--task_url={task_url} "
+                               "--result_url={result_url} "
+                               "--logdir={logdir} "
+                               "--hb_period={heartbeat_period} "
+                               "--hb_threshold={heartbeat_threshold} "
+                               "--mode={worker_mode} "
+                               "--container_image={container_image} ")
+
         self.current_platform = {'parsl_v': PARSL_VERSION,
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
                                                                sys.version_info.minor,
@@ -186,6 +228,55 @@ class Interchange(object):
                                  'dir': os.getcwd()}
 
         logger.info("Platform info: {}".format(self.current_platform))
+        try:
+            self.load_config()
+        except Exception as e:
+            logger.exception("Caught exception")
+            raise
+
+
+    def load_config(self):
+        """ Load the config
+        """
+        logger.info("Loading endpoint local config")
+        working_dir = self.config.working_dir
+        if self.config.working_dir is None:
+            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+        logger.info("Setting working_dir: {}".format(working_dir))
+
+        self.config.provider.script_dir = working_dir
+        self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
+        self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
+        os.makedirs(self.config.provider.script_dir, exist_ok=True)
+
+        debug_opts = "--debug" if self.config.worker_debug else ""
+        max_workers = "" if self.config.max_workers_per_node == float('inf') \
+                      else "--max_workers={}".format(self.config.max_workers_per_node)
+
+        worker_task_url = f"tcp://127.0.0.1:{self.worker_task_port}"
+        worker_result_url = f"tcp://127.0.0.1:{self.worker_result_port}"
+
+        l_cmd = self.launch_cmd.format(debug=debug_opts,
+                                       max_workers=max_workers,
+                                       cores_per_worker=self.config.cores_per_worker,
+                                       #mem_per_worker=self.config.mem_per_worker,
+                                       prefetch_capacity=self.config.prefetch_capacity,
+                                       task_url=worker_task_url,
+                                       result_url=worker_result_url,
+                                       nodes_per_block=self.config.provider.nodes_per_block,
+                                       heartbeat_period=self.config.heartbeat_period,
+                                       heartbeat_threshold=self.config.heartbeat_threshold,
+                                       poll_period=self.config.poll_period,
+                                       worker_mode=self.config.worker_mode,
+                                       container_image=None,
+                                       logdir=working_dir)
+        self.config.launch_cmd = l_cmd
+        logger.info("Launch command: {}".format(self.config.launch_cmd))
+
+        if self.config.scaling_enabled:
+            logger.info("Scaling ...")
+            self.config.provider.submit(self.config.launch_cmd, 1, 1)
+
 
     def get_tasks(self, count):
         """ Obtains a batch of tasks from the internal pending_task_queue
@@ -272,6 +363,10 @@ class Interchange(object):
                         reply = True
                     else:
                         reply = False
+
+                elif command_req == "HEARTBEAT":
+                    logger.info("[CMD] Received heartbeat message from hub")
+                    reply = "HBT,{}".format(self.endpoint_id)
 
                 elif command_req == "SHUTDOWN":
                     logger.info("[CMD] Received SHUTDOWN command")
@@ -444,7 +539,7 @@ class Interchange(object):
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
 
-            logger.debug("[MAIN] entering bad_managers section")
+            # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [manager for manager in self._ready_manager_queue if
                             time.time() - self._ready_manager_queue[manager]['last'] > self.heartbeat_threshold]
             for manager in bad_managers:
@@ -457,12 +552,67 @@ class Interchange(object):
                     self.results_outgoing.send(pkl_package)
                     logger.warning("[MAIN] Sent failure reports, unregistering manager")
                 self._ready_manager_queue.pop(manager, 'None')
-            logger.debug("[MAIN] leaving bad_managers section")
             logger.debug("[MAIN] ending one main loop iteration")
 
         delta = time.time() - start
         logger.info("Processed {} tasks in {} seconds".format(count, delta))
         logger.warning("Exiting")
+
+    def compose_worker_launch_cmd(self):
+        """ Compose the launch command
+        """
+        debug_opts = "--debug" if self.worker_debug else ""
+        max_workers = "" if self.max_workers == float('inf') else "--max_workers={}".format(self.max_workers)
+
+        l_cmd = self.launch_cmd.format(debug=debug_opts,
+                                       task_url=self.worker_task_url,
+                                       result_url=self.worker_result_url,
+                                       cores_per_worker=self.cores_per_worker,
+                                       max_workers=max_workers,
+                                       nodes_per_block=self.provider.nodes_per_block,
+                                       heartbeat_period=self.heartbeat_period,
+                                       heartbeat_threshold=self.heartbeat_threshold,
+                                       poll_period=self.poll_period,
+                                       logdir="{}/{}".format(self.run_dir, self.label),
+                                       worker_mode=self.worker_mode,
+                                       container_image=self.container_image)
+        self.launch_cmd = l_cmd
+        logger.debug("Launch command: {}".format(self.launch_cmd))
+
+    def scale_out(self, blocks=1):
+        """Scales out the number of blocks by "blocks"
+
+        Raises:
+             NotImplementedError
+        """
+        r = []
+        for i in range(blocks):
+            if self.provider:
+                block = self.provider.submit(self.launch_cmd, 1, 1)
+                logger.debug("Launched block {}:{}".format(i, block))
+                if not block:
+                    raise(ScalingFailed(self.provider.label,
+                                        "Attempts to provision nodes via provider has failed"))
+                self.blocks.extend([block])
+            else:
+                logger.error("No execution provider available")
+                r = None
+        return r
+
+    def scale_in(self, blocks):
+        """Scale in the number of active blocks by specified amount.
+
+        The scale in method here is very rude. It doesn't give the workers
+        the opportunity to finish current tasks or cleanup. This is tracked
+        in issue #530
+
+        Raises:
+             NotImplementedError
+        """
+        to_kill = self.blocks[:blocks]
+        if self.provider:
+            r = self.provider.cancel(to_kill)
+        return r
 
 
 def start_file_logger(filename, name='interchange', level=logging.DEBUG, format_string=None):
@@ -510,47 +660,50 @@ def starter(comm_q, *args, **kwargs):
     ic.start()
 
 
-if __name__ == '__main__':
+def cli_run():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--client_address",
+    parser.add_argument("-c", "--client_address", required=True,
                         help="Client address")
-    parser.add_argument("-l", "--logdir", default="parsl_worker_logs",
+    parser.add_argument("--client_ports", required=True,
+                        help="client ports as a triple of outgoing,incoming,command")
+    parser.add_argument("--worker_port_range",
+                        help="Worker port range as a tuple")
+    parser.add_argument("-l", "--logdir", default="./parsl_worker_logs",
                         help="Parsl worker log directory")
-    parser.add_argument("-t", "--task_url",
-                        help="REQUIRED: ZMQ url for receiving tasks")
-    parser.add_argument("-r", "--result_url",
-                        help="REQUIRED: ZMQ url for posting results")
     parser.add_argument("-p", "--poll_period",
                         help="REQUIRED: poll period used for main thread")
     parser.add_argument("--worker_ports", default=None,
                         help="OPTIONAL, pair of workers ports to listen on, eg --worker_ports=50001,50005")
     parser.add_argument("--suppress_failure", action='store_true',
                         help="Enables suppression of failures")
+    parser.add_argument("--endpoint_id", default=None,
+                        help="Endpoint ID, used to identify the endpoint to the remote broker")
+    parser.add_argument("--hb_threshold",
+                        help="Heartbeat threshold in seconds")
+    parser.add_argument("--config", default=None,
+                        help="Configuration object that describes provisioning")
     parser.add_argument("-d", "--debug", action='store_true',
-                        help="Count of apps to launch")
+                        help="Enables debug logging")
 
+    print("Starting HTEX Intechange")
     args = parser.parse_args()
-
-    # Setup logging
-    global logger
-    format_string = "%(asctime)s %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    logger = logging.getLogger("interchange")
-    logger.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler()
-    handler.setLevel('DEBUG' if args.debug is True else 'INFO')
-    formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-    logger.debug("Starting Interchange")
 
     optionals = {}
     optionals['suppress_failure'] = args.suppress_failure
+    optionals['logdir'] = os.path.abspath(args.logdir)
+    optionals['client_address'] = args.client_address
+    optionals['client_ports'] = [int(i) for i in args.client_ports.split(',')]
+    optionals['endpoint_id'] = args.endpoint_id
+    optionals['config'] = args.config
 
+    if args.debug:
+        optionals['logging_level'] = logging.DEBUG
     if args.worker_ports:
         optionals['worker_ports'] = [int(i) for i in args.worker_ports.split(',')]
+    if args.worker_port_range:
+        optionals['worker_port_range'] = [int(i) for i in args.worker_port_range.split(',')]
 
-    ic = Interchange(**optionals)
-    ic.start()
+    with daemon.DaemonContext():
+        ic = Interchange(**optionals)
+        ic.start()

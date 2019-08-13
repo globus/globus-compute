@@ -16,15 +16,24 @@ import json
 import shutil
 import subprocess
 import multiprocessing
+import random
 
-from parsl.executors.high_throughput.funcx_worker import funcx_worker
+from typing import Any
+from queue import PriorityQueue
+
+# from funcx.executors.high_throughput.funcx_worker import funcx_worker
+
+from funcx.executors.high_throughput.worker_map import WorkerMap
+
+from funcx.version import VERSION as FUNCX_VERSION
 from parsl.version import VERSION as PARSL_VERSION
+from funcx import set_file_logger
 
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
-
 HEARTBEAT_CODE = (2 ** 32) - 1
+
 
 
 class Manager(object):
@@ -54,9 +63,11 @@ class Manager(object):
                  heartbeat_period=30,
                  logdir=None,
                  debug=False,
+                 internal_worker_port_range=(50000,60000),
                  mode="singularity_reuse",
                  container_image=None,
-                 poll_period=10):
+                 # TODO : This should be 10ms
+                 poll_period=100):
         """
         Parameters
         ----------
@@ -83,6 +94,10 @@ class Manager(object):
 
         heartbeat_period : int
              Number of seconds after which a heartbeat message is sent to the interchange
+
+        internal_worker_port_range : tuple(int, int)
+             Port range from which the port(s) for the workers to connect to the manager is picked.
+             Default: (50000,60000)
 
         mode : str
              Pick between 3 supported modes for the worker:
@@ -123,13 +138,23 @@ class Manager(object):
         self.max_workers = max_workers
         self.worker_count = min(max_workers,
                                 math.floor(cores_on_node / cores_per_worker))
+        self.worker_map = WorkerMap(self.worker_count)
         logger.info("Manager will spawn {} workers".format(self.worker_count))
 
-        self.internal_worker_port = 50055
-        self.funcx_task_socket = self.context.socket(zmq.DEALER)
-        self.funcx_task_socket.set_hwm(0)
-        self.funcx_task_socket.bind("tcp://*:{}".format(self.internal_worker_port))
+        self.internal_worker_port_range = internal_worker_port_range
 
+        self.funcx_task_socket = self.context.socket(zmq.ROUTER)
+        self.funcx_task_socket.set_hwm(0)
+        self.address = '127.0.0.1'
+        self.worker_port = self.funcx_task_socket.bind_to_random_port(
+            "tcp://*",
+            min_port=self.internal_worker_port_range[0],
+            max_port=self.internal_worker_port_range[1])
+
+        logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
+
+        self.task_queues = {'RAW': queue.Queue()}
+        
         self.pending_result_queue = multiprocessing.Queue()
 
         self.max_queue_size = max_queue_size + self.worker_count
@@ -164,6 +189,16 @@ class Manager(object):
         """ Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
+
+        While :
+            receive results and task requests from the workers
+            receive tasks/heartbeats from the Interchange
+            match tasks to workers
+            if task doesn't have appropriate worker type:
+                 launch worker of type.. with LRU or some sort of caching strategy.
+            if workers >> tasks:
+                 advertize available capacity
+
         Parameters:
         -----------
         kill_event : threading.Event
@@ -185,17 +220,21 @@ class Manager(object):
 
         poll_timer = self.poll_period
 
+        # This dict holds the info on the count of workers of various types available.
+        worker_map = {'slots' : self.worker_count}
+
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
+            logger.debug("[TASK_PULL_THREAD] Loop start")
             pending_task_count = task_recv_counter - task_done_counter
-            ready_worker_count = self.worker_count - pending_task_count
-
-            logger.debug("[TASK_PULL_THREAD] ready workers:{}, pending tasks:{}".format(ready_worker_count,
-                                                                                        pending_task_count))
+            ready_worker_count = self.worker_map.ready_worker_count()
+            logger.debug("[TASK_PULL_THREAD pending_task_count: {} Ready_worker_count: {}".format(
+                pending_task_count, ready_worker_count))
 
             if time.time() > last_beat + self.heartbeat_period:
                 self.heartbeat()
                 last_beat = time.time()
+
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ready_worker_count))
@@ -207,13 +246,32 @@ class Manager(object):
             if self.funcx_task_socket in socks and socks[self.funcx_task_socket] == zmq.POLLIN:
                 # logger.debug("[FUNCX] There's an incoming result")
                 try:
-                    _, result_obj = self.funcx_task_socket.recv_multipart()
+                    w_id, m_type, message = self.funcx_task_socket.recv_multipart()
+                    logger.warning(f"Got registration message")
+                    if m_type == b'REGISTER':
+                        reg_info = pickle.loads(message)
+                        logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
+
+                        # Increment worker_type count by 1
+                        self.worker_map.register_worker(w_id, reg_info['worker_type'])
+                        # TODO : HERE
+
+                    elif m_type == b'TASK_RET':
+                        logger.info("Result received from worker:{}".format(w_id))
+                        logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
+                        self.pending_result_queue.put(message)
+                        self.worker_map.put_worker(w_id)
+                        task_done_counter += 1
+
+                        # UNCOMMENT to kill workers. 
+                        # self.kill_worker(1)
+                    
+                    elif m_type == b'WRKR_DIE':
+                        logger.debug("[KILL] Scrubbing the worker from the map!")
+                        self.worker_map.scrub_worker(w_id)
+
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
-                else:
-                    logger.debug("[TASK_PULL_THREAD] Got result: {}".format(result_obj))
-                self.pending_result_queue.put(result_obj)
-                task_done_counter += 1
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -231,6 +289,8 @@ class Manager(object):
                     logger.debug("Got heartbeat from interchange")
 
                 else:
+                    # TODO : Update this to unpack and forward tasks to the appropriate
+                    # workers.
                     task_recv_counter += len(tasks)
                     logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t['task_id'] for t in tasks],
                                                                                  task_recv_counter))
@@ -238,10 +298,18 @@ class Manager(object):
                     for task in tasks:
                         # In the FuncX model we forward tasks received directly via a DEALER socket.
                         b_task_id = (task['task_id']).to_bytes(4, "little")
+                        # Set default type to raw
+                        task_type = task.get('task_type', 'RAW')
+                        if task_type not in self.task_queues:
+                            self.task_queues[task_type] = queue.Queue()
+                        self.task_queues[task_type].put(task)
+                        logger.debug("Task {} pushed to a task queue".format(task))
+                        """
                         #logger.debug("[TASK_PULL_THREAD] FuncX attempting send")
                         i = self.funcx_task_socket.send_multipart([b'', b_task_id] + task['buffer'])
                         logger.debug("[TASK_PULL_THREAD] FUNCX Forwarded task: {}".format(task['task_id']))
                         logger.debug("[TASK_PULL_THREAD] forward returned:{}".format(i))
+                        """
 
             else:
                 logger.debug("[TASK_PULL_THREAD] No incoming tasks")
@@ -257,6 +325,29 @@ class Manager(object):
                     kill_event.set()
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
+
+            current_worker_map = self.worker_map.get_worker_counts()
+            for task_type in current_worker_map:
+                if task_type == 'slots':
+                    continue
+
+
+                else:
+
+                    # TODO: TYLER -- in here, make KILL actually kill. 
+
+                    available_workers = current_worker_map[task_type]
+                    logger.debug("Available workers of type {}: {}".format(task_type,
+                                                                           available_workers))
+                    for i in range(available_workers):
+                        if task_type in self.task_queues and not self.task_queues[task_type].empty():
+                            task = self.task_queues[task_type].get()
+                            worker_id = self.worker_map.get_worker(task_type)
+                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))                            
+                            to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
+                            self.funcx_task_socket.send_multipart(to_send)
+                            logger.debug("Sending done")
+
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """ Listens on the pending_result_queue and sends out results via 0mq
@@ -293,7 +384,108 @@ class Manager(object):
 
         logger.critical("[RESULT_PUSH_THREAD] Exiting")
 
+
+    def launch_worker(self, worker_id=str(random.random()),
+                      mode='no_container',
+                      container_uri=None,
+                      walltime=1):
+        """ Launch the appropriate worker
+
+        Parameters
+        ----------
+        worker_id : str
+           Worker identifier string
+        mode : str
+           Valid options are no_container, singularity
+        walltime : int
+           Walltime in seconds before we check status
+
+        """
+        print("LAUNCH_WORKER is only partially baked")
+
+        debug = ' --debug' if self.debug else ''
+        # TODO : This should assign some meaningful worker_id rather than random
+        worker_id = ' --worker_id {}'.format(worker_id)
+
+        cmd = (f'funcx-worker {debug}{worker_id} '
+               f'-a {self.address} '
+               f'-p {self.worker_port} '
+               f'--logdir={self.logdir}/{self.uid} ')
+
+        print("Command string : ", cmd)
+        if mode == 'no_container':
+            modded_cmd = cmd
+        elif mode == 'singularity':
+            modded_cmd = 'singularity run --writable {container_uri} {cmd}'.format(self.container_uri)
+        else:
+            raise NameError("Invalid container launch mode.")
+
+        stdout = 'STDOUT: READING FAILED'
+        stderr = 'STDERR: READING FAILED'
+        try:
+            proc = subprocess.Popen(cmd,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    shell=True)
+            print("Launched proc")
+
+        except Exception as e:
+            print("TODO : Got an error in worker launch, got error {}".format(e))
+
+        return proc
+
+
+    def kill_worker(self, worker_type):
+        """
+            Kill a worker of a given worker_type. 
+
+            Add a kill message to the task_type queue.
+
+            Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing. 
+        """
+        
+        # self.dead_workers.add(worker_type)
+        # self.available_workers[worker_type] -= 1  # COMMENTED OUT because messes with assigning the KILL task to the worker...
+        logger.debug("[KILL] Appending KILL message to worker queue")
+        self.task_queues[worker_type].put({"task_id": "KILL", "buffer": "KILL"})
+        # self.worker_map.scrub_worker(worker_type)
+
+
     def start(self):
+        """
+        * while True:
+            Receive tasks and start appropriate workers
+            Push tasks to available workers
+            Forward results
+        """
+
+        self.task_queues = {}  # k-v: task_type - task_q (PriorityQueue)
+        self.worker_capacities = {}  # k-v: worker_id - capacity (integer... should only ever be 0 or 1)
+        # TODO: Switch ^^^ to FIFO task queue.
+        self.task_to_worker_sets = {}  # k-v: task_type - workers (set)
+
+        # Keep track of workers to whom we've sent kill messages
+        self.dead_worker_set = set()
+
+        self.workers = [self.launch_worker(worker_id=5)]
+
+        logger.debug("Initial workers launched")
+        self._kill_event = threading.Event()
+        self._result_pusher_thread = threading.Thread(target=self.push_results,
+                                                      args=(self._kill_event,))
+        self._result_pusher_thread.start()
+
+        self.pull_tasks(self._kill_event)
+        logger.info("Waiting")
+
+
+
+
+
+
+    #----------------------------------------------------------------------------------------------
+    # Deprecated
+    def _start(self):
         """ Start the worker processes.
 
         TODO: Move task receiving to a thread
@@ -430,13 +622,13 @@ class Manager(object):
                     is_alive = False
                 else:
                     is_alive = True
-         
+
                 logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
                                                                   is_alive))
-            else: 
+            else:
                 logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
-                                                                  self.procs[proc_id].is_alive()))                
-            
+                                                                  self.procs[proc_id].is_alive()))
+
             self.procs[proc_id].join()
             logger.debug("Worker:{} joined successfully".format(self.procs[proc_id]))
 
@@ -444,61 +636,12 @@ class Manager(object):
         self.result_outgoing.close()
         self.context.term()
         delta = time.time() - start
-        logger.info("process_worker_pool ran for {} seconds".format(delta))
+        logger.info("FuncX Manager ran for {} seconds".format(delta))
         return
 
 
-def start_file_logger(filename, rank, name='parsl', level=logging.DEBUG, format_string=None):
-    """Add a stream log handler.
 
-    Args:
-        - filename (string): Name of the file to write logs to
-        - name (string): Logger name
-        - level (logging.LEVEL): Set the logging level.
-        - format_string (string): Set the format string
-
-    Returns:
-       -  None
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d Rank:{0} [%(levelname)s]  %(message)s".format(rank)
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-    handler = logging.FileHandler(filename)
-    handler.setLevel(level)
-    formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-
-def set_stream_logger(name='parsl', level=logging.DEBUG, format_string=None):
-    """Add a stream log handler.
-
-    Args:
-         - name (string) : Set the logger name.
-         - level (logging.LEVEL) : Set to logging.DEBUG by default.
-         - format_string (sting) : Set to None by default.
-
-    Returns:
-         - None
-    """
-    if format_string is None:
-        format_string = "%(asctime)s %(name)s [%(levelname)s] Thread:%(thread)d %(message)s"
-        # format_string = "%(asctime)s %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-    formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-
-if __name__ == "__main__":
+def cli_run():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", action='store_true',
@@ -535,9 +678,9 @@ if __name__ == "__main__":
         pass
 
     try:
-        start_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
-                          0,
-                          level=logging.DEBUG if args.debug is True else logging.INFO)
+        global logger
+        logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
+                                 level=logging.DEBUG if args.debug is True else logging.INFO)
 
         logger.info("Python version: {}".format(sys.version))
         logger.info("Debug logging: {}".format(args.debug))
@@ -546,6 +689,8 @@ if __name__ == "__main__":
         logger.info("cores_per_worker: {}".format(args.cores_per_worker))
         logger.info("task_url: {}".format(args.task_url))
         logger.info("result_url: {}".format(args.result_url))
+        logger.info("hb_period: {}".format(args.hb_period))
+        logger.info("hb_threshold: {}".format(args.hb_threshold))
         logger.info("max_workers: {}".format(args.max_workers))
         logger.info("poll_period: {}".format(args.poll))
         logger.info("mode: {}".format(args.mode))
@@ -572,3 +717,7 @@ if __name__ == "__main__":
     else:
         logger.info("process_worker_pool exiting")
         print("PROCESS_WORKER_POOL exiting")
+
+
+if __name__ == "__main__":
+    cli_run()

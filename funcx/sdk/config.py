@@ -22,12 +22,12 @@ __all__ = (
 )
 
 # The path to read and write servable definitions.
-FUNCX_URL = "https://funcx.org/"
-FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
+# FUNCX_URL = "https://funcx.org/"
+# FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
 
 CONF_SECTION_NAME = 'funcx'
 
-CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
+# CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 FUNCX_RT_OPTNAME = 'funcx_refresh_token'
 FUNCX_AT_OPTNAME = 'funcx_access_token'
 FUNCX_AT_EXPIRES_OPTNAME = 'funcx_access_token_expires'

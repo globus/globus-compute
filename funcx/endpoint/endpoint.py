@@ -1,216 +1,377 @@
-import threading
-import platform
+import requests
+import argparse
 import logging
-import pickle
-import parsl
+import os
+import pathlib
+import grp
+import signal
 import time
 import json
-import queue
+import daemon
+import daemon.pidfile
+import lockfile
+import uuid
+import json
+import sys
+import platform
+import getpass
+import shutil
+import tarfile
+import signal
+import psutil
 
+import funcx
+from funcx.executors.high_throughput import global_config, default_config
+from funcx.executors.high_throughput.interchange import Interchange
+from funcx.endpoint.list_endpoints import list_endpoints
 from funcx.sdk.client import FuncXClient
-from funcx.endpoint.utils.zmq_worker import ZMQWorker
-from funcx.endpoint.config import (_get_parsl_config, _load_auth_client, _get_executor, FUNCX_HUB_URL)
-from funcx.sdk.config import lookup_option, write_option
-
-from funcx.executor import HighThroughputExecutor
-from parsl.providers import LocalProvider
-from parsl.channels import LocalChannel
-from parsl.config import Config
-
-from parsl.app.app import python_app
-
-logging.basicConfig(filename='funcx_endpoint.log', level=logging.DEBUG)
+from funcx.errors import *
 
 
-def execute_function(code, entry_point, event=None):
-    """Run the function. First it exec's the function code
-    to load it into the current context and then eval's the function
-    using the entry point
+def check_pidfile(filepath, match_name, endpoint_name):
+    """ Helper function to identify possible dead endpoints
+    """
+    if not os.path.exists(filepath):
+        return
+
+    older_pid = int(open(filepath, 'r').read().strip())
+
+    try:
+        proc = psutil.Process(older_pid)
+        if proc.name() == match_name:
+            logger.info("Endpoint is already active")
+    except psutil.NoSuchProcess:
+        logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
+        logger.info('''Please cleanup using:
+    $ funcx-endpoint stop {}'''.format(endpoint_name))
+
+def load_endpoint(endpoint_dir):
+    """
+    Parameters
+    ----------
+
+    endpoint_dir : str
+        endpoint directory path within funcx_dir
+    """
+    import importlib.machinery
+
+    endpoint_config_file = endpoint_dir + 'config.py'
+    endpoint_name = os.path.basename(endpoint_dir)
+
+    if os.path.exists(endpoint_config_file):
+        config = importlib.machinery.SourceFileLoader('{}_config'.format(endpoint_name),
+                                                      endpoint_config_file).load_module()
+    logger.debug("Loaded config for {}".format(endpoint_name))
+    return config.config
+
+def init_endpoint_dir(funcx_dir, endpoint_name):
+    """ Initialize a clean endpoint dir
+
+    Returns if an endpoint_dir already exists
 
     Parameters
     ----------
-    code : str
-        The function code in a string format.
-    entry_point : str
-        The name of the function's entry point.
-    event : dict
-        The event context
 
-    Returns
-    -------
-    json
-        The result of running the function
+    funcx_dir : str
+        Path to the funcx_dir on the system
+
+    endpoint_name : str
+        Name of the endpoint, which will be used to name the dir
+        for the endpoint.
+    """
+    endpoint_dir = os.path.join(funcx_dir, endpoint_name)
+    os.makedirs(endpoint_dir, exist_ok=True)
+    shutil.copyfile(default_config.__file__,
+                    os.path.join(endpoint_dir, 'config.py'))
+    return endpoint_dir
+
+
+def init_endpoint(args):
+    """ Setup funcx dirs and config files including a default endpoint config
+
+    TODO : Every mechanism that will update the config file, must be using a
+    locking mechanism, ideally something like fcntl https://docs.python.org/3/library/fcntl.html
+    to ensure that multiple endpoint invocations do not mangle the funcx config files
+    or the lockfile module.
+    """
+    funcx_dir = args.config_dir
+
+    if args.force and os.path.exists(funcx_dir):
+        logger.warning("Wiping all current configs in {}".format(funcx_dir))
+        try:
+            logger.debug("Removing old backups in {}".format(funcx_dir + '.bak'))
+            shutil.rmtree(funcx_dir + '.bak')
+        except Exception:
+            pass
+        os.renames(funcx_dir, funcx_dir + '.bak')
+
+    if os.path.exists(args.config_file):
+        logger.debug("Config file exists at {}".format(args.config_file))
+        return
+
+    try:
+        os.makedirs(funcx_dir, exist_ok=True)
+    except Exception as e:
+        print("[FuncX] Caught exception during registration {}".format(e))
+
+    shutil.copyfile(global_config.__file__, args.config_file)
+    init_endpoint_dir(funcx_dir, "default")
+
+
+def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
+    """ This currently registers directly with the Forwarder micro service.
+
+    Can be used as an example of how to make calls this it, while the main API
+    is updated to do this calling on behalf of the endpoint in the second iteration.
     """
     try:
-        exec(code)
-        return eval(entry_point)(event)
+        r = requests.post(address + '/register',
+                          json={'endpoint_id': str(uuid.uuid4()),
+                                'redis_address': redis_host})
+    except requests.exceptions.ConnectionError:
+        logger.critical("Unable to reach the funcX hub at {}".format(address))
+        exit(-1)
+        # raise FuncXUnreachable(str(address))
+
+    if r.status_code != 200:
+        print(dir(r))
+        print(r)
+        raise RegistrationError(r.reason)
+
+    return r.json()
+
+
+def start_endpoint(args, global_config=None):
+    """Start an endpoint
+
+    This function will do:
+    1. Connect to the broker service, and register itself
+    2. Get connection info from broker service
+    3. Start the interchange as a daemon
+
+
+    |                      Broker service       |
+    |               -----2----> Forwarder       |
+    |    /register <-----3----+   ^             |
+    +-----^-----------------------+-------------+
+          |     |                 |
+          1     4                 6
+          |     v                 |
+    +-----+-----+-----+           v
+    |      Start      |---5---> Interchange
+    |     Endpoint    |        daemon
+    +-----------------+
+
+    Parameters
+    ----------
+    args : args object
+       Args object from the arg parsing
+
+    global_config : dict
+       Global config dict
+    """
+
+    endpoint_dir = os.path.join(args.config_dir, args.name)
+    endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
+
+    if not os.path.exists(endpoint_dir):
+        init_endpoint_dir(args.config_dir, args.name)
+        print('''A default profile has been create for <{}> at {}
+Configure this file and try restarting with:
+    $ funcx-endpoint start {}'''.format(args.name,
+                                        os.path.join(endpoint_dir, 'config.py'),
+                                        args.name))
+        return
+
+    # If pervious registration info exists, use that
+    if os.path.exists(endpoint_json):
+        with open(endpoint_json, 'r') as fp:
+            logger.debug("Connection info loaded from prior registration record")
+            reg_info = json.load(fp)
+    else:
+        logger.debug("Endpoint prior connection record not available. Attempting registration")
+
+        if global_config.get('broker_test', False) is True:
+            logger.warning("**************** BROKER DEBUG MODE *******************")
+            reg_info = register_with_hub(global_config['broker_address'],
+                                         global_config['redis_host'])
+        else:
+            funcx_client = FuncXClient()
+
+            logger.debug("Attempting registration")
+            eid = str(uuid.uuid4())
+            logger.debug(f"Trying with eid : {eid}")
+            reg_info = funcx_client.register_endpoint(args.name, eid)
+            logger.debug("Got endpoint info : {}".format(reg_info))
+
+        logger.info("Registration info from broker: {}".format(reg_info))
+        with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
+            json.dump(reg_info, fp)
+            logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
+
+    optionals = {}
+    optionals['client_address'] = reg_info['address']
+    optionals['client_ports'] = reg_info['client_ports'].split(',')
+
+    optionals['logdir'] = endpoint_dir
+    # optionals['debug'] = True
+
+    if args.debug:
+        optionals['logging_level'] = logging.DEBUG
+
+    import importlib.machinery
+    endpoint_config = importlib.machinery.SourceFileLoader(
+        'config',
+        os.path.join(endpoint_dir,'config.py')).load_module()
+    # TODO : we need to load the config ? maybe not. This needs testing
+
+    stdout = open('./interchange.stdout', 'w+')
+    stderr = open('./interchange.stderr', 'w+')
+    try:
+        context = daemon.DaemonContext(working_directory=endpoint_dir,
+                                       umask=0o002,
+                                       # lockfile.FileLock(
+                                       pidfile=daemon.pidfile.PIDLockFile(os.path.join(endpoint_dir,
+                                                                                       'daemon.pid')),
+                                       stdout=stdout,
+                                       stderr=stderr,
+
+        )
     except Exception as e:
-        return str(e)
+        print("Caught exception while trying to setup endpoint context dirs")
+        print("Exception : ", e)
+
+    check_pidfile(context.pidfile.path, "funcx-endpoint", args.name)
+
+    with context:
+        ic = Interchange(endpoint_config.config, **optionals)
+        ic.start()
+
+    stdout.close()
+    stderr.close()
+
+    print("Done")
 
 
-class FuncXEndpoint:
+def stop_endpoint(args, global_config=None):
+    """ Stops an endpoint using the pidfile
 
-    def __init__(self,
-                 ip=FUNCX_HUB_URL,
-                 port=50001,
-                 worker_threads=1,
-                 container_type="Singularity",
-                 endpoint_type="FuncX",
-        ):
-        """Initiate a funcX endpoint
+    Parameters
+    ----------
 
-        Parameters
-        ----------
-        ip : int
-            IP address of the service to receive tasks
-        port : int
-            Port of the service to receive tasks
-        worker_threads : int
-            Number of concurrent workers to receive and process tasks
-        container_type : str
-            The virtualization type to use (Singularity, Shifter, Docker)
-        """
+    args
+    global_config
 
-        # Log in and start a client
-        self.fx = FuncXClient()
+    """
 
-        self.ip = ip
-        self.port = port
-        self.worker_threads = worker_threads
-        self.container_type = container_type
-        # Keep track of staged containers
-        self.staged_containers = set()
+    endpoint_dir = os.path.join(args.config_dir, args.name)
+    pid_file = os.path.join(endpoint_dir, "daemon.pid")
 
-        # Register this endpoint with funcX
-        self.endpoint_uuid = lookup_option("endpoint_uuid")
-        self.endpoint_uuid = self.fx.register_endpoint(platform.node(), self.endpoint_uuid)
-        print(f"Endpoint UUID: {self.endpoint_uuid}")
-        write_option("endpoint_uuid", self.endpoint_uuid)
+    if os.path.exists(pid_file):
+        logger.debug("{} has a daemon.pid file".format(args.name))
+        pid = None
+        with open(pid_file, 'r') as f:
+            pid = int(f.read())
+        # Attempt terminating
+        try:
+            logger.debug("Signalling process: {}".format(pid))
+            os.kill(pid, signal.SIGKILL)
+            time.sleep(0.1)
+            # Wait to confirm that the pid file disappears
+            if not os.path.exists(pid_file):
+                logger.info("Endpoint <{}> is now stopped".format(args.name))
 
-        # Start parsl
-        self.dfk = parsl.load(_get_parsl_config())
-
-        # Start the endpoint
-        self.endpoint_worker()
-
-    def endpoint_worker(self):
-        """The funcX endpoint worker. This initiates a funcX client and starts worker threads to:
-        1. receive ZMQ messages (zmq_worker)
-        2. perform function executions (execution_workers)
-        3. return results (result_worker)
-
-        We have two loops, one that persistently listens for tasks
-        and the other that waits for task completion and send results
-
-        Returns
-        -------
-        None
-        """
-
-        logging.info(f"Endpoint ID: {self.endpoint_uuid}")
-        endpoint_worker = ZMQWorker("tcp://{}:{}".format(self.ip, self.port), self.endpoint_uuid)
-        task_q = queue.Queue()
-        result_q = queue.Queue()
-        threads = []
-        for i in range(1):
-            thread = threading.Thread(target=self.execution_worker, args=(task_q, result_q,))
-            thread.daemon = True
-            threads.append(thread)
-            thread.start()
-
-        thread = threading.Thread(target=self.result_worker, args=(endpoint_worker, result_q,))
-        thread.daemon = True
-        threads.append(thread)
-        thread.start()
-
-        while True:
-            (request, reply_to) = endpoint_worker.recv()
-            task_q.put((request, reply_to))
-
-    def _stage_container(self, container_uuid, container_type):
-        """Stage the set of containers for local use.
-
-        Parameters
-        ----------
-        endpoint_containers : dict
-            A dictionary of containers to have locally for deployment
-
-        Returns
-        -------
-        None
-        """
-        container = self.fx.get_container(container_uuid=container_uuid, container_type=container_type)
-        if container['type'] == 'docker':      # docker container -- kubernetes will handle that
-            container['local'] = None
-        else:                                  # singularity or shifter
-           pass
-        self.staged_containers.add(container['container_uuid'])
-        return container
-
-    def execution_worker(self, task_q, result_q):
-        """A worker thread to process tasks and place results on the
-        result queue.
-
-        Parameters
-        ----------
-        task_q : queue.Queue
-            A queue of tasks to process.
-        result_q : queue.Queue
-            A queue to put return queues.
-
-        Returns
-        -------
-        None
-        """
-
-        while True:
-            if task_q:
-                request, reply_to = task_q.get()
-
-                to_do = pickle.loads(request[0])
-                code, entry_point, event = to_do[-1]['function'], to_do[-1]['entry_point'], to_do[-1]['event']
-                try:
-                    container_uuid = to_do[-1]['container_uuid']
-                except:
-                    container_uuid = None 
-                if container_uuid:
-                    if container_uuid not in self.staged_containers:
-                        container = self._stage_container(container_uuid, self.container_type)
-                        print("Staged container {}".format(container))
-                        executor = _get_executor(container)
-                        self.dfk.add_executors(executor)
-                        print("added new executors")
-                    app = python_app(execute_function, executors=[container_uuid]) 
-                else:
-                    app = python_app(execute_function, executors=['htex_local'])
-                result = pickle.dumps(app(code, entry_point, event=event).result())
-                print(pickle.loads(result))
-                result_q.put(([result], reply_to))
-
-    def result_worker(self, zmq_worker, result_q):
-        """Worker thread to send results back to funcX service via the broker.
-
-        Parameters
-        ----------
-        zmq_worker : Thread
-            The worker thread
-        result_q : queue.Queue
-            The queue to add results to.
-
-        Returns
-        -------
-        None
-        """
-
-        while True:
-            (result, reply_to) = result_q.get()
-            zmq_worker.send(result, reply_to)
+        except OSError:
+            logger.warning("Endpoint {} could not be terminated".format(args.name))
+            logger.warning("Attempting Endpoint {} cleanup".format(args.name))
+            os.remove(pid_file)
+            sys.exit(-1)
+    else:
+        logger.info("Endpoint <{}> is not active.".format(args.name))
 
 
-def start_endpoint():
-    logging.debug("Starting endpoint")
-    ep = FuncXEndpoint(ip=FUNCX_HUB_URL, port=50001, container_type='docker')
+def register_endpoint(args):
+    print("Register args : ", args)
 
 
-if __name__ == "__main__":
-    start_endpoint()
+def cli_run():
+    """ Entry point for funcx-endpoint
+    """
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='command')
+    parser.add_argument("-v", "--version",
+                        help="Print Endpoint version information")
+    parser.add_argument("-d", "--debug", action='store_true',
+                        help="Enables debug logging")
+    parser.add_argument("-c", "--config_dir",
+                        default='{}/.funcx'.format(pathlib.Path.home()),
+                        help="Path to funcx config directory")
+
+    # Init Endpoint
+    init = subparsers.add_parser('init',
+                                 help='Sets up starter config files to help start running endpoints')
+    init.add_argument("-f", "--force", action='store_true',
+                      help="Force re-initialization of config with this flag.\nWARNING: This will wipe your current config")
+
+    # Start an endpoint
+    start = subparsers.add_parser('start',
+                                  help='Starts an endpoint')
+    start.add_argument("name", help="Name of the endpoint to start")
+
+    # Stop an endpoint
+    stop = subparsers.add_parser('stop', help='Stops an active endpoint')
+    stop.add_argument("name", help="Name of the endpoint to stop")
+
+    # List all endpoints
+    subparsers.add_parser('list', help='Lists all endpoints')
+
+    args = parser.parse_args()
+
+    funcx.set_stream_logger(level=logging.DEBUG if args.debug else logging.INFO)
+    global logger
+    logger = logging.getLogger('funcx')
+
+    if args.version:
+        logger.info("FuncX version: {}".format(funcx.__version__))
+
+    logger.debug("Command: {}".format(args.command))
+
+    args.config_file = os.path.join(args.config_dir, 'config.py')
+
+    if args.command == "init":
+        if args.force:
+            logger.debug("Forcing re-authentication via GlobusAuth")
+        funcx_client = FuncXClient(force_login=args.force)
+        init_endpoint(args)
+        return
+
+    if not os.path.exists(args.config_file):
+        logger.critical("Missing a config file at {}. Critical error. Exiting.".format(args.config_file))
+        logger.info("Please run the following to create the appropriate config files : \n $> funcx-endpoint init")
+        exit(-1)
+    else:
+        logger.debug("Using config files from {}".format(args.config_dir))
+
+    if args.command == "init":
+
+        init_endpoint(args)
+        exit(-1)
+    else:
+        logger.debug("Using config files from {}".format(args.config_dir))
+
+    import importlib.machinery
+    global_config = importlib.machinery.SourceFileLoader('global_config',
+                                                         args.config_file).load_module()
+
+    if args.command == "start":
+        start_endpoint(args, global_config=global_config.global_options)
+
+    elif args.command == "stop":
+        stop_endpoint(args, global_config=global_config.global_options)
+
+    elif args.command == "list":
+        list_endpoints(args)
+
+
+if __name__ == '__main__':
+    cli_run()

@@ -1,17 +1,23 @@
 """HighThroughputExecutor builds on the Swift/T EMEWS architecture to use MPI for fast task distribution
+
+There's a slow but sure deviation from Parsl's Executor interface here, that needs
+to be addressed.
 """
 
 from concurrent.futures import Future
+import os
 import logging
 import threading
 import queue
 import pickle
+import daemon
 from multiprocessing import Process, Queue
 
-from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
+#from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
 from ipyparallel.serialize import deserialize_object  # ,serialize_object
+from funcx.serialize import FuncXSerializer
+fx_serializer = FuncXSerializer()
 
-from parsl.executors.high_throughput import zmq_pipes
 from parsl.executors.high_throughput import interchange
 from parsl.executors.errors import *
 from parsl.executors.base import ParslExecutor
@@ -20,10 +26,15 @@ from parsl.dataflow.error import ConfigurationError
 from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
 
+
+from funcx.executors.high_throughput import zmq_pipes
+
 logger = logging.getLogger(__name__)
 
 BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
+
+
 
 
 class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
@@ -182,7 +193,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self.poll_period = poll_period
         self.suppress_failure = suppress_failure
         self.run_dir = '.'
-
+        self.queue_proc = None
         # FuncX specific options
         self.container_image = container_image
         self.worker_mode = worker_mode
@@ -198,6 +209,13 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                                "--hb_threshold={heartbeat_threshold} "
                                "--mode={worker_mode} "
                                "--container_image={container_image} ")
+
+        self.ix_launch_cmd = ("htex-interchange {debug} -c={client_address} "
+                              "--client_ports={client_ports} "
+                              "--worker_port_range={worker_port_range} "
+                              "--logdir={logdir} "
+                              "{suppress_failure} "
+                              "--hb_threshold={heartbeat_threshold} ")
 
     def initialize_scaling(self):
         """ Compose the launch command and call the scale_out
@@ -235,9 +253,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     def start(self):
         """Create the Interchange process and connect to it.
         """
-        self.outgoing_q = zmq_pipes.TasksOutgoing("127.0.0.1", self.interchange_port_range)
-        self.incoming_q = zmq_pipes.ResultsIncoming("127.0.0.1", self.interchange_port_range)
-        self.command_client = zmq_pipes.CommandClient("127.0.0.1", self.interchange_port_range)
+        self.outgoing_q = zmq_pipes.TasksOutgoing("0.0.0.0", self.interchange_port_range)
+        self.incoming_q = zmq_pipes.ResultsIncoming("0.0.0.0", self.interchange_port_range)
+        self.command_client = zmq_pipes.CommandClient("0.0.0.0", self.interchange_port_range)
 
         self.is_alive = True
 
@@ -245,15 +263,63 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self._executor_exception = None
         self._queue_management_thread = None
         self._start_queue_management_thread()
-        self._start_local_queue_process()
+        # We do not want to start the interchange. The user will do that via starting
+        # the endpoint.
+        # self._start_local_interchange_process()
+        print("Attempting remote start")
+        # self._start_remote_interchange_process()
 
         logger.debug("Created management thread: {}".format(self._queue_management_thread))
 
         if self.provider:
-            self.initialize_scaling()
+            # self.initialize_scaling()
+            pass
         else:
             self._scaling_enabled = False
             logger.debug("Starting HighThroughputExecutor with no provider")
+
+        return (self.outgoing_q.port, self.incoming_q.port, self.command_client.port)
+
+    def _start_remote_interchange_process(self):
+        """ Starts the interchange process locally
+
+        Starts the interchange process remotely via the provider.channel and uses the command channel
+        to request worker urls that the interchange has selected.
+        """
+        logger.debug("Attempting Interchange deployment via channel: {}".format(self.provider.channel))
+
+        debug_opts = "--debug" if self.worker_debug else ""
+        suppress_failure = "--suppress_failure" if self.suppress_failure else ""
+        logger.debug("Before : \n{}\n".format(self.ix_launch_cmd))
+        launch_command = self.ix_launch_cmd.format(debug=debug_opts,
+                                                   client_address=self.address,
+                                                   client_ports="{},{},{}".format(self.outgoing_q.port,
+                                                                                  self.incoming_q.port,
+                                                                                  self.command_client.port),
+                                                   worker_port_range="{},{}".format(self.worker_port_range[0],
+                                                                                    self.worker_port_range[1]),
+                                                   logdir="{}/runinfo/{}/{}".format(self.provider.channel.script_dir,
+                                                                                    os.path.basename(self.run_dir),
+                                                                                    self.label),
+                                                   suppress_failure=suppress_failure,
+                                                   heartbeat_threshold=self.heartbeat_threshold)
+
+        if self.provider.worker_init:
+            launch_command = self.provider.worker_init + '\n' + launch_command
+
+        logger.debug("Launch command : \n{}\n".format(launch_command))
+        print("Launch command : \n{}\n".format(launch_command))
+
+        """
+        retcode, stdout, stderr = self.provider.execute_wait(launch_command)
+        if retcode == 0:
+            logger.debug("Starting Interchange remotely worked")
+
+        logger.debug("Requesting worker urls ")
+        self.worker_task_url, self.worker_result_url = self.get_worker_urls()
+        logger.debug("Got worker urls {}, {}".format(self.worker_task_url, self.worker_result_url))
+        """
+        return
 
     def _queue_management_worker(self):
         """Listen to the queue for task status messages and handle them.
@@ -368,7 +434,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         """We do not use this yet."""
         q.put(None)
 
-    def _start_local_queue_process(self):
+    def _start_local_interchange_process(self):
         """ Starts the interchange process locally
 
         Starts the interchange process locally and uses an internal command queue to
@@ -431,6 +497,11 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Sent hold request to worker: {}".format(worker_id))
         return c
 
+    def wait_for_endpoint(self):
+        heartbeat = self.command_client.run('HEARTBEAT')
+        logger.debug("Attempting heartbeat to interchange")
+        return heartbeat
+
     @property
     def outstanding(self):
         outstanding_c = self.command_client.run("OUTSTANDING_C")
@@ -443,19 +514,16 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Got managers: {}".format(workers))
         return workers
 
-    def submit(self, func, *args, **kwargs):
+    def submit(self, bufs, task_id=None):
         """Submits work to the the outgoing_q.
 
         The outgoing_q is an external process listens on this
         queue for new work. This method behaves like a
         submit call as described here `Python docs: <https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor>`_
 
-        Args:
-            - func (callable) : Callable function
-            - *args (list) : List of arbitrary positional arguments.
-
-        Kwargs:
-            - **kwargs (dict) : A dictionary of arbitrary keyword args for func.
+        Parameters
+        ----------
+        Bufs - Pickled buffer with (b'<Function>', b'<args>', b'<kwargs>')
 
         Returns:
               Future
@@ -464,24 +532,37 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
             raise self._executor_exception
 
         self._task_counter += 1
-        task_id = self._task_counter
-
-        logger.debug("Pushing function {} to queue with args {}".format(func, args))
+        if not task_id:
+            task_id = self._task_counter
 
         self.tasks[task_id] = Future()
 
-        fn_buf = pack_apply_message(func, args, kwargs,
-                                    buffer_threshold=1024 * 1024,
-                                    item_threshold=1024)
-
+        # This needs to be a byte buffer
+        # We want a cleaner header to the task here for the downstream systems
+        # to appropriately route tasks
         msg = {"task_id": task_id,
-               "buffer": fn_buf}
+               "buffer": bufs}
 
         # Post task to the the outgoing queue
         self.outgoing_q.put(msg)
 
         # Return the future
         return self.tasks[task_id]
+
+    @property
+    def connection_info(self):
+        """ All connection info necessary for the endpoint to connect back
+
+        Returns:
+              Dict with connection info
+        """
+        return {'address': self.address,
+                # A memorial to the ungodly amount of time and effort spent,
+                # troubleshooting the order of these ports.
+                'client_ports': '{},{},{}'.format(self.outgoing_q.port,
+                                                  self.incoming_q.port,
+                                                  self.command_client.port)
+        }
 
     @property
     def scaling_enabled(self):
@@ -548,6 +629,26 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.info("Attempting HighThroughputExecutor shutdown")
         # self.outgoing_q.close()
         # self.incoming_q.close()
-        self.queue_proc.terminate()
+        if self.queue_proc:
+            self.queue_proc.terminate()
         logger.info("Finished HighThroughputExecutor shutdown attempt")
         return True
+
+
+def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
+
+    from funcx import set_file_logger
+
+    stdout = open(os.path.join(logdir, "executor.{}.stdout".format(endpoint_id)), 'w')
+    stderr = open(os.path.join(logdir, "executor.{}.stderr".format(endpoint_id)), 'w')
+
+    logdir = os.path.abspath(logdir)
+    with daemon.DaemonContext(stdout=stdout, stderr=stderr):
+        global logger
+        print("cwd: ", os.getcwd())
+        logger = set_file_logger(os.path.join(logdir, "executor.{}.log".format(endpoint_id)),
+                                 level=logging_level)
+        htex.start()
+
+    stdout.close()
+    stderr.close()

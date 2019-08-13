@@ -1,17 +1,16 @@
-from funcx.sdk.config import (check_logged_in, FUNCX_SERVICE_ADDRESS, CLIENT_ID, lookup_option)
-from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
-from funcx.sdk.utils.futures import FuncXFuture
-
-from globus_sdk.base import BaseClient, slash_join
-from mdf_toolbox import login, logout
-
-import pickle as pkl
 import codecs
 import json
 import os
+import logging
+import pickle as pkl
 
-_token_dir = os.path.expanduser("~/.funcx/credentials")
+from globus_sdk.base import BaseClient, slash_join
+from mdf_toolbox import login, logout
+from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
+from funcx.serialize import FuncXSerializer
+# from funcx.sdk.utils.futures import FuncXFuture
 
+logger = logging.getLogger(__name__)
 
 class FuncXClient(BaseClient):
     """Main class for interacting with the funcX service
@@ -19,31 +18,50 @@ class FuncXClient(BaseClient):
     Holds helper operations for performing common tasks with the funcX service.
     """
 
-    def __init__(self, fx_authorizer=None, http_timeout=None,
-                 force_login=False, **kwargs):
-        """Initialize the client
-        Args:
-            fx_authorizer (:class:`GlobusAuthorizer
-                            <globus_sdk.authorizers.base.GlobusAuthorizer>`):
-                An authorizer instance used to communicate with funcX.
-                If ``None``, will be created.
-            http_timeout (int): Timeout for any call to service in seconds. (default is no timeout)
-            force_login (bool): Whether to force a login to get new credentials.
-                A login will always occur if ``fx_authorizer`` 
-                are not provided.
+    TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
+    CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
+    # FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
+    FUNCX_SERVICE_ADDRESS = "https://dev.funcx.org/api/v1"
+
+    def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
+                 force_login=False, fx_authorizer=None, **kwargs):
+        """ Initialize the client
+
+        Parameters
+        ----------
+        http_timeout: int
+        Timeout for any call to service in seconds.
+        Default is no timeout
+
+        force_login: bool
+        Whether to force a login to get new credentials.
+
+        fx_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
+        A custom authorizer instance to communicate with funcX.
+        Default: ``None``, will be created.
+
         Keyword arguments are the same as for BaseClient.
         """
+        self.ep_registration_path = 'register_endpoint_2'
+        self.funcx_home = os.path.expanduser(funcx_home)
+
+
         if force_login or not fx_authorizer:
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
-            auth_res = login(services=[fx_scope], 
+            auth_res = login(services=[fx_scope],
                              app_name="funcX_Client",
-                             client_id=CLIENT_ID, clear_old_tokens=force_login,
-                             token_dir=_token_dir)
+                             client_id=self.CLIENT_ID,
+                             clear_old_tokens=force_login,
+                             token_dir=self.TOKEN_DIR)
             dlh_authorizer = auth_res['funcx_service']
 
-        super(FuncXClient, self).__init__("funcX", environment='funcx', authorizer=dlh_authorizer,
-                                          http_timeout=http_timeout, base_url=FUNCX_SERVICE_ADDRESS,
+        super(FuncXClient, self).__init__("funcX",
+                                          environment='funcx',
+                                          authorizer=dlh_authorizer,
+                                          http_timeout=http_timeout,
+                                          base_url=self.FUNCX_SERVICE_ADDRESS,
                                           **kwargs)
+        self.fx_serializer = FuncXSerializer()
 
     def logout(self):
         """Remove credentials from your local system
@@ -67,70 +85,48 @@ class FuncXClient(BaseClient):
         r = self.get("{task_id}/status".format(task_id=task_id))
         return json.loads(r.text)
 
-    def get_local_endpoint(self):
-        """Get the local endpoint if it exists.
-
-        Returns:
-            (str) the uuid of the endpoint
-        -------
-        """
-
-        endpoint_uuid = lookup_option("endpoint_uuid")
-        return endpoint_uuid
-
-    def run(self, inputs, endpoint, func_id, asynchronous=False, input_type='json', async_poll=5):
-
+    def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
 
         Parameters
         ----------
-        inputs : list
-            Data to be used as input to the function. Can be a string of file paths or URLs
-        input_type : str
-            How to send the data to funcX. Can be "python" (which pickles
-            the data), "json" (which uses JSON to serialize the data), or "files" (which
-            sends the data as files).
-        endpoint : str
-            The uuid of the endpoint
-        func_id : str
-            The uuid of the function
+        *args : Any
+            Args as specified by the function signature
+        endpoint_id : uuid str
+            Endpoint UUID string. Required
+        function_id : uuid str
+            Function UUID string. Required
         asynchronous : bool
             Whether or not to run the function asynchronously
-        input_type : str
-            Input type to use: json, python, files
-        async_poll : float
-            How often to poll for task status
 
         Returns
         -------
-        FuncXFuture
-            Future representing the task
+        task_id : str
+        UUID string that identifies the task
         """
-        servable_path = 'execute'
-        data = {'endpoint': endpoint, 'func': func_id}
+        servable_path = 'submit'
+        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
+        assert function_id is not None, "function_id key-word argument must be set"
 
-        # Prepare the data to be sent to funcX
-        if input_type == 'python':
-            data['python'] = codecs.encode(pkl.dumps(inputs), 'base64').decode()
-        elif input_type == 'json':
-            data['data'] = inputs
-        elif input_type == 'files':
-            raise NotImplementedError('Files support is not yet implemented')
-        else:
-            raise ValueError('Input type not recognized: {}'.format(input_type))
-        
+        ser_args = self.fx_serializer.serialize(args)
+        ser_kwargs = self.fx_serializer.serialize(kwargs)
+        payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
+
+        data = {'endpoint': endpoint_id,
+                'func': function_id,
+                'payload': payload,
+                'is_async': asynchronous}
+
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
         if r.http_status is not 200:
             raise Exception(r)
 
-        task_id = None
-        try:
-            task_id = r['task_id']
-        except:
-            pass
+        if 'task_uuid' not in r:
+            raise MalformedResponse(r)
 
-        # Create a future to deal with the result
+        """
+        Create a future to deal with the result
         funcx_future = FuncXFuture(self, task_id, async_poll)
 
         if not asynchronous:
@@ -138,6 +134,9 @@ class FuncXClient(BaseClient):
 
         # Return the result
         return funcx_future
+        """
+        return r['task_uuid']
+
 
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
@@ -153,19 +152,20 @@ class FuncXClient(BaseClient):
 
         Returns
         -------
-        int
-            The uuid of the endpoint
+        A dict
+            {'endopoint_id' : <>,
+             'address' : <>,
+             'client_ports': <>}
         """
-        registration_path = 'register_endpoint'
-
         data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
 
-        r = self.post(registration_path, json_body=data)
+        r = self.post(self.ep_registration_path, json_body=data)
         if r.http_status is not 200:
             raise Exception(r)
 
         # Return the result
-        return r.data['endpoint_uuid']
+        logger.info("Data returned : {}".format(r.data))
+        return r.data
 
     def get_containers(self, name, description=None):
         """Register a DLHub endpoint with the funcX service and get the containers to launch.
@@ -217,63 +217,34 @@ class FuncXClient(BaseClient):
         # Return the result
         return r.data['container']
 
-    def register_container(self, name, location, description, container_type):
-        """Register a container with the funcX service.
-
-        Parameters
-        ----------
-        name : str
-            A name for the container
-        location : str
-            The location of the container (e.g., its docker url)
-        description : str
-            A description to associate with the container
-        container_type : str
-            The type of containers that will be used (Singularity, Shifter, Docker)
-
-        Returns
-        -------
-        str
-            The id of the container
-        """
-        container_path = f'containers'
-
-        payload = {'name': name, 'location': location, 'description': description, 'type': container_type}
-
-        r = self.post(container_path, json_body=payload)
-        if r.http_status is not 200:
-            raise Exception(r)
-
-        # Return the result
-        return r.data['container_id']
-
-    def register_function(self, name, code, entry_point='funcx_handler', container=None, description=None):
+    def register_function(self, function, entry_point=None, description=None):
         """Register a function code with the funcX service.
 
         Parameters
         ----------
-        name : str
-            Name of the endpoint
+        function : Python Function
+            The function to be registered for remote execution
         description : str
             Description of the file
-        code : str
-            Function code
         entry_point : str
-            The entry point (function name) of the function
-        container : str
-            The uuid of the container to run this function in
-        description : str
-            A description of the container
+            The entry point (function name) of the function. Default: None
 
         Returns
         -------
-        str
-            The name of the function
+        function uuid : str
+            UUID identifier for the registered function
         """
         registration_path = 'register_function'
 
-        data = {"function_name": name, "function_code": code, "entry_point": entry_point,
-                "container": container, "description": description}
+        serialized_fn = self.fx_serializer.serialize(function)
+        packed_code = self.fx_serializer.pack_buffers([serialized_fn])
+
+        data = {"function_name": function.__name__,
+                "function_code": packed_code,
+                "entry_point": entry_point if entry_point else function.__name__,
+                "description": description}
+
+        logger.info("Registering function : {}".format(data))
 
         r = self.post(registration_path, json_body=data)
         if r.http_status is not 200:
