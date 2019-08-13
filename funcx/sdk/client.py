@@ -8,7 +8,7 @@ from globus_sdk.base import BaseClient, slash_join
 from mdf_toolbox import login, logout
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
 from funcx.serialize import FuncXSerializer
-from funcx.sdk.utils.futures import FuncXFuture
+# from funcx.sdk.utils.futures import FuncXFuture
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +130,15 @@ class FuncXClient(BaseClient):
         except:
             pass
 
+        return task_id
         # Create a future to deal with the result
-        funcx_future = FuncXFuture(self, task_id, async_poll)
+        # funcx_future = FuncXFuture(self, task_id, async_poll)
 
-        if not asynchronous:
-            return funcx_future.result()
+        #if not asynchronous:
+        #    return funcx_future.result()
 
         # Return the result
-        return funcx_future
+        #return funcx_future
 
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
