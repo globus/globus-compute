@@ -14,7 +14,10 @@ on campus clusters, clouds and supercomputers.
 
    quickstart
    endpoints
-   foo
+   Tutorial.ipynb
+   client
+   debugging
+
 
 Indices and tables
 ==================
