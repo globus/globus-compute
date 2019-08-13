@@ -86,7 +86,6 @@ class FuncXClient(BaseClient):
         return json.loads(r.text)
 
     def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
-
         """Initiate an invocation
 
         Parameters
@@ -102,8 +101,8 @@ class FuncXClient(BaseClient):
 
         Returns
         -------
-        FuncXFuture
-            Future representing the task
+        task_id : str
+        UUID string that identifies the task
         """
         servable_path = 'submit'
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
@@ -112,7 +111,6 @@ class FuncXClient(BaseClient):
         ser_args = self.fx_serializer.serialize(args)
         ser_kwargs = self.fx_serializer.serialize(kwargs)
         payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
-        print("Payload : ", payload)
 
         data = {'endpoint': endpoint_id,
                 'func': function_id,
@@ -124,21 +122,21 @@ class FuncXClient(BaseClient):
         if r.http_status is not 200:
             raise Exception(r)
 
-        task_id = None
-        try:
-            task_id = r['task_id']
-        except:
-            pass
+        if 'task_uuid' not in r:
+            raise MalformedResponse(r)
 
-        return task_id
-        # Create a future to deal with the result
-        # funcx_future = FuncXFuture(self, task_id, async_poll)
+        """
+        Create a future to deal with the result
+        funcx_future = FuncXFuture(self, task_id, async_poll)
 
-        #if not asynchronous:
-        #    return funcx_future.result()
+        if not asynchronous:
+            return funcx_future.result()
 
         # Return the result
-        #return funcx_future
+        return funcx_future
+        """
+        return r['task_uuid']
+
 
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
