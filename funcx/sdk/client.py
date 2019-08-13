@@ -22,21 +22,28 @@ class FuncXClient(BaseClient):
     # FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
     FUNCX_SERVICE_ADDRESS = "https://dev.funcx.org/api/v1"
 
-    def __init__(self, fx_authorizer=None, http_timeout=None,
-                 force_login=False, **kwargs):
-        """Initialize the client
-        Args:
-            fx_authorizer (:class:`GlobusAuthorizer
-                            <globus_sdk.authorizers.base.GlobusAuthorizer>`):
-                An authorizer instance used to communicate with funcX.
-                If ``None``, will be created.
-            http_timeout (int): Timeout for any call to service in seconds. (default is no timeout)
-            force_login (bool): Whether to force a login to get new credentials.
-                A login will always occur if ``fx_authorizer``
-                are not provided.
+    def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
+                 force_login=False, fx_authorizer=None, **kwargs):
+        """ Initialize the client
+
+        Parameters
+        ----------
+        http_timeout: int
+        Timeout for any call to service in seconds.
+        Default is no timeout
+
+        force_login: bool
+        Whether to force a login to get new credentials.
+
+        fx_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
+        A custom authorizer instance to communicate with funcX.
+        Default: ``None``, will be created.
+
         Keyword arguments are the same as for BaseClient.
         """
         self.ep_registration_path = 'register_endpoint_2'
+        self.funcx_home = os.path.expanduser(funcx_home)
+
 
         if force_login or not fx_authorizer:
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
