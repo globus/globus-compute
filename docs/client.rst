@@ -7,14 +7,12 @@ interface to:
 1. Register functions
 2. Register containers and execution environments
 3. Launch registered function against endpoints
-4. Check status on launched functions and
+4. Check the status of launched functions and
 5. Retrieve outputs from functions
 
 
 FuncXClient Reference:
 ----------------------
-
-Concrete subclass of AppBase that implements the Python App functionality.
 
 .. autoclass:: funcx.FuncXClient
    :members:
