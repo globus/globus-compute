@@ -234,6 +234,8 @@ class Interchange(object):
             logger.exception("Caught exception")
             raise
 
+        self.flowcontrol = FlowControl(self)
+
 
     def load_config(self):
         """ Load the config
@@ -273,9 +275,11 @@ class Interchange(object):
         self.config.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.config.launch_cmd))
 
+        """
         if self.config.scaling_enabled:
             logger.info("Scaling ...")
             self.config.provider.submit(self.config.launch_cmd, 1, 1)
+        """
 
 
     def get_tasks(self, count):
@@ -332,6 +336,29 @@ class Interchange(object):
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
 
+
+    def get_total_outstanding(self):
+        """ Get the outstanding tasks in total
+        """
+        outstanding = self.pending_task_queue.qsize()
+        for manager in self._ready_manager_queue:
+            outstanding += len(self._ready_manager_queue[manager]['tasks'])
+        return outstanding
+
+    def get_outstanding_breakdown(self):
+        """ Get outstanding breakdown per manager and in the interchange queues
+        """
+
+        pending_on_interchange = self.pending_task_queue.qsize()
+        # Reporting pending on interchange is a deviation from Parsl
+        reply = [('interchange', pending_on_interchange, pending_on_interchange)]
+        for manager in self._ready_manager_queue:
+            resp = (manager.decode('utf-8'),
+                    len(self._ready_manager_queue[manager]['tasks']),
+                    self._ready_manager_queue[manager]['active'])
+            reply.append(resp)
+        return reply
+
     def _command_server(self, kill_event):
         """ Command server to run async command to the interchange
         """
@@ -341,18 +368,10 @@ class Interchange(object):
                 command_req = self.command_channel.recv_pyobj()
                 logger.debug("[COMMAND] Received command request: {}".format(command_req))
                 if command_req == "OUTSTANDING_C":
-                    outstanding = self.pending_task_queue.qsize()
-                    for manager in self._ready_manager_queue:
-                        outstanding += len(self._ready_manager_queue[manager]['tasks'])
-                    reply = outstanding
+                    reply = self.get_total_outstanding()
 
                 elif command_req == "MANAGERS":
-                    reply = []
-                    for manager in self._ready_manager_queue:
-                        resp = (manager.decode('utf-8'),
-                                len(self._ready_manager_queue[manager]['tasks']),
-                                self._ready_manager_queue[manager]['active'])
-                        reply.append(resp)
+                    reply = self.get_outstanding_breakdown()
 
                 elif command_req.startswith("HOLD_WORKER"):
                     cmd, s_manager = command_req.split(';')
@@ -491,8 +510,9 @@ class Interchange(object):
 
             # If we had received any requests, check if there are tasks that could be passed
 
-            logger.debug("Managers count (total/interesting): {}/{}".format(len(self._ready_manager_queue),
-                                                                            len(interesting_managers)))
+            logger.info("[MAIN] Managers count (total/interesting): {}/{}".format(
+                len(self._ready_manager_queue),
+                len(interesting_managers)))
 
             if interesting_managers and not self.pending_task_queue.empty():
                 shuffled_managers = list(interesting_managers)
