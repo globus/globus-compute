@@ -10,13 +10,13 @@ The latest version available on PyPI is ``v0.0.1a0``.
 Installation
 ------------
 
-**funcX** comes with two components, the **endpoints** which are user launched services that make
+**funcX** comes with two components: the **endpoints** which are user launched services that make
 computation resources accessible for function executions, and the **funcX client** that enables
 the registration, execution and tracking of functions across **endpoints**.
 
 Here are some pre-requisites for both the `endpoints` and the `funcX client`
 
-  1. funcX currently requires Python3.6
+  1. Python3.6
   2. The machine must have outbound network access
 
 To check if you have the right Python version, run the following commands::
