@@ -402,7 +402,7 @@ class Manager(object):
            Walltime in seconds before we check status
 
         """
-        print("LAUNCH_WORKER is only partially baked")
+        logger.info("LAUNCH_WORKER is only partially baked")
 
         debug = ' --debug' if self.debug else ''
         # TODO : This should assign some meaningful worker_id rather than random
@@ -414,7 +414,7 @@ class Manager(object):
                f'-t {worker_type} '
                f'--logdir={self.logdir}/{self.uid} ')
 
-        print("Command string : ", cmd)
+        logger.info("[TYLER] Command string :\n {}".format(cmd))
         if mode == 'no_container':
             modded_cmd = cmd
         elif mode == 'singularity':
@@ -429,10 +429,9 @@ class Manager(object):
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     shell=True)
-            print("Launched proc")
 
         except Exception as e:
-            print("TODO : Got an error in worker launch, got error {}".format(e))
+            logger.info("TODO : Got an error in worker launch, got error {}".format(e))
 
         return proc
 
@@ -467,6 +466,7 @@ class Manager(object):
         # Keep track of workers to whom we've sent kill messages
         self.dead_worker_set = set()
 
+        logger.info("[TYLER] *** LAUNCHING WORKER *** ")
         self.workers = [self.launch_worker(worker_id=5)]
 
         logger.debug("Initial workers launched")

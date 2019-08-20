@@ -195,7 +195,7 @@ def cli_run():
                          args.address,
                          int(args.port),
                          args.logdir,
-                         worker_type=args.worker_type,
+                         worker_type=args.type,
                          debug=args.debug, )
     worker.start()
     return
