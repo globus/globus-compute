@@ -22,7 +22,7 @@ from funcx.executors.high_throughput.worker_map import WorkerMap
 from parsl.version import VERSION as PARSL_VERSION
 from funcx import set_file_logger
 
-from container_scheduler import container_scheduler
+from funcx.executors.high_throughput.container_scheduler import naive_scheduler
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
@@ -311,7 +311,7 @@ class Manager(object):
                     break
 
             # TODO: TYLER -- call the scheduler and update the worker_map here.
-            new_worker_map = container_scheduler.naive(self.task_queues, self.max_workers, logger=logger)
+            new_worker_map = naive_scheduler(self.task_queues, self.max_workers, logger=logger)
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be killed
