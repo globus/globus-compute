@@ -311,7 +311,9 @@ class Manager(object):
                     break
 
             # TODO: TYLER -- call the scheduler and update the worker_map here.
-            new_worker_map = naive_scheduler(self.task_queues, self.max_workers, logger=logger)
+            logger.info("Task queues: {}".format(self.task_queues))
+            logger.info("[TYLER] Max Workers: {}".format(self.max_workers))
+            new_worker_map = naive_scheduler(self.task_queues, self.worker_count, logger=logger)
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be killed
