@@ -13,19 +13,12 @@ import uuid
 import zmq
 import math
 import json
-import shutil
 import subprocess
 import multiprocessing
 import random
 
-from typing import Any
-from queue import PriorityQueue
-
-# from funcx.executors.high_throughput.funcx_worker import funcx_worker
-
 from funcx.executors.high_throughput.worker_map import WorkerMap
 
-from funcx.version import VERSION as FUNCX_VERSION
 from parsl.version import VERSION as PARSL_VERSION
 from funcx import set_file_logger
 
@@ -349,7 +342,6 @@ class Manager(object):
                             self.funcx_task_socket.send_multipart(to_send)
                             logger.debug("Sending done")
 
-
     def push_results(self, kill_event, max_result_batch_size=1):
         """ Listens on the pending_result_queue and sends out results via 0mq
 
@@ -484,161 +476,161 @@ class Manager(object):
 
 
 
-    #----------------------------------------------------------------------------------------------
-    # Deprecated
-    def _start(self):
-        """ Start the worker processes.
-
-        TODO: Move task receiving to a thread
-        """
-        start = time.time()
-        self._kill_event = threading.Event()
-
-        self.procs = {}
-
-        # @Tyler, we should do a `which funcx_worker.py` [note: not entry point, this must be a script]
-        # copy that file over the directory '.' and then have the container run with pwd visible
-        # as an initial cut, while we resolve possible issues.
-        orig_location = os.getcwd()
-
-        if not os.path.isdir("NAMESPACE"):
-            os.mkdir("NAMESPACE")
-
-        context = zmq.Context()
-        registration_socket = context.socket(zmq.REP)
-        self.reg_port = registration_socket.bind_to_random_port("tcp://*", min_port=50001, max_port=55000)
-
-        for worker_id in range(self.worker_count):
-
-            if self.mode.startswith("singularity"):
-                try:
-                    os.mkdir("NAMESPACE/{}".format(worker_id))
-                    # shutil.copyfile(worker_py_path, "NAMESPACE/{}/funcx_worker.py".format(worker_id))
-                except Exception:
-                    pass  # Assuming the directory already exists.
-
-            if self.mode == "no_container":
-                p = multiprocessing.Process(target=funcx_worker,
-                                            args=(worker_id,
-                                                  self.uid,
-                                                  "tcp://localhost:{}".format(self.internal_worker_port),
-                                                  "tcp://localhost:{}".format(self.reg_port),
-                                                  ),
-                                            # DEBUG YADU. MUST SET BACK TO False,
-                                            kwargs={'no_reuse': False,
-                                                    'debug': self.debug,
-                                                    'logdir': self.logdir})
-
-                p.start()
-                self.procs[worker_id] = p
-
-            elif self.mode == "singularity_reuse":
-
-                os.chdir("NAMESPACE/{}".format(worker_id))
-                # @Tyler, FuncX worker path needs to be updated to not use the run command in the container.
-                # We just want to invoke with "funcx_worker.py" which is found in the $PATH
-                sys_cmd = ("singularity run {singularity_img} /usr/local/bin/funcx_worker.py --worker_id {worker_id} "
-                           "--pool_id {pool_id} --task_url {task_url} --reg_url {reg_url} "
-                           "--logdir {logdir} ")
-
-
-                sys_cmd = sys_cmd.format(singularity_img=self.container_image,
-                                         worker_id=worker_id,
-                                         pool_id=self.uid,
-                                         task_url="tcp://localhost:{}".format(self.internal_worker_port),
-                                         reg_url="tcp://localhost:{}".format(self.reg_port),
-                                         logdir=self.logdir)
-
-                logger.debug("Singularity reuse launch cmd: {}".format(sys_cmd))
-                proc = subprocess.Popen(sys_cmd, shell=True)
-                self.procs[worker_id] = proc
-
-                # Update the command to say something like :
-                # while :
-                # do
-                #     singularity run {singularity_img} funcx_worker.py --no_reuse .....
-                # done
-
-                # FuncX worker to accept new --no_reuse flag that breaks the loop after 1 task.
-                os.chdir(orig_location)
-
-            elif self.mode == "singularity_single_use":
-                # raise Exception("Not supported")
-                os.chdir("NAMESPACE/{}".format(worker_id))
-
-                if self.mode.startswith("singularity"):
-                    #while True:
-                    logger.info("New subprocess loop!")
-                    sys_cmd = ("singularity run {singularity_img} /usr/local/bin/funcx_worker.py --no_reuse --worker_id {worker_id} "
-                                   "--pool_id {pool_id} --task_url {task_url} --reg_url {reg_url} "
-                                   "--logdir {logdir} ")
-                    sys_cmd = sys_cmd.format(singularity_img=self.container_image,
-                                             worker_id=worker_id,
-                                             pool_id=self.uid,
-                                             task_url="tcp://localhost:{}".format(self.internal_worker_port),
-                                             reg_url="tcp://localhost:{}".format(self.reg_port),
-                                             logdir=self.logdir)
-
-                    bash_cmd = """ while :
-                                   do
-                                      {}
-                                   done """.format(sys_cmd)
-                    logger.debug("Singularity NO-reuse launch cmd: {}".format(bash_cmd))
-                    proc = subprocess.Popen(bash_cmd, shell=True)
-                    self.procs[worker_id] = proc
-                    os.chdir(orig_location)
-
-
-        for worker_id in range(self.worker_count):
-            msg = registration_socket.recv_pyobj()
-            logger.info("Received registration message from worker: {}".format(msg))
-            registration_socket.send_pyobj("ACK")
-
-        logger.debug("Manager synced with workers")
-
-        self._task_puller_thread = threading.Thread(target=self.pull_tasks,
-                                                    args=(self._kill_event,))
-        self._result_pusher_thread = threading.Thread(target=self.push_results,
-                                                      args=(self._kill_event,))
-        self._task_puller_thread.start()
-        self._result_pusher_thread.start()
-
-        logger.info("Loop start")
-
-        # TODO : Add mechanism in this loop to stop the worker pool
-        # This might need a multiprocessing event to signal back.
-        self._kill_event.wait()
-        logger.critical("[MAIN] Received kill event, terminating worker processes")
-
-        self._task_puller_thread.join()
-        self._result_pusher_thread.join()
-        for proc_id in self.procs:
-            self.procs[proc_id].terminate()
-
-            if type(self.procs[proc_id]) == "subprocess.Popen":
-
-                poll = p.poll()
-
-                if poll == None:
-                    is_alive = False
-                else:
-                    is_alive = True
-
-                logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
-                                                                  is_alive))
-            else:
-                logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
-                                                                  self.procs[proc_id].is_alive()))
-
-            self.procs[proc_id].join()
-            logger.debug("Worker:{} joined successfully".format(self.procs[proc_id]))
-
-        self.task_incoming.close()
-        self.result_outgoing.close()
-        self.context.term()
-        delta = time.time() - start
-        logger.info("FuncX Manager ran for {} seconds".format(delta))
-        return
+    # #----------------------------------------------------------------------------------------------
+    # # Deprecated
+    # def _start(self):
+    #     """ Start the worker processes.
+    #
+    #     TODO: Move task receiving to a thread
+    #     """
+    #     start = time.time()
+    #     self._kill_event = threading.Event()
+    #
+    #     self.procs = {}
+    #
+    #     # @Tyler, we should do a `which funcx_worker.py` [note: not entry point, this must be a script]
+    #     # copy that file over the directory '.' and then have the container run with pwd visible
+    #     # as an initial cut, while we resolve possible issues.
+    #     orig_location = os.getcwd()
+    #
+    #     if not os.path.isdir("NAMESPACE"):
+    #         os.mkdir("NAMESPACE")
+    #
+    #     context = zmq.Context()
+    #     registration_socket = context.socket(zmq.REP)
+    #     self.reg_port = registration_socket.bind_to_random_port("tcp://*", min_port=50001, max_port=55000)
+    #
+    #     for worker_id in range(self.worker_count):
+    #
+    #         if self.mode.startswith("singularity"):
+    #             try:
+    #                 os.mkdir("NAMESPACE/{}".format(worker_id))
+    #                 # shutil.copyfile(worker_py_path, "NAMESPACE/{}/funcx_worker.py".format(worker_id))
+    #             except Exception:
+    #                 pass  # Assuming the directory already exists.
+    #
+    #         if self.mode == "no_container":
+    #             p = multiprocessing.Process(target=funcx_worker,
+    #                                         args=(worker_id,
+    #                                               self.uid,
+    #                                               "tcp://localhost:{}".format(self.internal_worker_port),
+    #                                               "tcp://localhost:{}".format(self.reg_port),
+    #                                               ),
+    #                                         # DEBUG YADU. MUST SET BACK TO False,
+    #                                         kwargs={'no_reuse': False,
+    #                                                 'debug': self.debug,
+    #                                                 'logdir': self.logdir})
+    #
+    #             p.start()
+    #             self.procs[worker_id] = p
+    #
+    #         elif self.mode == "singularity_reuse":
+    #
+    #             os.chdir("NAMESPACE/{}".format(worker_id))
+    #             # @Tyler, FuncX worker path needs to be updated to not use the run command in the container.
+    #             # We just want to invoke with "funcx_worker.py" which is found in the $PATH
+    #             sys_cmd = ("singularity run {singularity_img} /usr/local/bin/funcx_worker.py --worker_id {worker_id} "
+    #                        "--pool_id {pool_id} --task_url {task_url} --reg_url {reg_url} "
+    #                        "--logdir {logdir} ")
+    #
+    #
+    #             sys_cmd = sys_cmd.format(singularity_img=self.container_image,
+    #                                      worker_id=worker_id,
+    #                                      pool_id=self.uid,
+    #                                      task_url="tcp://localhost:{}".format(self.internal_worker_port),
+    #                                      reg_url="tcp://localhost:{}".format(self.reg_port),
+    #                                      logdir=self.logdir)
+    #
+    #             logger.debug("Singularity reuse launch cmd: {}".format(sys_cmd))
+    #             proc = subprocess.Popen(sys_cmd, shell=True)
+    #             self.procs[worker_id] = proc
+    #
+    #             # Update the command to say something like :
+    #             # while :
+    #             # do
+    #             #     singularity run {singularity_img} funcx_worker.py --no_reuse .....
+    #             # done
+    #
+    #             # FuncX worker to accept new --no_reuse flag that breaks the loop after 1 task.
+    #             os.chdir(orig_location)
+    #
+    #         elif self.mode == "singularity_single_use":
+    #             # raise Exception("Not supported")
+    #             os.chdir("NAMESPACE/{}".format(worker_id))
+    #
+    #             if self.mode.startswith("singularity"):
+    #                 #while True:
+    #                 logger.info("New subprocess loop!")
+    #                 sys_cmd = ("singularity run {singularity_img} /usr/local/bin/funcx_worker.py --no_reuse --worker_id {worker_id} "
+    #                                "--pool_id {pool_id} --task_url {task_url} --reg_url {reg_url} "
+    #                                "--logdir {logdir} ")
+    #                 sys_cmd = sys_cmd.format(singularity_img=self.container_image,
+    #                                          worker_id=worker_id,
+    #                                          pool_id=self.uid,
+    #                                          task_url="tcp://localhost:{}".format(self.internal_worker_port),
+    #                                          reg_url="tcp://localhost:{}".format(self.reg_port),
+    #                                          logdir=self.logdir)
+    #
+    #                 bash_cmd = """ while :
+    #                                do
+    #                                   {}
+    #                                done """.format(sys_cmd)
+    #                 logger.debug("Singularity NO-reuse launch cmd: {}".format(bash_cmd))
+    #                 proc = subprocess.Popen(bash_cmd, shell=True)
+    #                 self.procs[worker_id] = proc
+    #                 os.chdir(orig_location)
+    #
+    #
+    #     for worker_id in range(self.worker_count):
+    #         msg = registration_socket.recv_pyobj()
+    #         logger.info("Received registration message from worker: {}".format(msg))
+    #         registration_socket.send_pyobj("ACK")
+    #
+    #     logger.debug("Manager synced with workers")
+    #
+    #     self._task_puller_thread = threading.Thread(target=self.pull_tasks,
+    #                                                 args=(self._kill_event,))
+    #     self._result_pusher_thread = threading.Thread(target=self.push_results,
+    #                                                   args=(self._kill_event,))
+    #     self._task_puller_thread.start()
+    #     self._result_pusher_thread.start()
+    #
+    #     logger.info("Loop start")
+    #
+    #     # TODO : Add mechanism in this loop to stop the worker pool
+    #     # This might need a multiprocessing event to signal back.
+    #     self._kill_event.wait()
+    #     logger.critical("[MAIN] Received kill event, terminating worker processes")
+    #
+    #     self._task_puller_thread.join()
+    #     self._result_pusher_thread.join()
+    #     for proc_id in self.procs:
+    #         self.procs[proc_id].terminate()
+    #
+    #         if type(self.procs[proc_id]) == "subprocess.Popen":
+    #
+    #             poll = p.poll()
+    #
+    #             if poll == None:
+    #                 is_alive = False
+    #             else:
+    #                 is_alive = True
+    #
+    #             logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
+    #                                                               is_alive))
+    #         else:
+    #             logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
+    #                                                               self.procs[proc_id].is_alive()))
+    #
+    #         self.procs[proc_id].join()
+    #         logger.debug("Worker:{} joined successfully".format(self.procs[proc_id]))
+    #
+    #     self.task_incoming.close()
+    #     self.result_outgoing.close()
+    #     self.context.term()
+    #     delta = time.time() - start
+    #     logger.info("FuncX Manager ran for {} seconds".format(delta))
+    #     return
 
 
 
