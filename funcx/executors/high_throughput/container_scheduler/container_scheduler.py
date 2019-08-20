@@ -1,3 +1,8 @@
+
+import math
+import random
+
+
 def naive(task_qs, max_workers, logger):
     """ Return two items (as one tuple) dict kill_list :: KILL [(worker_type, num_kill), ...]
                                         dict create_list :: CREATE [(worker_type, num_create), ...]

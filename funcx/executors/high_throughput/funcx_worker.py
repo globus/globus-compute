@@ -3,12 +3,11 @@
 import logging
 import argparse
 import zmq
-import os
 import sys
 import pickle
 
 
-from ipyparallel.serialize import serialize_object, unpack_apply_message
+from ipyparallel.serialize import serialize_object
 from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx import set_file_logger
@@ -69,14 +68,12 @@ class FuncXWorker(object):
         self.poller = zmq.Poller()
         self.identity = worker_id.encode()
 
-
         self.task_socket = self.context.socket(zmq.DEALER)
         self.task_socket.setsockopt(zmq.IDENTITY, self.identity)
 
         logger.info('Trying to connect to : tcp://{}:{}'.format(self.address, self.port))
         self.task_socket.connect('tcp://{}:{}'.format(self.address, self.port))
         self.poller.register(self.task_socket, zmq.POLLIN)
-
 
     def registration_message(self):
         return {'worker_id': self.worker_id,
@@ -182,6 +179,8 @@ def cli_run():
     parser = argparse.ArgumentParser()
     parser.add_argument("-w", "--worker_id", required=True,
                         help="ID of worker from process_worker_pool")
+    parser.add_argument("-t", "--type", required=False,
+                        help="Container type of worker", default="RAW")
     parser.add_argument("-a", "--address", required=True,
                         help="Address for the manager, eg X,Y,")
     parser.add_argument("-p", "--port", required=True,
@@ -196,9 +195,11 @@ def cli_run():
                          args.address,
                          int(args.port),
                          args.logdir,
-                         debug=args.debug)
+                         worker_type=args.worker_type,
+                         debug=args.debug, )
     worker.start()
     return
+
 
 if __name__ == "__main__":
     cli_run()

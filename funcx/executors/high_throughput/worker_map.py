@@ -44,9 +44,8 @@ class WorkerMap(object):
 
         logger.debug("In KILL worker worker_id: {} type: {}".format(worker_id, worker_type))
         self.worker_counts[worker_type] -= 1
-        self.worker_counts[slots] += 1
+        self.worker_counts['slots'] += 1
         del self.worker_types[worker_id]  # Remove this worker type from our map. 
-
 
     def put_worker(self, worker):
         """ Adds worker to the list of waiting workers
@@ -79,26 +78,3 @@ class WorkerMap(object):
 
     def ready_worker_count(self):
         return sum(self.worker_counts.values())
-
-
-#if __name__ == "__main__":
-
-#    from funcx import set_stream_logger
-#    logger = set_stream_logger(level=logging.DEBUG)
-
-#    worker_map = WorkerMap(8)
-
-#    worker_map.register_worker(1, 'DEFAULT')
-#    worker_map.register_worker(2, 'CONT_1')
-
-#    worker_map.put_worker(1)
-#    worker_map.put_worker(2)
-
-#    print("Counts : ", worker_map.get_worker_counts())
-
-#    x = worker_map.get_worker('DEFAULT')
-#    print("Took worker of type {} : {}".format('DEFAULT', x))
-
-#    print("Counts : ", worker_map.get_worker_counts())
-
-#    print("Here")
