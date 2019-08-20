@@ -258,6 +258,8 @@ class Manager(object):
                         logger.debug("[KILL] Scrubbing the worker from the map!")
                         self.worker_map.scrub_worker(w_id)
 
+                    # TODO: TYLER -- RIGHT HERE, if total_workers < max_workers, then SPIN UP the difference.
+
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
@@ -467,6 +469,7 @@ class Manager(object):
         self.dead_worker_set = set()
 
         logger.info("[TYLER] *** LAUNCHING WORKER *** ")
+        # TODO: Make the scheduler handle this.
         self.workers = [self.launch_worker(worker_id=5)]
 
         logger.debug("Initial workers launched")
@@ -503,7 +506,7 @@ def cli_run():
     parser.add_argument("--container_image", default=None,
                         help="Container image identifier/path")
     parser.add_argument("--mode", default="singularity_reuse",
-                        help=("Select the mode of operation from "
+                        help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
     parser.add_argument("-r", "--result_url", required=True,
                         help="REQUIRED: ZMQ url for posting results")

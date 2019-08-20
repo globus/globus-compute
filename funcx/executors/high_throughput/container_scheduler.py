@@ -23,7 +23,7 @@ def naive_scheduler(task_qs, max_workers, logger):
         sum_q_size += q_size
         q_sizes[q_type] = q_size
 
-    logger.debug("Total number of tasks is {}".format(sum_q_size))
+    logger.info("Total number of tasks is {}".format(sum_q_size))
 
     # Set proportions of workers equal to the proportion of queue size.
     new_worker_map = {}
@@ -35,8 +35,9 @@ def naive_scheduler(task_qs, max_workers, logger):
 
     # CLEANUP: Assign the difference here to any random worker. Should be small.
     difference = round(max_workers - sum(new_worker_map.values()))
-    logger.debug("Offset difference: {}".format(difference))
+    logger.info("Offset difference: {}".format(difference))
 
+    logger.info("Queue Types: {}".format(q_types))
     if len(q_types) > 0:
         for i in range(difference):
             win_q = random.choice(q_types)
