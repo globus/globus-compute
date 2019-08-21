@@ -15,7 +15,6 @@ import json
 import daemon
 
 from parsl.version import VERSION as PARSL_VERSION
-from funcx.strategies import SimpleStrategy
 from ipyparallel.serialize import serialize_object
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -354,13 +353,6 @@ class Interchange(object):
                 active += self._ready_manager_queue[manager]['worker_count']
         return active
 
-    def get_total_workers_active(self):
-        """ Get the outstanding tasks in total
-        """
-        for manager in self._ready_manager_queue:
-            active += len(self._ready_manager_queue[manager][''])
-        return outstanding
-
     def get_outstanding_breakdown(self):
         """ Get outstanding breakdown per manager and in the interchange queues
 
@@ -392,9 +384,9 @@ class Interchange(object):
             if self._ready_manager_queue[manager]['active'] and \
                self._ready_manager_queue[manager]['block_id'] == block_id:
                 logger.debug("[HOLD_BLOCK]: Sending hold to manager: {}".format(manager))
-                self.hold_worker(manager)
+                self.hold_manager(manager)
 
-    def hold_worker(manager):
+    def hold_manager(manager):
         """ Put manager on hold
         Parameters
         ----------
@@ -638,10 +630,10 @@ class Interchange(object):
         Raises:
              NotImplementedError
         """
-        self._block_counter += 1
         r = []
         for i in range(blocks):
             if self.config.provider:
+                self._block_counter += 1
                 external_block_id = self._block_counter
                 launch_cmd = self.launch_cmd.format(block_id=external_block_id)
                 internal_block = self.config.provider.submit(launch_cmd, 1, 1)
