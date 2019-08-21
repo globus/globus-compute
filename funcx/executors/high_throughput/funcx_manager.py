@@ -163,6 +163,11 @@ class Manager(object):
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
         self.next_worker_q = queue.Queue()  # FIFO queue for spinning up workers.
+        self.worker_counter = 0  # used to create worker_ids
+
+        # Only spin up containers if active_workers + pending_workers < max_workers.
+        self.active_workers = 0
+        self.pending_workers = 0
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -249,6 +254,8 @@ class Manager(object):
                         logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
 
                         # Increment worker_type count by 1
+                        self.pending_workers -= 1
+                        self.active_workers += 1
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
 
                     elif m_type == b'TASK_RET':
@@ -259,16 +266,32 @@ class Manager(object):
                         task_done_counter += 1
                     
                     elif m_type == b'WRKR_DIE':
-                        logger.debug("[KILL] Scrubbing the worker from worker_map...")
+                        logger.info("[KILL] Scrubbing the worker from worker_map...")
                         self.worker_map.scrub_worker(w_id)
-
-                    if self.next_worker_q.qsize() > 0:
-                        num_slots = min(self.worker_map.worker_counts['slots'], self.next_worker_q.qsize())
-                        for _ in range(1, num_slots):
-                            self.launch_worker(self.next_worker_q.get())
+                        self.active_workers -= 1
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+
+            logger.info("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
+
+            logger.info("ACTIVE WORKERS: {}".format(self.active_workers))
+            logger.info("PENDING WORKERS: {}".format(self.pending_workers))
+            logger.info("WORKER COUNT: {}".format(self.worker_count))
+
+            if self.next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
+                logger.info("[SPIN UP] Spinning up new workers!")
+                # logger.info("[SLOTS] Current number of slots: {}".format(self.worker_map.worker_counts['slots']))
+                num_slots = min(self.worker_count - self.active_workers - self.pending_workers, self.next_worker_q.qsize())
+                for _ in range(1, num_slots):
+                    self.pending_workers += 1
+                    try:
+                        self.launch_worker(worker_id=str(self.worker_counter))
+                    except Exception as e:
+                        logger.error(e)
+                        logger.error("Error spinning up worker! Skipping...")
+                        continue
+                    self.worker_counter += 1
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -297,6 +320,8 @@ class Manager(object):
 
                         # Set default type to raw
                         task_type = task.get('task_type', 'RAW')
+
+                        logger.info("[TASK DEBUG] Task is of type: {}".format(task_type))
 
                         logger.info("[TYLER] Incoming task type: {}".format(task_type))
                         if task_type not in self.task_queues:
@@ -417,6 +442,7 @@ class Manager(object):
            Walltime in seconds before we check status
 
         """
+
         logger.info("LAUNCH_WORKER is only partially baked")
 
         debug = ' --debug' if self.debug else ''
@@ -447,6 +473,8 @@ class Manager(object):
 
         except Exception as e:
             logger.info("TODO : Got an error in worker launch, got error {}".format(e))
+            # TODO: handle this exception everywher elaunche_worker called.
+            raise
 
         return proc
 
@@ -481,7 +509,8 @@ class Manager(object):
 
         logger.info("[TYLER] *** LAUNCHING WORKER *** ")
 
-        #self.workers = [self.launch_worker(worker_id=5)]
+        self.workers = [self.launch_worker(worker_id=str(self.worker_counter))]
+        self.worker_counter += 1
 
         # logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
         # self.kill_init('RAW')

@@ -62,6 +62,8 @@ class FuncXWorker(object):
                                  level=logging.DEBUG if debug else logging.INFO)
 
         logger.info('Initializing worker {}'.format(worker_id))
+        logger.info('Worker is of type: {}'.format(worker_type))
+
         if debug:
             logger.debug('Debug logging enabled')
 
@@ -122,12 +124,9 @@ class FuncXWorker(object):
                 logger.debug("Execution completed without exception")
                 result_package = {'task_id': task_id, 'result': serialized_result}
 
-
             # TODO: Change this to serialize_object to match IX?
             result = result_package
             task_type = b'TASK_RET'
-
-
 
     def execute_task(self, message):
         """Deserialize the buffer and execute the task.
