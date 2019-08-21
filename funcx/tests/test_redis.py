@@ -31,8 +31,10 @@ def test(endpoint_id=None, tasks=10, hostname=None, port=None):
         ser_kwargs = fxs.serialize({'duration':0})
         input_data = fxs.pack_buffers([ser_args, ser_kwargs])
         payload = fn_code + input_data
-        tasks_rq.put(f"0{i}", payload)
+        container_id = "odd" if i%2 else "even"
+        tasks_rq.put(f"0{i};{container_id}", payload)
 
+    print(f"Launched {tasks} tasks")
     for i in range(tasks):
         res = results_rq.get(timeout=1)
         print("Result : ", res)
@@ -58,4 +60,3 @@ if __name__ == "__main__":
     test(endpoint_id=args.endpoint_id,
          hostname=args.redis_hostname,
          tasks=int(args.count))
-
