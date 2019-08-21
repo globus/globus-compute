@@ -30,6 +30,10 @@ TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2 ** 32) - 1
 
 
+# TODO: Next_worker_queue size inflates to become too large.
+# TODO: Rigorously test with many multiple incoming work types.
+# TODO: Ask Yadu about what to do with worker_log situation.
+
 class Manager(object):
     """ Manager manages task execution by the workers
 
@@ -258,14 +262,10 @@ class Manager(object):
                         logger.debug("[KILL] Scrubbing the worker from worker_map...")
                         self.worker_map.scrub_worker(w_id)
 
-                    # TODO: Spin up workers here!
-                    ######### CONSTRUCTION ZONE ##########
-
                     if self.next_worker_q.qsize() > 0:
                         num_slots = min(self.worker_map.worker_counts['slots'], self.next_worker_q.qsize())
                         for _ in range(1, num_slots):
                             self.launch_worker(self.next_worker_q.get())
-                    ######################################
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
@@ -458,11 +458,8 @@ class Manager(object):
 
             Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing. 
         """
-        
-        # self.dead_workers.add(worker_type)
-        # self.available_workers[worker_type] -= 1  # COMMENTED OUT because messes with assigning the KILL task to the worker...
-        logger.debug("[KILL] Appending KILL message to worker queue")
 
+        logger.debug("[KILL] Appending KILL message to worker queue")
         self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
                                            "buffer": b'KILL'})
 
@@ -483,9 +480,8 @@ class Manager(object):
         self.dead_worker_set = set()
 
         logger.info("[TYLER] *** LAUNCHING WORKER *** ")
-        # TODO: Make the scheduler handle this.
+
         #self.workers = [self.launch_worker(worker_id=5)]
-        self.workers = []  # TODO: pointless?
 
         # logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
         # self.kill_init('RAW')
