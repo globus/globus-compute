@@ -81,7 +81,7 @@ class BaseStrategy(object):
     def strategize(self, *args, **kwargs):
         """ Strategize is called everytime the threshold or the interval is hit
         """
-        print("Checker called with {} {}".format(args, kwargs))
+        logger.debug("Strategize called with {} {}".format(args, kwargs))
 
     def _wake_up_timer(self, kill_event):
         """Internal. This is the function that the thread will execute.
