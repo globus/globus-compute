@@ -57,7 +57,7 @@ class FuncXWorker(object):
         self.deserialize = self.serializer.deserialize
 
         global logger
-        logger = set_file_logger('{}/funcx_worker_{}{}.log'.format(logdir, worker_id, random.randint(000000,999999)),
+        logger = set_file_logger('{}/funcx_worker_{}.log'.format(logdir, worker_id),
                                  name="worker_log",
                                  level=logging.DEBUG if debug else logging.INFO)
 
