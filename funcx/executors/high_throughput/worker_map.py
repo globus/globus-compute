@@ -1,4 +1,4 @@
-import funcx
+
 from queue import Queue
 import logging
 
@@ -11,7 +11,7 @@ class WorkerMap(object):
     def __init__(self, worker_count):
         logger.info("Start")
         self.worker_count = worker_count
-        self.worker_counts = {'slots' : self.worker_count}
+        self.worker_counts = {'slots' : self.worker_count, 'RAW': 0}
         self.worker_queues = {}
         self.worker_types = {}
 
@@ -45,7 +45,7 @@ class WorkerMap(object):
         logger.debug("In KILL worker worker_id: {} type: {}".format(worker_id, worker_type))
         self.worker_counts[worker_type] -= 1
         self.worker_counts['slots'] += 1
-        del self.worker_types[worker_id]  # Remove this worker type from our map. 
+        # del self.worker_types[worker_id]  # Remove this worker type from our map. # TODO: NOT THIS!
 
     def put_worker(self, worker):
         """ Adds worker to the list of waiting workers

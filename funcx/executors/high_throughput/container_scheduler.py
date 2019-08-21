@@ -23,26 +23,31 @@ def naive_scheduler(task_qs, max_workers, logger):
         sum_q_size += q_size
         q_sizes[q_type] = q_size
 
-    logger.info("Total number of tasks is {}".format(sum_q_size))
-
-    # Set proportions of workers equal to the proportion of queue size.
     new_worker_map = {}
-    
     if sum_q_size > 0:
+        logger.info("Total number of tasks is {}".format(sum_q_size))
+
+        # Set proportions of workers equal to the proportion of queue size.
+
         for q_type in q_sizes:
             ratio = q_sizes[q_type]/sum_q_size
             new_worker_map[q_type] = int(math.floor(ratio*max_workers))
 
-    # CLEANUP: Assign the difference here to any random worker. Should be small.
-    difference = round(max_workers - sum(new_worker_map.values()))
-    logger.info("Offset difference: {}".format(difference))
+        # CLEANUP: Assign the difference here to any random worker. Should be small.
+        difference = round(max_workers - sum(new_worker_map.values()))
+        logger.info("Offset difference: {}".format(difference))
 
-    logger.info("Queue Types: {}".format(q_types))
-    if len(q_types) > 0:
-        for i in range(difference):
-            win_q = random.choice(q_types)
-            print("Winning queue: {}".format(q_types))
-            new_worker_map[win_q] += 1
+        logger.info("Queue Types: {}".format(q_types))
+        if len(q_types) > 0:
+            for i in range(difference):
+                win_q = random.choice(q_types)
+                print("Winning queue: {}".format(q_types))
+                new_worker_map[win_q] += 1
 
-    logger.debug(new_worker_map)
+        logger.debug(new_worker_map)
+
+    else:
+        for key in task_qs:
+            new_worker_map[key] = 0
+
     return new_worker_map
