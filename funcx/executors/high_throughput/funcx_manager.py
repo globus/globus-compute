@@ -258,9 +258,14 @@ class Manager(object):
                         logger.debug("[KILL] Scrubbing the worker from worker_map...")
                         self.worker_map.scrub_worker(w_id)
 
-
                     # TODO: Spin up workers here!
+                    ######### CONSTRUCTION ZONE ##########
 
+                    if self.next_worker_q.qsize() > 0:
+                        num_slots = min(self.worker_map.worker_counts['slots'], self.next_worker_q.qsize())
+                        for _ in range(1, num_slots):
+                            self.launch_worker(self.next_worker_q.get())
+                    ######################################
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
@@ -479,7 +484,8 @@ class Manager(object):
 
         logger.info("[TYLER] *** LAUNCHING WORKER *** ")
         # TODO: Make the scheduler handle this.
-        self.workers = [self.launch_worker(worker_id=5)]
+        #self.workers = [self.launch_worker(worker_id=5)]
+        self.workers = []  # TODO: pointless?
 
         # logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
         # self.kill_init('RAW')
