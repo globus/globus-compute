@@ -102,10 +102,11 @@ class FuncXWorker(object):
             task_id = pickle.loads(p_task_id)
             logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
 
-            if task_id == "KILL":
+            if msg == b"KILL":  # TODO: This WAS task type...
                 logger.info("[KILL] -- Worker KILL message received! ")
                 task_type = b'WRKR_DIE'
-                result = None      
+                result = None
+                continue
 
             logger.debug("Executing task...")
 
@@ -125,7 +126,6 @@ class FuncXWorker(object):
             result = result_package
             task_type = b'TASK_RET'
 
-        logger.warning("Broke out of the loop... dying")
 
 
     def execute_task(self, message):

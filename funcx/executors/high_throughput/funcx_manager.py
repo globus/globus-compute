@@ -18,6 +18,7 @@ import multiprocessing
 import random
 
 from funcx.executors.high_throughput.worker_map import WorkerMap
+from funcx.serialize import FuncXSerializer
 
 from parsl.version import VERSION as PARSL_VERSION
 from funcx import set_file_logger
@@ -156,6 +157,7 @@ class Manager(object):
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
+        self.serializer = FuncXSerializer()
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -449,8 +451,9 @@ class Manager(object):
         # self.dead_workers.add(worker_type)
         # self.available_workers[worker_type] -= 1  # COMMENTED OUT because messes with assigning the KILL task to the worker...
         logger.debug("[KILL] Appending KILL message to worker queue")
-        self.task_queues[worker_type].put({"task_id": "KILL", "buffer": "KILL"})
-        # self.worker_map.scrub_worker(worker_type)
+
+        self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
+                                           "buffer": b'KILL'})
 
     def start(self):
         """
@@ -460,7 +463,7 @@ class Manager(object):
             Forward results
         """
 
-        self.task_queues = {}  # k-v: task_type - task_q (PriorityQueue)
+        self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
         self.worker_capacities = {}  # k-v: worker_id - capacity (integer... should only ever be 0 or 1)
         # TODO: Switch ^^^ to FIFO task queue.
         self.task_to_worker_sets = {}  # k-v: task_type - workers (set)
@@ -471,6 +474,9 @@ class Manager(object):
         logger.info("[TYLER] *** LAUNCHING WORKER *** ")
         # TODO: Make the scheduler handle this.
         self.workers = [self.launch_worker(worker_id=5)]
+
+        logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
+        self.kill_init('RAW')
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
