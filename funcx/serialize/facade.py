@@ -82,8 +82,6 @@ class FuncXSerializer(object):
         else:
             raise Exception("Invalid header: {} in data payload".format(header))
 
-        print("Header: ", header)
-        print("Result: ", result)
         return result
 
 

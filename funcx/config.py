@@ -1,5 +1,6 @@
 from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
+from funcx.strategies import SimpleStrategy
 
 class Config(RepresentationMixin):
     """ Specification of FuncX configuration options.
@@ -43,6 +44,7 @@ class Config(RepresentationMixin):
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  # Scaling info
+                 strategy=SimpleStrategy(),
                  max_workers_per_node=float('inf'),
                  cores_per_worker=1.0,
                  mem_per_worker=None,
@@ -66,6 +68,7 @@ class Config(RepresentationMixin):
         self.worker_port_range = worker_port_range
 
         # Scaling info
+        self.strategy = strategy
         self.max_workers_per_node = max_workers_per_node
         self.cores_per_worker = cores_per_worker
         self.mem_per_worker = mem_per_worker
