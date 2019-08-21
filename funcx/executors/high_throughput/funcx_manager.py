@@ -215,10 +215,6 @@ class Manager(object):
 
         poll_timer = self.poll_period
 
-        # This dict holds the info on the count of workers of various types available.
-    # NOTE: In naive scheduler, slots will never increase (montonically decreasing)
-    #     worker_map = {'slots' : self.worker_count}
-
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
             logger.debug("[TASK_PULL_THREAD] Loop start")
@@ -257,10 +253,12 @@ class Manager(object):
                         task_done_counter += 1
                     
                     elif m_type == b'WRKR_DIE':
-                        logger.debug("[KILL] Scrubbing the worker from the map!")
+                        logger.debug("[KILL] Scrubbing the worker from worker_map...")
                         self.worker_map.scrub_worker(w_id)
 
                     # TODO: TYLER -- RIGHT HERE, if total_workers < max_workers, then SPIN UP the difference.
+
+
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
@@ -314,26 +312,26 @@ class Manager(object):
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
 
-            # TODO: TYLER -- call the scheduler and update the worker_map here.
             logger.info("Task queues: {}".format(self.task_queues))
             logger.info("[TYLER] Max Workers: {}".format(self.max_workers))
             new_worker_map = naive_scheduler(self.task_queues, self.worker_count, logger=logger)
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be killed
-            for worker_type in new_worker_map:
-                if new_worker_map[worker_type] < self.worker_map.worker_counts[worker_type]:
-                    num_kill = self.worker_map.worker_counts[worker_type] - new_worker_map[worker_type]
+            if new_worker_map is not None:  # TYLER: None-case is when there's no tasks in the queue. Don't Kill!
+                for worker_type in new_worker_map:
+                    if new_worker_map[worker_type] < self.worker_map.worker_counts[worker_type]:
+                        num_kill = self.worker_map.worker_counts[worker_type] - new_worker_map[worker_type]
 
-                    # Actually kill the workers.
-                    for i in range(num_kill):
-                        print("KILL (not really)")
-                        # self.kill_init(worker_type)
+                        logger.info("[KILL] Killing {} workers of type {}".format(num_kill, worker_type))
+                        for i in range(num_kill):
+                            self.kill_init(worker_type)
 
-            # Spin up new workers
-                if new_worker_map[worker_type] > self.worker_map.worker_counts[worker_type]:
-                    print("LAUNCH (not really)")
-                    # self.launch_worker()
+                # Spin up new workers
+                # TODO: Move this up to main loop (right after kill confirmations received :)
+                    if new_worker_map[worker_type] > self.worker_map.worker_counts[worker_type]:
+                        print("LAUNCH (not really)")
+                        # self.launch_worker()
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
@@ -341,7 +339,6 @@ class Manager(object):
                     continue
 
                 else:
-                    # TODO: TYLER -- ensure that kill actually works here. 
                     available_workers = current_worker_map[task_type]
                     logger.debug("Available workers of type {}: {}".format(task_type,
                                                                            available_workers))
@@ -475,8 +472,8 @@ class Manager(object):
         # TODO: Make the scheduler handle this.
         self.workers = [self.launch_worker(worker_id=5)]
 
-        logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
-        self.kill_init('RAW')
+        # logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
+        # self.kill_init('RAW')
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()

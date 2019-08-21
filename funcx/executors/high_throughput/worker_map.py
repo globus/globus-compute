@@ -11,7 +11,7 @@ class WorkerMap(object):
     def __init__(self, worker_count):
         logger.info("Start")
         self.worker_count = worker_count
-        self.worker_counts = {'slots' : self.worker_count, 'RAW': 0}
+        self.worker_counts = {'slots': self.worker_count, 'RAW': 0}
         self.worker_queues = {}
         self.worker_types = {}
 

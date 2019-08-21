@@ -44,9 +44,11 @@ def naive_scheduler(task_qs, max_workers, logger):
                 new_worker_map[win_q] += 1
 
         logger.debug(new_worker_map)
+        return new_worker_map
+
 
     else:
-        for key in task_qs:
-            new_worker_map[key] = 0
+        # for key in task_qs:
+        #     new_worker_map[key] = 0
+        return None
 
-    return new_worker_map
