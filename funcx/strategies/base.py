@@ -3,6 +3,8 @@ import threading
 import logging
 import time
 
+logger = logging.getLogger("interchange.strategy.base")
+
 class BaseStrategy(object):
     """Implements threshold-interval based flow control.
 
@@ -37,19 +39,17 @@ class BaseStrategy(object):
     from a duplicate logger being added by the thread.
     """
 
-    def __init__(self, interchange, *args, threshold=20, interval=5):
+    def __init__(self, *args, threshold=20, interval=5):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
+        Parameters
+        ----------
+        - threshold (int) : Tasks after which the callback is triggered
+        - interval (int) : seconds after which timer expires
 
-        Args:
-             - dfk (DataFlowKernel) : DFK object to track parsl progress
-
-        KWargs:
-             - threshold (int) : Tasks after which the callback is triggered
-             - interval (int) : seconds after which timer expires
         """
-        self.interchange = interchange
+        self.interchange = None
         self.threshold = threshold
         self.interval = interval
 
@@ -62,6 +62,20 @@ class BaseStrategy(object):
         self._kill_event = threading.Event()
         self._thread = threading.Thread(target=self._wake_up_timer, args=(self._kill_event,))
         self._thread.daemon = True
+
+    def start(self, interchange):
+        """Actually start the strategy
+        Parameters
+        ----------
+        interchange: funcx.executors.high_throughput.interchange.Interchange
+            Interchange to bind the strategy to
+        """
+        self.interchange = interchange
+        if hasattr(interchange.config, 'provider'):
+            logger.debug("Strategy bounds-> init:{}, min:{}, max:{}".format(
+                interchange.config.provider.init_blocks,
+                interchange.config.provider.min_blocks,
+                interchange.config.provider.max_blocks))
         self._thread.start()
 
     def strategize(self, *args, **kwargs):
