@@ -28,7 +28,6 @@ def naive_scheduler(task_qs, max_workers, logger):
         logger.info("[SCHEDULER] Total number of tasks is {}".format(sum_q_size))
 
         # Set proportions of workers equal to the proportion of queue size.
-
         for q_type in q_sizes:
             ratio = q_sizes[q_type]/sum_q_size
             new_worker_map[q_type] = int(math.floor(ratio*max_workers))
