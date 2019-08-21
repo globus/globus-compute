@@ -158,6 +158,7 @@ class Manager(object):
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
+        self.next_worker_q = queue.Queue()  # FIFO queue for spinning up workers.
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -215,6 +216,7 @@ class Manager(object):
 
         poll_timer = self.poll_period
 
+        new_worker_map = None
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
             logger.debug("[TASK_PULL_THREAD] Loop start")
@@ -256,8 +258,8 @@ class Manager(object):
                         logger.debug("[KILL] Scrubbing the worker from worker_map...")
                         self.worker_map.scrub_worker(w_id)
 
-                    # TODO: TYLER -- RIGHT HERE, if total_workers < max_workers, then SPIN UP the difference.
 
+                    # TODO: Spin up workers here!
 
 
                 except Exception as e:
@@ -327,11 +329,18 @@ class Manager(object):
                         for i in range(num_kill):
                             self.kill_init(worker_type)
 
-                # Spin up new workers
-                # TODO: Move this up to main loop (right after kill confirmations received :)
+            # Add workers to next-worker-queue (TO BE spun up at top of loop)
+            logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
+            if new_worker_map is not None:
+                for worker_type in new_worker_map:
+                    # If we don't already have this type of worker in our worker_map...
+                    if worker_type not in self.worker_map.worker_counts:
+                        self.worker_map.worker_counts[worker_type] = 0
                     if new_worker_map[worker_type] > self.worker_map.worker_counts[worker_type]:
-                        print("LAUNCH (not really)")
-                        # self.launch_worker()
+
+                        for i in range(1, new_worker_map[worker_type] - self.worker_map.worker_counts[worker_type]):
+                            # Add worker
+                            self.next_worker_q.put(worker_type)
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
