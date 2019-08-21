@@ -98,7 +98,7 @@ class FuncXWorker(object):
 
             if task_type == b'WRKR_DIE':
                 logger.info("*** WORKER {} ABOUT TO DIE ***".format(self.worker_id))
-                exit()  # Kill the worker after accepting death in message to manager. 
+                exit()  # Kill the worker after accepting death in message to manager.
 
             logger.debug("Waiting for task")
             p_task_id, msg = self.task_socket.recv_multipart()
@@ -108,7 +108,7 @@ class FuncXWorker(object):
             if task_id == "KILL":
                 logger.info("[KILL] -- Worker KILL message received! ")
                 task_type = b'WRKR_DIE'
-                result = None      
+                result = None
 
             logger.debug("Executing task...")
 
@@ -116,8 +116,8 @@ class FuncXWorker(object):
                 result = self.execute_task(msg)
                 logger.debug("Executed result: {}".format(result))
                 serialized_result = serialize_object(result)
-            except Exception:
-                logger.exception("Caught an exception {}")
+            except Exception as e:
+                logger.exception(f"Caught an exception {e}")
                 result_package = {'task_id': task_id, 'exception': serialize_object(RemoteExceptionWrapper(*sys.exc_info()))}
             else:
                 logger.debug("Execution completed without exception")
@@ -146,35 +146,6 @@ class FuncXWorker(object):
         f, args, kwargs = self.serializer.unpack_and_deserialize(decoded)
         logger.debug("Message unpacked")
 
-        # We might need to look into callability of the function from itself
-        # since we change it's name in the new namespace
-        """
-        prefix = "parsl_"
-        fname = prefix + "f"
-        argname = prefix + "args"
-        kwargname = prefix + "kwargs"
-        resultname = prefix + "result"
-
-        user_ns.update({fname: f,
-                        argname: args,
-                        kwargname: kwargs,
-                        resultname: resultname})
-
-        logger.debug("Namespace updated")
-
-        code = "{0} = {1}(*{2}, **{3})".format(resultname, fname,
-                                               argname, kwargname)
-
-        try:
-            exec(code, user_ns, user_ns)
-
-        except Exception as e:
-            raise e
-
-        else:
-            return user_ns.get(resultname)
-
-        """
         return f(*args, **kwargs)
 
 
