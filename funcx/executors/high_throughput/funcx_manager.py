@@ -284,13 +284,15 @@ class Manager(object):
                 # logger.info("[SLOTS] Current number of slots: {}".format(self.worker_map.worker_counts['slots']))
                 num_slots = min(self.worker_count - self.active_workers - self.pending_workers, self.next_worker_q.qsize())
                 for _ in range(1, num_slots):
-                    self.pending_workers += 1
+
                     try:
-                        self.launch_worker(worker_id=str(self.worker_counter))
+                        self.launch_worker(worker_id=str(self.worker_counter), worker_type=self.next_worker_q.get())
                     except Exception as e:
                         logger.error(e)
                         logger.error("Error spinning up worker! Skipping...")
                         continue
+                    else:
+                        self.pending_workers += 1
                     self.worker_counter += 1
 
             # Receive task batches from Interchange and forward to workers
@@ -318,16 +320,19 @@ class Manager(object):
                         # In the FuncX model we forward tasks received directly via a DEALER socket.
                         b_task_id = task['task_id'].encode()
 
+
+
                         # Set default type to raw
-                        task_type = task.get('task_type', 'RAW')
+                        task_type = task['task_id'].split(';')[1]
 
                         logger.info("[TASK DEBUG] Task is of type: {}".format(task_type))
 
                         logger.info("[TYLER] Incoming task type: {}".format(task_type))
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
+                            self.worker_map.worker_counts[task_type] = 0
                         self.task_queues[task_type].put(task)
-                        logger.debug("Task {} pushed to a task queue".format(task))
+                        logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
             else:
                 logger.debug("[TASK_PULL_THREAD] No incoming tasks")
@@ -361,7 +366,11 @@ class Manager(object):
 
             # Add workers to next-worker-queue (TO BE spun up at top of loop)
             logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
+
+            # NOTE: Wipe the queue -- previous scheduling loops don't affect what's needed now.
+            self.next_worker_q = queue.Queue()
             if new_worker_map is not None:
+                new_worker_list = []
                 for worker_type in new_worker_map:
                     # If we don't already have this type of worker in our worker_map...
                     if worker_type not in self.worker_map.worker_counts:
@@ -370,7 +379,15 @@ class Manager(object):
 
                         for i in range(1, new_worker_map[worker_type] - self.worker_map.worker_counts[worker_type]):
                             # Add worker
-                            self.next_worker_q.put(worker_type)
+                            new_worker_list.append(worker_type)
+                            #self.next_worker_q.put(worker_type)
+
+                # Randomly assign order of newly needed containers... add to spin-up queue.
+                if len(new_worker_list) > 0:
+                    random.shuffle(new_worker_list)
+
+                    for item in new_worker_list:
+                        self.next_worker_q.put(item)
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
@@ -472,8 +489,7 @@ class Manager(object):
                                     shell=True)
 
         except Exception as e:
-            logger.info("TODO : Got an error in worker launch, got error {}".format(e))
-            # TODO: handle this exception everywher elaunche_worker called.
+            logger.error("Got an error in worker launch, got error {}".format(e))
             raise
 
         return proc
@@ -511,6 +527,7 @@ class Manager(object):
 
         self.workers = [self.launch_worker(worker_id=str(self.worker_counter))]
         self.worker_counter += 1
+        self.pending_workers += 1
 
         # logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
         # self.kill_init('RAW')
