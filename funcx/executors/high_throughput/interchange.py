@@ -15,6 +15,7 @@ import json
 import daemon
 
 from parsl.version import VERSION as PARSL_VERSION
+from funcx.strategies import SimpleStrategy
 from ipyparallel.serialize import serialize_object
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -148,6 +149,7 @@ class Interchange(object):
         self.config = config
         logger.info("Got config : {}".format(config))
 
+        self.strategy = self.config.strategy
         self.client_address = client_address
         self.interchange_address = interchange_address
         self.suppress_failure = suppress_failure
@@ -205,7 +207,7 @@ class Interchange(object):
         self._ready_manager_queue = {}
 
         self.heartbeat_threshold = heartbeat_threshold
-
+        self.blocks = {}  # type: Dict[str, str]
         self.launch_cmd = launch_cmd
         if not launch_cmd:
             self.launch_cmd = ("funcx-manager {debug} {max_workers} "
@@ -214,6 +216,7 @@ class Interchange(object):
                                "--task_url={task_url} "
                                "--result_url={result_url} "
                                "--logdir={logdir} "
+                               "--block_id={{block_id}} "
                                "--hb_period={heartbeat_period} "
                                "--hb_threshold={heartbeat_threshold} "
                                "--mode={worker_mode} "
@@ -228,13 +231,12 @@ class Interchange(object):
                                  'dir': os.getcwd()}
 
         logger.info("Platform info: {}".format(self.current_platform))
+        self._block_counter = 0
         try:
             self.load_config()
         except Exception as e:
             logger.exception("Caught exception")
             raise
-
-        self.flowcontrol = FlowControl(self)
 
 
     def load_config(self):
@@ -272,14 +274,12 @@ class Interchange(object):
                                        worker_mode=self.config.worker_mode,
                                        container_image=None,
                                        logdir=working_dir)
-        self.config.launch_cmd = l_cmd
-        logger.info("Launch command: {}".format(self.config.launch_cmd))
+        self.launch_cmd = l_cmd
+        logger.info("Launch command: {}".format(self.launch_cmd))
 
-        """
         if self.config.scaling_enabled:
             logger.info("Scaling ...")
-            self.config.provider.submit(self.config.launch_cmd, 1, 1)
-        """
+            self.scale_out(self.config.provider.init_blocks)
 
 
     def get_tasks(self, count):
@@ -337,7 +337,7 @@ class Interchange(object):
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
 
 
-    def get_total_outstanding(self):
+    def get_total_tasks_outstanding(self):
         """ Get the outstanding tasks in total
         """
         outstanding = self.pending_task_queue.qsize()
@@ -345,19 +345,68 @@ class Interchange(object):
             outstanding += len(self._ready_manager_queue[manager]['tasks'])
         return outstanding
 
+    def get_total_live_workers(self):
+        """ Get the total active workers
+        """
+        active = 0
+        for manager in self._ready_manager_queue:
+            if self._ready_manager_queue[manager]['active']:
+                active += self._ready_manager_queue[manager]['worker_count']
+        return active
+
+    def get_total_workers_active(self):
+        """ Get the outstanding tasks in total
+        """
+        for manager in self._ready_manager_queue:
+            active += len(self._ready_manager_queue[manager][''])
+        return outstanding
+
     def get_outstanding_breakdown(self):
         """ Get outstanding breakdown per manager and in the interchange queues
+
+        Returns
+        -------
+        List of status for online elements
+        [ (element, tasks_pending, status) ... ]
         """
 
         pending_on_interchange = self.pending_task_queue.qsize()
         # Reporting pending on interchange is a deviation from Parsl
-        reply = [('interchange', pending_on_interchange, pending_on_interchange)]
+        reply = [('interchange', pending_on_interchange, True)]
         for manager in self._ready_manager_queue:
             resp = (manager.decode('utf-8'),
                     len(self._ready_manager_queue[manager]['tasks']),
                     self._ready_manager_queue[manager]['active'])
             reply.append(resp)
         return reply
+
+    def _hold_block(self, block_id):
+        """ Sends hold command to all managers which are in a specific block
+
+        Parameters
+        ----------
+        block_id : str
+             Block identifier of the block to be put on hold
+        """
+        for manager in self._ready_manager_queue:
+            if self._ready_manager_queue[manager]['active'] and \
+               self._ready_manager_queue[manager]['block_id'] == block_id:
+                logger.debug("[HOLD_BLOCK]: Sending hold to manager: {}".format(manager))
+                self.hold_worker(manager)
+
+    def hold_worker(manager):
+        """ Put manager on hold
+        Parameters
+        ----------
+
+        manager : str
+          Manager id to be put on hold while being killed
+        """
+        if manager in self._ready_manager_queue:
+            self._ready_manager_queue[manager]['active'] = False
+            reply = True
+        else:
+            reply = False
 
     def _command_server(self, kill_event):
         """ Command server to run async command to the interchange
@@ -403,7 +452,7 @@ class Interchange(object):
                 continue
 
     def start(self, poll_period=None):
-        """ Start the NeedNameQeueu
+        """ Start the Interchange
 
         Parameters:
         ----------
@@ -426,6 +475,8 @@ class Interchange(object):
         self._command_thread = threading.Thread(target=self._command_server,
                                                 args=(self._kill_event,))
         self._command_thread.start()
+
+        self.strategy.start(self)
 
         poller = zmq.Poller()
         # poller.register(self.task_incoming, zmq.POLLIN)
@@ -540,9 +591,12 @@ class Interchange(object):
                     else:
                         interesting_managers.remove(manager)
                         # logger.debug("Nothing to send to manager {}".format(manager))
-                logger.debug("[MAIN] leaving _ready_manager_queue section, with {} managers still interesting".format(len(interesting_managers)))
+                # logger.debug("[MAIN] leaving _ready_manager_queue section, with {} managers still interesting".format(len(interesting_managers)))
+                pass
             else:
-                logger.debug("[MAIN] either no interesting managers or no tasks, so skipping manager pass")
+                # logger.debug("[MAIN] either no interesting managers or no tasks, so skipping manager pass")
+                pass
+
             # Receive any results and forward to client
             if self.results_incoming in self.socks and self.socks[self.results_incoming] == zmq.POLLIN:
                 logger.debug("[MAIN] entering results_incoming section")
@@ -578,64 +632,68 @@ class Interchange(object):
         logger.info("Processed {} tasks in {} seconds".format(count, delta))
         logger.warning("Exiting")
 
-    def compose_worker_launch_cmd(self):
-        """ Compose the launch command
-        """
-        debug_opts = "--debug" if self.worker_debug else ""
-        max_workers = "" if self.max_workers == float('inf') else "--max_workers={}".format(self.max_workers)
-
-        l_cmd = self.launch_cmd.format(debug=debug_opts,
-                                       task_url=self.worker_task_url,
-                                       result_url=self.worker_result_url,
-                                       cores_per_worker=self.cores_per_worker,
-                                       max_workers=max_workers,
-                                       nodes_per_block=self.provider.nodes_per_block,
-                                       heartbeat_period=self.heartbeat_period,
-                                       heartbeat_threshold=self.heartbeat_threshold,
-                                       poll_period=self.poll_period,
-                                       logdir="{}/{}".format(self.run_dir, self.label),
-                                       worker_mode=self.worker_mode,
-                                       container_image=self.container_image)
-        self.launch_cmd = l_cmd
-        logger.debug("Launch command: {}".format(self.launch_cmd))
-
     def scale_out(self, blocks=1):
         """Scales out the number of blocks by "blocks"
 
         Raises:
              NotImplementedError
         """
+        self._block_counter += 1
         r = []
         for i in range(blocks):
-            if self.provider:
-                block = self.provider.submit(self.launch_cmd, 1, 1)
-                logger.debug("Launched block {}:{}".format(i, block))
-                if not block:
+            if self.config.provider:
+                external_block_id = self._block_counter
+                launch_cmd = self.launch_cmd.format(block_id=external_block_id)
+                internal_block = self.config.provider.submit(launch_cmd, 1, 1)
+                logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
+                if not internal_block:
                     raise(ScalingFailed(self.provider.label,
                                         "Attempts to provision nodes via provider has failed"))
-                self.blocks.extend([block])
+                self.blocks[external_block_id] = internal_block
             else:
                 logger.error("No execution provider available")
                 r = None
         return r
 
-    def scale_in(self, blocks):
+    def scale_in(self, blocks=None, block_ids=[]):
         """Scale in the number of active blocks by specified amount.
 
-        The scale in method here is very rude. It doesn't give the workers
-        the opportunity to finish current tasks or cleanup. This is tracked
-        in issue #530
+        Parameters
+        ----------
+        blocks : int
+            # of blocks to terminate
 
-        Raises:
-             NotImplementedError
+        block_ids : [str.. ]
+            List of external block ids to terminate
         """
-        to_kill = self.blocks[:blocks]
-        if self.provider:
-            r = self.provider.cancel(to_kill)
+        if block_ids:
+            block_ids_to_kill = block_ids
+        else:
+            block_ids_to_kill = list(self.blocks.keys())[:blocks]
+
+        # Try a polite terminate
+        # TODO : Missing logic to hold blocks
+        for block_id in block_ids_to_kill:
+            self._hold_block(block_id)
+
+        # Now kill via provider
+        to_kill = [self.blocks.pop(bid) for bid in block_ids_to_kill]
+
+        if self.config.scaling_enabled and self.config.provider:
+            r = self.config.provider.cancel(to_kill)
+
         return r
 
+    def provider_status(self):
+        """ Get status of all blocks from the provider
+        """
+        status = []
+        if self.config.provider:
+            status = self.config.provider.status(list(self.blocks.values()))
 
-def start_file_logger(filename, name='interchange', level=logging.DEBUG, format_string=None):
+        return status
+
+def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
 
     Parameters
