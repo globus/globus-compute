@@ -11,7 +11,7 @@ class SimpleStrategy(BaseStrategy):
     def __init__(self, *args,
                  threshold=20,
                  interval=1,
-                 max_idletime=3):
+                 max_idletime=60):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
