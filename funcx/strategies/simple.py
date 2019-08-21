@@ -57,7 +57,6 @@ class SimpleStrategy(BaseStrategy):
         nodes_per_block = self.interchange.config.provider.nodes_per_block
         parallelism = self.interchange.config.provider.parallelism
 
-        # TODO : This doesn't work
         active_tasks = self.interchange.get_total_tasks_outstanding()
         status = self.interchange.provider_status()
         logger.debug(f"Provider status : {status}")
@@ -68,7 +67,7 @@ class SimpleStrategy(BaseStrategy):
         active_blocks = running + submitting + pending
         active_slots = active_blocks * tasks_per_node * nodes_per_block
 
-        logger.debug('FuncX has {} active tasks, {}/{}/{} running/submitted/pending blocks, and {} connected workers'.format(
+        logger.debug('Endpoint has {} active tasks, {}/{}/{} running/submitted/pending blocks, and {} connected workers'.format(
             active_tasks, running, submitting, pending, self.interchange.get_total_live_workers()))
 
         # reset kill timer if executor has active tasks
