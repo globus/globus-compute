@@ -57,7 +57,7 @@ class Config(RepresentationMixin):
                  poll_period=10,
                  # Logging info
                  working_dir=None,
-                 worker_debug=True):
+                 worker_debug=False):
 
         # Scaling mechanics
         self.provider = provider
