@@ -305,7 +305,7 @@ class Interchange(object):
 
         return tasks
 
-    def migrate_tasks_to_internal(self, kill_event):
+    def migrate_tasks_to_internal(self, kill_event, status_request):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
@@ -330,6 +330,9 @@ class Interchange(object):
             if msg == 'STOP':
                 kill_event.set()
                 break
+            elif msg == 'STATUS_REQUEST':
+                logger.warning("Got STATUS_REQUEST")
+                status_request.set()
             else:
                 self.pending_task_queue.put(msg)
                 task_counter += 1
@@ -448,8 +451,8 @@ class Interchange(object):
 
         Parameters:
         ----------
-
-        TODO: Move task receiving to a thread
+        poll_period : int
+           poll_period in milliseconds
         """
         logger.info("Incoming ports bound")
 
@@ -460,12 +463,13 @@ class Interchange(object):
         count = 0
 
         self._kill_event = threading.Event()
+        self._status_request = threading.Event()
         self._task_puller_thread = threading.Thread(target=self.migrate_tasks_to_internal,
-                                                    args=(self._kill_event,))
+                                                    args=(self._kill_event, self._status_request, ))
         self._task_puller_thread.start()
 
         self._command_thread = threading.Thread(target=self._command_server,
-                                                args=(self._kill_event,))
+                                                args=(self._kill_event, ))
         self._command_thread.start()
 
         self.strategy.start(self)
@@ -503,6 +507,7 @@ class Interchange(object):
 
                     # By default we set up to ignore bad nodes/registration messages.
                     self._ready_manager_queue[manager] = {'last': time.time(),
+                                                          'reg_time': time.time(),
                                                           'free_capacity': 0,
                                                           'active': True,
                                                           'tasks': []}
@@ -620,9 +625,35 @@ class Interchange(object):
                 self._ready_manager_queue.pop(manager, 'None')
             logger.debug("[MAIN] ending one main loop iteration")
 
+            if self._status_request.is_set():
+                logger.warning("status request response")
+                result_package = self.get_status_report()
+                pkl_package = pickle.dumps(result_package)
+                self.results_outgoing.send(pkl_package)
+                logger.info("[MAIN] Sent info response")
+                self._status_request.clear()
+
         delta = time.time() - start
         logger.info("Processed {} tasks in {} seconds".format(count, delta))
         logger.warning("Exiting")
+
+    def get_status_report(self):
+        """ Get utilization numbers
+        """
+        total_cores = 0;
+        total_mem = 0;
+        core_hrs = 0
+        for manager in self._ready_manager_queue:
+            total_cores += self._ready_manager_queue[manager]['cores']
+            total_mem += self._ready_manager_queue[manager]['mem']
+            active_dur = time.time() - self._ready_manager_queue[manager]['reg_time']
+            core_hrs += ( active_dur * total_cores ) / 3600
+
+        result_package = {'task_id': -2,
+                          'info': {'total_cores': total_cores,
+                                   'total_mem' : total_mem,
+                                   'total_core_hrs': round(core_hrs, 2)}}
+        return result_package
 
     def scale_out(self, blocks=1):
         """Scales out the number of blocks by "blocks"
