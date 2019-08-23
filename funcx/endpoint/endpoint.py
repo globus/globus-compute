@@ -204,7 +204,7 @@ Configure this file and try restarting with:
             reg_info = funcx_client.register_endpoint(args.name, eid)
             logger.debug("Got endpoint info : {}".format(reg_info))
 
-        logger.info("Registration info from broker: {}".format(reg_info))
+        logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
         with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
             json.dump(reg_info, fp)
             logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
