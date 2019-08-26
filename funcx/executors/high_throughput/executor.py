@@ -35,8 +35,6 @@ BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
 
 
-
-
 class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     """Executor designed for cluster-scale
 
@@ -141,6 +139,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     container_image : str
         Path or identfier to the container image to be used by the workers
 
+    endpoint_db = None
+        Endpoint DB object
+
     worker_mode : str
         Select the mode of operation from no_container, singularity_reuse, singularity_single_use
         Default: singularity_reuse
@@ -165,6 +166,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                  container_image=None,
                  worker_mode="singularity_reuse",
                  suppress_failure=False,
+                 endpoint_id=None,
+                 endpoint_db=None,
                  managed=True):
 
         logger.debug("Initializing HighThroughputExecutor")
@@ -182,7 +185,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self.tasks = {}
         self.cores_per_worker = cores_per_worker
         self.max_workers = max_workers
-
+        self.endpoint_db = endpoint_db
+        self.endpoint_db.connect()
+        self.endpoint_id = endpoint_id
         self._task_counter = 0
         self.address = address
         self.worker_ports = worker_ports
@@ -384,12 +389,23 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                     for serialized_msg in msgs:
                         try:
                             msg = pickle.loads(serialized_msg)
+                            logger.info("Got response msg : {}".format(msg))
                             tid = msg['task_id']
                         except pickle.UnpicklingError:
                             raise BadMessage("Message received could not be unpickled")
 
                         except Exception:
                             raise BadMessage("Message received does not contain 'task_id' field")
+
+                        if tid == -2 and 'info' in msg:
+                            logger.warning("Received info response : {}".format(msg['info']))
+                            try:
+                                if self.endpoint_db:
+                                    self.endpoint_db.put(self.endpoint_id, msg['info'])
+                            except Exception as e:
+                                logger.exception("Caught error while trying to push data into redis")
+                                pass
+                            continue
 
                         if tid == -1 and 'exception' in msg:
                             logger.warning("Executor shutting down due to version mismatch in interchange")
@@ -403,6 +419,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                                 self.tasks[task].set_exception(self._executor_exception)
                             break
 
+                        logger.warning("YADU: HERE with {}".format(tid))
                         task_fut = self.tasks[tid]
 
                         if 'result' in msg:
@@ -496,6 +513,10 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         c = self.command_client.run("HOLD_WORKER;{}".format(worker_id))
         logger.debug("Sent hold request to worker: {}".format(worker_id))
         return c
+
+    def request_status_info(self):
+        logger.warning("Requesting status info from interchange")
+        self.outgoing_q.put('STATUS_REQUEST')
 
     def wait_for_endpoint(self):
         heartbeat = self.command_client.run('HEARTBEAT')
