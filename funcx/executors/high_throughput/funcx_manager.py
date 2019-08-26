@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import multiprocessing
 import random
+import psutil
 
 from typing import Any
 from queue import PriorityQueue
@@ -136,10 +137,12 @@ class Manager(object):
 
         self.mode = mode
         self.container_image = container_image
-        cores_on_node = multiprocessing.cpu_count()
+        self.cores_on_node = multiprocessing.cpu_count()
         self.max_workers = max_workers
+        self.cores_per_workers = cores_per_worker
+        self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
         self.worker_count = min(max_workers,
-                                math.floor(cores_on_node / cores_per_worker))
+                                math.floor(self.cores_on_node / cores_per_worker))
         self.worker_map = WorkerMap(self.worker_count)
         logger.info("Manager will spawn {} workers".format(self.worker_count))
 
@@ -174,6 +177,8 @@ class Manager(object):
                                              sys.version_info.minor,
                                              sys.version_info.micro),
                'worker_count': self.worker_count,
+               'cores': self.cores_on_node,
+               'mem': self.available_mem_on_node,
                'block_id': self.block_id,
                'os': platform.system(),
                'hname': platform.node(),
