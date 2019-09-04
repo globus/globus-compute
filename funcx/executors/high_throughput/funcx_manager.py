@@ -136,6 +136,7 @@ class Manager(object):
         self.max_workers = max_workers
         self.worker_count = min(max_workers,
                                 math.floor(cores_on_node / cores_per_worker))
+
         self.worker_map = WorkerMap(self.worker_count)
         logger.info("Manager will spawn {} workers".format(self.worker_count))
 
@@ -254,6 +255,7 @@ class Manager(object):
                         logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
 
                         # Increment worker_type count by 1
+                        assert(self.pending_workers >= 1) 
                         self.pending_workers -= 1
                         self.active_workers += 1
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
@@ -267,17 +269,16 @@ class Manager(object):
                     
                     elif m_type == b'WRKR_DIE':
                         logger.info("[KILL] Scrubbing the worker from worker_map...")
+                        logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_counts))
+                        logger.debug("Total worker counts: {}".format(self.worker_map.worker_counts))
                         self.worker_map.scrub_worker(w_id)
+                        assert(self.active_workers >= 1) 
                         self.active_workers -= 1
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
             logger.info("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
-
-            logger.info("ACTIVE WORKERS: {}".format(self.active_workers))
-            logger.info("PENDING WORKERS: {}".format(self.pending_workers))
-            logger.info("WORKER COUNT: {}".format(self.worker_count))
 
             if self.next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
                 logger.info("[SPIN UP] Spinning up new workers!")
@@ -311,23 +312,17 @@ class Manager(object):
                     logger.debug("Got heartbeat from interchange")
 
                 else:
-                    # TODO TYLER: Update this to unpack and forward tasks to the appropriate workers.
                     task_recv_counter += len(tasks)
                     logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t['task_id'] for t in tasks],
                                                                                  task_recv_counter))
 
                     for task in tasks:
-                        # In the FuncX model we forward tasks received directly via a DEALER socket.
-                        b_task_id = task['task_id'].encode()
-
-
 
                         # Set default type to raw
                         task_type = task['task_id'].split(';')[1]
 
                         logger.info("[TASK DEBUG] Task is of type: {}".format(task_type))
 
-                        logger.info("[TYLER] Incoming task type: {}".format(task_type))
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
                             self.worker_map.worker_counts[task_type] = 0
@@ -380,7 +375,6 @@ class Manager(object):
                         for i in range(1, new_worker_map[worker_type] - self.worker_map.worker_counts[worker_type]):
                             # Add worker
                             new_worker_list.append(worker_type)
-                            #self.next_worker_q.put(worker_type)
 
                 # Randomly assign order of newly needed containers... add to spin-up queue.
                 if len(new_worker_list) > 0:
@@ -394,18 +388,25 @@ class Manager(object):
                 if task_type == 'slots':
                     continue
 
+                # *** Match tasks to workers ***
                 else:
                     available_workers = current_worker_map[task_type]
                     logger.debug("Available workers of type {}: {}".format(task_type,
                                                                            available_workers))
+
                     for i in range(available_workers):
-                        if task_type in self.task_queues and not self.task_queues[task_type].empty():
+                        if task_type in self.task_queues and not self.task_queues[task_type].qsize() == 0 and not self.worker_map.worker_queues[task_type].qsize() == 0:
+
+                            logger.debug("Task type {} has task queue size {}".format(task_type, self.task_queues[task_type].qsize()))
+                            logger.debug("... and available workers: {}".format(self.worker_map.worker_queues[task_type].qsize()))
+
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
-                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))                            
+
+                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
-                            logger.debug("Sending done")
+                            logger.debug("Sending complete!")
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """ Listens on the pending_result_queue and sends out results via 0mq
@@ -463,7 +464,7 @@ class Manager(object):
         logger.info("LAUNCH_WORKER is only partially baked")
 
         debug = ' --debug' if self.debug else ''
-        # TODO : This should assign some meaningful worker_id rather than random
+
         worker_id = ' --worker_id {}'.format(worker_id)
 
         cmd = (f'funcx-worker {debug}{worker_id} '
@@ -516,8 +517,6 @@ class Manager(object):
         """
 
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
-        self.worker_capacities = {}  # k-v: worker_id - capacity (integer... should only ever be 0 or 1)
-        # TODO: Switch ^^^ to FIFO task queue.
         self.task_to_worker_sets = {}  # k-v: task_type - workers (set)
 
         # Keep track of workers to whom we've sent kill messages
