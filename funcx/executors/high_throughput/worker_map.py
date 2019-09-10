@@ -8,10 +8,11 @@ logger = logging.getLogger(__name__)
 class WorkerMap(object):
     """ WorkerMap keeps track of workers
     """
+
     def __init__(self, worker_count):
         self.worker_count = worker_count
         self.total_worker_type_counts = {'slots': self.worker_count, 'RAW': 0}
-        self.ready_worker_counts = {}
+        self.ready_worker_type_counts = {}
         self.worker_queues = {}
         self.worker_types = {}
 
@@ -25,14 +26,14 @@ class WorkerMap(object):
             self.worker_queues[worker_type] = Queue()
 
         self.total_worker_type_counts[worker_type] = self.total_worker_type_counts.get(worker_type, 0) + 1
-        self.ready_worker_counts[worker_type] = self.ready_worker_counts.get(worker_type, 0) + 1
+        self.ready_worker_type_counts[worker_type] = self.ready_worker_type_counts.get(worker_type, 0) + 1
         self.total_worker_type_counts['slots'] -= 1
         self.worker_queues[worker_type].put(worker_id)
 
     def remove_worker(self, worker_id):
         """ Remove the worker from the WorkerMap
 
-            Should already be KILLed by this point. 
+            Should already be KILLed by this point.
         """
 
         worker_type = self.worker_types[worker_id]
@@ -48,7 +49,7 @@ class WorkerMap(object):
         if worker_type not in self.worker_queues:
             self.worker_queues[worker_type] = Queue()
 
-        self.ready_worker_counts[worker_type] += 1
+        self.ready_worker_type_counts[worker_type] += 1
         self.worker_queues[worker_type].put(worker)
 
     def get_worker(self, worker_type):
@@ -60,8 +61,8 @@ class WorkerMap(object):
         # except Exception as e:
         #     raise
         # else:
-            # pass 
-        self.ready_worker_counts[worker_type] -= 1
+        # pass
+        self.ready_worker_type_counts[worker_type] -= 1
         return worker
 
     def get_worker_counts(self):
