@@ -253,7 +253,6 @@ class Manager(object):
                         logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
 
                         # Increment worker_type count by 1
-                        assert(self.pending_workers >= 1) 
                         self.pending_workers -= 1
                         self.active_workers += 1
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
@@ -270,7 +269,6 @@ class Manager(object):
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.worker_counts))
                         self.worker_map.remove_worker(w_id)
-                        assert(self.active_workers >= 1) 
                         self.active_workers -= 1
 
                 except Exception as e:
@@ -473,7 +471,7 @@ class Manager(object):
         if mode == 'no_container':
             modded_cmd = cmd
         elif mode == 'singularity':
-            modded_cmd = 'singularity run --writable {container_uri} {cmd}'
+            modded_cmd = f'singularity run --writable {container_uri} {cmd}'
         else:
             raise NameError("Invalid container launch mode.")
 
