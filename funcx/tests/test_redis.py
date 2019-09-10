@@ -16,6 +16,9 @@ def test(endpoint_id=None, tasks=10, hostname=None, port=None):
     ser_code = fxs.serialize(slow_double)
     fn_code = fxs.pack_buffers([ser_code])
 
+    tasks_rq.connect()
+    results_rq.connect()
+
     while True:
         try:
             x = results_rq.get(timeout=1)
@@ -23,8 +26,6 @@ def test(endpoint_id=None, tasks=10, hostname=None, port=None):
             print("No more results left")
             break
 
-    tasks_rq.connect()
-    results_rq.connect()
     start = time.time()
     for i in range(tasks):
         ser_args = fxs.serialize([i])
@@ -36,7 +37,7 @@ def test(endpoint_id=None, tasks=10, hostname=None, port=None):
 
     print(f"Launched {tasks} tasks")
     for i in range(tasks):
-        res = results_rq.get(timeout=1)
+        res = results_rq.get(timeout=10)
         print("Result : ", res)
 
     delta = time.time() - start
