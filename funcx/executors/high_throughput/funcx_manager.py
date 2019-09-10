@@ -285,7 +285,7 @@ class Manager(object):
                 for _ in range(1, num_slots):
 
                     try:
-                        self.launch_worker(worker_id=str(self.worker_counter), worker_type=self.next_worker_q.get())
+                        self.add_worker(worker_id=str(self.worker_counter), worker_type=self.next_worker_q.get())
                     except Exception as e:
                         logger.error(e)
                         logger.error("Error spinning up worker! Skipping...")
@@ -440,11 +440,11 @@ class Manager(object):
 
         logger.critical("[RESULT_PUSH_THREAD] Exiting")
 
-    def launch_worker(self, worker_id=str(random.random()),
-                      mode='no_container',
-                      worker_type = 'RAW',
-                      container_uri=None,
-                      walltime=1):
+    def add_worker(self, worker_id=str(random.random()),
+                   mode='no_container',
+                   worker_type = 'RAW',
+                   container_uri=None,
+                   walltime=1):
         """ Launch the appropriate worker
 
         Parameters
@@ -513,19 +513,10 @@ class Manager(object):
         """
 
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
-        self.task_to_worker_sets = {}  # k-v: task_type - workers (set)
 
-        # Keep track of workers to whom we've sent kill messages
-        self.dead_worker_set = set()
-
-        logger.info("[TYLER] *** LAUNCHING WORKER *** ")
-
-        self.workers = [self.launch_worker(worker_id=str(self.worker_counter))]
+        self.workers = [self.add_worker(worker_id=str(self.worker_counter))]
         self.worker_counter += 1
         self.pending_workers += 1
-
-        # logger.info("[TYLER] TEST --- IMMEDIATELY SENDING KILL MESSAGE FOR WORKERR")
-        # self.kill_init('RAW')
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()

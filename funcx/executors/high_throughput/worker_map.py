@@ -9,7 +9,6 @@ class WorkerMap(object):
     """ WorkerMap keeps track of workers
     """
     def __init__(self, worker_count):
-        logger.info("Start")
         self.worker_count = worker_count
         self.worker_counts = {'slots': self.worker_count, 'RAW': 0}
         self.ready_worker_counts = {}
@@ -19,15 +18,8 @@ class WorkerMap(object):
     def register_worker(self, worker_id, worker_type):
         """ Add a new worker
         """
-        # logger.debug("In register worker worker_id: {} type:{}".format(worker_id, worker_type))
+        logger.debug("In register worker worker_id: {} type:{}".format(worker_id, worker_type))
         self.worker_types[worker_id] = worker_type
-
-        if worker_id in self.worker_counts:
-            raise Exception("Worker already exists")
-
-        # TODO: Is this code redundant from like 7 lines down???
-        if worker_type not in self.worker_counts:
-            self.worker_counts[worker_type] = 0
 
         if worker_type not in self.worker_queues:
             self.worker_queues[worker_type] = Queue()
@@ -45,8 +37,6 @@ class WorkerMap(object):
 
         worker_type = self.worker_types[worker_id]
 
-        # logger.debug("In KILL worker worker_id: {} type: {}".format(worker_id, worker_type))
-        assert(self.worker_counts[worker_type] >= 1)
         self.worker_counts[worker_type] -= 1
         self.worker_counts['slots'] += 1
 
