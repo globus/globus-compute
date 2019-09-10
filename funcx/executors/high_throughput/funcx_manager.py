@@ -268,7 +268,7 @@ class Manager(object):
                     elif m_type == b'WRKR_DIE':
                         logger.info("[WORKER_REMOVE] Removing worker from worker_map...")
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_counts))
-                        logger.debug("Total worker counts: {}".format(self.worker_map.worker_counts))
+                        logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
                         self.worker_map.remove_worker(w_id)
                         self.active_workers -= 1
 
@@ -321,7 +321,7 @@ class Manager(object):
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
-                            self.worker_map.worker_counts[task_type] = 0
+                            self.worker_map.total_worker_type_counts[task_type] = 0
                         self.task_queues[task_type].put(task)
                         logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
@@ -347,8 +347,8 @@ class Manager(object):
             #  Count the workers of each type that need to be removed
             if new_worker_map is not None:  # TYLER: None-case is when there's no tasks in the queue. Don't Kill!
                 for worker_type in new_worker_map:
-                    if new_worker_map[worker_type] < self.worker_map.worker_counts[worker_type]:
-                        num_remove = self.worker_map.worker_counts[worker_type] - new_worker_map[worker_type]
+                    if new_worker_map[worker_type] < self.worker_map.total_worker_type_counts[worker_type]:
+                        num_remove = self.worker_map.total_worker_type_counts[worker_type] - new_worker_map[worker_type]
 
                         logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
                         for i in range(num_remove):
@@ -363,11 +363,11 @@ class Manager(object):
                 new_worker_list = []
                 for worker_type in new_worker_map:
                     # If we don't already have this type of worker in our worker_map...
-                    if worker_type not in self.worker_map.worker_counts:
-                        self.worker_map.worker_counts[worker_type] = 0
-                    if new_worker_map[worker_type] > self.worker_map.worker_counts[worker_type]:
+                    if worker_type not in self.worker_map.total_worker_type_counts:
+                        self.worker_map.total_worker_type_counts[worker_type] = 0
+                    if new_worker_map[worker_type] > self.worker_map.total_worker_type_counts[worker_type]:
 
-                        for i in range(1, new_worker_map[worker_type] - self.worker_map.worker_counts[worker_type]):
+                        for i in range(1, new_worker_map[worker_type] - self.worker_map.total_worker_type_counts[worker_type]):
                             # Add worker
                             new_worker_list.append(worker_type)
 
