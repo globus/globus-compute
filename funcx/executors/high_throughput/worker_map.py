@@ -37,7 +37,7 @@ class WorkerMap(object):
         self.worker_counts['slots'] -= 1
         self.worker_queues[worker_type].put(worker_id)
 
-    def scrub_worker(self, worker_id):
+    def remove_worker(self, worker_id):
         """ Remove the worker from the WorkerMap
 
             Should already be KILLed by this point. 

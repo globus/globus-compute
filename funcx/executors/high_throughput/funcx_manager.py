@@ -239,7 +239,7 @@ class Manager(object):
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ready_worker_count))
-                msg = ((ready_worker_count).to_bytes(4, "little"))
+                msg = (ready_worker_count.to_bytes(4, "little"))
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
@@ -266,10 +266,10 @@ class Manager(object):
                         task_done_counter += 1
                     
                     elif m_type == b'WRKR_DIE':
-                        logger.info("[KILL] Scrubbing the worker from worker_map...")
+                        logger.info("[WORKER_REMOVE] Removing worker from worker_map...")
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.worker_counts))
-                        self.worker_map.scrub_worker(w_id)
+                        self.worker_map.remove_worker(w_id)
                         assert(self.active_workers >= 1) 
                         self.active_workers -= 1
 
@@ -343,7 +343,6 @@ class Manager(object):
                     break
 
             logger.info("Task queues: {}".format(self.task_queues))
-            logger.info("[TYLER] Max Workers: {}".format(self.max_workers))
             new_worker_map = naive_scheduler(self.task_queues, self.worker_count, logger=logger)
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
@@ -355,7 +354,7 @@ class Manager(object):
 
                         logger.info("[KILL] Killing {} workers of type {}".format(num_kill, worker_type))
                         for i in range(num_kill):
-                            self.kill_init(worker_type)
+                            self.remove_worker_init(worker_type)
 
             # Add workers to next-worker-queue (TO BE spun up at top of loop)
             logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
@@ -459,8 +458,6 @@ class Manager(object):
 
         """
 
-        logger.info("LAUNCH_WORKER is only partially baked")
-
         debug = ' --debug' if self.debug else ''
 
         worker_id = ' --worker_id {}'.format(worker_id)
@@ -471,7 +468,8 @@ class Manager(object):
                f'-t {worker_type} '
                f'--logdir={self.logdir}/{self.uid} ')
 
-        logger.info("[TYLER] Command string :\n {}".format(cmd))
+        logger.info("Command string :\n {}".format(cmd))
+
         if mode == 'no_container':
             modded_cmd = cmd
         elif mode == 'singularity':
@@ -493,7 +491,7 @@ class Manager(object):
 
         return proc
 
-    def kill_init(self, worker_type):
+    def remove_worker_init(self, worker_type):
         """
             Kill a worker of a given worker_type. 
 
