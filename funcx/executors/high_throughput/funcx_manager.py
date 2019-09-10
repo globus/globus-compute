@@ -62,7 +62,7 @@ class Manager(object):
                  logdir=None,
                  debug=False,
                  block_id=None,
-                 internal_worker_port_range=(50000,60000),
+                 internal_worker_port_range=(50000, 60000),
                  mode="singularity_reuse",
                  container_image=None,
                  # TODO : This should be 10ms
@@ -139,9 +139,8 @@ class Manager(object):
         self.cores_per_workers = cores_per_worker
         self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
         self.worker_count = min(max_workers,
-                                math.floor(cores_on_node / cores_per_worker))
+                                math.floor(self.cores_on_node / cores_per_worker))
         self.worker_map = WorkerMap(self.worker_count)
-        logger.info("Manager will spawn {} workers".format(self.worker_count))
 
         self.internal_worker_port_range = internal_worker_port_range
 

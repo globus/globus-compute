@@ -8,5 +8,5 @@ config = Config(
         min_blocks=1,
         max_blocks=1,
     ),
-    max_workers_per_node=2,
+    max_workers_per_node=10,
 )
