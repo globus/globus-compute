@@ -13,28 +13,24 @@ import uuid
 import zmq
 import math
 import json
-import shutil
 import subprocess
 import multiprocessing
 import random
 import psutil
 
-from typing import Any
-from queue import PriorityQueue
-
-# from funcx.executors.high_throughput.funcx_worker import funcx_worker
-
+from funcx.executors.high_throughput.container_scheduler import naive_scheduler
 from funcx.executors.high_throughput.worker_map import WorkerMap
+from funcx.serialize import FuncXSerializer
 
-from funcx.version import VERSION as FUNCX_VERSION
 from parsl.version import VERSION as PARSL_VERSION
+from funcx.version import VERSION as FUNCX_VERSION
+
 from funcx import set_file_logger
 
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2 ** 32) - 1
-
 
 
 class Manager(object):
@@ -53,6 +49,7 @@ class Manager(object):
                 |                          |                IPC-Qeueues
 
     """
+
     def __init__(self,
                  task_q_url="tcp://127.0.0.1:50097",
                  result_q_url="tcp://127.0.0.1:50098",
@@ -142,7 +139,7 @@ class Manager(object):
         self.cores_per_workers = cores_per_worker
         self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
         self.worker_count = min(max_workers,
-                                math.floor(self.cores_on_node / cores_per_worker))
+                                math.floor(cores_on_node / cores_per_worker))
         self.worker_map = WorkerMap(self.worker_count)
         logger.info("Manager will spawn {} workers".format(self.worker_count))
 
@@ -168,6 +165,13 @@ class Manager(object):
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
+        self.serializer = FuncXSerializer()
+        self.next_worker_q = queue.Queue()  # FIFO queue for spinning up workers.
+        self.worker_counter = 0  # used to create worker_ids
+
+        # Only spin up containers if active_workers + pending_workers < max_workers.
+        self.active_workers = 0
+        self.pending_workers = 0
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -229,9 +233,7 @@ class Manager(object):
 
         poll_timer = self.poll_period
 
-        # This dict holds the info on the count of workers of various types available.
-        worker_map = {'slots' : self.worker_count}
-
+        new_worker_map = None
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
             logger.debug("[TASK_PULL_THREAD] Loop start")
@@ -244,16 +246,14 @@ class Manager(object):
                 self.heartbeat()
                 last_beat = time.time()
 
-
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ready_worker_count))
-                msg = ((ready_worker_count).to_bytes(4, "little"))
+                msg = (ready_worker_count.to_bytes(4, "little"))
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
             socks = dict(poller.poll(timeout=poll_timer))
             if self.funcx_task_socket in socks and socks[self.funcx_task_socket] == zmq.POLLIN:
-                # logger.debug("[FUNCX] There's an incoming result")
                 try:
                     w_id, m_type, message = self.funcx_task_socket.recv_multipart()
                     logger.warning(f"Got registration message")
@@ -262,8 +262,9 @@ class Manager(object):
                         logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
 
                         # Increment worker_type count by 1
+                        self.pending_workers -= 1
+                        self.active_workers += 1
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
-                        # TODO : HERE
 
                     elif m_type == b'TASK_RET':
                         logger.info("Result received from worker:{}".format(w_id))
@@ -272,15 +273,32 @@ class Manager(object):
                         self.worker_map.put_worker(w_id)
                         task_done_counter += 1
 
-                        # UNCOMMENT to kill workers. 
-                        # self.kill_worker(1)
-                    
                     elif m_type == b'WRKR_DIE':
-                        logger.debug("[KILL] Scrubbing the worker from the map!")
-                        self.worker_map.scrub_worker(w_id)
+                        logger.info("[WORKER_REMOVE] Removing worker from worker_map...")
+                        logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
+                        logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
+                        self.worker_map.remove_worker(w_id)
+                        self.active_workers -= 1
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+
+            logger.debug("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
+
+            if self.next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
+                logger.debug("[SPIN UP] Spinning up new workers!")
+                num_slots = min(self.worker_count - self.active_workers - self.pending_workers, self.next_worker_q.qsize())
+                for _ in range(1, num_slots):
+
+                    try:
+                        self.add_worker(worker_id=str(self.worker_counter), worker_type=self.next_worker_q.get())
+                    except Exception as e:
+                        logger.error(e)
+                        logger.error("Error spinning up worker! Skipping...")
+                        continue
+                    else:
+                        self.pending_workers += 1
+                    self.worker_counter += 1
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -298,28 +316,22 @@ class Manager(object):
                     logger.debug("Got heartbeat from interchange")
 
                 else:
-                    # TODO : Update this to unpack and forward tasks to the appropriate
-                    # workers.
                     task_recv_counter += len(tasks)
                     logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t['task_id'] for t in tasks],
                                                                                  task_recv_counter))
 
                     for task in tasks:
-                        # In the FuncX model we forward tasks received directly via a DEALER socket.
-                        b_task_id = task['task_id'].encode()
 
                         # Set default type to raw
-                        task_type = task.get('task_type', 'RAW')
+                        task_type = task['task_id'].split(';')[1]
+
+                        logger.info("[TASK DEBUG] Task is of type: {}".format(task_type))
+
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
+                            self.worker_map.total_worker_type_counts[task_type] = 0
                         self.task_queues[task_type].put(task)
-                        logger.debug("Task {} pushed to a task queue".format(task))
-                        """
-                        #logger.debug("[TASK_PULL_THREAD] FuncX attempting send")
-                        i = self.funcx_task_socket.send_multipart([b'', b_task_id] + task['buffer'])
-                        logger.debug("[TASK_PULL_THREAD] FUNCX Forwarded task: {}".format(task['task_id']))
-                        logger.debug("[TASK_PULL_THREAD] forward returned:{}".format(i))
-                        """
+                        logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
             else:
                 logger.debug("[TASK_PULL_THREAD] No incoming tasks")
@@ -336,28 +348,71 @@ class Manager(object):
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
 
+            logger.info("Task queues: {}".format(self.task_queues))
+            new_worker_map = naive_scheduler(self.task_queues, self.worker_count, logger=logger)
+            logger.info("[TYLER] New worker map: {}".format(new_worker_map))
+
+            #  Count the workers of each type that need to be removed
+            if new_worker_map is not None:  # TYLER: None-case is when there's no tasks in the queue. Don't Kill!
+                for worker_type in new_worker_map:
+                    if new_worker_map[worker_type] < self.worker_map.total_worker_type_counts[worker_type]:
+                        num_remove = self.worker_map.total_worker_type_counts[worker_type] - new_worker_map[worker_type]
+
+                        logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
+                        for i in range(num_remove):
+                            self.remove_worker_init(worker_type)
+
+            # Add workers to next-worker-queue (TO BE spun up at top of loop)
+            logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
+
+            # NOTE: Wipe the queue -- previous scheduling loops don't affect what's needed now.
+            self.next_worker_q = queue.Queue()
+            if new_worker_map is not None:
+                new_worker_list = []
+                for worker_type in new_worker_map:
+                    # If we don't already have this type of worker in our worker_map...
+                    if worker_type not in self.worker_map.total_worker_type_counts:
+                        self.worker_map.total_worker_type_counts[worker_type] = 0
+                    if new_worker_map[worker_type] > self.worker_map.total_worker_type_counts[worker_type]:
+
+                        for i in range(1, new_worker_map[worker_type] - self.worker_map.total_worker_type_counts[worker_type]):
+                            # Add worker
+                            new_worker_list.append(worker_type)
+
+                # Randomly assign order of newly needed containers... add to spin-up queue.
+                if len(new_worker_list) > 0:
+                    random.shuffle(new_worker_list)
+
+                    for item in new_worker_list:
+                        self.next_worker_q.put(item)
+
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
                 if task_type == 'slots':
                     continue
 
-
+                # *** Match tasks to workers *** #
                 else:
-
-                    # TODO: TYLER -- in here, make KILL actually kill. 
-
                     available_workers = current_worker_map[task_type]
                     logger.debug("Available workers of type {}: {}".format(task_type,
                                                                            available_workers))
+
                     for i in range(available_workers):
-                        if task_type in self.task_queues and not self.task_queues[task_type].empty():
+                        if task_type in self.task_queues and not self.task_queues[task_type].qsize() == 0 \
+                                and not self.worker_map.worker_queues[task_type].qsize() == 0:
+
+                            logger.debug("Task type {} has task queue size {}"
+                                         .format(task_type, self.task_queues[task_type].qsize()))
+                            logger.debug("... and available workers: {}"
+                                         .format(self.worker_map.worker_queues[task_type].qsize()))
+
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
-                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))                            
+
+                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
-                            logger.debug("Sending done")
-
+                            logger.debug("Sending complete!")
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """ Listens on the pending_result_queue and sends out results via 0mq
@@ -394,11 +449,11 @@ class Manager(object):
 
         logger.critical("[RESULT_PUSH_THREAD] Exiting")
 
-
-    def launch_worker(self, worker_id=str(random.random()),
-                      mode='no_container',
-                      container_uri=None,
-                      walltime=1):
+    def add_worker(self, worker_id=str(random.random()),
+                   mode='no_container',
+                   worker_type='RAW',
+                   container_uri=None,
+                   walltime=1):
         """ Launch the appropriate worker
 
         Parameters
@@ -411,55 +466,50 @@ class Manager(object):
            Walltime in seconds before we check status
 
         """
-        print("LAUNCH_WORKER is only partially baked")
 
         debug = ' --debug' if self.debug else ''
-        # TODO : This should assign some meaningful worker_id rather than random
+
         worker_id = ' --worker_id {}'.format(worker_id)
 
         cmd = (f'funcx-worker {debug}{worker_id} '
                f'-a {self.address} '
                f'-p {self.worker_port} '
+               f'-t {worker_type} '
                f'--logdir={self.logdir}/{self.uid} ')
 
-        print("Command string : ", cmd)
+        logger.info("Command string :\n {}".format(cmd))
+
         if mode == 'no_container':
             modded_cmd = cmd
         elif mode == 'singularity':
-            modded_cmd = 'singularity run --writable {container_uri} {cmd}'.format(self.container_uri)
+            modded_cmd = f'singularity run --writable {container_uri} {cmd}'
         else:
             raise NameError("Invalid container launch mode.")
 
-        stdout = 'STDOUT: READING FAILED'
-        stderr = 'STDERR: READING FAILED'
         try:
-            proc = subprocess.Popen(cmd,
+            proc = subprocess.Popen(modded_cmd,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     shell=True)
-            print("Launched proc")
 
         except Exception as e:
-            print("TODO : Got an error in worker launch, got error {}".format(e))
+            logger.error("Got an error in worker launch, got error {}".format(e))
+            raise
 
         return proc
 
-
-    def kill_worker(self, worker_type):
+    def remove_worker_init(self, worker_type):
         """
-            Kill a worker of a given worker_type. 
+            Kill/Remove a worker of a given worker_type.
 
             Add a kill message to the task_type queue.
 
-            Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing. 
+            Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing.
         """
-        
-        # self.dead_workers.add(worker_type)
-        # self.available_workers[worker_type] -= 1  # COMMENTED OUT because messes with assigning the KILL task to the worker...
-        logger.debug("[KILL] Appending KILL message to worker queue")
-        self.task_queues[worker_type].put({"task_id": "KILL", "buffer": "KILL"})
-        # self.worker_map.scrub_worker(worker_type)
 
+        logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue")
+        self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
+                                           "buffer": b'KILL'})
 
     def start(self):
         """
@@ -469,15 +519,11 @@ class Manager(object):
             Forward results
         """
 
-        self.task_queues = {}  # k-v: task_type - task_q (PriorityQueue)
-        self.worker_capacities = {}  # k-v: worker_id - capacity (integer... should only ever be 0 or 1)
-        # TODO: Switch ^^^ to FIFO task queue.
-        self.task_to_worker_sets = {}  # k-v: task_type - workers (set)
+        self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
 
-        # Keep track of workers to whom we've sent kill messages
-        self.dead_worker_set = set()
-
-        self.workers = [self.launch_worker(worker_id=5)]
+        self.workers = [self.add_worker(worker_id=str(self.worker_counter))]
+        self.worker_counter += 1
+        self.pending_workers += 1
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
@@ -487,168 +533,6 @@ class Manager(object):
 
         self.pull_tasks(self._kill_event)
         logger.info("Waiting")
-
-
-
-
-
-
-    #----------------------------------------------------------------------------------------------
-    # Deprecated
-    def _start(self):
-        """ Start the worker processes.
-
-        TODO: Move task receiving to a thread
-        """
-        start = time.time()
-        self._kill_event = threading.Event()
-
-        self.procs = {}
-
-        # @Tyler, we should do a `which funcx_worker.py` [note: not entry point, this must be a script]
-        # copy that file over the directory '.' and then have the container run with pwd visible
-        # as an initial cut, while we resolve possible issues.
-        orig_location = os.getcwd()
-
-        if not os.path.isdir("NAMESPACE"):
-            os.mkdir("NAMESPACE")
-
-        context = zmq.Context()
-        registration_socket = context.socket(zmq.REP)
-        self.reg_port = registration_socket.bind_to_random_port("tcp://*", min_port=50001, max_port=55000)
-
-        for worker_id in range(self.worker_count):
-
-            if self.mode.startswith("singularity"):
-                try:
-                    os.mkdir("NAMESPACE/{}".format(worker_id))
-                    # shutil.copyfile(worker_py_path, "NAMESPACE/{}/funcx_worker.py".format(worker_id))
-                except Exception:
-                    pass  # Assuming the directory already exists.
-
-            if self.mode == "no_container":
-                p = multiprocessing.Process(target=funcx_worker,
-                                            args=(worker_id,
-                                                  self.uid,
-                                                  "tcp://localhost:{}".format(self.internal_worker_port),
-                                                  "tcp://localhost:{}".format(self.reg_port),
-                                                  ),
-                                            # DEBUG YADU. MUST SET BACK TO False,
-                                            kwargs={'no_reuse': False,
-                                                    'debug': self.debug,
-                                                    'logdir': self.logdir})
-
-                p.start()
-                self.procs[worker_id] = p
-
-            elif self.mode == "singularity_reuse":
-
-                os.chdir("NAMESPACE/{}".format(worker_id))
-                # @Tyler, FuncX worker path needs to be updated to not use the run command in the container.
-                # We just want to invoke with "funcx_worker.py" which is found in the $PATH
-                sys_cmd = ("singularity run {singularity_img} /usr/local/bin/funcx_worker.py --worker_id {worker_id} "
-                           "--pool_id {pool_id} --task_url {task_url} --reg_url {reg_url} "
-                           "--logdir {logdir} ")
-
-
-                sys_cmd = sys_cmd.format(singularity_img=self.container_image,
-                                         worker_id=worker_id,
-                                         pool_id=self.uid,
-                                         task_url="tcp://localhost:{}".format(self.internal_worker_port),
-                                         reg_url="tcp://localhost:{}".format(self.reg_port),
-                                         logdir=self.logdir)
-
-                logger.debug("Singularity reuse launch cmd: {}".format(sys_cmd))
-                proc = subprocess.Popen(sys_cmd, shell=True)
-                self.procs[worker_id] = proc
-
-                # Update the command to say something like :
-                # while :
-                # do
-                #     singularity run {singularity_img} funcx_worker.py --no_reuse .....
-                # done
-
-                # FuncX worker to accept new --no_reuse flag that breaks the loop after 1 task.
-                os.chdir(orig_location)
-
-            elif self.mode == "singularity_single_use":
-                # raise Exception("Not supported")
-                os.chdir("NAMESPACE/{}".format(worker_id))
-
-                if self.mode.startswith("singularity"):
-                    #while True:
-                    logger.info("New subprocess loop!")
-                    sys_cmd = ("singularity run {singularity_img} /usr/local/bin/funcx_worker.py --no_reuse --worker_id {worker_id} "
-                                   "--pool_id {pool_id} --task_url {task_url} --reg_url {reg_url} "
-                                   "--logdir {logdir} ")
-                    sys_cmd = sys_cmd.format(singularity_img=self.container_image,
-                                             worker_id=worker_id,
-                                             pool_id=self.uid,
-                                             task_url="tcp://localhost:{}".format(self.internal_worker_port),
-                                             reg_url="tcp://localhost:{}".format(self.reg_port),
-                                             logdir=self.logdir)
-
-                    bash_cmd = """ while :
-                                   do
-                                      {}
-                                   done """.format(sys_cmd)
-                    logger.debug("Singularity NO-reuse launch cmd: {}".format(bash_cmd))
-                    proc = subprocess.Popen(bash_cmd, shell=True)
-                    self.procs[worker_id] = proc
-                    os.chdir(orig_location)
-
-
-        for worker_id in range(self.worker_count):
-            msg = registration_socket.recv_pyobj()
-            logger.info("Received registration message from worker: {}".format(msg))
-            registration_socket.send_pyobj("ACK")
-
-        logger.debug("Manager synced with workers")
-
-        self._task_puller_thread = threading.Thread(target=self.pull_tasks,
-                                                    args=(self._kill_event,))
-        self._result_pusher_thread = threading.Thread(target=self.push_results,
-                                                      args=(self._kill_event,))
-        self._task_puller_thread.start()
-        self._result_pusher_thread.start()
-
-        logger.info("Loop start")
-
-        # TODO : Add mechanism in this loop to stop the worker pool
-        # This might need a multiprocessing event to signal back.
-        self._kill_event.wait()
-        logger.critical("[MAIN] Received kill event, terminating worker processes")
-
-        self._task_puller_thread.join()
-        self._result_pusher_thread.join()
-        for proc_id in self.procs:
-            self.procs[proc_id].terminate()
-
-            if type(self.procs[proc_id]) == "subprocess.Popen":
-
-                poll = p.poll()
-
-                if poll == None:
-                    is_alive = False
-                else:
-                    is_alive = True
-
-                logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
-                                                                  is_alive))
-            else:
-                logger.critical("Terminating worker {}:{}".format(self.procs[proc_id],
-                                                                  self.procs[proc_id].is_alive()))
-
-            self.procs[proc_id].join()
-            logger.debug("Worker:{} joined successfully".format(self.procs[proc_id]))
-
-        self.task_incoming.close()
-        self.result_outgoing.close()
-        self.context.term()
-        delta = time.time() - start
-        logger.info("FuncX Manager ran for {} seconds".format(delta))
-        return
-
 
 
 def cli_run():
@@ -677,7 +561,7 @@ def cli_run():
     parser.add_argument("--container_image", default=None,
                         help="Container image identifier/path")
     parser.add_argument("--mode", default="singularity_reuse",
-                        help=("Select the mode of operation from "
+                        help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
     parser.add_argument("-r", "--result_url", required=True,
                         help="REQUIRED: ZMQ url for posting results")

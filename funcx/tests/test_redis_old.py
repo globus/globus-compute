@@ -6,18 +6,15 @@ import time
 def slow_double(i, duration=0):
     import time
     time.sleep(duration)
-    return i*4
+    return i*2
 
-def test(endpoint_id=None, tasks=10, duration=1, hostname=None, port=None):
+def test(endpoint_id=None, tasks=10, hostname=None, port=None):
     tasks_rq = RedisQueue(f'task_{endpoint_id}', hostname)
     results_rq = RedisQueue(f'results', hostname)
     fxs = FuncXSerializer()
 
     ser_code = fxs.serialize(slow_double)
     fn_code = fxs.pack_buffers([ser_code])
-
-    tasks_rq.connect()
-    results_rq.connect()
 
     while True:
         try:
@@ -26,22 +23,19 @@ def test(endpoint_id=None, tasks=10, duration=1, hostname=None, port=None):
             print("No more results left")
             break
 
+    tasks_rq.connect()
+    results_rq.connect()
     start = time.time()
     for i in range(tasks):
         ser_args = fxs.serialize([i])
-        ser_kwargs = fxs.serialize({'duration':duration})
+        ser_kwargs = fxs.serialize({'duration':0})
         input_data = fxs.pack_buffers([ser_args, ser_kwargs])
         payload = fn_code + input_data
-        container_id = "odd" if i%2 else "even"
-        tasks_rq.put(f"0{i};{container_id}", payload)
+        tasks_rq.put(f"0{i}", payload)
 
-    d1 = time.time() - start
-    print("Time to launch {} tasks: {:8.3f} s".format(tasks, d1))
-
-    print(f"Launched {tasks} tasks")
     for i in range(tasks):
-        res = results_rq.get(timeout=300)
-        # print("Result : ", res)
+        res = results_rq.get(timeout=1)
+        print("Result : ", res)
 
     delta = time.time() - start
     print("Time to complete {} tasks: {:8.3f} s".format(tasks, delta))
@@ -55,8 +49,6 @@ if __name__ == "__main__":
                         help="Hostname of the Redis server")
     parser.add_argument("-e", "--endpoint_id", required=True,
                         help="Endpoint_id")
-    parser.add_argument("-d", "--duration", required=True,
-                        help="Duration of the tasks")
     parser.add_argument("-c", "--count", required=True,
                         help="Number of tasks")
 
@@ -65,5 +57,5 @@ if __name__ == "__main__":
 
     test(endpoint_id=args.endpoint_id,
          hostname=args.redis_hostname,
-         duration=int(args.duration),
          tasks=int(args.count))
+

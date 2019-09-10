@@ -3,7 +3,6 @@
 import logging
 import argparse
 import zmq
-import os
 import sys
 import pickle
 
@@ -60,6 +59,8 @@ class FuncXWorker(object):
                                  level=logging.DEBUG if debug else logging.INFO)
 
         logger.info('Initializing worker {}'.format(worker_id))
+        logger.info('Worker is of type: {}'.format(worker_type))
+
         if debug:
             logger.debug('Debug logging enabled')
 
@@ -103,10 +104,11 @@ class FuncXWorker(object):
             logger.debug(
                 "Received task_id:{} with task:{}".format(task_id, msg))
 
-            if task_id == "KILL":
+            if msg == b"KILL":
                 logger.info("[KILL] -- Worker KILL message received! ")
                 task_type = b'WRKR_DIE'
                 result = None
+                continue
 
             logger.debug("Executing task...")
 
@@ -127,6 +129,7 @@ class FuncXWorker(object):
             task_type = b'TASK_RET'
 
         logger.warning("Broke out of the loop... dying")
+
 
     def execute_task(self, message):
         """Deserialize the buffer and execute the task.
@@ -150,6 +153,8 @@ def cli_run():
     parser = argparse.ArgumentParser()
     parser.add_argument("-w", "--worker_id", required=True,
                         help="ID of worker from process_worker_pool")
+    parser.add_argument("-t", "--type", required=False,
+                        help="Container type of worker", default="RAW")
     parser.add_argument("-a", "--address", required=True,
                         help="Address for the manager, eg X,Y,")
     parser.add_argument("-p", "--port", required=True,
@@ -164,7 +169,8 @@ def cli_run():
                          args.address,
                          int(args.port),
                          args.logdir,
-                         debug=args.debug)
+                         worker_type=args.type,
+                         debug=args.debug, )
     worker.start()
     return
 
