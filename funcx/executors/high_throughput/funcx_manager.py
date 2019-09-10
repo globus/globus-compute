@@ -48,6 +48,7 @@ class Manager(object):
                 |                          |                IPC-Qeueues
 
     """
+
     def __init__(self,
                  task_q_url="tcp://127.0.0.1:50097",
                  result_q_url="tcp://127.0.0.1:50098",
@@ -151,7 +152,7 @@ class Manager(object):
         logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
 
         self.task_queues = {'RAW': queue.Queue()}
-        
+
         self.pending_result_queue = multiprocessing.Queue()
 
         self.max_queue_size = max_queue_size + self.worker_count
@@ -263,7 +264,7 @@ class Manager(object):
                         self.pending_result_queue.put(message)
                         self.worker_map.put_worker(w_id)
                         task_done_counter += 1
-                    
+
                     elif m_type == b'WRKR_DIE':
                         logger.info("[WORKER_REMOVE] Removing worker from worker_map...")
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_counts))
@@ -274,11 +275,10 @@ class Manager(object):
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
-            logger.info("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
+            logger.debug("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
 
             if self.next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
-                logger.info("[SPIN UP] Spinning up new workers!")
-                # logger.info("[SLOTS] Current number of slots: {}".format(self.worker_map.worker_counts['slots']))
+                logger.debug("[SPIN UP] Spinning up new workers!")
                 num_slots = min(self.worker_count - self.active_workers - self.pending_workers, self.next_worker_q.qsize())
                 for _ in range(1, num_slots):
 
@@ -390,10 +390,13 @@ class Manager(object):
                                                                            available_workers))
 
                     for i in range(available_workers):
-                        if task_type in self.task_queues and not self.task_queues[task_type].qsize() == 0 and not self.worker_map.worker_queues[task_type].qsize() == 0:
+                        if task_type in self.task_queues and not self.task_queues[task_type].qsize() == 0 \
+                                and not self.worker_map.worker_queues[task_type].qsize() == 0:
 
-                            logger.debug("Task type {} has task queue size {}".format(task_type, self.task_queues[task_type].qsize()))
-                            logger.debug("... and available workers: {}".format(self.worker_map.worker_queues[task_type].qsize()))
+                            logger.debug("Task type {} has task queue size {}"
+                                         .format(task_type, self.task_queues[task_type].qsize()))
+                            logger.debug("... and available workers: {}"
+                                         .format(self.worker_map.worker_queues[task_type].qsize()))
 
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
@@ -440,7 +443,7 @@ class Manager(object):
 
     def add_worker(self, worker_id=str(random.random()),
                    mode='no_container',
-                   worker_type = 'RAW',
+                   worker_type='RAW',
                    container_uri=None,
                    walltime=1):
         """ Launch the appropriate worker
@@ -475,8 +478,6 @@ class Manager(object):
         else:
             raise NameError("Invalid container launch mode.")
 
-        stdout = 'STDOUT: READING FAILED'
-        stderr = 'STDERR: READING FAILED'
         try:
             proc = subprocess.Popen(modded_cmd,
                                     stdout=subprocess.PIPE,
@@ -495,7 +496,7 @@ class Manager(object):
 
             Add a kill message to the task_type queue.
 
-            Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing. 
+            Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing.
         """
 
         logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue")
