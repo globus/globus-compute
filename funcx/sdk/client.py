@@ -164,7 +164,6 @@ class FuncXClient(BaseClient):
             raise Exception(r)
 
         # Return the result
-        logger.info("Data returned : {}".format(r.data))
         return r.data
 
     def get_containers(self, name, description=None):

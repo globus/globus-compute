@@ -6,8 +6,6 @@ import zmq
 import sys
 import pickle
 
-
-from ipyparallel.serialize import serialize_object
 from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx import set_file_logger
@@ -97,12 +95,14 @@ class FuncXWorker(object):
 
             if task_type == b'WRKR_DIE':
                 logger.info("*** WORKER {} ABOUT TO DIE ***".format(self.worker_id))
-                exit()  # Kill the worker after accepting death in message to manager.
+                # Kill the worker after accepting death in message to manager.
+                exit()
 
             logger.debug("Waiting for task")
             p_task_id, msg = self.task_socket.recv_multipart()
             task_id = pickle.loads(p_task_id)
-            logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
+            logger.debug(
+                "Received task_id:{} with task:{}".format(task_id, msg))
 
             if msg == b"KILL":
                 logger.info("[KILL] -- Worker KILL message received! ")
@@ -114,19 +114,21 @@ class FuncXWorker(object):
 
             try:
                 result = self.execute_task(msg)
-                logger.debug("Executed result: {}".format(result))
-                serialized_result = serialize_object(result)
+                serialized_result = self.serialize(result)
             except Exception as e:
                 logger.exception(f"Caught an exception {e}")
-                result_package = {'task_id': task_id, 'exception': serialize_object(
+                result_package = {'task_id': task_id, 'exception': self.serialize(
                     RemoteExceptionWrapper(*sys.exc_info()))}
             else:
                 logger.debug("Execution completed without exception")
-                result_package = {'task_id': task_id, 'result': serialized_result}
+                result_package = {'task_id': task_id,
+                                  'result': serialized_result}
 
-            # TODO: Change this to serialize_object to match IX?
             result = result_package
             task_type = b'TASK_RET'
+
+        logger.warning("Broke out of the loop... dying")
+
 
     def execute_task(self, message):
         """Deserialize the buffer and execute the task.
