@@ -124,7 +124,6 @@ class FuncXWorker(object):
                 result_package = {'task_id': task_id,
                                   'result': serialized_result}
 
-            # TODO: Change this to serialize_object to match IX?
             result = result_package
             task_type = b'TASK_RET'
 
