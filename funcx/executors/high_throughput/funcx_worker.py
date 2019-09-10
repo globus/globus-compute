@@ -117,7 +117,7 @@ class FuncXWorker(object):
                 logger.debug("Executed result: {}".format(result))
                 serialized_result = serialize_object(result)
             except Exception as e:
-                logger.exception("Caught an exception {}".format(e))
+                logger.exception(f"Caught an exception {e}")
                 result_package = {'task_id': task_id, 'exception': serialize_object(
                     RemoteExceptionWrapper(*sys.exc_info()))}
             else:
@@ -134,44 +134,15 @@ class FuncXWorker(object):
         Returns the result or throws exception.
         """
 
-        logger.debug("Inside execute_task function")
+        # logger.debug("Inside execute_task function")
         user_ns = locals()
         user_ns.update({'__builtins__': __builtins__})
 
-        logger.info("Trying to pickle load the message {}".format(message))
+        # logger.info("Trying to pickle load the message {}".format(message))
         decoded = message.decode()
         f, args, kwargs = self.serializer.unpack_and_deserialize(decoded)
-        logger.debug("Message unpacked")
+        # logger.debug("Message unpacked")
 
-        # We might need to look into callability of the function from itself
-        # since we change it's name in the new namespace
-        """
-        prefix = "parsl_"
-        fname = prefix + "f"
-        argname = prefix + "args"
-        kwargname = prefix + "kwargs"
-        resultname = prefix + "result"
-
-        user_ns.update({fname: f,
-                        argname: args,
-                        kwargname: kwargs,
-                        resultname: resultname})
-
-        logger.debug("Namespace updated")
-
-        code = "{0} = {1}(*{2}, **{3})".format(resultname, fname,
-                                               argname, kwargname)
-
-        try:
-            exec(code, user_ns, user_ns)
-
-        except Exception as e:
-            raise e
-
-        else:
-            return user_ns.get(resultname)
-
-        """
         return f(*args, **kwargs)
 
 

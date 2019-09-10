@@ -2,10 +2,10 @@ Endpoints
 =========
 
 An endpoint is a persistent service launched by the user on their compute system that serves as a conduit for routing
-and executing functions to their compute system.. This could be their laptop, the login node of a campus cluster,
+and executing functions to their compute system. This could be their laptop, the login node of a campus cluster,
 grid or supercomputing facility.
 
-The endpoint can be configured to connect up to the funcX webservice at `funcx.org <https://funcx.org>`_
+The endpoint can be configured to connect to the funcX webservice at `funcx.org <https://funcx.org>`_
 or to your private service. Once the endpoint is connected, the web portal presents available
 endpoints to which you can direct functions.
 
@@ -34,7 +34,7 @@ To start a new endpoint run the following command::
        $ funcx-endpoint start <ENDPOINT_NAME>
 
 The above command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/config.py`.
-This file should be updated with the appropriate configurations for the computational system your are
+This file should be updated with the appropriate configurations for the computational system you are
 targeting before you start the endpoint. To launch the endpoint, simply rerun the above command.
 
 .. note:: If the ENDPOINT_NAME is not specified, a defaut endpoint named "default" is started.
@@ -48,7 +48,7 @@ To stop an endpoint, run the following command::
 
 .. note:: If the ENDPOINT_NAME is not specified, the default endpoint is stopped.
 
-.. warning:: Please run the ``funcx-endpoint stop`` command **twice** to ensure that the endpoint is shutdown.
+.. warning:: Run the ``funcx-endpoint stop`` command **twice** to ensure that the endpoint is shutdown.
 
 Listing Endpoints
 -----------------
@@ -66,11 +66,11 @@ To list available endpoints on the current system, run::
   | gpu_cluster   | Initialized | None                                 |
   +---------------+-------------+--------------------------------------+
 
-The endpoints can be the following states:
+Endpoints can be the following states:
 
-* **Initialized** : This status means that the endpoint has been created, but not started
+* **Initialized**: This status means that the endpoint has been created, but not started
   following configuration and not registered with the `funcx service`
-* **Active** : This status means that the endpoint is active and available for executing
+* **Active**: This status means that the endpoint is active and available for executing
   functions
-* **Inactive** : This status means that endpoint is not running right now and therefore,
+* **Inactive**: This status means that endpoint is not running right now and therefore,
   cannot service any functions.

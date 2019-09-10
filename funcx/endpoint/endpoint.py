@@ -19,6 +19,7 @@ import shutil
 import tarfile
 import signal
 import psutil
+import random
 
 import funcx
 from funcx.executors.high_throughput import global_config, default_config
@@ -124,9 +125,15 @@ def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.am
     Can be used as an example of how to make calls this it, while the main API
     is updated to do this calling on behalf of the endpoint in the second iteration.
     """
+    print("Picking source as a mock site")
+    sites = ['128.135.112.73', '140.221.69.24',
+             '52.86.208.63', '129.114.63.99',
+             '128.219.134.72', '134.79.129.79']
+    ip_addr = random.choice(sites)
     try:
         r = requests.post(address + '/register',
                           json={'endpoint_id': str(uuid.uuid4()),
+                                'endpoint_addr': ip_addr, 
                                 'redis_address': redis_host})
     except requests.exceptions.ConnectionError:
         logger.critical("Unable to reach the funcX hub at {}".format(address))
@@ -204,7 +211,7 @@ Configure this file and try restarting with:
             reg_info = funcx_client.register_endpoint(args.name, eid)
             logger.debug("Got endpoint info : {}".format(reg_info))
 
-        logger.info("Registration info from broker: {}".format(reg_info))
+        logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
         with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
             json.dump(reg_info, fp)
             logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))

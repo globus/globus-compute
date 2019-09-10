@@ -16,6 +16,7 @@ import json
 import subprocess
 import multiprocessing
 import random
+import psutil
 
 from funcx.executors.high_throughput.container_scheduler import naive_scheduler
 from funcx.executors.high_throughput.worker_map import WorkerMap
@@ -60,7 +61,8 @@ class Manager(object):
                  heartbeat_period=30,
                  logdir=None,
                  debug=False,
-                 internal_worker_port_range=(50000, 60000),
+                 block_id=None,
+                 internal_worker_port_range=(50000,60000),
                  mode="singularity_reuse",
                  container_image=None,
                  # TODO : This should be 10ms
@@ -121,6 +123,7 @@ class Manager(object):
 
         self.logdir = logdir
         self.debug = debug
+        self.block_id = block_id
         self.result_outgoing = self.context.socket(zmq.DEALER)
         self.result_outgoing.setsockopt(zmq.IDENTITY, uid.encode('utf-8'))
         self.result_outgoing.setsockopt(zmq.LINGER, 0)
@@ -131,11 +134,12 @@ class Manager(object):
 
         self.mode = mode
         self.container_image = container_image
-        cores_on_node = multiprocessing.cpu_count()
+        self.cores_on_node = multiprocessing.cpu_count()
         self.max_workers = max_workers
+        self.cores_per_workers = cores_per_worker
+        self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
         self.worker_count = min(max_workers,
                                 math.floor(cores_on_node / cores_per_worker))
-
         self.worker_map = WorkerMap(self.worker_count)
         logger.info("Manager will spawn {} workers".format(self.worker_count))
 
@@ -176,6 +180,10 @@ class Manager(object):
                'python_v': "{}.{}.{}".format(sys.version_info.major,
                                              sys.version_info.minor,
                                              sys.version_info.micro),
+               'worker_count': self.worker_count,
+               'cores': self.cores_on_node,
+               'mem': self.available_mem_on_node,
+               'block_id': self.block_id,
                'os': platform.system(),
                'hname': platform.node(),
                'dir': os.getcwd(),
@@ -536,6 +544,8 @@ def cli_run():
                         help="Process worker pool log directory")
     parser.add_argument("-u", "--uid", default=str(uuid.uuid4()).split('-')[-1],
                         help="Unique identifier string for Manager")
+    parser.add_argument("-b", "--block_id", default=None,
+                        help="Block identifier string for Manager")
     parser.add_argument("-c", "--cores_per_worker", default="1.0",
                         help="Number of cores assigned to each worker process. Default=1.0")
     parser.add_argument("-t", "--task_url", required=True,
@@ -572,6 +582,7 @@ def cli_run():
         logger.info("Debug logging: {}".format(args.debug))
         logger.info("Log dir: {}".format(args.logdir))
         logger.info("Manager ID: {}".format(args.uid))
+        logger.info("Block ID: {}".format(args.block_id))
         logger.info("cores_per_worker: {}".format(args.cores_per_worker))
         logger.info("task_url: {}".format(args.task_url))
         logger.info("result_url: {}".format(args.result_url))
@@ -585,6 +596,7 @@ def cli_run():
         manager = Manager(task_q_url=args.task_url,
                           result_q_url=args.result_url,
                           uid=args.uid,
+                          block_id=args.block_id,
                           cores_per_worker=float(args.cores_per_worker),
                           max_workers=args.max_workers if args.max_workers == float('inf') else int(args.max_workers),
                           heartbeat_threshold=int(args.hb_threshold),
