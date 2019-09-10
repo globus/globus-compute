@@ -21,6 +21,8 @@ from funcx.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
 from parsl.version import VERSION as PARSL_VERSION
+from funcx.version import VERSION as FUNCX_VERSION
+
 from funcx import set_file_logger
 
 from funcx.executors.high_throughput.container_scheduler import naive_scheduler
@@ -29,10 +31,6 @@ RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2 ** 32) - 1
 
-
-# TODO: Next_worker_queue size inflates to become too large.
-# TODO: Rigorously test with many multiple incoming work types.
-# TODO: Ask Yadu about what to do with worker_log situation.
 
 class Manager(object):
     """ Manager manages task execution by the workers
