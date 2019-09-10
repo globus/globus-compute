@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="ed4cecf6-9578-4f1c-9863-11f1afe83754" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/funcx_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/funcx_manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/funcx_worker.py" beforeDir="false" afterPath="$PROJECT_DIR$/funcx_worker.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../tests/test_redis.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../tests/test_redis.py" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/funcx_worker.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="69">
+              <caret line="7" selection-start-line="7" selection-end-line="7" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/funcx_manager.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-1184">
+              <caret line="32" selection-start-line="32" selection-end-line="32" />
+              <folding>
+                <element signature="e#24#39#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/worker_map.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="345">
+              <caret line="24" column="33" selection-start-line="24" selection-start-column="33" selection-end-line="24" selection-end-column="33" />
+              <folding>
+                <element signature="e#1#24#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/container_scheduler.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="315">
+              <caret line="22" column="28" selection-start-line="22" selection-start-column="28" selection-end-line="22" selection-end-column="28" />
+              <folding>
+                <element signature="e#1#12#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>self.task_queues</find>
+      <find>Queue</find>
+      <find>kill_init</find>
+      <find>serialize</find>
+      <find>self.workers</find>
+      <find>5</find>
+      <find>spinning</find>
+      <find>-=</find>
+      <find>launch_worker</find>
+      <find>Incoming task type</find>
+      <find>logger</find>
+      <find>scheduler</find>
+      <find>pending_workers -= 1</find>
+      <find>pending_workers</find>
+      <find>start</find>
+      <find>available workers of type</find>
+      <find>get_worker_counts</find>
+      <find>scrub</find>
+      <find>self.worker_map</find>
+      <find>ready</find>
+      <find>Available workers of type</find>
+      <find>failure</find>
+      <find>debug</find>
+      <find>logger.debug</find>
+      <find>new_worker_map</find>
+      <find>worker_capacities</find>
+      <find>random</find>
+      <find>scrub_worker</find>
+      <find>worker_counts</find>
+      <find>serialize_object</find>
+    </findStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../../.." />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/scheduler.py" />
+        <option value="$PROJECT_DIR$/container_scheduler.py" />
+        <option value="$PROJECT_DIR$/worker_map.py" />
+        <option value="$PROJECT_DIR$/funcx_worker.py" />
+        <option value="$PROJECT_DIR$/funcx_manager.py" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectConfigurationFiles">
+    <option name="files">
+      <list>
+        <option value="$PROJECT_DIR$/.idea/high_throughput.iml" />
+        <option value="$PROJECT_DIR$/.idea/misc.xml" />
+        <option value="$PROJECT_DIR$/.idea/vcs.xml" />
+        <option value="$PROJECT_DIR$/.idea/modules.xml" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectFrameBounds">
+    <option name="y" value="113" />
+    <option name="width" value="1680" />
+    <option name="height" value="972" />
+  </component>
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="Scope" />
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="high_throughput" type="b2602c69:ProjectViewProjectNode" />
+              <item name="high_throughput" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.detected.package.tslint" value="true" />
+    <property name="node.js.path.for.package.eslint" value="project" />
+    <property name="node.js.path.for.package.tslint" value="project" />
+    <property name="node.js.selected.package.eslint" value="(autodetect)" />
+    <property name="node.js.selected.package.tslint" value="(autodetect)" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+      <recent name="$PROJECT_DIR$/container_scheduler" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager">
+    <configuration name="funcx_manager" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="high_throughput" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/funcx_manager.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.funcx_manager" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ed4cecf6-9578-4f1c-9863-11f1afe83754" name="Default Changelist" comment="" />
+      <created>1565903815500</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1565903815500</updated>
+      <workItem from="1565903818401" duration="493000" />
+      <workItem from="1565907446169" duration="92000" />
+      <workItem from="1566270083633" duration="4796000" />
+      <workItem from="1566322933821" duration="1963000" />
+      <workItem from="1566332688853" duration="23881000" />
+      <workItem from="1566422152336" duration="1919000" />
+      <workItem from="1567612122702" duration="1880000" />
+      <workItem from="1567614081525" duration="2845000" />
+      <workItem from="1568056853469" duration="4665000" />
+      <workItem from="1568128613613" duration="965000" />
+    </task>
+    <task id="LOCAL-00001" summary="Broken commit -- cannot find my scheduler file.">
+      <created>1566275765596</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1566275765596</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Broken commit -- Weird Python path error.">
+      <created>1566327696450</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1566327696450</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Naive scheduling working. Adding back dynamic spin up/down of containers.">
+      <created>1566336390006</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1566336390006</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Workers now accepting (and registering with) tasks types other than 'RAW'.">
+      <created>1566339386288</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1566339386288</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Working. Outlined remainder of tasks for tonight/tomorrow.">
+      <created>1566340357626</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1566340357626</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Fix zero-case for scheduler">
+      <created>1566353389544</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1566353389545</updated>
+    </task>
+    <task id="LOCAL-00007" summary="Killing workers functional with Yadu's serialization scheme.">
+      <created>1566353418497</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1566353418497</updated>
+    </task>
+    <task id="LOCAL-00008" summary="Cleaning up scheduler.">
+      <created>1566355865671</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1566355865671</updated>
+    </task>
+    <task id="LOCAL-00009" summary="&quot;Overkill&quot; problem fixed.">
+      <created>1566356673160</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1566356673160</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Switched worker spin-up to queue model (wait for kills).">
+      <created>1566359224773</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1566359224773</updated>
+    </task>
+    <task id="LOCAL-00011" summary="[Needs Testing] Multi-container scheduler seemingly working.">
+      <created>1566361926208</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1566361926208</updated>
+    </task>
+    <task id="LOCAL-00012" summary="[Needs Testing] Multi-container scheduler seemingly working.">
+      <created>1566362133283</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1566362133283</updated>
+    </task>
+    <task id="LOCAL-00013" summary="Adding a last couple TODOs for tomorrow.">
+      <created>1566362370145</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1566362370145</updated>
+    </task>
+    <task id="LOCAL-00014" summary="Container spin up working (not too many now).">
+      <created>1566415566932</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1566415566932</updated>
+    </task>
+    <task id="LOCAL-00015" summary="Everything works! test_redis fails occasionally - explore more.">
+      <created>1566423954762</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1566423954762</updated>
+    </task>
+    <task id="LOCAL-00016" summary="Fix the scheduler to rewrite queues on each loop.">
+      <created>1566423986559</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1566423986559</updated>
+    </task>
+    <task id="LOCAL-00017" summary="Cleaned up variable names, removed redundant code. For PR #5.">
+      <created>1568060217850</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1568060217850</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
+    <servers />
+  </component>
+  <component name="TimeTrackingManager">
+    <option name="totallyTimeSpent" value="43499000" />
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="0" y="113" width="1680" height="972" extended-state="0" />
+    <editor active="true" />
+    <layout>
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.114774115" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.32914287" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.3295063" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Version Control" order="8" weight="0.32914287" />
+      <window_info anchor="bottom" id="Database Changes" order="9" />
+      <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" />
+      <window_info anchor="bottom" id="Terminal" order="11" weight="0.3295063" />
+      <window_info anchor="bottom" id="Python Console" order="12" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="right" id="SciView" order="3" />
+      <window_info anchor="right" id="Database" order="4" />
+    </layout>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Broken commit -- cannot find my scheduler file." />
+    <MESSAGE value="Broken commit -- Weird Python path error." />
+    <MESSAGE value="Naive scheduling working. Adding back dynamic spin up/down of containers." />
+    <MESSAGE value="Workers now accepting (and registering with) tasks types other than 'RAW'." />
+    <MESSAGE value="Working. Outlined remainder of tasks for tonight/tomorrow." />
+    <MESSAGE value="Fix zero-case for scheduler" />
+    <MESSAGE value="Killing workers functional with Yadu's serialization scheme." />
+    <MESSAGE value="Cleaning up scheduler." />
+    <MESSAGE value="&quot;Overkill&quot; problem fixed." />
+    <MESSAGE value="Switched worker spin-up to queue model (wait for kills)." />
+    <MESSAGE value="[Needs Testing] Multi-container scheduler seemingly working." />
+    <MESSAGE value="Adding a last couple TODOs for tomorrow." />
+    <MESSAGE value="Container spin up working (not too many now)." />
+    <MESSAGE value="Everything works! test_redis fails occasionally - explore more." />
+    <MESSAGE value="Fix the scheduler to rewrite queues on each loop." />
+    <MESSAGE value="Cleaned up variable names, removed redundant code. For PR #5." />
+    <option name="LAST_COMMIT_MESSAGE" value="Cleaned up variable names, removed redundant code. For PR #5." />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/high_throughput$funcx_manager.coverage" NAME="funcx_manager Coverage Results" MODIFIED="1566273607766" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/container_scheduler/__init__.py" />
+    <entry file="file://$PROJECT_DIR$/default_config.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/global_config.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/worker_map.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="345">
+          <caret line="24" column="33" selection-start-line="24" selection-start-column="33" selection-end-line="24" selection-end-column="33" />
+          <folding>
+            <element signature="e#1#24#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/container_scheduler.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="315">
+          <caret line="22" column="28" selection-start-line="22" selection-start-column="28" selection-end-line="22" selection-end-column="28" />
+          <folding>
+            <element signature="e#1#12#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/funcx_worker.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="69">
+          <caret line="7" selection-start-line="7" selection-end-line="7" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/funcx_manager.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-1184">
+          <caret line="32" selection-start-line="32" selection-end-line="32" />
+          <folding>
+            <element signature="e#24#39#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+  </component>
+</project>
