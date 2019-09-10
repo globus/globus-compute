@@ -23,6 +23,34 @@ A default endpoint profile is also created that will be used, whenever you do no
 specify a profile to use for endpoint actions.
 
 
+Configuring an Endpoint
+-----------------------
+
+FuncX endpoints are designed to act as gateways to computational resources such as Clusters, Clouds,
+Supercomputers and even your laptop. To make the best use of your resource, the endpoint must be
+configured to match the computational resources you wish to match the needs of the workloads that
+you plan to execute and the capacity of the computational resource available to you. For eg, you may
+want to limit the number of cloud nodes to your budget.
+
+FuncX provides you a rich class based configuration model that allows you to specify the shape of the
+resources (# of nodes, # of cores per worker, duration etc) as well as place limits on how FuncX may
+scale the resources in response to changing workload demands.
+
+
+To generate the appropiate directories and default config template, run the following command::
+
+  $ funcx-endpoint start <ENDPOINT_NAME>
+  A default profile has been create for <testing> at ~/.funcx/<ENDPOINT_NAME>/config.py
+  Configure this file and try restarting with:
+       $ funcx-endpoint start <ENDPOINT_NAME>
+
+The above command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/config.py`.
+This file should be updated with the appropriate configurations for the computational system you are
+targeting before you start the endpoint. To launch the endpoint, see the next section.
+
+.. note:: If the ENDPOINT_NAME is not specified, a defaut endpoint named "default" is configured.
+
+
 Starting an Endpoint
 --------------------
 
