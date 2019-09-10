@@ -5,7 +5,6 @@ import argparse
 import zmq
 import sys
 import pickle
-import random
 
 
 from ipyparallel.serialize import serialize_object
