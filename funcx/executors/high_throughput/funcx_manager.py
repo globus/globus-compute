@@ -17,6 +17,7 @@ import subprocess
 import multiprocessing
 import random
 
+from funcx.executors.high_throughput.container_scheduler import naive_scheduler
 from funcx.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
@@ -25,7 +26,6 @@ from funcx.version import VERSION as FUNCX_VERSION
 
 from funcx import set_file_logger
 
-from funcx.executors.high_throughput.container_scheduler import naive_scheduler
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
@@ -346,14 +346,14 @@ class Manager(object):
             new_worker_map = naive_scheduler(self.task_queues, self.worker_count, logger=logger)
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
-            #  Count the workers of each type that need to be killed
+            #  Count the workers of each type that need to be removed
             if new_worker_map is not None:  # TYLER: None-case is when there's no tasks in the queue. Don't Kill!
                 for worker_type in new_worker_map:
                     if new_worker_map[worker_type] < self.worker_map.worker_counts[worker_type]:
-                        num_kill = self.worker_map.worker_counts[worker_type] - new_worker_map[worker_type]
+                        num_remove = self.worker_map.worker_counts[worker_type] - new_worker_map[worker_type]
 
-                        logger.info("[KILL] Killing {} workers of type {}".format(num_kill, worker_type))
-                        for i in range(num_kill):
+                        logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
+                        for i in range(num_remove):
                             self.remove_worker_init(worker_type)
 
             # Add workers to next-worker-queue (TO BE spun up at top of loop)
@@ -385,7 +385,7 @@ class Manager(object):
                 if task_type == 'slots':
                     continue
 
-                # *** Match tasks to workers ***
+                # *** Match tasks to workers *** #
                 else:
                     available_workers = current_worker_map[task_type]
                     logger.debug("Available workers of type {}: {}".format(task_type,
@@ -473,14 +473,14 @@ class Manager(object):
         if mode == 'no_container':
             modded_cmd = cmd
         elif mode == 'singularity':
-            modded_cmd = 'singularity run --writable {container_uri} {cmd}'.format(self.container_uri)
+            modded_cmd = 'singularity run --writable {container_uri} {cmd}'
         else:
             raise NameError("Invalid container launch mode.")
 
         stdout = 'STDOUT: READING FAILED'
         stderr = 'STDERR: READING FAILED'
         try:
-            proc = subprocess.Popen(cmd,
+            proc = subprocess.Popen(modded_cmd,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     shell=True)
@@ -493,14 +493,14 @@ class Manager(object):
 
     def remove_worker_init(self, worker_type):
         """
-            Kill a worker of a given worker_type. 
+            Kill/Remove a worker of a given worker_type.
 
             Add a kill message to the task_type queue.
 
             Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing. 
         """
 
-        logger.debug("[KILL] Appending KILL message to worker queue")
+        logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue")
         self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
                                            "buffer": b'KILL'})
 
