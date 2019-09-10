@@ -267,7 +267,7 @@ class Manager(object):
 
                     elif m_type == b'WRKR_DIE':
                         logger.info("[WORKER_REMOVE] Removing worker from worker_map...")
-                        logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_counts))
+                        logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
                         self.worker_map.remove_worker(w_id)
                         self.active_workers -= 1
