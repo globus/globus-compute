@@ -408,6 +408,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                             continue
 
                         if tid == -1 and 'exception' in msg:
+                            # TODO: This could be handled better we are essentially shutting down the
+                            # client with little indication to the user.
                             logger.warning("Executor shutting down due to version mismatch in interchange")
                             self._executor_exception, _ = deserialize_object(msg['exception'])
                             logger.exception("Exception: {}".format(self._executor_exception))
@@ -422,22 +424,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                         logger.warning("YADU: HERE with {}".format(tid))
                         task_fut = self.tasks[tid]
 
-                        if 'result' in msg:
-                            result, _ = deserialize_object(msg['result'])
-                            task_fut.set_result(result)
-
-                        elif 'exception' in msg:
-                            try:
-                                s, _ = deserialize_object(msg['exception'])
-                                # s should be a RemoteExceptionWrapper... so we can reraise it
-                                try:
-                                    s.reraise()
-                                except Exception as e:
-                                    task_fut.set_exception(e)
-                            except Exception as e:
-                                # TODO could be a proper wrapped exception?
-                                task_fut.set_exception(
-                                    DeserializationError("Received exception, but handling also threw an exception: {}".format(e)))
+                        if 'result' in msg or 'exception' in msg:
+                            task_fut.set_result(msg)
                         else:
                             raise BadMessage("Message received is neither result or exception")
 

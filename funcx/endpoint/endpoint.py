@@ -209,7 +209,6 @@ Configure this file and try restarting with:
             eid = str(uuid.uuid4())
             logger.debug(f"Trying with eid : {eid}")
             reg_info = funcx_client.register_endpoint(args.name, eid)
-            logger.debug("Got endpoint info : {}".format(reg_info))
 
         logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
         with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
