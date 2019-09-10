@@ -3,12 +3,11 @@
 import logging
 import argparse
 import zmq
-import os
 import sys
 import pickle
 
 
-from ipyparallel.serialize import serialize_object, unpack_apply_message
+from ipyparallel.serialize import serialize_object
 from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx import set_file_logger
@@ -62,6 +61,8 @@ class FuncXWorker(object):
                                  level=logging.DEBUG if debug else logging.INFO)
 
         logger.info('Initializing worker {}'.format(worker_id))
+        logger.info('Worker is of type: {}'.format(worker_type))
+
         if debug:
             logger.debug('Debug logging enabled')
 
@@ -69,14 +70,12 @@ class FuncXWorker(object):
         self.poller = zmq.Poller()
         self.identity = worker_id.encode()
 
-
         self.task_socket = self.context.socket(zmq.DEALER)
         self.task_socket.setsockopt(zmq.IDENTITY, self.identity)
 
         logger.info('Trying to connect to : tcp://{}:{}'.format(self.address, self.port))
         self.task_socket.connect('tcp://{}:{}'.format(self.address, self.port))
         self.poller.register(self.task_socket, zmq.POLLIN)
-
 
     def registration_message(self):
         return {'worker_id': self.worker_id,
@@ -93,7 +92,7 @@ class FuncXWorker(object):
 
             logger.debug("Sending result")
             # TODO : Swap for our serialization methods
-            self.task_socket.send_multipart([task_type, # Byte encoded
+            self.task_socket.send_multipart([task_type,  # Byte encoded
                                              pickle.dumps(result)])
 
             if task_type == b'WRKR_DIE':
@@ -105,10 +104,11 @@ class FuncXWorker(object):
             task_id = pickle.loads(p_task_id)
             logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
 
-            if task_id == "KILL":
+            if msg == b"KILL":
                 logger.info("[KILL] -- Worker KILL message received! ")
                 task_type = b'WRKR_DIE'
                 result = None
+                continue
 
             logger.debug("Executing task...")
 
@@ -118,18 +118,15 @@ class FuncXWorker(object):
                 serialized_result = serialize_object(result)
             except Exception as e:
                 logger.exception(f"Caught an exception {e}")
-                result_package = {'task_id': task_id, 'exception': serialize_object(RemoteExceptionWrapper(*sys.exc_info()))}
+                result_package = {'task_id': task_id, 'exception': serialize_object(
+                    RemoteExceptionWrapper(*sys.exc_info()))}
             else:
                 logger.debug("Execution completed without exception")
                 result_package = {'task_id': task_id, 'result': serialized_result}
 
-
             # TODO: Change this to serialize_object to match IX?
             result = result_package
             task_type = b'TASK_RET'
-
-        logger.warning("Broke out of the loop... dying")
-
 
     def execute_task(self, message):
         """Deserialize the buffer and execute the task.
@@ -153,6 +150,8 @@ def cli_run():
     parser = argparse.ArgumentParser()
     parser.add_argument("-w", "--worker_id", required=True,
                         help="ID of worker from process_worker_pool")
+    parser.add_argument("-t", "--type", required=False,
+                        help="Container type of worker", default="RAW")
     parser.add_argument("-a", "--address", required=True,
                         help="Address for the manager, eg X,Y,")
     parser.add_argument("-p", "--port", required=True,
@@ -167,9 +166,11 @@ def cli_run():
                          args.address,
                          int(args.port),
                          args.logdir,
-                         debug=args.debug)
+                         worker_type=args.type,
+                         debug=args.debug, )
     worker.start()
     return
+
 
 if __name__ == "__main__":
     cli_run()
