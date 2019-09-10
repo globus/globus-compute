@@ -62,7 +62,6 @@ class WorkerMap(object):
         else:
             # pass 
             self.ready_worker_counts[worker_type] -= 1
-
         return worker
 
     def get_worker_counts(self):

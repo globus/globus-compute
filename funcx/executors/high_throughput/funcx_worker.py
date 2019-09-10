@@ -13,7 +13,6 @@ from parsl.app.errors import RemoteExceptionWrapper
 from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 
-# . 
 
 class FuncXWorker(object):
     """ The FuncX worker
@@ -93,7 +92,7 @@ class FuncXWorker(object):
 
             logger.debug("Sending result")
             # TODO : Swap for our serialization methods
-            self.task_socket.send_multipart([task_type, # Byte encoded
+            self.task_socket.send_multipart([task_type,  # Byte encoded
                                              pickle.dumps(result)])
 
             if task_type == b'WRKR_DIE':
@@ -105,7 +104,7 @@ class FuncXWorker(object):
             task_id = pickle.loads(p_task_id)
             logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
 
-            if msg == b"KILL":  # TODO: This WAS task type...
+            if msg == b"KILL":
                 logger.info("[KILL] -- Worker KILL message received! ")
                 task_type = b'WRKR_DIE'
                 result = None
@@ -117,9 +116,10 @@ class FuncXWorker(object):
                 result = self.execute_task(msg)
                 logger.debug("Executed result: {}".format(result))
                 serialized_result = serialize_object(result)
-            except Exception:
-                logger.exception("Caught an exception {}")
-                result_package = {'task_id': task_id, 'exception': serialize_object(RemoteExceptionWrapper(*sys.exc_info()))}
+            except Exception as e:
+                logger.exception("Caught an exception {}".format(e))
+                result_package = {'task_id': task_id, 'exception': serialize_object(
+                    RemoteExceptionWrapper(*sys.exc_info()))}
             else:
                 logger.debug("Execution completed without exception")
                 result_package = {'task_id': task_id, 'result': serialized_result}
