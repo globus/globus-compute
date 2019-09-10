@@ -147,6 +147,33 @@ def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.am
 
     return r.json()
 
+def configure_endpoint(args, global_config=None):
+    """Configure an endpoint
+
+    Drops a config.py template into the funcx configs directory.
+    The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
+
+    Parameters
+    ----------
+    args : args object
+       Args object from the arg parsing
+
+    global_config : dict
+       Global config dict
+    """
+
+    endpoint_dir = os.path.join(args.config_dir, args.name)
+    endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
+
+    if not os.path.exists(endpoint_dir):
+        init_endpoint_dir(args.config_dir, args.name)
+        print('''A default profile has been create for <{}> at {}
+Configure this file and try restarting with:
+    $ funcx-endpoint start {}'''.format(args.name,
+                                        os.path.join(endpoint_dir, 'config.py'),
+                                        args.name))
+        return
+
 
 def start_endpoint(args, global_config=None):
     """Start an endpoint
@@ -178,16 +205,17 @@ def start_endpoint(args, global_config=None):
        Global config dict
     """
 
+
     endpoint_dir = os.path.join(args.config_dir, args.name)
     endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
 
     if not os.path.exists(endpoint_dir):
-        init_endpoint_dir(args.config_dir, args.name)
-        print('''A default profile has been create for <{}> at {}
-Configure this file and try restarting with:
-    $ funcx-endpoint start {}'''.format(args.name,
-                                        os.path.join(endpoint_dir, 'config.py'),
-                                        args.name))
+        print('''Endpoint {0} is not configured!
+1. Please create a configuration template with:
+   $ funcx-endpoint configure {0}
+2. Update configuration
+3. Start the endpoint.
+        '''.format(args.name))
         return
 
     # If pervious registration info exists, use that
@@ -320,6 +348,11 @@ def cli_run():
     init.add_argument("-f", "--force", action='store_true',
                       help="Force re-initialization of config with this flag.\nWARNING: This will wipe your current config")
 
+    # Configure an endpoint
+    configure = subparsers.add_parser('configure',
+                                  help='Configures an endpoint')
+    configure.add_argument("name", help="Name of the endpoint to configure for")
+
     # Start an endpoint
     start = subparsers.add_parser('start',
                                   help='Starts an endpoint')
@@ -370,7 +403,10 @@ def cli_run():
     global_config = importlib.machinery.SourceFileLoader('global_config',
                                                          args.config_file).load_module()
 
-    if args.command == "start":
+    if args.command == "configure":
+        start_endpoint(args, global_config=global_config.global_options)
+
+    elif args.command == "start":
         start_endpoint(args, global_config=global_config.global_options)
 
     elif args.command == "stop":
