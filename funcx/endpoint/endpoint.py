@@ -404,7 +404,7 @@ def cli_run():
                                                          args.config_file).load_module()
 
     if args.command == "configure":
-        start_endpoint(args, global_config=global_config.global_options)
+        configure_endpoint(args, global_config=global_config.global_options)
 
     elif args.command == "start":
         start_endpoint(args, global_config=global_config.global_options)
