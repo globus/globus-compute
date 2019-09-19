@@ -50,6 +50,7 @@ class Manager(object):
 
     """
 
+    # TODO: Create mutex. Only do a container scaling event when all changes for a given container type are changed.
     def __init__(self,
                  task_q_url="tcp://127.0.0.1:50097",
                  result_q_url="tcp://127.0.0.1:50098",
@@ -233,6 +234,9 @@ class Manager(object):
         poll_timer = self.poll_period
 
         new_worker_map = None
+
+        # TODO: Start breaking up some container-specific stuff from this task loop as it realistically needs to be run
+        # TODO:    at some other frequency. (n events or nt seconds have passed to do container updates.)
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
             logger.debug("[TASK_PULL_THREAD] Loop start")
