@@ -545,15 +545,20 @@ class Interchange(object):
                                 manager))
 
                 else:
-                    tasks_requested = int.from_bytes(message[1], "little")
-                    logger.debug("[MAIN] Manager {} requested {} tasks".format(manager, tasks_requested))
                     self._ready_manager_queue[manager]['last'] = time.time()
-                    if tasks_requested == HEARTBEAT_CODE:
+
+                    if message[1] == b'HEARTBEAT':
                         logger.debug("[MAIN] Manager {} sends heartbeat".format(manager))
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
+
                     else:
+                        manager_advert = pickle.loads(message[1])
+                        logger.debug("[MAIN] Manager {} requested {}".format(manager, manager_advert))
+                        # YADU: DEBUG, match tasks_requested to the actual advertized capacity
+                        tasks_requested = 1
                         self._ready_manager_queue[manager]['free_capacity'] = tasks_requested
                         interesting_managers.add(manager)
+
                 logger.debug("[MAIN] leaving task_outgoing section")
 
             # If we had received any requests, check if there are tasks that could be passed
