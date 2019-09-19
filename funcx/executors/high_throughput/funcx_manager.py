@@ -138,9 +138,9 @@ class Manager(object):
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
         self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
-        self.worker_count = min(max_workers,
+        self.max_worker_count = min(max_workers,
                                 math.floor(self.cores_on_node / cores_per_worker))
-        self.worker_map = WorkerMap(self.worker_count)
+        self.worker_map = WorkerMap(self.max_worker_count)
 
         self.internal_worker_port_range = internal_worker_port_range
 
@@ -158,7 +158,7 @@ class Manager(object):
 
         self.pending_result_queue = multiprocessing.Queue()
 
-        self.max_queue_size = max_queue_size + self.worker_count
+        self.max_queue_size = max_queue_size + self.max_worker_count
         self.tasks_per_round = 1
 
         self.heartbeat_period = heartbeat_period
@@ -166,7 +166,7 @@ class Manager(object):
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
         self.next_worker_q = queue.Queue()  # FIFO queue for spinning up workers.
-        self.worker_counter = 0  # used to create worker_ids
+        self.worker_naming_counter = 0  # used to create worker_ids
 
         # Only spin up containers if active_workers + pending_workers < max_workers.
         self.active_workers = 0
@@ -179,7 +179,7 @@ class Manager(object):
                'python_v': "{}.{}.{}".format(sys.version_info.major,
                                              sys.version_info.minor,
                                              sys.version_info.micro),
-               'worker_count': self.worker_count,
+               'max_worker_count': self.max_worker_count,
                'cores': self.cores_on_node,
                'mem': self.available_mem_on_node,
                'block_id': self.block_id,
@@ -193,7 +193,7 @@ class Manager(object):
     def heartbeat(self):
         """ Send heartbeat to the incoming task queue
         """
-        heartbeat = (HEARTBEAT_CODE).to_bytes(4, "little")
+        heartbeat = b'HEARTBEAT' #(HEARTBEAT_CODE).to_bytes(4, "little")
         r = self.task_incoming.send(heartbeat)
         logger.debug("Return from heartbeat: {}".format(r))
 
@@ -246,8 +246,10 @@ class Manager(object):
                 last_beat = time.time()
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
-                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ready_worker_count))
-                msg = (ready_worker_count.to_bytes(4, "little"))
+
+                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(
+                    self.worker_map.ready_worker_type_counts))
+                msg = pickle.dumps(self.worker_map.ready_worker_type_counts)
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
@@ -284,20 +286,25 @@ class Manager(object):
 
             logger.debug("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
 
-            if self.next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
+            logger.debug("[SPIN UP] next_worker_q.qsize() : {}".format(self.next_worker_q.qsize()))
+            logger.debug(f"[SPIN UP] self.active_workers : {self.active_workers}")
+            logger.debug(f"[SPIN UP] self.pending_workers : {self.pending_workers}")
+            logger.debug(f"[SPIN UP] self.max_worker_count : {self.max_worker_count}")
+            if self.next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.max_worker_count:
                 logger.debug("[SPIN UP] Spinning up new workers!")
-                num_slots = min(self.worker_count - self.active_workers - self.pending_workers, self.next_worker_q.qsize())
-                for _ in range(1, num_slots):
+                num_slots = min(self.max_worker_count - self.active_workers - self.pending_workers, self.next_worker_q.qsize())
+                logger.debug(f"[SPIN UP] num_slots : {num_slots}")
+
+                for _ in range(num_slots):
 
                     try:
-                        self.add_worker(worker_id=str(self.worker_counter), worker_type=self.next_worker_q.get())
+                        self.add_worker(worker_id=str(self.worker_naming_counter), worker_type=self.next_worker_q.get())
                     except Exception as e:
-                        logger.error(e)
                         logger.error("Error spinning up worker! Skipping...")
                         continue
                     else:
                         self.pending_workers += 1
-                    self.worker_counter += 1
+                    self.worker_naming_counter += 1
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -316,12 +323,13 @@ class Manager(object):
 
                 else:
                     task_recv_counter += len(tasks)
-                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t['task_id'] for t in tasks],
-                                                                                 task_recv_counter))
+                    logger.info("[TASK_PULL_THREAD] YADU Got tasks: {} of {}".format([t['task_id'] for t in tasks],
+                                                                                     task_recv_counter))
 
                     for task in tasks:
 
                         # Set default type to raw
+                        logger.info("Task id : {}".format(task['task_id']))
                         task_type = task['task_id'].split(';')[1]
 
                         logger.info("[TASK DEBUG] Task is of type: {}".format(task_type))
@@ -347,9 +355,9 @@ class Manager(object):
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
 
-            logger.info("Task queues: {}".format(self.task_queues))
-            new_worker_map = naive_scheduler(self.task_queues, self.worker_count, logger=logger)
-            logger.info("[TYLER] New worker map: {}".format(new_worker_map))
+            logger.debug("Task queues: {}".format(self.task_queues))
+            new_worker_map = naive_scheduler(self.task_queues, self.max_worker_count, logger=logger)
+            # logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be removed
             if new_worker_map is not None:  # TYLER: None-case is when there's no tasks in the queue. Don't Kill!
@@ -385,6 +393,7 @@ class Manager(object):
                     for item in new_worker_list:
                         self.next_worker_q.put(item)
 
+            logger.debug("[AFTER UPDATE] qsize: {}".format(self.next_worker_q.qsize()))
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
                 if task_type == 'slots':
@@ -466,7 +475,7 @@ class Manager(object):
 
         """
 
-        debug = ' --debug' if self.debug else ''
+        debug = '--debug ' if self.debug else ''
 
         worker_id = ' --worker_id {}'.format(worker_id)
 
@@ -520,8 +529,8 @@ class Manager(object):
 
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
 
-        self.workers = [self.add_worker(worker_id=str(self.worker_counter))]
-        self.worker_counter += 1
+        self.workers = [self.add_worker(worker_id=str(self.worker_naming_counter))]
+        self.worker_naming_counter += 1
         self.pending_workers += 1
 
         logger.debug("Initial workers launched")
