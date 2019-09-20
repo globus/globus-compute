@@ -33,6 +33,7 @@ def test(endpoint_id=None, tasks=10, duration=1, hostname=None, port=None):
         input_data = fxs.pack_buffers([ser_args, ser_kwargs])
         payload = fn_code + input_data
         container_id = "odd" if i%2 else "even"
+        print(f"0{i};{container_id}", payload)
         tasks_rq.put(f"0{i};{container_id}", payload)
 
     d1 = time.time() - start
