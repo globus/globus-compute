@@ -208,6 +208,7 @@ class Interchange(object):
         self.heartbeat_threshold = heartbeat_threshold
         self.blocks = {}  # type: Dict[str, str]
         self.launch_cmd = launch_cmd
+        self.last_core_hr_counter = 0
         if not launch_cmd:
             self.launch_cmd = ("funcx-manager {debug} {max_workers} "
                                "-c {cores_per_worker} "
@@ -652,7 +653,9 @@ class Interchange(object):
         result_package = {'task_id': -2,
                           'info': {'total_cores': total_cores,
                                    'total_mem' : total_mem,
+                                   'new_core_hrs': core_hrs - self.last_core_hr_counter,
                                    'total_core_hrs': round(core_hrs, 2)}}
+        self.last_core_hr_counter = core_hrs
         return result_package
 
     def scale_out(self, blocks=1):
