@@ -274,8 +274,6 @@ class Manager(object):
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
-            logger.debug("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
-
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
             spin_up = self.worker_map.spin_up_workers(self.next_worker_q,
@@ -334,7 +332,6 @@ class Manager(object):
                     break
 
             logger.info("Task queues: {}".format(self.task_queues))
-            # TODO: ADDING OLD WORKER MAP HERE.
             new_worker_map = naive_scheduler(self.task_queues, self.worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
@@ -346,11 +343,11 @@ class Manager(object):
                     self.remove_worker_init(w_type)
 
             # Add workers to next-worker-queue (TO BE spun up at top of loop)
-            logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
+            # logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
 
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
             if new_worker_map is not None:
-                next_worker_q = self.worker_map.get_next_worker_q(new_worker_map)
+                self.next_worker_q = self.worker_map.get_next_worker_q(new_worker_map)
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
