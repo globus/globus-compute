@@ -13,12 +13,11 @@ import uuid
 import zmq
 import math
 import json
-import subprocess
 import multiprocessing
 import random
 import psutil
 
-from funcx.executors.high_throughput.container_scheduler import naive_scheduler
+from funcx.executors.high_throughput.container_scheduler_1 import naive_scheduler
 from funcx.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
@@ -166,11 +165,6 @@ class Manager(object):
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
         self.next_worker_q = queue.Queue()  # FIFO queue for spinning up workers.
-        self.worker_counter = 0  # used to create worker_ids
-
-        # Only spin up containers if active_workers + pending_workers < max_workers.
-        self.active_workers = 0
-        self.pending_workers = 0
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -261,8 +255,8 @@ class Manager(object):
                         logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
 
                         # Increment worker_type count by 1
-                        self.pending_workers -= 1
-                        self.active_workers += 1
+                        self.worker_map.pending_workers -= 1
+                        self.worker_map.active_workers += 1
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
 
                     elif m_type == b'TASK_RET':
@@ -277,27 +271,22 @@ class Manager(object):
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
                         self.worker_map.remove_worker(w_id)
-                        self.active_workers -= 1
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
             logger.debug("Next-worker Q-SIZE: {}".format(self.next_worker_q.qsize()))
 
-            if self.next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
-                logger.debug("[SPIN UP] Spinning up new workers!")
-                num_slots = min(self.worker_count - self.active_workers - self.pending_workers, self.next_worker_q.qsize())
-                for _ in range(1, num_slots):
-
-                    try:
-                        self.add_worker(worker_id=str(self.worker_counter), worker_type=self.next_worker_q.get())
-                    except Exception as e:
-                        logger.error(e)
-                        logger.error("Error spinning up worker! Skipping...")
-                        continue
-                    else:
-                        self.pending_workers += 1
-                    self.worker_counter += 1
+            # Spin up any new workers according to the worker queue.
+            # Returns the total number of containers that have spun up.
+            # TODO.
+            spin_up = self.worker_map.spin_up_workers(self.next_worker_q,
+                                                      debug=self.debug,
+                                                      address=self.address,
+                                                      uid=self.uid,
+                                                      logdir=self.logdir,
+                                                      worker_port=self.worker_port)
+            logger.info("[TYLER]: Spun up {} containers".format(spin_up))
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -320,7 +309,6 @@ class Manager(object):
                                                                                  task_recv_counter))
 
                     for task in tasks:
-
                         # Set default type to raw
                         task_type = task['task_id'].split(';')[1]
 
@@ -352,38 +340,20 @@ class Manager(object):
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be removed
-            if new_worker_map is not None:  # TYLER: None-case is when there's no tasks in the queue. Don't Kill!
-                for worker_type in new_worker_map:
-                    if new_worker_map[worker_type] < self.worker_map.total_worker_type_counts[worker_type]:
-                        num_remove = self.worker_map.total_worker_type_counts[worker_type] - new_worker_map[worker_type]
+            # TODO.
 
-                        logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
-                        for i in range(num_remove):
-                            self.remove_worker_init(worker_type)
+            if new_worker_map is not None:
+                spin_downs = self.worker_map.spin_down_workers(new_worker_map)
+
+                for w_type in spin_downs:
+                    self.remove_worker_init(w_type)
 
             # Add workers to next-worker-queue (TO BE spun up at top of loop)
             logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
 
-            # NOTE: Wipe the queue -- previous scheduling loops don't affect what's needed now.
-            self.next_worker_q = queue.Queue()
+            # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
             if new_worker_map is not None:
-                new_worker_list = []
-                for worker_type in new_worker_map:
-                    # If we don't already have this type of worker in our worker_map...
-                    if worker_type not in self.worker_map.total_worker_type_counts:
-                        self.worker_map.total_worker_type_counts[worker_type] = 0
-                    if new_worker_map[worker_type] > self.worker_map.total_worker_type_counts[worker_type]:
-
-                        for i in range(1, new_worker_map[worker_type] - self.worker_map.total_worker_type_counts[worker_type]):
-                            # Add worker
-                            new_worker_list.append(worker_type)
-
-                # Randomly assign order of newly needed containers... add to spin-up queue.
-                if len(new_worker_list) > 0:
-                    random.shuffle(new_worker_list)
-
-                    for item in new_worker_list:
-                        self.next_worker_q.put(item)
+                next_worker_q = self.worker_map.get_next_worker_q(new_worker_map)
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
@@ -448,54 +418,7 @@ class Manager(object):
 
         logger.critical("[RESULT_PUSH_THREAD] Exiting")
 
-    def add_worker(self, worker_id=str(random.random()),
-                   mode='no_container',
-                   worker_type='RAW',
-                   container_uri=None,
-                   walltime=1):
-        """ Launch the appropriate worker
 
-        Parameters
-        ----------
-        worker_id : str
-           Worker identifier string
-        mode : str
-           Valid options are no_container, singularity
-        walltime : int
-           Walltime in seconds before we check status
-
-        """
-
-        debug = ' --debug' if self.debug else ''
-
-        worker_id = ' --worker_id {}'.format(worker_id)
-
-        cmd = (f'funcx-worker {debug}{worker_id} '
-               f'-a {self.address} '
-               f'-p {self.worker_port} '
-               f'-t {worker_type} '
-               f'--logdir={self.logdir}/{self.uid} ')
-
-        logger.info("Command string :\n {}".format(cmd))
-
-        if mode == 'no_container':
-            modded_cmd = cmd
-        elif mode == 'singularity':
-            modded_cmd = f'singularity run --writable {container_uri} {cmd}'
-        else:
-            raise NameError("Invalid container launch mode.")
-
-        try:
-            proc = subprocess.Popen(modded_cmd,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
-                                    shell=True)
-
-        except Exception as e:
-            logger.error("Got an error in worker launch, got error {}".format(e))
-            raise
-
-        return proc
 
     def remove_worker_init(self, worker_type):
         """
@@ -520,9 +443,15 @@ class Manager(object):
 
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
 
-        self.workers = [self.add_worker(worker_id=str(self.worker_counter))]
-        self.worker_counter += 1
-        self.pending_workers += 1
+        self.workers = [self.worker_map.add_worker(worker_id=str(self.worker_map.worker_counter),
+                                    worker_type='RAW',
+                                    address=self.address,
+                                    debug=self.debug,
+                                    uid=self.uid,
+                                    logdir=self.logdir,
+                                    worker_port=self.worker_port)]
+        self.worker_map.worker_counter += 1
+        self.worker_map.pending_workers += 1
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
