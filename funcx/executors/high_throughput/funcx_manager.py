@@ -14,7 +14,6 @@ import zmq
 import math
 import json
 import multiprocessing
-import random
 import psutil
 
 from funcx.executors.high_throughput.container_scheduler_1 import naive_scheduler
@@ -279,7 +278,6 @@ class Manager(object):
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
-            # TODO.
             spin_up = self.worker_map.spin_up_workers(self.next_worker_q,
                                                       debug=self.debug,
                                                       address=self.address,
@@ -336,12 +334,11 @@ class Manager(object):
                     break
 
             logger.info("Task queues: {}".format(self.task_queues))
-            new_worker_map = naive_scheduler(self.task_queues, self.worker_count, logger=logger)
+            # TODO: ADDING OLD WORKER MAP HERE.
+            new_worker_map = naive_scheduler(self.task_queues, self.worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
             logger.info("[TYLER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be removed
-            # TODO.
-
             if new_worker_map is not None:
                 spin_downs = self.worker_map.spin_down_workers(new_worker_map)
 
@@ -418,8 +415,6 @@ class Manager(object):
 
         logger.critical("[RESULT_PUSH_THREAD] Exiting")
 
-
-
     def remove_worker_init(self, worker_type):
         """
             Kill/Remove a worker of a given worker_type.
@@ -430,6 +425,7 @@ class Manager(object):
         """
 
         logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue")
+        self.worker_map.to_die_count[worker_type] += 1
         self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
                                            "buffer": b'KILL'})
 

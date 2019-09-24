@@ -26,7 +26,6 @@ class WorkerMap(object):
         # Need to keep track of workers that are ABOUT to die
         self.to_die_count = {'RAW': 0}
 
-
     def register_worker(self, worker_id, worker_type):
         """ Add a new worker
         """
@@ -41,6 +40,9 @@ class WorkerMap(object):
         self.total_worker_type_counts['slots'] -= 1
         self.worker_queues[worker_type].put(worker_id)
 
+        if worker_type not in self.to_die_count:
+            self.to_die_count[worker_type] = 0
+
     def remove_worker(self, worker_id):
         """ Remove the worker from the WorkerMap
 
@@ -51,6 +53,7 @@ class WorkerMap(object):
 
         self.active_workers -= 1
         self.total_worker_type_counts[worker_type] -= 1
+        self.to_die_count[worker_type] -= 1
         self.total_worker_type_counts['slots'] += 1
 
     def spin_up_workers(self, next_worker_q, address=None, debug=None, uid=None, logdir=None, worker_port=None):
