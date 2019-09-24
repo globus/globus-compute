@@ -331,6 +331,8 @@ class Manager(object):
                     break
 
             logger.info("Task queues: {}".format(self.task_queues))
+            logger.info("To-Die Counts: {}".format(self.worker_map.to_die_count))
+            logger.info("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
             new_worker_map = naive_scheduler(self.task_queues, self.worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
             logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
