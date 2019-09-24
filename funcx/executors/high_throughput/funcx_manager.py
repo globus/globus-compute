@@ -248,7 +248,6 @@ class Manager(object):
             if self.funcx_task_socket in socks and socks[self.funcx_task_socket] == zmq.POLLIN:
                 try:
                     w_id, m_type, message = self.funcx_task_socket.recv_multipart()
-                    logger.warning(f"Got registration message")
                     if m_type == b'REGISTER':
                         reg_info = pickle.loads(message)
                         logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
@@ -259,7 +258,7 @@ class Manager(object):
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
 
                     elif m_type == b'TASK_RET':
-                        logger.info("Result received from worker:{}".format(w_id))
+                        logger.info("Result received from worker: {}".format(w_id))
                         logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
                         self.pending_result_queue.put(message)
                         self.worker_map.put_worker(w_id)
@@ -282,7 +281,7 @@ class Manager(object):
                                                       uid=self.uid,
                                                       logdir=self.logdir,
                                                       worker_port=self.worker_port)
-            logger.info("[TYLER]: Spun up {} containers".format(spin_up))
+            logger.info("[SPIN UP]: Spun up {} containers".format(spin_up))
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -333,7 +332,7 @@ class Manager(object):
 
             logger.info("Task queues: {}".format(self.task_queues))
             new_worker_map = naive_scheduler(self.task_queues, self.worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
-            logger.info("[TYLER] New worker map: {}".format(new_worker_map))
+            logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be removed
             if new_worker_map is not None:
@@ -341,9 +340,6 @@ class Manager(object):
 
                 for w_type in spin_downs:
                     self.remove_worker_init(w_type)
-
-            # Add workers to next-worker-queue (TO BE spun up at top of loop)
-            # logger.info("[SPIN UP] New worker queue size: {}".format(self.next_worker_q.qsize()))
 
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
             if new_worker_map is not None:
