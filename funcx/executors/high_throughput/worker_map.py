@@ -88,7 +88,7 @@ class WorkerMap(object):
         if next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
             logger.debug("[SPIN UP] Spinning up new workers!")
             num_slots = min(self.worker_count - self.active_workers - self.pending_workers, next_worker_q.qsize())
-            for _ in range(1, num_slots):
+            for _ in range(num_slots):
 
                 try:
                     self.add_worker(worker_id=str(self.worker_counter),
