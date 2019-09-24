@@ -21,9 +21,10 @@ def naive_scheduler(task_qs, max_workers, old_worker_map, to_die_list, logger):
     blocked_types = []
     for w_type in to_die_list:
         if to_die_list[w_type] > 0:
-            blocked_workers += old_worker_map[w_type]  # These workers cannot be replaced.
-            blocked_types.append(w_type)
-            new_worker_map[w_type] = old_worker_map[w_type]  # Keep the same.
+            if old_worker_map is not None:
+                blocked_workers += old_worker_map[w_type]  # These workers cannot be replaced.
+                blocked_types.append(w_type)
+                new_worker_map[w_type] = old_worker_map[w_type]  # Keep the same.
     # ## ****************************************************************# ## #
 
     # Remove blocked workers from max workers.

@@ -59,6 +59,12 @@ class WorkerMap(object):
     def spin_up_workers(self, next_worker_q, address=None, debug=None, uid=None, logdir=None, worker_port=None):
 
         spin_ups = 0
+
+        logger.info("[SPIN UP] Next Worker Qsize: {}".format(next_worker_q.qsize()))
+        logger.info("[SPIN UP] Active Workers: {}".format(self.active_workers))
+        logger.info("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
+        logger.info("[SPIN UP] Max Worker Count: {}".format(self.worker_count))
+
         if next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
             logger.debug("[SPIN UP] Spinning up new workers!")
             num_slots = min(self.worker_count - self.active_workers - self.pending_workers, next_worker_q.qsize())
@@ -157,8 +163,7 @@ class WorkerMap(object):
                 self.total_worker_type_counts[worker_type] = 0
             if new_worker_map[worker_type] > self.total_worker_type_counts[worker_type]:
 
-                for i in range(1,
-                               new_worker_map[worker_type] - self.total_worker_type_counts[worker_type]):
+                for i in range(new_worker_map[worker_type] - self.total_worker_type_counts[worker_type]):
                     # Add worker
                     new_worker_list.append(worker_type)
 

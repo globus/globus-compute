@@ -37,8 +37,6 @@ class FuncXWorker(object):
          task = recv ()
          result = execute(task)
          send(result)
-
-
     """
 
     def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW'):
@@ -128,7 +126,6 @@ class FuncXWorker(object):
             task_type = b'TASK_RET'
 
         logger.warning("Broke out of the loop... dying")
-
 
     def execute_task(self, message):
         """Deserialize the buffer and execute the task.
