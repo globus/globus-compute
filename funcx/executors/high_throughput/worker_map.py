@@ -234,12 +234,7 @@ class WorkerMap(object):
         """ Get a task and reduce the # of worker for that type by 1.
         Raises queue.Empty if empty
         """
-        # try:
         worker = self.worker_queues[worker_type].get_nowait()
-        # except Exception as e:
-        #     raise
-        # else:
-        # pass
         self.ready_worker_type_counts[worker_type] -= 1
         return worker
 
