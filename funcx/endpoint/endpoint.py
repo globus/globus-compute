@@ -218,6 +218,8 @@ Configure this file and try restarting with:
     optionals = {}
     optionals['client_address'] = reg_info['address']
     optionals['client_ports'] = reg_info['client_ports'].split(',')
+    if 'endpoint_address' in global_config:
+        optionals['interchange_address'] = global_config['endpoint_address']
 
     optionals['logdir'] = endpoint_dir
     # optionals['debug'] = True
