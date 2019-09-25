@@ -176,6 +176,7 @@ class Interchange(object):
 
         self.pending_task_queue = queue.Queue(maxsize=10 ** 6)
 
+        logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
 
@@ -257,8 +258,8 @@ class Interchange(object):
         max_workers = "" if self.config.max_workers_per_node == float('inf') \
                       else "--max_workers={}".format(self.config.max_workers_per_node)
 
-        worker_task_url = f"tcp://127.0.0.1:{self.worker_task_port}"
-        worker_result_url = f"tcp://127.0.0.1:{self.worker_result_port}"
+        worker_task_url = f"tcp://{self.interchange_address}:{self.worker_task_port}"
+        worker_result_url = f"tcp://{self.interchange_address}:{self.worker_result_port}"
 
         l_cmd = self.launch_cmd.format(debug=debug_opts,
                                        max_workers=max_workers,
