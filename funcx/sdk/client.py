@@ -85,6 +85,49 @@ class FuncXClient(BaseClient):
         r = self.get("{task_id}/status".format(task_id=task_id))
         return json.loads(r.text)
 
+    def get_result(self, task_id):
+        """ Get the result of a funcX task
+
+        Parameters
+        ----------
+        task_id: str
+            UUID of the task
+
+        Returns
+        -------
+        Result obj: If task completed
+
+        Raises
+        ------
+        Exception obj: Exception due to which the task failed
+        """
+
+        r = self.get("{task_id}/status".format(task_id=task_id))
+
+        logger.info(f"Got from globus : {r}")
+        r_dict = json.loads(r.text)
+
+        if 'result' in r_dict:
+            try:
+                r_obj = self.fx_serializer.deserialize(r_dict['result'])
+            except Exception:
+                raise Exception("Failure during deserialization of the result object")
+            else:
+                return r_obj
+
+        elif 'exception' in r_dict:
+            try:
+                r_exception = self.fx_serializer.deserialize(r_dict['exception'])
+                logger.info(f"Exception : {r_exception}")
+            except Exception:
+                raise Exception("Failure during deserialization of the Task's exception object")
+            else:
+                r_exception.reraise()
+
+        else:
+            raise Exception("Task pending")
+
+
     def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
 
