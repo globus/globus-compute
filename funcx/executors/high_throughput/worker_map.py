@@ -97,9 +97,8 @@ class WorkerMap(object):
                                     uid=uid,
                                     logdir=logdir,
                                     worker_port=worker_port)
-                except Exception as e:
-                    logger.error(e)
-                    logger.error("Error spinning up worker! Skipping...")
+                except Exception:
+                    logger.exception("Error spinning up worker! Skipping...")
                     continue
                 else:
                     spin_ups += 1
@@ -178,8 +177,8 @@ class WorkerMap(object):
                                     stderr=subprocess.PIPE,
                                     shell=True)
 
-        except Exception as e:
-            logger.error("Got an error in worker launch, got error {}".format(e))
+        except Exception:
+            logger.exception("Got an error in worker launch")
             raise
 
         return proc
