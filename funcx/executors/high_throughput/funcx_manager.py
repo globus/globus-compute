@@ -334,16 +334,6 @@ class Manager(object):
             logger.debug("To-Die Counts: {}".format(self.worker_map.to_die_count))
             logger.debug("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
 
-            # TODO: Sanity check only checking if N time elapsed.
-            # TODO: Revisit the "Interchange-Task routing" doc.
-            # TODO: Add cleanup issue to Github.
-
-            # STRATEGIES WE WANT TO SUPPORT#
-            # TODO: 1. Hard (set ratio of container types) -- string: "raw;raw;A;B;A;B;raw"
-                # PUT THIS ^^^ into the config
-            # TODO: 2. min=1 (always have 1 warm cont of each type, and if it goes below, use LRU).
-                # Add a basic rule (if idle for N time, then auto-kill)
-            # TODO: 3. min_wait (min wait time by determining there is new task type SO schedule at that very point)
             new_worker_map = naive_scheduler(self.task_queues, self.worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
             logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
@@ -446,12 +436,12 @@ class Manager(object):
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
 
         self.workers = [self.worker_map.add_worker(worker_id=str(self.worker_map.worker_counter),
-                                    worker_type='RAW',
-                                    address=self.address,
-                                    debug=self.debug,
-                                    uid=self.uid,
-                                    logdir=self.logdir,
-                                    worker_port=self.worker_port)]
+                                                   worker_type='RAW',
+                                                   address=self.address,
+                                                   debug=self.debug,
+                                                   uid=self.uid,
+                                                   logdir=self.logdir,
+                                                   worker_port=self.worker_port)]
         self.worker_map.worker_counter += 1
         self.worker_map.pending_workers += 1
 
