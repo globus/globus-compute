@@ -87,7 +87,7 @@ class FuncXWorker(object):
         while True:
 
             logger.debug("Sending result")
-            # TODO : Swap for our serialization methods
+
             self.task_socket.send_multipart([task_type,  # Byte encoded
                                              pickle.dumps(result)])
 

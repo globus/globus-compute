@@ -250,7 +250,7 @@ class Manager(object):
                     w_id, m_type, message = self.funcx_task_socket.recv_multipart()
                     if m_type == b'REGISTER':
                         reg_info = pickle.loads(message)
-                        logger.info("Registration received from worker:{} {}".format(w_id, reg_info))
+                        logger.debug("Registration received from worker:{} {}".format(w_id, reg_info))
 
                         # Increment worker_type count by 1
                         self.worker_map.pending_workers -= 1
@@ -258,14 +258,14 @@ class Manager(object):
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
 
                     elif m_type == b'TASK_RET':
-                        logger.info("Result received from worker: {}".format(w_id))
+                        logger.debug("Result received from worker: {}".format(w_id))
                         logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
                         self.pending_result_queue.put(message)
                         self.worker_map.put_worker(w_id)
                         task_done_counter += 1
 
                     elif m_type == b'WRKR_DIE':
-                        logger.info("[WORKER_REMOVE] Removing worker from worker_map...")
+                        logger.debug("[WORKER_REMOVE] Removing worker from worker_map...")
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
                         self.worker_map.remove_worker(w_id)
@@ -281,7 +281,7 @@ class Manager(object):
                                                       uid=self.uid,
                                                       logdir=self.logdir,
                                                       worker_port=self.worker_port)
-            logger.info("[SPIN UP]: Spun up {} containers".format(spin_up))
+            logger.debug("[SPIN UP]: Spun up {} containers".format(spin_up))
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -307,7 +307,7 @@ class Manager(object):
                         # Set default type to raw
                         task_type = task['task_id'].split(';')[1]
 
-                        logger.info("[TASK DEBUG] Task is of type: {}".format(task_type))
+                        logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
@@ -330,9 +330,9 @@ class Manager(object):
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
 
-            logger.info("Task queues: {}".format(self.task_queues))
-            logger.info("To-Die Counts: {}".format(self.worker_map.to_die_count))
-            logger.info("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
+            logger.debug("Task queues: {}".format(self.task_queues))
+            logger.debug("To-Die Counts: {}".format(self.worker_map.to_die_count))
+            logger.debug("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
 
             # TODO: Sanity check only checking if N time elapsed.
             # TODO: Revisit the "Interchange-Task routing" doc.
@@ -381,7 +381,7 @@ class Manager(object):
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
 
-                            logger.info("Sending task {} to {}".format(task['task_id'], worker_id))
+                            logger.debug("Sending task {} to {}".format(task['task_id'], worker_id))
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
                             logger.debug("Sending complete!")
