@@ -37,8 +37,6 @@ class FuncXWorker(object):
          task = recv ()
          result = execute(task)
          send(result)
-
-
     """
 
     def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW'):
@@ -89,7 +87,7 @@ class FuncXWorker(object):
         while True:
 
             logger.debug("Sending result")
-            # TODO : Swap for our serialization methods
+
             self.task_socket.send_multipart([task_type,  # Byte encoded
                                              pickle.dumps(result)])
 
@@ -129,21 +127,17 @@ class FuncXWorker(object):
 
         logger.warning("Broke out of the loop... dying")
 
-
     def execute_task(self, message):
         """Deserialize the buffer and execute the task.
 
         Returns the result or throws exception.
         """
 
-        # logger.debug("Inside execute_task function")
         user_ns = locals()
         user_ns.update({'__builtins__': __builtins__})
 
-        # logger.info("Trying to pickle load the message {}".format(message))
         decoded = message.decode()
         f, args, kwargs = self.serializer.unpack_and_deserialize(decoded)
-        # logger.debug("Message unpacked")
 
         return f(*args, **kwargs)
 
