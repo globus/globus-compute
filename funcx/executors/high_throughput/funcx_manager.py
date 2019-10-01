@@ -163,7 +163,7 @@ class Manager(object):
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
-        self.next_worker_q = queue.Queue()  # FIFO queue for spinning up workers.
+        self.next_worker_q = []  # FIFO queue for spinning up workers.
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange

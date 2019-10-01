@@ -80,19 +80,19 @@ class WorkerMap(object):
         """
         spin_ups = 0
 
-        logger.info("[SPIN UP] Next Worker Qsize: {}".format(next_worker_q.qsize()))
+        logger.info("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
         logger.info("[SPIN UP] Active Workers: {}".format(self.active_workers))
         logger.info("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
         logger.info("[SPIN UP] Max Worker Count: {}".format(self.worker_count))
 
-        if next_worker_q.qsize() > 0 and self.active_workers + self.pending_workers < self.worker_count:
+        if len(next_worker_q) > 0 and self.active_workers + self.pending_workers < self.worker_count:
             logger.debug("[SPIN UP] Spinning up new workers!")
-            num_slots = min(self.worker_count - self.active_workers - self.pending_workers, next_worker_q.qsize())
+            num_slots = min(self.worker_count - self.active_workers - self.pending_workers, len(next_worker_q))
             for _ in range(num_slots):
 
                 try:
                     self.add_worker(worker_id=str(self.worker_counter),
-                                    worker_type=next_worker_q.get(),
+                                    worker_type=next_worker_q.pop(0),
                                     address=address, debug=debug,
                                     uid=uid,
                                     logdir=logdir,
@@ -197,7 +197,7 @@ class WorkerMap(object):
         Queue containing the next workers the system should spin-up.
         """
 
-        next_worker_q = Queue()
+        # next_worker_q = []
         new_worker_list = []
         for worker_type in new_worker_map:
             # If we don't already have this type of worker in our worker_map...
@@ -213,10 +213,7 @@ class WorkerMap(object):
         if len(new_worker_list) > 0:
             random.shuffle(new_worker_list)
 
-            for item in new_worker_list:
-                next_worker_q.put(item)
-
-        return next_worker_q
+        return new_worker_list
 
     def put_worker(self, worker):
         """ Adds worker to the list of waiting workers
