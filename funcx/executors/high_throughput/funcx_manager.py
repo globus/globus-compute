@@ -16,7 +16,7 @@ import json
 import multiprocessing
 import psutil
 
-from funcx.executors.high_throughput.container_scheduler_1 import naive_scheduler
+from funcx.executors.high_throughput.container_sched import naive_scheduler
 from funcx.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
