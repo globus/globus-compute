@@ -83,6 +83,12 @@ class FuncXClient(BaseClient):
         """
 
         r = self.get("{task_id}/status".format(task_id=task_id))
+        try: 
+            t = r["result"]
+            r = {"status": "COMPLETED", "task_id": r["task_id"]}
+        except KeyError:
+            pass
+
         return json.loads(r.text)
 
     def get_result(self, task_id):
