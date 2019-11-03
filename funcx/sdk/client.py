@@ -5,7 +5,7 @@ import logging
 import pickle as pkl
 
 from globus_sdk.base import BaseClient, slash_join
-from mdf_toolbox import login, logout
+from fair_research_login import NativeClient
 from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
@@ -48,18 +48,23 @@ class FuncXClient(BaseClient):
         self.ep_registration_path = 'register_endpoint_2'
         self.funcx_home = os.path.expanduser(funcx_home)
 
-        if force_login or not fx_authorizer:
-            fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
-            auth_res = login(services=[fx_scope],
-                             app_name="funcX_Client",
-                             client_id=self.CLIENT_ID,
-                             clear_old_tokens=force_login,
-                             token_dir=self.TOKEN_DIR)
-            dlh_authorizer = auth_res['funcx_service']
+        native_client = NativeClient(client_id=self.CLIENT_ID)
+
+        fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
+
+        if not fx_authorizer:
+            native_client.login(requested_scopes=[fx_scope],
+                                no_local_server=kwargs.get("no_local_server", True),
+                                no_browser=kwargs.get("no_browser", True),
+                                refresh_tokens=kwargs.get("refresh_tokens", True),
+                                force=force_login)
+
+            all_authorizers = native_client.get_authorizers_by_scope(requested_scopes=[fx_scope])
+            fx_authorizer = all_authorizers[fx_scope]
 
         super(FuncXClient, self).__init__("funcX",
                                           environment='funcx',
-                                          authorizer=dlh_authorizer,
+                                          authorizer=fx_authorizer,
                                           http_timeout=http_timeout,
                                           base_url=funcx_service_address,
                                           **kwargs)
