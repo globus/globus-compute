@@ -6,6 +6,5 @@ parsl
 configobj
 texttable
 psutil
-mdf_toolbox
 python-daemon
-
+fair_research_login
