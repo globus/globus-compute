@@ -20,11 +20,10 @@ class FuncXClient(BaseClient):
 
     TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
-    # FUNCX_SERVICE_ADDRESS = "https://funcx.org/api/v1"
-    FUNCX_SERVICE_ADDRESS = "https://dev.funcx.org/api/v1"
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, **kwargs):
+                 force_login=False, fx_authorizer=None, funcx_service_address='https://dev.funcx.org/api/v1',
+                 **kwargs):
         """ Initialize the client
 
         Parameters
@@ -40,11 +39,14 @@ class FuncXClient(BaseClient):
         A custom authorizer instance to communicate with funcX.
         Default: ``None``, will be created.
 
+        service_address: str
+        The address of the funcX web service to communicate with.
+        Default: https://dev.funcx.org/api/v1
+
         Keyword arguments are the same as for BaseClient.
         """
         self.ep_registration_path = 'register_endpoint_2'
         self.funcx_home = os.path.expanduser(funcx_home)
-
 
         if force_login or not fx_authorizer:
             fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
@@ -59,7 +61,7 @@ class FuncXClient(BaseClient):
                                           environment='funcx',
                                           authorizer=dlh_authorizer,
                                           http_timeout=http_timeout,
-                                          base_url=self.FUNCX_SERVICE_ADDRESS,
+                                          base_url=funcx_service_address,
                                           **kwargs)
         self.fx_serializer = FuncXSerializer()
 
