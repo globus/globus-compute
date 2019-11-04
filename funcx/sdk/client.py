@@ -4,9 +4,8 @@ import os
 import logging
 import pickle as pkl
 
-from globus_sdk.base import BaseClient, slash_join
+from globus_sdk.base import BaseClient
 from fair_research_login import NativeClient
-from funcx.sdk.utils.auth import do_login_flow, make_authorizer, logout
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 
@@ -48,18 +47,18 @@ class FuncXClient(BaseClient):
         self.ep_registration_path = 'register_endpoint_2'
         self.funcx_home = os.path.expanduser(funcx_home)
 
-        native_client = NativeClient(client_id=self.CLIENT_ID)
+        self.native_client = NativeClient(client_id=self.CLIENT_ID, app_name="FuncX SDK")
 
         fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
 
         if not fx_authorizer:
-            native_client.login(requested_scopes=[fx_scope],
-                                no_local_server=kwargs.get("no_local_server", True),
-                                no_browser=kwargs.get("no_browser", True),
-                                refresh_tokens=kwargs.get("refresh_tokens", True),
-                                force=force_login)
+            self.native_client.login(requested_scopes=[fx_scope],
+                                     no_local_server=kwargs.get("no_local_server", True),
+                                     no_browser=kwargs.get("no_browser", True),
+                                     refresh_tokens=kwargs.get("refresh_tokens", True),
+                                     force=force_login)
 
-            all_authorizers = native_client.get_authorizers_by_scope(requested_scopes=[fx_scope])
+            all_authorizers = self.native_client.get_authorizers_by_scope(requested_scopes=[fx_scope])
             fx_authorizer = all_authorizers[fx_scope]
 
         super(FuncXClient, self).__init__("funcX",
@@ -73,7 +72,7 @@ class FuncXClient(BaseClient):
     def logout(self):
         """Remove credentials from your local system
         """
-        logout()
+        self.native_client.logout()
 
     def get_task_status(self, task_id):
         """Get the status of a funcX task.
