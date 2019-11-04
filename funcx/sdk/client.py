@@ -5,7 +5,7 @@ import logging
 import pickle as pkl
 
 from globus_sdk.base import BaseClient
-from fair_research_login import NativeClient
+from fair_research_login import NativeClient, JSONTokenStorage
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 
@@ -18,6 +18,7 @@ class FuncXClient(BaseClient):
     """
 
     TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
+    TOKEN_FILENAME = 'funcx_sdk_tokens.json'
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
@@ -47,7 +48,10 @@ class FuncXClient(BaseClient):
         self.ep_registration_path = 'register_endpoint_2'
         self.funcx_home = os.path.expanduser(funcx_home)
 
-        self.native_client = NativeClient(client_id=self.CLIENT_ID, app_name="FuncX SDK")
+        tokens_filename = os.path.join(self.TOKEN_DIR, self.TOKEN_FILENAME)
+        self.native_client = NativeClient(client_id=self.CLIENT_ID,
+                                          app_name="FuncX SDK",
+                                          token_storage=JSONTokenStorage(tokens_filename))
 
         fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
 
