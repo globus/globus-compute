@@ -164,6 +164,7 @@ class Manager(object):
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
         self.next_worker_q = []  # FIFO queue for spinning up workers.
+        self.worker_procs = []
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -327,6 +328,9 @@ class Manager(object):
                 if time.time() > last_interchange_contact + self.heartbeat_threshold:
                     logger.critical("[TASK_PULL_THREAD] Missing contact with interchange beyond heartbeat_threshold")
                     kill_event.set()
+                    logger.critical("Killing all workers")
+                    for proc in self.worker_procs:
+                        proc.kill()
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
 
@@ -435,13 +439,13 @@ class Manager(object):
 
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
 
-        self.workers = [self.worker_map.add_worker(worker_id=str(self.worker_map.worker_counter),
+        self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_counter),
                                                    worker_type='RAW',
                                                    address=self.address,
                                                    debug=self.debug,
                                                    uid=self.uid,
                                                    logdir=self.logdir,
-                                                   worker_port=self.worker_port)]
+                                                   worker_port=self.worker_port))
         self.worker_map.worker_counter += 1
         self.worker_map.pending_workers += 1
 
