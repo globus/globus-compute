@@ -172,10 +172,10 @@ class WorkerMap(object):
             raise NameError("Invalid container launch mode.")
 
         try:
-            proc = subprocess.Popen(modded_cmd,
+            proc = subprocess.Popen(modded_cmd.split(),
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
-                                    shell=True)
+                                    shell=False)
 
         except Exception:
             logger.exception("Got an error in worker launch")
