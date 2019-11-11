@@ -324,6 +324,8 @@ def stop_endpoint(args, global_config=None):
             logger.debug("Signalling process: {}".format(pid))
             os.kill(pid, signal.SIGTERM)
             time.sleep(0.1)
+            os.kill(pid, signal.SIGKILL)
+            time.sleep(0.1)
             # Wait to confirm that the pid file disappears
             if not os.path.exists(pid_file):
                 logger.info("Endpoint <{}> is now stopped".format(args.name))
