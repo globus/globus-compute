@@ -560,7 +560,7 @@ class Interchange(object):
 
             # If we had received any requests, check if there are tasks that could be passed
 
-            logger.info("[MAIN] Managers count (total/interesting): {}/{}".format(
+            logger.debug("[MAIN] Managers count (total/interesting): {}/{}".format(
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
@@ -577,15 +577,14 @@ class Interchange(object):
                             task_count = len(tasks)
                             count += task_count
                             tids = [t['task_id'] for t in tasks]
-                            logger.debug("[MAIN] Sent tasks: {} to {}".format(tids, manager))
                             self._ready_manager_queue[manager]['free_capacity'] -= task_count
                             self._ready_manager_queue[manager]['tasks'].extend(tids)
                             logger.info("[MAIN] Sent tasks: {} to manager {}".format(tids, manager))
                             if self._ready_manager_queue[manager]['free_capacity'] > 0:
-                                logger.info("[MAIN] Manager {} still has free_capacity {}".format(manager, self._ready_manager_queue[manager]['free_capacity']))
+                                logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, self._ready_manager_queue[manager]['free_capacity']))
                                 # ... so keep it in the interesting_managers list
                             else:
-                                logger.info("[MAIN] Manager {} is now saturated".format(manager))
+                                logger.debug("[MAIN] Manager {} is now saturated".format(manager))
                                 interesting_managers.remove(manager)
                     else:
                         interesting_managers.remove(manager)
