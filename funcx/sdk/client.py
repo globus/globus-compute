@@ -47,8 +47,8 @@ class FuncXClient(BaseClient):
         self.ep_registration_path = 'register_endpoint_2'
         self.funcx_home = os.path.expanduser(funcx_home)
 
-        if not os.path.exists(self.funcx_home):
-            os.makedirs(self.funcx_home)
+        if not os.path.exists(self.TOKEN_DIR):
+            os.makedirs(self.TOKEN_DIR)
 
         tokens_filename = os.path.join(self.TOKEN_DIR, self.TOKEN_FILENAME)
         self.native_client = NativeClient(client_id=self.CLIENT_ID,
