@@ -625,6 +625,8 @@ class Interchange(object):
                     self.results_outgoing.send(pkl_package)
                     logger.warning("[MAIN] Sent failure reports, unregistering manager")
                 self._ready_manager_queue.pop(manager, 'None')
+                if manager in interesting_managers:
+                    interesting_managers.remove(manager)
             logger.debug("[MAIN] ending one main loop iteration")
 
             if self._status_request.is_set():
