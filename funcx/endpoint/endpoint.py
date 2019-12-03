@@ -212,6 +212,9 @@ def start_endpoint(args, global_config=None):
     args : args object
        Args object from the arg parsing
 
+    endpoint_uuid : str
+       Endpoint UUID string to register with
+
     global_config : dict
        Global config dict
     """
@@ -245,9 +248,11 @@ def start_endpoint(args, global_config=None):
             funcx_client = FuncXClient()
 
             logger.debug("Attempting registration")
-            eid = str(uuid.uuid4())
-            logger.debug(f"Trying with eid : {eid}")
-            reg_info = funcx_client.register_endpoint(args.name, eid)
+            endpoint_uuid = str(uuid.uuid4())
+            if args.endpoint_uuid:
+                endpoint_uuid = args.endpoint_uuid
+            logger.debug(f"Trying with eid : {endpoint_uuid}")
+            reg_info = funcx_client.register_endpoint(args.name, endpoint_uuid)
 
         logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
         with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
@@ -272,8 +277,8 @@ def start_endpoint(args, global_config=None):
         os.path.join(endpoint_dir,'config.py')).load_module()
     # TODO : we need to load the config ? maybe not. This needs testing
 
-    stdout = open('./interchange.stdout', 'w+')
-    stderr = open('./interchange.stderr', 'w+')
+    stdout = open(os.path.join(endpoint_dir, './interchange.stdout'), 'w+')
+    stderr = open(os.path.join(endpoint_dir, './interchange.stderr'), 'w+')
     try:
         context = daemon.DaemonContext(working_directory=endpoint_dir,
                                        umask=0o002,
@@ -373,6 +378,8 @@ def cli_run():
     start = subparsers.add_parser('start',
                                   help='Starts an endpoint')
     start.add_argument("name", help="Name of the endpoint to start")
+    start.add_argument("--endpoint_uuid", help="The UUID for the endpoint to register with",
+                       default=None, required=False)
 
     # Stop an endpoint
     stop = subparsers.add_parser('stop', help='Stops an active endpoint')
