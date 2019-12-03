@@ -378,8 +378,8 @@ def cli_run():
     start = subparsers.add_parser('start',
                                   help='Starts an endpoint')
     start.add_argument("name", help="Name of the endpoint to start")
-    start.add_argument("endpoint_uuid", help="The UUID for the endpoint to register with",
-                       default=None)
+    start.add_argument("--endpoint_uuid", help="The UUID for the endpoint to register with",
+                       default=None, required=False)
 
     # Stop an endpoint
     stop = subparsers.add_parser('stop', help='Stops an active endpoint')
