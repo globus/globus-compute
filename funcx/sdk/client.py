@@ -21,7 +21,7 @@ class FuncXClient(BaseClient):
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, funcx_service_address='https://dev.funcx.org/api/v1',
+                 force_login=False, fx_authorizer=None, funcx_service_address='https://funcx.org/api/v1',
                  **kwargs):
         """ Initialize the client
 
