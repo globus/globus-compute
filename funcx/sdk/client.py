@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import boto3
 import pickle as pkl
 
 from globus_sdk.base import BaseClient
@@ -312,3 +313,31 @@ class FuncXClient(BaseClient):
 
         # Return the result
         return r.data['function_uuid']
+
+    def register_ecr_container(self, cont_name, ecr_url, description):
+        """Register a container that is already located in ECR
+
+        Parameters
+        ----------
+        ecr_url : str
+            Location at which the container is stored in AWS Elastic Container Registry
+
+        Returns
+        -------
+        container_uuid : str
+            UUID the user should use to link function to a container
+        """
+
+        cont_path = 'containers'
+
+        data = {'name': cont_name, 'location': ecr_url, 'type': 'docker', 'description': description}
+
+        r = self.post(cont_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+        return r.data['container_id']
+
+
+
+
+
