@@ -3,14 +3,14 @@ import os
 import logging
 import pickle as pkl
 
-from globus_sdk.base import BaseClient
 from fair_research_login import NativeClient, JSONTokenStorage
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
+from funcx.sdk.utils import throttling
 
 logger = logging.getLogger(__name__)
 
-class FuncXClient(BaseClient):
+class FuncXClient(throttling.ThrottledBaseClient):
     """Main class for interacting with the funcX service
 
     Holds helper operations for performing common tasks with the funcX service.
