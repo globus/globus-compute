@@ -1,7 +1,6 @@
 import time
 import json
-from globus_sdk.base import BaseClient
-
+import globus_sdk
 
 class ThrottlingException(Exception):
     pass
@@ -15,7 +14,7 @@ class MaxRequestsExceeded(ThrottlingException):
     pass
 
 
-class ThrottledBaseClient(BaseClient):
+class ThrottledBaseClient(globus_sdk.base.BaseClient):
     """
     Throttled base client allows for two different types of Throttling. Note,
     this is 'polite' client side throttling, to avoid well intentioned users
