@@ -57,7 +57,6 @@ class ThrottledBaseClient(globus_sdk.base.BaseClient):
 
         self.requests += 1
 
-        print((self.requests, self.max_requests))
         if self.requests > self.max_requests:
             raise MaxRequestsExceeded()
 
