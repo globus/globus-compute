@@ -336,8 +336,3 @@ class FuncXClient(BaseClient):
         if r.http_status is not 200:
             raise Exception(r)
         return r.data['container_id']
-
-
-
-
-
