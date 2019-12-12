@@ -35,7 +35,7 @@ class ThrottledBaseClient(BaseClient):
 
     """
     # Max requests per second, in a 5 second period
-    DEFAULT_MAX_REQUESTS = 1
+    DEFAULT_MAX_REQUESTS = 5
     # Max size is 2Mb
     DEFAULT_MAX_REQUEST_SIZE = 2 * 2 ** 20
 
@@ -58,7 +58,8 @@ class ThrottledBaseClient(BaseClient):
 
         self.requests += 1
 
-        if self.requests > self.max_requests * self.period:
+        print((self.requests, self.max_requests))
+        if self.requests > self.max_requests:
             raise MaxRequestsExceeded()
 
     def throttle_request_size(self, *request_args, **request_kwargs):
