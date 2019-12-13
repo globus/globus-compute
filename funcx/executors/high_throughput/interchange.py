@@ -405,11 +405,16 @@ class Interchange(object):
         else:
             reply = False
 
-    def _command_server(self, kill_event):
+    def _command_server(self, kill_event, heartbeat_timeout=60):
         """ Command server to run async command to the interchange
         """
         logger.debug("[COMMAND] Command Server Starting")
+
         while not kill_event.is_set():
+            # Check if we have missed too many heartbeats
+            if int(time.time() - last_heartbeat) > heartbeat_timeout:
+                logger.info("[COMMAND] Missed too many heartbeats. Setting kill event.")
+                kill_event.set()
             try:
                 command_req = self.command_channel.recv_pyobj()
                 logger.debug("[COMMAND] Received command request: {}".format(command_req))
@@ -432,6 +437,7 @@ class Interchange(object):
                 elif command_req == "HEARTBEAT":
                     logger.info("[CMD] Received heartbeat message from hub")
                     reply = "HBT,{}".format(self.endpoint_id)
+                    last_heartbeat = time.time()
 
                 elif command_req == "SHUTDOWN":
                     logger.info("[CMD] Received SHUTDOWN command")
