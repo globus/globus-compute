@@ -217,6 +217,8 @@ def start_endpoint(args, global_config=None):
        Global config dict
     """
 
+    funcx_client = FuncXClient()
+
     endpoint_dir = os.path.join(args.config_dir, args.name)
     endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
 
@@ -266,7 +268,7 @@ def start_endpoint(args, global_config=None):
                 reg_info = register_with_hub(global_config['broker_address'],
                                              global_config['redis_host'])
             else:
-                reg_info = register_endpoint(args.name, endpoint_uuid, endpoint_dir)
+                reg_info = register_endpoint(funcx_client, args.name, endpoint_uuid, endpoint_dir)
 
             # Configure the parameters for the interchange
             optionals = {}
@@ -296,8 +298,25 @@ def start_endpoint(args, global_config=None):
     print("Done")
 
 
-def register_endpoint(endpoint_name, endpoint_uuid, endpoint_dir):
-    funcx_client = FuncXClient()
+def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
+    """Register the endpoint and return the registration info.
+
+    Parameters
+    ----------
+
+    funcx_client : FuncXClient
+        The auth'd client to communicate with the funcX service
+
+    endpoint_name : str
+        The name to register the endpoint with
+
+    endpoint_uuid : str
+        The uuid to register the endpoint with
+
+    endpoint_dir : str
+        The directory to write endpoint registration info into.
+
+    """
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
     reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid)
