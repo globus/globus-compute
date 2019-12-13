@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class CommandClient(object):
     """ CommandClient
     """
-    def __init__(self, ip_address, port_range):
+    def __init__(self, ip_address, port_range, max_timeout=5000):
         """
         Parameters
         ----------
@@ -20,11 +20,13 @@ class CommandClient(object):
            IP address of the client (where Parsl runs)
         port_range: tuple(int, int)
            Port range for the comms between client and interchange
+        max_timeout: int
+            ms to wait for a response before timing out and raising a zmq.EAGAIN exception
 
         """
         self.context = zmq.Context()
         self.zmq_socket = self.context.socket(zmq.DEALER)
-        self.zmq_socket.setsockopt(zmq.RCVTIMEO, 5000)
+        self.zmq_socket.setsockopt(zmq.RCVTIMEO, max_timeout)
         self.port = self.zmq_socket.bind_to_random_port("tcp://{}".format(ip_address),
                                                         min_port=port_range[0],
                                                         max_port=port_range[1])
