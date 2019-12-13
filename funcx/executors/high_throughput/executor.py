@@ -6,6 +6,7 @@ to be addressed.
 
 from concurrent.futures import Future
 import os
+import time
 import logging
 import threading
 import queue
@@ -202,6 +203,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         # FuncX specific options
         self.container_image = container_image
         self.worker_mode = worker_mode
+        self.last_response_time = time.time()
 
         if not launch_cmd:
             self.launch_cmd = ("process_worker_pool.py {debug} {max_workers} "
@@ -364,6 +366,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         while not self._executor_bad_state.is_set():
             try:
                 msgs = self.incoming_q.get(timeout=1)
+                self.last_response_time = time.time()
                 # logger.debug("[MTHREAD] get has returned {}".format(len(msgs)))
 
             except queue.Empty:
