@@ -20,6 +20,7 @@ import tarfile
 import signal
 import psutil
 import random
+import importlib.machinery
 
 import funcx
 from funcx.executors.high_throughput import global_config, default_config
@@ -212,13 +213,9 @@ def start_endpoint(args, global_config=None):
     args : args object
        Args object from the arg parsing
 
-    endpoint_uuid : str
-       Endpoint UUID string to register with
-
     global_config : dict
        Global config dict
     """
-
 
     endpoint_dir = os.path.join(args.config_dir, args.name)
     endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
@@ -237,46 +234,13 @@ def start_endpoint(args, global_config=None):
         with open(endpoint_json, 'r') as fp:
             logger.debug("Connection info loaded from prior registration record")
             reg_info = json.load(fp)
+            endpoint_uuid = reg_info['endpoint_id']
+    elif args.endpoint_uuid:
+        endpoint_uuid = args.endpoint_uuid
     else:
-        logger.debug("Endpoint prior connection record not available. Attempting registration")
+        endpoint_uuid = str(uuid.uuid4())
 
-        if global_config.get('broker_test', False) is True:
-            logger.warning("**************** BROKER DEBUG MODE *******************")
-            reg_info = register_with_hub(global_config['broker_address'],
-                                         global_config['redis_host'])
-        else:
-            funcx_client = FuncXClient()
-
-            logger.debug("Attempting registration")
-            endpoint_uuid = str(uuid.uuid4())
-            if args.endpoint_uuid:
-                endpoint_uuid = args.endpoint_uuid
-            logger.debug(f"Trying with eid : {endpoint_uuid}")
-            reg_info = funcx_client.register_endpoint(args.name, endpoint_uuid)
-
-        logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
-        with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
-            json.dump(reg_info, fp)
-            logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
-
-    optionals = {}
-    optionals['client_address'] = reg_info['address']
-    optionals['client_ports'] = reg_info['client_ports'].split(',')
-    if 'endpoint_address' in global_config:
-        optionals['interchange_address'] = global_config['endpoint_address']
-
-    optionals['logdir'] = endpoint_dir
-    # optionals['debug'] = True
-
-    if args.debug:
-        optionals['logging_level'] = logging.DEBUG
-
-    import importlib.machinery
-    endpoint_config = importlib.machinery.SourceFileLoader(
-        'config',
-        os.path.join(endpoint_dir,'config.py')).load_module()
-    # TODO : we need to load the config ? maybe not. This needs testing
-
+    # Create a daemon context
     stdout = open(os.path.join(endpoint_dir, './interchange.stdout'), 'w+')
     stderr = open(os.path.join(endpoint_dir, './interchange.stderr'), 'w+')
     try:
@@ -287,7 +251,6 @@ def start_endpoint(args, global_config=None):
                                                                                        'daemon.pid')),
                                        stdout=stdout,
                                        stderr=stderr,
-
         )
     except Exception as e:
         print("Caught exception while trying to setup endpoint context dirs")
@@ -296,13 +259,55 @@ def start_endpoint(args, global_config=None):
     check_pidfile(context.pidfile.path, "funcx-endpoint", args.name)
 
     with context:
-        ic = Interchange(endpoint_config.config, **optionals)
-        ic.start()
+        while True:
+            # Register the endpoint
+            if global_config.get('broker_test', False) is True:
+                logger.warning("**************** BROKER DEBUG MODE *******************")
+                reg_info = register_with_hub(global_config['broker_address'],
+                                             global_config['redis_host'])
+            else:
+                reg_info = register_endpoint(args.name, endpoint_uuid, endpoint_dir)
+
+            # Configure the parameters for the interchange
+            optionals = {}
+            optionals['client_address'] = reg_info['address']
+            optionals['client_ports'] = reg_info['client_ports'].split(',')
+            if 'endpoint_address' in global_config:
+                optionals['interchange_address'] = global_config['endpoint_address']
+
+            optionals['logdir'] = endpoint_dir
+            # optionals['debug'] = True
+
+            if args.debug:
+                optionals['logging_level'] = logging.DEBUG
+
+            endpoint_config = importlib.machinery.SourceFileLoader(
+                'config',
+                os.path.join(endpoint_dir, 'config.py')).load_module()
+            # TODO : we need to load the config ? maybe not. This needs testing
+
+            ic = Interchange(endpoint_config.config, **optionals)
+            ic.start()
+
 
     stdout.close()
     stderr.close()
 
     print("Done")
+
+
+def register_endpoint(endpoint_name, endpoint_uuid, endpoint_dir):
+    funcx_client = FuncXClient()
+    logger.debug("Attempting registration")
+    logger.debug(f"Trying with eid : {endpoint_uuid}")
+    reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid)
+
+    logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+    with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
+        json.dump(reg_info, fp)
+        logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
+
+    return reg_info
 
 
 def stop_endpoint(args, global_config=None):
@@ -342,10 +347,6 @@ def stop_endpoint(args, global_config=None):
             sys.exit(-1)
     else:
         logger.info("Endpoint <{}> is not active.".format(args.name))
-
-
-def register_endpoint(args):
-    print("Register args : ", args)
 
 
 def cli_run():
