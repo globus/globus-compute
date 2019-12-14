@@ -23,7 +23,8 @@ class CommandClient(object):
 
         """
         self.context = zmq.Context()
-        self.zmq_socket = self.context.socket(zmq.DEALER)
+        self.zmq_socket = self.context.socket(zmq.REQ)
+#        self.zmq_socket.set_hwm(0)
         self.port = self.zmq_socket.bind_to_random_port("tcp://{}".format(ip_address),
                                                         min_port=port_range[0],
                                                         max_port=port_range[1])
@@ -37,9 +38,15 @@ class CommandClient(object):
         in ZMQ sockets reaching a broken state once there are ~10k tasks in flight.
         This issue can be magnified if each the serialized buffer itself is larger.
         """
-        self.zmq_socket.send_pyobj(message, copy=True)
-        reply = self.zmq_socket.recv_pyobj()
-        return reply
+        try:
+            print(f'trying to send cmd channel message: {message}')
+            self.zmq_socket.send_pyobj(message, copy=True)
+            reply = self.zmq_socket.recv_pyobj()
+            print(f'got reply {reply}')
+            return reply
+        except Exception as e:
+            print('ERROR')
+            print(e)
 
     def close(self):
         self.zmq_socket.close()
