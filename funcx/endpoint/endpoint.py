@@ -156,6 +156,7 @@ def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.am
 
     return r.json()
 
+
 def configure_endpoint(args, config_file=None, global_config=None):
     """Configure an endpoint
 
@@ -242,6 +243,7 @@ def start_endpoint(args, global_config=None):
     else:
         endpoint_uuid = str(uuid.uuid4())
 
+    logger.debug(f"Using endpoint uuid: {endpoint_uuid}")
     # Create a daemon context
     stdout = open(os.path.join(endpoint_dir, './interchange.stdout'), 'w+')
     stderr = open(os.path.join(endpoint_dir, './interchange.stderr'), 'w+')
@@ -255,20 +257,28 @@ def start_endpoint(args, global_config=None):
                                        stderr=stderr,
         )
     except Exception as e:
-        print("Caught exception while trying to setup endpoint context dirs")
-        print("Exception : ", e)
+        logger.critical("Caught exception while trying to setup endpoint context dirs")
+        logger.critical("Exception : ", e)
 
     check_pidfile(context.pidfile.path, "funcx-endpoint", args.name)
+
+    # TODO : we need to load the config ? maybe not. This needs testing
+    endpoint_config = importlib.machinery.SourceFileLoader(
+        'config',
+        os.path.join(endpoint_dir, 'config.py')).load_module()
 
     with context:
         while True:
             # Register the endpoint
+            logger.debug("Registering endpoint")
             if global_config.get('broker_test', False) is True:
                 logger.warning("**************** BROKER DEBUG MODE *******************")
                 reg_info = register_with_hub(global_config['broker_address'],
                                              global_config['redis_host'])
             else:
                 reg_info = register_endpoint(funcx_client, args.name, endpoint_uuid, endpoint_dir)
+
+            logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
             # Configure the parameters for the interchange
             optionals = {}
@@ -283,19 +293,16 @@ def start_endpoint(args, global_config=None):
             if args.debug:
                 optionals['logging_level'] = logging.DEBUG
 
-            endpoint_config = importlib.machinery.SourceFileLoader(
-                'config',
-                os.path.join(endpoint_dir, 'config.py')).load_module()
-            # TODO : we need to load the config ? maybe not. This needs testing
-
             ic = Interchange(endpoint_config.config, **optionals)
             ic.start()
+            ic.stop()
 
+            logger.critical("Interchange terminated.")
 
     stdout.close()
     stderr.close()
 
-    print("Done")
+    logger.critical(f"Shutting down endpoint {endpoint_uuid}")
 
 
 def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
@@ -321,7 +328,6 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     logger.debug(f"Trying with eid : {endpoint_uuid}")
     reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid)
 
-    logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
         logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
