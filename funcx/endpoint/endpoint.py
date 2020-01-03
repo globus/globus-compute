@@ -301,6 +301,7 @@ def start_endpoint(args, global_config=None):
             ic.stop()
 
             logger.critical("Interchange terminated.")
+            time.sleep(10)
 
     stdout.close()
     stderr.close()
