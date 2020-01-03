@@ -81,7 +81,7 @@ class Interchange(object):
                  launch_cmd=None,
                  heartbeat_threshold=60,
                  logdir=".",
-                 logging_level=logging.INFO,
+                 logging_level=logging.DEBUG,
                  poll_period=10,
                  endpoint_id=None,
                  suppress_failure=False,
@@ -174,7 +174,7 @@ class Interchange(object):
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
         logger.info("Connected to client")
 
-        self.pending_task_queue = queue.Queue(maxsize=10 ** 6)
+        self.pending_task_queue = {'total_pending_task_count': 0}
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
@@ -220,7 +220,8 @@ class Interchange(object):
                                "--block_id={{block_id}} "
                                "--hb_period={heartbeat_period} "
                                "--hb_threshold={heartbeat_threshold} "
-                               "--mode={worker_mode} "
+                               "--worker_mode={worker_mode} "
+                               "--scheduler_mode={scheduler_mode} "
                                "--container_image={container_image} ")
 
         self.current_platform = {'parsl_v': PARSL_VERSION,
@@ -273,6 +274,7 @@ class Interchange(object):
                                        heartbeat_threshold=self.config.heartbeat_threshold,
                                        poll_period=self.config.poll_period,
                                        worker_mode=self.config.worker_mode,
+                                       scheduler_mode=self.config.scheduler_mode,
                                        container_image=None,
                                        logdir=working_dir)
         self.launch_cmd = l_cmd
@@ -326,7 +328,7 @@ class Interchange(object):
                 msg = self.task_incoming.recv_pyobj()
             except zmq.Again:
                 # We just timed out while attempting to receive
-                logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.pending_task_queue.qsize()))
+                #logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.pending_task_queue.qsize()))
                 continue
 
             if msg == 'STOP':
@@ -336,7 +338,12 @@ class Interchange(object):
                 logger.warning("Got STATUS_REQUEST")
                 status_request.set()
             else:
-                self.pending_task_queue.put(msg)
+                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
+                task_id, task_type = msg['task_id'].split(";")
+                if task_type not in self.pending_task_queue:
+                    self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
+                self.pending_task_queue[task_type].put(msg)
+                self.pending_task_queue['total_pending_task_count'] += 1
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
 
@@ -344,7 +351,10 @@ class Interchange(object):
     def get_total_tasks_outstanding(self):
         """ Get the outstanding tasks in total
         """
-        outstanding = self.pending_task_queue.qsize()
+        
+        outstanding = 0
+        for task_type in self.pending_task_queue:
+            outstanding += task_type.qsize()
         for manager in self._ready_manager_queue:
             outstanding += len(self._ready_manager_queue[manager]['tasks'])
         return outstanding
@@ -355,7 +365,7 @@ class Interchange(object):
         active = 0
         for manager in self._ready_manager_queue:
             if self._ready_manager_queue[manager]['active']:
-                active += self._ready_manager_queue[manager]['worker_count']
+                active += self._ready_manager_queue[manager]['max_worker_count']
         return active
 
     def get_outstanding_breakdown(self):
@@ -367,7 +377,9 @@ class Interchange(object):
         [ (element, tasks_pending, status) ... ]
         """
 
-        pending_on_interchange = self.pending_task_queue.qsize()
+        pending_on_interchange = 0
+        for task_type in self.pending_task_queue:
+            pending_on_interchange += task_type.qsize()
         # Reporting pending on interchange is a deviation from Parsl
         reply = [('interchange', pending_on_interchange, True)]
         for manager in self._ready_manager_queue:
@@ -511,6 +523,7 @@ class Interchange(object):
                     self._ready_manager_queue[manager] = {'last': time.time(),
                                                           'reg_time': time.time(),
                                                           'free_capacity': 0,
+                                                          'free_capacity_by_type': {},
                                                           'active': True,
                                                           'tasks': []}
                     if reg_flag is True:
@@ -547,16 +560,16 @@ class Interchange(object):
                                 manager))
 
                 else:
-                    tasks_requested = int.from_bytes(message[1], "little")
-                    logger.debug("[MAIN] Manager {} requested {} tasks".format(manager, tasks_requested))
                     self._ready_manager_queue[manager]['last'] = time.time()
-                    if tasks_requested == HEARTBEAT_CODE:
+                    if message[1] == b'HEARTBEAT':
                         logger.debug("[MAIN] Manager {} sends heartbeat".format(manager))
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                     else:
+                        manager_adv = pickle.loads(message[1])
+                        logger.debug("[MAIN] Manager {} requested {}".format(manager, manager_adv))
+                        tasks_requested = 1
                         self._ready_manager_queue[manager]['free_capacity'] = tasks_requested
                         interesting_managers.add(manager)
-                logger.debug("[MAIN] leaving task_outgoing section")
 
             # If we had received any requests, check if there are tasks that could be passed
 
@@ -564,36 +577,47 @@ class Interchange(object):
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
-            if interesting_managers and not self.pending_task_queue.empty():
-                shuffled_managers = list(interesting_managers)
-                random.shuffle(shuffled_managers)
-                while shuffled_managers and not self.pending_task_queue.empty():  # cf. the if statement above...
-                    manager = shuffled_managers.pop()
-                    if (self._ready_manager_queue[manager]['free_capacity'] and
-                        self._ready_manager_queue[manager]['active']):
-                        tasks = self.get_tasks(self._ready_manager_queue[manager]['free_capacity'])
-                        if tasks:
-                            self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
-                            task_count = len(tasks)
-                            count += task_count
-                            tids = [t['task_id'] for t in tasks]
-                            self._ready_manager_queue[manager]['free_capacity'] -= task_count
-                            self._ready_manager_queue[manager]['tasks'].extend(tids)
-                            logger.info("[MAIN] Sent tasks: {} to manager {}".format(tids, manager))
-                            if self._ready_manager_queue[manager]['free_capacity'] > 0:
-                                logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, self._ready_manager_queue[manager]['free_capacity']))
-                                # ... so keep it in the interesting_managers list
-                            else:
-                                logger.debug("[MAIN] Manager {} is now saturated".format(manager))
-                                interesting_managers.remove(manager)
-                    else:
-                        interesting_managers.remove(manager)
-                        # logger.debug("Nothing to send to manager {}".format(manager))
-                # logger.debug("[MAIN] leaving _ready_manager_queue section, with {} managers still interesting".format(len(interesting_managers)))
-                pass
-            else:
-                # logger.debug("[MAIN] either no interesting managers or no tasks, so skipping manager pass")
-                pass
+            task_dispatch = naive_interchange_task_dispatch(interesting_managers,
+                                                            self.pending_task_queue,
+                                                            self.ready_manager_queue,
+                                                            scheduler_mode='hard')
+            for manager in task_dispatch:
+                tasks = task_dispatch[manager]
+                if tasks:
+                    logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
+                    self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
+
+#             if interesting_managers and not self.pending_task_queue.empty():
+#                 shuffled_managers = list(interesting_managers)
+#                 random.shuffle(shuffled_managers)
+#                 while shuffled_managers and not self.pending_task_queue.empty():  # cf. the if statement above...
+#                     manager = shuffled_managers.pop()
+#                     if (self._ready_manager_queue[manager]['free_capacity'] and
+#                         self._ready_manager_queue[manager]['active']):
+#                         tasks = self.get_tasks(self._ready_manager_queue[manager]['free_capacity'])
+#                         if tasks:
+#                             logger.info("[MAIN] Sending Task message {}".format(tasks))
+#                             self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
+#                             task_count = len(tasks)
+#                             count += task_count
+#                             tids = [t['task_id'] for t in tasks]
+#                             self._ready_manager_queue[manager]['free_capacity'] -= task_count
+#                             self._ready_manager_queue[manager]['tasks'].extend(tids)
+#                             logger.info("[MAIN] Sent tasks: {} to manager {}".format(tids, manager))
+#                             if self._ready_manager_queue[manager]['free_capacity'] > 0:
+#                                 logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, self._ready_manager_queue[manager]['free_capacity']))
+#                                 # ... so keep it in the interesting_managers list
+#                             else:
+#                                 logger.debug("[MAIN] Manager {} is now saturated".format(manager))
+#                                 interesting_managers.remove(manager)
+#                     else:
+#                         interesting_managers.remove(manager)
+#                         # logger.debug("Nothing to send to manager {}".format(manager))
+#                 # logger.debug("[MAIN] leaving _ready_manager_queue section, with {} managers still interesting".format(len(interesting_managers)))
+#                 pass
+#             else:
+#                 # logger.debug("[MAIN] either no interesting managers or no tasks, so skipping manager pass")
+#                 pass
 
             # Receive any results and forward to client
             if self.results_incoming in self.socks and self.socks[self.results_incoming] == zmq.POLLIN:
