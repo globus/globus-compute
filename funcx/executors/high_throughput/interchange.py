@@ -85,7 +85,8 @@ class Interchange(object):
                  poll_period=10,
                  endpoint_id=None,
                  suppress_failure=False,
-             ):
+                 max_heartbeats_missed=2
+                 ):
         """
         Parameters
         ----------
@@ -136,6 +137,9 @@ class Interchange(object):
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
 
+        max_heartbeats_missed : int
+             Number of heartbeats missed before setting kill_event
+
         """
         self.logdir = logdir
         try:
@@ -168,8 +172,9 @@ class Interchange(object):
         logger.info("Results outgoing on tcp://{}:{}".format(client_address, client_ports[1]))
         self.results_outgoing.connect("tcp://{}:{}".format(client_address, client_ports[1]))
 
-        self.command_channel = self.context.socket(zmq.REP)
+        self.command_channel = self.context.socket(zmq.DEALER)
         self.command_channel.RCVTIMEO = 1000  # in milliseconds
+        # self.command_channel.set_hwm(0)
         logger.info("Command channel on tcp://{}:{}".format(client_address, client_ports[2]))
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
         logger.info("Connected to client")
@@ -184,6 +189,10 @@ class Interchange(object):
         self.task_outgoing.set_hwm(0)
         self.results_incoming = self.context.socket(zmq.ROUTER)
         self.results_incoming.set_hwm(0)
+
+        # initalize the last heartbeat time to start the loop
+        self.last_heartbeat = time.time()
+        self.max_heartbeats_missed = max_heartbeats_missed
 
         self.endpoint_id = endpoint_id
         if self.worker_ports:
@@ -324,8 +333,16 @@ class Interchange(object):
         poller.register(self.task_incoming, zmq.POLLIN)
 
         while not kill_event.is_set():
+            # Check when the last heartbeat was.
+            # logger.debug(f"[TASK_PULL_THREAD] Last heartbeat: {self.last_heartbeat}")
+            if int(time.time() - self.last_heartbeat) > (self.heartbeat_threshold * self.max_heartbeats_missed):
+                logger.critical("[TASK_PULL_THREAD] Missed too many heartbeats. Setting kill event.")
+                kill_event.set()
+                break
+
             try:
                 msg = self.task_incoming.recv_pyobj()
+                self.last_heartbeat = time.time()
             except zmq.Again:
                 # We just timed out while attempting to receive
                 #logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.pending_task_queue.qsize()))
@@ -346,7 +363,6 @@ class Interchange(object):
                 self.pending_task_queue['total_pending_task_count'] += 1
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
-
 
     def get_total_tasks_outstanding(self):
         """ Get the outstanding tasks in total
@@ -421,6 +437,7 @@ class Interchange(object):
         """ Command server to run async command to the interchange
         """
         logger.debug("[COMMAND] Command Server Starting")
+
         while not kill_event.is_set():
             try:
                 command_req = self.command_channel.recv_pyobj()
@@ -460,6 +477,13 @@ class Interchange(object):
                 logger.debug("[COMMAND] is alive")
                 continue
 
+    def stop(self):
+        """Prepare the interchange for shutdown"""
+        self._kill_event.set()
+
+        self._task_puller_thread.join()
+        self._command_thread.join()
+
     def start(self, poll_period=None):
         """ Start the Interchange
 
@@ -486,7 +510,13 @@ class Interchange(object):
                                                 args=(self._kill_event, ))
         self._command_thread.start()
 
-        self.strategy.start(self)
+        try:
+            logger.debug("Starting strategy.")
+            self.strategy.start(self)
+        except RuntimeError as e:
+            # This is raised when re-registering an endpoint as strategy already exists
+            logger.debug("Failed to start strategy.")
+            logger.info(e)
 
         poller = zmq.Poller()
         # poller.register(self.task_incoming, zmq.POLLIN)
@@ -771,11 +801,12 @@ def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_
     global logger
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    handler = logging.FileHandler(filename)
-    handler.setLevel(level)
-    formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    if not len(logger.handlers):
+        handler = logging.FileHandler(filename)
+        handler.setLevel(level)
+        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
 
 def starter(comm_q, *args, **kwargs):
