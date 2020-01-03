@@ -243,7 +243,10 @@ def start_endpoint(args, global_config=None):
     else:
         endpoint_uuid = str(uuid.uuid4())
 
-    logger.debug(f"Using endpoint uuid: {endpoint_uuid}")
+
+    print(f"Starting endpoint with uuid: {endpoint_uuid}")
+    logger.debug(f"Starting endpoint with uuid: {endpoint_uuid}")
+
     # Create a daemon context
     stdout = open(os.path.join(endpoint_dir, './interchange.stdout'), 'w+')
     stderr = open(os.path.join(endpoint_dir, './interchange.stderr'), 'w+')
