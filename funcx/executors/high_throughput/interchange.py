@@ -16,6 +16,8 @@ import daemon
 
 from parsl.version import VERSION as PARSL_VERSION
 from ipyparallel.serialize import serialize_object
+from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
+
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
@@ -368,9 +370,7 @@ class Interchange(object):
         """ Get the outstanding tasks in total
         """
         
-        outstanding = 0
-        for task_type in self.pending_task_queue:
-            outstanding += task_type.qsize()
+        outstanding = self.pending_task_queue['total_pending_task_count']
         for manager in self._ready_manager_queue:
             outstanding += len(self._ready_manager_queue[manager]['tasks'])
         return outstanding
@@ -393,9 +393,7 @@ class Interchange(object):
         [ (element, tasks_pending, status) ... ]
         """
 
-        pending_on_interchange = 0
-        for task_type in self.pending_task_queue:
-            pending_on_interchange += task_type.qsize()
+        pending_on_interchange = self.pending_task_queue['total_pending_task_count']
         # Reporting pending on interchange is a deviation from Parsl
         reply = [('interchange', pending_on_interchange, True)]
         for manager in self._ready_manager_queue:
@@ -552,8 +550,7 @@ class Interchange(object):
                     # By default we set up to ignore bad nodes/registration messages.
                     self._ready_manager_queue[manager] = {'last': time.time(),
                                                           'reg_time': time.time(),
-                                                          'free_capacity': 0,
-                                                          'free_capacity_by_type': {},
+                                                          'free_capacity': {},
                                                           'active': True,
                                                           'tasks': []}
                     if reg_flag is True:
@@ -597,8 +594,8 @@ class Interchange(object):
                     else:
                         manager_adv = pickle.loads(message[1])
                         logger.debug("[MAIN] Manager {} requested {}".format(manager, manager_adv))
-                        tasks_requested = 1
-                        self._ready_manager_queue[manager]['free_capacity'] = tasks_requested
+                        self._ready_manager_queue[manager]['free_capacity'] = manager_adv
+                        self._ready_manager_queue[manager]['free_capacity']['total_workers'] = sum(manager_adv.values())
                         interesting_managers.add(manager)
 
             # If we had received any requests, check if there are tasks that could be passed
@@ -609,8 +606,9 @@ class Interchange(object):
 
             task_dispatch = naive_interchange_task_dispatch(interesting_managers,
                                                             self.pending_task_queue,
-                                                            self.ready_manager_queue,
+                                                            self._ready_manager_queue,
                                                             scheduler_mode='hard')
+
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]
                 if tasks:

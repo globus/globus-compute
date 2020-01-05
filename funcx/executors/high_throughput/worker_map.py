@@ -14,7 +14,7 @@ class WorkerMap(object):
     def __init__(self, max_worker_count):
         self.max_worker_count = max_worker_count
         self.total_worker_type_counts = {'slots': self.max_worker_count, 'RAW': 0}
-        self.ready_worker_type_counts = {}
+        self.ready_worker_type_counts = {'unused': self.max_worker_count}
         self.worker_queues = {}  # a dict to keep track of all the worker_queues with the key of work_type
         self.worker_types = {}  # a dict to keep track of all the worker_types with the key of worker_id
         self.worker_id_counter = 0  # used to create worker_ids
@@ -38,6 +38,7 @@ class WorkerMap(object):
         self.total_worker_type_counts[worker_type] = self.total_worker_type_counts.get(worker_type, 0) + 1
         self.ready_worker_type_counts[worker_type] = self.ready_worker_type_counts.get(worker_type, 0) + 1
         self.total_worker_type_counts['slots'] -= 1
+        self.ready_worker_type_counts['unused'] -= 1
         self.pending_workers -= 1
         self.active_workers += 1
         self.worker_queues[worker_type].put(worker_id)
