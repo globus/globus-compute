@@ -13,6 +13,7 @@ import queue
 import threading
 import json
 import daemon
+import collections
 
 from parsl.version import VERSION as PARSL_VERSION
 from ipyparallel.serialize import serialize_object
@@ -87,7 +88,7 @@ class Interchange(object):
                  poll_period=10,
                  endpoint_id=None,
                  suppress_failure=False,
-                 max_heartbeats_missed=2
+                 max_heartbeats_missed=2,
                  ):
         """
         Parameters
@@ -143,6 +144,7 @@ class Interchange(object):
              Number of heartbeats missed before setting kill_event
 
         """
+
         self.logdir = logdir
         try:
             os.makedirs(self.logdir)
@@ -219,6 +221,7 @@ class Interchange(object):
 
         self.heartbeat_threshold = heartbeat_threshold
         self.blocks = {}  # type: Dict[str, str]
+        self.block_id_map = {}
         self.launch_cmd = launch_cmd
         self.last_core_hr_counter = 0
         if not launch_cmd:
@@ -233,7 +236,7 @@ class Interchange(object):
                                "--hb_threshold={heartbeat_threshold} "
                                "--worker_mode={worker_mode} "
                                "--scheduler_mode={scheduler_mode} "
-                               "--container_image={container_image} ")
+                               "--worker_type={worker_type} ")
 
         self.current_platform = {'parsl_v': PARSL_VERSION,
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
@@ -262,9 +265,10 @@ class Interchange(object):
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.config.provider.script_dir = working_dir
-        self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
-        self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
-        os.makedirs(self.config.provider.script_dir, exist_ok=True)
+        if hasattr(self.config.provider, 'channel'):
+            self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
+            self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
+            os.makedirs(self.config.provider.script_dir, exist_ok=True)
 
         debug_opts = "--debug" if self.config.worker_debug else ""
         max_workers = "" if self.config.max_workers_per_node == float('inf') \
@@ -286,7 +290,7 @@ class Interchange(object):
                                        poll_period=self.config.poll_period,
                                        worker_mode=self.config.worker_mode,
                                        scheduler_mode=self.config.scheduler_mode,
-                                       container_image=None,
+                                       worker_type=None,
                                        logdir=working_dir)
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))
@@ -358,7 +362,7 @@ class Interchange(object):
                 status_request.set()
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
-                task_id, task_type = msg['task_id'].split(";")
+                task_type = msg['task_id'].split(";")[1]
                 if task_type not in self.pending_task_queue:
                     self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
                 self.pending_task_queue[task_type].put(msg)
@@ -369,10 +373,13 @@ class Interchange(object):
     def get_total_tasks_outstanding(self):
         """ Get the outstanding tasks in total
         """
-        
-        outstanding = self.pending_task_queue['total_pending_task_count']
+        outstanding = {}
+        for task_type in self.pending_task_queue:
+            if task_type != 'total_pending_task_count':
+                outstanding[task_type] = outstanding.get(task_type, 0) + self.pending_task_queue[task_type].qsize()
         for manager in self._ready_manager_queue:
-            outstanding += len(self._ready_manager_queue[manager]['tasks'])
+            for task_type in self._ready_manager_queue[manager]['tasks']:
+                outstanding[task_type] = outstanding.get(task_type, 0) + len(self._ready_manager_queue[manager]['tasks'][task_type])
         return outstanding
 
     def get_total_live_workers(self):
@@ -552,14 +559,14 @@ class Interchange(object):
                                                           'reg_time': time.time(),
                                                           'free_capacity': {},
                                                           'active': True,
-                                                          'tasks': []}
+                                                          'tasks': collections.defaultdict(set)}
                     if reg_flag is True:
                         interesting_managers.add(manager)
                         logger.info("[MAIN] Adding manager: {} to ready queue".format(manager))
                         self._ready_manager_queue[manager].update(msg)
                         logger.info("[MAIN] Registration info for manager {}: {}".format(manager, msg))
 
-                        if (msg['python_v'] != self.current_platform['python_v'] or
+                        if (msg['python_v'].rsplit(".", 1)[0] != self.current_platform['python_v'].rsplit(".", 1)[0] or
                             msg['parsl_v'] != self.current_platform['parsl_v']):
                             logger.warn("[MAIN] Manager {} has incompatible version info with the interchange".format(manager))
 
@@ -608,7 +615,7 @@ class Interchange(object):
                                                             self.pending_task_queue,
                                                             self._ready_manager_queue,
                                                             scheduler_mode='hard')
-
+            
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]
                 if tasks:
@@ -658,7 +665,8 @@ class Interchange(object):
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
-                        self._ready_manager_queue[manager]['tasks'].remove(r['task_id'])
+                        task_type = r['task_id'].split(";")[1]
+                        self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self.results_outgoing.send_multipart(b_messages)
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
@@ -670,11 +678,12 @@ class Interchange(object):
                 logger.debug("[MAIN] Last: {} Current: {}".format(self._ready_manager_queue[manager]['last'], time.time()))
                 logger.warning("[MAIN] Too many heartbeats missed for manager {}".format(manager))
                 e = ManagerLost(manager)
-                for tid in self._ready_manager_queue[manager]['tasks']:
-                    result_package = {'task_id': tid, 'exception': serialize_object(e)}
-                    pkl_package = pickle.dumps(result_package)
-                    self.results_outgoing.send(pkl_package)
-                    logger.warning("[MAIN] Sent failure reports, unregistering manager")
+                for task_type in self._ready_manager_queue[manager]['tasks']:
+                    for tid in self._ready_manager_queue[manager]['tasks'][task_type]:
+                        result_package = {'task_id': tid, 'exception': serialize_object(e)}
+                        pkl_package = pickle.dumps(result_package)
+                        self.results_outgoing.send(pkl_package)
+                logger.warning("[MAIN] Sent failure reports, unregistering manager")
                 self._ready_manager_queue.pop(manager, 'None')
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
@@ -712,7 +721,7 @@ class Interchange(object):
         self.last_core_hr_counter = core_hrs
         return result_package
 
-    def scale_out(self, blocks=1):
+    def scale_out(self, blocks=1, task_type=None):
         """Scales out the number of blocks by "blocks"
 
         Raises:
@@ -724,18 +733,22 @@ class Interchange(object):
                 self._block_counter += 1
                 external_block_id = self._block_counter
                 launch_cmd = self.launch_cmd.format(block_id=external_block_id)
-                internal_block = self.config.provider.submit(launch_cmd, 1, 1)
+                if not task_type:
+                    internal_block = self.config.provider.submit(launch_cmd, 1)
+                else:
+                    internal_block = self.config.provider.submit(launch_cmd, 1, task_type)
                 logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
                 if not internal_block:
                     raise(ScalingFailed(self.provider.label,
                                         "Attempts to provision nodes via provider has failed"))
                 self.blocks[external_block_id] = internal_block
+                self.block_id_map[internal_block] = external_block_id
             else:
                 logger.error("No execution provider available")
                 r = None
         return r
 
-    def scale_in(self, blocks=None, block_ids=[]):
+    def scale_in(self, blocks=None, block_ids=[], task_type=None):
         """Scale in the number of active blocks by specified amount.
 
         Parameters
@@ -746,6 +759,16 @@ class Interchange(object):
         block_ids : [str.. ]
             List of external block ids to terminate
         """
+        if task_type:
+            logger.info("Scaling in blocks of specific task type {}. Let the provider to decide which to kill".format(task_type))
+            if self.config.scaling_enabled and self.config.provider:
+                to_kill, r = self.config.provider.cancel(blocks, task_type=task_type)
+                for job in to_kill:
+                    block_id = self.block_id_map[job]
+                    self._hold_block(block_id)
+                    self.blocks.pop(block_id)
+                return r
+        
         if block_ids:
             block_ids_to_kill = block_ids
         else:

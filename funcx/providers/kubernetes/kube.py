@@ -1,5 +1,6 @@
 import logging
 import time
+import queue
 from parsl.providers.kubernetes.template import template_string
 
 logger = logging.getLogger(__name__)
@@ -118,9 +119,11 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         self.kube_client = client.CoreV1Api()
 
         # Dictionary that keeps track of jobs, keyed on job_id
-        self.resources = {}  # type: Dict[str, Dict[str, Any]]
+        self.resources_by_pod_name = {}
+        # Dictionary that keeps track of jobs, keyed on task_type
+        self.resources_by_task_type = {}
 
-    def submit(self, cmd_string, tasks_per_node, image=None, pod_name=None, job_name="parsl"):
+    def submit(self, cmd_string, tasks_per_node, task_type=None, job_name="parsl"):
         """ Submit a job
         Args:
              - cmd_string  :(String) - Name of the container to initiate
@@ -136,8 +139,12 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         cur_timestamp = str(time.time() * 1000).split(".")[0]
         job_name = "{0}-{1}".format(job_name, cur_timestamp)
 
-        if not image:
+        pod_name = None
+        if not task_type:
             image = self.image
+        else:
+            pod_name, image = task_type.split(",")
+
         if pod_name:  
             pod_name = '{}-{}'.format(pod_name,
                                       cur_timestamp)
@@ -147,6 +154,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             pod_name = '{}-{}'.format(self.pod_name,
                                       cur_timestamp)
 
+        cmd_string = cmd_string.format(worker_type=task_type)
         formatted_cmd = template_string.format(command=cmd_string,
                                                worker_init=self.worker_init)
 
@@ -156,7 +164,10 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                          job_name=job_name,
                          cmd_string=formatted_cmd,
                          volumes=self.persistent_volumes)
-        self.resources[pod_name] = {'status': 'RUNNING'}
+        self.resources_by_pod_name[pod_name] = {'status': 'RUNNING', 'task_type': task_type}
+        if task_type not in self.resources_by_task_type:
+            self.resources_by_task_type[task_type] = queue.Queue()
+        self.resources_by_task_type[task_type].put(pod_name)
 
         return pod_name
 
@@ -171,11 +182,28 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         Raises:
              - ExecutionProviderExceptions or its subclasses
         """
-        self._status()
         # This is a hack
-        return ['RUNNING' for jid in job_ids]
+        status = {}
+        for jid in job_ids:
+            task_type = self.resources_by_pod_name[jid]['task_type']
+            status[task_type] = status.get(task_type, 0) + 1
+            
+        return status
 
-    def cancel(self, job_ids):
+    def cancel(self, num_pods, task_type=None):
+        to_kill = []
+        if task_type and task_type in self.resources_by_task_type:
+            while num_pods > 0:
+                try:
+                    to_kill.append(self.resources_by_task_type.get(block=False))
+                except queue.Empty:
+                    break
+                else:
+                    num_pods -= 1
+        rets = self._cancel(to_kill)
+        return to_kill, rets
+
+    def _cancel(self, job_ids):
         """ Cancels the jobs specified by a list of job ids
         Args:
         job_ids : [<job_id> ...]
@@ -201,7 +229,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
               [status...] : Status list of all jobs
         """
 
-        jobs_ids = list(self.resources.keys())
+        task_type = list(self.resources.keys())
         # TODO: fix this
         return jobs_ids
         # do something to get the deployment's status

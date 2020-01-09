@@ -63,7 +63,7 @@ class Manager(object):
                  internal_worker_port_range=(50000, 60000),
                  worker_mode="singularity_reuse",
                  scheduler_mode="soft",
-                 container_image=None,
+                 worker_type=None,
                  # TODO : This should be 10ms
                  poll_period=100):
         """
@@ -108,8 +108,8 @@ class Manager(object):
               1. hard: the manager cannot change the launched container type
               2. soft: the manager can decide whether to launch different containers
 
-        container_image : str
-             Path or identifier for the container to be used. Default: None
+        worker_type : str
+             If set, the worker type for this manager is fixed. Default: None
 
         poll_period : int
              Timeout period used by the manager in milliseconds. Default: 10ms
@@ -138,7 +138,7 @@ class Manager(object):
 
         self.worker_mode = worker_mode
         self.scheduler_mode = scheduler_mode
-        self.container_image = container_image
+        self.worker_type = worker_type
         self.cores_on_node = multiprocessing.cpu_count()
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
@@ -159,7 +159,7 @@ class Manager(object):
 
         logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
 
-        self.task_queues = {'RAW': queue.Queue()}
+        self.task_queues = {}
 
         self.pending_result_queue = multiprocessing.Queue()
 
@@ -279,13 +279,12 @@ class Manager(object):
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
-            spin_up = self.worker_map.spin_up_workers(self.next_worker_q,
-                                                      debug=self.debug,
-                                                      address=self.address,
-                                                      uid=self.uid,
-                                                      logdir=self.logdir,
-                                                      worker_port=self.worker_port)
-            logger.debug("[SPIN UP]: Spun up {} containers".format(spin_up))
+            self.worker_procs.extend(self.worker_map.spin_up_workers(self.next_worker_q,
+                                                                     debug=self.debug,
+                                                                     address=self.address,
+                                                                     uid=self.uid,
+                                                                     logdir=self.logdir,
+                                                                     worker_port=self.worker_port))
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -309,7 +308,7 @@ class Manager(object):
 
                     for task in tasks:
                         # Set default type to raw
-                        task_type = task['task_id'].split(';')[1]
+                        task_type = task['task_id'].split(";")[1]
 
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
@@ -357,7 +356,7 @@ class Manager(object):
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
-                if task_type == 'slots':
+                if task_type == 'unused':
                     continue
 
                 # *** Match tasks to workers *** #
@@ -440,15 +439,14 @@ class Manager(object):
             Forward results
         """
 
-        self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
-
-        self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
-                                                   worker_type='RAW',
-                                                   address=self.address,
-                                                   debug=self.debug,
-                                                   uid=self.uid,
-                                                   logdir=self.logdir,
-                                                   worker_port=self.worker_port))
+        if self.worker_type and self.scheduler_mode == 'hard':
+            self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
+                                                                worker_type=self.worker_type,
+                                                                address=self.address,
+                                                                debug=self.debug,
+                                                                uid=self.uid,
+                                                                logdir=self.logdir,
+                                                                worker_port=self.worker_port))
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
@@ -483,8 +481,8 @@ def cli_run():
                         help="Heartbeat threshold in seconds. Uses manager default unless set")
     parser.add_argument("--poll", default=10,
                         help="Poll period used in milliseconds")
-    parser.add_argument("--container_image", default=None,
-                        help="Container image identifier/path")
+    parser.add_argument("--worker_type", default=None,
+                        help="Fixed worker type of manager")
     parser.add_argument("--worker_mode", default="singularity_reuse",
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
@@ -520,7 +518,7 @@ def cli_run():
         logger.info("poll_period: {}".format(args.poll))
         logger.info("worker_mode: {}".format(args.worker_mode))
         logger.info("scheduler_mode: {}".format(args.scheduler_mode))
-        logger.info("container_image: {}".format(args.container_image))
+        logger.info("worker_type: {}".format(args.worker_type))
 
         manager = Manager(task_q_url=args.task_url,
                           result_q_url=args.result_url,
@@ -534,7 +532,7 @@ def cli_run():
                           debug=args.debug,
                           worker_mode=args.worker_mode,
                           scheduler_mode=args.scheduler_mode,
-                          container_image=args.container_image,
+                          worker_type=args.worker_type,
                           poll_period=int(args.poll))
         manager.start()
 
