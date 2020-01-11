@@ -66,8 +66,8 @@ class KubeSimpleStrategy(BaseStrategy):
             active_slots = active_blocks * tasks_per_node * nodes_per_block
             active_tasks_per_type = active_tasks[task_type]
             
-            logger.debug('Endpoint has {} active tasks of {}, {}/{}/{} running/submitted/pending blocks, and {} connected workers'.format(
-            active_tasks_per_type, task_type, running, submitting, pending, self.interchange.get_total_live_workers()))
+            logger.debug('Endpoint has {} active tasks of {}, {} active blocks, {} connected workers'.format(
+            active_tasks_per_type, task_type, active_blocks, self.interchange.get_total_live_workers()))
 
             if active_tasks_per_type > 0:
                 self.executors_idle_since[task_type] = None

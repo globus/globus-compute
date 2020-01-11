@@ -19,7 +19,6 @@ from parsl.version import VERSION as PARSL_VERSION
 from ipyparallel.serialize import serialize_object
 from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 
-
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
 PKL_HEARTBEAT_CODE = pickle.dumps((2 ** 32) - 1)
@@ -152,6 +151,7 @@ class Interchange(object):
             pass
 
         start_file_logger("{}/interchange.log".format(self.logdir), level=logging_level)
+        logger.info("logger location {}".format(logger.handlers))
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -418,13 +418,15 @@ class Interchange(object):
         block_id : str
              Block identifier of the block to be put on hold
         """
+        logger.debug("[HOLD_BLOCK]: Holding {}".format(block_id))
         for manager in self._ready_manager_queue:
+            logger.debug("[HOLD_BLOCK]: Checking manager {}: {}".format(manager, self._ready_manager_queue[manager]))
             if self._ready_manager_queue[manager]['active'] and \
                self._ready_manager_queue[manager]['block_id'] == block_id:
                 logger.debug("[HOLD_BLOCK]: Sending hold to manager: {}".format(manager))
                 self.hold_manager(manager)
 
-    def hold_manager(manager):
+    def hold_manager(self, manager):
         """ Put manager on hold
         Parameters
         ----------
@@ -557,7 +559,7 @@ class Interchange(object):
                     # By default we set up to ignore bad nodes/registration messages.
                     self._ready_manager_queue[manager] = {'last': time.time(),
                                                           'reg_time': time.time(),
-                                                          'free_capacity': {},
+                                                          'free_capacity': {'total_workers': 0},
                                                           'active': True,
                                                           'tasks': collections.defaultdict(set)}
                     if reg_flag is True:
@@ -731,7 +733,7 @@ class Interchange(object):
         for i in range(blocks):
             if self.config.provider:
                 self._block_counter += 1
-                external_block_id = self._block_counter
+                external_block_id = str(self._block_counter)
                 launch_cmd = self.launch_cmd.format(block_id=external_block_id)
                 if not task_type:
                     internal_block = self.config.provider.submit(launch_cmd, 1)
@@ -762,9 +764,12 @@ class Interchange(object):
         if task_type:
             logger.info("Scaling in blocks of specific task type {}. Let the provider to decide which to kill".format(task_type))
             if self.config.scaling_enabled and self.config.provider:
-                to_kill, r = self.config.provider.cancel(blocks, task_type=task_type)
+                to_kill, r = self.config.provider.cancel(blocks, task_type)
+                logger.info("Get the killed blocks: {}, and status: {}".format(to_kill, r))
                 for job in to_kill:
+                    logger.info("[scale_in] Getting the block_id map {} for job {}".format(self.block_id_map, job))
                     block_id = self.block_id_map[job]
+                    logger.info("[scale_in] Holding block {}".format(block_id))
                     self._hold_block(block_id)
                     self.blocks.pop(block_id)
                 return r
@@ -792,7 +797,9 @@ class Interchange(object):
         """
         status = []
         if self.config.provider:
+            logger.debug("[MAIN] Getting the status of {} blocks.".format(list(self.blocks.values())))
             status = self.config.provider.status(list(self.blocks.values()))
+            logger.debug("[MAIN] The status is {}".format(status))
 
         return status
 

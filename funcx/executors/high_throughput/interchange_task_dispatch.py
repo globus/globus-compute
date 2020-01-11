@@ -18,13 +18,11 @@ def naive_interchange_task_dispatch(interesting_managers,
     """
     
     if scheduler_mode == 'hard':
-        logger.debug("Using hard mode for task dispatching")
         return naive_scheduler_hard(interesting_managers,
                                     pending_task_queue,
                                     ready_manager_queue,
                                     )
     elif scheduler_mode == 'soft':
-        logger.debug("Using soft mode for task dispatching")
         return naive_scheduler_soft(interesting_managers,
                                     pending_task_queue,
                                     ready_manager_queue,
@@ -94,6 +92,7 @@ def naive_scheduler_hard(interesting_managers,
 def get_tasks_hard(pending_task_queue, manager_ads, mode='first'):
     tasks = []
     tids = collections.defaultdict(set)
+    # allocate unused slots to tasks
     if mode != "first":
         for task_type in pending_task_queue:
             if task_type == 'total_pending_task_count':
@@ -116,6 +115,8 @@ def get_tasks_hard(pending_task_queue, manager_ads, mode='first'):
         if task_type != 'unused' and task_type != 'total_workers':
             while manager_ads['free_capacity'][task_type] > 0:
                 try:
+                    if task_type not in pending_task_queue:
+                        break
                     x = pending_task_queue[task_type].get(block=False)
                 except queue.Empty:
                     break

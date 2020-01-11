@@ -1,9 +1,10 @@
 import logging
 import time
 import queue
-from parsl.providers.kubernetes.template import template_string
+from funcx.providers.kubernetes.template import template_string
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("interchange")
+print(logger.handlers)
 
 from parsl.providers.error import OptionalModuleMissing
 from parsl.providers.provider_base import ExecutionProvider
@@ -123,7 +124,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         # Dictionary that keeps track of jobs, keyed on task_type
         self.resources_by_task_type = {}
 
-    def submit(self, cmd_string, tasks_per_node, task_type=None, job_name="parsl"):
+    def submit(self, cmd_string, tasks_per_node, task_type, job_name="parsl"):
         """ Submit a job
         Args:
              - cmd_string  :(String) - Name of the container to initiate
@@ -139,11 +140,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         cur_timestamp = str(time.time() * 1000).split(".")[0]
         job_name = "{0}-{1}".format(job_name, cur_timestamp)
 
-        pod_name = None
-        if not task_type:
-            image = self.image
-        else:
-            pod_name, image = task_type.split(",")
+        pod_name, image = task_type.split(",")
 
         if pod_name:  
             pod_name = '{}-{}'.format(pod_name,
@@ -154,7 +151,8 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             pod_name = '{}-{}'.format(self.pod_name,
                                       cur_timestamp)
 
-        cmd_string = cmd_string.format(worker_type=task_type)
+        cmd_string = cmd_string.replace("--worker_type=None", "--worker_type={}".format(task_type))
+        logger.debug("cmd_string is {}".format(cmd_string))
         formatted_cmd = template_string.format(command=cmd_string,
                                                worker_init=self.worker_init)
 
@@ -164,6 +162,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                          job_name=job_name,
                          cmd_string=formatted_cmd,
                          volumes=self.persistent_volumes)
+
         self.resources_by_pod_name[pod_name] = {'status': 'RUNNING', 'task_type': task_type}
         if task_type not in self.resources_by_task_type:
             self.resources_by_task_type[task_type] = queue.Queue()
@@ -183,10 +182,12 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
              - ExecutionProviderExceptions or its subclasses
         """
         # This is a hack
+        logger.debug("Getting Kubernetes provider status")
         status = {}
         for jid in job_ids:
-            task_type = self.resources_by_pod_name[jid]['task_type']
-            status[task_type] = status.get(task_type, 0) + 1
+            if jid in self.resources_by_pod_name:
+                task_type = self.resources_by_pod_name[jid]['task_type']
+                status[task_type] = status.get(task_type, 0) + 1
             
         return status
 
@@ -195,11 +196,12 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         if task_type and task_type in self.resources_by_task_type:
             while num_pods > 0:
                 try:
-                    to_kill.append(self.resources_by_task_type.get(block=False))
+                    to_kill.append(self.resources_by_task_type[task_type].get(block=False))
                 except queue.Empty:
                     break
                 else:
                     num_pods -= 1
+        logger.debug("[KUBERNETES] The to_kill pods are {}".format(to_kill))
         rets = self._cancel(to_kill)
         return to_kill, rets
 
@@ -215,8 +217,9 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             # Here we are assuming that for local, the job_ids are the process id's
             self._delete_pod(job)
 
-            self.resources[job]['status'] = 'CANCELLED'
-            del self.resources[job]
+            self.resources_by_pod_name[job]['status'] = 'CANCELLED'
+            del self.resources_by_pod_name[job]
+        logger.debug("[KUBERNETES] The resources in kube provider is {}".format(self.resources_by_pod_name))
         rets = [True for i in job_ids]
 
         return rets
@@ -229,7 +232,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
               [status...] : Status list of all jobs
         """
 
-        task_type = list(self.resources.keys())
+        task_type = list(self.resources_by_pod_name.keys())
         # TODO: fix this
         return jobs_ids
         # do something to get the deployment's status
