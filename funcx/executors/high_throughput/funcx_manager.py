@@ -440,6 +440,7 @@ class Manager(object):
         """
 
         if self.worker_type and self.scheduler_mode == 'hard':
+            logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
             self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
                                                                 worker_type=self.worker_type,
                                                                 address=self.address,
