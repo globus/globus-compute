@@ -314,7 +314,6 @@ class Manager(object):
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
-                            self.worker_map.total_worker_type_counts[task_type] = 0
                         self.task_queues[task_type].put(task)
                         logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
