@@ -548,3 +548,4 @@ def cli_run():
 
 if __name__ == "__main__":
     cli_run()
+    time.sleep(180)
