@@ -4,7 +4,6 @@ import queue
 from funcx.providers.kubernetes.template import template_string
 
 logger = logging.getLogger("interchange")
-print(logger.handlers)
 
 from parsl.providers.error import OptionalModuleMissing
 from parsl.providers.provider_base import ExecutionProvider
