@@ -183,7 +183,8 @@ class Interchange(object):
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
         logger.info("Connected to client")
 
-        self.pending_task_queue = {'total_pending_task_count': 0}
+        self.pending_task_queue = {}
+        self.total_pending_task_count = 0
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
@@ -366,7 +367,8 @@ class Interchange(object):
                 if task_type not in self.pending_task_queue:
                     self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
                 self.pending_task_queue[task_type].put(msg)
-                self.pending_task_queue['total_pending_task_count'] += 1
+                self.total_pending_task_count += 1
+                logger.info("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
 
@@ -375,8 +377,7 @@ class Interchange(object):
         """
         outstanding = {}
         for task_type in self.pending_task_queue:
-            if task_type != 'total_pending_task_count':
-                outstanding[task_type] = outstanding.get(task_type, 0) + self.pending_task_queue[task_type].qsize()
+            outstanding[task_type] = outstanding.get(task_type, 0) + self.pending_task_queue[task_type].qsize()
         for manager in self._ready_manager_queue:
             for task_type in self._ready_manager_queue[manager]['tasks']:
                 outstanding[task_type] = outstanding.get(task_type, 0) + len(self._ready_manager_queue[manager]['tasks'][task_type])
@@ -400,7 +401,7 @@ class Interchange(object):
         [ (element, tasks_pending, status) ... ]
         """
 
-        pending_on_interchange = self.pending_task_queue['total_pending_task_count']
+        pending_on_interchange = self.total_pending_task_count
         # Reporting pending on interchange is a deviation from Parsl
         reply = [('interchange', pending_on_interchange, True)]
         for manager in self._ready_manager_queue:
@@ -554,13 +555,14 @@ class Interchange(object):
                     except Exception:
                         logger.warning("[MAIN] Got a non-json registration message from manager:{}".format(
                             manager))
-                        logger.debug("[MAIN] Message :\n{}\n".format(message[0]))
+                        logger.debug("[MAIN] Message :\n{}\n".format(message))
 
                     # By default we set up to ignore bad nodes/registration messages.
                     self._ready_manager_queue[manager] = {'last': time.time(),
                                                           'reg_time': time.time(),
                                                           'free_capacity': {'total_workers': 0},
                                                           'active': True,
+                                                          'max_worker_count': 0,
                                                           'tasks': collections.defaultdict(set)}
                     if reg_flag is True:
                         interesting_managers.add(manager)
@@ -586,6 +588,7 @@ class Interchange(object):
                     else:
                         # Registration has failed.
                         if self.suppress_failure is False:
+                            logger.debug("Setting kill event for bad manager")
                             self._kill_event.set()
                             e = BadRegistration(manager, critical=True)
                             result_package = {'task_id': -1, 'exception': serialize_object(e)}
@@ -613,10 +616,12 @@ class Interchange(object):
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
-            task_dispatch = naive_interchange_task_dispatch(interesting_managers,
-                                                            self.pending_task_queue,
-                                                            self._ready_manager_queue,
-                                                            scheduler_mode='hard')
+            time.sleep(1)
+            task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                             self.pending_task_queue,
+                                                                             self._ready_manager_queue,
+                                                                             scheduler_mode=self.config.scheduler_mode)
+            self.total_pending_task_count -= dispatched_task
             
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]

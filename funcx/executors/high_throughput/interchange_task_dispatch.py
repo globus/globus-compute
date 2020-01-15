@@ -39,10 +39,17 @@ def naive_scheduler_hard(interesting_managers,
     """
 
     task_dispatch = {}
+    dispatched_task = 0
     # The first round: send tasks to the fixed containers on managers
-    if interesting_managers and pending_task_queue['total_pending_task_count'] > 0:
+    logger.debug("The interesting managers: {}".format(interesting_managers))
+    tmp = {}
+    for task_type in pending_task_queue:
+        tmp[task_type] = pending_task_queue[task_type].qsize()
+    logger.debug("The pending task queue is: {}".format(tmp))
+    if interesting_managers > 0:
         shuffled_managers = list(interesting_managers)
         random.shuffle(shuffled_managers)
+        logger.debug("In the first loop of task dispatch")
         for manager in shuffled_managers:
             if (ready_manager_queue[manager]['free_capacity']['total_workers'] and
                 ready_manager_queue[manager]['active']):
@@ -52,6 +59,7 @@ def naive_scheduler_hard(interesting_managers,
                     for task_type in tids:    
                         ready_manager_queue[manager]['tasks'][task_type].update(tids[task_type])
                     task_dispatch[manager] = tasks
+                    dispatched_task += len(tasks)
                     logger.info("[MAIN] Assigned tasks {} to manager {}".format(tids, manager))
                 if ready_manager_queue[manager]['free_capacity']['total_workers'] > 0:
                     logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, ready_manager_queue[manager]['free_capacity']['total_workers']))
@@ -61,10 +69,16 @@ def naive_scheduler_hard(interesting_managers,
             else:
                 interesting_managers.remove(manager)
 
-    # The second round: send tasks to the unused slots on managers 
-    if interesting_managers and pending_task_queue['total_pending_task_count'] > 0:
+    # The second round: send tasks to the unused slots on managers
+    logger.debug("The interesting managers: {}".format(interesting_managers))
+    tmp = {}
+    for task_type in pending_task_queue:
+        tmp[task_type] = pending_task_queue[task_type].qsize()
+    logger.debug("The pending task queue is: {}".format(tmp))
+    if interesting_managers > 0:
         shuffled_managers = list(interesting_managers)
         random.shuffle(shuffled_managers)
+        logger.debug("In the second loop of task dispatch")
         for manager in shuffled_managers:
             if (ready_manager_queue[manager]['free_capacity']['total_workers'] and
                 ready_manager_queue[manager]['active']):
@@ -74,6 +88,7 @@ def naive_scheduler_hard(interesting_managers,
                     for task_type in tids:    
                         ready_manager_queue[manager]['tasks'][task_type].update(tids[task_type])
                     task_dispatch[manager] = tasks
+                    dispatched_task += len(tasks)
                     logger.info("[MAIN] Assigned tasks {} to manager {}".format(tids, manager))
                 if ready_manager_queue[manager]['free_capacity']['total_workers'] > 0:
                     logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, ready_manager_queue[manager]['free_capacity']['total_workers']))
@@ -85,8 +100,8 @@ def naive_scheduler_hard(interesting_managers,
     else:
         pass
 
-    logger.debug("The task dispatch is {}".format(task_dispatch))
-    return task_dispatch
+    logger.debug("The task dispatch is {}, in total {} tasks".format(task_dispatch, dispatched_task))
+    return task_dispatch, dispatched_task
 
 
 def get_tasks_hard(pending_task_queue, manager_ads, mode='first'):
@@ -95,8 +110,6 @@ def get_tasks_hard(pending_task_queue, manager_ads, mode='first'):
     # allocate unused slots to tasks
     if mode != "first":
         for task_type in pending_task_queue:
-            if task_type == 'total_pending_task_count':
-                continue
             while manager_ads['free_capacity']["unused"] > 0:
                 try:
                     x = pending_task_queue[task_type].get(block=False)
@@ -106,7 +119,6 @@ def get_tasks_hard(pending_task_queue, manager_ads, mode='first'):
                     logger.debug("Get task {}".format(x))
                     tasks.append(x)
                     tids[task_type].add(x['task_id'])
-                    pending_task_queue['total_pending_task_count'] -= 1
                     manager_ads['free_capacity']['unused'] -= 1
                     manager_ads['free_capacity']['total_workers'] -= 1
         return tasks, tids
@@ -123,8 +135,7 @@ def get_tasks_hard(pending_task_queue, manager_ads, mode='first'):
                 else:
                     logger.debug("Get task {}".format(x))
                     tasks.append(x)
-                    tids[task_type].add(x['task_id'])
-                    pending_task_queue['total_pending_task_count'] -= 1
+                    tids[task_type].add(x['task_id'])                    
                     manager_ads['free_capacity'][task_type] -= 1
                     manager_ads['free_capacity']['total_workers'] -= 1
     return tasks, tids
