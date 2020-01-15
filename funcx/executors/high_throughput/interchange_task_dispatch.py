@@ -46,7 +46,7 @@ def naive_scheduler_hard(interesting_managers,
     for task_type in pending_task_queue:
         tmp[task_type] = pending_task_queue[task_type].qsize()
     logger.debug("The pending task queue is: {}".format(tmp))
-    if interesting_managers > 0:
+    if interesting_managers:
         shuffled_managers = list(interesting_managers)
         random.shuffle(shuffled_managers)
         logger.debug("In the first loop of task dispatch")
@@ -75,7 +75,7 @@ def naive_scheduler_hard(interesting_managers,
     for task_type in pending_task_queue:
         tmp[task_type] = pending_task_queue[task_type].qsize()
     logger.debug("The pending task queue is: {}".format(tmp))
-    if interesting_managers > 0:
+    if interesting_managers:
         shuffled_managers = list(interesting_managers)
         random.shuffle(shuffled_managers)
         logger.debug("In the second loop of task dispatch")

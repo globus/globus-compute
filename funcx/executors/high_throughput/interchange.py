@@ -83,7 +83,7 @@ class Interchange(object):
                  launch_cmd=None,
                  heartbeat_threshold=60,
                  logdir=".",
-                 logging_level=logging.DEBUG,
+                 logging_level=logging.INFO,
                  poll_period=10,
                  endpoint_id=None,
                  suppress_failure=False,
@@ -616,7 +616,6 @@ class Interchange(object):
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
-            time.sleep(1)
             task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
                                                                              self.pending_task_queue,
                                                                              self._ready_manager_queue,
