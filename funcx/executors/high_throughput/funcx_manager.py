@@ -195,6 +195,7 @@ class Manager(object):
         """ Send heartbeat to the incoming task queue
         """
         heartbeat = b'HEARTBEAT'
+        logger.debug("Sending heartbeat to interchange")
         r = self.task_incoming.send(heartbeat)
         logger.debug("Return from heartbeat: {}".format(r))
 
@@ -547,4 +548,3 @@ def cli_run():
 
 if __name__ == "__main__":
     cli_run()
-    time.sleep(180)
