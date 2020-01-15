@@ -368,7 +368,7 @@ class Interchange(object):
                     self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
                 self.pending_task_queue[task_type].put(msg)
                 self.total_pending_task_count += 1
-                logger.info("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
+                logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
 
@@ -419,9 +419,7 @@ class Interchange(object):
         block_id : str
              Block identifier of the block to be put on hold
         """
-        logger.debug("[HOLD_BLOCK]: Holding {}".format(block_id))
         for manager in self._ready_manager_queue:
-            logger.debug("[HOLD_BLOCK]: Checking manager {}: {}".format(manager, self._ready_manager_queue[manager]))
             if self._ready_manager_queue[manager]['active'] and \
                self._ready_manager_queue[manager]['block_id'] == block_id:
                 logger.debug("[HOLD_BLOCK]: Sending hold to manager: {}".format(manager))
@@ -627,38 +625,6 @@ class Interchange(object):
                 if tasks:
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
                     self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
-
-#             if interesting_managers and not self.pending_task_queue.empty():
-#                 shuffled_managers = list(interesting_managers)
-#                 random.shuffle(shuffled_managers)
-#                 while shuffled_managers and not self.pending_task_queue.empty():  # cf. the if statement above...
-#                     manager = shuffled_managers.pop()
-#                     if (self._ready_manager_queue[manager]['free_capacity'] and
-#                         self._ready_manager_queue[manager]['active']):
-#                         tasks = self.get_tasks(self._ready_manager_queue[manager]['free_capacity'])
-#                         if tasks:
-#                             logger.info("[MAIN] Sending Task message {}".format(tasks))
-#                             self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
-#                             task_count = len(tasks)
-#                             count += task_count
-#                             tids = [t['task_id'] for t in tasks]
-#                             self._ready_manager_queue[manager]['free_capacity'] -= task_count
-#                             self._ready_manager_queue[manager]['tasks'].extend(tids)
-#                             logger.info("[MAIN] Sent tasks: {} to manager {}".format(tids, manager))
-#                             if self._ready_manager_queue[manager]['free_capacity'] > 0:
-#                                 logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, self._ready_manager_queue[manager]['free_capacity']))
-#                                 # ... so keep it in the interesting_managers list
-#                             else:
-#                                 logger.debug("[MAIN] Manager {} is now saturated".format(manager))
-#                                 interesting_managers.remove(manager)
-#                     else:
-#                         interesting_managers.remove(manager)
-#                         # logger.debug("Nothing to send to manager {}".format(manager))
-#                 # logger.debug("[MAIN] leaving _ready_manager_queue section, with {} managers still interesting".format(len(interesting_managers)))
-#                 pass
-#             else:
-#                 # logger.debug("[MAIN] either no interesting managers or no tasks, so skipping manager pass")
-#                 pass
 
             # Receive any results and forward to client
             if self.results_incoming in self.socks and self.socks[self.results_incoming] == zmq.POLLIN:

@@ -41,11 +41,6 @@ def naive_scheduler_hard(interesting_managers,
     task_dispatch = {}
     dispatched_task = 0
     # The first round: send tasks to the fixed containers on managers
-    logger.debug("The interesting managers: {}".format(interesting_managers))
-    tmp = {}
-    for task_type in pending_task_queue:
-        tmp[task_type] = pending_task_queue[task_type].qsize()
-    logger.debug("The pending task queue is: {}".format(tmp))
     if interesting_managers:
         shuffled_managers = list(interesting_managers)
         random.shuffle(shuffled_managers)
@@ -54,13 +49,13 @@ def naive_scheduler_hard(interesting_managers,
             if (ready_manager_queue[manager]['free_capacity']['total_workers'] and
                 ready_manager_queue[manager]['active']):
                 tasks, tids = get_tasks_hard(pending_task_queue, ready_manager_queue[manager], mode="first")
-                logger.info("[MAIN] Get tasks {} from queue".format(tasks))
+                logger.debug("[MAIN] Get tasks {} from queue".format(tasks))
                 if tasks:
                     for task_type in tids:    
                         ready_manager_queue[manager]['tasks'][task_type].update(tids[task_type])
                     task_dispatch[manager] = tasks
                     dispatched_task += len(tasks)
-                    logger.info("[MAIN] Assigned tasks {} to manager {}".format(tids, manager))
+                    logger.debug("[MAIN] Assigned tasks {} to manager {}".format(tids, manager))
                 if ready_manager_queue[manager]['free_capacity']['total_workers'] > 0:
                     logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, ready_manager_queue[manager]['free_capacity']['total_workers']))
                 else:
@@ -70,11 +65,6 @@ def naive_scheduler_hard(interesting_managers,
                 interesting_managers.remove(manager)
 
     # The second round: send tasks to the unused slots on managers
-    logger.debug("The interesting managers: {}".format(interesting_managers))
-    tmp = {}
-    for task_type in pending_task_queue:
-        tmp[task_type] = pending_task_queue[task_type].qsize()
-    logger.debug("The pending task queue is: {}".format(tmp))
     if interesting_managers:
         shuffled_managers = list(interesting_managers)
         random.shuffle(shuffled_managers)
@@ -83,13 +73,13 @@ def naive_scheduler_hard(interesting_managers,
             if (ready_manager_queue[manager]['free_capacity']['total_workers'] and
                 ready_manager_queue[manager]['active']):
                 tasks, tids = get_tasks_hard(pending_task_queue, ready_manager_queue[manager], mode="second")
-                logger.info("[MAIN] Get tasks {} from queue".format(tasks))
+                logger.debug("[MAIN] Get tasks {} from queue".format(tasks))
                 if tasks:
                     for task_type in tids:    
                         ready_manager_queue[manager]['tasks'][task_type].update(tids[task_type])
                     task_dispatch[manager] = tasks
                     dispatched_task += len(tasks)
-                    logger.info("[MAIN] Assigned tasks {} to manager {}".format(tids, manager))
+                    logger.debug("[MAIN] Assigned tasks {} to manager {}".format(tids, manager))
                 if ready_manager_queue[manager]['free_capacity']['total_workers'] > 0:
                     logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, ready_manager_queue[manager]['free_capacity']['total_workers']))
                 else:
