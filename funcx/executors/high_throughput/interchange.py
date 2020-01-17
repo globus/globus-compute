@@ -282,7 +282,7 @@ class Interchange(object):
                                        heartbeat_threshold=self.config.heartbeat_threshold,
                                        poll_period=self.config.poll_period,
                                        worker_mode=self.config.worker_mode,
-                                       container_image=self.config.container_image,
+                                       container_image=None,
                                        logdir=working_dir)
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))

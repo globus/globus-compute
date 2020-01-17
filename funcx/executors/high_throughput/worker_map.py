@@ -56,15 +56,7 @@ class WorkerMap(object):
         self.to_die_count[worker_type] -= 1
         self.total_worker_type_counts['slots'] += 1
 
-    def spin_up_workers(self,
-                        next_worker_q,
-                        mode='no_container',
-                        container_uri=None,
-                        address=None,
-                        debug=None,
-                        uid=None,
-                        logdir=None,
-                        worker_port=None):
+    def spin_up_workers(self, next_worker_q, address=None, debug=None, uid=None, logdir=None, worker_port=None):
         """ Helper function to call 'remove' for appropriate workers in 'new_worker_map'.
 
         Parameters
@@ -101,8 +93,6 @@ class WorkerMap(object):
                 try:
                     self.add_worker(worker_id=str(self.worker_counter),
                                     worker_type=next_worker_q.pop(0),
-                                    mode=mode,
-                                    container_uri=container_uri,
                                     address=address, debug=debug,
                                     uid=uid,
                                     logdir=logdir,
@@ -177,12 +167,9 @@ class WorkerMap(object):
         if mode == 'no_container':
             modded_cmd = cmd
         elif mode == 'singularity':
-            modded_cmd = f'singularity exec --writable {container_uri} {cmd}'
+            modded_cmd = f'singularity run --writable {container_uri} {cmd}'
         else:
             raise NameError("Invalid container launch mode.")
-
-        modded_cmd = f'singularity exec --writable {container_uri} {cmd}'
-        logger.info("Command string :\n {}".format(modded_cmd))
 
         try:
             proc = subprocess.Popen(modded_cmd.split(),
