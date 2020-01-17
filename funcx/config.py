@@ -43,7 +43,6 @@ class Config(RepresentationMixin):
                  # Connection info
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
-                 container_image=None,
                  # Scaling info
                  strategy=SimpleStrategy(),
                  max_workers_per_node=float('inf'),
@@ -67,7 +66,6 @@ class Config(RepresentationMixin):
         # Connection info
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
-        self.container_image = container_image
 
         # Scaling info
         self.strategy = strategy

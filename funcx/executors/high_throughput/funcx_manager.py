@@ -61,7 +61,7 @@ class Manager(object):
                  debug=False,
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
-                 mode="no_container",
+                 mode="singularity_reuse",
                  container_image=None,
                  # TODO : This should be 10ms
                  poll_period=100):
@@ -277,8 +277,6 @@ class Manager(object):
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
             spin_up = self.worker_map.spin_up_workers(self.next_worker_q,
-                                                      mode=self.mode,
-                                                      container_uri=self.container_image,
                                                       debug=self.debug,
                                                       address=self.address,
                                                       uid=self.uid,
@@ -441,11 +439,8 @@ class Manager(object):
 
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
 
-        logger.info("Initializing workers with mode {}, container image {}".format(self.mode, self.container_image))
         self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_counter),
                                                    worker_type='RAW',
-                                                   mode=self.mode,
-                                                   container_uri=self.container_image,
                                                    address=self.address,
                                                    debug=self.debug,
                                                    uid=self.uid,
@@ -489,7 +484,7 @@ def cli_run():
                         help="Poll period used in milliseconds")
     parser.add_argument("--container_image", default=None,
                         help="Container image identifier/path")
-    parser.add_argument("--mode", default="no_container",
+    parser.add_argument("--mode", default="singularity_reuse",
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
     parser.add_argument("-r", "--result_url", required=True,
