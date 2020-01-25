@@ -94,7 +94,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
             Status block containing "status" key.
         """
 
-        r = self.get("{task_id}/status".format(task_id=task_id))
+        r = self.get("tasks/{task_id}/status".format(task_id=task_id))
         return json.loads(r.text)
 
     def get_result(self, task_id):
