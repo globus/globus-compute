@@ -17,6 +17,7 @@ import collections
 
 from parsl.version import VERSION as PARSL_VERSION
 from ipyparallel.serialize import serialize_object
+from funcx.sdk.client import FuncXClient
 from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -184,7 +185,9 @@ class Interchange(object):
         logger.info("Connected to client")
 
         self.pending_task_queue = {}
+        self.containers = {}
         self.total_pending_task_count = 0
+        self.fxs = FuncXClient()
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
@@ -363,7 +366,9 @@ class Interchange(object):
                 status_request.set()
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
-                task_type = msg['task_id'].split(";")[1]
+                task_type = self.get_container(msg['task_id'].split(";")[1])
+                msg['container'] = task_type
+                # task_type = '{},{}'.format(msg['task_id'].split(";")[1], container_location)
                 if task_type not in self.pending_task_queue:
                     self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
                 self.pending_task_queue[task_type].put(msg)
@@ -371,6 +376,22 @@ class Interchange(object):
                 logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
+
+    def get_container(self, container_uuid):
+        """ Get the container image location if it is not known to the interchange"""
+        if container_uuid not in self.containers:
+            if container_uuid == 'RAW' or not container_uuid:
+                self.containers[container_uuid] = 'RAW'
+            else:
+                try:
+                    container = self.fxs.get_container(container_uuid, self.config.container_type)
+                except Exception:
+                    logger.exception("[FETCH_CONTAINER] Unable to resolve container location")
+                    self.containers[container_uuid] = 'RAW'
+                else:
+                    logger.info("[FETCH_CONTAINER] Got container info: {}".format(container))
+                    self.containers[container_uuid] = container['location']
+        return self.containers[container_uuid]
 
     def get_total_tasks_outstanding(self):
         """ Get the outstanding tasks in total
@@ -633,14 +654,15 @@ class Interchange(object):
                 if manager not in self._ready_manager_queue:
                     logger.warning("[MAIN] Received a result from a un-registered manager: {}".format(manager))
                 else:
-                    logger.debug("[MAIN] Got {} result items in batch".format(len(b_messages)))
+                    logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
-                        # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
-                        task_type = r['task_id'].split(";")[1]
+                        logger.info("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
+                        task_type = self.containers[r['task_id'].split(';')[1]]
+                        # task_type = '{},{}'.format(container_uuid, self.containers[container_uuid])
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self.results_outgoing.send_multipart(b_messages)
-                    logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
+                    logger.info("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
 
             # logger.debug("[MAIN] entering bad_managers section")
