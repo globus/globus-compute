@@ -123,7 +123,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         # Dictionary that keeps track of jobs, keyed on task_type
         self.resources_by_task_type = {}
 
-    def submit(self, cmd_string, tasks_per_node, task_type, job_name="parsl"):
+    def submit(self, cmd_string, tasks_per_node, task_type, job_name="FuncX"):
         """ Submit a job
         Args:
              - cmd_string  :(String) - Name of the container to initiate
@@ -139,12 +139,11 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         cur_timestamp = str(time.time() * 1000).split(".")[0]
         job_name = "{0}-{1}".format(job_name, cur_timestamp)
 
-        pod_name, image = task_type.split(",")
+        # Use default image
+        image = self.image if task_type == 'RAW' else task_type
 
-        if pod_name:  
-            pod_name = '{}-{}'.format(pod_name,
-                                      cur_timestamp)
-        elif not self.pod_name:
+        # Set the pod name
+        if not self.pod_name:
             pod_name = '{}'.format(job_name)
         else:
             pod_name = '{}-{}'.format(self.pod_name,
