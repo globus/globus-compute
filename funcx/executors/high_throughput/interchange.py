@@ -368,7 +368,6 @@ class Interchange(object):
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
                 task_type = self.get_container(msg['task_id'].split(";")[1])
                 msg['container'] = task_type
-                # task_type = '{},{}'.format(msg['task_id'].split(";")[1], container_location)
                 if task_type not in self.pending_task_queue:
                     self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
                 self.pending_task_queue[task_type].put(msg)
@@ -659,7 +658,6 @@ class Interchange(object):
                         r = pickle.loads(b_message)
                         logger.info("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
                         task_type = self.containers[r['task_id'].split(';')[1]]
-                        # task_type = '{},{}'.format(container_uuid, self.containers[container_uuid])
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self.results_outgoing.send_multipart(b_messages)
                     logger.info("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
