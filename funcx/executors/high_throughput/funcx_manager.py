@@ -184,6 +184,7 @@ class Manager(object):
                'cores': self.cores_on_node,
                'mem': self.available_mem_on_node,
                'block_id': self.block_id,
+               'worker_type': self.worker_type,
                'os': platform.system(),
                'hname': platform.node(),
                'dir': os.getcwd(),
