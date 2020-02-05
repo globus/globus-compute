@@ -58,6 +58,7 @@ class WorkerMap(object):
         self.total_worker_type_counts[worker_type] -= 1
         self.to_die_count[worker_type] -= 1
         self.total_worker_type_counts['unused'] += 1
+        self.ready_worker_type_counts['unused'] += 1
 
     def spin_up_workers(self, next_worker_q, address=None, debug=None, uid=None, logdir=None, worker_port=None):
         """ Helper function to call 'remove' for appropriate workers in 'new_worker_map'.
