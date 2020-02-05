@@ -240,7 +240,7 @@ class Interchange(object):
                                "--hb_threshold={heartbeat_threshold} "
                                "--worker_mode={worker_mode} "
                                "--scheduler_mode={scheduler_mode} "
-                               "--worker_type={worker_type} ")
+                               "--worker_type={{worker_type}} ")
 
         self.current_platform = {'parsl_v': PARSL_VERSION,
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
@@ -294,7 +294,6 @@ class Interchange(object):
                                        poll_period=self.config.poll_period,
                                        worker_mode=self.config.worker_mode,
                                        scheduler_mode=self.config.scheduler_mode,
-                                       worker_type=None,
                                        logdir=working_dir)
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))
@@ -724,7 +723,7 @@ class Interchange(object):
             if self.config.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
-                launch_cmd = self.launch_cmd.format(block_id=external_block_id)
+                launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
                 if not task_type:
                     internal_block = self.config.provider.submit(launch_cmd, 1)
                 else:

@@ -149,7 +149,6 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             pod_name = '{}-{}'.format(self.pod_name,
                                       cur_timestamp)
 
-        cmd_string = cmd_string.replace("--worker_type=None", "--worker_type={}".format(task_type))
         logger.debug("cmd_string is {}".format(cmd_string))
         formatted_cmd = template_string.format(command=cmd_string,
                                                worker_init=self.worker_init)
