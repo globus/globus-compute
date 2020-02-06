@@ -623,7 +623,7 @@ class Interchange(object):
                     else:
                         manager_adv = pickle.loads(message[1])
                         logger.debug("[MAIN] Manager {} requested {}".format(manager, manager_adv))
-                        self._ready_manager_queue[manager]['free_capacity'] = manager_adv
+                        self._ready_manager_queue[manager]['free_capacity'].update(manager_adv)
                         self._ready_manager_queue[manager]['free_capacity']['total_workers'] = sum(manager_adv.values())
                         interesting_managers.add(manager)
 
