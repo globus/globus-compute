@@ -425,7 +425,7 @@ class Interchange(object):
         reply = [('interchange', pending_on_interchange, True)]
         for manager in self._ready_manager_queue:
             resp = (manager.decode('utf-8'),
-                    len(self._ready_manager_queue[manager]['tasks']),
+                    sum([len(tids) for tids in self._ready_manager_queue[manager]['tasks'].values()]),
                     self._ready_manager_queue[manager]['active'])
             reply.append(resp)
         return reply
