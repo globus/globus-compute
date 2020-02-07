@@ -40,12 +40,14 @@ def dispatch(interesting_managers,
              ready_manager_queue,
              scheduler_mode='hard',
              loop='first',
-             task_dispatch={},
+             task_dispatch=None,
              dispatched_tasks=0):
     """
     This is the core task dispatching algorithm for interchange.
     The algorithm depends on the scheduler mode and which loop.
     """
+    if not task_dispatch:
+        task_dispatch = {}
     if interesting_managers:
         shuffled_managers = list(interesting_managers)
         random.shuffle(shuffled_managers)
