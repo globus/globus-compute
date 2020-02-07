@@ -84,10 +84,10 @@ class WorkerMap(object):
         """
         spin_ups = []
 
-        logger.info("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
-        logger.info("[SPIN UP] Active Workers: {}".format(self.active_workers))
-        logger.info("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
-        logger.info("[SPIN UP] Max Worker Count: {}".format(self.max_worker_count))
+        logger.debug("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
+        logger.debug("[SPIN UP] Active Workers: {}".format(self.active_workers))
+        logger.debug("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
+        logger.debug("[SPIN UP] Max Worker Count: {}".format(self.max_worker_count))
 
         if len(next_worker_q) > 0 and self.active_workers + self.pending_workers < self.max_worker_count:
             logger.debug("[SPIN UP] Spinning up new workers!")
