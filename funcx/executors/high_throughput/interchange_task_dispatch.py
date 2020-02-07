@@ -40,7 +40,7 @@ def dispatch(interesting_managers,
              ready_manager_queue,
              scheduler_mode='hard',
              loop='first',
-             task_dispatch=None,
+             task_dispatch={},
              dispatched_tasks=0):
     """
     This is the core task dispatching algorithm for interchange.
