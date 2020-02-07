@@ -3,7 +3,7 @@ import time
 import queue
 from funcx.providers.kubernetes.template import template_string
 
-logger = logging.getLogger("interchange")
+logger = logging.getLogger("interchange.kube_provider")
 
 from parsl.providers.error import OptionalModuleMissing
 from parsl.providers.provider_base import ExecutionProvider
@@ -153,7 +153,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         formatted_cmd = template_string.format(command=cmd_string,
                                                worker_init=self.worker_init)
 
-        logger.debug("Pod name :{}".format(pod_name))
+        logger.info("[KUBERNETES] Scaling out a pod with name :{}".format(pod_name))
         self._create_pod(image=image,
                          pod_name=pod_name,
                          job_name=job_name,
@@ -198,7 +198,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                     break
                 else:
                     num_pods -= 1
-        logger.debug("[KUBERNETES] The to_kill pods are {}".format(to_kill))
+        logger.info("[KUBERNETES] The to_kill pods are {}".format(to_kill))
         rets = self._cancel(to_kill)
         return to_kill, rets
 

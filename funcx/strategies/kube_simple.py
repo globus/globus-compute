@@ -95,7 +95,7 @@ class KubeSimpleStrategy(BaseStrategy):
                     if (time.time() - idle_since) > self.max_idletime:
                             # We have resources idle for the max duration,
                             # we have to scale_in now.
-                            logger.debug("Idle time has reached {}s; removing resources of task type {}".format(
+                            logger.info("Idle time has reached {}s; removing resources of task type {}".format(
                                 self.max_idletime, task_type)
                             )
                             self.interchange.scale_in(active_blocks - min_blocks, task_type=task_type)
@@ -120,13 +120,13 @@ class KubeSimpleStrategy(BaseStrategy):
                     excess = math.ceil((active_tasks_per_type * parallelism) - active_slots)
                     excess_blocks = math.ceil(float(excess) / (tasks_per_node * nodes_per_block))
                     excess_blocks = min(excess_blocks, max_blocks - active_blocks)
-                    logger.debug("Requesting {} more blocks".format(excess_blocks))
+                    logger.info("Requesting {} more blocks".format(excess_blocks))
                     self.interchange.scale_out(excess_blocks, task_type=task_type)
 
             elif active_slots == 0 and active_tasks_per_type > 0:
                 # Case 4
                 # Check if slots are being lost quickly ?
-                logger.debug("Requesting single slot")
+                logger.info("Requesting single slot")
                 if active_blocks < max_blocks:
                     self.interchange.scale_out(1, task_type=task_type)
             # Case 3
