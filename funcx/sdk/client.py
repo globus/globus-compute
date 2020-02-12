@@ -114,7 +114,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         Exception obj: Exception due to which the task failed
         """
 
-        r = self.get("{task_id}/status".format(task_id=task_id))
+        r = self.get("tasks/{task_id}".format(task_id=task_id))
 
         logger.info(f"Got from globus : {r}")
         r_dict = json.loads(r.text)
