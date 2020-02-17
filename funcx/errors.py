@@ -3,7 +3,7 @@ class FuncxError(Exception):
     """
 
     def __str__(self):
-        return self.__repr__
+        return self.__repr__()
 
 
 class RegistrationError(FuncxError):
@@ -29,7 +29,7 @@ class FuncXUnreachable(FuncxError):
 class MalformedResponse(FuncxError):
     """ FuncX remote service responded with a Malformed Response
     """
-    def __init__(self, task_id, response):
+    def __init__(self, response):
         self.response = response
 
     def __repr__(self):

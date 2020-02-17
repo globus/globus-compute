@@ -7,6 +7,7 @@ from fair_research_login import NativeClient, JSONTokenStorage
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
+from funcx.errors import MalformedResponse
 
 logger = logging.getLogger(__name__)
 
