@@ -192,6 +192,53 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         return r['task_uuid']
 
+    def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
+        """Initiate an invocation
+
+        Parameters
+        ----------
+        *args : Any
+            Args as specified by the function signature
+        endpoint_id : uuid str
+            Endpoint UUID string. Required
+        function_id : uuid str
+            Function UUID string. Required
+        asynchronous : bool
+            Whether or not to run the function asynchronously
+
+        Returns
+        -------
+        task_id : str
+        UUID string that identifies the task
+        """
+        servable_path = 'submit_batch'
+        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
+        assert function_id is not None, "function_id key-word argument must be set"
+
+        ser_kwargs = self.fx_serializer.serialize(kwargs)
+
+        batch_payload = []
+        iterator = args[0]
+        for arg in iterator:
+            ser_args = self.fx_serializer.serialize((arg))
+            payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
+            batch_payload.append(payload)
+
+        data = {'endpoints': [endpoint_id],
+                'func': function_id,
+                'payload': batch_payload,
+                'is_async': asynchronous}
+
+        # Send the data to funcX
+        r = self.post(servable_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        if 'task_uuids' not in r:
+            raise MalformedResponse(r)
+
+        return r['task_uuids']
+
 
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
