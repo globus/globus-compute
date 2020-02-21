@@ -360,16 +360,67 @@ class FuncXClient(throttling.ThrottledBaseClient):
         json
             The response of the request
         """
-        container_path = f'endpoints/{endpoint_id}/whitelist'
+        req_path = f'endpoints/{endpoint_id}/whitelist'
 
         if not isinstance(function_ids, list):
             function_ids = [function_ids]
 
         payload = {'func': function_ids}
 
-        r = self.post(container_path, json_body=payload)
+        r = self.post(req_path, json_body=payload)
         if r.http_status is not 200:
             raise Exception(r)
 
         # Return the result
-        return r.json
+        return r
+
+    def get_whitelist(self, endpoint_id):
+        """List the endpoint's whitelist
+
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        req_path = f'endpoints/{endpoint_id}/whitelist'
+
+        r = self.get(req_path)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r
+
+    def delete_from_whitelist(self, endpoint_id, function_ids):
+        """List the endpoint's whitelist
+
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+        function_ids : list
+            A list of function id's to be whitelisted
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        if not isinstance(function_ids, list):
+            function_ids = [function_ids]
+        res = []
+        for fid in function_ids:
+            req_path = f'endpoints/{endpoint_id}/whitelist/{fid}'
+
+            r = self.delete(req_path)
+            if r.http_status is not 200:
+                raise Exception(r)
+            res.append(r)
+
+        # Return the result
+        return res
