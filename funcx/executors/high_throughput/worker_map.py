@@ -11,13 +11,13 @@ class WorkerMap(object):
     """ WorkerMap keeps track of workers
     """
 
-    def __init__(self, worker_count):
-        self.worker_count = worker_count
-        self.total_worker_type_counts = {'slots': self.worker_count, 'RAW': 0}
+    def __init__(self, max_worker_count):
+        self.max_worker_count = max_worker_count
+        self.total_worker_type_counts = {'slots': self.max_worker_count, 'RAW': 0}
         self.ready_worker_type_counts = {}
-        self.worker_queues = {}
-        self.worker_types = {}
         self.worker_counter = 0  # used to create worker_ids
+        self.worker_queues = {}  # a dict to keep track of all the worker_queues with the key of work_type
+        self.worker_types = {}  # a dict to keep track of all the worker_types with the key of worker_id
 
         # Only spin up containers if active_workers + pending_workers < max_workers.
         self.active_workers = 0
@@ -80,14 +80,14 @@ class WorkerMap(object):
         """
         spin_ups = 0
 
-        logger.info("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
-        logger.info("[SPIN UP] Active Workers: {}".format(self.active_workers))
-        logger.info("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
-        logger.info("[SPIN UP] Max Worker Count: {}".format(self.worker_count))
+        logger.debug("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
+        logger.debug("[SPIN UP] Active Workers: {}".format(self.active_workers))
+        logger.debug("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
+        logger.debug("[SPIN UP] Max Worker Count: {}".format(self.max_worker_count))
 
-        if len(next_worker_q) > 0 and self.active_workers + self.pending_workers < self.worker_count:
+        if len(next_worker_q) > 0 and self.active_workers + self.pending_workers < self.max_worker_count:
             logger.debug("[SPIN UP] Spinning up new workers!")
-            num_slots = min(self.worker_count - self.active_workers - self.pending_workers, len(next_worker_q))
+            num_slots = min(self.max_worker_count - self.active_workers - self.pending_workers, len(next_worker_q))
             for _ in range(num_slots):
 
                 try:
