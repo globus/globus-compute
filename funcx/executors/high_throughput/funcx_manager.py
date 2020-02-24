@@ -136,9 +136,9 @@ class Manager(object):
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
         self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
-        self.worker_count = min(max_workers,
+        self.max_worker_count = min(max_workers,
                                 math.floor(self.cores_on_node / cores_per_worker))
-        self.worker_map = WorkerMap(self.worker_count)
+        self.worker_map = WorkerMap(self.max_worker_count)
 
         self.internal_worker_port_range = internal_worker_port_range
 
@@ -156,7 +156,7 @@ class Manager(object):
 
         self.pending_result_queue = multiprocessing.Queue()
 
-        self.max_queue_size = max_queue_size + self.worker_count
+        self.max_queue_size = max_queue_size + self.max_worker_count
         self.tasks_per_round = 1
 
         self.heartbeat_period = heartbeat_period
@@ -173,7 +173,7 @@ class Manager(object):
                'python_v': "{}.{}.{}".format(sys.version_info.major,
                                              sys.version_info.minor,
                                              sys.version_info.micro),
-               'worker_count': self.worker_count,
+               'max_worker_count': self.max_worker_count,
                'cores': self.cores_on_node,
                'mem': self.available_mem_on_node,
                'block_id': self.block_id,
@@ -232,7 +232,7 @@ class Manager(object):
             logger.debug("[TASK_PULL_THREAD] Loop start")
             pending_task_count = task_recv_counter - task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
-            logger.debug("[TASK_PULL_THREAD pending_task_count: {} Ready_worker_count: {}".format(
+            logger.debug("[TASK_PULL_THREAD pending_task_count: {}, Ready_worker_count: {}".format(
                 pending_task_count, ready_worker_count))
 
             if time.time() > last_beat + self.heartbeat_period:
@@ -338,7 +338,7 @@ class Manager(object):
             logger.debug("To-Die Counts: {}".format(self.worker_map.to_die_count))
             logger.debug("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
 
-            new_worker_map = naive_scheduler(self.task_queues, self.worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
+            new_worker_map = naive_scheduler(self.task_queues, self.max_worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
             logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be removed
