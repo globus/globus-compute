@@ -57,7 +57,7 @@ class SimpleStrategy(BaseStrategy):
         nodes_per_block = self.interchange.config.provider.nodes_per_block
         parallelism = self.interchange.config.provider.parallelism
 
-        active_tasks = self.interchange.get_total_tasks_outstanding()
+        active_tasks = sum(self.interchange.get_total_tasks_outstanding().values())
         status = self.interchange.provider_status()
         logger.debug(f"Provider status : {status}")
 
