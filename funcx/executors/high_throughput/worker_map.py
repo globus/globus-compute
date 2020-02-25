@@ -13,8 +13,8 @@ class WorkerMap(object):
 
     def __init__(self, max_worker_count):
         self.max_worker_count = max_worker_count
-        self.total_worker_type_counts = {'slots': self.max_worker_count, 'RAW': 0}
-        self.ready_worker_type_counts = {}
+        self.total_worker_type_counts = {'unused': self.max_worker_count}
+        self.ready_worker_type_counts = {'unused': self.max_worker_count}
         self.pending_worker_type_counts = {}
         self.worker_queues = {}  # a dict to keep track of all the worker_queues with the key of work_type
         self.worker_types = {}  # a dict to keep track of all the worker_types with the key of worker_id
@@ -25,7 +25,7 @@ class WorkerMap(object):
         self.pending_workers = 0
 
         # Need to keep track of workers that are ABOUT to die
-        self.to_die_count = {'RAW': 0}
+        self.to_die_count = {}
 
     def register_worker(self, worker_id, worker_type):
         """ Add a new worker
@@ -57,7 +57,8 @@ class WorkerMap(object):
         self.active_workers -= 1
         self.total_worker_type_counts[worker_type] -= 1
         self.to_die_count[worker_type] -= 1
-        self.total_worker_type_counts['slots'] += 1
+        self.total_worker_type_counts['unused'] += 1
+        self.ready_worker_type_counts['unused'] += 1
 
     def spin_up_workers(self, next_worker_q, address=None, debug=None, uid=None, logdir=None, worker_port=None):
         """ Helper function to call 'remove' for appropriate workers in 'new_worker_map'.
@@ -183,7 +184,8 @@ class WorkerMap(object):
             logger.exception("Got an error in worker launch")
             raise
 
-        self.total_worker_type_counts['slots'] -= 1
+        self.total_worker_type_counts['unused'] -= 1
+        self.ready_worker_type_counts['unused'] -= 1
         self.pending_worker_type_counts[worker_type] = self.pending_worker_type_counts.get(worker_type, 0) + 1
         self.pending_workers += 1
 
@@ -246,4 +248,4 @@ class WorkerMap(object):
         return self.total_worker_type_counts
 
     def ready_worker_count(self):
-        return sum(self.total_worker_type_counts.values())
+        return sum(self.ready_worker_type_counts.values())

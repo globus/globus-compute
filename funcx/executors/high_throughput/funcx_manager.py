@@ -159,7 +159,7 @@ class Manager(object):
 
         logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
 
-        self.task_queues = {'RAW': queue.Queue()}
+        self.task_queues = {}
 
         self.pending_result_queue = multiprocessing.Queue()
 
@@ -195,7 +195,8 @@ class Manager(object):
     def heartbeat(self):
         """ Send heartbeat to the incoming task queue
         """
-        heartbeat = (HEARTBEAT_CODE).to_bytes(4, "little")
+        heartbeat = b'HEARTBEAT'
+        logger.debug("Sending heartbeat to interchange")
         r = self.task_incoming.send(heartbeat)
         logger.debug("Return from heartbeat: {}".format(r))
 
@@ -248,8 +249,8 @@ class Manager(object):
                 last_beat = time.time()
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
-                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ready_worker_count))
-                msg = (ready_worker_count.to_bytes(4, "little"))
+                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(self.worker_map.ready_worker_type_counts))
+                msg = pickle.dumps(self.worker_map.ready_worker_type_counts)
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
@@ -309,7 +310,7 @@ class Manager(object):
 
                     for task in tasks:
                         # Set default type to raw
-                        task_type = task['task_id'].split(';')[1]
+                        task_type = task['container']
 
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
@@ -356,7 +357,7 @@ class Manager(object):
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
-                if task_type == 'slots':
+                if task_type == 'unused':
                     continue
 
                 # *** Match tasks to workers *** #
@@ -439,15 +440,15 @@ class Manager(object):
             Forward results
         """
 
-        self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
-
-        self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
-                                                   worker_type='RAW',
-                                                   address=self.address,
-                                                   debug=self.debug,
-                                                   uid=self.uid,
-                                                   logdir=self.logdir,
-                                                   worker_port=self.worker_port))
+        if self.worker_type and self.scheduler_mode == 'hard':
+            logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
+            self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
+                                                                worker_type=self.worker_type,
+                                                                address=self.address,
+                                                                debug=self.debug,
+                                                                uid=self.uid,
+                                                                logdir=self.logdir,
+                                                                worker_port=self.worker_port))
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
