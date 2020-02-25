@@ -407,7 +407,7 @@ class Interchange(object):
                 logger.debug("[HOLD_BLOCK]: Sending hold to manager: {}".format(manager))
                 self.hold_manager(manager)
 
-    def hold_manager(manager):
+    def hold_manager(self, manager):
         """ Put manager on hold
         Parameters
         ----------
@@ -700,7 +700,7 @@ class Interchange(object):
         for i in range(blocks):
             if self.config.provider:
                 self._block_counter += 1
-                external_block_id = self._block_counter
+                external_block_id = str(self._block_counter)
                 launch_cmd = self.launch_cmd.format(block_id=external_block_id)
                 internal_block = self.config.provider.submit(launch_cmd, 1, 1)
                 logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
