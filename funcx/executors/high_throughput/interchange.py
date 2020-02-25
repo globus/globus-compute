@@ -371,7 +371,7 @@ class Interchange(object):
         active = 0
         for manager in self._ready_manager_queue:
             if self._ready_manager_queue[manager]['active']:
-                active += self._ready_manager_queue[manager]['worker_count']
+                active += self._ready_manager_queue[manager]['max_worker_count']
         return active
 
     def get_outstanding_breakdown(self):
