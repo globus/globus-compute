@@ -27,7 +27,7 @@ def test(fxc, ep_id, task_count=10):
 
     for i in range(3):
         x = fxc.get_batch_status(task_ids)
-        complete_count = sum([ 1 for t in task_ids if x[t].get('pending', False) ])
+        complete_count = sum([ 1 for t in task_ids if t in x and x[t].get('pending', False) ])
         print("Batch status : {}/{} complete".format(complete_count, len(task_ids)))
         if complete_count == len(task_ids):
             break
