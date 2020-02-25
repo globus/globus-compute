@@ -229,8 +229,9 @@ class Interchange(object):
                                "--block_id={{block_id}} "
                                "--hb_period={heartbeat_period} "
                                "--hb_threshold={heartbeat_threshold} "
-                               "--mode={worker_mode} "
-                               "--container_image={container_image} ")
+                               "--worker_mode={worker_mode} "
+                               "--scheduler_mode={scheduler_mode} "
+                               "--worker_type={{worker_type}} ")
 
         self.current_platform = {'parsl_v': PARSL_VERSION,
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
@@ -282,7 +283,7 @@ class Interchange(object):
                                        heartbeat_threshold=self.config.heartbeat_threshold,
                                        poll_period=self.config.poll_period,
                                        worker_mode=self.config.worker_mode,
-                                       container_image=None,
+                                       scheduler_mode=self.config.scheduler_mode,
                                        logdir=working_dir)
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))
