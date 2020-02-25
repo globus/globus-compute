@@ -62,7 +62,7 @@ def naive_scheduler(task_qs, max_workers, old_worker_map, to_die_list, logger):
         if len(q_types) > 0:
             while difference > 0:
                 win_q = random.choice(q_types)
-                if q_sizes(win_q) > new_worker_map[win_q]:
+                if q_sizes[win_q] > new_worker_map[win_q]:
                     new_worker_map[win_q] += 1
                     difference -= 1
 
