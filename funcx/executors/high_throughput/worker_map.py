@@ -122,12 +122,11 @@ class WorkerMap(object):
 
         spin_downs = []
         for worker_type in new_worker_map:
-            if new_worker_map[worker_type] < self.total_worker_type_counts[worker_type]:
-                num_remove = self.total_worker_type_counts[worker_type] - new_worker_map[worker_type]
+            num_remove = max(0, self.total_worker_type_counts.get(worker_type, 0) - new_worker_map[worker_type])
 
-                logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
-                for i in range(num_remove):
-                    spin_downs.append(worker_type)
+            logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
+            for i in range(num_remove):
+                spin_downs.append(worker_type)
         return spin_downs
 
     def add_worker(self, worker_id=str(random.random()),
