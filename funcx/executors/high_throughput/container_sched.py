@@ -49,7 +49,7 @@ def naive_scheduler(task_qs, max_workers, old_worker_map, to_die_list, logger):
             new_worker_map[q_type] = min(int(math.floor(ratio * max_workers)), q_sizes[q_type])
 
         # CLEANUP: Assign the difference here to any random worker. Should be small.
-        logger.info("Temporary new worker map: {}".format(new_worker_map))
+        logger.debug("Temporary new worker map: {}".format(new_worker_map))
 
         # Check the difference
         tmp_sum_q_size = sum(new_worker_map.values())
