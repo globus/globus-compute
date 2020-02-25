@@ -541,6 +541,7 @@ class Interchange(object):
                     self._ready_manager_queue[manager] = {'last': time.time(),
                                                           'reg_time': time.time(),
                                                           'free_capacity': 0,
+                                                          'max_worker_count': 0,
                                                           'active': True,
                                                           'tasks': []}
                     if reg_flag is True:
