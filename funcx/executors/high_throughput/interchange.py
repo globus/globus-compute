@@ -259,9 +259,10 @@ class Interchange(object):
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.config.provider.script_dir = working_dir
-        self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
-        self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
-        os.makedirs(self.config.provider.script_dir, exist_ok=True)
+        if hasattr(self.config.provider, 'channel'):
+            self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
+            self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
+            os.makedirs(self.config.provider.script_dir, exist_ok=True)
 
         debug_opts = "--debug" if self.config.worker_debug else ""
         max_workers = "" if self.config.max_workers_per_node == float('inf') \
