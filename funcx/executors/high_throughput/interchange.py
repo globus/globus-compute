@@ -217,6 +217,7 @@ class Interchange(object):
 
         self.heartbeat_threshold = heartbeat_threshold
         self.blocks = {}  # type: Dict[str, str]
+        self.block_id_map = {}
         self.launch_cmd = launch_cmd
         self.last_core_hr_counter = 0
         if not launch_cmd:
@@ -690,7 +691,7 @@ class Interchange(object):
         self.last_core_hr_counter = core_hrs
         return result_package
 
-    def scale_out(self, blocks=1):
+    def scale_out(self, blocks=1, task_type=None):
         """Scales out the number of blocks by "blocks"
 
         Raises:
@@ -700,20 +701,24 @@ class Interchange(object):
         for i in range(blocks):
             if self.config.provider:
                 self._block_counter += 1
-                external_block_id = self._block_counter
-                launch_cmd = self.launch_cmd.format(block_id=external_block_id)
-                internal_block = self.config.provider.submit(launch_cmd, 1, 1)
+                external_block_id = str(self._block_counter)
+                launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
+                if not task_type:
+                    internal_block = self.config.provider.submit(launch_cmd, 1)
+                else:
+                    internal_block = self.config.provider.submit(launch_cmd, 1, task_type)
                 logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
                 if not internal_block:
                     raise(ScalingFailed(self.provider.label,
                                         "Attempts to provision nodes via provider has failed"))
                 self.blocks[external_block_id] = internal_block
+                self.block_id_map[internal_block] = external_block_id
             else:
                 logger.error("No execution provider available")
                 r = None
         return r
 
-    def scale_in(self, blocks=None, block_ids=[]):
+    def scale_in(self, blocks=None, block_ids=[], task_type=None):
         """Scale in the number of active blocks by specified amount.
 
         Parameters
@@ -724,6 +729,19 @@ class Interchange(object):
         block_ids : [str.. ]
             List of external block ids to terminate
         """
+        if task_type:
+            logger.info("Scaling in blocks of specific task type {}. Let the provider decide which to kill".format(task_type))
+            if self.config.scaling_enabled and self.config.provider:
+                to_kill, r = self.config.provider.cancel(blocks, task_type)
+                logger.info("Get the killed blocks: {}, and status: {}".format(to_kill, r))
+                for job in to_kill:
+                    logger.info("[scale_in] Getting the block_id map {} for job {}".format(self.block_id_map, job))
+                    block_id = self.block_id_map[job]
+                    logger.info("[scale_in] Holding block {}".format(block_id))
+                    self._hold_block(block_id)
+                    self.blocks.pop(block_id)
+                return r
+
         if block_ids:
             block_ids_to_kill = block_ids
         else:
