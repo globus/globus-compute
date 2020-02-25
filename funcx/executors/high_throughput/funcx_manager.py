@@ -61,8 +61,9 @@ class Manager(object):
                  debug=False,
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
-                 mode="singularity_reuse",
-                 container_image=None,
+                 worker_mode="singularity_reuse",
+                 scheduler_mode="soft",
+                 worker_type=None,
                  # TODO : This should be 10ms
                  poll_period=100):
         """
@@ -96,14 +97,19 @@ class Manager(object):
              Port range from which the port(s) for the workers to connect to the manager is picked.
              Default: (50000,60000)
 
-        mode : str
+        worker_mode : str
              Pick between 3 supported modes for the worker:
               1. no_container : Worker launched without containers
               2. singularity_reuse : Worker launched inside a singularity container that will be reused
               3. singularity_single_use : Each worker and task runs inside a new container instance.
 
-        container_image : str
-             Path or identifier for the container to be used. Default: None
+        scheduler_mode : str
+             Pick between 2 supported modes for the manager:
+              1. hard: the manager cannot change the launched container type
+              2. soft: the manager can decide whether to launch different containers
+
+        worker_type : str
+             If set, the worker type for this manager is fixed. Default: None
 
         poll_period : int
              Timeout period used by the manager in milliseconds. Default: 10ms
@@ -130,8 +136,9 @@ class Manager(object):
 
         self.uid = uid
 
-        self.mode = mode
-        self.container_image = container_image
+        self.worker_mode = worker_mode
+        self.scheduler_mode = scheduler_mode
+        self.worker_type = worker_type
         self.cores_on_node = multiprocessing.cpu_count()
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
@@ -177,6 +184,7 @@ class Manager(object):
                'cores': self.cores_on_node,
                'mem': self.available_mem_on_node,
                'block_id': self.block_id,
+               'worker_type': self.worker_type,
                'os': platform.system(),
                'hname': platform.node(),
                'dir': os.getcwd(),
@@ -474,11 +482,14 @@ def cli_run():
                         help="Heartbeat threshold in seconds. Uses manager default unless set")
     parser.add_argument("--poll", default=10,
                         help="Poll period used in milliseconds")
-    parser.add_argument("--container_image", default=None,
-                        help="Container image identifier/path")
-    parser.add_argument("--mode", default="singularity_reuse",
+    parser.add_argument("--worker_type", default=None,
+                        help="Fixed worker type of manager")
+    parser.add_argument("--worker_mode", default="singularity_reuse",
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
+    parser.add_argument("--scheduler_mode", default="soft",
+                        help=("Choose the mode of scheduler "
+                              "(hard, soft"))
     parser.add_argument("-r", "--result_url", required=True,
                         help="REQUIRED: ZMQ url for posting results")
 
@@ -506,8 +517,9 @@ def cli_run():
         logger.info("hb_threshold: {}".format(args.hb_threshold))
         logger.info("max_workers: {}".format(args.max_workers))
         logger.info("poll_period: {}".format(args.poll))
-        logger.info("mode: {}".format(args.mode))
-        logger.info("container_image: {}".format(args.container_image))
+        logger.info("worker_mode: {}".format(args.worker_mode))
+        logger.info("scheduler_mode: {}".format(args.scheduler_mode))
+        logger.info("worker_type: {}".format(args.worker_type))
 
         manager = Manager(task_q_url=args.task_url,
                           result_q_url=args.result_url,
@@ -519,8 +531,9 @@ def cli_run():
                           heartbeat_period=int(args.hb_period),
                           logdir=args.logdir,
                           debug=args.debug,
-                          mode=args.mode,
-                          container_image=args.container_image,
+                          worker_mode=args.worker_mode,
+                          scheduler_mode=args.scheduler_mode,
+                          worker_type=args.worker_type,
                           poll_period=int(args.poll))
         manager.start()
 
