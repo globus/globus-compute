@@ -35,7 +35,7 @@ class Config(RepresentationMixin):
         Default: soft
 
     container_type : str
-        Select the type of container from Docker, Singularity, Shifter
+        Select the type of container from docker, singularity, shifter
         Default: None
 
     scaling_enabled : Bool
