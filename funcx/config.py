@@ -59,7 +59,7 @@ class Config(RepresentationMixin):
                  launch_cmd=None,
                  # Tuning info
                  worker_mode='no_container',
-                 scheduler_mode='hard',
+                 scheduler_mode='soft',
                  container_type=None,
                  prefetch_capacity=10,
                  heartbeat_period=2,
