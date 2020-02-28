@@ -8,3 +8,4 @@ texttable
 psutil
 python-daemon
 fair_research_login
+dill>=0.3
