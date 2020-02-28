@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import argparse
 import zmq
-# import uuid
 import os
 import sys
 import platform
@@ -15,7 +14,6 @@ import json
 import daemon
 
 from parsl.version import VERSION as PARSL_VERSION
-# from ipyparallel.serialize import serialize_object
 from funcx.serialize import FuncXSerializer
 
 LOOP_SLOWDOWN = 0.0  # in seconds
