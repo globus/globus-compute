@@ -189,6 +189,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
             r = self.post("/batch_status", json_body=payload)
             logger.debug("Response string : {}".format(r))
 
+        pending_task_ids = set(pending_task_ids)
+
         for task_id in task_id_list:
             if task_id in pending_task_ids:
                 try:
