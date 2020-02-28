@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import argparse
 import zmq
-# import uuid
 import os
 import sys
 import platform
@@ -15,7 +14,7 @@ import json
 import daemon
 
 from parsl.version import VERSION as PARSL_VERSION
-from ipyparallel.serialize import serialize_object
+from funcx.serialize import FuncXSerializer
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
@@ -158,6 +157,7 @@ class Interchange(object):
         self.suppress_failure = suppress_failure
         self.poll_period = poll_period
 
+        self.serializer = FuncXSerializer()
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
             client_address, client_ports[0], client_ports[1], client_ports[2]))
         self.context = zmq.Context()
@@ -557,7 +557,8 @@ class Interchange(object):
                                 logger.debug("Setting kill event")
                                 self._kill_event.set()
                                 e = ManagerLost(manager)
-                                result_package = {'task_id': -1, 'exception': serialize_object(e)}
+                                result_package = {'task_id': -1,
+                                                  'exception': self.serializer.serialize(e)}
                                 pkl_package = pickle.dumps(result_package)
                                 self.results_outgoing.send(pkl_package)
                                 logger.warning("[MAIN] Sent failure reports, unregistering manager")
@@ -569,7 +570,8 @@ class Interchange(object):
                         if self.suppress_failure is False:
                             self._kill_event.set()
                             e = BadRegistration(manager, critical=True)
-                            result_package = {'task_id': -1, 'exception': serialize_object(e)}
+                            result_package = {'task_id': -1,
+                                              'exception': self.serializer.serialize(e)}
                             pkl_package = pickle.dumps(result_package)
                             self.results_outgoing.send(pkl_package)
                         else:
@@ -649,7 +651,7 @@ class Interchange(object):
                 logger.warning("[MAIN] Too many heartbeats missed for manager {}".format(manager))
                 e = ManagerLost(manager)
                 for tid in self._ready_manager_queue[manager]['tasks']:
-                    result_package = {'task_id': tid, 'exception': serialize_object(e)}
+                    result_package = {'task_id': tid, 'exception': self.serializer.serialize(e)}
                     pkl_package = pickle.dumps(result_package)
                     self.results_outgoing.send(pkl_package)
                     logger.warning("[MAIN] Sent failure reports, unregistering manager")
