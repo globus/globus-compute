@@ -653,7 +653,7 @@ class Interchange(object):
                 logger.warning("[MAIN] Too many heartbeats missed for manager {}".format(manager))
                 e = ManagerLost(manager)
                 for tid in self._ready_manager_queue[manager]['tasks']:
-                    result_package = {'task_id': tid, 'exception': serialize_object(e)}
+                    result_package = {'task_id': tid, 'exception': self.serializer.serialize(e)}
                     pkl_package = pickle.dumps(result_package)
                     self.results_outgoing.send(pkl_package)
                     logger.warning("[MAIN] Sent failure reports, unregistering manager")
