@@ -387,7 +387,7 @@ class Interchange(object):
                     self.containers[container_uuid] = 'RAW'
                 else:
                     logger.info("[FETCH_CONTAINER] Got container info: {}".format(container))
-                    self.containers[container_uuid] = container['location']
+                    self.containers[container_uuid] = container.get('location', 'RAW')
         return self.containers[container_uuid]
 
     def get_total_tasks_outstanding(self):
