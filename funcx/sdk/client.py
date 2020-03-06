@@ -392,22 +392,22 @@ class FuncXClient(throttling.ThrottledBaseClient):
         # Return the result
         return r.data['container']
 
-    def register_function(self, function, function_name=None, container_uuid=None, description=None):
+    def register_function(self, function, function_name=None, container_uuid=None, description=None,
+                          public=False):
         """Register a function code with the funcX service.
 
         Parameters
         ----------
         function : Python Function
             The function to be registered for remote execution
-
         function_name : str
             The entry point (function name) of the function. Default: None
-
         container_uuid : str
             Container UUID from registration with funcX
-
         description : str
             Description of the file
+        public : bool
+            Whether or not the function is publicly accessible. Default = False
 
         Returns
         -------
@@ -423,7 +423,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 "function_code": packed_code,
                 "container_uuid": container_uuid,
                 "entry_point": function_name if function_name else function.__name__,
-                "description": description}
+                "description": description,
+                "public": public}
 
         logger.info("Registering function : {}".format(data))
 
