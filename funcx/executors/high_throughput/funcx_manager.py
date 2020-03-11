@@ -252,10 +252,6 @@ class Manager(object):
                     if m_type == b'REGISTER':
                         reg_info = pickle.loads(message)
                         logger.debug("Registration received from worker:{} {}".format(w_id, reg_info))
-
-                        # Increment worker_type count by 1
-                        self.worker_map.pending_workers -= 1
-                        self.worker_map.active_workers += 1
                         self.worker_map.register_worker(w_id, reg_info['worker_type'])
 
                     elif m_type == b'TASK_RET':
@@ -276,13 +272,12 @@ class Manager(object):
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
-            spin_up = self.worker_map.spin_up_workers(self.next_worker_q,
-                                                      debug=self.debug,
-                                                      address=self.address,
-                                                      uid=self.uid,
-                                                      logdir=self.logdir,
-                                                      worker_port=self.worker_port)
-            logger.debug("[SPIN UP]: Spun up {} containers".format(spin_up))
+            self.worker_procs.extend(self.worker_map.spin_up_workers(self.next_worker_q,
+                                                                     debug=self.debug,
+                                                                     address=self.address,
+                                                                     uid=self.uid,
+                                                                     logdir=self.logdir,
+                                                                     worker_port=self.worker_port))
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -312,7 +307,6 @@ class Manager(object):
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
-                            self.worker_map.total_worker_type_counts[task_type] = 0
                         self.task_queues[task_type].put(task)
                         logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
@@ -439,15 +433,13 @@ class Manager(object):
 
         self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
 
-        self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_counter),
+        self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
                                                    worker_type='RAW',
                                                    address=self.address,
                                                    debug=self.debug,
                                                    uid=self.uid,
                                                    logdir=self.logdir,
                                                    worker_port=self.worker_port))
-        self.worker_map.worker_counter += 1
-        self.worker_map.pending_workers += 1
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
