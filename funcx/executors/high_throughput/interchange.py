@@ -697,7 +697,7 @@ class Interchange(object):
                           'info': {'total_cores': total_cores,
                                    'total_mem' : total_mem,
                                    'new_core_hrs': core_hrs - self.last_core_hr_counter,
-                                   'total_core_hrs': round(core_hrs, 2)
+                                   'total_core_hrs': round(core_hrs, 2),
                                    'managers': num_managers,
                                    'active_managers': active_managers,
                                    'free_capacity': free_capacity,
