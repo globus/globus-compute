@@ -684,7 +684,7 @@ class Interchange(object):
         pending_tasks = self.pending_task_queue.qsize()
         num_managers = len(self._ready_manager_queue)
         live_workers = self.get_total_live_workers()
-        ready_workers = self.worker_map.ready_worker_count()
+        # ready_workers = self.worker_map.ready_worker_count()
 
         for manager in self._ready_manager_queue:
             total_cores += self._ready_manager_queue[manager]['cores']
@@ -703,7 +703,7 @@ class Interchange(object):
                                    'managers': num_managers,
                                    'active_managers': active_managers,
                                    'live_workers': live_workers,
-                                   'idle_workers': ready_workers,
+                                   # 'idle_workers': ready_workers,
                                    'free_capacity': free_capacity,
                                    'pending_tasks': pending_tasks,
                                    'outstanding_tasks': outstanding_tasks}}
