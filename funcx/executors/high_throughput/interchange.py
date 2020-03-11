@@ -682,7 +682,7 @@ class Interchange(object):
         free_capacity = 0
         outstanding_tasks = self.get_total_tasks_outstanding()
         pending_tasks = self.pending_task_queue.qsize()
-        num_managers = self._ready_manager_queue.qsize()
+        num_managers = len(self._ready_manager_queue.qsize)
         live_workers = self.get_total_live_workers()
 
         for manager in self._ready_manager_queue:
