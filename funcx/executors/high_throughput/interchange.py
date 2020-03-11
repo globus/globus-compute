@@ -350,7 +350,7 @@ class Interchange(object):
                 kill_event.set()
                 break
             elif msg == 'STATUS_REQUEST':
-                logger.warning("Got STATUS_REQUEST")
+                logger.debug("Got STATUS_REQUEST")
                 status_request.set()
             else:
                 self.pending_task_queue.put(msg)
@@ -661,7 +661,7 @@ class Interchange(object):
             logger.debug("[MAIN] ending one main loop iteration")
 
             if self._status_request.is_set():
-                logger.warning("status request response")
+                logger.info("status request response")
                 result_package = self.get_status_report()
                 pkl_package = pickle.dumps(result_package)
                 self.results_outgoing.send(pkl_package)
