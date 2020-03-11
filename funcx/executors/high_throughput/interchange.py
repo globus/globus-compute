@@ -678,17 +678,27 @@ class Interchange(object):
         total_cores = 0;
         total_mem = 0;
         core_hrs = 0
+        active_managers = 0
+        free_capacity = 0
+
         for manager in self._ready_manager_queue:
             total_cores += self._ready_manager_queue[manager]['cores']
             total_mem += self._ready_manager_queue[manager]['mem']
             active_dur = time.time() - self._ready_manager_queue[manager]['reg_time']
             core_hrs += ( active_dur * total_cores ) / 3600
+            if self._ready_manager_queue[manager]['active']:
+                active_managers += 1
+            free_capacity += self._ready_manager_queue[manager]['free_capacity']
+
 
         result_package = {'task_id': -2,
                           'info': {'total_cores': total_cores,
                                    'total_mem' : total_mem,
                                    'new_core_hrs': core_hrs - self.last_core_hr_counter,
-                                   'total_core_hrs': round(core_hrs, 2)}}
+                                   'total_core_hrs': round(core_hrs, 2)
+                                   'managers': {'count': len(self._ready_manager_queue),
+                                                'active': active_managers,
+                                                'free_capacity': free_capacity}}}
         self.last_core_hr_counter = core_hrs
         return result_package
 
