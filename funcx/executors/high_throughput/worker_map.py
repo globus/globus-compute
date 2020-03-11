@@ -240,4 +240,4 @@ class WorkerMap(object):
         return self.total_worker_type_counts
 
     def ready_worker_count(self):
-        return sum(self.total_worker_type_counts.values())
+        return sum(self.ready_worker_type_counts.values())
