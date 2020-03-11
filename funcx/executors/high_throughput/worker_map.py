@@ -15,9 +15,10 @@ class WorkerMap(object):
         self.worker_count = worker_count
         self.total_worker_type_counts = {'slots': self.worker_count, 'RAW': 0}
         self.ready_worker_type_counts = {}
-        self.worker_queues = {}
-        self.worker_types = {}
-        self.worker_counter = 0  # used to create worker_ids
+        self.pending_worker_type_counts = {}
+        self.worker_queues = {}  # a dict to keep track of all the worker_queues with the key of work_type
+        self.worker_types = {}  # a dict to keep track of all the worker_types with the key of worker_id
+        self.worker_id_counter = 0  # used to create worker_ids
 
         # Only spin up containers if active_workers + pending_workers < max_workers.
         self.active_workers = 0
@@ -37,7 +38,9 @@ class WorkerMap(object):
 
         self.total_worker_type_counts[worker_type] = self.total_worker_type_counts.get(worker_type, 0) + 1
         self.ready_worker_type_counts[worker_type] = self.ready_worker_type_counts.get(worker_type, 0) + 1
-        self.total_worker_type_counts['slots'] -= 1
+        self.pending_worker_type_counts[worker_type] = self.pending_worker_type_counts.get(worker_type, 0) - 1
+        self.pending_workers -= 1
+        self.active_workers += 1
         self.worker_queues[worker_type].put(worker_id)
 
         if worker_type not in self.to_die_count:
@@ -78,7 +81,7 @@ class WorkerMap(object):
         ---------
         Total number of spun-up workers.
         """
-        spin_ups = 0
+        spin_ups = []
 
         logger.info("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
         logger.info("[SPIN UP] Active Workers: {}".format(self.active_workers))
@@ -91,19 +94,17 @@ class WorkerMap(object):
             for _ in range(num_slots):
 
                 try:
-                    self.add_worker(worker_id=str(self.worker_counter),
-                                    worker_type=next_worker_q.pop(0),
-                                    address=address, debug=debug,
-                                    uid=uid,
-                                    logdir=logdir,
-                                    worker_port=worker_port)
+                    proc = self.add_worker(worker_id=str(self.worker_id_counter),
+                                           worker_type=next_worker_q.pop(0),
+                                           address=address, debug=debug,
+                                           uid=uid,
+                                           logdir=logdir,
+                                           worker_port=worker_port)
                 except Exception:
                     logger.exception("Error spinning up worker! Skipping...")
                     continue
                 else:
-                    spin_ups += 1
-                    self.pending_workers += 1
-                self.worker_counter += 1
+                    spin_ups.append(proc)
         return spin_ups
 
     def spin_down_workers(self, new_worker_map):
@@ -156,6 +157,8 @@ class WorkerMap(object):
 
         worker_id = ' --worker_id {}'.format(worker_id)
 
+        self.worker_id_counter += 1
+
         cmd = (f'funcx-worker {debug}{worker_id} '
                f'-a {address} '
                f'-p {worker_port} '
@@ -180,6 +183,10 @@ class WorkerMap(object):
         except Exception:
             logger.exception("Got an error in worker launch")
             raise
+
+        self.total_worker_type_counts['slots'] -= 1
+        self.pending_worker_type_counts[worker_type] = self.pending_worker_type_counts.get(worker_type, 0) + 1
+        self.pending_workers += 1
 
         return proc
 
