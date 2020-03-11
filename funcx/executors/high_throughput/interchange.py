@@ -680,6 +680,8 @@ class Interchange(object):
         core_hrs = 0
         active_managers = 0
         free_capacity = 0
+        outstanding_tasks = self.get_total_tasks_outstanding()
+        pending_tasks= self.pending_task_queue.qsize()
 
         for manager in self._ready_manager_queue:
             total_cores += self._ready_manager_queue[manager]['cores']
@@ -690,7 +692,6 @@ class Interchange(object):
                 active_managers += 1
             free_capacity += self._ready_manager_queue[manager]['free_capacity']
 
-
         result_package = {'task_id': -2,
                           'info': {'total_cores': total_cores,
                                    'total_mem' : total_mem,
@@ -698,7 +699,9 @@ class Interchange(object):
                                    'total_core_hrs': round(core_hrs, 2)
                                    'managers': {'count': len(self._ready_manager_queue),
                                                 'active': active_managers,
-                                                'free_capacity': free_capacity}}}
+                                                'free_capacity': free_capacity,
+                                                'pending_tasks': pending_tasks,
+                                                'outstanding_tasks': outstanding_tasks}}}
         self.last_core_hr_counter = core_hrs
         return result_package
 
