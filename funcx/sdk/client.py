@@ -393,8 +393,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         return r.data['container']
 
     def get_endpoint_status(self, endpoint_uuid):
-        """Get the status reports for an endpoint. This returns all of them as they are returned
-        from the EndpointDB's get() call.
+        """Get the status reports for an endpoint.
 
         Parameters
         ----------
