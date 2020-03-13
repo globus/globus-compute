@@ -353,7 +353,7 @@ class Interchange(object):
                 self.last_heartbeat = time.time()
             except zmq.Again:
                 # We just timed out while attempting to receive
-                logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.pending_task_queue.qsize()))
+                logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(len(self.total_pending_task_count)))
                 continue
 
             if msg == 'STOP':
