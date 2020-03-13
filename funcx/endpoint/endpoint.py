@@ -128,7 +128,7 @@ def init_endpoint(args):
     init_endpoint_dir(funcx_dir, "default")
 
 
-def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
+def register_with_hub(endpoint_uuid, endpoint_dir, address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
     """ This currently registers directly with the Forwarder micro service.
 
     Can be used as an example of how to make calls this it, while the main API
@@ -141,7 +141,7 @@ def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.am
     ip_addr = random.choice(sites)
     try:
         r = requests.post(address + '/register',
-                          json={'endpoint_id': str(uuid.uuid4()),
+                          json={'endpoint_id': endpoint_uuid,
                                 'endpoint_addr': ip_addr, 
                                 'redis_address': redis_host})
     except requests.exceptions.ConnectionError:
@@ -153,6 +153,10 @@ def register_with_hub(address, redis_host='funcx-redis.wtgh6h.0001.use1.cache.am
         print(dir(r))
         print(r)
         raise RegistrationError(r.reason)
+
+    with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
+        json.dump(r.json(), fp)
+        logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
 
     return r.json()
 
@@ -276,7 +280,9 @@ def start_endpoint(args, global_config=None):
             logger.debug("Registering endpoint")
             if global_config.get('broker_test', False) is True:
                 logger.warning("**************** BROKER DEBUG MODE *******************")
-                reg_info = register_with_hub(global_config['broker_address'],
+                reg_info = register_with_hub(endpoint_uuid,
+                                             endpoint_dir,
+                                             global_config['broker_address'],
                                              global_config['redis_host'])
             else:
                 reg_info = register_endpoint(funcx_client, args.name, endpoint_uuid, endpoint_dir)
