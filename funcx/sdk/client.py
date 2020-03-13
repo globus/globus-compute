@@ -3,6 +3,8 @@ import os
 import logging
 import pickle as pkl
 
+from parsl.app.errors import RemoteExceptionWrapper
+
 from fair_research_login import NativeClient, JSONTokenStorage
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
@@ -45,6 +47,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         Keyword arguments are the same as for BaseClient.
         """
+        self.func_table = {}
         self.ep_registration_path = 'register_endpoint_2'
         self.funcx_home = os.path.expanduser(funcx_home)
 
@@ -81,6 +84,47 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         self.native_client.logout()
 
+
+    def update_table(self, return_msg, task_id):
+        """ Parses the return message from the service and updates the internal func_tables
+
+        Parameters
+        ----------
+
+        return_msg : str
+           Return message received from the funcx service
+        task_id : str
+           task id string
+        """
+        if isinstance(return_msg, str):
+            r_dict = json.loads(return_msg)
+        else:
+            r_dict = return_msg
+
+        status = {'pending': True}
+
+        if 'result' in r_dict:
+            try:
+                r_obj = self.fx_serializer.deserialize(r_dict['result'])
+            except Exception:
+                raise Exception("Failure during deserialization of the result object")
+            else:
+                status.update({'pending': 'False',
+                               'result': r_obj})
+                self.func_table[task_id] = status
+
+        elif 'exception' in r_dict:
+            try:
+                r_exception = self.fx_serializer.deserialize(r_dict['exception'])
+                logger.info(f"Exception : {r_exception}")
+            except Exception:
+                raise Exception("Failure during deserialization of the Task's exception object")
+            else:
+                status.update({'pending': 'False',
+                               'exception': r_exception})
+                self.func_table[task_id] = status
+        return status
+
     def get_task_status(self, task_id):
         """Get the status of a funcX task.
 
@@ -94,9 +138,16 @@ class FuncXClient(throttling.ThrottledBaseClient):
         dict
             Status block containing "status" key.
         """
+        if task_id in self.func_table:
+             return self.func_table[task_id]
 
         r = self.get("{task_id}/status".format(task_id=task_id))
-        return json.loads(r.text)
+        logger.debug("Response string : {}".format(r))
+        try:
+            rets = self.update_table(r.text, task_id)
+        except Exception as e:
+            raise e
+        return rets
 
     def get_result(self, task_id):
         """ Get the result of a funcX task
@@ -114,31 +165,53 @@ class FuncXClient(throttling.ThrottledBaseClient):
         ------
         Exception obj: Exception due to which the task failed
         """
-
-        r = self.get("{task_id}/status".format(task_id=task_id))
-
-        logger.info(f"Got from globus : {r}")
-        r_dict = json.loads(r.text)
-
-        if 'result' in r_dict:
-            try:
-                r_obj = self.fx_serializer.deserialize(r_dict['result'])
-            except Exception:
-                raise Exception("Failure during deserialization of the result object")
-            else:
-                return r_obj
-
-        elif 'exception' in r_dict:
-            try:
-                r_exception = self.fx_serializer.deserialize(r_dict['exception'])
-                logger.info(f"Exception : {r_exception}")
-            except Exception:
-                raise Exception("Failure during deserialization of the Task's exception object")
-            else:
-                r_exception.reraise()
-
-        else:
+        status = self.get_task_status(task_id)
+        if status['pending'] is True:
             raise Exception("Task pending")
+        else:
+            if 'result' in status:
+                return status['result']
+            else:
+                logger.warn("We have an exception : {}".format(status['exception']))
+                status['exception'].reraise()
+
+    def get_batch_status(self, task_id_list):
+        """ Request status for a batch of task_ids
+        """
+        assert isinstance(task_id_list, list), "get_batch_status expects a list of task ids"
+
+
+        pending_task_ids = [t for t in task_id_list if t not in self.func_table]
+
+        results = {}
+
+        if pending_task_ids :
+            payload = {'task_ids': pending_task_ids}
+            r = self.post("/batch_status", json_body=payload)
+            logger.debug("Response string : {}".format(r))
+
+        pending_task_ids = set(pending_task_ids)
+
+        for task_id in task_id_list:
+            if task_id in pending_task_ids:
+                try:
+                    data = r['results'][task_id]
+                    rets = self.update_table(data, task_id)
+                    results[task_id] = rets
+                except KeyError:
+                    logger.debug("Task {} info was not available in the batch status")
+                except Exception as e:
+                    logger.exception("Failure while unpacking results fom get_batch_status")
+            else:
+                results[task_id] = self.func_table[task_id]
+
+        return results
+
+
+    def get_batch_result(self, task_id_list):
+        """ Request results for a batch of task_ids
+        """
+        pass
 
 
     def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
@@ -192,6 +265,53 @@ class FuncXClient(throttling.ThrottledBaseClient):
         return funcx_future
         """
         return r['task_uuid']
+
+    def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
+        """Initiate an invocation
+
+        Parameters
+        ----------
+        *args : Any
+            Args as specified by the function signature
+        endpoint_id : uuid str
+            Endpoint UUID string. Required
+        function_id : uuid str
+            Function UUID string. Required
+        asynchronous : bool
+            Whether or not to run the function asynchronously
+
+        Returns
+        -------
+        task_id : str
+        UUID string that identifies the task
+        """
+        servable_path = 'submit_batch'
+        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
+        assert function_id is not None, "function_id key-word argument must be set"
+
+        ser_kwargs = self.fx_serializer.serialize(kwargs)
+
+        batch_payload = []
+        iterator = args[0]
+        for arg in iterator:
+            ser_args = self.fx_serializer.serialize((arg,))
+            payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
+            batch_payload.append(payload)
+
+        data = {'endpoints': [endpoint_id],
+                'func': function_id,
+                'payload': batch_payload,
+                'is_async': asynchronous}
+
+        # Send the data to funcX
+        r = self.post(servable_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        if 'task_uuids' not in r:
+            raise MalformedResponse(r)
+
+        return r['task_uuids']
 
 
     def register_endpoint(self, name, endpoint_uuid, description=None):
@@ -272,22 +392,22 @@ class FuncXClient(throttling.ThrottledBaseClient):
         # Return the result
         return r.data['container']
 
-    def register_function(self, function, function_name=None, container_uuid=None, description=None):
+    def register_function(self, function, function_name=None, container_uuid=None, description=None,
+                          public=False):
         """Register a function code with the funcX service.
 
         Parameters
         ----------
         function : Python Function
             The function to be registered for remote execution
-
         function_name : str
             The entry point (function name) of the function. Default: None
-
         container_uuid : str
             Container UUID from registration with funcX
-
         description : str
             Description of the file
+        public : bool
+            Whether or not the function is publicly accessible. Default = False
 
         Returns
         -------
@@ -303,7 +423,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 "function_code": packed_code,
                 "container_uuid": container_uuid,
                 "entry_point": function_name if function_name else function.__name__,
-                "description": description}
+                "description": description,
+                "public": public}
 
         logger.info("Registering function : {}".format(data))
 
@@ -314,7 +435,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         # Return the result
         return r.data['function_uuid']
 
-    def register_container(self, location, container_type,  name='', description=''):
+    def register_container(self, location, container_type, name='', description=''):
         """Register a container with the funcX service.
 
         Parameters
@@ -344,3 +465,83 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         # Return the result
         return r.data['container_id']
+
+    def add_to_whitelist(self, endpoint_id, function_ids):
+        """Adds the function to the endpoint's whitelist
+
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+        function_ids : list
+            A list of function id's to be whitelisted
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        req_path = f'endpoints/{endpoint_id}/whitelist'
+
+        if not isinstance(function_ids, list):
+            function_ids = [function_ids]
+
+        payload = {'func': function_ids}
+
+        r = self.post(req_path, json_body=payload)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r
+
+    def get_whitelist(self, endpoint_id):
+        """List the endpoint's whitelist
+
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        req_path = f'endpoints/{endpoint_id}/whitelist'
+
+        r = self.get(req_path)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        # Return the result
+        return r
+
+    def delete_from_whitelist(self, endpoint_id, function_ids):
+        """List the endpoint's whitelist
+
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+        function_ids : list
+            A list of function id's to be whitelisted
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        if not isinstance(function_ids, list):
+            function_ids = [function_ids]
+        res = []
+        for fid in function_ids:
+            req_path = f'endpoints/{endpoint_id}/whitelist/{fid}'
+
+            r = self.delete(req_path)
+            if r.http_status is not 200:
+                raise Exception(r)
+            res.append(r)
+
+        # Return the result
+        return res
