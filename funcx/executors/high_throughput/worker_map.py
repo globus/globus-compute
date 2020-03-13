@@ -11,20 +11,21 @@ class WorkerMap(object):
     """ WorkerMap keeps track of workers
     """
 
-    def __init__(self, worker_count):
-        self.worker_count = worker_count
-        self.total_worker_type_counts = {'slots': self.worker_count, 'RAW': 0}
-        self.ready_worker_type_counts = {}
-        self.worker_queues = {}
-        self.worker_types = {}
-        self.worker_counter = 0  # used to create worker_ids
+    def __init__(self, max_worker_count):
+        self.max_worker_count = max_worker_count
+        self.total_worker_type_counts = {'unused': self.max_worker_count}
+        self.ready_worker_type_counts = {'unused': self.max_worker_count}
+        self.pending_worker_type_counts = {}
+        self.worker_queues = {}  # a dict to keep track of all the worker_queues with the key of work_type
+        self.worker_types = {}  # a dict to keep track of all the worker_types with the key of worker_id
+        self.worker_id_counter = 0  # used to create worker_ids
 
         # Only spin up containers if active_workers + pending_workers < max_workers.
         self.active_workers = 0
         self.pending_workers = 0
 
         # Need to keep track of workers that are ABOUT to die
-        self.to_die_count = {'RAW': 0}
+        self.to_die_count = {}
 
     def register_worker(self, worker_id, worker_type):
         """ Add a new worker
@@ -37,7 +38,9 @@ class WorkerMap(object):
 
         self.total_worker_type_counts[worker_type] = self.total_worker_type_counts.get(worker_type, 0) + 1
         self.ready_worker_type_counts[worker_type] = self.ready_worker_type_counts.get(worker_type, 0) + 1
-        self.total_worker_type_counts['slots'] -= 1
+        self.pending_worker_type_counts[worker_type] = self.pending_worker_type_counts.get(worker_type, 0) - 1
+        self.pending_workers -= 1
+        self.active_workers += 1
         self.worker_queues[worker_type].put(worker_id)
 
         if worker_type not in self.to_die_count:
@@ -54,7 +57,8 @@ class WorkerMap(object):
         self.active_workers -= 1
         self.total_worker_type_counts[worker_type] -= 1
         self.to_die_count[worker_type] -= 1
-        self.total_worker_type_counts['slots'] += 1
+        self.total_worker_type_counts['unused'] += 1
+        self.ready_worker_type_counts['unused'] += 1
 
     def spin_up_workers(self, next_worker_q, address=None, debug=None, uid=None, logdir=None, worker_port=None):
         """ Helper function to call 'remove' for appropriate workers in 'new_worker_map'.
@@ -78,32 +82,30 @@ class WorkerMap(object):
         ---------
         Total number of spun-up workers.
         """
-        spin_ups = 0
+        spin_ups = []
 
-        logger.info("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
-        logger.info("[SPIN UP] Active Workers: {}".format(self.active_workers))
-        logger.info("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
-        logger.info("[SPIN UP] Max Worker Count: {}".format(self.worker_count))
+        logger.debug("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
+        logger.debug("[SPIN UP] Active Workers: {}".format(self.active_workers))
+        logger.debug("[SPIN UP] Pending Workers: {}".format(self.pending_workers))
+        logger.debug("[SPIN UP] Max Worker Count: {}".format(self.max_worker_count))
 
-        if len(next_worker_q) > 0 and self.active_workers + self.pending_workers < self.worker_count:
+        if len(next_worker_q) > 0 and self.active_workers + self.pending_workers < self.max_worker_count:
             logger.debug("[SPIN UP] Spinning up new workers!")
-            num_slots = min(self.worker_count - self.active_workers - self.pending_workers, len(next_worker_q))
+            num_slots = min(self.max_worker_count - self.active_workers - self.pending_workers, len(next_worker_q))
             for _ in range(num_slots):
 
                 try:
-                    self.add_worker(worker_id=str(self.worker_counter),
-                                    worker_type=next_worker_q.pop(0),
-                                    address=address, debug=debug,
-                                    uid=uid,
-                                    logdir=logdir,
-                                    worker_port=worker_port)
+                    proc = self.add_worker(worker_id=str(self.worker_id_counter),
+                                           worker_type=next_worker_q.pop(0),
+                                           address=address, debug=debug,
+                                           uid=uid,
+                                           logdir=logdir,
+                                           worker_port=worker_port)
                 except Exception:
                     logger.exception("Error spinning up worker! Skipping...")
                     continue
                 else:
-                    spin_ups += 1
-                    self.pending_workers += 1
-                self.worker_counter += 1
+                    spin_ups.append(proc)
         return spin_ups
 
     def spin_down_workers(self, new_worker_map):
@@ -121,12 +123,11 @@ class WorkerMap(object):
 
         spin_downs = []
         for worker_type in new_worker_map:
-            if new_worker_map[worker_type] < self.total_worker_type_counts[worker_type]:
-                num_remove = self.total_worker_type_counts[worker_type] - new_worker_map[worker_type]
+            num_remove = max(0, self.total_worker_type_counts.get(worker_type, 0) - new_worker_map[worker_type])
 
-                logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
-                for i in range(num_remove):
-                    spin_downs.append(worker_type)
+            logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
+            for i in range(num_remove):
+                spin_downs.append(worker_type)
         return spin_downs
 
     def add_worker(self, worker_id=str(random.random()),
@@ -156,6 +157,8 @@ class WorkerMap(object):
 
         worker_id = ' --worker_id {}'.format(worker_id)
 
+        self.worker_id_counter += 1
+
         cmd = (f'funcx-worker {debug}{worker_id} '
                f'-a {address} '
                f'-p {worker_port} '
@@ -180,6 +183,11 @@ class WorkerMap(object):
         except Exception:
             logger.exception("Got an error in worker launch")
             raise
+
+        self.total_worker_type_counts['unused'] -= 1
+        self.ready_worker_type_counts['unused'] -= 1
+        self.pending_worker_type_counts[worker_type] = self.pending_worker_type_counts.get(worker_type, 0) + 1
+        self.pending_workers += 1
 
         return proc
 
@@ -240,4 +248,4 @@ class WorkerMap(object):
         return self.total_worker_type_counts
 
     def ready_worker_count(self):
-        return sum(self.total_worker_type_counts.values())
+        return sum(self.ready_worker_type_counts.values())
