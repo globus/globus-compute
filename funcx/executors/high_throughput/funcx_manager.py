@@ -61,8 +61,9 @@ class Manager(object):
                  debug=False,
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
-                 mode="singularity_reuse",
-                 container_image=None,
+                 worker_mode="singularity_reuse",
+                 scheduler_mode="soft",
+                 worker_type=None,
                  # TODO : This should be 10ms
                  poll_period=100):
         """
@@ -96,14 +97,19 @@ class Manager(object):
              Port range from which the port(s) for the workers to connect to the manager is picked.
              Default: (50000,60000)
 
-        mode : str
+        worker_mode : str
              Pick between 3 supported modes for the worker:
               1. no_container : Worker launched without containers
               2. singularity_reuse : Worker launched inside a singularity container that will be reused
               3. singularity_single_use : Each worker and task runs inside a new container instance.
 
-        container_image : str
-             Path or identifier for the container to be used. Default: None
+        scheduler_mode : str
+             Pick between 2 supported modes for the manager:
+              1. hard: the manager cannot change the launched container type
+              2. soft: the manager can decide whether to launch different containers
+
+        worker_type : str
+             If set, the worker type for this manager is fixed. Default: None
 
         poll_period : int
              Timeout period used by the manager in milliseconds. Default: 10ms
@@ -130,15 +136,16 @@ class Manager(object):
 
         self.uid = uid
 
-        self.mode = mode
-        self.container_image = container_image
+        self.worker_mode = worker_mode
+        self.scheduler_mode = scheduler_mode
+        self.worker_type = worker_type
         self.cores_on_node = multiprocessing.cpu_count()
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
         self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
-        self.worker_count = min(max_workers,
+        self.max_worker_count = min(max_workers,
                                 math.floor(self.cores_on_node / cores_per_worker))
-        self.worker_map = WorkerMap(self.worker_count)
+        self.worker_map = WorkerMap(self.max_worker_count)
 
         self.internal_worker_port_range = internal_worker_port_range
 
@@ -152,11 +159,11 @@ class Manager(object):
 
         logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
 
-        self.task_queues = {'RAW': queue.Queue()}
+        self.task_queues = {}
 
         self.pending_result_queue = multiprocessing.Queue()
 
-        self.max_queue_size = max_queue_size + self.worker_count
+        self.max_queue_size = max_queue_size + self.max_worker_count
         self.tasks_per_round = 1
 
         self.heartbeat_period = heartbeat_period
@@ -173,10 +180,11 @@ class Manager(object):
                'python_v': "{}.{}.{}".format(sys.version_info.major,
                                              sys.version_info.minor,
                                              sys.version_info.micro),
-               'worker_count': self.worker_count,
+               'max_worker_count': self.max_worker_count,
                'cores': self.cores_on_node,
                'mem': self.available_mem_on_node,
                'block_id': self.block_id,
+               'worker_type': self.worker_type,
                'os': platform.system(),
                'hname': platform.node(),
                'dir': os.getcwd(),
@@ -187,7 +195,8 @@ class Manager(object):
     def heartbeat(self):
         """ Send heartbeat to the incoming task queue
         """
-        heartbeat = (HEARTBEAT_CODE).to_bytes(4, "little")
+        heartbeat = b'HEARTBEAT'
+        logger.debug("Sending heartbeat to interchange")
         r = self.task_incoming.send(heartbeat)
         logger.debug("Return from heartbeat: {}".format(r))
 
@@ -232,7 +241,7 @@ class Manager(object):
             logger.debug("[TASK_PULL_THREAD] Loop start")
             pending_task_count = task_recv_counter - task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
-            logger.debug("[TASK_PULL_THREAD pending_task_count: {} Ready_worker_count: {}".format(
+            logger.debug("[TASK_PULL_THREAD pending_task_count: {}, Ready_worker_count: {}".format(
                 pending_task_count, ready_worker_count))
 
             if time.time() > last_beat + self.heartbeat_period:
@@ -240,8 +249,8 @@ class Manager(object):
                 last_beat = time.time()
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
-                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ready_worker_count))
-                msg = (ready_worker_count.to_bytes(4, "little"))
+                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(self.worker_map.ready_worker_type_counts))
+                msg = pickle.dumps(self.worker_map.ready_worker_type_counts)
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
@@ -301,7 +310,7 @@ class Manager(object):
 
                     for task in tasks:
                         # Set default type to raw
-                        task_type = task['task_id'].split(';')[1]
+                        task_type = task['container']
 
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
@@ -332,7 +341,7 @@ class Manager(object):
             logger.debug("To-Die Counts: {}".format(self.worker_map.to_die_count))
             logger.debug("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
 
-            new_worker_map = naive_scheduler(self.task_queues, self.worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
+            new_worker_map = naive_scheduler(self.task_queues, self.max_worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
             logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be removed
@@ -348,7 +357,7 @@ class Manager(object):
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
-                if task_type == 'slots':
+                if task_type == 'unused':
                     continue
 
                 # *** Match tasks to workers *** #
@@ -431,15 +440,15 @@ class Manager(object):
             Forward results
         """
 
-        self.task_queues = {'RAW': queue.Queue()}  # k-v: task_type - task_q (PriorityQueue) -- default = RAW
-
-        self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
-                                                   worker_type='RAW',
-                                                   address=self.address,
-                                                   debug=self.debug,
-                                                   uid=self.uid,
-                                                   logdir=self.logdir,
-                                                   worker_port=self.worker_port))
+        if self.worker_type and self.scheduler_mode == 'hard':
+            logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
+            self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
+                                                                worker_type=self.worker_type,
+                                                                address=self.address,
+                                                                debug=self.debug,
+                                                                uid=self.uid,
+                                                                logdir=self.logdir,
+                                                                worker_port=self.worker_port))
 
         logger.debug("Initial workers launched")
         self._kill_event = threading.Event()
@@ -474,11 +483,14 @@ def cli_run():
                         help="Heartbeat threshold in seconds. Uses manager default unless set")
     parser.add_argument("--poll", default=10,
                         help="Poll period used in milliseconds")
-    parser.add_argument("--container_image", default=None,
-                        help="Container image identifier/path")
-    parser.add_argument("--mode", default="singularity_reuse",
+    parser.add_argument("--worker_type", default=None,
+                        help="Fixed worker type of manager")
+    parser.add_argument("--worker_mode", default="singularity_reuse",
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
+    parser.add_argument("--scheduler_mode", default="soft",
+                        help=("Choose the mode of scheduler "
+                              "(hard, soft"))
     parser.add_argument("-r", "--result_url", required=True,
                         help="REQUIRED: ZMQ url for posting results")
 
@@ -506,8 +518,9 @@ def cli_run():
         logger.info("hb_threshold: {}".format(args.hb_threshold))
         logger.info("max_workers: {}".format(args.max_workers))
         logger.info("poll_period: {}".format(args.poll))
-        logger.info("mode: {}".format(args.mode))
-        logger.info("container_image: {}".format(args.container_image))
+        logger.info("worker_mode: {}".format(args.worker_mode))
+        logger.info("scheduler_mode: {}".format(args.scheduler_mode))
+        logger.info("worker_type: {}".format(args.worker_type))
 
         manager = Manager(task_q_url=args.task_url,
                           result_q_url=args.result_url,
@@ -519,8 +532,9 @@ def cli_run():
                           heartbeat_period=int(args.hb_period),
                           logdir=args.logdir,
                           debug=args.debug,
-                          mode=args.mode,
-                          container_image=args.container_image,
+                          worker_mode=args.worker_mode,
+                          scheduler_mode=args.scheduler_mode,
+                          worker_type=args.worker_type,
                           poll_period=int(args.poll))
         manager.start()
 

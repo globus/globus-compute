@@ -12,8 +12,11 @@ import queue
 import threading
 import json
 import daemon
+import collections
 
 from parsl.version import VERSION as PARSL_VERSION
+from funcx.sdk.client import FuncXClient
+from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -147,6 +150,7 @@ class Interchange(object):
             pass
 
         start_file_logger("{}/interchange.log".format(self.logdir), level=logging_level)
+        logger.info("logger location {}".format(logger.handlers))
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -179,7 +183,10 @@ class Interchange(object):
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
         logger.info("Connected to client")
 
-        self.pending_task_queue = queue.Queue(maxsize=10 ** 6)
+        self.pending_task_queue = {}
+        self.containers = {}
+        self.total_pending_task_count = 0
+        self.fxs = FuncXClient()
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
@@ -217,6 +224,7 @@ class Interchange(object):
 
         self.heartbeat_threshold = heartbeat_threshold
         self.blocks = {}  # type: Dict[str, str]
+        self.block_id_map = {}
         self.launch_cmd = launch_cmd
         self.last_core_hr_counter = 0
         if not launch_cmd:
@@ -229,8 +237,9 @@ class Interchange(object):
                                "--block_id={{block_id}} "
                                "--hb_period={heartbeat_period} "
                                "--hb_threshold={heartbeat_threshold} "
-                               "--mode={worker_mode} "
-                               "--container_image={container_image} ")
+                               "--worker_mode={worker_mode} "
+                               "--scheduler_mode={scheduler_mode} "
+                               "--worker_type={{worker_type}} ")
 
         self.current_platform = {'parsl_v': PARSL_VERSION,
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
@@ -259,9 +268,10 @@ class Interchange(object):
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.config.provider.script_dir = working_dir
-        self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
-        self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
-        os.makedirs(self.config.provider.script_dir, exist_ok=True)
+        if hasattr(self.config.provider, 'channel'):
+            self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
+            self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
+            os.makedirs(self.config.provider.script_dir, exist_ok=True)
 
         debug_opts = "--debug" if self.config.worker_debug else ""
         max_workers = "" if self.config.max_workers_per_node == float('inf') \
@@ -282,7 +292,7 @@ class Interchange(object):
                                        heartbeat_threshold=self.config.heartbeat_threshold,
                                        poll_period=self.config.poll_period,
                                        worker_mode=self.config.worker_mode,
-                                       container_image=None,
+                                       scheduler_mode=self.config.scheduler_mode,
                                        logdir=working_dir)
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))
@@ -343,7 +353,7 @@ class Interchange(object):
                 self.last_heartbeat = time.time()
             except zmq.Again:
                 # We just timed out while attempting to receive
-                logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.pending_task_queue.qsize()))
+                logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.total_pending_task_count))
                 continue
 
             if msg == 'STOP':
@@ -353,16 +363,42 @@ class Interchange(object):
                 logger.debug("Got STATUS_REQUEST")
                 status_request.set()
             else:
-                self.pending_task_queue.put(msg)
+                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
+                task_type = self.get_container(msg['task_id'].split(";")[1])
+                msg['container'] = task_type
+                if task_type not in self.pending_task_queue:
+                    self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
+                self.pending_task_queue[task_type].put(msg)
+                self.total_pending_task_count += 1
+                logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
+
+    def get_container(self, container_uuid):
+        """ Get the container image location if it is not known to the interchange"""
+        if container_uuid not in self.containers:
+            if container_uuid == 'RAW' or not container_uuid:
+                self.containers[container_uuid] = 'RAW'
+            else:
+                try:
+                    container = self.fxs.get_container(container_uuid, self.config.container_type)
+                except Exception:
+                    logger.exception("[FETCH_CONTAINER] Unable to resolve container location")
+                    self.containers[container_uuid] = 'RAW'
+                else:
+                    logger.info("[FETCH_CONTAINER] Got container info: {}".format(container))
+                    self.containers[container_uuid] = container.get('location', 'RAW')
+        return self.containers[container_uuid]
 
     def get_total_tasks_outstanding(self):
         """ Get the outstanding tasks in total
         """
-        outstanding = self.pending_task_queue.qsize()
+        outstanding = {}
+        for task_type in self.pending_task_queue:
+            outstanding[task_type] = outstanding.get(task_type, 0) + self.pending_task_queue[task_type].qsize()
         for manager in self._ready_manager_queue:
-            outstanding += len(self._ready_manager_queue[manager]['tasks'])
+            for task_type in self._ready_manager_queue[manager]['tasks']:
+                outstanding[task_type] = outstanding.get(task_type, 0) + len(self._ready_manager_queue[manager]['tasks'][task_type])
         return outstanding
 
     def get_total_live_workers(self):
@@ -371,7 +407,7 @@ class Interchange(object):
         active = 0
         for manager in self._ready_manager_queue:
             if self._ready_manager_queue[manager]['active']:
-                active += self._ready_manager_queue[manager]['worker_count']
+                active += self._ready_manager_queue[manager]['max_worker_count']
         return active
 
     def get_outstanding_breakdown(self):
@@ -383,12 +419,12 @@ class Interchange(object):
         [ (element, tasks_pending, status) ... ]
         """
 
-        pending_on_interchange = self.pending_task_queue.qsize()
+        pending_on_interchange = self.total_pending_task_count
         # Reporting pending on interchange is a deviation from Parsl
         reply = [('interchange', pending_on_interchange, True)]
         for manager in self._ready_manager_queue:
             resp = (manager.decode('utf-8'),
-                    len(self._ready_manager_queue[manager]['tasks']),
+                    sum([len(tids) for tids in self._ready_manager_queue[manager]['tasks'].values()]),
                     self._ready_manager_queue[manager]['active'])
             reply.append(resp)
         return reply
@@ -407,7 +443,7 @@ class Interchange(object):
                 logger.debug("[HOLD_BLOCK]: Sending hold to manager: {}".format(manager))
                 self.hold_manager(manager)
 
-    def hold_manager(manager):
+    def hold_manager(self, manager):
         """ Put manager on hold
         Parameters
         ----------
@@ -535,21 +571,22 @@ class Interchange(object):
                     except Exception:
                         logger.warning("[MAIN] Got a non-json registration message from manager:{}".format(
                             manager))
-                        logger.debug("[MAIN] Message :\n{}\n".format(message[0]))
+                        logger.debug("[MAIN] Message :\n{}\n".format(message))
 
                     # By default we set up to ignore bad nodes/registration messages.
                     self._ready_manager_queue[manager] = {'last': time.time(),
                                                           'reg_time': time.time(),
-                                                          'free_capacity': 0,
+                                                          'free_capacity': {'total_workers': 0},
+                                                          'max_worker_count': 0,
                                                           'active': True,
-                                                          'tasks': []}
+                                                          'tasks': collections.defaultdict(set)}
                     if reg_flag is True:
                         interesting_managers.add(manager)
                         logger.info("[MAIN] Adding manager: {} to ready queue".format(manager))
                         self._ready_manager_queue[manager].update(msg)
                         logger.info("[MAIN] Registration info for manager {}: {}".format(manager, msg))
 
-                        if (msg['python_v'] != self.current_platform['python_v'] or
+                        if (msg['python_v'].rsplit(".", 1)[0] != self.current_platform['python_v'].rsplit(".", 1)[0] or
                             msg['parsl_v'] != self.current_platform['parsl_v']):
                             logger.warn("[MAIN] Manager {} has incompatible version info with the interchange".format(manager))
 
@@ -568,6 +605,7 @@ class Interchange(object):
                     else:
                         # Registration has failed.
                         if self.suppress_failure is False:
+                            logger.debug("Setting kill event for bad manager")
                             self._kill_event.set()
                             e = BadRegistration(manager, critical=True)
                             result_package = {'task_id': -1,
@@ -579,16 +617,16 @@ class Interchange(object):
                                 manager))
 
                 else:
-                    tasks_requested = int.from_bytes(message[1], "little")
-                    logger.debug("[MAIN] Manager {} requested {} tasks".format(manager, tasks_requested))
                     self._ready_manager_queue[manager]['last'] = time.time()
-                    if tasks_requested == HEARTBEAT_CODE:
+                    if message[1] == b'HEARTBEAT':
                         logger.debug("[MAIN] Manager {} sends heartbeat".format(manager))
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                     else:
-                        self._ready_manager_queue[manager]['free_capacity'] = tasks_requested
+                        manager_adv = pickle.loads(message[1])
+                        logger.debug("[MAIN] Manager {} requested {}".format(manager, manager_adv))
+                        self._ready_manager_queue[manager]['free_capacity'].update(manager_adv)
+                        self._ready_manager_queue[manager]['free_capacity']['total_workers'] = sum(manager_adv.values())
                         interesting_managers.add(manager)
-                logger.debug("[MAIN] leaving task_outgoing section")
 
             # If we had received any requests, check if there are tasks that could be passed
 
@@ -596,36 +634,17 @@ class Interchange(object):
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
-            if interesting_managers and not self.pending_task_queue.empty():
-                shuffled_managers = list(interesting_managers)
-                random.shuffle(shuffled_managers)
-                while shuffled_managers and not self.pending_task_queue.empty():  # cf. the if statement above...
-                    manager = shuffled_managers.pop()
-                    if (self._ready_manager_queue[manager]['free_capacity'] and
-                        self._ready_manager_queue[manager]['active']):
-                        tasks = self.get_tasks(self._ready_manager_queue[manager]['free_capacity'])
-                        if tasks:
-                            self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
-                            task_count = len(tasks)
-                            count += task_count
-                            tids = [t['task_id'] for t in tasks]
-                            self._ready_manager_queue[manager]['free_capacity'] -= task_count
-                            self._ready_manager_queue[manager]['tasks'].extend(tids)
-                            logger.info("[MAIN] Sent tasks: {} to manager {}".format(tids, manager))
-                            if self._ready_manager_queue[manager]['free_capacity'] > 0:
-                                logger.debug("[MAIN] Manager {} still has free_capacity {}".format(manager, self._ready_manager_queue[manager]['free_capacity']))
-                                # ... so keep it in the interesting_managers list
-                            else:
-                                logger.debug("[MAIN] Manager {} is now saturated".format(manager))
-                                interesting_managers.remove(manager)
-                    else:
-                        interesting_managers.remove(manager)
-                        # logger.debug("Nothing to send to manager {}".format(manager))
-                # logger.debug("[MAIN] leaving _ready_manager_queue section, with {} managers still interesting".format(len(interesting_managers)))
-                pass
-            else:
-                # logger.debug("[MAIN] either no interesting managers or no tasks, so skipping manager pass")
-                pass
+            task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                             self.pending_task_queue,
+                                                                             self._ready_manager_queue,
+                                                                             scheduler_mode=self.config.scheduler_mode)
+            self.total_pending_task_count -= dispatched_task
+
+            for manager in task_dispatch:
+                tasks = task_dispatch[manager]
+                if tasks:
+                    logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
+                    self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
 
             # Receive any results and forward to client
             if self.results_incoming in self.socks and self.socks[self.results_incoming] == zmq.POLLIN:
@@ -638,7 +657,8 @@ class Interchange(object):
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
-                        self._ready_manager_queue[manager]['tasks'].remove(r['task_id'])
+                        task_type = self.containers[r['task_id'].split(';')[1]]
+                        self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self.results_outgoing.send_multipart(b_messages)
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
@@ -650,11 +670,12 @@ class Interchange(object):
                 logger.debug("[MAIN] Last: {} Current: {}".format(self._ready_manager_queue[manager]['last'], time.time()))
                 logger.warning("[MAIN] Too many heartbeats missed for manager {}".format(manager))
                 e = ManagerLost(manager)
-                for tid in self._ready_manager_queue[manager]['tasks']:
-                    result_package = {'task_id': tid, 'exception': self.serializer.serialize(e)}
-                    pkl_package = pickle.dumps(result_package)
-                    self.results_outgoing.send(pkl_package)
-                    logger.warning("[MAIN] Sent failure reports, unregistering manager")
+                for task_type in self._ready_manager_queue[manager]['tasks']:
+                    for tid in self._ready_manager_queue[manager]['tasks'][task_type]:
+                        result_package = {'task_id': tid, 'exception': self.serializer.serialize(e)}
+                        pkl_package = pickle.dumps(result_package)
+                        self.results_outgoing.send(pkl_package)
+                logger.warning("[MAIN] Sent failure reports, unregistering manager")
                 self._ready_manager_queue.pop(manager, 'None')
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
@@ -722,7 +743,7 @@ class Interchange(object):
         self.last_core_hr_counter = core_hrs
         return result_package
 
-    def scale_out(self, blocks=1):
+    def scale_out(self, blocks=1, task_type=None):
         """Scales out the number of blocks by "blocks"
 
         Raises:
@@ -732,20 +753,24 @@ class Interchange(object):
         for i in range(blocks):
             if self.config.provider:
                 self._block_counter += 1
-                external_block_id = self._block_counter
-                launch_cmd = self.launch_cmd.format(block_id=external_block_id)
-                internal_block = self.config.provider.submit(launch_cmd, 1, 1)
+                external_block_id = str(self._block_counter)
+                launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
+                if not task_type:
+                    internal_block = self.config.provider.submit(launch_cmd, 1)
+                else:
+                    internal_block = self.config.provider.submit(launch_cmd, 1, task_type)
                 logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
                 if not internal_block:
                     raise(ScalingFailed(self.provider.label,
                                         "Attempts to provision nodes via provider has failed"))
                 self.blocks[external_block_id] = internal_block
+                self.block_id_map[internal_block] = external_block_id
             else:
                 logger.error("No execution provider available")
                 r = None
         return r
 
-    def scale_in(self, blocks=None, block_ids=[]):
+    def scale_in(self, blocks=None, block_ids=[], task_type=None):
         """Scale in the number of active blocks by specified amount.
 
         Parameters
@@ -756,6 +781,19 @@ class Interchange(object):
         block_ids : [str.. ]
             List of external block ids to terminate
         """
+        if task_type:
+            logger.info("Scaling in blocks of specific task type {}. Let the provider decide which to kill".format(task_type))
+            if self.config.scaling_enabled and self.config.provider:
+                to_kill, r = self.config.provider.cancel(blocks, task_type)
+                logger.info("Get the killed blocks: {}, and status: {}".format(to_kill, r))
+                for job in to_kill:
+                    logger.info("[scale_in] Getting the block_id map {} for job {}".format(self.block_id_map, job))
+                    block_id = self.block_id_map[job]
+                    logger.info("[scale_in] Holding block {}".format(block_id))
+                    self._hold_block(block_id)
+                    self.blocks.pop(block_id)
+                return r
+
         if block_ids:
             block_ids_to_kill = block_ids
         else:
@@ -779,7 +817,9 @@ class Interchange(object):
         """
         status = []
         if self.config.provider:
+            logger.debug("[MAIN] Getting the status of {} blocks.".format(list(self.blocks.values())))
             status = self.config.provider.status(list(self.blocks.values()))
+            logger.debug("[MAIN] The status is {}".format(status))
 
         return status
 
