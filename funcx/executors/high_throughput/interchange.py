@@ -704,7 +704,21 @@ class Interchange(object):
                                    'total_workers': live_workers,
                                    'idle_workers': free_capacity,
                                    'pending_tasks': pending_tasks,
-                                   'outstanding_tasks': outstanding_tasks}}
+                                   'outstanding_tasks': outstanding_tasks,
+                                   'worker_mode': self.config.worker_mode,
+                                   'scheduler_mode': self.config.scheduler_mode,
+                                   'scaling_enabled': self.config.scaling_enabled,
+                                   'mem_per_worker': self.config.mem_per_worker,
+                                   'cores_per_worker': self.config.cores_per_worker,
+                                   'prefetch_capacity': self.config.prefetch_capacity,
+                                   'max_blocks': self.config.provider.max_blocks,
+                                   'min_blocks': self.config.provider.min_blocks,
+                                   'max_workers_per_node': self.config.max_workers_per_node,
+                                   'nodes_per_block': self.config.provider.nodes_per_block
+
+
+
+        }}
         self.last_core_hr_counter = core_hrs
         return result_package
 
