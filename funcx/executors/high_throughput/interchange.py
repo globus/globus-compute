@@ -696,9 +696,9 @@ class Interchange(object):
     def get_status_report(self):
         """ Get utilization numbers
         """
-        total_cores = 0;
-        total_mem = 0;
-        core_hrs = 0i
+        total_cores = 0
+        total_mem = 0
+        core_hrs = 0
         active_managers = 0
         free_capacity = 0
         outstanding_tasks = self.get_total_tasks_outstanding()
