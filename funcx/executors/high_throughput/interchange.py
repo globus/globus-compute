@@ -702,7 +702,7 @@ class Interchange(object):
         active_managers = 0
         free_capacity = 0
         outstanding_tasks = self.get_total_tasks_outstanding()
-        pending_tasks = self.pending_task_queue.qsize()
+        pending_tasks = self.total_pending_task_count
         num_managers = len(self._ready_manager_queue)
         live_workers = self.get_total_live_workers()
 
@@ -713,7 +713,7 @@ class Interchange(object):
             core_hrs += ( active_dur * total_cores ) / 3600
             if self._ready_manager_queue[manager]['active']:
                 active_managers += 1
-            free_capacity += self._ready_manager_queue[manager]['free_capacity']
+            free_capacity += self._ready_manager_queue[manager]['free_capacity']['total_workers']
 
         result_package = {'task_id': -2,
                           'info': {'total_cores': total_cores,
