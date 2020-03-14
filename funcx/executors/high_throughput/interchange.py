@@ -698,12 +698,22 @@ class Interchange(object):
         """
         total_cores = 0;
         total_mem = 0;
-        core_hrs = 0
+        core_hrs = 0i
+        active_managers = 0
+        free_capacity = 0
+        outstanding_tasks = self.get_total_tasks_outstanding()
+        pending_tasks = self.total_pending_task_count
+        num_managers = len(self._ready_manager_queue)
+        live_workers = self.get_total_live_workers()
+        
         for manager in self._ready_manager_queue:
             total_cores += self._ready_manager_queue[manager]['cores']
             total_mem += self._ready_manager_queue[manager]['mem']
             active_dur = time.time() - self._ready_manager_queue[manager]['reg_time']
-            core_hrs += ( active_dur * total_cores ) / 3600
+            core_hrs += (active_dur * total_cores ) / 3600
+            if self._ready_manager_queue[manager]['active']:
+                active_managers += 1
+            free_capacity += self._ready_manager_queue[manager]['free_capacity']['total_workers']
 
         result_package = {'task_id': -2,
                           'info': {'total_cores': total_cores,
