@@ -360,7 +360,7 @@ class Interchange(object):
                 kill_event.set()
                 break
             elif msg == 'STATUS_REQUEST':
-                logger.debug("Got STATUS_REQUEST")
+                logger.warning("Got STATUS_REQUEST")
                 status_request.set()
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
@@ -682,7 +682,7 @@ class Interchange(object):
             logger.debug("[MAIN] ending one main loop iteration")
 
             if self._status_request.is_set():
-                logger.info("status request response")
+                logger.warning("status request response")
                 result_package = self.get_status_report()
                 pkl_package = pickle.dumps(result_package)
                 self.results_outgoing.send(pkl_package)
@@ -699,47 +699,17 @@ class Interchange(object):
         total_cores = 0;
         total_mem = 0;
         core_hrs = 0
-        active_managers = 0
-        free_capacity = 0
-        outstanding_tasks = self.get_total_tasks_outstanding()
-        pending_tasks = self.pending_task_queue.qsize()
-        num_managers = len(self._ready_manager_queue)
-        live_workers = self.get_total_live_workers()
-
         for manager in self._ready_manager_queue:
             total_cores += self._ready_manager_queue[manager]['cores']
             total_mem += self._ready_manager_queue[manager]['mem']
             active_dur = time.time() - self._ready_manager_queue[manager]['reg_time']
             core_hrs += ( active_dur * total_cores ) / 3600
-            if self._ready_manager_queue[manager]['active']:
-                active_managers += 1
-            free_capacity += self._ready_manager_queue[manager]['free_capacity']
 
         result_package = {'task_id': -2,
                           'info': {'total_cores': total_cores,
                                    'total_mem' : total_mem,
                                    'new_core_hrs': core_hrs - self.last_core_hr_counter,
-                                   'total_core_hrs': round(core_hrs, 2),
-                                   'managers': num_managers,
-                                   'active_managers': active_managers,
-                                   'total_workers': live_workers,
-                                   'idle_workers': free_capacity,
-                                   'pending_tasks': pending_tasks,
-                                   'outstanding_tasks': outstanding_tasks,
-                                   'worker_mode': self.config.worker_mode,
-                                   'scheduler_mode': self.config.scheduler_mode,
-                                   'scaling_enabled': self.config.scaling_enabled,
-                                   'mem_per_worker': self.config.mem_per_worker,
-                                   'cores_per_worker': self.config.cores_per_worker,
-                                   'prefetch_capacity': self.config.prefetch_capacity,
-                                   'max_blocks': self.config.provider.max_blocks,
-                                   'min_blocks': self.config.provider.min_blocks,
-                                   'max_workers_per_node': self.config.max_workers_per_node,
-                                   'nodes_per_block': self.config.provider.nodes_per_block
-
-
-
-        }}
+                                   'total_core_hrs': round(core_hrs, 2)}}
         self.last_core_hr_counter = core_hrs
         return result_package
 
