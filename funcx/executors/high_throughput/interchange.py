@@ -709,7 +709,7 @@ class Interchange(object):
         for manager in self._ready_manager_queue:
             total_cores += self._ready_manager_queue[manager]['cores']
             total_mem += self._ready_manager_queue[manager]['mem']
-            active_dur = time.time() - self._ready_manager_queue[manager]['reg_time']
+            active_dur = abs(time.time() - self._ready_manager_queue[manager]['reg_time'])
             core_hrs += (active_dur * total_cores) / 3600
             if self._ready_manager_queue[manager]['active']:
                 active_managers += 1
