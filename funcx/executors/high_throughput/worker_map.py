@@ -122,8 +122,10 @@ class WorkerMap(object):
         """
 
         spin_downs = []
-        for worker_type in new_worker_map:
-            num_remove = max(0, self.total_worker_type_counts.get(worker_type, 0) - new_worker_map[worker_type])
+        for worker_type in self.total_worker_type_counts:
+            if worker_type == 'unused':
+                continue
+            num_remove = max(0, self.total_worker_type_counts[worker_type] - new_worker_map.get(worker_type, 0))
 
             logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
             for i in range(num_remove):
@@ -211,9 +213,11 @@ class WorkerMap(object):
             # If we don't already have this type of worker in our worker_map...
             if worker_type not in self.total_worker_type_counts:
                 self.total_worker_type_counts[worker_type] = 0
-            if new_worker_map[worker_type] > self.total_worker_type_counts[worker_type]:
+                self.pending_worker_type_counts[worker_type] = 0
+            cur_workers = self.total_worker_type_counts[worker_type] + self.pending_worker_type_counts[worker_type]
+            if new_worker_map[worker_type] > cur_workers:
 
-                for i in range(new_worker_map[worker_type] - self.total_worker_type_counts[worker_type]):
+                for i in range(new_worker_map[worker_type] - cur_workers):
                     # Add worker
                     new_worker_list.append(worker_type)
 

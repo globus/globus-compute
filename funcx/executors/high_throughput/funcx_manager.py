@@ -160,6 +160,8 @@ class Manager(object):
         logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
 
         self.task_queues = {}
+        self.outstanding_task_count = {}
+        self.task_type_mapping = {}
 
         self.pending_result_queue = multiprocessing.Queue()
 
@@ -269,6 +271,10 @@ class Manager(object):
                         self.pending_result_queue.put(message)
                         self.worker_map.put_worker(w_id)
                         task_done_counter += 1
+                        task_type = self.task_type_mapping.pop(pickle.loads(message)['task_id'])
+                        logger.debug("Task type: {}".format(task_type))
+                        self.outstanding_task_count[task_type] -= 1
+                        logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
 
                     elif m_type == b'WRKR_DIE':
                         logger.debug("[WORKER_REMOVE] Removing worker from worker_map...")
@@ -316,7 +322,11 @@ class Manager(object):
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
+                            self.outstanding_task_count[task_type] = 0
                         self.task_queues[task_type].put(task)
+                        self.outstanding_task_count[task_type] += 1
+                        self.task_type_mapping[task['task_id']] = task_type
+                        logger.debug("Got task: Outstanding task counts: {}".format(self.outstanding_task_count))
                         logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
             else:
@@ -336,12 +346,17 @@ class Manager(object):
                         proc.kill()
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
-
-            logger.debug("Task queues: {}".format(self.task_queues))
+            if 'RAW' in self.task_queues:
+                logger.debug("Task queues: {}".format(self.task_queues['RAW'].qsize()))
             logger.debug("To-Die Counts: {}".format(self.worker_map.to_die_count))
             logger.debug("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
 
-            new_worker_map = naive_scheduler(self.task_queues, self.max_worker_count, new_worker_map, self.worker_map.to_die_count, logger=logger)
+            new_worker_map = naive_scheduler(self.task_queues,
+                                             self.outstanding_task_count,
+                                             self.max_worker_count,
+                                             new_worker_map,
+                                             self.worker_map.to_die_count,
+                                             logger=logger)
             logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
             #  Count the workers of each type that need to be removed
