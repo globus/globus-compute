@@ -346,8 +346,7 @@ class Manager(object):
                         proc.kill()
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
-            if 'RAW' in self.task_queues:
-                logger.debug("Task queues: {}".format(self.task_queues['RAW'].qsize()))
+
             logger.debug("To-Die Counts: {}".format(self.worker_map.to_die_count))
             logger.debug("Alive worker counts: {}".format(self.worker_map.total_worker_type_counts))
 
