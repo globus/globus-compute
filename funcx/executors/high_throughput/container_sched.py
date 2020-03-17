@@ -3,7 +3,7 @@ import math
 import random
 
 
-def naive_scheduler(task_qs, max_workers, old_worker_map, to_die_list, logger):
+def naive_scheduler(task_qs, outstanding_task_count, max_workers, old_worker_map, to_die_list, logger):
     """ Return two items (as one tuple) dict kill_list :: KILL [(worker_type, num_kill), ...]
                                         dict create_list :: CREATE [(worker_type, num_create), ...]
 
@@ -33,10 +33,10 @@ def naive_scheduler(task_qs, max_workers, old_worker_map, to_die_list, logger):
 
     # Sum the size of each *available* (unblocked) task queue
     sum_q_size = 0
-    for q_type in task_qs:
+    for q_type in outstanding_task_count:
         if q_type not in blocked_types:
             q_types.append(q_type)
-            q_size = task_qs[q_type].qsize()
+            q_size = outstanding_task_count[q_type]
             sum_q_size += q_size
             q_sizes[q_type] = q_size
 
@@ -67,11 +67,7 @@ def naive_scheduler(task_qs, max_workers, old_worker_map, to_die_list, logger):
                     difference -= 1
 
         logger.debug("Final new_worker_map: {}".format(new_worker_map))
-        return new_worker_map
-
-    else:
-
-        return None
+    return new_worker_map
 
 
 # TODO: Remove after debugging complete.
