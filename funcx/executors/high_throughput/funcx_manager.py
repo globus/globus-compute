@@ -160,6 +160,8 @@ class Manager(object):
         logger.info("Manager listening on {} port for incoming worker connections".format(self.worker_port))
 
         self.task_queues = {}
+        if worker_type:
+            self.task_queues[worker_type] = queue.Queue()
         self.outstanding_task_count = {}
         self.task_type_mapping = {}
 
