@@ -324,6 +324,7 @@ class Manager(object):
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
+                        if task_type not in self.outstanding_task_count:
                             self.outstanding_task_count[task_type] = 0
                         self.task_queues[task_type].put(task)
                         self.outstanding_task_count[task_type] += 1
