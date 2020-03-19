@@ -23,27 +23,19 @@ on existing infrastructure including clouds, clusters, and supercomputers.
 Quickstart
 ==========
 
-funcX is in alpha state and is not available on PyPI yet. To install funcX,
-we recommend installing from source into a conda environment.
+funcX is in alpha state with version `0.0.1a4` currently available on PyPI.
 
+To install funcX, please ensure you have python3.6+.::
 
-1. Install Conda and set up python3.6 following the instructions `here <https://conda.io/docs/user-guide/install/macos.html>`_::
+   $ python3 --version
 
-   $ conda create --name funcx_py36 python=3.6
-   $ source activate funcx_py36
+Install using Pip::
 
-2. Download funcX::
+   $ pip install funcx
 
-   $ git clone https://github.com/funcx-faas/funcX
+To use our example notebooks you will need Jupyter.::
 
-3. Install from source::
-
-   $ cd funcX
-   $ pip install .
-
-4. Use funcX!
-
-.. note:: funcX currently only support Python3.6 functions and environment for execution.
+   $ pip install jupyter
 
 
 Documentation
