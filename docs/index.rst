@@ -17,6 +17,7 @@ and supercomputers.
    endpoints
    Tutorial.ipynb
    client
+   reference
    debugging
 
 

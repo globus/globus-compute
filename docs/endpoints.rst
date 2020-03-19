@@ -71,8 +71,9 @@ To generate the appropriate directories and default config template, run the fol
 
 The above command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/` and will instantiate a
 `config.py` file. This file should be updated with the appropriate configurations for the computational system you are
-targeting before you start the endpoint. The funcX configuration builds on `Parsl <https://parsl-project.org>`_ configs.
-More information regarding this configuration file can be found `here <https://parsl.readthedocs.io/en/stable/userguide/configuring.html>`_
+targeting before you start the endpoint. The funcX builds on `Parsl <https://parsl-project.org>`_ and is
+configured using a :class:`~funcx.config.Config` object.
+For more information, see the :class:`~funcx.config.Config` class documentation.
 
 .. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is configured.
 
