@@ -56,7 +56,7 @@ Documentation on batch requests can be found below.
 
 
 Client Throttling
-----------
+-----------------
 
 In order to avoid accidentally DoS'ing the funcX Web Service we place soft throttling restrictions on the funcX client.
 There are two key throttling measures: firstly, we limit the number of requests a client can make to the Web Service
