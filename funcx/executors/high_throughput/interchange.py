@@ -579,7 +579,8 @@ class Interchange(object):
                                                           'free_capacity': {'total_workers': 0},
                                                           'max_worker_count': 0,
                                                           'active': True,
-                                                          'tasks': collections.defaultdict(set)}
+                                                          'tasks': collections.defaultdict(set),
+                                                          'total_tasks': 0}
                     if reg_flag is True:
                         interesting_managers.add(manager)
                         logger.info("[MAIN] Adding manager: {} to ready queue".format(manager))
@@ -659,6 +660,7 @@ class Interchange(object):
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
                         task_type = self.containers[r['task_id'].split(';')[1]]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
+                    self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
                     self.results_outgoing.send_multipart(b_messages)
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
