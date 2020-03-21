@@ -19,13 +19,13 @@ def naive_scheduler(task_qs, outstanding_task_count, max_workers, old_worker_map
     new_worker_map = {}
     # ## Added to disallow rescheduling workers we're waiting to spin down ## #
     blocked_workers = 0
-    blocked_types = []
+    # blocked_types = []
     for w_type in to_die_list:
         if to_die_list[w_type] > 0:
             if old_worker_map is not None:
                 blocked_workers += old_worker_map.get(w_type, 0)  # These workers cannot be replaced.
-                blocked_types.append(w_type)
-                new_worker_map[w_type] = old_worker_map.get(w_type, 0)  # Keep the same.
+    #             blocked_types.append(w_type)
+    #             new_worker_map[w_type] = old_worker_map.get(w_type, 0)  # Keep the same.
     # ## ****************************************************************# ## #
 
     # Remove blocked workers from max workers.
@@ -34,11 +34,11 @@ def naive_scheduler(task_qs, outstanding_task_count, max_workers, old_worker_map
     # Sum the size of each *available* (unblocked) task queue
     sum_q_size = 0
     for q_type in outstanding_task_count:
-        if q_type not in blocked_types:
-            q_types.append(q_type)
-            q_size = outstanding_task_count[q_type]
-            sum_q_size += q_size
-            q_sizes[q_type] = q_size
+        # if q_type not in blocked_types:
+        q_types.append(q_type)
+        q_size = outstanding_task_count[q_type]
+        sum_q_size += q_size
+        q_sizes[q_type] = q_size
 
     if sum_q_size > 0:
         logger.info("[SCHEDULER] Total number of tasks is {}".format(sum_q_size))
@@ -56,9 +56,9 @@ def naive_scheduler(task_qs, outstanding_task_count, max_workers, old_worker_map
         difference = 0
         if sum_q_size > tmp_sum_q_size:
             difference = min(max_workers - tmp_sum_q_size, sum_q_size - tmp_sum_q_size)
-        logger.info("[SCHEDULER] Offset difference: {}".format(difference))
+        # logger.info("[SCHEDULER] Offset difference: {}".format(difference))
 
-        logger.info("[SCHEDULER] Queue Types: {}".format(q_types))
+        # logger.info("[SCHEDULER] Queue Types: {}".format(q_types))
         if len(q_types) > 0:
             while difference > 0:
                 win_q = random.choice(q_types)
@@ -66,19 +66,6 @@ def naive_scheduler(task_qs, outstanding_task_count, max_workers, old_worker_map
                     new_worker_map[win_q] += 1
                     difference -= 1
 
-        logger.debug("Final new_worker_map: {}".format(new_worker_map))
+        # logger.debug("Final new_worker_map: {}".format(new_worker_map))
     return new_worker_map
 
-
-# TODO: Remove after debugging complete.
-# from queue import Queue
-# task_qs = {'RAW': Queue(), 'even': Queue(), 'odd': Queue()}
-# task_qs['RAW'].put(1)
-# task_qs['RAW'].put(2)
-# task_qs['even'].put(1)
-# task_qs['even'].put(2)
-# task_qs['odd'].put(1)
-# task_qs['odd'].put(2)
-
-
-# print(naive_scheduler(task_qs, max_workers=12, to_die_list={'RAW':10, 'even':0, 'odd': 0}, old_worker_map={'RAW': 0, 'even': 0, 'odd': 0}, logger=None))
