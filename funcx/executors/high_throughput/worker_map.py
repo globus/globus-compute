@@ -178,8 +178,8 @@ class WorkerMap(object):
 
         try:
             proc = subprocess.Popen(modded_cmd.split(),
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
                                     shell=False)
 
         except Exception:
