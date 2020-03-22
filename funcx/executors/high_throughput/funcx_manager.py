@@ -279,7 +279,7 @@ class Manager(object):
                         logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
 
                     elif m_type == b'WRKR_DIE':
-                        logger.debug("[WORKER_REMOVE] Removing worker from worker_map...")
+                        logger.debug("[WORKER_REMOVE] Removing worker {} from worker_map...".format(w_id))
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
                         self.worker_map.remove_worker(w_id)
@@ -444,7 +444,7 @@ class Manager(object):
             Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing.
         """
 
-        logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue")
+        logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue {}".format(worker_type))
         self.worker_map.to_die_count[worker_type] += 1
         self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
                                            "buffer": b'KILL'})

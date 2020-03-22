@@ -27,7 +27,8 @@ def naive_scheduler(task_qs, outstanding_task_count, max_workers, old_worker_map
     #             blocked_types.append(w_type)
     #             new_worker_map[w_type] = old_worker_map.get(w_type, 0)  # Keep the same.
     # ## ****************************************************************# ## #
-
+    logger.debug(f"Blocked_workers: {blocked_workers}")
+    logger.debug(f"Block types: {blocked_types}")
     # Remove blocked workers from max workers.
     max_workers -= blocked_workers
 

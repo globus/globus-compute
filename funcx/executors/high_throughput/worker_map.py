@@ -209,6 +209,8 @@ class WorkerMap(object):
 
         # next_worker_q = []
         new_worker_list = []
+        logger.debug(f"[GET_NEXT_WORKER] total_worker_type_counts: {self.total_worker_type_counts}")
+        logger.debug(f"[GET_NEXT_WORKER] pending_worker_type_counts: {self.pending_worker_type_counts}")
         for worker_type in new_worker_map:
             # If we don't already have this type of worker in our worker_map...
             if worker_type not in self.total_worker_type_counts:
