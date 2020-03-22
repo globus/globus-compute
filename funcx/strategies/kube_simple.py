@@ -43,6 +43,8 @@ class KubeSimpleStrategy(BaseStrategy):
             pass
 
     def _strategize(self, *args, **kwargs):
+        task_breakdown = self.interchange.get_outstanding_breakdown()
+        logger.info(f"Task breakdown {task_breakdown}")
 
         min_blocks = self.interchange.config.provider.min_blocks
         max_blocks = self.interchange.config.provider.max_blocks
