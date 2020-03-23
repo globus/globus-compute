@@ -7,15 +7,19 @@ funcX - High Performance Function Serving
 #########################################
 
 funcX is a High performance function serving system designed to orchestrate scientific workloads
-on campus clusters, clouds and supercomputers.
+across heterogeneous computing resources, from laptops and local servers, through to campus clusters, clouds,
+and supercomputers.
 
 
 .. toctree::
+   :maxdepth: 2
+   :caption: Contents:
 
    quickstart
    endpoints
    Tutorial.ipynb
    client
+   reference
    debugging
 
 
@@ -23,5 +27,4 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
