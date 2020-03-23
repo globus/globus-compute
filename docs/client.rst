@@ -10,10 +10,12 @@ interface to:
 4. Check the status of launched functions and
 5. Retrieve outputs from functions
 
-The following shows an example of creating a client.::
+The following shows an example of creating a client.
 
-  $ from funcx.sdk.client import FuncXClient
-  $ fxc = FuncXClient()
+.. code-block:: python
+
+  from funcx.sdk.client import FuncXClient
+  fxc = FuncXClient()
 
 Instantiating a client will start an authentication process where you will be asked to authenticate with Globus Auth.
 We require every interaction with the funcX Web Service to be authenticated using a Bearer token, this allows funcX
@@ -63,10 +65,12 @@ There are two key throttling measures: firstly, we limit the number of requests 
 to 5 every 5 seconds, and secondly, we limit the size of inputs and outputs transmitted through the service to 2MB.
 
 Batching requests and status can help reduce the number of requests made to the Web Service. In addition, the limit on
-the number of requests made to the Web Service can be removed by setting `throttling_enabled` to False.::
+the number of requests made to the Web Service can be removed by setting `throttling_enabled` to False.
 
-  $ fxc = FuncXClient()
-    fxc.throttling_enabled = False
+.. code-block:: python
+
+  fxc = FuncXClient()
+  fxc.throttling_enabled = False
 
 
 FuncXClient Reference:

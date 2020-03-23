@@ -40,18 +40,20 @@ same resource as the endpoint (e.g., when using a batch submission system, or cl
 
 .. note:: If your funcX workers are not deployed on the same resource as the endpoint you must set the endpoint address for the workers to find the endpoint. This is done by setting the endpoint_address.
 
-For example::
+For example
 
-  $ import getpass
-    from parsl.addresses import address_by_route, address_by_hostname
+.. code-block:: python
 
-    global_options = {
-      'username': getpass.getuser(),
-      'email': 'USER@USERDOMAIN.COM',
-      'broker_address': '127.0.0.1',
-      'broker_port': 8088,
-      'endpoint_address': address_by_hostname(),
-    }
+  import getpass
+  from parsl.addresses import address_by_route, address_by_hostname
+
+  global_options = {
+    'username': getpass.getuser(),
+    'email': 'USER@USERDOMAIN.COM',
+    'broker_address': '127.0.0.1',
+    'broker_port': 8088,
+    'endpoint_address': address_by_hostname(),
+  }
 
 Configuring an Endpoint
 -----------------------
