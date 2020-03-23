@@ -91,7 +91,10 @@ class WorkerMap(object):
 
         if len(next_worker_q) > 0 and self.active_workers + self.pending_workers < self.max_worker_count:
             logger.debug("[SPIN UP] Spinning up new workers!")
-            num_slots = min(self.max_worker_count - self.active_workers - self.pending_workers, len(next_worker_q))
+            logger.debug(f"[SPIN up] Empty slots: {self.max_worker_count - self.active_workers - self.pending_workers}")
+            logger.debug(f"[SPIN up] New workers: {len(next_worker_q)}")
+            logger.debug(f"[SPIN up] Unused slots: {self.total_worker_type_count['unused']}")
+            num_slots = min(self.max_worker_count - self.active_workers - self.pending_workers, len(next_worker_q), self.total_worker_type_counts['unused'])
             for _ in range(num_slots):
 
                 try:
