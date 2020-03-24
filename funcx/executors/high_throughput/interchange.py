@@ -754,7 +754,10 @@ class Interchange(object):
             if self.config.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
-                launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
+                if not task_type and self.config.scheduler_mode == 'hard':
+                    launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type='RAW')
+                else:
+                    launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
                 if not task_type:
                     internal_block = self.config.provider.submit(launch_cmd, 1)
                 else:

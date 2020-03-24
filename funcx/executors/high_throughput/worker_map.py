@@ -111,7 +111,7 @@ class WorkerMap(object):
                     spin_ups.append(proc)
         return spin_ups
 
-    def spin_down_workers(self, new_worker_map):
+    def spin_down_workers(self, new_worker_map, scheduler_mode='hard'):
         """ Helper function to call 'remove' for appropriate workers in 'new_worker_map'.
 
         Parameters
@@ -129,8 +129,11 @@ class WorkerMap(object):
             if worker_type == 'unused':
                 continue
             num_remove = max(0, self.total_worker_type_counts[worker_type] - new_worker_map.get(worker_type, 0))
+            if scheduler_mode == 'hard':
+                max_remove = max(0, self.total_worker_type_counts[worker_type] - 1)
+                num_remove = min(num_remove, max_remove)
 
-            logger.info("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
+            logger.debug("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
             for i in range(num_remove):
                 spin_downs.append(worker_type)
         return spin_downs

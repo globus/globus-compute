@@ -58,7 +58,8 @@ def dispatch(interesting_managers,
             if (real_capacity and ready_manager_queue[manager]['active']):
                 if scheduler_mode == 'hard':
                     tasks, tids = get_tasks_hard(pending_task_queue,
-                                                 ready_manager_queue[manager])
+                                                 ready_manager_queue[manager],
+                                                 real_capacity)
                 else:
                     tasks, tids = get_tasks_soft(pending_task_queue,
                                                  ready_manager_queue[manager],
@@ -86,7 +87,7 @@ def dispatch(interesting_managers,
     return task_dispatch, dispatched_tasks
 
 
-def get_tasks_hard(pending_task_queue, manager_ads):
+def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
     tasks = []
     tids = collections.defaultdict(set)
     task_type = manager_ads['worker_type']
@@ -99,7 +100,7 @@ def get_tasks_hard(pending_task_queue, manager_ads):
 
     # dispatch tasks of available types on manager
     if task_type in manager_ads['free_capacity']:
-        while manager_ads['free_capacity'][task_type] > 0:
+        while manager_ads['free_capacity'][task_type] > 0 and real_capacity > 0:
             try:
                 x = pending_task_queue[task_type].get(block=False)
             except queue.Empty:
@@ -110,10 +111,11 @@ def get_tasks_hard(pending_task_queue, manager_ads):
                 tids[task_type].add(x['task_id'])                    
                 manager_ads['free_capacity'][task_type] -= 1
                 manager_ads['free_capacity']['total_workers'] -= 1
+                real_capacity -= 1
 
     # dispatch tasks to unused slots based on the manager type
     logger.debug("Second round of task fetching!")
-    while manager_ads['free_capacity']["unused"] > 0:
+    while manager_ads['free_capacity']["unused"] > 0 and real_capacity > 0:
         try:
             x = pending_task_queue[task_type].get(block=False)
         except queue.Empty:
@@ -124,6 +126,7 @@ def get_tasks_hard(pending_task_queue, manager_ads):
             tids[task_type].add(x['task_id'])
             manager_ads['free_capacity']['unused'] -= 1
             manager_ads['free_capacity']['total_workers'] -= 1
+            real_capacity -= 1
     return tasks, tids
 
 

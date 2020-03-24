@@ -363,7 +363,7 @@ class Manager(object):
 
             #  Count the workers of each type that need to be removed
             if new_worker_map is not None:
-                spin_downs = self.worker_map.spin_down_workers(new_worker_map)
+                spin_downs = self.worker_map.spin_down_workers(new_worker_map, scheduler_mode=self.scheduler_mode)
 
                 for w_type in spin_downs:
                     self.remove_worker_init(w_type)
