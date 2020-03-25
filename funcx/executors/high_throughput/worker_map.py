@@ -154,7 +154,7 @@ class WorkerMap(object):
                 logger.debug(f"[SPIN DOWN] Idle since: {self.worker_idle_since[worker_type]}")
                 logger.debug(f"[SPIN DOWN] Worker type {worker_type} has not exceeded maximum idle time {worker_max_idletime}, continuing")
                 continue
-            num_remove = max(0, self.total_worker_type_counts[worker_type] - new_worker_map.get(worker_type, 0))
+            num_remove = max(0, self.total_worker_type_counts[worker_type] - self.to_die_count.get(worker_type, 0) - new_worker_map.get(worker_type, 0))
             if scheduler_mode == 'hard':
                 max_remove = max(0, self.total_worker_type_counts[worker_type] - 1)
                 num_remove = min(num_remove, max_remove)
@@ -244,11 +244,7 @@ class WorkerMap(object):
         logger.debug(f"[GET_NEXT_WORKER] total_worker_type_counts: {self.total_worker_type_counts}")
         logger.debug(f"[GET_NEXT_WORKER] pending_worker_type_counts: {self.pending_worker_type_counts}")
         for worker_type in new_worker_map:
-            # If we don't already have this type of worker in our worker_map...
-            if worker_type not in self.total_worker_type_counts:
-                self.total_worker_type_counts[worker_type] = 0
-                self.pending_worker_type_counts[worker_type] = 0
-            cur_workers = self.total_worker_type_counts[worker_type] + self.pending_worker_type_counts[worker_type]
+            cur_workers = self.total_worker_type_counts.get(worker_type, 0) + self.pending_worker_type_counts.get(worker_type, 0)
             if new_worker_map[worker_type] > cur_workers:
 
                 for i in range(new_worker_map[worker_type] - cur_workers):
