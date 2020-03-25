@@ -15,6 +15,7 @@ import math
 import json
 import multiprocessing
 import psutil
+import subprocess
 
 from funcx.executors.high_throughput.container_sched import naive_scheduler
 from funcx.executors.high_throughput.worker_map import WorkerMap
@@ -287,8 +288,11 @@ class Manager(object):
                         self.worker_map.remove_worker(w_id)
                         proc = self.worker_procs.pop(w_id.decode())
                         if not proc.poll():
-                            proc.wait()
-                        logger.debug("[WORKER_REMOVE] Removing worker {} process object.".format(w_id))
+                            try:
+                                proc.wait(timeout=1)
+                            except subprocess.TimeoutExpired:
+                                logger.warning(f"[WORKER_REMOVE] Timeout waiting for worker {w_id} process to terminate")
+                        logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
                         logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
                 except Exception as e:
