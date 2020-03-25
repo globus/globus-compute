@@ -1,8 +1,8 @@
-
 from queue import Queue
 import logging
 import random
 import subprocess
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,9 @@ class WorkerMap(object):
         # Need to keep track of workers that are ABOUT to die
         self.to_die_count = {}
 
+        # Need to keep track of workers' last idle time by worker type
+        self.worker_idle_since = {}
+
     def register_worker(self, worker_id, worker_type):
         """ Add a new worker
         """
@@ -42,6 +45,7 @@ class WorkerMap(object):
         self.pending_workers -= 1
         self.active_workers += 1
         self.worker_queues[worker_type].put(worker_id)
+        self.worker_idle_since[worker_type] = time.time()
 
         if worker_type not in self.to_die_count:
             self.to_die_count[worker_type] = 0
@@ -111,7 +115,7 @@ class WorkerMap(object):
                     spin_ups.append(proc)
         return spin_ups
 
-    def spin_down_workers(self, new_worker_map, scheduler_mode='hard'):
+    def spin_down_workers(self, new_worker_map, worker_max_idletime=60, need_more=False, scheduler_mode='hard'):
         """ Helper function to call 'remove' for appropriate workers in 'new_worker_map'.
 
         Parameters
@@ -123,17 +127,39 @@ class WorkerMap(object):
         ---------
         List of removed worker types.
         """
+        if need_more:
+            return self._spin_down(new_worker_map, worker_max_idletime=worker_max_idletime, scheduler_mode=scheduler_mode, check_idle=False)
+        else:
+            return self._spin_down(new_worker_map, worker_max_idletime=worker_max_idletime, scheduler_mode=scheduler_mode, check_idle=True)
 
+    def _spin_down(self, new_worker_map, worker_max_idletime=60, scheduler_mode='hard', check_idle=True):
+        """ Helper function to call 'remove' for appropriate workers in 'new_worker_map'.
+
+        Parameters
+        ----------
+        new_worker_map : dict
+           {worker_type: total_number_of_containers,...}.
+        check_idle : boolean
+           A boolean to indicate whether to check the idle time or not
+        Returns
+        ---------
+        List of removed worker types.
+        """
         spin_downs = []
         for worker_type in self.total_worker_type_counts:
             if worker_type == 'unused':
+                continue
+            if check_idle and time.time() - self.worker_idle_since[worker_type] < worker_max_idletime:
+                logger.debug(f"[SPIN DOWN] Current time: {time.time()}")
+                logger.debug(f"[SPIN DOWN] Idle since: {self.worker_idle_since[worker_type]}")
+                logger.debug(f"[SPIN DOWN] Worker type {worker_type} has not exceeded maximum idle time {worker_max_idletime}, continuing")
                 continue
             num_remove = max(0, self.total_worker_type_counts[worker_type] - new_worker_map.get(worker_type, 0))
             if scheduler_mode == 'hard':
                 max_remove = max(0, self.total_worker_type_counts[worker_type] - 1)
                 num_remove = min(num_remove, max_remove)
 
-            logger.debug("[WORKER_REMOVE] Removing {} workers of type {}".format(num_remove, worker_type))
+            logger.debug("[SPIN DOWN] Removing {} workers of type {}".format(num_remove, worker_type))
             for i in range(num_remove):
                 spin_downs.append(worker_type)
         return spin_downs
@@ -229,11 +255,20 @@ class WorkerMap(object):
                     # Add worker
                     new_worker_list.append(worker_type)
 
+        need_more = False
+        if len(new_worker_list) > self.total_worker_type_counts['unused']:
+            need_more = True
         # Randomly assign order of newly needed containers... add to spin-up queue.
         if len(new_worker_list) > 0:
             random.shuffle(new_worker_list)
 
-        return new_worker_list
+        return new_worker_list, need_more
+
+    def update_worker_idle(self, worker_type):
+        """ Update the workers' last idle time by worker type
+        """
+        logger.debug(f"[UPDATE_WORKER_IDLE] Worker idle since: {self.worker_idle_since}")
+        self.worker_idle_since[worker_type] = time.time()
 
     def put_worker(self, worker):
         """ Adds worker to the list of waiting workers

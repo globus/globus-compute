@@ -64,6 +64,7 @@ class Manager(object):
                  worker_mode="singularity_reuse",
                  scheduler_mode="soft",
                  worker_type=None,
+                 worker_max_idletime=60,
                  # TODO : This should be 10ms
                  poll_period=100):
         """
@@ -139,6 +140,7 @@ class Manager(object):
         self.worker_mode = worker_mode
         self.scheduler_mode = scheduler_mode
         self.worker_type = worker_type
+        self.worker_max_idletime = worker_max_idletime
         self.cores_on_node = multiprocessing.cpu_count()
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
@@ -361,16 +363,17 @@ class Manager(object):
                                              logger=logger)
             logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
-            #  Count the workers of each type that need to be removed
-            if new_worker_map is not None:
-                spin_downs = self.worker_map.spin_down_workers(new_worker_map, scheduler_mode=self.scheduler_mode)
-
-                for w_type in spin_downs:
-                    self.remove_worker_init(w_type)
-
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
-            if new_worker_map is not None:
-                self.next_worker_q = self.worker_map.get_next_worker_q(new_worker_map)
+            self.next_worker_q, need_more = self.worker_map.get_next_worker_q(new_worker_map)
+
+            #  Count the workers of each type that need to be removed
+            spin_downs = self.worker_map.spin_down_workers(new_worker_map,
+                                                           worker_max_idletime=self.worker_max_idletime,
+                                                           need_more=need_more,
+                                                           scheduler_mode=self.scheduler_mode)
+
+            for w_type in spin_downs:
+                self.remove_worker_init(w_type)
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
@@ -398,6 +401,7 @@ class Manager(object):
                             logger.debug("Sending task {} to {}".format(task['task_id'], worker_id))
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
+                            self.worker_map.update_worker_idle(task_type)
                             logger.debug("Sending complete!")
 
     def push_results(self, kill_event, max_result_batch_size=1):
