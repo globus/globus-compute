@@ -287,7 +287,7 @@ class Manager(object):
                         self.worker_map.remove_worker(w_id)
                         proc = self.worker_procs.pop(w_id.decode())
                         if not proc.poll():
-                            proc.call()
+                            proc.wait()
                         logger.debug("[WORKER_REMOVE] Removing worker {} process object.".format(w_id))
                         logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
