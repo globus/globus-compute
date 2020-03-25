@@ -32,7 +32,7 @@ class Config(RepresentationMixin):
 
     scheduler_mode : str
         Select the mode of how the container is managed from hard, soft
-        Default: soft
+        Default: hard
 
     container_type : str
         Select the type of container from Docker, Singularity, Shifter
@@ -59,7 +59,7 @@ class Config(RepresentationMixin):
                  launch_cmd=None,
                  # Tuning info
                  worker_mode='no_container',
-                 scheduler_mode='soft',
+                 scheduler_mode='hard',
                  container_type=None,
                  prefetch_capacity=10,
                  heartbeat_period=2,

@@ -62,7 +62,7 @@ class Manager(object):
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
                  worker_mode="singularity_reuse",
-                 scheduler_mode="soft",
+                 scheduler_mode="hard",
                  worker_type=None,
                  worker_max_idletime=60,
                  # TODO : This should be 10ms
