@@ -177,7 +177,7 @@ class Manager(object):
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
         self.next_worker_q = []  # FIFO queue for spinning up workers.
-        self.worker_procs = []
+        self.worker_procs = {}
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -285,18 +285,24 @@ class Manager(object):
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
                         self.worker_map.remove_worker(w_id)
+                        proc = self.worker_procs.pop(w_id.decode())
+                        if not proc.poll():
+                            proc.call()
+                        logger.debug("[WORKER_REMOVE] Removing worker {} process object.".format(w_id))
+                        logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
-            self.worker_procs.extend(self.worker_map.spin_up_workers(self.next_worker_q,
+            self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
                                                                      debug=self.debug,
                                                                      address=self.address,
                                                                      uid=self.uid,
                                                                      logdir=self.logdir,
                                                                      worker_port=self.worker_port))
+            logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -347,7 +353,7 @@ class Manager(object):
                     logger.critical("[TASK_PULL_THREAD] Missing contact with interchange beyond heartbeat_threshold")
                     kill_event.set()
                     logger.critical("Killing all workers")
-                    for proc in self.worker_procs:
+                    for proc in self.worker_procs.values():
                         proc.kill()
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
@@ -463,7 +469,7 @@ class Manager(object):
 
         if self.worker_type and self.scheduler_mode == 'hard':
             logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
-            self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
+            self.worker_procs.update(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
                                                                 worker_type=self.worker_type,
                                                                 address=self.address,
                                                                 debug=self.debug,

@@ -86,7 +86,7 @@ class WorkerMap(object):
         ---------
         Total number of spun-up workers.
         """
-        spin_ups = []
+        spin_ups = {}
 
         logger.debug("[SPIN UP] Next Worker Qsize: {}".format(len(next_worker_q)))
         logger.debug("[SPIN UP] Active Workers: {}".format(self.active_workers))
@@ -112,7 +112,7 @@ class WorkerMap(object):
                     logger.exception("Error spinning up worker! Skipping...")
                     continue
                 else:
-                    spin_ups.append(proc)
+                    spin_ups.update(proc)
         return spin_ups
 
     def spin_down_workers(self, new_worker_map, worker_max_idletime=60, need_more=False, scheduler_mode='hard'):
@@ -223,7 +223,7 @@ class WorkerMap(object):
         self.pending_worker_type_counts[worker_type] = self.pending_worker_type_counts.get(worker_type, 0) + 1
         self.pending_workers += 1
 
-        return proc
+        return {str(self.worker_id_counter-1): proc}
 
     def get_next_worker_q(self, new_worker_map):
         """ Helper function to generate a queue of next workers to spin up .
