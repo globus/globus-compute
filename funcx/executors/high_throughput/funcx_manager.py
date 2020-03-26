@@ -15,6 +15,7 @@ import math
 import json
 import multiprocessing
 import psutil
+import subprocess
 
 from funcx.executors.high_throughput.container_sched import naive_scheduler
 from funcx.executors.high_throughput.worker_map import WorkerMap
@@ -62,8 +63,9 @@ class Manager(object):
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
                  worker_mode="singularity_reuse",
-                 scheduler_mode="soft",
+                 scheduler_mode="hard",
                  worker_type=None,
+                 worker_max_idletime=60,
                  # TODO : This should be 10ms
                  poll_period=100):
         """
@@ -139,6 +141,7 @@ class Manager(object):
         self.worker_mode = worker_mode
         self.scheduler_mode = scheduler_mode
         self.worker_type = worker_type
+        self.worker_max_idletime = worker_max_idletime
         self.cores_on_node = multiprocessing.cpu_count()
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
@@ -175,7 +178,7 @@ class Manager(object):
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
         self.next_worker_q = []  # FIFO queue for spinning up workers.
-        self.worker_procs = []
+        self.worker_procs = {}
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -279,22 +282,31 @@ class Manager(object):
                         logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
 
                     elif m_type == b'WRKR_DIE':
-                        logger.debug("[WORKER_REMOVE] Removing worker from worker_map...")
+                        logger.debug("[WORKER_REMOVE] Removing worker {} from worker_map...".format(w_id))
                         logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
                         logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
                         self.worker_map.remove_worker(w_id)
+                        proc = self.worker_procs.pop(w_id.decode())
+                        if not proc.poll():
+                            try:
+                                proc.wait(timeout=1)
+                            except subprocess.TimeoutExpired:
+                                logger.warning(f"[WORKER_REMOVE] Timeout waiting for worker {w_id} process to terminate")
+                        logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
+                        logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
                 except Exception as e:
                     logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
-            self.worker_procs.extend(self.worker_map.spin_up_workers(self.next_worker_q,
+            self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
                                                                      debug=self.debug,
                                                                      address=self.address,
                                                                      uid=self.uid,
                                                                      logdir=self.logdir,
                                                                      worker_port=self.worker_port))
+            logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -345,7 +357,7 @@ class Manager(object):
                     logger.critical("[TASK_PULL_THREAD] Missing contact with interchange beyond heartbeat_threshold")
                     kill_event.set()
                     logger.critical("Killing all workers")
-                    for proc in self.worker_procs:
+                    for proc in self.worker_procs.values():
                         proc.kill()
                     logger.critical("[TASK_PULL_THREAD] Exiting")
                     break
@@ -361,16 +373,17 @@ class Manager(object):
                                              logger=logger)
             logger.debug("[SCHEDULER] New worker map: {}".format(new_worker_map))
 
-            #  Count the workers of each type that need to be removed
-            if new_worker_map is not None:
-                spin_downs = self.worker_map.spin_down_workers(new_worker_map)
-
-                for w_type in spin_downs:
-                    self.remove_worker_init(w_type)
-
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
-            if new_worker_map is not None:
-                self.next_worker_q = self.worker_map.get_next_worker_q(new_worker_map)
+            self.next_worker_q, need_more = self.worker_map.get_next_worker_q(new_worker_map)
+
+            #  Count the workers of each type that need to be removed
+            spin_downs = self.worker_map.spin_down_workers(new_worker_map,
+                                                           worker_max_idletime=self.worker_max_idletime,
+                                                           need_more=need_more,
+                                                           scheduler_mode=self.scheduler_mode)
+
+            for w_type in spin_downs:
+                self.remove_worker_init(w_type)
 
             current_worker_map = self.worker_map.get_worker_counts()
             for task_type in current_worker_map:
@@ -398,6 +411,7 @@ class Manager(object):
                             logger.debug("Sending task {} to {}".format(task['task_id'], worker_id))
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
+                            self.worker_map.update_worker_idle(task_type)
                             logger.debug("Sending complete!")
 
     def push_results(self, kill_event, max_result_batch_size=1):
@@ -444,7 +458,7 @@ class Manager(object):
             Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing.
         """
 
-        logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue")
+        logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue {}".format(worker_type))
         self.worker_map.to_die_count[worker_type] += 1
         self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
                                            "buffer": b'KILL'})
@@ -459,7 +473,7 @@ class Manager(object):
 
         if self.worker_type and self.scheduler_mode == 'hard':
             logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
-            self.worker_procs.append(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
+            self.worker_procs.update(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
                                                                 worker_type=self.worker_type,
                                                                 address=self.address,
                                                                 debug=self.debug,

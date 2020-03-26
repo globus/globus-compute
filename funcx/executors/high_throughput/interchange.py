@@ -579,7 +579,8 @@ class Interchange(object):
                                                           'free_capacity': {'total_workers': 0},
                                                           'max_worker_count': 0,
                                                           'active': True,
-                                                          'tasks': collections.defaultdict(set)}
+                                                          'tasks': collections.defaultdict(set),
+                                                          'total_tasks': 0}
                     if reg_flag is True:
                         interesting_managers.add(manager)
                         logger.info("[MAIN] Adding manager: {} to ready queue".format(manager))
@@ -653,12 +654,13 @@ class Interchange(object):
                 if manager not in self._ready_manager_queue:
                     logger.warning("[MAIN] Received a result from a un-registered manager: {}".format(manager))
                 else:
-                    logger.debug("[MAIN] Got {} result items in batch".format(len(b_messages)))
+                    logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
                         task_type = self.containers[r['task_id'].split(';')[1]]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
+                    self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
                     self.results_outgoing.send_multipart(b_messages)
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
@@ -752,7 +754,10 @@ class Interchange(object):
             if self.config.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
-                launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
+                if not task_type and self.config.scheduler_mode == 'hard':
+                    launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type='RAW')
+                else:
+                    launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
                 if not task_type:
                     internal_block = self.config.provider.submit(launch_cmd, 1)
                 else:
