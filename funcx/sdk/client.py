@@ -24,7 +24,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, funcx_service_address='https://funcx.org/api/v1',
+                 force_login=False, fx_authorizer=None, funcx_service_address='https://dev.funcx.org/api/v1',
                  **kwargs):
         """ Initialize the client
 
@@ -265,6 +265,47 @@ class FuncXClient(throttling.ThrottledBaseClient):
         return funcx_future
         """
         return r['task_uuid']
+
+    def batch_wrapper(self, *args, endpoint_id=None, function_id=None, **kwargs):
+        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
+        assert function_id is not None, "function_id key-word argument must be set"
+
+        ser_args = self.fx_serializer.serialize(args)
+        ser_kwargs = self.fx_serializer.serialize(kwargs)
+        payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
+
+        data = {'endpoint': endpoint_id,
+                'function': function_id,
+                'payload': payload}
+
+        return data
+
+    def batch_run(self, function_wrappers, asynchronous=False):
+        servable_path = 'batch_run'
+        assert isinstance(function_wrappers, list), "Expect a list of function wrappers"
+        assert len(function_wrappers) > 0, "Expect a non-empty list "
+
+        data = {
+            'endpoints': [],
+            'functions': [],
+            'payloads': [],
+            'is_async': asynchronous,
+        }
+
+        for wrapper in function_wrappers:
+            data['endpoints'].append(wrapper['endpoint'])
+            data['functions'].append(wrapper['function'])
+            data['payloads'].append(wrapper['payload'])
+
+        # Send the data to funcX
+        r = self.post(servable_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        if 'task_uuids' not in r:
+            raise MalformedResponse(r)
+
+        return r['task_uuids']
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
