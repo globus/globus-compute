@@ -3,14 +3,14 @@ import time
 
 fx = FuncXClient()
 
-def test_batch1(a, b=2):
-    return a + b
+def test_batch1(a, b, c=2, d=2):
+    return a + b + c + d
 
-def test_batch2(a, b=2):
-    return a * b
+def test_batch2(a, b, c=2, d=2):
+    return a * b * c * d
 
-def test_batch3(a, b=2):
-    return a + 2 * b
+def test_batch3(a, b, c=2, d=2):
+    return a + 2 * b + 3 * c + 4 * d
 
 funcs = [test_batch1, test_batch2, test_batch3]
 func_ids = []
@@ -25,7 +25,7 @@ wrappers = []
 task_count = 5
 for func_id in func_ids:
     for i in range(task_count):
-        wrapper = fx.batch_wrapper(i, b=i+1, endpoint_id=ep_id, function_id=func_id)
+        wrapper = fx.batch_wrapper(i, i+1, c=i+2, d=i+3, endpoint_id=ep_id, function_id=func_id)
         wrappers.append(wrapper)
 
 task_ids = fx.batch_run(wrappers)
