@@ -213,7 +213,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         pass
 
-    def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
+    def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
         """Initiate an invocation
 
         Parameters
@@ -237,7 +237,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         batch = self.create_batch()
         batch.add(*args, endpoint_id=endpoint_id, function_id=function_id, **kwargs)
-        r = self.batch_run(batch, asynchronous=asynchronous)
+        r = self.batch_run(batch)
 
         """
         Create a future to deal with the result
@@ -267,13 +267,12 @@ class FuncXClient(throttling.ThrottledBaseClient):
         batch = Batch()
         return batch
 
-    def batch_run(self, batch, asynchronous=False):
+    def batch_run(self, batch):
         servable_path = 'batch_run'
         assert isinstance(batch, Batch), "Expect a Batch object as input"
         assert len(batch.tasks) > 0, "Expect a non-empty batch"
 
         data = batch.prepare()
-        data['is_async'] = asynchronous
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
