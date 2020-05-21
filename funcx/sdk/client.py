@@ -232,7 +232,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         task_id : str
         UUID string that identifies the task
         """
-        servable_path = 'batch_run'
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
