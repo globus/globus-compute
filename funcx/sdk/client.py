@@ -9,6 +9,7 @@ from fair_research_login import NativeClient, JSONTokenStorage
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
+from funcx.sdk.utils.batch import Batch
 from funcx.errors import MalformedResponse
 
 logger = logging.getLogger(__name__)
@@ -207,12 +208,10 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         return results
 
-
     def get_batch_result(self, task_id_list):
         """ Request results for a batch of task_ids
         """
         pass
-
 
     def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
@@ -233,26 +232,13 @@ class FuncXClient(throttling.ThrottledBaseClient):
         task_id : str
         UUID string that identifies the task
         """
-        servable_path = 'submit'
+        servable_path = 'batch_run'
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
-        ser_args = self.fx_serializer.serialize(args)
-        ser_kwargs = self.fx_serializer.serialize(kwargs)
-        payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
-
-        data = {'endpoint': endpoint_id,
-                'func': function_id,
-                'payload': payload,
-                'is_async': asynchronous}
-
-        # Send the data to funcX
-        r = self.post(servable_path, json_body=data)
-        if r.http_status is not 200:
-            raise Exception(r)
-
-        if 'task_uuid' not in r:
-            raise MalformedResponse(r)
+        batch = self.create_batch()
+        batch.add(*args, endpoint_id=endpoint_id, function_id=function_id, **kwargs)
+        r = self.batch_run(batch, asynchronous=asynchronous)
 
         """
         Create a future to deal with the result
@@ -264,38 +250,31 @@ class FuncXClient(throttling.ThrottledBaseClient):
         # Return the result
         return funcx_future
         """
-        return r['task_uuid']
 
-    def batch_wrapper(self, *args, endpoint_id=None, function_id=None, **kwargs):
-        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
-        assert function_id is not None, "function_id key-word argument must be set"
+        return r[0]
 
-        ser_args = self.fx_serializer.serialize(args)
-        ser_kwargs = self.fx_serializer.serialize(kwargs)
-        payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
+    def create_batch(self):
+        """
+        Create a Batch instance to handle batch submission in funcX
 
-        data = {'endpoint': endpoint_id,
-                'function': function_id,
-                'payload': payload}
+        Parameters
+        ----------
 
-        return data
+        Returns
+        -------
+        Batch instance
+            Status block containing "status" key.
+        """
+        batch = Batch()
+        return batch
 
-    def batch_run(self, function_wrappers, asynchronous=False):
+    def batch_run(self, batch, asynchronous=False):
         servable_path = 'batch_run'
-        assert isinstance(function_wrappers, list), "Expect a list of function wrappers"
-        assert len(function_wrappers) > 0, "Expect a non-empty list "
+        assert isinstance(batch, Batch), "Expect a Batch object as input"
+        assert len(batch.tasks) > 0, "Expect a non-empty batch"
 
-        data = {
-            'endpoints': [],
-            'functions': [],
-            'payloads': [],
-            'is_async': asynchronous,
-        }
-
-        for wrapper in function_wrappers:
-            data['endpoints'].append(wrapper['endpoint'])
-            data['functions'].append(wrapper['function'])
-            data['payloads'].append(wrapper['payload'])
+        data = batch.prepare()
+        data['is_async'] = asynchronous
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)

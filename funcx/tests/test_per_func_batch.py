@@ -21,14 +21,14 @@ ep_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
 print("FN_UUID : ", func_ids)
 
 start = time.time()
-wrappers = []
 task_count = 5
+batch = fx.create_batch()
 for func_id in func_ids:
     for i in range(task_count):
-        wrapper = fx.batch_wrapper(i, i+1, c=i+2, d=i+3, endpoint_id=ep_id, function_id=func_id)
-        wrappers.append(wrapper)
+        batch.add(i, i+1, c=i+2, d=i+3, endpoint_id=ep_id, function_id=func_id)
 
-task_ids = fx.batch_run(wrappers)
+task_ids = fx.batch_run(batch)
+
 delta = time.time() - start
 print("Time to launch {} tasks: {:8.3f} s".format(task_count * len(func_ids), delta))
 print("Got {} tasks_ids ".format(len(task_ids)))
