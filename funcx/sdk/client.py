@@ -268,6 +268,16 @@ class FuncXClient(throttling.ThrottledBaseClient):
         return batch
 
     def batch_run(self, batch):
+        """Initiate a batch of tasks to funcX
+
+        Parameters
+        ----------
+        batch: a Batch object
+
+        Returns
+        -------
+        task_ids : a list of UUID strings that identify the tasks
+        """
         servable_path = 'batch_run'
         assert isinstance(batch, Batch), "Expect a Batch object as input"
         assert len(batch.tasks) > 0, "Expect a non-empty batch"
