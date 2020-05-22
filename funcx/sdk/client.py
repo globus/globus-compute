@@ -9,6 +9,7 @@ from fair_research_login import NativeClient, JSONTokenStorage
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
+from funcx.sdk.utils.batch import Batch
 from funcx.errors import MalformedResponse
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, funcx_service_address='https://funcx.org/api/v1',
+                 force_login=False, fx_authorizer=None, funcx_service_address='https://dev.funcx.org/api/v1',
                  **kwargs):
         """ Initialize the client
 
@@ -207,14 +208,12 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         return results
 
-
     def get_batch_result(self, task_id_list):
         """ Request results for a batch of task_ids
         """
         pass
 
-
-    def run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
+    def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
         """Initiate an invocation
 
         Parameters
@@ -233,26 +232,12 @@ class FuncXClient(throttling.ThrottledBaseClient):
         task_id : str
         UUID string that identifies the task
         """
-        servable_path = 'submit'
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
-        ser_args = self.fx_serializer.serialize(args)
-        ser_kwargs = self.fx_serializer.serialize(kwargs)
-        payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
-
-        data = {'endpoint': endpoint_id,
-                'func': function_id,
-                'payload': payload,
-                'is_async': asynchronous}
-
-        # Send the data to funcX
-        r = self.post(servable_path, json_body=data)
-        if r.http_status is not 200:
-            raise Exception(r)
-
-        if 'task_uuid' not in r:
-            raise MalformedResponse(r)
+        batch = self.create_batch()
+        batch.add(*args, endpoint_id=endpoint_id, function_id=function_id, **kwargs)
+        r = self.batch_run(batch)
 
         """
         Create a future to deal with the result
@@ -264,7 +249,50 @@ class FuncXClient(throttling.ThrottledBaseClient):
         # Return the result
         return funcx_future
         """
-        return r['task_uuid']
+
+        return r[0]
+
+    def create_batch(self):
+        """
+        Create a Batch instance to handle batch submission in funcX
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        Batch instance
+            Status block containing "status" key.
+        """
+        batch = Batch()
+        return batch
+
+    def batch_run(self, batch):
+        """Initiate a batch of tasks to funcX
+
+        Parameters
+        ----------
+        batch: a Batch object
+
+        Returns
+        -------
+        task_ids : a list of UUID strings that identify the tasks
+        """
+        servable_path = 'batch_run'
+        assert isinstance(batch, Batch), "Expect a Batch object as input"
+        assert len(batch.tasks) > 0, "Expect a non-empty batch"
+
+        data = batch.prepare()
+
+        # Send the data to funcX
+        r = self.post(servable_path, json_body=data)
+        if r.http_status is not 200:
+            raise Exception(r)
+
+        if 'task_uuids' not in r:
+            raise MalformedResponse(r)
+
+        return r['task_uuids']
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
