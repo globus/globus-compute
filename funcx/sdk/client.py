@@ -278,9 +278,9 @@ class FuncXClient(throttling.ThrottledBaseClient):
         -------
         task_ids : a list of UUID strings that identify the tasks
         """
-        servable_path = 'batch_run'
-        assert isinstance(batch, Batch), "Expect a Batch object as input"
-        assert len(batch.tasks) > 0, "Expect a non-empty batch"
+        servable_path = 'submit'
+        assert isinstance(batch, Batch), "Requires a Batch object as input"
+        assert len(batch.tasks) > 0, "Requires a non-empty batch"
 
         data = batch.prepare()
 

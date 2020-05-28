@@ -50,14 +50,11 @@ class Batch:
         payloads in dictionary, Dict[str, list]
         """
         data = {
-            'endpoints': [],
-            'functions': [],
-            'payloads': [],
+            'tasks': []
         }
 
         for task in self.tasks:
-            data['endpoints'].append(task['endpoint'])
-            data['functions'].append(task['function'])
-            data['payloads'].append(task['payload'])
+            new_task = (task['function'], task['endpoint'], task['payload'])
+            data['tasks'].append(new_task)
 
         return data
