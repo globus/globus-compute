@@ -1,3 +1,4 @@
+from IPython import get_ipython
 from globus_sdk import SearchAPIError
 from globus_sdk.search import SearchClient
 from texttable import Texttable
@@ -11,24 +12,6 @@ SEARCH_LIMIT = 10000
 
 # By default we will return 10 functions at a time
 DEFAULT_SEARCH_LIMIT = 10
-
-
-def _trim_func_data(func_data):
-    """Remove unnecessary fields from FuncX function metadata for ingest
-
-    Parameters
-    ----------
-    func_data : dict
-    """
-    return {
-        'function_name': func_data['function_name'],
-        'function_code': func_data['function_code'],
-        'container_uuid': func_data.get('container_uuid', ''),
-        'description': func_data['description'],
-        'public': func_data['public'],
-        'group': func_data['group'],
-        'author': ''
-    }
 
 
 class SearchHelper:
@@ -72,19 +55,21 @@ class SearchHelper:
             raise err
 
     def search_function(self, q, offset=0, limit=DEFAULT_SEARCH_LIMIT, advanced=False):
-        """
+        """Executes client side search.
 
         Parameters
         ----------
-        q
-        offset
-        limit
-        query_template
-        advanced
-
+        q : str
+            Free-form query input
+        offset : int
+            offset into total results
+        limit : int
+            max number of results to return
+        advanced : bool
+            enables advanced query syntax
         Returns
         -------
-
+        SearchResults
         """
         response = self._sc.search(
             SearchHelper.SEARCH_INDEX_ID,
@@ -100,6 +85,7 @@ class SearchHelper:
         for item in gmeta:
             data = item['entries'][0]
             data['function_uuid'] = item['subject']
+            data['function_source'] = 'def funcx_sum(items):\n    return sum(items)\n'
             data = {**data, **data['content']}
             del data['content']
             results.append(data)
@@ -115,7 +101,14 @@ class SearchHelper:
 
 class SearchResults(list):
     """Wrapper class to have better display of results"""
-    FILTER_COLUMNS = {'function_code', 'entry_id', 'group', 'public', 'container_uuid'}
+    FILTER_COLUMNS = {
+        'function_code',
+        'entry_id',
+        'group',
+        'public',
+        'container_uuid',
+        'function_source'
+    }
 
     def __init__(self, gsearchresult):
         """
@@ -157,15 +150,29 @@ class SearchResults(list):
         return "[]"
 
     def load_result(self, ix: int):
+        """Get the code for a function.
+
+        If in an ipython environment, this creates a new input and places the
+        source in it.  Otherwise, the source code is printed.
+
+        Parameters
+        ----------
+        ix : int
+            index into the current list of results
+
+        Returns
+        -------
+        None
+        """
         res = self[ix]
-        packed_func = res['function_code']
-        func = self.serializer.unpack_and_deserialize(packed_func)[0]
-        return func
+        func_source = res['function_source']
+        # func = self.serializer.unpack_and_deserialize(packed_func)[0]
+        # return func
 
         # if we also saved the source code of the function, we could interactively
         # generate a cell to edit the searched function
-        # ipython = get_ipython()
-        # if ipython:
-        #     ipython.set_next_input(func_code)
-        # else:
-        #     print(func_code)
+        ipython = get_ipython()
+        if ipython:
+            ipython.set_next_input(func_source)
+        else:
+            print(func_source)
