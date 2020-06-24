@@ -1,33 +1,30 @@
-import requests
 import argparse
+import importlib.machinery
+import json
 import logging
 import os
 import pathlib
-import grp
+import random
+import shutil
 import signal
+import sys
 import time
-import json
+import uuid
+
 import daemon
 import daemon.pidfile
-import lockfile
-import uuid
-import json
-import sys
-import platform
-import getpass
-import shutil
-import tarfile
-import signal
 import psutil
-import random
-import importlib.machinery
+import requests
+import typer
 
 import funcx
+from funcx.endpoint.list_endpoints import list_endpoints
+from funcx.errors import *
 from funcx.executors.high_throughput import global_config, default_config
 from funcx.executors.high_throughput.interchange import Interchange
-from funcx.endpoint.list_endpoints import list_endpoints
 from funcx.sdk.client import FuncXClient
-from funcx.errors import *
+
+app = typer.Typer()
 
 
 def check_pidfile(filepath, match_name, endpoint_name):
