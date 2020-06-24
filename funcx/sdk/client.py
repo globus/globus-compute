@@ -6,6 +6,8 @@ import pickle as pkl
 from parsl.app.errors import RemoteExceptionWrapper
 
 from fair_research_login import NativeClient, JSONTokenStorage
+
+from funcx.sdk.search import SearchHelper, SearchResults
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
@@ -13,6 +15,7 @@ from funcx.sdk.utils.batch import Batch
 from funcx.errors import MalformedResponse
 
 logger = logging.getLogger(__name__)
+
 
 class FuncXClient(throttling.ThrottledBaseClient):
     """Main class for interacting with the funcX service
@@ -60,17 +63,23 @@ class FuncXClient(throttling.ThrottledBaseClient):
                                           app_name="FuncX SDK",
                                           token_storage=JSONTokenStorage(tokens_filename))
 
+        # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
         fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
+        search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
+        scopes = [fx_scope, search_scope]
+
+        search_authorizer = None
 
         if not fx_authorizer:
-            self.native_client.login(requested_scopes=[fx_scope],
+            self.native_client.login(requested_scopes=scopes,
                                      no_local_server=kwargs.get("no_local_server", True),
                                      no_browser=kwargs.get("no_browser", True),
                                      refresh_tokens=kwargs.get("refresh_tokens", True),
                                      force=force_login)
 
-            all_authorizers = self.native_client.get_authorizers_by_scope(requested_scopes=[fx_scope])
+            all_authorizers = self.native_client.get_authorizers_by_scope(requested_scopes=scopes)
             fx_authorizer = all_authorizers[fx_scope]
+            search_authorizer = all_authorizers[search_scope]
 
         super(FuncXClient, self).__init__("funcX",
                                           environment='funcx',
@@ -79,12 +88,12 @@ class FuncXClient(throttling.ThrottledBaseClient):
                                           base_url=funcx_service_address,
                                           **kwargs)
         self.fx_serializer = FuncXSerializer()
+        self.searcher = SearchHelper(authorizer=search_authorizer)
 
     def logout(self):
         """Remove credentials from your local system
         """
         self.native_client.logout()
-
 
     def update_table(self, return_msg, task_id):
         """ Parses the return message from the service and updates the internal func_tables
@@ -341,7 +350,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         return r['task_uuids']
 
-
     def register_endpoint(self, name, endpoint_uuid, description=None):
         """Register an endpoint with the funcX service.
 
@@ -485,8 +493,33 @@ class FuncXClient(throttling.ThrottledBaseClient):
         if r.http_status is not 200:
             raise Exception(r)
 
+        func_uuid = r.data['function_uuid']
+
         # Return the result
-        return r.data['function_uuid']
+        return func_uuid
+
+    def update_function(self, func_uuid, function):
+        pass
+
+    def search_function(self, q, offset=0, limit=10, advanced=False):
+        """Search for function via the funcX service
+
+        Parameters
+        ----------
+        q : str
+            free-form query string
+        offset : int
+            offset into total results
+        limit : int
+            max number of results to return
+        advanced : bool
+            allows elastic-search like syntax in query string
+
+        Returns
+        -------
+        SearchResults
+        """
+        return self.searcher.search_function(q, offset=offset, limit=limit, advanced=advanced)
 
     def register_container(self, location, container_type, name='', description=''):
         """Register a container with the funcX service.
