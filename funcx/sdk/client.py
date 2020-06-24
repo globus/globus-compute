@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import pickle as pkl
+from inspect import getsource
 
 from parsl.app.errors import RemoteExceptionWrapper
 
@@ -451,7 +452,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         return r.data
 
     def register_function(self, function, function_name=None, container_uuid=None, description=None,
-                          public=False, group=None):
+                          public=False, group=None, searchable=True):
         """Register a function code with the funcX service.
 
         Parameters
@@ -468,6 +469,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
             Whether or not the function is publicly accessible. Default = False
         group : str
             A globus group uuid to share this function with
+        searchable : bool
+            If true, the function will be indexed into globus search with the appropriate permissions
 
         Returns
         -------
@@ -476,16 +479,24 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         registration_path = 'register_function'
 
+        source_code = ""
+        try:
+            source_code = getsource(function)
+        except OSError:
+            logger.error("Failed to find source code during function registration.")
+
         serialized_fn = self.fx_serializer.serialize(function)
         packed_code = self.fx_serializer.pack_buffers([serialized_fn])
 
         data = {"function_name": function.__name__,
                 "function_code": packed_code,
+                "function_source": source_code,
                 "container_uuid": container_uuid,
                 "entry_point": function_name if function_name else function.__name__,
                 "description": description,
                 "public": public,
-                "group": group}
+                "group": group,
+                "searchable": searchable}
 
         logger.info("Registering function : {}".format(data))
 
