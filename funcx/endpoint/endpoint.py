@@ -424,13 +424,13 @@ def main(
     # Sets up global variables in the State wrapper (debug flag, config dir, default config file).
     # For commands other than `init`, we ensure the existence of the config directory and file.
 
-    funcx.set_stream_logger(level=logging.DEBUG if debug else logging.INFO)
     global logger
+    funcx.set_stream_logger(level=logging.DEBUG if debug else logging.INFO)
     logger = logging.getLogger('funcx')
     logger.debug("Command: {}".format(ctx.invoked_subcommand))
 
     # Set global state variables, to avoid passing them around as arguments all the time
-    State.DEBUG = State.DEBUG
+    State.DEBUG = debug
     State.CONFIG_DIR = config_dir
     State.CONFIG_FILE = os.path.join(State.CONFIG_DIR, 'config.py')
 
