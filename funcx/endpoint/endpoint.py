@@ -42,8 +42,7 @@ class State:
 
 def version_callback(value):
     if value:
-        logger.info("Theodore's Version!")
-        logger.info("FuncX version: {}".format(funcx.__version__))
+        typer.echo("FuncX version: {}".format(funcx.__version__))
         raise typer.Exit()
 
 
@@ -97,13 +96,7 @@ def init_endpoint_dir(endpoint_name, endpoint_config=None):
     return endpoint_dir
 
 
-@app.command(name="init")
-def init_endpoint(
-        force: bool = typer.Option(
-            False, "--force", help="Force re-initialization of config with this flag. WARNING: This will wipe your "
-                                   "current config "
-        )
-):
+def init_endpoint():
     """Setup funcx dirs and default endpoint config files
 
     TODO : Every mechanism that will update the config file, must be using a
@@ -111,15 +104,14 @@ def init_endpoint(
     to ensure that multiple endpoint invocations do not mangle the funcx config files
     or the lockfile module.
     """
-    if force:
-        typer.confirm(
-            "Are you sure you want to force re-initialization? "
-            f"This will erase all configs in {State.FUNCX_DIR}", abort=True
-        )
-        _ = FuncXClient(force_login=True)
+    _ = FuncXClient()
  
-    if force and os.path.exists(State.FUNCX_DIR):
-        logger.warning("Wiping all current configs in {}".format(State.FUNCX_DIR))
+    if os.path.exists(State.FUNCX_CONFIG_FILE):
+        typer.confirm(
+            "Are you sure you want to initialize this directory? "
+            f"This will erase everything in {State.FUNCX_DIR}", abort=True
+        )
+        logger.info("Wiping all current configs in {}".format(State.FUNCX_DIR))
         backup_dir = State.FUNCX_DIR + ".bak"
         try:
             logger.debug(f"Removing old backups in {backup_dir}")
@@ -251,7 +243,6 @@ def start_endpoint(
     elif not endpoint_uuid:
         endpoint_uuid = str(uuid.uuid4())
 
-    print(f"Starting endpoint with uuid: {endpoint_uuid}")
     logger.debug(f"Starting endpoint with uuid: {endpoint_uuid}")
 
     # Create a daemon context
@@ -435,15 +426,10 @@ def main(
     State.FUNCX_DIR = config_dir
     State.FUNCX_CONFIG_FILE = os.path.join(State.FUNCX_DIR, FUNCX_CONFIG_FILE_NAME)
 
-    # If we are running the init command, then we don't need to check existence of config
-    if ctx.invoked_subcommand == "init":
-        return
-
     # Otherwise, we ensure that configs exist
     if not os.path.exists(State.FUNCX_CONFIG_FILE):
-        logger.critical("Missing a config file at {}. Critical error. Exiting.".format(State.FUNCX_CONFIG_FILE))
-        logger.info("Please run the following to create the appropriate config files : \n $> funcx-endpoint init")
-        exit(-1)
+        logger.info(f"No existing configuration found at {State.FUNCX_CONFIG_FILE}. Initializing...")
+        init_endpoint()
 
     logger.debug("Loading config files from {}".format(State.FUNCX_DIR))
 
@@ -453,10 +439,6 @@ def main(
 
 def cli_run():
     """Entry point for setuptools to point to"""
-    funcx.set_stream_logger(level=logging.INFO)
-    global logger
-    logger = logging.getLogger('funcx')
-
     app()
 
 
