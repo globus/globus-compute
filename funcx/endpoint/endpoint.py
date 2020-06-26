@@ -112,6 +112,10 @@ def init_endpoint(
     or the lockfile module.
     """
     if force:
+        typer.confirm(
+            "Are you sure you want to force re-initialization? "
+            f"This will erase all configs in {State.FUNCX_DIR}", abort=True
+        )
         _ = FuncXClient(force_login=True)
  
     if force and os.path.exists(State.FUNCX_DIR):
