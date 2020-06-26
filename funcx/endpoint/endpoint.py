@@ -1,4 +1,3 @@
-import argparse
 import glob
 from importlib.machinery import SourceFileLoader
 import json
@@ -18,22 +17,27 @@ import psutil
 import requests
 import texttable as tt
 import typer
+from requests import Response
 
 import funcx
 from funcx.errors import *
-from funcx.executors.high_throughput import default_config, global_config
+from funcx.executors.high_throughput import default_config as endpoint_default_config
+from funcx.executors.high_throughput import global_config as funcx_default_config
 from funcx.executors.high_throughput.interchange import Interchange
 from funcx.sdk.client import FuncXClient
+
+
+FUNCX_CONFIG_FILE_NAME = 'config.py'
 
 app = typer.Typer()
 
 
 class State:
     DEBUG = False
-    CONFIG_DIR = '{}/.funcx'.format(pathlib.Path.home())
-    CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.py')
-    GLOBAL_CONFIG_FILE = global_config.__file__
-    GLOBAL_CONFIG = {}
+    FUNCX_DIR = '{}/.funcx'.format(pathlib.Path.home())
+    FUNCX_CONFIG_FILE = os.path.join(FUNCX_DIR, FUNCX_CONFIG_FILE_NAME)
+    FUNCX_DEFAULT_CONFIG_TEMPLATE = funcx_default_config.__file__
+    FUNCX_CONFIG = {}
 
 
 def version_callback(value):
@@ -44,7 +48,7 @@ def version_callback(value):
 
 
 def complete_endpoint_name():
-    config_files = glob.glob('{}/*/config.py'.format(State.CONFIG_DIR))
+    config_files = glob.glob('{}/*/config.py'.format(State.FUNCX_DIR))
     return [
         os.path.basename(os.path.dirname(config_file))
         for config_file in config_files
@@ -69,31 +73,27 @@ def check_pidfile(filepath, match_name, endpoint_name):
     $ funcx-endpoint stop {}'''.format(endpoint_name))
 
 
-def init_endpoint_dir(endpoint_name, config=None):
+def init_endpoint_dir(endpoint_name, endpoint_config=None):
     """ Initialize a clean endpoint dir
 
     Returns if an endpoint_dir already exists
 
     Parameters
     ----------
-
-    funcx_dir : str
-        Path to the funcx_dir on the system
-
     endpoint_name : str
         Name of the endpoint, which will be used to name the dir
-        for the endpoint.
+        for the endpoint in the FUNCX_DIR
 
-    config : str
+    endpoint_config : str
        Path to a config file to be used instead of the funcX default config file
 
     """
-    endpoint_dir = os.path.join(State.CONFIG_DIR, endpoint_name)
+    endpoint_dir = os.path.join(State.FUNCX_DIR, endpoint_name)
+    logger.debug(f"Creating endpoint dir {endpoint_dir}")
     os.makedirs(endpoint_dir, exist_ok=True)
 
-    config = config if config else default_config.__file__
-    shutil.copyfile(config,
-                    os.path.join(endpoint_dir, 'config.py'))
+    endpoint_config = endpoint_config if endpoint_config else endpoint_default_config.__file__
+    shutil.copyfile(endpoint_config, os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME))
     return endpoint_dir
 
 
@@ -114,26 +114,27 @@ def init_endpoint(
     if force:
         _ = FuncXClient(force_login=True)
  
-    if force and os.path.exists(State.CONFIG_DIR):
-        logger.warning("Wiping all current configs in {}".format(State.CONFIG_DIR))
+    if force and os.path.exists(State.FUNCX_DIR):
+        logger.warning("Wiping all current configs in {}".format(State.FUNCX_DIR))
+        backup_dir = State.FUNCX_DIR + ".bak"
         try:
-            logger.debug("Removing old backups in {}".format(State.CONFIG_DIR + '.bak'))
-            shutil.rmtree(State.CONFIG_DIR + '.bak')
-        except Exception:
+            logger.debug(f"Removing old backups in {backup_dir}")
+            shutil.rmtree(backup_dir)
+        except OSError:
             pass
-        os.renames(State.CONFIG_DIR, State.CONFIG_DIR + '.bak')
+        os.renames(State.FUNCX_DIR, backup_dir)
 
-    if os.path.exists(State.CONFIG_FILE):
-        logger.debug("Config file exists at {}".format(State.CONFIG_FILE))
+    if os.path.exists(State.FUNCX_CONFIG_FILE):
+        logger.debug("Config file exists at {}".format(State.FUNCX_CONFIG_FILE))
         return
 
     try:
-        os.makedirs(State.CONFIG_DIR, exist_ok=True)
+        os.makedirs(State.FUNCX_DIR, exist_ok=True)
     except Exception as e:
         print("[FuncX] Caught exception during registration {}".format(e))
 
-    shutil.copyfile(State.GLOBAL_CONFIG_FILE, State.CONFIG_FILE)
-    init_endpoint_dir(State.CONFIG_DIR, "default")
+    shutil.copyfile(State.FUNCX_DEFAULT_CONFIG_TEMPLATE, State.FUNCX_CONFIG_FILE)
+    init_endpoint_dir("default")
 
 
 def register_with_hub(endpoint_uuid, endpoint_dir, address,
@@ -156,7 +157,6 @@ def register_with_hub(endpoint_uuid, endpoint_dir, address,
     except requests.exceptions.ConnectionError:
         logger.critical("Unable to reach the funcX hub at {}".format(address))
         exit(-1)
-        # raise FuncXUnreachable(str(address))
 
     if r.status_code != 200:
         print(dir(r))
@@ -173,18 +173,18 @@ def register_with_hub(endpoint_uuid, endpoint_dir, address,
 @app.command(name="configure", help="Configure an endpoint")
 def configure_endpoint(
         name: str = typer.Argument("default", help="endpoint name", autocompletion=complete_endpoint_name),
-        config: str = typer.Option(None, "--config", help="Config file to be used as template")
+        endpoint_config: str = typer.Option(None, "--endpoint-config", help="endpoint config file")
 ):
     """Configure an endpoint
 
     Drops a config.py template into the funcx configs directory.
     The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
     """
-    endpoint_dir = os.path.join(State.CONFIG_DIR, name)
-    new_config_file = os.path.join(endpoint_dir, 'config.py')
+    endpoint_dir = os.path.join(State.FUNCX_DIR, name)
+    new_config_file = os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)
 
     if not os.path.exists(endpoint_dir):
-        init_endpoint_dir(name, config=config)
+        init_endpoint_dir(name, endpoint_config=endpoint_config)
         print('''A default profile has been create for <{}> at {}
 Configure this file and try restarting with:
     $ funcx-endpoint start {}'''.format(name,
@@ -220,16 +220,13 @@ def start_endpoint(
 
     Parameters
     ----------
-    args : args object
-       Args object from the arg parsing
-
-    global_config : dict
-       Global config dict
+    name : str
+    endpoint_uuid : str
     """
 
     funcx_client = FuncXClient()
 
-    endpoint_dir = os.path.join(State.CONFIG_DIR, name)
+    endpoint_dir = os.path.join(State.FUNCX_DIR, name)
     endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
 
     if not os.path.exists(endpoint_dir):
@@ -274,18 +271,18 @@ def start_endpoint(
     # TODO : we need to load the config ? maybe not. This needs testing
     endpoint_config = SourceFileLoader(
         'config',
-        os.path.join(endpoint_dir, 'config.py')).load_module()
+        os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
 
     with context:
         while True:
             # Register the endpoint
             logger.debug("Registering endpoint")
-            if State.GLOBAL_CONFIG.get('broker_test', False) is True:
+            if State.FUNCX_CONFIG.get('broker_test', False) is True:
                 logger.warning("**************** BROKER State.DEBUG MODE *******************")
                 reg_info = register_with_hub(endpoint_uuid,
                                              endpoint_dir,
-                                             State.GLOBAL_CONFIG['broker_address'],
-                                             State.GLOBAL_CONFIG['redis_host'])
+                                             State.FUNCX_CONFIG['broker_address'],
+                                             State.FUNCX_CONFIG['redis_host'])
             else:
                 reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
 
@@ -295,8 +292,8 @@ def start_endpoint(
             optionals = {}
             optionals['client_address'] = reg_info['address']
             optionals['client_ports'] = reg_info['client_ports'].split(',')
-            if 'endpoint_address' in State.GLOBAL_CONFIG:
-                optionals['interchange_address'] = State.GLOBAL_CONFIG['endpoint_address']
+            if 'endpoint_address' in State.FUNCX_CONFIG:
+                optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
 
             optionals['logdir'] = endpoint_dir
             # optionals['State.DEBUG'] = True
@@ -353,7 +350,7 @@ def stop_endpoint(name: str = typer.Argument("default", autocompletion=complete_
 
     """
 
-    endpoint_dir = os.path.join(State.CONFIG_DIR, name)
+    endpoint_dir = os.path.join(State.FUNCX_DIR, name)
     pid_file = os.path.join(endpoint_dir, "daemon.pid")
 
     if os.path.exists(pid_file):
@@ -390,7 +387,7 @@ def list_endpoints():
     headings = ['Endpoint Name', 'Status', 'Endpoint ID']
     table.header(headings)
 
-    config_files = glob.glob('{}/*/config.py'.format(State.CONFIG_DIR))
+    config_files = glob.glob('{}/*/config.py'.format(State.FUNCX_DIR))
     for config_file in config_files:
         endpoint_dir = os.path.dirname(config_file)
         endpoint_name = os.path.basename(endpoint_dir)
@@ -416,9 +413,9 @@ def list_endpoints():
 @app.callback()
 def main(
         ctx: typer.Context,
-        version: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True),
+        _: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True),
         debug: bool = typer.Option(False, "--debug", "-d"),
-        config_dir: str = typer.Option(State.CONFIG_DIR, "--config_dir", "-c", help="override default config dir")
+        config_dir: str = typer.Option(State.FUNCX_DIR, "--config_dir", "-c", help="override default config dir")
 ):
     # Note: no docstring here; the docstring for @app.callback is used as a help message for overall app.
     # Sets up global variables in the State wrapper (debug flag, config dir, default config file).
@@ -431,24 +428,23 @@ def main(
 
     # Set global state variables, to avoid passing them around as arguments all the time
     State.DEBUG = debug
-    State.CONFIG_DIR = config_dir
-    State.CONFIG_FILE = os.path.join(State.CONFIG_DIR, 'config.py')
+    State.FUNCX_DIR = config_dir
+    State.FUNCX_CONFIG_FILE = os.path.join(State.FUNCX_DIR, FUNCX_CONFIG_FILE_NAME)
 
     # If we are running the init command, then we don't need to check existence of config
     if ctx.invoked_subcommand == "init":
         return
 
     # Otherwise, we ensure that configs exist
-    if not os.path.exists(State.CONFIG_FILE):
-        logger.critical("Missing a config file at {}. Critical error. Exiting.".format(State.CONFIG_FILE))
+    if not os.path.exists(State.FUNCX_CONFIG_FILE):
+        logger.critical("Missing a config file at {}. Critical error. Exiting.".format(State.FUNCX_CONFIG_FILE))
         logger.info("Please run the following to create the appropriate config files : \n $> funcx-endpoint init")
         exit(-1)
 
-    logger.debug("Loading config files from {}".format(State.CONFIG_DIR))
+    logger.debug("Loading config files from {}".format(State.FUNCX_DIR))
 
-    global_config = SourceFileLoader('global_config', State.CONFIG_FILE).load_module()
-    State.GLOBAL_CONFIG_FILE = global_config.__file__
-    State.GLOBAL_CONFIG = global_config.global_options
+    funcx_config = SourceFileLoader('global_config', State.FUNCX_CONFIG_FILE).load_module()
+    State.FUNCX_CONFIG = funcx_config.global_options
 
 
 def cli_run():
