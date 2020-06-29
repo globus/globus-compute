@@ -254,8 +254,9 @@ def start_endpoint(
                                        # lockfile.FileLock(
                                        pidfile=daemon.pidfile.PIDLockFile(os.path.join(endpoint_dir,
                                                                                        'daemon.pid')),
-                                       stdout=stdout,
+                                       stdout=sys.stdout,
                                        stderr=stderr,
+                                       files_preserve=[sys.stdout, 0]
                                        )
     except Exception as e:
         logger.critical("Caught exception while trying to setup endpoint context dirs")
@@ -410,6 +411,26 @@ def list_endpoints():
 
     s = table.draw()
     print(s)
+
+
+@app.command(name="delete")
+def delete_endpoint(
+        name: str = typer.Argument(..., autocompletion=complete_endpoint_name),
+        autoconfirm: bool = typer.Option(False, "-y", help="Do not ask for confirmation to delete.")
+):
+    """Deletes an endpoint and its config."""
+    if not autoconfirm:
+        typer.confirm(f"Are you sure you want to delete the endpoint <{name}>?", abort=True)
+
+    endpoint_dir = os.path.join(State.FUNCX_DIR, name)
+
+    # If endpoint currently running, stop it.
+    pid_file = os.path.join(endpoint_dir, "daemon.pid")
+    active = os.path.exists(pid_file)
+    if active:
+        stop_endpoint(name)
+
+    shutil.rmtree(endpoint_dir)
 
 
 @app.callback()
