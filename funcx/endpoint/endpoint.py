@@ -373,6 +373,13 @@ def stop_endpoint(name: str = typer.Argument("default", autocompletion=complete_
         logger.info("Endpoint <{}> is not active.".format(name))
 
 
+@app.command(name="restart")
+def restart_endpoint(name: str = typer.Argument("default", autocompletion=complete_endpoint_name)):
+    """Restarts an endpoint"""
+    stop_endpoint(name)
+    start_endpoint(name)
+
+
 @app.command(name="list")
 def list_endpoints():
     """ List all available endpoints
