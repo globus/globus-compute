@@ -243,7 +243,7 @@ def start_endpoint(
     elif not endpoint_uuid:
         endpoint_uuid = str(uuid.uuid4())
 
-    logger.debug(f"Starting endpoint with uuid: {endpoint_uuid}")
+    logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
     # Create a daemon context
     stdout = open(os.path.join(endpoint_dir, './interchange.stdout'), 'w+')
