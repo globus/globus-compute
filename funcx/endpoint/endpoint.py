@@ -89,7 +89,9 @@ def init_endpoint_dir(endpoint_name, endpoint_config=None):
     logger.debug(f"Creating endpoint dir {endpoint_dir}")
     os.makedirs(endpoint_dir, exist_ok=True)
 
-    endpoint_config = endpoint_config if endpoint_config else endpoint_default_config.__file__
+    if not endpoint_config:
+        endpoint_config = endpoint_default_config.__file__
+        
     shutil.copyfile(endpoint_config, os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME))
     return endpoint_dir
 
