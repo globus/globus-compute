@@ -91,7 +91,7 @@ def init_endpoint_dir(endpoint_name, endpoint_config=None):
 
     if not endpoint_config:
         endpoint_config = endpoint_default_config.__file__
-        
+
     shutil.copyfile(endpoint_config, os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME))
     return endpoint_dir
 
@@ -254,9 +254,8 @@ def start_endpoint(
                                        # lockfile.FileLock(
                                        pidfile=daemon.pidfile.PIDLockFile(os.path.join(endpoint_dir,
                                                                                        'daemon.pid')),
-                                       stdout=sys.stdout,
+                                       stdout=stdout,
                                        stderr=stderr,
-                                       files_preserve=[sys.stdout, 0]
                                        )
     except Exception as e:
         logger.critical("Caught exception while trying to setup endpoint context dirs")
