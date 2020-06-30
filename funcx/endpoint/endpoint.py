@@ -189,7 +189,7 @@ Configure this file and try restarting with:
         return
 
 
-@app.command(name="start")
+@app.command(name="start", help="Start an endpoint by name")
 def start_endpoint(
         name: str = typer.Argument("default", autocompletion=complete_endpoint_name),
         endpoint_uuid: str = typer.Option(None, help="The UUID for the endpoint to register with")
@@ -291,7 +291,6 @@ def start_endpoint(
                 optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
 
             optionals['logdir'] = endpoint_dir
-            # optionals['State.DEBUG'] = True
 
             if State.DEBUG:
                 optionals['logging_level'] = logging.DEBUG
@@ -469,5 +468,5 @@ def cli_run():
     app()
 
 
-# if __name__ == '__main__':
-#     app()
+if __name__ == '__main__':
+    app()
