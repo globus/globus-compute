@@ -48,10 +48,8 @@ def version_callback(value):
 
 def complete_endpoint_name():
     config_files = glob.glob('{}/*/config.py'.format(State.FUNCX_DIR))
-    return [
-        os.path.basename(os.path.dirname(config_file))
-        for config_file in config_files
-    ]
+    for config_file in config_files:
+        yield os.path.basename(os.path.dirname(config_file))
 
 
 def check_pidfile(filepath, match_name, endpoint_name):
