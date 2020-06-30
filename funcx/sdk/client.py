@@ -85,7 +85,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         self.native_client.logout()
 
-
     def update_table(self, return_msg, task_id):
         """ Parses the return message from the service and updates the internal func_tables
 
@@ -126,8 +125,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 self.func_table[task_id] = status
         return status
 
-    def get_task_status(self, task_id):
-        """Get the status of a funcX task.
+    def get_task(self, task_id):
+        """Get a funcX task.
 
         Parameters
         ----------
@@ -137,12 +136,12 @@ class FuncXClient(throttling.ThrottledBaseClient):
         Returns
         -------
         dict
-            Status block containing "status" key.
+            Task block containing "status" key.
         """
         if task_id in self.func_table:
-             return self.func_table[task_id]
+            return self.func_table[task_id]
 
-        r = self.get("{task_id}/status".format(task_id=task_id))
+        r = self.get("tasks/{task_id}".format(task_id=task_id))
         logger.debug("Response string : {}".format(r))
         try:
             rets = self.update_table(r.text, task_id)
@@ -166,21 +165,20 @@ class FuncXClient(throttling.ThrottledBaseClient):
         ------
         Exception obj: Exception due to which the task failed
         """
-        status = self.get_task_status(task_id)
-        if status['pending'] is True:
+        task = self.get_task(task_id)
+        if task['pending'] is True:
             raise Exception("Task pending")
         else:
-            if 'result' in status:
-                return status['result']
+            if 'result' in task:
+                return task['result']
             else:
-                logger.warn("We have an exception : {}".format(status['exception']))
-                status['exception'].reraise()
+                logger.warning("We have an exception : {}".format(task['exception']))
+                task['exception'].reraise()
 
     def get_batch_status(self, task_id_list):
         """ Request status for a batch of task_ids
         """
         assert isinstance(task_id_list, list), "get_batch_status expects a list of task ids"
-
 
         pending_task_ids = [t for t in task_id_list if t not in self.func_table]
 
