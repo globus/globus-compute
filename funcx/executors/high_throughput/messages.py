@@ -6,7 +6,7 @@ from struct import Struct
 MESSAGE_TYPE_FORMATTER = Struct('b')
 
 
-class MessageTypeHeader(Enum):
+class MessageType(Enum):
     STOP = 0
     HEARTBEAT = 1
     STATUS_REQUEST = 2
@@ -14,6 +14,11 @@ class MessageTypeHeader(Enum):
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
+
+    @classmethod
+    def unpack(cls, buffer):
+        val = MESSAGE_TYPE_FORMATTER.unpack_from(buffer, offset=0)
+        return MessageType(val), buffer[MESSAGE_TYPE_FORMATTER.size:]
 
 
 class TaskHeader:
