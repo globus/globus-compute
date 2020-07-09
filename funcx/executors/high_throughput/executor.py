@@ -549,14 +549,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
         self.tasks[task_id] = Future()
 
-        # This needs to be a byte buffer
-        # We want a cleaner header to the task here for the downstream systems
-        # to appropriately route tasks
-        msg = {"task_id": task_id,
-               "buffer": bufs}
-
         # Post task to the the outgoing queue
-        self.outgoing_q.put(msg)
+        self.outgoing_q.put(bufs)
 
         # Return the future
         return self.tasks[task_id]
