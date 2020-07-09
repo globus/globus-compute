@@ -15,6 +15,8 @@ import daemon
 import collections
 
 from parsl.version import VERSION as PARSL_VERSION
+
+from funcx.executors.high_throughput.messages import TaskHeader, MessageType
 from funcx.sdk.client import FuncXClient
 from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
@@ -356,19 +358,27 @@ class Interchange(object):
                 logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.total_pending_task_count))
                 continue
 
-            if msg == 'STOP':
+            message_type, msg = MessageType.unpack(msg)
+            if message_type is MessageType.STOP:
                 kill_event.set()
                 break
-            elif msg == 'STATUS_REQUEST':
-                logger.info("Got STATUS_REQUEST")
+            elif message_type is MessageType.STATUS_REQUEST:
+                logger.info("Got MessageType.STATUS_REQUEST")
                 status_request.set()
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
-                task_type = self.get_container(msg['task_id'].split(";")[1])
-                msg['container'] = task_type
-                if task_type not in self.pending_task_queue:
-                    self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
-                self.pending_task_queue[task_type].put(msg)
+                header, msg = TaskHeader.unpack(msg)
+                container = self.get_container(header.container_id)
+
+                task_packet = {
+                    "task_id": header.task_id,
+                    "container": container
+                }
+
+                if container not in self.pending_task_queue:
+                    self.pending_task_queue[container] = queue.Queue(maxsize=10 ** 6)
+                    
+                self.pending_task_queue[container].put(msg)
                 self.total_pending_task_count += 1
                 logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
