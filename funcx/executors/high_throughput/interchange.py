@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import argparse
+from typing import Tuple
+
 import zmq
 import os
 import sys
@@ -78,7 +80,7 @@ class Interchange(object):
                  config,
                  client_address="127.0.0.1",
                  interchange_address="127.0.0.1",
-                 client_ports=(50055, 50056, 50057),
+                 client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  cores_per_worker=1.0,
@@ -104,7 +106,7 @@ class Interchange(object):
         interchange_address : str
              The ip address at which the workers will be able to reach the Interchange. Default: "127.0.0.1"
 
-        client_ports : triple(int, int, int)
+        client_ports : Tuple[int, int, int]
              The ports at which the client can be reached
 
         launch_cmd : str
@@ -260,6 +262,8 @@ class Interchange(object):
             logger.exception("Caught exception")
             raise
 
+        self.tasks = set()
+        self.task_status_deltas = {}
 
     def load_config(self):
         """ Load the config
