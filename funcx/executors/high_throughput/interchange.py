@@ -14,9 +14,10 @@ import json
 import daemon
 import collections
 
+from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Heartbeat
+from funcx.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat
 from funcx.sdk.client import FuncXClient
 from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
@@ -303,7 +304,6 @@ class Interchange(object):
             logger.info("Scaling ...")
             self.scale_out(self.config.provider.init_blocks)
 
-
     def get_tasks(self, count):
         """ Obtains a batch of tasks from the internal pending_task_queue
 
@@ -482,7 +482,7 @@ class Interchange(object):
 
                 if command.type is MessageType.HEARTBEAT_REQ:
                     logger.info("[CMD] Received synchonous HEARTBEAT_REQ from hub")
-                    reply = self._construct_heartbeat()
+                    reply = Heartbeat(self.endpoint_id)
 
                 logger.debug("[COMMAND] Reply: {}".format(reply))
                 self.command_channel.send(reply.pack())
@@ -816,14 +816,14 @@ class Interchange(object):
 
         return status
 
-    def _construct_heartbeat(self) -> Heartbeat:
+    def _construct_status_report(self) -> EPStatusReport:
         """Construct a Heartbeat that contains various bits of status info, including deltas on each of the tasks.
 
         Returns
         -------
-        Heartbeat
+        EPStatusReport
         """
-        return Heartbeat(self.endpoint_id, [])
+        return EPStatusReport(self.endpoint_id, [])
 
 
 def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_string=None):

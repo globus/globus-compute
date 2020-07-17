@@ -9,6 +9,7 @@ MESSAGE_TYPE_FORMATTER = Struct('b')
 class MessageType(Enum):
     HEARTBEAT_REQ = auto()
     HEARTBEAT = auto()
+    EP_STATUS_REPORT = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -52,6 +53,8 @@ class Message(ABC):
             return HeartbeatReq.unpack(msg)
         elif message_type is MessageType.HEARTBEAT:
             return Heartbeat.unpack(msg)
+        elif message_type is MessageType.EP_STATUS_REPORT:
+            return EPStatusReport.unpack(msg)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
@@ -82,16 +85,33 @@ class HeartbeatReq(Message):
 
 
 class Heartbeat(Message):
+    type = MessageType.HEARTBEAT
+
+    def __init__(self, endpoint_id):
+        super().__init__()
+        self.endpoint_id = endpoint_id
+
+    @classmethod
+    def unpack(cls, msg):
+        return cls(msg.decode("ascii"))
+
+    def pack(self):
+        return self.endpoint_id.encode("ascii")
+
+
+class EPStatusReport(Message):
     _header_formatter = Struct('16s')  # header contains number of task statuses in payload
     _payload_formatter = Struct('16sb')  # need to think of appropriate structure?  Task id and 1 byte code?
 
-    type = MessageType.HEARTBEAT
+    type = MessageType.EP_STATUS_REPORT
 
-    def __init__(self, endpoint_id, statuses):
+    def __init__(self, endpoint_id, ep_status_report, task_statuses):
         super().__init__()
         endpoint_id_bytes = uuid.UUID(endpoint_id).bytes
         self._header = self._header_formatter.pack(endpoint_id_bytes)
-        self._payload = statuses
+        self.ep_status = ep_status_report
+        self.task_statuses = task_statuses
+        self._payload = task_statuses
 
     @classmethod
     def unpack(cls, msg):
@@ -105,7 +125,7 @@ class Heartbeat(Message):
                 "task_id": task_id,
                 "status_code": status_code
             })
-        return cls(endpoint_id, statuses)
+        return cls(endpoint_id, None, statuses)
 
     def pack(self):
         n = len(self._payload)
