@@ -7,11 +7,8 @@ MESSAGE_TYPE_FORMATTER = Struct('b')
 
 
 class MessageType(Enum):
-    STOP = auto()
     HEARTBEAT_REQ = auto()
     HEARTBEAT = auto()
-    TASK = auto()
-    SHUTDOWN = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -20,6 +17,11 @@ class MessageType(Enum):
     def unpack(cls, buffer):
         mtype, = MESSAGE_TYPE_FORMATTER.unpack_from(buffer, offset=0)
         return MessageType(mtype), buffer[MESSAGE_TYPE_FORMATTER.size:]
+
+
+COMMAND_TYPES = {
+    MessageType.HEARTBEAT_REQ
+}
 
 
 class Message(ABC):
@@ -50,9 +52,8 @@ class Message(ABC):
             return HeartbeatReq.unpack(msg)
         elif message_type is MessageType.HEARTBEAT:
             return Heartbeat.unpack(msg)
-        elif message_type is MessageType.TASK:
-            return TaskMessage.unpack(msg)
-        pass
+
+        raise Exception(f"Unknown Message Type Code: {message_type}")
 
     @abstractmethod
     def pack(self):

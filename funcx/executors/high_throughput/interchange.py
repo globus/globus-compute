@@ -15,18 +15,20 @@ import daemon
 import collections
 
 from parsl.version import VERSION as PARSL_VERSION
+
+from funcx.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Heartbeat
 from funcx.sdk.client import FuncXClient
 from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
-PKL_HEARTBEAT_CODE = pickle.dumps((2 ** 32) - 1)
+PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
 
 
 class ShutdownRequest(Exception):
-    ''' Exception raised when any async component receives a ShutdownRequest
-    '''
+    """ Exception raised when any async component receives a ShutdownRequest
+    """
     def __init__(self):
         self.tstamp = time.time()
 
@@ -35,9 +37,9 @@ class ShutdownRequest(Exception):
 
 
 class ManagerLost(Exception):
-    ''' Task lost due to worker loss. Worker is considered lost when multiple heartbeats
+    """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
     have been missed.
-    '''
+    """
     def __init__(self, worker_id):
         self.worker_id = worker_id
         self.tstamp = time.time()
@@ -459,43 +461,31 @@ class Interchange(object):
 
     def _command_server(self, kill_event):
         """ Command server to run async command to the interchange
+
+        We want to be able to receive the following not yet implemented/updated commands:
+         - OutstandingCount
+         - ListManagers (get outstanding broken down by manager)
+         - HoldWorker
+         - Shutdown
         """
         logger.debug("[COMMAND] Command Server Starting")
 
         while not kill_event.is_set():
             try:
-                command_req = self.command_channel.recv_pyobj()
-                logger.debug("[COMMAND] Received command request: {}".format(command_req))
-                if command_req == "OUTSTANDING_C":
-                    reply = self.get_total_outstanding()
+                buffer = self.command_channel.recv()
+                logger.debug("[COMMAND] Received command request")
+                command = Message.unpack(buffer)
+                if command.type not in COMMAND_TYPES:
+                    logger.error("Received incorrect message type on command channel")
+                    self.command_channel.send(bytes())
+                    continue
 
-                elif command_req == "MANAGERS":
-                    reply = self.get_outstanding_breakdown()
-
-                elif command_req.startswith("HOLD_WORKER"):
-                    cmd, s_manager = command_req.split(';')
-                    manager = s_manager.encode('utf-8')
-                    logger.info("[CMD] Received HOLD_WORKER for {}".format(manager))
-                    if manager in self._ready_manager_queue:
-                        self._ready_manager_queue[manager]['active'] = False
-                        reply = True
-                    else:
-                        reply = False
-
-                elif command_req == "HEARTBEAT":
-                    logger.info("[CMD] Received heartbeat message from hub")
-                    reply = "HBT,{}".format(self.endpoint_id)
-
-                elif command_req == "SHUTDOWN":
-                    logger.info("[CMD] Received SHUTDOWN command")
-                    kill_event.set()
-                    reply = True
-
-                else:
-                    reply = None
+                if command.type is MessageType.HEARTBEAT_REQ:
+                    logger.info("[CMD] Received synchonous HEARTBEAT_REQ from hub")
+                    reply = self._construct_heartbeat()
 
                 logger.debug("[COMMAND] Reply: {}".format(reply))
-                self.command_channel.send_pyobj(reply)
+                self.command_channel.send(reply.pack())
 
             except zmq.Again:
                 logger.debug("[COMMAND] is alive")
@@ -825,6 +815,16 @@ class Interchange(object):
             logger.debug("[MAIN] The status is {}".format(status))
 
         return status
+
+    def _construct_heartbeat(self) -> Heartbeat:
+        """Construct a Heartbeat that contains various bits of status info, including deltas on each of the tasks.
+
+        Returns
+        -------
+        Heartbeat
+        """
+        return Heartbeat(self.endpoint_id, [])
+
 
 def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
