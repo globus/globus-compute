@@ -5,6 +5,8 @@ import time
 import pickle
 import logging
 
+from funcx.executors.high_throughput.messages import Message
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,9 +40,9 @@ class CommandClient(object):
         in ZMQ sockets reaching a broken state once there are ~10k tasks in flight.
         This issue can be magnified if each the serialized buffer itself is larger.
         """
-        self.zmq_socket.send_pyobj(message, copy=True)
-        reply = self.zmq_socket.recv_pyobj()
-        return reply
+        self.zmq_socket.send(message.pack(), copy=True)
+        reply = self.zmq_socket.recv()
+        return Message.unpack(reply)
 
     def close(self):
         self.zmq_socket.close()
