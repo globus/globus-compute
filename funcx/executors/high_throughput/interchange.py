@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse
-from typing import Tuple
+from typing import Tuple, Dict
 
 import zmq
 import os
@@ -19,7 +19,8 @@ import collections
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat
+from funcx.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat, \
+    TaskStatusCode
 from funcx.sdk.client import FuncXClient
 from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
@@ -374,8 +375,11 @@ class Interchange(object):
                 msg['container'] = task_type
                 if task_type not in self.pending_task_queue:
                     self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
+
                 self.pending_task_queue[task_type].put(msg)
                 self.total_pending_task_count += 1
+                self.task_status_deltas[msg['task_id']] = TaskStatusCode.WAITING_FOR_NODES
+                logger.debug(f"[TASK_PULL_THREAD] task {msg['task_id']} is now WAITING_FOR_NODES")
                 logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
@@ -477,7 +481,7 @@ class Interchange(object):
         while not kill_event.is_set():
             try:
                 buffer = self.command_channel.recv()
-                logger.debug("[COMMAND] Received command request")
+                logger.debug(f"[COMMAND] Received command request {buffer}")
                 command = Message.unpack(buffer)
                 if command.type not in COMMAND_TYPES:
                     logger.error("Received incorrect message type on command channel")
@@ -485,7 +489,8 @@ class Interchange(object):
                     continue
 
                 if command.type is MessageType.HEARTBEAT_REQ:
-                    logger.info("[CMD] Received synchonous HEARTBEAT_REQ from hub")
+                    logger.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
+                    logger.info(f"[COMMAND] Replying with Heartbeat({self.endpoint_id})")
                     reply = Heartbeat(self.endpoint_id)
 
                 logger.debug("[COMMAND] Reply: {}".format(reply))
@@ -640,6 +645,10 @@ class Interchange(object):
                 if tasks:
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
                     self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
+                    for task in tasks:
+                        task_id = task["task_id"]
+                        logger.debug(f"Task {task_id} is now WAITING_FOR_LAUNCH")
+                        self.task_status_deltas[task_id] = TaskStatusCode.WAITING_FOR_LAUNCH
 
             # Receive any results and forward to client
             if self.results_incoming in self.socks and self.socks[self.results_incoming] == zmq.POLLIN:

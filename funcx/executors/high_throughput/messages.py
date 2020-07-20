@@ -20,6 +20,14 @@ class MessageType(Enum):
         return MessageType(mtype), buffer[MESSAGE_TYPE_FORMATTER.size:]
 
 
+class TaskStatusCode(Enum):
+    WAITING_FOR_NODES = auto()
+    WAITING_FOR_LAUNCH = auto()
+    RUNNING = auto()
+    SUCCESS = auto()
+    FAILED = auto()
+
+
 COMMAND_TYPES = {
     MessageType.HEARTBEAT_REQ
 }
@@ -96,7 +104,7 @@ class Heartbeat(Message):
         return cls(msg.decode("ascii"))
 
     def pack(self):
-        return self.endpoint_id.encode("ascii")
+        return self.type.pack() + self.endpoint_id.encode("ascii")
 
 
 class EPStatusReport(Message):
