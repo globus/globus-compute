@@ -16,6 +16,8 @@ from multiprocessing import Process, Queue
 
 #from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
 from ipyparallel.serialize import deserialize_object  # ,serialize_object
+
+from funcx.executors.high_throughput.messages import HeartbeatReq
 from funcx.serialize import FuncXSerializer
 fx_serializer = FuncXSerializer()
 
@@ -510,7 +512,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self.outgoing_q.put('STATUS_REQUEST')
 
     def wait_for_endpoint(self):
-        heartbeat = self.command_client.run('HEARTBEAT')
+        heartbeat = self.command_client.run(HeartbeatReq())
         logger.debug("Attempting heartbeat to interchange")
         return heartbeat
 
