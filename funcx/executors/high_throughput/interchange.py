@@ -686,10 +686,7 @@ class Interchange(object):
                         r = pickle.loads(b_message)
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
                         task_type = self.containers[r['task_id'].split(';')[1]]
-                        if 'result' in r:
-                            self.task_status_deltas[r['task_id']] = TaskStatusCode.SUCCESS
-                        elif 'exception' in r:
-                            self.task_status_deltas[r['task_id']] = TaskStatusCode.FAILED
+                        del self.task_status_deltas[r['task_id']]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
                     # self.results_outgoing.send_multipart(b_messages)
