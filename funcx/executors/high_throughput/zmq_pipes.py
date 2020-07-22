@@ -5,10 +5,11 @@ import time
 import pickle
 import logging
 
+from funcx import set_file_logger
 from funcx.executors.high_throughput.messages import Message
 
-logger = logging.getLogger(__name__)
-
+# logger = logging.getLogger(__name__)
+logger = set_file_logger("zmq_pipe.log", name=__name__)
 
 class CommandClient(object):
     """ CommandClient
@@ -141,7 +142,14 @@ class ResultsIncoming(object):
                                                               max_port=port_range[1])
 
     def get(self, block=True, timeout=None):
-        return self.results_receiver.recv_multipart()
+        block_messages = self.results_receiver.recv()
+        try:
+            res = pickle.loads(block_messages)
+        except pickle.UnpicklingError:
+            logger.debug(f"MSG unpack: {block_messages}")
+            res = Message.unpack(block_messages)
+
+        return res
 
     def request_close(self):
         status = self.results_receiver.send(pickle.dumps(None))
