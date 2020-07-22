@@ -87,7 +87,7 @@ class Interchange(object):
                  cores_per_worker=1.0,
                  worker_debug=False,
                  launch_cmd=None,
-                 heartbeat_threshold=60,
+                 heartbeat_threshold=30,
                  logdir=".",
                  logging_level=logging.INFO,
                  poll_period=10,
@@ -363,12 +363,17 @@ class Interchange(object):
                 logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.total_pending_task_count))
                 continue
 
+            try:
+                msg = Message.unpack(msg)
+                logger.debug("[TASK_PULL_THREAD] received Message/Heartbeat? on task queue")
+            except:
+                pass
+
             if msg == 'STOP':
                 kill_event.set()
                 break
-            elif msg == 'STATUS_REQUEST':
-                logger.info("Got STATUS_REQUEST")
-                status_request.set()
+            elif isinstance(msg, Heartbeat):
+                logger.info("Got heartbeat")
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
                 task_type = self.get_container(msg['task_id'].split(";")[1])
@@ -467,6 +472,21 @@ class Interchange(object):
         else:
             reply = False
 
+    def _status_report_loop(self, kill_event):
+        logger.debug("[STATUS] Status reporting loop starting")
+
+        while not kill_event.is_set():
+            msg = EPStatusReport(
+                self.endpoint_id,
+                self.get_status_report(),
+                self.task_status_deltas
+            )
+            logger.info(f"[STATUS] Sending status report to forwarder: {msg.task_statuses}")
+            self.results_outgoing.send(msg.pack())
+            logger.info("[STATUS] Clearing task deltas")
+            self.task_status_deltas.clear()
+            time.sleep(self.heartbeat_threshold)
+
     def _command_server(self, kill_event):
         """ Command server to run async command to the interchange
 
@@ -532,6 +552,10 @@ class Interchange(object):
         self._command_thread = threading.Thread(target=self._command_server,
                                                 args=(self._kill_event, ))
         self._command_thread.start()
+
+        self._status_report_thread = threading.Thread(target=self._status_report_loop,
+                                                      args=(self._kill_event,))
+        self._status_report_thread.start()
 
         try:
             logger.debug("Starting strategy.")
@@ -668,7 +692,9 @@ class Interchange(object):
                             self.task_status_deltas[r['task_id']] = TaskStatusCode.FAILED
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
-                    self.results_outgoing.send_multipart(b_messages)
+                    # self.results_outgoing.send_multipart(b_messages)
+                    # TODO: handle this with a Task message or something?
+                    self.results_outgoing.send(pickle.dumps(b_messages))
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
 
