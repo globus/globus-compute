@@ -1,3 +1,4 @@
+import json
 import uuid
 from abc import ABC, abstractmethod
 from enum import Enum, auto
@@ -20,7 +21,7 @@ class MessageType(Enum):
         return MessageType(mtype), buffer[MESSAGE_TYPE_FORMATTER.size:]
 
 
-class TaskStatusCode(Enum):
+class TaskStatusCode(int, Enum):
     WAITING_FOR_NODES = auto()
     WAITING_FOR_LAUNCH = auto()
     RUNNING = auto()
@@ -58,11 +59,11 @@ class Message(ABC):
     def unpack(cls, msg):
         message_type, remaining = MessageType.unpack(msg)
         if message_type is MessageType.HEARTBEAT_REQ:
-            return HeartbeatReq.unpack(msg)
+            return HeartbeatReq.unpack(remaining)
         elif message_type is MessageType.HEARTBEAT:
-            return Heartbeat.unpack(msg)
+            return Heartbeat.unpack(remaining)
         elif message_type is MessageType.EP_STATUS_REPORT:
-            return EPStatusReport.unpack(msg)
+            return EPStatusReport.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
@@ -108,40 +109,33 @@ class Heartbeat(Message):
 
 
 class EPStatusReport(Message):
-    _header_formatter = Struct('16s')  # header contains number of task statuses in payload
-    _payload_formatter = Struct('16sb')  # need to think of appropriate structure?  Task id and 1 byte code?
+    # _payload_formatter = Struct('16sb')  # need to think of appropriate structure?  Task id and 1 byte code?
 
     type = MessageType.EP_STATUS_REPORT
 
     def __init__(self, endpoint_id, ep_status_report, task_statuses):
         super().__init__()
-        endpoint_id_bytes = uuid.UUID(endpoint_id).bytes
-        self._header = self._header_formatter.pack(endpoint_id_bytes)
+        self._header = uuid.UUID(endpoint_id).bytes
         self.ep_status = ep_status_report
         self.task_statuses = task_statuses
-        self._payload = task_statuses
+        # self._payload = task_statuses
 
     @classmethod
     def unpack(cls, msg):
-        endpoint_id, = cls._header_formatter.unpack_from(msg)
-        msg = msg[cls._header_formatter.size:]
-        statuses = []
-        for chonk in cls._payload_formatter.iter_unpack(msg):
-            task_bytes, status_code = chonk
-            task_id = str(uuid.UUID(bytes=task_bytes))
-            statuses.append({
-                "task_id": task_id,
-                "status_code": status_code
-            })
-        return cls(endpoint_id, None, statuses)
+        endpoint_id = str(uuid.UUID(bytes=msg[:16]))
+        msg = msg[16:]
+        jsonified = msg.decode("ascii")
+        ep_status, task_statuses = json.loads(jsonified)
+        return cls(endpoint_id, ep_status, task_statuses)
 
     def pack(self):
-        n = len(self._payload)
-        buffer = bytes([0] * n * self._payload_formatter.size)
-        for i, status in enumerate(self.payload):
-            self._payload_formatter.pack_into(
-                buffer, i * self._payload_formatter.size,
-                status['task_id'], status['status_code']
-            )
-        return self.type.pack() + self._header + buffer
+        # n = len(self._payload)
+        # buffer = bytes([0] * n * self._payload_formatter.size)
+        # for i, status in enumerate(self.payload):
+        #     self._payload_formatter.pack_into(
+        #         buffer, i * self._payload_formatter.size,
+        #         status['task_id'], status['status_code']
+        #     )
+        jsonified = json.dumps([self.ep_status, self.task_statuses])
+        return self.type.pack() + self._header + jsonified.encode("ascii")
 
