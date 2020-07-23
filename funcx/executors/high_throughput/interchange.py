@@ -671,7 +671,7 @@ class Interchange(object):
                     self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
                     for task in tasks:
                         task_id = task["task_id"]
-                        logger.debug(f"Task {task_id} is now WAITING_FOR_LAUNCH")
+                        logger.debug(f"[MAIN] Task {task_id} is now WAITING_FOR_LAUNCH")
                         self.task_status_deltas[task_id] = TaskStatusCode.WAITING_FOR_LAUNCH
 
             # Receive any results and forward to client
@@ -681,12 +681,22 @@ class Interchange(object):
                 if manager not in self._ready_manager_queue:
                     logger.warning("[MAIN] Received a result from a un-registered manager: {}".format(manager))
                 else:
+                    try:
+                        logger.debug("[MAIN] Trying to unpack ")
+                        manager_report = Message.unpack(b_messages[0])
+                        logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
+                        self.task_status_deltas.update(manager_report.task_statuses)
+                        continue
+                    except Exception:
+                        logger.exception("[MAIN] Error unpacking b_messages")
+
                     logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
                         task_type = self.containers[r['task_id'].split(';')[1]]
-                        del self.task_status_deltas[r['task_id']]
+                        if r['task_id'] in self.task_status_deltas:
+                            del self.task_status_deltas[r['task_id']]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
                     # self.results_outgoing.send_multipart(b_messages)
