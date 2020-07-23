@@ -18,6 +18,7 @@ import psutil
 import subprocess
 
 from funcx.executors.high_throughput.container_sched import naive_scheduler
+from funcx.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
 from funcx.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
@@ -134,6 +135,12 @@ class Manager(object):
         self.result_outgoing.setsockopt(zmq.IDENTITY, uid.encode('utf-8'))
         self.result_outgoing.setsockopt(zmq.LINGER, 0)
         self.result_outgoing.connect(result_q_url)
+
+        self.status_outgoing = self.context.socket(zmq.DEALER)
+        self.status_outgoing.setsockopt(zmq.IDENTITY, uid.encode('utf-8'))
+        self.status_outgoing.setsockopt(zmq.LINGER, 0)
+        self.status_outgoing.connect(result_q_url)
+
         logger.info("Manager connected")
 
         self.uid = uid
@@ -179,6 +186,18 @@ class Manager(object):
         self.serializer = FuncXSerializer()
         self.next_worker_q = []  # FIFO queue for spinning up workers.
         self.worker_procs = {}
+
+        self.task_status_deltas = {}
+
+        self._kill_event = threading.Event()
+        self._result_pusher_thread = threading.Thread(
+            target=self.push_results,
+            args=(self._kill_event,)
+        )
+        self._status_report_thread = threading.Thread(
+            target=self._status_report_loop,
+            args=(self._kill_event,)
+        )
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -412,7 +431,22 @@ class Manager(object):
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
+                            logger.debug(f"Set task {task['task_id']} to RUNNING")
+                            self.task_status_deltas[task['task_id']] = TaskStatusCode.RUNNING
                             logger.debug("Sending complete!")
+
+    def _status_report_loop(self, kill_event):
+        logger.debug("[STATUS] Manager status reporting loop starting")
+
+        while not kill_event.is_set():
+            msg = ManagerStatusReport(
+                self.task_status_deltas
+            )
+            logger.info(f"[STATUS] Sending status report to interchange: {msg.task_statuses}")
+            self.result_outgoing.send_multipart([msg.pack()])
+            logger.info("[STATUS] Clearing task deltas")
+            self.task_status_deltas.clear()
+            time.sleep(self.heartbeat_period)
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """ Listens on the pending_result_queue and sends out results via 0mq
@@ -482,11 +516,8 @@ class Manager(object):
                                                                 worker_port=self.worker_port))
 
         logger.debug("Initial workers launched")
-        self._kill_event = threading.Event()
-        self._result_pusher_thread = threading.Thread(target=self.push_results,
-                                                      args=(self._kill_event,))
         self._result_pusher_thread.start()
-
+        self._status_report_thread.start()
         self.pull_tasks(self._kill_event)
         logger.info("Waiting")
 
@@ -534,6 +565,7 @@ def cli_run():
 
     try:
         global logger
+        args.debug = True
         logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
                                  level=logging.DEBUG if args.debug is True else logging.INFO)
 
