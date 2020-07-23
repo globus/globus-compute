@@ -11,6 +11,7 @@ class MessageType(Enum):
     HEARTBEAT_REQ = auto()
     HEARTBEAT = auto()
     EP_STATUS_REPORT = auto()
+    MANAGER_STATUS_REPORT = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -64,6 +65,8 @@ class Message(ABC):
             return Heartbeat.unpack(remaining)
         elif message_type is MessageType.EP_STATUS_REPORT:
             return EPStatusReport.unpack(remaining)
+        elif message_type is MessageType.MANAGER_STATUS_REPORT:
+            return ManagerStatusReport.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
@@ -129,13 +132,24 @@ class EPStatusReport(Message):
         return cls(endpoint_id, ep_status, task_statuses)
 
     def pack(self):
-        # n = len(self._payload)
-        # buffer = bytes([0] * n * self._payload_formatter.size)
-        # for i, status in enumerate(self.payload):
-        #     self._payload_formatter.pack_into(
-        #         buffer, i * self._payload_formatter.size,
-        #         status['task_id'], status['status_code']
-        #     )
         jsonified = json.dumps([self.ep_status, self.task_statuses])
         return self.type.pack() + self._header + jsonified.encode("ascii")
+
+
+class ManagerStatusReport(Message):
+    type = MessageType.MANAGER_STATUS_REPORT
+
+    def __init__(self, task_statuses):
+        super().__init__()
+        self.task_statuses = task_statuses
+
+    @classmethod
+    def unpack(cls, msg):
+        jsonified = msg.decode("ascii")
+        task_statuses = json.loads(jsonified)
+        return cls(task_statuses)
+
+    def pack(self):
+        jsonified = json.dumps(self.task_statuses)
+        return self.type.pack() + jsonified.encode("ascii")
 
