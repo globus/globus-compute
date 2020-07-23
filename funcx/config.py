@@ -49,6 +49,7 @@ class Config(RepresentationMixin):
                  provider=LocalProvider(),
                  scaling_enabled=True,
                  # Connection info
+                 funcx_service_address='https://funcx.org/api/v1',
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  # Scaling info
@@ -74,6 +75,7 @@ class Config(RepresentationMixin):
         self.scaling_enabled = scaling_enabled
 
         # Connection info
+        self.funcx_service_address = funcx_service_address
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
 

@@ -9,4 +9,5 @@ config = Config(
         max_blocks=1,
     ),
     max_workers_per_node=2,
+    funcx_service_address='https://funcx.org/api/v1'
 )
