@@ -219,11 +219,18 @@ def start_endpoint(
     name : str
     endpoint_uuid : str
     """
-
-    funcx_client = FuncXClient()
-
     endpoint_dir = os.path.join(State.FUNCX_DIR, name)
     endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
+
+    # TODO : we need to load the config ? maybe not. This needs testing
+    endpoint_config = SourceFileLoader(
+        'config',
+        os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)
+    ).load_module()
+
+    funcx_client = FuncXClient(
+        funcx_service_address=endpoint_config.config.funcx_service_address
+    )
 
     if not os.path.exists(endpoint_dir):
         print('''Endpoint {0} is not configured!
@@ -263,10 +270,7 @@ def start_endpoint(
 
     check_pidfile(context.pidfile.path, "funcx-endpoint", name)
 
-    # TODO : we need to load the config ? maybe not. This needs testing
-    endpoint_config = SourceFileLoader(
-        'config',
-        os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
+
 
     with context:
         while True:
