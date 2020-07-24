@@ -866,15 +866,6 @@ class Interchange(object):
 
         return status
 
-    def _construct_status_report(self) -> EPStatusReport:
-        """Construct a Heartbeat that contains various bits of status info, including deltas on each of the tasks.
-
-        Returns
-        -------
-        EPStatusReport
-        """
-        return EPStatusReport(self.endpoint_id, [])
-
 
 def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
