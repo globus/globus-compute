@@ -12,12 +12,13 @@ Once the endpoint is registered you can invoke functions to be executed on it.
 First time setup
 ----------------
 
-For general use, running the initialize command via the `funcx-endpoint` CLI tool is the quickest way to
-setup your installation::
+The first time you run any of the `funcx-endpoint` commands, if there is no existing configuration found at
+`$HOME/.funcx`, you will be prompted to authenticate.  For example, you will likely want to configure an endpoint
+so you may as well start by
 
-  $ funcx-endpoint init
+  $ funcx-endpoint configure
 
-Initiating funcX will ask you to authenticate with Globus Auth. We require authentication in order to associate
+You will be asked to authenticate with Globus Auth. We require authentication in order to associate
 endpoints with users and enforce authentication and access control on the endpoint. As part of this step
 we request access to your identity information (to retrieve your email address) and Globus Groups management.
 We use Groups information to facilitate sharing of functions and endpoints by checking the Group membership
