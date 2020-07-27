@@ -28,6 +28,11 @@ Once you've run this command, a directory will be created at `$HOME/.funcx` and 
 A default endpoint profile is also created that will be used, whenever you do not explicitly
 specify a profile to use for endpoint actions.
 
+You can also set up auto-completion for the `funcx-endpoint` commands in your shell, by using the command
+
+  $ funcx-endpoint --install-completion [zsh bash fish ...]
+
+Which will allow commands and endpoint names to autocomplete.
 
 Configuring funcX
 -----------------
