@@ -13,7 +13,7 @@ on existing infrastructure including clouds, clusters, and supercomputers.
    :target: https://travis-ci.com/funcx-faas/funcX
    :alt: Build status
 .. |docs| image:: https://readthedocs.org/projects/funcx/badge/?version=latest
-   :target: http://funcx.readthedocs.io/en/stable/?badge=latest
+   :target: https://funcx.readthedocs.io/en/latest/
    :alt: Documentation Status
 .. |launch| image:: https://mybinder.org/badge_logo.svg
    :target: https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2FTutorial.ipynb
