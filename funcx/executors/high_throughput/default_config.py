@@ -10,3 +10,12 @@ config = Config(
     ),
     max_workers_per_node=2,
 )
+
+meta = {
+    "name": "$name",
+    "description": "",
+    "organization": "",
+    "department": "",
+    "public": False,
+    "visible_to": []
+}

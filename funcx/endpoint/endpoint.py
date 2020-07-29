@@ -10,6 +10,7 @@ import signal
 import sys
 import time
 import uuid
+from string import Template
 
 import daemon
 import daemon.pidfile
@@ -89,10 +90,19 @@ def init_endpoint_dir(endpoint_name, endpoint_config=None):
     logger.debug(f"Creating endpoint dir {endpoint_dir}")
     os.makedirs(endpoint_dir, exist_ok=True)
 
-    if not endpoint_config:
-        endpoint_config = endpoint_default_config.__file__
+    endpoint_config_target_file = os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)
+    if endpoint_config:
+        shutil.copyfile(endpoint_config, endpoint_config_target_file)
+        return endpoint_dir
 
-    shutil.copyfile(endpoint_config, os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME))
+    endpoint_config = endpoint_default_config.__file__
+    with open(endpoint_config) as r:
+        endpoint_config_template = Template(r.read())
+
+    endpoint_config_template = endpoint_config_template.substitute(name=endpoint_name)
+    with open(endpoint_config_target_file, "w") as w:
+        w.write(endpoint_config_template)
+
     return endpoint_dir
 
 
