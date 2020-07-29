@@ -89,7 +89,9 @@ class FuncXClient(throttling.ThrottledBaseClient):
                                           base_url=funcx_service_address,
                                           **kwargs)
         self.fx_serializer = FuncXSerializer()
-        self.searcher = SearchHelper(authorizer=search_authorizer)
+
+        user_info = self.native_client.client.oauth2_userinfo()
+        self.searcher = SearchHelper(authorizer=search_authorizer, owner_uuid=user_info['sub'])
 
     def logout(self):
         """Remove credentials from your local system
