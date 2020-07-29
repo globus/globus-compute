@@ -531,6 +531,21 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         return self.searcher.search_function(q, offset=offset, limit=limit, advanced=advanced)
 
+    def search_endpoint(self, q, scope='all', owner_id=None):
+        """
+
+        Parameters
+        ----------
+        q
+        scope
+        owner_id
+
+        Returns
+        -------
+
+        """
+        return self.searcher.search_endpoint(q, scope=scope, owner_id=owner_id)
+
     def register_container(self, location, container_type, name='', description=''):
         """Register a container with the funcX service.
 

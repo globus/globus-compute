@@ -21,8 +21,10 @@ class SearchHelper:
     implementation is helpful for local debugging
     """
 
-    SEARCH_INDEX_NAME = 'funcx'
-    SEARCH_INDEX_ID = '673a4b58-3231-421d-9473-9df1b6fa3a9d'
+    FUNCTION_SEARCH_INDEX_NAME = 'funcx'
+    FUNCTION_SEARCH_INDEX_ID = '673a4b58-3231-421d-9473-9df1b6fa3a9d'
+    ENDPOINT_SEARCH_INDEX_NAME = 'funcx-endpoints'
+    ENDPOINT_SEARCH_INDEX_ID = ''
 
     def __init__(self, authorizer):
         """Initialize the Search Helper
@@ -47,7 +49,7 @@ class SearchHelper:
 
         """
         try:
-            res = self._sc.get_entry(SearchHelper.SEARCH_INDEX_ID, func_uuid)
+            res = self._sc.get_entry(SearchHelper.FUNCTION_SEARCH_INDEX_ID, func_uuid)
             return len(res.data['entries']) > 0
         except SearchAPIError as err:
             if err.http_status == 404:
@@ -72,7 +74,7 @@ class SearchHelper:
         SearchResults
         """
         response = self._sc.search(
-            SearchHelper.SEARCH_INDEX_ID,
+            SearchHelper.FUNCTION_SEARCH_INDEX_ID,
             q, offset=offset, limit=limit, advanced=advanced
         )
 
@@ -97,6 +99,9 @@ class SearchHelper:
             'total': response.data['total'],
             'has_next_page': response.data['has_next_page']
         })
+
+    def search_endpoint(self, q, scope='all', owner_id=None):
+        pass
 
 
 class SearchResults(list):
