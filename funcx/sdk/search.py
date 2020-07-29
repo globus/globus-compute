@@ -23,10 +23,10 @@ class SearchHelper:
 
     FUNCTION_SEARCH_INDEX_NAME = 'funcx'
     FUNCTION_SEARCH_INDEX_ID = '673a4b58-3231-421d-9473-9df1b6fa3a9d'
-    ENDPOINT_SEARCH_INDEX_NAME = 'funcx-endpoints'
-    ENDPOINT_SEARCH_INDEX_ID = ''
+    ENDPOINT_SEARCH_INDEX_NAME = 'funcx_endpoints'
+    ENDPOINT_SEARCH_INDEX_ID = '85bcc497-3ee9-4d73-afbb-2abf292e398b'
 
-    def __init__(self, authorizer):
+    def __init__(self, authorizer, owner_uuid):
         """Initialize the Search Helper
 
         Parameters
@@ -35,6 +35,7 @@ class SearchHelper:
 
         """
         self._authorizer = authorizer
+        self._owner_uuid = owner_uuid
         self._sc = SearchClient(authorizer=self._authorizer)
 
     def _exists(self, func_uuid):
@@ -101,7 +102,54 @@ class SearchHelper:
         })
 
     def search_endpoint(self, q, scope='all', owner_id=None):
-        pass
+        """
+
+        Parameters
+        ----------
+        q
+        scope
+        owner_id
+
+        Returns
+        -------
+
+        """
+        query = {
+            'q': q,
+            'filters': []
+        }
+
+        if owner_id:
+            query['filters'].append({
+                'type': 'match_all',
+                'field_name': 'owner',
+                'values': [owner_id]
+            })
+
+        scope_filter = None
+        if scope == 'my-endpoints':
+            scope_filter = {
+                'type': 'match_all',
+                'field_name': 'owner',
+                'values': [self._owner_uuid]
+            }
+        elif scope == 'shared-with-me':
+            # TODO: filter for public=False AND owner != self._owner_uuid
+            # but...need to build advanced query for that, because GFilters cannot do NOT
+            raise Exception('This scope has not been implemented')
+        elif scope == 'shared-by-me':
+            # TODO: filter for owner=self._owner_uuid AND len(shared_with) > 0
+            # but...how to filter for length of list...
+            raise Exception('This scope has not been implemented')
+        elif scope != 'all':
+            raise Exception('This scope is invalid')
+
+        query['filters'].append(scope_filter)
+
+        resp = self._sc.post_search(self.ENDPOINT_SEARCH_INDEX_ID, query)
+
+        return resp
+
 
 
 class SearchResults(list):
