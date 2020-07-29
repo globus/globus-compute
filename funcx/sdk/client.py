@@ -352,7 +352,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         return r['task_uuids']
 
-    def register_endpoint(self, name, endpoint_uuid, description=None):
+    def register_endpoint(self, name, endpoint_uuid, metadata=None):
         """Register an endpoint with the funcX service.
 
         Parameters
@@ -361,8 +361,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
             Name of the endpoint
         endpoint_uuid : str
                 The uuid of the endpoint
-        description : str
-            Description of the endpoint
+        metadata : dict
+            endpoint metadata, see default_config example
 
         Returns
         -------
@@ -371,7 +371,9 @@ class FuncXClient(throttling.ThrottledBaseClient):
              'address' : <>,
              'client_ports': <>}
         """
-        data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
+        data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid}
+        if metadata:
+            data['meta'] = metadata
 
         r = self.post(self.ep_registration_path, json_body=data)
         if r.http_status is not 200:

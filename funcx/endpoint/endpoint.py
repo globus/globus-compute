@@ -289,7 +289,7 @@ def start_endpoint(
                                              State.FUNCX_CONFIG['broker_address'],
                                              State.FUNCX_CONFIG['redis_host'])
             else:
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_config.meta, endpoint_dir)
 
             logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
@@ -318,7 +318,7 @@ def start_endpoint(
     logger.critical(f"Shutting down endpoint {endpoint_uuid}")
 
 
-def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
+def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, metadata, endpoint_dir):
     """Register the endpoint and return the registration info.
 
     Parameters
@@ -339,7 +339,7 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
-    reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid)
+    reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid, metadata=metadata)
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
