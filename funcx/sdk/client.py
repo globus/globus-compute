@@ -4,6 +4,7 @@ import logging
 import pickle as pkl
 from inspect import getsource
 
+from globus_sdk import AuthClient
 from parsl.app.errors import RemoteExceptionWrapper
 
 from fair_research_login import NativeClient, JSONTokenStorage
@@ -67,7 +68,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
         fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
         search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
-        scopes = [fx_scope, search_scope]
+        scopes = [fx_scope, search_scope, "openid"]
 
         search_authorizer = None
 
@@ -81,6 +82,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
             all_authorizers = self.native_client.get_authorizers_by_scope(requested_scopes=scopes)
             fx_authorizer = all_authorizers[fx_scope]
             search_authorizer = all_authorizers[search_scope]
+            openid_authorizer = all_authorizers["openid"]
 
         super(FuncXClient, self).__init__("funcX",
                                           environment='funcx',
@@ -90,7 +92,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
                                           **kwargs)
         self.fx_serializer = FuncXSerializer()
 
-        user_info = self.native_client.client.oauth2_userinfo()
+        authclient = AuthClient(authorizer=openid_authorizer)
+        user_info = authclient.oauth2_userinfo()
         self.searcher = SearchHelper(authorizer=search_authorizer, owner_uuid=user_info['sub'])
 
     def logout(self):
