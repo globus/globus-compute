@@ -80,8 +80,6 @@ class HeartbeatReq(Message):
     Synchronous request for a Heartbeat.  This is sent from the Forwarder to the endpoint on start to get
     an initial connection and ensure liveness.
     """
-    _header_formatter = Struct('')
-    _payload_formatter = Struct('')
     type = MessageType.HEARTBEAT_REQ
 
     @property
@@ -123,8 +121,6 @@ class EPStatusReport(Message):
     Status report for an endpoint, sent from Interchange to Forwarder.  Includes EP-wide info such as utilization,
     as well as per-task status information.
     """
-    # _payload_formatter = Struct('16sb')  # need to think of appropriate structure?  Task id and 1 byte code?
-
     type = MessageType.EP_STATUS_REPORT
 
     def __init__(self, endpoint_id, ep_status_report, task_statuses):
@@ -143,6 +139,7 @@ class EPStatusReport(Message):
         return cls(endpoint_id, ep_status, task_statuses)
 
     def pack(self):
+        # TODO: do we want to do better than JSON?
         jsonified = json.dumps([self.ep_status, self.task_statuses])
         return self.type.pack() + self._header + jsonified.encode("ascii")
 
@@ -165,6 +162,7 @@ class ManagerStatusReport(Message):
         return cls(task_statuses)
 
     def pack(self):
+        # TODO: do better than JSON?
         jsonified = json.dumps(self.task_statuses)
         return self.type.pack() + jsonified.encode("ascii")
 
