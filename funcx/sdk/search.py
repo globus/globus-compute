@@ -72,7 +72,7 @@ class SearchHelper:
             enables advanced query syntax
         Returns
         -------
-        SearchResults
+        FunctionSearchResults
         """
         response = self._sc.search(
             SearchHelper.FUNCTION_SEARCH_INDEX_ID,
@@ -88,12 +88,11 @@ class SearchHelper:
         for item in gmeta:
             data = item['entries'][0]
             data['function_uuid'] = item['subject']
-            data['function_source'] = 'def funcx_sum(items):\n    return sum(items)\n'
             data = {**data, **data['content']}
             del data['content']
             results.append(data)
 
-        return SearchResults({
+        return FunctionSearchResults({
             'results': results,
             'offset': offset,
             'count': response.data['count'],
@@ -144,15 +143,25 @@ class SearchHelper:
         elif scope != 'all':
             raise Exception('This scope is invalid')
 
-        query['filters'].append(scope_filter)
+        if scope_filter:
+            query['filters'].append(scope_filter)
 
+        print(query)
         resp = self._sc.post_search(self.ENDPOINT_SEARCH_INDEX_ID, query)
+        gmeta = resp.data['gmeta']
+        results = []
+        for res in gmeta:
+            data = res['entries'][0]
+            data['endpoint_uuid'] = res['subject']
+            data = {**data, **data['content']}
+            del data['entry_id']
+            del data['content']
+            results.append(data)
 
-        return resp
+        return results
 
 
-
-class SearchResults(list):
+class FunctionSearchResults(list):
     """Wrapper class to have better display of results"""
     FILTER_COLUMNS = {
         'function_code',
@@ -195,7 +204,7 @@ class SearchResults(list):
         self.columns = []
         if len(self):
             assert isinstance(self[0], dict)
-            self.columns = [k for k in self[0].keys() if k not in SearchResults.FILTER_COLUMNS]
+            self.columns = [k for k in self[0].keys() if k not in FunctionSearchResults.FILTER_COLUMNS]
 
     def __str__(self):
         if len(self):

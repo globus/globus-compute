@@ -9,7 +9,7 @@ from parsl.app.errors import RemoteExceptionWrapper
 
 from fair_research_login import NativeClient, JSONTokenStorage
 
-from funcx.sdk.search import SearchHelper, SearchResults
+from funcx.sdk.search import SearchHelper, FunctionSearchResults
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
@@ -534,7 +534,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         Returns
         -------
-        SearchResults
+        FunctionSearchResults
         """
         return self.searcher.search_function(q, offset=offset, limit=limit, advanced=advanced)
 
