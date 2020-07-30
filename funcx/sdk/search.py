@@ -130,7 +130,7 @@ class SearchHelper:
             scope_filter = {
                 'type': 'match_all',
                 'field_name': 'owner',
-                'values': [self._owner_uuid]
+                'values': [f"urn:globus:auth:identity:{self._owner_uuid}"]
             }
         elif scope == 'shared-with-me':
             # TODO: filter for public=False AND owner != self._owner_uuid
