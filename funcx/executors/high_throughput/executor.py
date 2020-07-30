@@ -401,9 +401,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                 elif isinstance(msgs, EPStatusReport):
                     logger.debug("[MTHREAD] Received EPStatusReport")
                     if len(msgs.task_statuses):
-                        logger.debug(f"[MTHREAD] I should task update: {msgs.task_statuses}")
                         self.task_status_queue.put(msgs.task_statuses)
-                        logger.debug(f"[MTHREAD] successfully put task status update on queue!")
                 else:
                     for serialized_msg in msgs:
                         try:
