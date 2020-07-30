@@ -544,7 +544,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
         Parameters
         ----------
         q
-        scope
+        scope : str
+            Can be one of {'all', 'my-endpoints', 'shared-with-me'}
         owner_id
 
         Returns
