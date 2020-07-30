@@ -289,7 +289,12 @@ def start_endpoint(
                                              State.FUNCX_CONFIG['broker_address'],
                                              State.FUNCX_CONFIG['redis_host'])
             else:
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_config.meta, endpoint_dir)
+                metadata = None
+                try:
+                    metadata = endpoint_config.meta
+                except NameError:
+                    logger.info("Did not find associated endpoint metadata")
+                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, metadata, endpoint_dir)
 
             logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
