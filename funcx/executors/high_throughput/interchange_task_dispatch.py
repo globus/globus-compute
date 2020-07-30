@@ -72,7 +72,9 @@ def dispatch(interesting_managers,
                         ready_manager_queue[manager]['tasks'][task_type].update(tids[task_type])
                     logger.debug("[MAIN] The tasks on manager {} is {}".format(manager, ready_manager_queue[manager]['tasks']))
                     ready_manager_queue[manager]['total_tasks'] += len(tasks)
-                    task_dispatch[manager] = tasks
+                    if manager not in task_dispatch:
++                        task_dispatch[manager] = []
++                    task_dispatch[manager] += tasks
                     dispatched_tasks += len(tasks)
                     logger.debug("[MAIN] Assigned tasks {} to manager {}".format(tids, manager))
                 if ready_manager_queue[manager]['free_capacity']['total_workers'] > 0:
