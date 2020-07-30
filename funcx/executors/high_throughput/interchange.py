@@ -481,9 +481,8 @@ class Interchange(object):
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.info(f"[STATUS] Sending status report to forwarder: {msg.task_statuses}")
+            logger.info(f"[STATUS] Sending status report to forwarder, and clearing task deltas.")
             self.results_outgoing.send(msg.pack())
-            logger.info("[STATUS] Clearing task deltas")
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_threshold)
 
