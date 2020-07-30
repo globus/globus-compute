@@ -547,6 +547,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         scope : str
             Can be one of {'all', 'my-endpoints', 'shared-with-me'}
         owner_id
+            should be urn like f"urn:globus:auth:identity:{owner_uuid}"
 
         Returns
         -------
