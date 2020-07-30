@@ -76,6 +76,10 @@ class Message(ABC):
 
 
 class HeartbeatReq(Message):
+    """
+    Synchronous request for a Heartbeat.  This is sent from the Forwarder to the endpoint on start to get
+    an initial connection and ensure liveness.
+    """
     _header_formatter = Struct('')
     _payload_formatter = Struct('')
     type = MessageType.HEARTBEAT_REQ
@@ -97,6 +101,9 @@ class HeartbeatReq(Message):
 
 
 class Heartbeat(Message):
+    """
+    Generic Heartbeat message, sent in both directions between Forwarder and Interchange.
+    """
     type = MessageType.HEARTBEAT
 
     def __init__(self, endpoint_id):
@@ -112,6 +119,10 @@ class Heartbeat(Message):
 
 
 class EPStatusReport(Message):
+    """
+    Status report for an endpoint, sent from Interchange to Forwarder.  Includes EP-wide info such as utilization,
+    as well as per-task status information.
+    """
     # _payload_formatter = Struct('16sb')  # need to think of appropriate structure?  Task id and 1 byte code?
 
     type = MessageType.EP_STATUS_REPORT
@@ -137,6 +148,10 @@ class EPStatusReport(Message):
 
 
 class ManagerStatusReport(Message):
+    """
+    Status report sent from the Manager to the Interchange, which mostly just amounts to saying which tasks are now
+    RUNNING.
+    """
     type = MessageType.MANAGER_STATUS_REPORT
 
     def __init__(self, task_statuses):
