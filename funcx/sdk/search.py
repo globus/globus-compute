@@ -135,7 +135,12 @@ class SearchHelper:
         elif scope == 'shared-with-me':
             # TODO: filter for public=False AND owner != self._owner_uuid
             # but...need to build advanced query for that, because GFilters cannot do NOT
-            raise Exception('This scope has not been implemented')
+            # raise Exception('This scope has not been implemented')
+            scope_filter = {
+                'type': 'match_all',
+                'field_name': 'public',
+                'values': ["False"]
+            }
         elif scope == 'shared-by-me':
             # TODO: filter for owner=self._owner_uuid AND len(shared_with) > 0
             # but...how to filter for length of list...
@@ -151,6 +156,9 @@ class SearchHelper:
         gmeta = resp.data['gmeta']
         results = []
         for res in gmeta:
+            if scope == 'shared-with-me' and \
+                    res['entries'][0]['content']['owner'] == f"urn:globus:auth:identity:{self._owner_uuid}":
+                continue
             data = res['entries'][0]
             data['endpoint_uuid'] = res['subject']
             data = {**data, **data['content']}
