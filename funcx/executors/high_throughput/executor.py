@@ -33,8 +33,9 @@ from parsl.providers import LocalProvider
 from funcx.executors.high_throughput import zmq_pipes
 from funcx import set_file_logger
 
-# logger = logging.getLogger(__name__)
-logger = set_file_logger("executor.log", name=__name__)
+logger = logging.getLogger(__name__)
+if not logger.hasHandlers():
+    logger = set_file_logger("executor.log", name=__name__)
 
 BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
