@@ -440,12 +440,10 @@ class Manager(object):
                 self.task_status_deltas
             )
             logger.info(f"[STATUS] Sending status report to interchange: {msg.task_statuses}")
-            # self.result_outgoing.send_multipart([msg.pack()])
             self.pending_result_queue.put(msg)
             logger.info("[STATUS] Clearing task deltas")
             self.task_status_deltas.clear()
-            # time.sleep(self.heartbeat_period)
-            time.sleep(15)
+            time.sleep(self.heartbeat_period)
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """ Listens on the pending_result_queue and sends out results via 0mq
@@ -467,6 +465,9 @@ class Manager(object):
         while not kill_event.is_set():
             try:
                 r = self.pending_result_queue.get(block=True, timeout=push_poll_period)
+                # This avoids the interchange searching and attempting to unpack every message in case it's a
+                # status report.  (Would be better to use Task Messages eventually to make this more uniform)
+                # TODO: use task messages, and don't have to prepend
                 if isinstance(r, ManagerStatusReport):
                     items.insert(0, r.pack())
                     logger.debug(f"[STATUS] prepended to queue {r.pack()}")
