@@ -472,7 +472,7 @@ class Interchange(object):
         else:
             reply = False
 
-    def _status_report_loop(self, kill_event):
+    def _status_report_loop(self, kill_event, status_report_queue: queue.Queue):
         logger.debug("[STATUS] Status reporting loop starting")
 
         while not kill_event.is_set():
@@ -482,7 +482,8 @@ class Interchange(object):
                 self.task_status_deltas
             )
             logger.info(f"[STATUS] Sending status report to forwarder, and clearing task deltas.")
-            self.results_outgoing.send(msg.pack())
+            # self.results_outgoing.send(msg.pack())
+            status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_threshold)
 
@@ -552,8 +553,9 @@ class Interchange(object):
                                                 args=(self._kill_event, ))
         self._command_thread.start()
 
+        status_report_queue = queue.Queue()
         self._status_report_thread = threading.Thread(target=self._status_report_loop,
-                                                      args=(self._kill_event,))
+                                                      args=(self._kill_event, status_report_queue))
         self._status_report_thread.start()
 
         try:
@@ -685,10 +687,9 @@ class Interchange(object):
                         manager_report = Message.unpack(b_messages[0])
                         logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
                         self.task_status_deltas.update(manager_report.task_statuses)
-                        continue
+                        b_messages = b_messages[1:]
                     except Exception:
-                        logger.exception("[MAIN] Error unpacking b_messages")
-
+                        pass
                     logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
@@ -698,11 +699,17 @@ class Interchange(object):
                             del self.task_status_deltas[r['task_id']]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
+
                     # self.results_outgoing.send_multipart(b_messages)
                     # TODO: handle this with a Task message or something?
                     self.results_outgoing.send(pickle.dumps(b_messages))
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
+
+            if not status_report_queue.empty():
+                packed_status_report = status_report_queue.get()
+                logger.debug(f"[MAIN] forwarding status report queue: {packed_status_report}")
+                self.results_outgoing.send(packed_status_report)
 
             # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [manager for manager in self._ready_manager_queue if
