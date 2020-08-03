@@ -686,7 +686,9 @@ class Interchange(object):
                         manager_report = Message.unpack(b_messages[0])
                         logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
                         self.task_status_deltas.update(manager_report.task_statuses)
+                        self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                         b_messages = b_messages[1:]
+                        self._ready_manager_queue[manager]['last'] = time.time()
                     except Exception:
                         pass
                     logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
