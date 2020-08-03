@@ -213,14 +213,6 @@ class Manager(object):
         b_msg = json.dumps(msg).encode('utf-8')
         return b_msg
 
-    def heartbeat(self):
-        """ Send heartbeat to the incoming task queue
-        """
-        heartbeat = b'HEARTBEAT'
-        logger.debug("Sending heartbeat to interchange")
-        r = self.task_incoming.send(heartbeat)
-        logger.debug("Return from heartbeat: {}".format(r))
-
     def pull_tasks(self, kill_event):
         """ Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
@@ -264,10 +256,6 @@ class Manager(object):
             ready_worker_count = self.worker_map.ready_worker_count()
             logger.debug("[TASK_PULL_THREAD pending_task_count: {}, Ready_worker_count: {}".format(
                 pending_task_count, ready_worker_count))
-
-            if time.time() > last_beat + self.heartbeat_period:
-                self.heartbeat()
-                last_beat = time.time()
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(self.worker_map.ready_worker_type_counts))
