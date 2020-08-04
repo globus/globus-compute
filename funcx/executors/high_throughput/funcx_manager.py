@@ -18,6 +18,7 @@ import psutil
 import subprocess
 
 from funcx.executors.high_throughput.container_sched import naive_scheduler
+from funcx.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
 from funcx.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
@@ -134,6 +135,7 @@ class Manager(object):
         self.result_outgoing.setsockopt(zmq.IDENTITY, uid.encode('utf-8'))
         self.result_outgoing.setsockopt(zmq.LINGER, 0)
         self.result_outgoing.connect(result_q_url)
+
         logger.info("Manager connected")
 
         self.uid = uid
@@ -180,6 +182,18 @@ class Manager(object):
         self.next_worker_q = []  # FIFO queue for spinning up workers.
         self.worker_procs = {}
 
+        self.task_status_deltas = {}
+
+        self._kill_event = threading.Event()
+        self._result_pusher_thread = threading.Thread(
+            target=self.push_results,
+            args=(self._kill_event,)
+        )
+        self._status_report_thread = threading.Thread(
+            target=self._status_report_loop,
+            args=(self._kill_event,)
+        )
+
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
         """
@@ -198,14 +212,6 @@ class Manager(object):
         }
         b_msg = json.dumps(msg).encode('utf-8')
         return b_msg
-
-    def heartbeat(self):
-        """ Send heartbeat to the incoming task queue
-        """
-        heartbeat = b'HEARTBEAT'
-        logger.debug("Sending heartbeat to interchange")
-        r = self.task_incoming.send(heartbeat)
-        logger.debug("Return from heartbeat: {}".format(r))
 
     def pull_tasks(self, kill_event):
         """ Pull tasks from the incoming tasks 0mq pipe onto the internal
@@ -251,10 +257,6 @@ class Manager(object):
             logger.debug("[TASK_PULL_THREAD pending_task_count: {}, Ready_worker_count: {}".format(
                 pending_task_count, ready_worker_count))
 
-            if time.time() > last_beat + self.heartbeat_period:
-                self.heartbeat()
-                last_beat = time.time()
-
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(self.worker_map.ready_worker_type_counts))
                 msg = pickle.dumps(self.worker_map.ready_worker_type_counts)
@@ -276,7 +278,9 @@ class Manager(object):
                         self.pending_result_queue.put(message)
                         self.worker_map.put_worker(w_id)
                         task_done_counter += 1
-                        task_type = self.task_type_mapping.pop(pickle.loads(message)['task_id'])
+                        task_id = pickle.loads(message)['task_id']
+                        task_type = self.task_type_mapping.pop(task_id)
+                        del self.task_status_deltas[task_id]
                         logger.debug("Task type: {}".format(task_type))
                         self.outstanding_task_count[task_type] -= 1
                         logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
@@ -412,7 +416,22 @@ class Manager(object):
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
+                            logger.debug(f"Set task {task['task_id']} to RUNNING")
+                            self.task_status_deltas[task['task_id']] = TaskStatusCode.RUNNING
                             logger.debug("Sending complete!")
+
+    def _status_report_loop(self, kill_event):
+        logger.debug("[STATUS] Manager status reporting loop starting")
+
+        while not kill_event.is_set():
+            msg = ManagerStatusReport(
+                self.task_status_deltas
+            )
+            logger.info(f"[STATUS] Sending status report to interchange: {msg.task_statuses}")
+            self.pending_result_queue.put(msg)
+            logger.info("[STATUS] Clearing task deltas")
+            self.task_status_deltas.clear()
+            time.sleep(self.heartbeat_period)
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """ Listens on the pending_result_queue and sends out results via 0mq
@@ -434,7 +453,13 @@ class Manager(object):
         while not kill_event.is_set():
             try:
                 r = self.pending_result_queue.get(block=True, timeout=push_poll_period)
-                items.append(r)
+                # This avoids the interchange searching and attempting to unpack every message in case it's a
+                # status report.  (Would be better to use Task Messages eventually to make this more uniform)
+                # TODO: use task messages, and don't have to prepend
+                if isinstance(r, ManagerStatusReport):
+                    items.insert(0, r.pack())
+                else:
+                    items.append(r)
             except queue.Empty:
                 pass
             except Exception as e:
@@ -482,11 +507,8 @@ class Manager(object):
                                                                 worker_port=self.worker_port))
 
         logger.debug("Initial workers launched")
-        self._kill_event = threading.Event()
-        self._result_pusher_thread = threading.Thread(target=self.push_results,
-                                                      args=(self._kill_event,))
         self._result_pusher_thread.start()
-
+        self._status_report_thread.start()
         self.pull_tasks(self._kill_event)
         logger.info("Waiting")
 

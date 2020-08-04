@@ -295,7 +295,7 @@ def start_endpoint(
             if State.DEBUG:
                 optionals['logging_level'] = logging.DEBUG
 
-            ic = Interchange(endpoint_config.config, **optionals)
+            ic = Interchange(endpoint_config.config, endpoint_id=endpoint_uuid, **optionals)
             ic.start()
             ic.stop()
 
