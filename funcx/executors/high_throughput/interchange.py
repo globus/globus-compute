@@ -681,6 +681,8 @@ class Interchange(object):
                 if manager not in self._ready_manager_queue:
                     logger.warning("[MAIN] Received a result from a un-registered manager: {}".format(manager))
                 else:
+                    # We expect the batch of messages to be (optionally) a task status update message
+                    # followed by 0 or more task results
                     try:
                         logger.debug("[MAIN] Trying to unpack ")
                         manager_report = Message.unpack(b_messages[0])
