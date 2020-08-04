@@ -709,10 +709,13 @@ class Interchange(object):
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
 
-            if not status_report_queue.empty():
-                packed_status_report = status_report_queue.get()
+            # Send status reports from this main thread to avoid thread-safety on zmq sockets
+            try:
+                packed_status_report = status_report_queue.get(block=False)
                 logger.debug(f"[MAIN] forwarding status report queue: {packed_status_report}")
                 self.results_outgoing.send(packed_status_report)
+            except queue.Empty:
+                pass
 
             # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [manager for manager in self._ready_manager_queue if
