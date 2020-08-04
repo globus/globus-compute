@@ -557,7 +557,6 @@ def cli_run():
 
     try:
         global logger
-        args.debug = True
         logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
                                  level=logging.DEBUG if args.debug is True else logging.INFO)
 
