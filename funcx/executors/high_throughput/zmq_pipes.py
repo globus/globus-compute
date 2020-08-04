@@ -8,8 +8,10 @@ import logging
 from funcx import set_file_logger
 from funcx.executors.high_throughput.messages import Message
 
-# logger = logging.getLogger(__name__)
-logger = set_file_logger("zmq_pipe.log", name=__name__)
+logger = logging.getLogger(__name__)
+if not logger.hasHandlers():
+    logger = set_file_logger("zmq_pipe.log", name=__name__)
+
 
 class CommandClient(object):
     """ CommandClient
