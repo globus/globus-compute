@@ -703,8 +703,8 @@ class Interchange(object):
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
 
-                    # self.results_outgoing.send_multipart(b_messages)
                     # TODO: handle this with a Task message or something?
+                    # previously used this; switched to mono-message, self.results_outgoing.send_multipart(b_messages)
                     self.results_outgoing.send(pickle.dumps(b_messages))
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
