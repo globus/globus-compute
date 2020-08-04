@@ -458,7 +458,6 @@ class Manager(object):
                 # TODO: use task messages, and don't have to prepend
                 if isinstance(r, ManagerStatusReport):
                     items.insert(0, r.pack())
-                    logger.debug(f"[STATUS] prepended to queue {r.pack()}")
                 else:
                     items.append(r)
             except queue.Empty:
