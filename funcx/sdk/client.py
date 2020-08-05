@@ -384,7 +384,12 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         self.version_check()
 
-        data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
+        data = {
+            "endpoint_name": name,
+            "endpoint_uuid": endpoint_uuid,
+            "description": description,
+            "version": VERSION
+        }
 
         r = self.post(self.ep_registration_path, json_body=data)
         if r.http_status is not 200:
