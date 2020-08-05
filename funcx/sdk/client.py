@@ -3,11 +3,14 @@ import os
 import logging
 import pickle as pkl
 from inspect import getsource
+from urllib.parse import urljoin
 
+import requests
 from parsl.app.errors import RemoteExceptionWrapper
 
 from fair_research_login import NativeClient, JSONTokenStorage
 
+from funcx import VERSION
 from funcx.sdk.search import SearchHelper, SearchResults
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
@@ -90,6 +93,16 @@ class FuncXClient(throttling.ThrottledBaseClient):
                                           **kwargs)
         self.fx_serializer = FuncXSerializer()
         self.searcher = SearchHelper(authorizer=search_authorizer)
+        self.funcx_service_address = funcx_service_address
+
+    def version_check(self):
+        version_url = urljoin(self.funcx_service_address, "version")
+        resp = requests.get(version_url, params={"service": "all"})
+        versions = resp.json()
+        min_ep_version = versions['min_ep_version']
+        if VERSION < min_ep_version:
+            raise Exception(f"Your endpoint is out of date.  Your version={VERSION} is lower than the minimum version "
+                            f"for an endpoint: {min_ep_version}.  Please update.")
 
     def logout(self):
         """Remove credentials from your local system
@@ -369,6 +382,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
              'address' : <>,
              'client_ports': <>}
         """
+        self.version_check()
+
         data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid, "description": description}
 
         r = self.post(self.ep_registration_path, json_body=data)
