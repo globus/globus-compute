@@ -29,7 +29,7 @@ on existing infrastructure including clouds, clusters, and supercomputers.
 Quickstart
 ==========
 
-funcX is in alpha state with version `0.0.1a4` currently available on PyPI.
+funcX is in alpha state with version `0.0.2` currently available on PyPI.
 
 To install funcX, please ensure you have python3.6+.::
 
