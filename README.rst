@@ -1,6 +1,6 @@
 funcX - Fast Function Serving
 =============================
-|licence| |build-status| |docs| |launch|
+|licence| |build-status| |docs| |launch| |funding1| |funding2|
 
 funcX is a high-performance function-as-a-service (FaaS) platform that enables
 intuitive, flexible, efficient, scalable, and performant remote function execution
@@ -18,6 +18,12 @@ on existing infrastructure including clouds, clusters, and supercomputers.
 .. |launch| image:: https://mybinder.org/badge_logo.svg
    :target: https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2FTutorial.ipynb
    :alt: Launch in Binder
+.. |funding1| image:: https://img.shields.io/badge/NSF-2004894-blue.svg
+   :target: https://nsf.gov/awardsearch/showAward?AWD_ID=2004894
+   :alt: NSF award info
+.. |funding2| image:: https://img.shields.io/badge/NSF-2004932-blue.svg
+   :target: https://nsf.gov/awardsearch/showAward?AWD_ID=2004932
+   :alt: NSF award info
 
 
 Quickstart
