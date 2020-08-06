@@ -399,7 +399,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         data = {
             "endpoint_name": name,
             "endpoint_uuid": endpoint_uuid,
-            "description": description,
             "version": VERSION
         }
         if metadata:
