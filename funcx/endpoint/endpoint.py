@@ -292,7 +292,7 @@ def start_endpoint(
                 metadata = None
                 try:
                     metadata = endpoint_config.meta
-                except NameError:
+                except AttributeError:
                     logger.info("Did not find associated endpoint metadata")
                 reg_info = register_endpoint(funcx_client, name, endpoint_uuid, metadata, endpoint_dir)
 
