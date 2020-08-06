@@ -3,13 +3,20 @@ import os
 import logging
 import pickle as pkl
 from inspect import getsource
+from urllib.parse import urljoin
+
 
 from globus_sdk import AuthClient
+
+import requests
+
 from parsl.app.errors import RemoteExceptionWrapper
 
 from fair_research_login import NativeClient, JSONTokenStorage
 
 from funcx.sdk.search import SearchHelper, FunctionSearchResults
+from funcx import VERSION
+
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
@@ -30,7 +37,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, funcx_service_address='https://funcx.org/api/v1',
+                 force_login=False, fx_authorizer=None, funcx_service_address='https://dev.api.funcx.org/v1',
                  **kwargs):
         """ Initialize the client
 
@@ -95,6 +102,19 @@ class FuncXClient(throttling.ThrottledBaseClient):
         authclient = AuthClient(authorizer=openid_authorizer)
         user_info = authclient.oauth2_userinfo()
         self.searcher = SearchHelper(authorizer=search_authorizer, owner_uuid=user_info['sub'])
+        self.funcx_service_address = funcx_service_address
+
+    def version_check(self):
+        """Check this client version meets the service's minimum supported version.
+        """
+        resp = self.get("version", params={"service": "all"})
+        versions = resp.data
+        if "min_ep_version" not in versions:
+            raise Exception("Failed to retrieve version information from funcX service.")
+        min_ep_version = versions['min_ep_version']
+        if VERSION < min_ep_version:
+            raise Exception(f"Your endpoint is out of date.  Your version={VERSION} is lower than the minimum version "
+                            f"for an endpoint: {min_ep_version}.  Please update.")
 
     def logout(self):
         """Remove credentials from your local system
@@ -374,7 +394,14 @@ class FuncXClient(throttling.ThrottledBaseClient):
              'address' : <>,
              'client_ports': <>}
         """
-        data = {"endpoint_name": name, "endpoint_uuid": endpoint_uuid}
+        self.version_check()
+
+        data = {
+            "endpoint_name": name,
+            "endpoint_uuid": endpoint_uuid,
+            "description": description,
+            "version": VERSION
+        }
         if metadata:
             data['meta'] = metadata
 

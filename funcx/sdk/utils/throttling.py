@@ -35,8 +35,8 @@ class ThrottledBaseClient(globus_sdk.base.BaseClient):
     """
     # Max requests per second, in a 5 second period
     DEFAULT_MAX_REQUESTS = 5
-    # Max size is 2Mb
-    DEFAULT_MAX_REQUEST_SIZE = 2 * 2 ** 20
+    # Max size is 5Mb
+    DEFAULT_MAX_REQUEST_SIZE = 5 * 2 ** 20
 
     def __init__(self, *args, **kwargs):
         self.max_request_size = self.DEFAULT_MAX_REQUEST_SIZE
