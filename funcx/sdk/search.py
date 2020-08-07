@@ -21,10 +21,12 @@ class SearchHelper:
     implementation is helpful for local debugging
     """
 
-    SEARCH_INDEX_NAME = 'funcx'
-    SEARCH_INDEX_ID = '673a4b58-3231-421d-9473-9df1b6fa3a9d'
+    FUNCTION_SEARCH_INDEX_NAME = 'funcx'
+    FUNCTION_SEARCH_INDEX_ID = '673a4b58-3231-421d-9473-9df1b6fa3a9d'
+    ENDPOINT_SEARCH_INDEX_NAME = 'funcx_endpoints'
+    ENDPOINT_SEARCH_INDEX_ID = '85bcc497-3ee9-4d73-afbb-2abf292e398b'
 
-    def __init__(self, authorizer):
+    def __init__(self, authorizer, owner_uuid):
         """Initialize the Search Helper
 
         Parameters
@@ -33,6 +35,7 @@ class SearchHelper:
 
         """
         self._authorizer = authorizer
+        self._owner_uuid = owner_uuid
         self._sc = SearchClient(authorizer=self._authorizer)
 
     def _exists(self, func_uuid):
@@ -47,7 +50,7 @@ class SearchHelper:
 
         """
         try:
-            res = self._sc.get_entry(SearchHelper.SEARCH_INDEX_ID, func_uuid)
+            res = self._sc.get_entry(SearchHelper.FUNCTION_SEARCH_INDEX_ID, func_uuid)
             return len(res.data['entries']) > 0
         except SearchAPIError as err:
             if err.http_status == 404:
@@ -69,10 +72,10 @@ class SearchHelper:
             enables advanced query syntax
         Returns
         -------
-        SearchResults
+        FunctionSearchResults
         """
         response = self._sc.search(
-            SearchHelper.SEARCH_INDEX_ID,
+            SearchHelper.FUNCTION_SEARCH_INDEX_ID,
             q, offset=offset, limit=limit, advanced=advanced
         )
 
@@ -85,12 +88,11 @@ class SearchHelper:
         for item in gmeta:
             data = item['entries'][0]
             data['function_uuid'] = item['subject']
-            data['function_source'] = 'def funcx_sum(items):\n    return sum(items)\n'
             data = {**data, **data['content']}
             del data['content']
             results.append(data)
 
-        return SearchResults({
+        return FunctionSearchResults({
             'results': results,
             'offset': offset,
             'count': response.data['count'],
@@ -98,8 +100,76 @@ class SearchHelper:
             'has_next_page': response.data['has_next_page']
         })
 
+    def search_endpoint(self, q, scope='all', owner_id=None):
+        """
 
-class SearchResults(list):
+        Parameters
+        ----------
+        q
+        scope
+        owner_id
+
+        Returns
+        -------
+
+        """
+        query = {
+            'q': q,
+            'filters': []
+        }
+
+        if owner_id:
+            query['filters'].append({
+                'type': 'match_all',
+                'field_name': 'owner',
+                'values': [owner_id]
+            })
+
+        scope_filter = None
+        if scope == 'my-endpoints':
+            scope_filter = {
+                'type': 'match_all',
+                'field_name': 'owner',
+                'values': [f"urn:globus:auth:identity:{self._owner_uuid}"]
+            }
+        elif scope == 'shared-with-me':
+            # TODO: filter for public=False AND owner != self._owner_uuid
+            # but...need to build advanced query for that, because GFilters cannot do NOT
+            # raise Exception('This scope has not been implemented')
+            scope_filter = {
+                'type': 'match_all',
+                'field_name': 'public',
+                'values': ["False"]
+            }
+        elif scope == 'shared-by-me':
+            # TODO: filter for owner=self._owner_uuid AND len(shared_with) > 0
+            # but...how to filter for length of list...
+            raise Exception('This scope has not been implemented')
+        elif scope != 'all':
+            raise Exception('This scope is invalid')
+
+        if scope_filter:
+            query['filters'].append(scope_filter)
+
+        print(query)
+        resp = self._sc.post_search(self.ENDPOINT_SEARCH_INDEX_ID, query)
+        gmeta = resp.data['gmeta']
+        results = []
+        for res in gmeta:
+            if scope == 'shared-with-me' and \
+                    res['entries'][0]['content']['owner'] == f"urn:globus:auth:identity:{self._owner_uuid}":
+                continue
+            data = res['entries'][0]
+            data['endpoint_uuid'] = res['subject']
+            data = {**data, **data['content']}
+            del data['entry_id']
+            del data['content']
+            results.append(data)
+
+        return results
+
+
+class FunctionSearchResults(list):
     """Wrapper class to have better display of results"""
     FILTER_COLUMNS = {
         'function_code',
@@ -142,7 +212,7 @@ class SearchResults(list):
         self.columns = []
         if len(self):
             assert isinstance(self[0], dict)
-            self.columns = [k for k in self[0].keys() if k not in SearchResults.FILTER_COLUMNS]
+            self.columns = [k for k in self[0].keys() if k not in FunctionSearchResults.FILTER_COLUMNS]
 
     def __str__(self):
         if len(self):

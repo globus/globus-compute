@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import argparse
+from typing import Tuple, Dict
+
 import zmq
 import os
 import sys
@@ -14,19 +16,23 @@ import json
 import daemon
 import collections
 
+from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
+
+from funcx.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat, \
+    TaskStatusCode
 from funcx.sdk.client import FuncXClient
 from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
-PKL_HEARTBEAT_CODE = pickle.dumps((2 ** 32) - 1)
+PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
 
 
 class ShutdownRequest(Exception):
-    ''' Exception raised when any async component receives a ShutdownRequest
-    '''
+    """ Exception raised when any async component receives a ShutdownRequest
+    """
     def __init__(self):
         self.tstamp = time.time()
 
@@ -35,9 +41,9 @@ class ShutdownRequest(Exception):
 
 
 class ManagerLost(Exception):
-    ''' Task lost due to worker loss. Worker is considered lost when multiple heartbeats
+    """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
     have been missed.
-    '''
+    """
     def __init__(self, worker_id):
         self.worker_id = worker_id
         self.tstamp = time.time()
@@ -75,13 +81,13 @@ class Interchange(object):
                  config,
                  client_address="127.0.0.1",
                  interchange_address="127.0.0.1",
-                 client_ports=(50055, 50056, 50057),
+                 client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  cores_per_worker=1.0,
                  worker_debug=False,
                  launch_cmd=None,
-                 heartbeat_threshold=60,
+                 heartbeat_threshold=30,
                  logdir=".",
                  logging_level=logging.INFO,
                  poll_period=10,
@@ -101,7 +107,7 @@ class Interchange(object):
         interchange_address : str
              The ip address at which the workers will be able to reach the Interchange. Default: "127.0.0.1"
 
-        client_ports : triple(int, int, int)
+        client_ports : Tuple[int, int, int]
              The ports at which the client can be reached
 
         launch_cmd : str
@@ -257,6 +263,8 @@ class Interchange(object):
             logger.exception("Caught exception")
             raise
 
+        self.tasks = set()
+        self.task_status_deltas = {}
 
     def load_config(self):
         """ Load the config
@@ -300,7 +308,6 @@ class Interchange(object):
         if self.config.scaling_enabled:
             logger.info("Scaling ...")
             self.scale_out(self.config.provider.init_blocks)
-
 
     def get_tasks(self, count):
         """ Obtains a batch of tasks from the internal pending_task_queue
@@ -356,20 +363,28 @@ class Interchange(object):
                 logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.total_pending_task_count))
                 continue
 
+            try:
+                msg = Message.unpack(msg)
+                logger.debug("[TASK_PULL_THREAD] received Message/Heartbeat? on task queue")
+            except:
+                pass
+
             if msg == 'STOP':
                 kill_event.set()
                 break
-            elif msg == 'STATUS_REQUEST':
-                logger.info("Got STATUS_REQUEST")
-                status_request.set()
+            elif isinstance(msg, Heartbeat):
+                logger.info("Got heartbeat")
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
                 task_type = self.get_container(msg['task_id'].split(";")[1])
                 msg['container'] = task_type
                 if task_type not in self.pending_task_queue:
                     self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
+
                 self.pending_task_queue[task_type].put(msg)
                 self.total_pending_task_count += 1
+                self.task_status_deltas[msg['task_id']] = TaskStatusCode.WAITING_FOR_NODES
+                logger.debug(f"[TASK_PULL_THREAD] task {msg['task_id']} is now WAITING_FOR_NODES")
                 logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
@@ -457,45 +472,48 @@ class Interchange(object):
         else:
             reply = False
 
+    def _status_report_loop(self, kill_event, status_report_queue: queue.Queue):
+        logger.debug("[STATUS] Status reporting loop starting")
+
+        while not kill_event.is_set():
+            msg = EPStatusReport(
+                self.endpoint_id,
+                self.get_status_report(),
+                self.task_status_deltas
+            )
+            logger.info(f"[STATUS] Sending status report to forwarder, and clearing task deltas.")
+            status_report_queue.put(msg.pack())
+            self.task_status_deltas.clear()
+            time.sleep(self.heartbeat_threshold)
+
     def _command_server(self, kill_event):
         """ Command server to run async command to the interchange
+
+        We want to be able to receive the following not yet implemented/updated commands:
+         - OutstandingCount
+         - ListManagers (get outstanding broken down by manager)
+         - HoldWorker
+         - Shutdown
         """
         logger.debug("[COMMAND] Command Server Starting")
 
         while not kill_event.is_set():
             try:
-                command_req = self.command_channel.recv_pyobj()
-                logger.debug("[COMMAND] Received command request: {}".format(command_req))
-                if command_req == "OUTSTANDING_C":
-                    reply = self.get_total_outstanding()
+                buffer = self.command_channel.recv()
+                logger.debug(f"[COMMAND] Received command request {buffer}")
+                command = Message.unpack(buffer)
+                if command.type not in COMMAND_TYPES:
+                    logger.error("Received incorrect message type on command channel")
+                    self.command_channel.send(bytes())
+                    continue
 
-                elif command_req == "MANAGERS":
-                    reply = self.get_outstanding_breakdown()
-
-                elif command_req.startswith("HOLD_WORKER"):
-                    cmd, s_manager = command_req.split(';')
-                    manager = s_manager.encode('utf-8')
-                    logger.info("[CMD] Received HOLD_WORKER for {}".format(manager))
-                    if manager in self._ready_manager_queue:
-                        self._ready_manager_queue[manager]['active'] = False
-                        reply = True
-                    else:
-                        reply = False
-
-                elif command_req == "HEARTBEAT":
-                    logger.info("[CMD] Received heartbeat message from hub")
-                    reply = "HBT,{}".format(self.endpoint_id)
-
-                elif command_req == "SHUTDOWN":
-                    logger.info("[CMD] Received SHUTDOWN command")
-                    kill_event.set()
-                    reply = True
-
-                else:
-                    reply = None
+                if command.type is MessageType.HEARTBEAT_REQ:
+                    logger.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
+                    logger.info(f"[COMMAND] Replying with Heartbeat({self.endpoint_id})")
+                    reply = Heartbeat(self.endpoint_id)
 
                 logger.debug("[COMMAND] Reply: {}".format(reply))
-                self.command_channel.send_pyobj(reply)
+                self.command_channel.send(reply.pack())
 
             except zmq.Again:
                 logger.debug("[COMMAND] is alive")
@@ -533,6 +551,11 @@ class Interchange(object):
         self._command_thread = threading.Thread(target=self._command_server,
                                                 args=(self._kill_event, ))
         self._command_thread.start()
+
+        status_report_queue = queue.Queue()
+        self._status_report_thread = threading.Thread(target=self._status_report_loop,
+                                                      args=(self._kill_event, status_report_queue))
+        self._status_report_thread.start()
 
         try:
             logger.debug("Starting strategy.")
@@ -646,6 +669,10 @@ class Interchange(object):
                 if tasks:
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
                     self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
+                    for task in tasks:
+                        task_id = task["task_id"]
+                        logger.debug(f"[MAIN] Task {task_id} is now WAITING_FOR_LAUNCH")
+                        self.task_status_deltas[task_id] = TaskStatusCode.WAITING_FOR_LAUNCH
 
             # Receive any results and forward to client
             if self.results_incoming in self.socks and self.socks[self.results_incoming] == zmq.POLLIN:
@@ -654,16 +681,41 @@ class Interchange(object):
                 if manager not in self._ready_manager_queue:
                     logger.warning("[MAIN] Received a result from a un-registered manager: {}".format(manager))
                 else:
+                    # We expect the batch of messages to be (optionally) a task status update message
+                    # followed by 0 or more task results
+                    try:
+                        logger.debug("[MAIN] Trying to unpack ")
+                        manager_report = Message.unpack(b_messages[0])
+                        logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
+                        self.task_status_deltas.update(manager_report.task_statuses)
+                        self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
+                        b_messages = b_messages[1:]
+                        self._ready_manager_queue[manager]['last'] = time.time()
+                    except Exception:
+                        pass
                     logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
                         task_type = self.containers[r['task_id'].split(';')[1]]
+                        if r['task_id'] in self.task_status_deltas:
+                            del self.task_status_deltas[r['task_id']]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
-                    self.results_outgoing.send_multipart(b_messages)
+
+                    # TODO: handle this with a Task message or something?
+                    # previously used this; switched to mono-message, self.results_outgoing.send_multipart(b_messages)
+                    self.results_outgoing.send(pickle.dumps(b_messages))
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
+
+            # Send status reports from this main thread to avoid thread-safety on zmq sockets
+            try:
+                packed_status_report = status_report_queue.get(block=False)
+                logger.debug(f"[MAIN] forwarding status report queue: {packed_status_report}")
+                self.results_outgoing.send(packed_status_report)
+            except queue.Empty:
+                pass
 
             # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [manager for manager in self._ready_manager_queue if
@@ -825,6 +877,7 @@ class Interchange(object):
             logger.debug("[MAIN] The status is {}".format(status))
 
         return status
+
 
 def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_string=None):
     """Add a stream log handler.

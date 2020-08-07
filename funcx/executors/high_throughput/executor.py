@@ -16,6 +16,8 @@ from multiprocessing import Process, Queue
 
 #from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
 from ipyparallel.serialize import deserialize_object  # ,serialize_object
+
+from funcx.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
 from funcx.serialize import FuncXSerializer
 fx_serializer = FuncXSerializer()
 
@@ -29,8 +31,11 @@ from parsl.providers import LocalProvider
 
 
 from funcx.executors.high_throughput import zmq_pipes
+from funcx import set_file_logger
 
 logger = logging.getLogger(__name__)
+if not logger.hasHandlers():
+    logger = set_file_logger("executor.log", name=__name__)
 
 BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
@@ -146,6 +151,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     worker_mode : str
         Select the mode of operation from no_container, singularity_reuse, singularity_single_use
         Default: singularity_reuse
+
+    task_status_queue : queue.Queue
+        Queue to pass updates to task statuses back to the forwarder.
     """
 
     def __init__(self,
@@ -169,7 +177,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                  suppress_failure=False,
                  endpoint_id=None,
                  endpoint_db=None,
-                 managed=True):
+                 managed=True,
+                 task_status_queue=None):
 
         logger.debug("Initializing HighThroughputExecutor")
 
@@ -200,6 +209,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self.suppress_failure = suppress_failure
         self.run_dir = '.'
         self.queue_proc = None
+
+        self.task_status_queue = task_status_queue
+
         # FuncX specific options
         self.container_image = container_image
         self.worker_mode = worker_mode
@@ -387,7 +399,10 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                 if msgs is None:
                     logger.debug("[MTHREAD] Got None, exiting")
                     return
-
+                elif isinstance(msgs, EPStatusReport):
+                    logger.debug("[MTHREAD] Received EPStatusReport")
+                    if len(msgs.task_statuses):
+                        self.task_status_queue.put(msgs.task_statuses)
                 else:
                     for serialized_msg in msgs:
                         try:
@@ -505,12 +520,13 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Sent hold request to worker: {}".format(worker_id))
         return c
 
-    def request_status_info(self):
-        logger.warning("Requesting status info from interchange")
-        self.outgoing_q.put('STATUS_REQUEST')
+    def send_heartbeat(self):
+        logger.warning("Sending heartbeat to interchange")
+        msg = Heartbeat(endpoint_id="")
+        self.outgoing_q.put(msg.pack())
 
     def wait_for_endpoint(self):
-        heartbeat = self.command_client.run('HEARTBEAT')
+        heartbeat = self.command_client.run(HeartbeatReq())
         logger.debug("Attempting heartbeat to interchange")
         return heartbeat
 

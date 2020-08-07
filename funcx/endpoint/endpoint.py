@@ -10,6 +10,7 @@ import signal
 import sys
 import time
 import uuid
+from string import Template
 
 import daemon
 import daemon.pidfile
@@ -89,10 +90,19 @@ def init_endpoint_dir(endpoint_name, endpoint_config=None):
     logger.debug(f"Creating endpoint dir {endpoint_dir}")
     os.makedirs(endpoint_dir, exist_ok=True)
 
-    if not endpoint_config:
-        endpoint_config = endpoint_default_config.__file__
+    endpoint_config_target_file = os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)
+    if endpoint_config:
+        shutil.copyfile(endpoint_config, endpoint_config_target_file)
+        return endpoint_dir
 
-    shutil.copyfile(endpoint_config, os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME))
+    endpoint_config = endpoint_default_config.__file__
+    with open(endpoint_config) as r:
+        endpoint_config_template = Template(r.read())
+
+    endpoint_config_template = endpoint_config_template.substitute(name=endpoint_name)
+    with open(endpoint_config_target_file, "w") as w:
+        w.write(endpoint_config_template)
+
     return endpoint_dir
 
 
@@ -279,7 +289,12 @@ def start_endpoint(
                                              State.FUNCX_CONFIG['broker_address'],
                                              State.FUNCX_CONFIG['redis_host'])
             else:
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+                metadata = None
+                try:
+                    metadata = endpoint_config.meta
+                except AttributeError:
+                    logger.info("Did not find associated endpoint metadata")
+                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, metadata, endpoint_dir)
 
             logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
@@ -295,7 +310,7 @@ def start_endpoint(
             if State.DEBUG:
                 optionals['logging_level'] = logging.DEBUG
 
-            ic = Interchange(endpoint_config.config, **optionals)
+            ic = Interchange(endpoint_config.config, endpoint_id=endpoint_uuid, **optionals)
             ic.start()
             ic.stop()
 
@@ -308,7 +323,7 @@ def start_endpoint(
     logger.critical(f"Shutting down endpoint {endpoint_uuid}")
 
 
-def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
+def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, metadata, endpoint_dir):
     """Register the endpoint and return the registration info.
 
     Parameters
@@ -329,7 +344,7 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
-    reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid)
+    reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid, metadata=metadata)
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
