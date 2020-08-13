@@ -2,6 +2,7 @@ from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
 from funcx.strategies import SimpleStrategy
 
+
 class Config(RepresentationMixin):
     """ Specification of FuncX configuration options.
 
@@ -68,7 +69,6 @@ class Config(RepresentationMixin):
                  # Logging info
                  working_dir=None,
                  worker_debug=False):
-
         # Scaling mechanics
         self.provider = provider
         self.scaling_enabled = scaling_enabled

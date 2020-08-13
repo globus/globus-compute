@@ -15,13 +15,18 @@ from parsl.app.errors import RemoteExceptionWrapper
 from fair_research_login import NativeClient, JSONTokenStorage
 
 from funcx.sdk.search import SearchHelper, FunctionSearchResults
-from funcx import VERSION
 
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
 from funcx.sdk.utils.batch import Batch
 from funcx.errors import MalformedResponse
+
+try:
+    from funcx.endpoint import ENDPOINT_VERSION
+except ModuleNotFoundError:
+    ENDPOINT_VERSION = None
+
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +117,11 @@ class FuncXClient(throttling.ThrottledBaseClient):
         if "min_ep_version" not in versions:
             raise Exception("Failed to retrieve version information from funcX service.")
         min_ep_version = versions['min_ep_version']
-        if VERSION < min_ep_version:
-            raise Exception(f"Your endpoint is out of date.  Your version={VERSION} is lower than the minimum version "
-                            f"for an endpoint: {min_ep_version}.  Please update.")
+        if ENDPOINT_VERSION is None:
+            raise Exception("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
+        if ENDPOINT_VERSION < min_ep_version:
+            raise Exception(f"Your endpoint is out of date.  Your version={ENDPOINT_VERSION} is lower than the "
+                            f"minimum version for an endpoint: {min_ep_version}.  Please update.")
 
     def logout(self):
         """Remove credentials from your local system
@@ -399,7 +406,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         data = {
             "endpoint_name": name,
             "endpoint_uuid": endpoint_uuid,
-            "version": VERSION
+            "version": ENDPOINT_VERSION
         }
         if metadata:
             data['meta'] = metadata

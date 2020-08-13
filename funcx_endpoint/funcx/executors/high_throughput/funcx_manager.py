@@ -23,9 +23,9 @@ from funcx.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
 from parsl.version import VERSION as PARSL_VERSION
-from funcx.version import VERSION as FUNCX_VERSION
+from funcx.endpoint.version import VERSION as FUNCX_VERSION
 
-from funcx import set_file_logger
+from funcx.loggers import set_file_logger
 
 
 RESULT_TAG = 10

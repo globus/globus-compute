@@ -31,7 +31,7 @@ from parsl.providers import LocalProvider
 
 
 from funcx.executors.high_throughput import zmq_pipes
-from funcx import set_file_logger
+from funcx.loggers import set_file_logger
 
 logger = logging.getLogger(__name__)
 if not logger.hasHandlers():
@@ -665,7 +665,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
 
-    from funcx import set_file_logger
+    from funcx.loggers import set_file_logger
 
     stdout = open(os.path.join(logdir, "executor.{}.stdout".format(endpoint_id)), 'w')
     stderr = open(os.path.join(logdir, "executor.{}.stderr".format(endpoint_id)), 'w')

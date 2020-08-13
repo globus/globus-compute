@@ -1,0 +1,12 @@
+requests>=2.20.0
+jsonschema>=3.2.0
+sphinx_rtd_theme
+nbsphinx
+parsl==0.9.0
+configobj
+texttable
+psutil
+python-daemon
+fair_research_login
+dill>=0.3
+typer>=0.3.0

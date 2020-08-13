@@ -1,13 +1,5 @@
-""" funcX : Fast function serving for clouds, clusters and supercomputers.
-
-"""
 import logging
-from funcx.version import VERSION
 
-__author__ = "The funcX team"
-__version__ = VERSION
-
-from funcx.sdk.client import FuncXClient
 
 def set_file_logger(filename, name='funcx', level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
@@ -57,5 +49,6 @@ def set_stream_logger(name='funcx', level=logging.DEBUG, format_string=None):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
+
 
 logging.getLogger('funcx').addHandler(logging.NullHandler())

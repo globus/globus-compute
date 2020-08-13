@@ -26,6 +26,7 @@ class FuncXUnreachable(FuncxError):
     def __repr__(self):
         return "FuncX remote service is un-reachable at {}".format(self.address)
 
+
 class MalformedResponse(FuncxError):
     """ FuncX remote service responded with a Malformed Response
     """
