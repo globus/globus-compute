@@ -41,9 +41,9 @@ jobs:
       run: |
         pip install funcx_endpoint
         python -c "from funcx.endpoint.version import VERSION"
-#    - name: Lint with Flake8
-#      run: |
-#        flake8
+    - name: Lint with Flake8
+      run: |
+        flake8
 #    - name: Test with pytest
 #      run: |
 #        pytest
