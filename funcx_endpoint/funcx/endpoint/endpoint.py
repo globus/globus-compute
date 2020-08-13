@@ -18,10 +18,9 @@ import psutil
 import requests
 import texttable as tt
 import typer
-from requests import Response
 
 import funcx
-from funcx.errors import *
+from funcx.utils.errors import *
 from funcx.executors.high_throughput import default_config as endpoint_default_config
 from funcx.executors.high_throughput import global_config as funcx_default_config
 from funcx.executors.high_throughput.interchange import Interchange

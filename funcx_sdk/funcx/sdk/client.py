@@ -1,15 +1,9 @@
 import json
 import os
 import logging
-import pickle as pkl
 from inspect import getsource
-from urllib.parse import urljoin
 
 from globus_sdk import AuthClient
-
-import requests
-
-from parsl.app.errors import RemoteExceptionWrapper
 
 from fair_research_login import NativeClient, JSONTokenStorage
 
@@ -19,7 +13,7 @@ from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.utils import throttling
 from funcx.sdk.utils.batch import Batch
-from funcx.errors import MalformedResponse
+from funcx.utils.errors import MalformedResponse
 
 try:
     from funcx.endpoint import ENDPOINT_VERSION

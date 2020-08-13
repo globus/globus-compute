@@ -1,5 +1,4 @@
 import logging
-import threading
 from functools import partial
 import uuid
 import os
@@ -7,8 +6,7 @@ import queue
 from multiprocessing import Queue
 
 from multiprocessing import Process
-from parsl.app.errors import RemoteExceptionWrapper
-from funcx.loggers import set_file_logger
+from funcx.utils.loggers import set_file_logger
 
 
 def double(x):

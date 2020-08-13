@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
-from funcx.errors import FuncxError
+from funcx.utils.errors import FuncxError
 
 
 class NotConnected(FuncxError):

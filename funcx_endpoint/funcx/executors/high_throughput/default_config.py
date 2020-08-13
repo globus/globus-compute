@@ -1,4 +1,4 @@
-from funcx.config import Config
+from funcx.utils.config import Config
 from parsl.providers import LocalProvider
 
 config = Config(
