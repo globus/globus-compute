@@ -6,9 +6,11 @@ import collections
 
 logger = logging.getLogger("interchange.strategy.KubeSimple")
 
+
 class KubeSimpleStrategy(BaseStrategy):
     """ Implements the simple strategy for Kubernetes
     """
+
     def __init__(self, *args,
                  threshold=20,
                  interval=1,
@@ -67,9 +69,9 @@ class KubeSimpleStrategy(BaseStrategy):
             active_blocks = status.get(task_type, 0)
             active_slots = active_blocks * tasks_per_node * nodes_per_block
             active_tasks_per_type = active_tasks[task_type]
-            
+
             logger.debug('Endpoint has {} active tasks of {}, {} active blocks, {} connected workers'.format(
-            active_tasks_per_type, task_type, active_blocks, self.interchange.get_total_live_workers()))
+                active_tasks_per_type, task_type, active_blocks, self.interchange.get_total_live_workers()))
 
             if active_tasks_per_type > 0:
                 self.executors_idle_since[task_type] = None
@@ -90,17 +92,20 @@ class KubeSimpleStrategy(BaseStrategy):
                     # We want to make sure that max_idletime is reached
                     # before killing off resources
                     if not self.executors_idle_since[task_type]:
-                        logger.debug("Endpoint has 0 active tasks of task type {}; starting kill timer (if idle time exceeds {}s, resources will be removed)".format(task_type, self.max_idletime))
+                        logger.debug(
+                            f"Endpoint has 0 active tasks of task type {task_type}; starting kill timer (if idle time "
+                            f"exceeds {self.max_idletime}s, resources will be removed)"
+                        )
                         self.executors_idle_since[task_type] = time.time()
 
                     idle_since = self.executors_idle_since[task_type]
                     if (time.time() - idle_since) > self.max_idletime:
-                            # We have resources idle for the max duration,
-                            # we have to scale_in now.
-                            logger.info("Idle time has reached {}s; removing resources of task type {}".format(
-                                self.max_idletime, task_type)
-                            )
-                            self.interchange.scale_in(active_blocks - min_blocks, task_type=task_type)
+                        # We have resources idle for the max duration,
+                        # we have to scale_in now.
+                        logger.info("Idle time has reached {}s; removing resources of task type {}".format(
+                            self.max_idletime, task_type)
+                        )
+                        self.interchange.scale_in(active_blocks - min_blocks, task_type=task_type)
 
                     else:
                         pass

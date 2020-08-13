@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class FuncXSerializer(object):
     """
     Information that we want to be able to ship around:
@@ -43,7 +44,6 @@ class FuncXSerializer(object):
     def _list_methods(self):
         return self.methods_for_code, self.methods_for_data
 
-
     def serialize(self, data):
         serialized = None
 
@@ -51,14 +51,14 @@ class FuncXSerializer(object):
             for method in self.methods_for_code.values():
                 try:
                     serialized = method.serialize(data)
-                except Exception as e:
+                except Exception:
                     logger.exception("Method {} did not work".format(method))
                     continue
         else:
             for method in self.methods_for_data.values():
                 try:
                     serialized = method.serialize(data)
-                except Exception as e:
+                except Exception:
                     logger.exception("Method {} did not work".format(method))
                     continue
 
@@ -83,7 +83,6 @@ class FuncXSerializer(object):
             raise Exception("Invalid header: {} in data payload".format(header))
 
         return result
-
 
     def pack_buffers(self, buffers):
         """

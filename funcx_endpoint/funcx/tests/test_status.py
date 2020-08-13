@@ -1,16 +1,19 @@
-import json
-import sys
 import argparse
 import time
+
 import funcx
-from funcx import FuncXClient
+from funcx.loggers import set_stream_logger
+from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
+
 fxs = FuncXSerializer()
 
-funcx.set_stream_logger()
+set_stream_logger()
+
 
 def sum_yadu_new01(event):
     return sum(event)
+
 
 """
 @funcx.register(description="...")
@@ -18,26 +21,27 @@ def sum_yadu_new01(event):
     return sum(event)
 """
 
-def test(fxc, ep_id):
 
+def test(fxc, ep_id):
     fn_uuid = fxc.register_function(sum_yadu_new01,
                                     description="New sum function defined without string spec")
     print("FN_UUID : ", fn_uuid)
 
-
-    task_id = fxc.run([1,2,3,9001], endpoint_id=ep_id, function_id=fn_uuid)
+    task_id = fxc.run([1, 2, 3, 9001], endpoint_id=ep_id, function_id=fn_uuid)
     r = fxc.get_task_status(task_id)
     print("Got from status :", r)
+
 
 def platinfo():
     import platform
     return platform.uname()
 
+
 def div_by_zero(x):
-    return x/0
+    return x / 0
+
 
 def test2(fxc, ep_id):
-
     fn_uuid = fxc.register_function(platinfo,
                                     description="Get platform info")
     print("FN_UUID : ", fn_uuid)
@@ -53,20 +57,19 @@ def test2(fxc, ep_id):
 
 
 def test3(fxc, ep_id):
-
     fn_uuid = fxc.register_function(div_by_zero,
                                     description="Div by zero")
     print("FN_UUID : ", fn_uuid)
     task_id = fxc.run(1099, endpoint_id=ep_id, function_id=fn_uuid)
 
     time.sleep(1)
-    r = fxc.get_task_status(task_id)
+    _ = fxc.get_task_status(task_id)
 
     print("Trying get_result")
-    r = fxc.get_result(task_id)
+    _ = fxc.get_result(task_id)
+
 
 def test4(fxc, ep_id):
-
     fn_uuid = fxc.register_function(platinfo,
                                     description="Get platform info")
     print("FN_UUID : ", fn_uuid)
@@ -88,4 +91,3 @@ if __name__ == '__main__':
     # test2(fxc, args.endpoint)
     test3(fxc, args.endpoint)
     test4(fxc, args.endpoint)
-

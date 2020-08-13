@@ -185,7 +185,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             if jid in self.resources_by_pod_name:
                 task_type = self.resources_by_pod_name[jid]['task_type']
                 status[task_type] = status.get(task_type, 0) + 1
-            
+
         return status
 
     def cancel(self, num_pods, task_type=None):
@@ -229,9 +229,10 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
               [status...] : Status list of all jobs
         """
 
-        task_type = list(self.resources_by_pod_name.keys())
+        # task_type = list(self.resources_by_pod_name.keys())
         # TODO: fix this
-        return jobs_ids
+        # return jobs_ids
+        raise NotImplementedError()
         # do something to get the deployment's status
 
     def _create_pod(self,

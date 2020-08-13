@@ -5,9 +5,11 @@ import time
 
 logger = logging.getLogger("interchange.strategy.simple")
 
+
 class SimpleStrategy(BaseStrategy):
     """ Implements the simple strategy
     """
+
     def __init__(self, *args,
                  threshold=20,
                  interval=1,
@@ -97,12 +99,12 @@ class SimpleStrategy(BaseStrategy):
 
                 idle_since = self.executors['idle_since']
                 if (time.time() - idle_since) > self.max_idletime:
-                        # We have resources idle for the max duration,
-                        # we have to scale_in now.
-                        logger.debug("Idle time has reached {}s; removing resources".format(
-                            self.max_idletime)
-                        )
-                        self.interchange.scale_in(active_blocks - min_blocks)
+                    # We have resources idle for the max duration,
+                    # we have to scale_in now.
+                    logger.debug("Idle time has reached {}s; removing resources".format(
+                        self.max_idletime)
+                    )
+                    self.interchange.scale_in(active_blocks - min_blocks)
 
                 else:
                     pass

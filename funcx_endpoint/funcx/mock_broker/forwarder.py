@@ -8,7 +8,7 @@ from multiprocessing import Queue
 
 from multiprocessing import Process
 from parsl.app.errors import RemoteExceptionWrapper
-from funcx import set_file_logger
+from funcx.loggers import set_file_logger
 
 
 def double(x):
@@ -82,7 +82,7 @@ class Forwarder(Process):
         try:
             res = future.result()
             self.result_q.put(task_id, res)
-        except Exception as e:
+        except Exception:
             logger.debug("Task:{} failed".format(task_id))
             # Todo : Since we caught an exception, we should wrap it here, and send it
             # back onto the results queue.

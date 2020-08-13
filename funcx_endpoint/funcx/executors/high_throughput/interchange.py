@@ -33,6 +33,7 @@ PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
 class ShutdownRequest(Exception):
     """ Exception raised when any async component receives a ShutdownRequest
     """
+
     def __init__(self):
         self.tstamp = time.time()
 
@@ -44,6 +45,7 @@ class ManagerLost(Exception):
     """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
     have been missed.
     """
+
     def __init__(self, worker_id):
         self.worker_id = worker_id
         self.tstamp = time.time()
@@ -55,6 +57,7 @@ class ManagerLost(Exception):
 class BadRegistration(Exception):
     ''' A new Manager tried to join the executor with a BadRegistration message
     '''
+
     def __init__(self, worker_id, critical=False):
         self.worker_id = worker_id
         self.tstamp = time.time()
@@ -77,6 +80,7 @@ class Interchange(object):
 
     TODO: We most likely need a PUB channel to send out global commands, like shutdown
     """
+
     def __init__(self,
                  config,
                  client_address="127.0.0.1",
@@ -259,7 +263,7 @@ class Interchange(object):
         self._block_counter = 0
         try:
             self.load_config()
-        except Exception as e:
+        except Exception:
             logger.exception("Caught exception")
             raise
 
@@ -291,7 +295,7 @@ class Interchange(object):
         l_cmd = self.launch_cmd.format(debug=debug_opts,
                                        max_workers=max_workers,
                                        cores_per_worker=self.config.cores_per_worker,
-                                       #mem_per_worker=self.config.mem_per_worker,
+                                       # mem_per_worker=self.config.mem_per_worker,
                                        prefetch_capacity=self.config.prefetch_capacity,
                                        task_url=worker_task_url,
                                        result_url=worker_result_url,
@@ -366,7 +370,7 @@ class Interchange(object):
             try:
                 msg = Message.unpack(msg)
                 logger.debug("[TASK_PULL_THREAD] received Message/Heartbeat? on task queue")
-            except:
+            except Exception:
                 pass
 
             if msg == 'STOP':
@@ -468,9 +472,6 @@ class Interchange(object):
         """
         if manager in self._ready_manager_queue:
             self._ready_manager_queue[manager]['active'] = False
-            reply = True
-        else:
-            reply = False
 
     def _status_report_loop(self, kill_event, status_report_queue: queue.Queue):
         logger.debug("[STATUS] Status reporting loop starting")
@@ -481,7 +482,7 @@ class Interchange(object):
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.info(f"[STATUS] Sending status report to forwarder, and clearing task deltas.")
+            logger.info("[STATUS] Sending status report to forwarder, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_threshold)
@@ -759,7 +760,7 @@ class Interchange(object):
         pending_tasks = self.total_pending_task_count
         num_managers = len(self._ready_manager_queue)
         live_workers = self.get_total_live_workers()
-        
+
         for manager in self._ready_manager_queue:
             total_cores += self._ready_manager_queue[manager]['cores']
             total_mem += self._ready_manager_queue[manager]['mem']
@@ -771,7 +772,7 @@ class Interchange(object):
 
         result_package = {'task_id': -2,
                           'info': {'total_cores': total_cores,
-                                   'total_mem' : total_mem,
+                                   'total_mem': total_mem,
                                    'new_core_hrs': core_hrs - self.last_core_hr_counter,
                                    'total_core_hrs': round(core_hrs, 2),
                                    'managers': num_managers,

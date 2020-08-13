@@ -2,6 +2,7 @@ import time
 import json
 import globus_sdk
 
+
 class ThrottlingException(Exception):
     pass
 
@@ -72,7 +73,6 @@ class ThrottledBaseClient(globus_sdk.base.BaseClient):
             raise MaxRequestSizeExceeded(
                 f'Size of {rtype} at {path} was {size} bytes, exceeded '
                 f'limit of {self.max_request_size}.')
-
 
     def _request(self, *args, **kwargs):
         if self.throttling_enabled is True:

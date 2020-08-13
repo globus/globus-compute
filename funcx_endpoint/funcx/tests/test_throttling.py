@@ -14,6 +14,7 @@ from funcx.sdk.utils.throttling import (ThrottledBaseClient,
                                         MaxRequestSizeExceeded,
                                         MaxRequestsExceeded)
 
+
 @pytest.fixture
 def mock_globus_sdk(monkeypatch):
     monkeypatch.setattr(globus_sdk.base.BaseClient, '__init__', Mock())

@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 from funcx.serialize.base import fxPicker_enforcer, fxPicker_shared
 
+
 class json_base64(fxPicker_shared):
 
     _identifier = '00\n'
@@ -43,6 +44,7 @@ class pickle_base64(fxPicker_shared):
         data = pickle.loads(codecs.decode(chomped.encode(), 'base64'))
         return data
 
+
 class code_pickle(fxPicker_shared):
 
     _identifier = '02\n'
@@ -59,6 +61,7 @@ class code_pickle(fxPicker_shared):
         chomped = self.chomp(payload)
         data = pickle.loads(codecs.decode(chomped.encode(), 'base64'))
         return data
+
 
 class code_text_dill(fxPicker_shared):
     """ We use dill to get the source code out of the function object
@@ -83,6 +86,7 @@ class code_text_dill(fxPicker_shared):
         name, body = pickle.loads(codecs.decode(chomped.encode(), 'base64'))
         exec(body)
         return locals()[name]
+
 
 class code_text_inspect(fxPicker_shared):
     """ We use dill to get the source code out of the function object
@@ -109,16 +113,15 @@ class code_text_inspect(fxPicker_shared):
         return locals()[name]
 
 
-def bar(x, y={'a':3}):
+def bar(x, y={'a': 3}):
     return x * y['a']
 
 
-if __name__ == '__main__' :
-
+if __name__ == '__main__':
 
     bar(29)
-    #print(json_base64.identifier)
-    #print(pickle_base64.identifier)
+    # print(json_base64.identifier)
+    # print(pickle_base64.identifier)
     ct = code_text_inspect()
     f = ct.serialize(bar)
     # print("Serialized : ", f)

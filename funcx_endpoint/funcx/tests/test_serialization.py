@@ -2,13 +2,13 @@ import funcx.serialize.concretes as concretes
 
 
 def foo(x, y=3):
-    return x*y
+    return x * y
 
 
 def test_1():
     jb = concretes.json_base64()
 
-    d = jb.serialize(([2], {'y':10}))
+    d = jb.serialize(([2], {'y': 10}))
     args, kwargs = jb.deserialize(d)
     result = foo(*args, **kwargs)
     print(result)
@@ -26,11 +26,12 @@ def test_2():
 
 
 def foo(x, y=3):
-    return x*y
+    return x * y
+
 
 def test_code_1():
     def bar(x, y=5):
-        return x*5
+        return x * 5
 
     cs = concretes.code_text_inspect()
     f = cs.serialize(foo)
@@ -47,7 +48,7 @@ def test_code_1():
 
 def test_code_2():
     def bar(x, y=5):
-        return x*5
+        return x * 5
 
     cs = concretes.code_text_dill()
     f = cs.serialize(foo)
@@ -61,9 +62,10 @@ def test_code_2():
 
     print("Test 1:", new_bar(10))
 
+
 def test_code_3():
     def bar(x, y=5):
-        return x*5
+        return x * 5
 
     cs = concretes.code_pickle()
     f = cs.serialize(foo)
@@ -84,14 +86,12 @@ def test_overall():
     fxs = FuncXSerializer()
     print(fxs._list_methods())
 
-
     x = fxs.serialize(foo)
     print(x)
     print(fxs.deserialize(x))
 
 
 if __name__ == '__main__':
-
 
     # test_1()
     # test_2()

@@ -1,5 +1,6 @@
 import globus_sdk
 
+
 def load_auth_client():
     """Create an AuthClient for the portal
 
@@ -12,6 +13,11 @@ def load_auth_client():
     """
 
     _prod = True
+    try:
+        GLOBUS_CLIENT
+        GLOBUS_KEY
+    except NameError:
+        GLOBUS_CLIENT = GLOBUS_KEY = None
 
     if _prod:
         app = globus_sdk.ConfidentialAppAuthClient(GLOBUS_CLIENT,

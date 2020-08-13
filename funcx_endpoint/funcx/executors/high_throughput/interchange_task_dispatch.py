@@ -7,6 +7,7 @@ import collections
 logger = logging.getLogger("interchange.task_dispatch")
 logger.info("Interchange task dispatch started")
 
+
 def naive_interchange_task_dispatch(interesting_managers,
                                     pending_task_queue,
                                     ready_manager_queue,
@@ -110,7 +111,7 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
             else:
                 logger.debug("Get task {}".format(x))
                 tasks.append(x)
-                tids[task_type].add(x['task_id'])                    
+                tids[task_type].add(x['task_id'])
                 manager_ads['free_capacity'][task_type] -= 1
                 manager_ads['free_capacity']['total_workers'] -= 1
                 real_capacity -= 1
@@ -150,10 +151,10 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='first')
                     else:
                         logger.debug("Get task {}".format(x))
                         tasks.append(x)
-                        tids[task_type].add(x['task_id'])                    
+                        tids[task_type].add(x['task_id'])
                         manager_ads['free_capacity'][task_type] -= 1
                         manager_ads['free_capacity']['total_workers'] -= 1
-                        real_capacity -= 1 
+                        real_capacity -= 1
         return tasks, tids
 
     # second round: allocate tasks to unused slots based on the manager type

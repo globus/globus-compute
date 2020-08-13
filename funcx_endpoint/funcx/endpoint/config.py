@@ -71,7 +71,7 @@ def _get_parsl_config():
 def _get_executor(container):
     """
     Get the Parsl executor from the container
-    
+
     Returns
     -----------
     executor
@@ -96,13 +96,13 @@ def _get_executor(container):
                        worker_init="""pip install git+https://github.com/Parsl/parsl;
                                    pip install git+https://github.com/funcx-faas/funcX;
                                    export PYTHONPATH=$PYTHONPATH:/home/ubuntu:/app""",
-                       #security=None,
+                       # security=None,
                        secret="ryan-kube-secret",
                        pod_name=container['name'].replace('.', '-').replace("_", '-').replace('/', '-').lower(),
-                       #secret="minikube-aws-ecr",
-                       #user_id=32781,
-                       #group_id=10253,
-                       #run_as_non_root=True
+                       # secret="minikube-aws-ecr",
+                       # user_id=32781,
+                       # group_id=10253,
+                       # run_as_non_root=True
                    ),
                )
     return [executor]

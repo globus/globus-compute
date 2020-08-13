@@ -20,6 +20,7 @@ class RegistrationError(FuncxError):
 class FuncXUnreachable(FuncxError):
     """ FuncX remote service is unreachable
     """
+
     def __init__(self, address):
         self.address = address
 
@@ -30,9 +31,9 @@ class FuncXUnreachable(FuncxError):
 class MalformedResponse(FuncxError):
     """ FuncX remote service responded with a Malformed Response
     """
+
     def __init__(self, response):
         self.response = response
 
     def __repr__(self):
         return "FuncX remote service responded with Malformed Response {}".format(self.response)
-

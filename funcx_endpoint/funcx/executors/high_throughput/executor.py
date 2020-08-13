@@ -14,7 +14,7 @@ import pickle
 import daemon
 from multiprocessing import Process, Queue
 
-#from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
+# from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
 from ipyparallel.serialize import deserialize_object  # ,serialize_object
 
 from funcx.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
@@ -420,7 +420,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                             try:
                                 if self.endpoint_db:
                                     self.endpoint_db.put(self.endpoint_id, msg['info'])
-                            except Exception as e:
+                            except Exception:
                                 logger.exception("Caught error while trying to push data into redis")
                                 pass
                             continue

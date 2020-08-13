@@ -223,7 +223,7 @@ class WorkerMap(object):
         self.pending_worker_type_counts[worker_type] = self.pending_worker_type_counts.get(worker_type, 0) + 1
         self.pending_workers += 1
 
-        return {str(self.worker_id_counter-1): proc}
+        return {str(self.worker_id_counter - 1): proc}
 
     def get_next_worker_q(self, new_worker_map):
         """ Helper function to generate a queue of next workers to spin up .

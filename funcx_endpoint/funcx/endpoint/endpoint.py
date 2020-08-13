@@ -115,7 +115,7 @@ def init_endpoint():
     or the lockfile module.
     """
     _ = FuncXClient()
- 
+
     if os.path.exists(State.FUNCX_CONFIG_FILE):
         typer.confirm(
             "Are you sure you want to initialize this directory? "

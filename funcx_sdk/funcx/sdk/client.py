@@ -5,7 +5,6 @@ import pickle as pkl
 from inspect import getsource
 from urllib.parse import urljoin
 
-
 from globus_sdk import AuthClient
 
 import requests
@@ -26,7 +25,6 @@ try:
     from funcx.endpoint import ENDPOINT_VERSION
 except ModuleNotFoundError:
     ENDPOINT_VERSION = None
-
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +225,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         results = {}
 
-        if pending_task_ids :
+        if pending_task_ids:
             payload = {'task_ids': pending_task_ids}
             r = self.post("/batch_status", json_body=payload)
             logger.debug("Response string : {}".format(r))
@@ -242,7 +240,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
                     results[task_id] = rets
                 except KeyError:
                     logger.debug("Task {} info was not available in the batch status")
-                except Exception as e:
+                except Exception:
                     logger.exception("Failure while unpacking results fom get_batch_status")
             else:
                 results[task_id] = self.func_table[task_id]
@@ -608,7 +606,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         str
             The id of the container
         """
-        container_path = f'containers'
+        container_path = 'containers'
 
         payload = {'name': name, 'location': location, 'description': description, 'type': container_type}
 

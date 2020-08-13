@@ -5,8 +5,10 @@ import time
 import funcx
 from funcx import FuncXClient
 
+
 def container_sum(event):
     return sum(event)
+
 
 def test(fxc, ep_id):
 
@@ -15,7 +17,7 @@ def test(fxc, ep_id):
                                     description="New sum function defined without string spec")
     print("FN_UUID : ", fn_uuid)
 
-    task_id = fxc.run([1,2,3,9001], endpoint_id=ep_id, function_id=fn_uuid)
+    task_id = fxc.run([1, 2, 3, 9001], endpoint_id=ep_id, function_id=fn_uuid)
     r = fxc.get_task_status(task_id)
     print("Got from status :", r)
 
@@ -28,4 +30,3 @@ if __name__ == '__main__':
     print("FuncX version : ", funcx.__version__)
     fxc = FuncXClient()
     test(fxc, args.endpoint)
-

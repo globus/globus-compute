@@ -10,6 +10,7 @@ from random import randint
 
 import zmq
 
+
 def socket_set_hwm(socket, hwm=-1):
     """libzmq 2/3/4 compatible sethwm"""
     try:
@@ -28,7 +29,6 @@ def dump(msg_or_socket):
     print("----------------------------------------")
     for part in msg:
         print("[%03d]" % len(part), end=' ')
-        is_text = True
         try:
             print(part.decode('ascii'))
         except UnicodeDecodeError:
@@ -53,4 +53,4 @@ def zpipe(ctx):
     iface = "inproc://%s" % binascii.hexlify(os.urandom(8))
     a.bind(iface)
     b.connect(iface)
-    return a,b
+    return a, b

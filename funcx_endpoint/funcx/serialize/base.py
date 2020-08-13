@@ -6,9 +6,11 @@ import logging
 METHODS_MAP_CODE = {}
 METHODS_MAP_DATA = {}
 
+
 class DeserializationError(Exception):
     """ Base class for all deserialization errors
     """
+
     def __init__(self, reason):
         self.reason = reason
 
@@ -41,7 +43,7 @@ class fxPicker_shared(object):
         methods for serializing code or data
         """
         super().__init_subclass__(*args, **kwargs)
-        if cls._for_code :
+        if cls._for_code:
             METHODS_MAP_CODE[cls._identifier] = cls
         else:
             METHODS_MAP_DATA[cls._identifier] = cls
@@ -89,6 +91,7 @@ class SerializerError:
     def __repr__(self):
         return self.__str__()
 
+
 class RemoteExceptionWrapper:
     def __init__(self, e_type, e_value, traceback):
 
@@ -99,5 +102,3 @@ class RemoteExceptionWrapper:
     def reraise(self):
         logger.debug("Reraising exception of type {}".format(self.e_type))
         reraise(self.e_type, self.e_value, self.e_traceback)
-
-

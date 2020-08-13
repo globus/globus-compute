@@ -16,6 +16,7 @@ if not logger.hasHandlers():
 class CommandClient(object):
     """ CommandClient
     """
+
     def __init__(self, ip_address, port_range):
         """
         Parameters
@@ -55,6 +56,7 @@ class CommandClient(object):
 class TasksOutgoing(object):
     """ Outgoing task queue from the executor to the Interchange
     """
+
     def __init__(self, ip_address, port_range):
         """
         Parameters

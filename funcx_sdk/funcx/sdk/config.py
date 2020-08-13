@@ -28,6 +28,7 @@ __all__ = (
 CONF_SECTION_NAME = 'funcx'
 
 # CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
+CLIENT_ID = None
 FUNCX_RT_OPTNAME = 'funcx_refresh_token'
 FUNCX_AT_OPTNAME = 'funcx_access_token'
 FUNCX_AT_EXPIRES_OPTNAME = 'funcx_access_token_expires'
@@ -37,12 +38,12 @@ if GLOBUS_ENV:
     FUNCX_RT_OPTNAME = '{}_{}'.format(GLOBUS_ENV, FUNCX_RT_OPTNAME)
     FUNCX_AT_OPTNAME = '{}_{}'.format(GLOBUS_ENV, FUNCX_AT_OPTNAME)
     FUNCX_AT_EXPIRES_OPTNAME = '{}_{}'.format(GLOBUS_ENV,
-                                               FUNCX_AT_EXPIRES_OPTNAME)
+                                              FUNCX_AT_EXPIRES_OPTNAME)
     CLIENT_ID = {
-        'sandbox':      'f9e36a20-2e1a-49e5-ba67-34cc82ca8b29',
-        'test':         '2aa543de-b6c6-4aa5-9d7b-ef28e3a28cd8',
-        'staging':      '0811fdd3-0d3e-4b5e-b634-8d6c91d87f21',
-        'preview':      '988ff3e0-3bcf-495a-9f12-3b3a309bdb36',
+        'sandbox': 'f9e36a20-2e1a-49e5-ba67-34cc82ca8b29',
+        'test': '2aa543de-b6c6-4aa5-9d7b-ef28e3a28cd8',
+        'staging': '0811fdd3-0d3e-4b5e-b634-8d6c91d87f21',
+        'preview': '988ff3e0-3bcf-495a-9f12-3b3a309bdb36',
     }.get(GLOBUS_ENV, CLIENT_ID)
 
 

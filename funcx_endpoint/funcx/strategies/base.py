@@ -5,6 +5,7 @@ import time
 
 logger = logging.getLogger("interchange.strategy.base")
 
+
 class BaseStrategy(object):
     """Implements threshold-interval based flow control.
 

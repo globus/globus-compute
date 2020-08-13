@@ -59,12 +59,11 @@ class FuncXFuture(Future):
             if status['status'] == 'FAILED':
                 try:
                     self.set_result(status['details']['reason'])
-                except:
+                except Exception:
                     self.set_result(status['details']['result'])
                 return False
             return True
         return False
-
 
     # def status(self):
     #     """Get the status of the task

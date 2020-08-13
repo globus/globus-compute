@@ -165,4 +165,3 @@ class ManagerStatusReport(Message):
         # TODO: do better than JSON?
         jsonified = json.dumps(self.task_statuses)
         return self.type.pack() + jsonified.encode("ascii")
-

@@ -11,7 +11,6 @@ class MockInterchange(object):
         self.max_blocks = max_blocks
         self.managers = 0
         self.status = self.create_data()
-        
 
     def get_outstanding_breakdown(self):
         item = self.status.get()
@@ -46,6 +45,7 @@ class MockInterchange(object):
 
         return q
 
+
 if __name__ == "__main__":
     print("Starting")
     mock = MockInterchange()
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     strategy = SimpleStrategy(mock, threshold=2, interval=1)
     print(strategy)
     for i in range(10):
-        if i < 3 :
+        if i < 3:
             mock.scale_out()
         time.sleep(1)
     print("Exiting now")

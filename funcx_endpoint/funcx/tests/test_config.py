@@ -4,7 +4,6 @@ from funcx.config import Config
 config = Config()
 
 
-
 if __name__ == '__main__':
 
     import funcx
@@ -15,12 +14,10 @@ if __name__ == '__main__':
 
     endpoint_dir = "/home/yadu/.funcx/default"
 
-
     if config.working_dir is None:
         working_dir = "{}/{}".format(endpoint_dir, "worker_logs")
     # if self.worker_logdir_root is not None:
     #      worker_logdir = "{}/{}".format(self.worker_logdir_root, self.label)
-
 
     print("Loading : ", config)
     # Set script dir
@@ -28,7 +25,6 @@ if __name__ == '__main__':
     config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
     config.provider.channel.makedirs(config.provider.channel.script_dir, exist_ok=True)
     os.makedirs(config.provider.script_dir, exist_ok=True)
-
 
     debug_opts = "--debug" if config.worker_debug else ""
     max_workers = "" if config.max_workers_per_node == float('inf') \

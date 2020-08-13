@@ -149,7 +149,7 @@ class Manager(object):
         self.cores_per_workers = cores_per_worker
         self.available_mem_on_node = round(psutil.virtual_memory().available / (2**30), 1)
         self.max_worker_count = min(max_workers,
-                                math.floor(self.cores_on_node / cores_per_worker))
+                                    math.floor(self.cores_on_node / cores_per_worker))
         self.worker_map = WorkerMap(self.max_worker_count)
 
         self.internal_worker_port_range = internal_worker_port_range
@@ -241,7 +241,6 @@ class Manager(object):
         msg = self.create_reg_message()
         logger.debug("Sending registration message: {}".format(msg))
         self.task_incoming.send(msg)
-        last_beat = time.time()
         last_interchange_contact = time.time()
         task_recv_counter = 0
         task_done_counter = 0

@@ -1,9 +1,11 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 from funcx.errors import FuncxError
 
+
 class NotConnected(FuncxError):
     """ Queue is not connected/active
     """
+
     def __init__(self, queue):
         self.queue = queue
 
