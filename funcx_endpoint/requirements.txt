@@ -10,3 +10,4 @@ python-daemon
 fair_research_login
 dill>=0.3
 typer>=0.3.0
+funcx-sdk==0.0.2a0
