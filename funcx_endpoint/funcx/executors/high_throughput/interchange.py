@@ -91,13 +91,10 @@ class Interchange(object):
                  cores_per_worker=1.0,
                  worker_debug=False,
                  launch_cmd=None,
-                 heartbeat_threshold=30,
                  logdir=".",
                  logging_level=logging.INFO,
-                 poll_period=10,
                  endpoint_id=None,
                  suppress_failure=False,
-                 max_heartbeats_missed=2
                  ):
         """
         Parameters
@@ -131,9 +128,6 @@ class Interchange(object):
         worker_debug : Bool
              Enables worker debug logging.
 
-        heartbeat_threshold : int
-             Number of seconds since the last heartbeat after which worker is considered lost.
-
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'
 
@@ -143,15 +137,8 @@ class Interchange(object):
         endpoint_id : str
              Identity string that identifies the endpoint to the broker
 
-        poll_period : int
-             The main thread polling period, in milliseconds. Default: 10ms
-
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
-
-        max_heartbeats_missed : int
-             Number of heartbeats missed before setting kill_event
-
         """
         self.logdir = logdir
         try:
@@ -169,7 +156,12 @@ class Interchange(object):
         self.client_address = client_address
         self.interchange_address = interchange_address
         self.suppress_failure = suppress_failure
-        self.poll_period = poll_period
+
+        self.poll_period = self.config.poll_period
+        self.heartbeat_period = self.config.heartbeat_period
+        self.heartbeat_threshold = self.config.heartbeat_threshold
+        # initalize the last heartbeat time to start the loop
+        self.last_heartbeat = time.time()
 
         self.serializer = FuncXSerializer()
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
@@ -207,10 +199,6 @@ class Interchange(object):
         self.results_incoming = self.context.socket(zmq.ROUTER)
         self.results_incoming.set_hwm(0)
 
-        # initalize the last heartbeat time to start the loop
-        self.last_heartbeat = time.time()
-        self.max_heartbeats_missed = max_heartbeats_missed
-
         self.endpoint_id = endpoint_id
         if self.worker_ports:
             self.worker_task_port = self.worker_ports[0]
@@ -232,7 +220,6 @@ class Interchange(object):
 
         self._ready_manager_queue = {}
 
-        self.heartbeat_threshold = heartbeat_threshold
         self.blocks = {}  # type: Dict[str, str]
         self.block_id_map = {}
         self.launch_cmd = launch_cmd
@@ -354,7 +341,7 @@ class Interchange(object):
         while not kill_event.is_set():
             # Check when the last heartbeat was.
             # logger.debug(f"[TASK_PULL_THREAD] Last heartbeat: {self.last_heartbeat}")
-            if int(time.time() - self.last_heartbeat) > (self.heartbeat_threshold * self.max_heartbeats_missed):
+            if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
                 logger.critical("[TASK_PULL_THREAD] Missed too many heartbeats. Setting kill event.")
                 kill_event.set()
                 break
@@ -485,7 +472,7 @@ class Interchange(object):
             logger.info("[STATUS] Sending status report to forwarder, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
-            time.sleep(self.heartbeat_threshold)
+            time.sleep(self.heartbeat_period)
 
     def _command_server(self, kill_event):
         """ Command server to run async command to the interchange

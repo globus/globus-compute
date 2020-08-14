@@ -63,8 +63,8 @@ class Config(RepresentationMixin):
                  scheduler_mode='hard',
                  container_type=None,
                  prefetch_capacity=10,
-                 heartbeat_period=2,
-                 heartbeat_threshold=10,
+                 heartbeat_period=30,
+                 heartbeat_threshold=120,
                  poll_period=10,
                  # Logging info
                  working_dir=None,
