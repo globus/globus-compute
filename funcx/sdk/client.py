@@ -37,7 +37,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, funcx_service_address='https://dev.api.funcx.org/v1',
+                 force_login=False, fx_authorizer=None, funcx_service_address='https://api.funcx.org/v1',
                  **kwargs):
         """ Initialize the client
 
@@ -54,9 +54,9 @@ class FuncXClient(throttling.ThrottledBaseClient):
         A custom authorizer instance to communicate with funcX.
         Default: ``None``, will be created.
 
-        service_address: str
+        funcx_service_address: str
         The address of the funcX web service to communicate with.
-        Default: https://dev.funcx.org/api/v1
+        Default: https://api.funcx.org/v1
 
         Keyword arguments are the same as for BaseClient.
         """

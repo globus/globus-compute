@@ -403,6 +403,13 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                     logger.debug("[MTHREAD] Received EPStatusReport")
                     if len(msgs.task_statuses):
                         self.task_status_queue.put(msgs.task_statuses)
+
+                    try:
+                        if self.endpoint_db:
+                            self.endpoint_db.put(self.endpoint_id, msgs.ep_status)
+                    except Exception as e:
+                        logger.error("Caught error while trying to push data into redis")
+
                 else:
                     for serialized_msg in msgs:
                         try:
@@ -417,13 +424,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
                         if tid == -2 and 'info' in msg:
                             logger.warning("Received info response : {}".format(msg['info']))
-                            try:
-                                if self.endpoint_db:
-                                    self.endpoint_db.put(self.endpoint_id, msg['info'])
-                            except Exception as e:
-                                logger.exception("Caught error while trying to push data into redis")
-                                pass
-                            continue
+
 
                         if tid == -1 and 'exception' in msg:
                             # TODO: This could be handled better we are essentially shutting down the
