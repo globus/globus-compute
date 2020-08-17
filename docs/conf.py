@@ -45,7 +45,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
-    #'sphinx.ext.linkcode',
+    # 'sphinx.ext.linkcode',
     'sphinx.ext.napoleon'
 ]
 

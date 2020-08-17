@@ -15,7 +15,7 @@
 ignore = D203, E124, E126, F403, F405, F811, E402, E129, W605, W504, F401
 max-line-length = 160
 exclude = parsl/executors/serialize/, test_import_fail.py
-# E741 disallows ambiguous single letter names which look like numbers
-# We disable it in visualization code because plotly uses 'l' as
-# a keyword arg
-per-file-ignores = parsl/monitoring/visualization/*:E741
+# F632 is comparing constant literals with == instead of "is"
+per-file-ignores = funcx_sdk/funcx/sdk/client.py:F632,
+    funcx_endpoint/funcx/endpoint/auth.py:F821,
+    funcx_endpoint/funcx/serialize/base.py:F821
