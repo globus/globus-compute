@@ -21,14 +21,12 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+
+    - name: Install dependencies for funcx-sdk
       run: |
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install -r funcx_sdk/requirements.txt
         python -m pip install -r funcx_sdk/test-requirements.txt
-        pip list
-        python -m pip install -r funcx_endpoint/requirements.txt
-        python -m pip install -r funcx_endpoint/test-requirements.txt
         pip list
     - name: Check for vulnerabilities in libraries
       run: |
@@ -38,6 +36,21 @@ jobs:
       run: |
         pip install funcx_sdk
         python -c "from funcx.sdk.client import FuncXClient"
+    - name: Lint with Flake8
+      run: |
+        flake8
+#    - name: Test with pytest
+#      run: |
+#        pytest
+    - name: Install dependencies for funcx-endpoint
+      run: |
+        python -m pip install -r funcx_endpoint/requirements.txt
+        python -m pip install -r funcx_endpoint/test-requirements.txt
+        pip list
+    - name: Check for vulnerabilities in libraries
+      run: |
+        pip install safety
+        pip freeze | safety check
     - name: Test endpoint by just importing
       run: |
         pip install funcx_endpoint
