@@ -34,14 +34,17 @@ jobs:
         pip freeze | safety check
     - name: Test sdk by just importing
       run: |
-        pip install funcx_sdk
+        cd funcx_sdk
+        pip install .
         python -c "from funcx.sdk.client import FuncXClient"
+        cd ..
     - name: Lint with Flake8
       run: |
         flake8
 #    - name: Test with pytest
 #      run: |
 #        pytest
+
     - name: Install dependencies for funcx-endpoint
       run: |
         python -m pip install -r funcx_endpoint/requirements.txt
@@ -53,8 +56,10 @@ jobs:
         pip freeze | safety check
     - name: Test endpoint by just importing
       run: |
+        cd funcx_endpoint
         pip install funcx_endpoint
         python -c "from funcx.endpoint.version import VERSION"
+        cd ..
     - name: Lint with Flake8
       run: |
         flake8
