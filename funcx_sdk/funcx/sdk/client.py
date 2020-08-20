@@ -111,9 +111,11 @@ class FuncXClient(throttling.ThrottledBaseClient):
         versions = resp.data
         if "min_ep_version" not in versions:
             raise Exception("Failed to retrieve version information from funcX service.")
+        """
+        # TODO : We need to have the service send the minimum endpoint and sdk version supported
+
         min_ep_version = versions['min_ep_version']
 
-        """
         if ENDPOINT_VERSION is None:
             raise Exception("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
         if ENDPOINT_VERSION < min_ep_version:
