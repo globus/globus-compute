@@ -149,22 +149,26 @@ class FuncXClient(throttling.ThrottledBaseClient):
         if 'result' in r_dict:
             try:
                 r_obj = self.fx_serializer.deserialize(r_dict['result'])
+                completion_t = r_dict['completion_t']
             except Exception:
                 raise Exception("Failure during deserialization of the result object")
             else:
-                status.update({'pending': 'False',
-                               'result': r_obj})
+                status.update({'pending': False,
+                               'result': r_obj,
+                               'completion_t': completion_t})
                 self.func_table[task_id] = status
 
         elif 'exception' in r_dict:
             try:
                 r_exception = self.fx_serializer.deserialize(r_dict['exception'])
+                completion_t = r_dict['completion_t']
                 logger.info(f"Exception : {r_exception}")
             except Exception:
                 raise Exception("Failure during deserialization of the Task's exception object")
             else:
-                status.update({'pending': 'False',
-                               'exception': r_exception})
+                status.update({'pending': False,
+                               'exception': r_exception,
+                               'completion_t': completion_t})
                 self.func_table[task_id] = status
         return status
 
