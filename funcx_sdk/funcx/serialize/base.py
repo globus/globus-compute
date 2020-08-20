@@ -1,5 +1,7 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 from tblib import Traceback
+from six import reraise
+
 import logging
 
 # GLOBALS
@@ -100,5 +102,4 @@ class RemoteExceptionWrapper:
         self.e_traceback = traceback
 
     def reraise(self):
-        logger.debug("Reraising exception of type {}".format(self.e_type))
         reraise(self.e_type, self.e_value, self.e_traceback)
