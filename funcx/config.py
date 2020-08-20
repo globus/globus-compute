@@ -49,7 +49,7 @@ class Config(RepresentationMixin):
                  provider=LocalProvider(),
                  scaling_enabled=True,
                  # Connection info
-                 funcx_service_address='https://funcx.org/api/v1',
+                 funcx_service_address='https://api.funcx.org/v1',
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  # Scaling info
