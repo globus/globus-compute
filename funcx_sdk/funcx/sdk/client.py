@@ -16,9 +16,12 @@ from funcx.sdk.utils.batch import Batch
 from funcx.utils.errors import MalformedResponse
 
 try:
-    from funcx.endpoint import ENDPOINT_VERSION
+    from funcx.endpoint import VERSION as ENDPOINT_VERSION
 except ModuleNotFoundError:
     ENDPOINT_VERSION = None
+
+from funcx.sdk import VERSION as SDK_VERSION
+
 
 logger = logging.getLogger(__name__)
 
@@ -109,11 +112,14 @@ class FuncXClient(throttling.ThrottledBaseClient):
         if "min_ep_version" not in versions:
             raise Exception("Failed to retrieve version information from funcX service.")
         min_ep_version = versions['min_ep_version']
+
+        """
         if ENDPOINT_VERSION is None:
             raise Exception("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
         if ENDPOINT_VERSION < min_ep_version:
             raise Exception(f"Your endpoint is out of date.  Your version={ENDPOINT_VERSION} is lower than the "
                             f"minimum version for an endpoint: {min_ep_version}.  Please update.")
+        """
 
     def logout(self):
         """Remove credentials from your local system
