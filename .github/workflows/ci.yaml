@@ -54,11 +54,12 @@ jobs:
       run: |
         pip install safety
         pip freeze | safety check
-    - name: Test endpoint by just importing
+    - name: Test funcx-endpoint by just importing
       run: |
         cd funcx_endpoint
-        pip install funcx_endpoint
+        pip install .
         python -c "from funcx.endpoint.version import VERSION"
+        funcx-endpoint -v
         cd ..
     - name: Lint with Flake8
       run: |
