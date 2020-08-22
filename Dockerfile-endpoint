@@ -1,5 +1,7 @@
 FROM python:3.6
 RUN mkdir /opt/funcx
+RUN pip install kubernetes
+
 COPY funcx_sdk /opt/funcx/funcx_sdk/
 
 WORKDIR /opt/funcx/funcx_sdk

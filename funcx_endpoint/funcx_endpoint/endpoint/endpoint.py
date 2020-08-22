@@ -21,9 +21,9 @@ import typer
 
 import funcx
 from funcx.utils.errors import *
-from funcx.executors.high_throughput import default_config as endpoint_default_config
-from funcx.executors.high_throughput import global_config as funcx_default_config
-from funcx.executors.high_throughput.interchange import Interchange
+from funcx_endpoint.executors.high_throughput import default_config as endpoint_default_config
+from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
+from funcx_endpoint.executors.high_throughput.interchange import Interchange
 from funcx.sdk.client import FuncXClient
 
 

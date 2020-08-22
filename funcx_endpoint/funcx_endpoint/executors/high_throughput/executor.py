@@ -17,7 +17,7 @@ from multiprocessing import Process, Queue
 # from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
 from ipyparallel.serialize import deserialize_object  # ,serialize_object
 
-from funcx.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
+from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
 from funcx.serialize import FuncXSerializer
 fx_serializer = FuncXSerializer()
 
@@ -30,7 +30,7 @@ from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
 
 
-from funcx.executors.high_throughput import zmq_pipes
+from funcx_endpoint.executors.high_throughput import zmq_pipes
 from funcx.utils.loggers import set_file_logger
 
 logger = logging.getLogger(__name__)

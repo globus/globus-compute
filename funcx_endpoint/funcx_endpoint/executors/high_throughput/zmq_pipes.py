@@ -6,7 +6,7 @@ import pickle
 import logging
 
 from funcx.utils.loggers import set_file_logger
-from funcx.executors.high_throughput.messages import Message
+from funcx_endpoint.executors.high_throughput.messages import Message
 
 logger = logging.getLogger(__name__)
 if not logger.hasHandlers():
