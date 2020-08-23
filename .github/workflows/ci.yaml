@@ -67,3 +67,21 @@ jobs:
 #    - name: Test with pytest
 #      run: |
 #        pytest
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Extract tag name
+      shell: bash
+      run: echo "##[set-output name=imagetag;]$(echo ${GITHUB_REF##*/})"
+      id: extract_tag_name
+
+    - name: Build funcX-web-endpoint Image
+      uses: elgohr/Publish-Docker-Github-Action@master
+      with:
+        name: funcx/kube-endpoint:${{ steps.extract_tag_name.outputs.imagetag }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        tag: "${GITHUB_REF##*/}"
