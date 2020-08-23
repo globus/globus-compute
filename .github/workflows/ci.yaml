@@ -57,8 +57,8 @@ jobs:
     - name: Test funcx-endpoint by just importing
       run: |
         cd funcx_endpoint
-        pip install .
-        python -c "from funcx.endpoint.version import VERSION"
+        pip install -e .
+        python -c "from funcx_endpoint.endpoint.version import VERSION"
         funcx-endpoint -v
         cd ..
     - name: Lint with Flake8

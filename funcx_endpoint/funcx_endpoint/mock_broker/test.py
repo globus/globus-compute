@@ -1,4 +1,4 @@
-from funcx.executors import HighThroughputExecutor as HTEX
+from funcx_endpoint.executors import HighThroughputExecutor as HTEX
 from parsl.providers import LocalProvider
 from parsl.channels import LocalChannel
 import parsl
@@ -45,7 +45,7 @@ def test_1():
 
 def test_2():
 
-    from funcx.executors.high_throughput.executor import executor_starter
+    from funcx_endpoint.executors.high_throughput.executor import executor_starter
 
     htex = HTEX(label='htex',
                 provider=LocalProvider(
@@ -57,7 +57,7 @@ def test_2():
 
 
 def test_3():
-    from funcx.mock_broker.forwarder import Forwarder, spawn_forwarder
+    from funcx_endpoint.mock_broker.forwarder import Forwarder, spawn_forwarder
     fw = spawn_forwarder("127.0.0.1", endpoint_id="0001")
     print("Spawned forwarder")
     time.sleep(120)

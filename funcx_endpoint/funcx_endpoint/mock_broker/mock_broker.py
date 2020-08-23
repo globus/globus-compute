@@ -12,7 +12,7 @@ import json
 import uuid
 import sys
 
-from funcx.mock_broker.forwarder import Forwarder, spawn_forwarder
+from funcx_endpoint.mock_broker.forwarder import Forwarder, spawn_forwarder
 
 
 @post('/register')

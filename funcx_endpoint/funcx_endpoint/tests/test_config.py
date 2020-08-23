@@ -1,4 +1,4 @@
-from funcx.utils.config import Config
+from funcx_endpoint.endpoint.utils.config import Config
 
 
 config = Config()

@@ -1,6 +1,6 @@
 import argparse
-from funcx.utils.config import Config
-from funcx.executors.high_throughput.interchange import Interchange
+from funcx_endpoint.endpoint.utils.config import Config
+from funcx_endpoint.executors.high_throughput.interchange import Interchange
 
 import funcx
 

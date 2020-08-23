@@ -1,7 +1,7 @@
-from base import BaseStrategy
-from simple import SimpleStrategy
 import queue
 import time
+
+from funcx_endpoint.strategies import SimpleStrategy
 
 
 class MockInterchange(object):

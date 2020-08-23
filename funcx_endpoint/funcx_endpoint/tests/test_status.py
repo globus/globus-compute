@@ -85,7 +85,7 @@ if __name__ == '__main__':
     parser.add_argument("-e", "--endpoint", required=True)
     args = parser.parse_args()
 
-    print("FuncX version : ", funcx.__version__)
+    print("FuncX version : ", funcx.sdk.__version__)
     fxc = FuncXClient()
     # test(fxc, args.endpoint)
     # test2(fxc, args.endpoint)

@@ -17,9 +17,9 @@ import multiprocessing
 import psutil
 import subprocess
 
-from funcx.executors.high_throughput.container_sched import naive_scheduler
-from funcx.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
-from funcx.executors.high_throughput.worker_map import WorkerMap
+from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
+from funcx_endpoint.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
+from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx.serialize import FuncXSerializer
 
 from parsl.version import VERSION as PARSL_VERSION

@@ -1,6 +1,7 @@
 import redis
-from funcx.queues.base import FuncxQueue, NotConnected
 import json
+
+from funcx_endpoint.queues.base import NotConnected, FuncxQueue
 
 
 class RedisQueue(FuncxQueue):

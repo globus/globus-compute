@@ -164,8 +164,8 @@ def spawn_forwarder(address,
     Returns:
          A Forwarder object
     """
-    from funcx.queues.redis import RedisQueue
-    from funcx.executors import HighThroughputExecutor as HTEX
+    from funcx_endpoint.queues import RedisQueue
+    from funcx_endpoint.executors import HighThroughputExecutor as HTEX
     from parsl.providers import LocalProvider
     from parsl.channels import LocalChannel
 

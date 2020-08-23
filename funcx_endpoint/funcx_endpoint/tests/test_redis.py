@@ -1,6 +1,6 @@
 import argparse
 from funcx.serialize import FuncXSerializer
-from funcx.queues import RedisQueue
+from funcx_endpoint.queues import RedisQueue
 import time
 
 

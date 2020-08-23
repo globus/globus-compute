@@ -1,7 +1,7 @@
 import logging
 import time
 import queue
-from funcx.providers.kubernetes.template import template_string
+from funcx_endpoint.providers.kubernetes.template import template_string
 
 logger = logging.getLogger("interchange.kube_provider")
 

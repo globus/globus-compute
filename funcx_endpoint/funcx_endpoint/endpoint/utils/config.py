@@ -1,6 +1,6 @@
 from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
-from funcx.strategies import SimpleStrategy
+from funcx_endpoint.strategies.simple import SimpleStrategy
 
 
 class Config(RepresentationMixin):

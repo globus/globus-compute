@@ -1,4 +1,4 @@
-from funcx.strategies.base import BaseStrategy
+from funcx_endpoint.strategies.base import BaseStrategy
 import math
 import logging
 import time

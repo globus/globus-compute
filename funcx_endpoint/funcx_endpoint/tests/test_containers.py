@@ -3,7 +3,7 @@ import sys
 import argparse
 import time
 import funcx
-from funcx import FuncXClient
+from funcx.sdk.client import FuncXClient
 
 
 def container_sum(event):

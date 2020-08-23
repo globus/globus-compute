@@ -19,10 +19,10 @@ import collections
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat, \
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat, \
     TaskStatusCode
 from funcx.sdk.client import FuncXClient
-from funcx.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
+from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 
 LOOP_SLOWDOWN = 0.0  # in seconds
