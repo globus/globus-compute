@@ -78,11 +78,10 @@ jobs:
       run: echo "##[set-output name=imagetag;]$(echo ${GITHUB_REF##*/})"
       id: extract_tag_name
 
-    - name: Build funcX-web-endpoint Image
+    - name: Build funcX-endpoint Image
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
         dockerfile: Dockerfile-endpoint
         name: funcx/kube-endpoint:${{ steps.extract_tag_name.outputs.imagetag }}
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-        tag: "${GITHUB_REF##*/}"
