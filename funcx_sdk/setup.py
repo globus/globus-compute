@@ -12,7 +12,7 @@ with open('requirements.txt') as f:
 setup(
     name='funcx-sdk',
     version=version,
-    packages=find_namespace_packages(include=['funcx.*']),
+    packages=find_namespace_packages(include=["funcx", 'funcx.*']),
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
     python_requires=">=3.6.0",
