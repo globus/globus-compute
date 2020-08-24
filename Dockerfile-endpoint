@@ -5,11 +5,11 @@ RUN pip install kubernetes
 
 COPY funcx_sdk /opt/funcx/funcx_sdk/
 WORKDIR /opt/funcx/funcx_sdk
-RUN PYTHONPATH=/opt/funcx/funcx_sdk python /opt/funcx/funcx_sdk/setup.py install
+RUN pip install .
 
 COPY funcx_endpoint /opt/funcx/funcx_endpoint
 WORKDIR /opt/funcx/funcx_endpoint
-RUN PYTHONPATH=/opt/funcx/funcx_endpoint python /opt/funcx/funcx_endpoint/setup.py install
+RUN pip install .
 
 RUN useradd -m funcx
 RUN mkdir -p /home/funcx/.kube
