@@ -243,6 +243,12 @@ def start_endpoint(
         '''.format(name))
         return
 
+    endpoint_config = SourceFileLoader('config',
+                                       os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
+
+    funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
+    print(funcx_client)
+
     # If pervious registration info exists, use that
     if os.path.exists(endpoint_json):
         with open(endpoint_json, 'r') as fp:
