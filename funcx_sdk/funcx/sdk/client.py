@@ -34,7 +34,9 @@ class FuncXClient(throttling.ThrottledBaseClient):
     CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, funcx_service_address='https://api.funcx.org/v1',
+                 force_login=False, fx_authorizer=None, search_authorizer=None,
+                 openid_authorizer=None,
+                 funcx_service_address='https://api.funcx.org/v1',
                  **kwargs):
         """ Initialize the client
 
@@ -49,6 +51,14 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         fx_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
         A custom authorizer instance to communicate with funcX.
+        Default: ``None``, will be created.
+
+        search_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
+        A custom authorizer instance to communicate with Globus Search.
+        Default: ``None``, will be created.
+
+        openid_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
+        A custom authorizer instance to communicate with OpenID.
         Default: ``None``, will be created.
 
         funcx_service_address: str
@@ -74,9 +84,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
         scopes = [fx_scope, search_scope, "openid"]
 
-        search_authorizer = None
-
-        if not fx_authorizer:
+        if not fx_authorizer or not search_authorizer or not openid_authorizer:
             self.native_client.login(requested_scopes=scopes,
                                      no_local_server=kwargs.get("no_local_server", True),
                                      no_browser=kwargs.get("no_browser", True),
