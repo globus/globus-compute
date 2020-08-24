@@ -407,7 +407,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                     try:
                         if self.endpoint_db:
                             self.endpoint_db.put(self.endpoint_id, msgs.ep_status)
-                    except Exception as e:
+                    except Exception:
                         logger.error("Caught error while trying to push data into redis")
 
                 else:

@@ -16,9 +16,12 @@ from funcx.sdk.utils.batch import Batch
 from funcx.utils.errors import MalformedResponse
 
 try:
-    from funcx.endpoint import ENDPOINT_VERSION
+    from funcx.endpoint import VERSION as ENDPOINT_VERSION
 except ModuleNotFoundError:
     ENDPOINT_VERSION = None
+
+from funcx.sdk import VERSION as SDK_VERSION
+
 
 logger = logging.getLogger(__name__)
 
@@ -108,12 +111,17 @@ class FuncXClient(throttling.ThrottledBaseClient):
         versions = resp.data
         if "min_ep_version" not in versions:
             raise Exception("Failed to retrieve version information from funcX service.")
+        """
+        # TODO : We need to have the service send the minimum endpoint and sdk version supported
+
         min_ep_version = versions['min_ep_version']
+
         if ENDPOINT_VERSION is None:
             raise Exception("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
         if ENDPOINT_VERSION < min_ep_version:
             raise Exception(f"Your endpoint is out of date.  Your version={ENDPOINT_VERSION} is lower than the "
                             f"minimum version for an endpoint: {min_ep_version}.  Please update.")
+        """
 
     def logout(self):
         """Remove credentials from your local system
@@ -319,7 +327,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         if 'task_uuids' not in r:
@@ -366,7 +374,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         if 'task_uuids' not in r:
@@ -404,7 +412,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
             data['meta'] = metadata
 
         r = self.post(self.ep_registration_path, json_body=data)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         # Return the result
@@ -430,7 +438,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         data = {"endpoint_name": name, "description": description}
 
         r = self.post(registration_path, json_body=data)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         # Return the result
@@ -454,7 +462,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         container_path = f'containers/{container_uuid}/{container_type}'
 
         r = self.get(container_path)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         # Return the result
@@ -476,7 +484,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         stats_path = f'endpoints/{endpoint_uuid}/status'
 
         r = self.get(stats_path)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         # Return the result
@@ -532,7 +540,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         logger.info("Registering function : {}".format(data))
 
         r = self.post(registration_path, json_body=data)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         func_uuid = r.data['function_uuid']
@@ -605,7 +613,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         payload = {'name': name, 'location': location, 'description': description, 'type': container_type}
 
         r = self.post(container_path, json_body=payload)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         # Return the result
@@ -634,7 +642,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         payload = {'func': function_ids}
 
         r = self.post(req_path, json_body=payload)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         # Return the result
@@ -656,7 +664,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         req_path = f'endpoints/{endpoint_id}/whitelist'
 
         r = self.get(req_path)
-        if r.http_status is not 200:
+        if r.http_status != 200:
             raise Exception(r)
 
         # Return the result
@@ -684,7 +692,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
             req_path = f'endpoints/{endpoint_id}/whitelist/{fid}'
 
             r = self.delete(req_path)
-            if r.http_status is not 200:
+            if r.http_status != 200:
                 raise Exception(r)
             res.append(r)
 
