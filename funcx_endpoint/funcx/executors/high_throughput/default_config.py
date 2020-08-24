@@ -9,6 +9,7 @@ config = Config(
         max_blocks=1,
     ),
     max_workers_per_node=2,
+    funcx_service_address='https://api.funcx.org/v1'
 )
 
 # For now, visible_to must be a list of URNs for globus auth users or groups, e.g.:

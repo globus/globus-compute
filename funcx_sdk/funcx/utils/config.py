@@ -52,6 +52,7 @@ class Config(RepresentationMixin):
                  # Connection info
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
+                 funcx_service_address='https://api.funcx.org/v1',
                  # Scaling info
                  strategy=SimpleStrategy(),
                  max_workers_per_node=float('inf'),
@@ -76,6 +77,7 @@ class Config(RepresentationMixin):
         # Connection info
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
+        self.funcx_service_address = funcx_service_address
 
         # Scaling info
         self.strategy = strategy
