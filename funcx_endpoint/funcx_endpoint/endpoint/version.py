@@ -3,5 +3,5 @@
 __version__ = "0.0.3"
 VERSION = __version__
 
-# app name to send as part of SDK requests
-app_name = "funcX SDK v{}".format(__version__)
+# app name to send as part of requests
+app_name = "funcX Endpoint v{}".format(__version__)

@@ -382,7 +382,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         return r['task_uuids']
 
-    def register_endpoint(self, name, endpoint_uuid, metadata=None):
+    def register_endpoint(self, name, endpoint_uuid, metadata=None, endpoint_version=None):
         """Register an endpoint with the funcX service.
 
         Parameters
@@ -393,6 +393,8 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 The uuid of the endpoint
         metadata : dict
             endpoint metadata, see default_config example
+        endpoint_version: str
+            Version string to be passed to the webService as a compatibility check
 
         Returns
         -------
@@ -406,7 +408,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         data = {
             "endpoint_name": name,
             "endpoint_uuid": endpoint_uuid,
-            "version": ENDPOINT_VERSION
+            "version": endpoint_version
         }
         if metadata:
             data['meta'] = metadata

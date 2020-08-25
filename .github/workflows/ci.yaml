@@ -58,7 +58,7 @@ jobs:
       run: |
         cd funcx_endpoint
         pip install .
-        python -c "from funcx.endpoint.version import VERSION"
+        python -c "from funcx_endpoint.endpoint.version import VERSION"
         funcx-endpoint -v
         cd ..
     - name: Lint with Flake8
@@ -67,3 +67,21 @@ jobs:
 #    - name: Test with pytest
 #      run: |
 #        pytest
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Extract tag name
+      shell: bash
+      run: echo "##[set-output name=imagetag;]$(echo ${GITHUB_REF##*/})"
+      id: extract_tag_name
+
+    - name: Build funcX-endpoint Image
+      uses: elgohr/Publish-Docker-Github-Action@master
+      with:
+        dockerfile: Dockerfile-endpoint
+        name: funcx/kube-endpoint:${{ steps.extract_tag_name.outputs.imagetag }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
