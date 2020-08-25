@@ -57,7 +57,7 @@ jobs:
     - name: Test funcx-endpoint by just importing
       run: |
         cd funcx_endpoint
-        pip install -e .
+        pip install .
         python -c "from funcx_endpoint.endpoint.version import VERSION"
         funcx-endpoint -v
         cd ..
