@@ -350,7 +350,10 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, metadata, endp
     """
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
-    reg_info = funcx_client.register_endpoint(endpoint_name, endpoint_uuid, metadata=metadata)
+    from funcx_endpoint.endpoint.version import VERSION as ENDPOINT_VERSION
+    reg_info = funcx_client.register_endpoint(endpoint_name,
+                                              endpoint_uuid,
+                                              endpoint_version=ENDPOINT_VERSION)
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
