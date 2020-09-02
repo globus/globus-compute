@@ -6,12 +6,23 @@ replicaCount: 1
 funcXServiceAddress: https://api.funcx.org
 image:
   repository: funcx/kube-endpoint
-  tag: 236_incluster_kube_config
+  tag: endpoint_helm
   pullPolicy: Always
 
-workerImage: covid19-mesa:dev
-workerInit: pip freeze
-workerNamespace: servicex
+workerImage: python:3.6-buster
+workerInit: pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0
+workerNamespace: default
+workingDir: /tmp/worker_logs
 
 rbacEnabled: true
 nameOverride: funcx-endpoint
+
+initMem: 2000Mi
+maxMem: 16000Mi
+initCPU: 1
+maxCPU: 2
+
+initBlocks: 0
+minBlocks: 1
+maxBlocks: 100
+
