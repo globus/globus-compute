@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-endpoint-config
+  labels:
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app: {{ .Release.Name }}
+data:
+  config.py: |
+    import getpass
+    from parsl.addresses import address_by_interface
+
+    global_options = {
+        'username': getpass.getuser(),
+        'email': 'USER@USERDOMAIN.COM',
+        'broker_address': '127.0.0.1',
+        'broker_port': 8088,
+        'endpoint_address': address_by_interface('eth0'),
+    }
+
