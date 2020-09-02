@@ -57,9 +57,6 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         the opposite situation in which as few resources as possible (i.e., min_blocks) are used.
     worker_init : str
         Command to be run first for the workers, such as `python start.py`.
-    in_cluster_config: bool
-        Should we load the kubernetes config as running inside the cluster, or attempt
-        to find a .kube file to read from? Default is True
     secret : str
         Docker secret to use to pull images
     pod_name : str
@@ -89,7 +86,6 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                  init_mem: str = "250Mi",
                  parallelism: float = 1,
                  worker_init: str = "",
-                 in_cluster_config=True,
                  pod_name: Optional[str] = None,
                  user_id: Optional[str] = None,
                  group_id: Optional[str] = None,
@@ -100,10 +96,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             raise OptionalModuleMissing(['kubernetes'],
                                         "Kubernetes provider requires kubernetes module and config.")
 
-        if in_cluster_config:
-            config.load_incluster_config()
-        else:
-            config.load_kube_config()
+        config.load_incluster_config()
 
         self.namespace = namespace
         self.image = image
