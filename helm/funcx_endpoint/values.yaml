@@ -6,8 +6,12 @@ replicaCount: 1
 funcXServiceAddress: https://api.funcx.org
 image:
   repository: funcx/kube-endpoint
-  tag: 236_incluster_config
-  pullPolicy: IfNotPresent
+  tag: 236_incluster_kube_config
+  pullPolicy: Always
 
 workerImage: covid19-mesa:dev
 workerInit: pip freeze
+workerNamespace: servicex
+
+rbacEnabled: true
+nameOverride: funcx-endpoint

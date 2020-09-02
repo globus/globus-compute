@@ -20,7 +20,8 @@ data:
             min_blocks=1,
             max_blocks=1,
             image="{{ .Values.workerImage }}",
-            worker_init='{{ .Values.workerInit }}'
+            worker_init='{{ .Values.workerInit }}',
+            namespace='{{ .Values.workerNamespace }}'
         ),
         strategy=KubeSimpleStrategy(max_idletime=3600),
         scheduler_mode='hard',

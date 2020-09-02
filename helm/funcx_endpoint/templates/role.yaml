@@ -1,0 +1,15 @@
+{{- if .Values.rbacEnabled }}
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ template "funcx_endpoint.fullname" . }}-worker-manager
+  labels:
+    app: {{ template "funcx_endpoint.name" . }}
+    chart: {{ template "funcx_endpoint.chart" .  }}
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{- end }}

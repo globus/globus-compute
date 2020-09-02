@@ -1,0 +1,19 @@
+{{- if .Values.rbacEnabled }}
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ template "funcx_endpoint.fullname" . }}-worker-manager
+  labels:
+    app: {{ template "funcx_endpoint.name" . }}
+    chart: {{ template "funcx_endpoint.chart" .  }}
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+subjects:
+- kind: ServiceAccount
+  name: {{ template "funcx_endpoint.fullname" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "funcx_endpoint.fullname" . }}-worker-manager
+
+{{- end }}
