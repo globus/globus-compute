@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-endpoint
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-endpoint
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-endpoint
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-endpoint
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        command: [ "/bin/bash", "-c", "--" ]
+        args: [ "mkdir ~/.funcx; mkdir ~/.funcx/{{ .Release.Name }}; mkdir ~/.funcx/credentials; cp /funcx/config/config.py ~/.funcx; cp /funcx/{{ .Release.Name }}/* ~/.funcx/{{ .Release.Name }}; cp /funcx/credentials/* ~/.funcx/credentials; funcx-endpoint start {{ .Release.Name }}; sleep infinity"]
+        tty: true
+        stdin: true
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.resources }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        {{- end }}
+
+        volumeMounts:
+          - mountPath: "/mnt"
+            name: funcxmnt
+          - name: funcx-sdk-tokens
+            mountPath: /funcx/credentials
+            readOnly: true
+          - name: endpoint-config
+            mountPath: /funcx/config
+          - name: endpoint-instance-config
+            mountPath: /funcx/{{ .Release.Name }}
+
+
+        ports:
+          - containerPort: 5000
+
+      volumes:
+        - name: funcxmnt
+          emptyDir: {}
+        - name: funcx-sdk-tokens
+          secret:
+            secretName: funcx-sdk-tokens
+        - name: endpoint-config
+          configMap:
+            name: {{ .Release.Name }}-endpoint-config
+        - name: endpoint-instance-config
+          configMap:
+            name: {{ .Release.Name }}-endpoint-instance-config

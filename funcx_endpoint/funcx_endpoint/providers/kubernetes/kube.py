@@ -95,7 +95,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         if not _kubernetes_enabled:
             raise OptionalModuleMissing(['kubernetes'],
                                         "Kubernetes provider requires kubernetes module and config.")
-        config.load_kube_config()
+        config.load_incluster_config()
 
         self.namespace = namespace
         self.image = image
