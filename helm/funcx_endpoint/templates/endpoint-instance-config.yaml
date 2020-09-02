@@ -16,9 +16,13 @@ data:
     config = Config(
         scaling_enabled=True,
         provider=KubernetesProvider(
-            init_blocks=0,
-            min_blocks=1,
-            max_blocks=1,
+            init_blocks={{ .Values.initBlocks }},
+            min_blocks={{ .Values.minBlocks }},
+            max_blocks={{ .Values.maxBlocks }},
+            init_cpu= {{ .Values.initCPU }},
+            max_cpu={{ .Values.maxCPU }},
+            init_mem="{{ .Values.initMem }}",
+            max_mem="{{ .Values.maxMem }}",
             image="{{ .Values.workerImage }}",
             worker_init='{{ .Values.workerInit }}',
             namespace='{{ .Values.workerNamespace }}'
@@ -27,8 +31,7 @@ data:
         scheduler_mode='hard',
         heartbeat_period=15,
         heartbeat_threshold=200,
-        max_workers_per_node=1,
-        working_dir='/tmp/worker_logs',
+        working_dir='{{ .Values.workingDir }}',
         funcx_service_address="{{ .Values.funcXServiceAddress }}/v1"
     )
 
