@@ -12,6 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-endpoint
     spec:
+      serviceAccountName: {{ template "funcx_endpoint.fullname" . }}
       containers:
       - name: {{ .Release.Name }}-endpoint
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
