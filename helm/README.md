@@ -5,6 +5,51 @@ will launch workers with a specified container image into a namespace.
 It uses Role Based Access Control to create a service account and assign it
 permissions to create the worker pod.
 
+## How to Use
+First you need to install valid funcX credentials into the cluster's 
+namespace. Launch a local version of the endpoint to get it to populate your
+`~/.funcx/credentials/funcx_sdk_tokens.json` with
+```
+funcx-endpoint start 
+```
+
+It will prompt you with an authentication URL to visit and ask you to paste the
+resulting token. After it completes you can stop your endpoint with 
+```
+funcx-endpoint stop 
+```
+
+cd to your `~/.funcx/credentials` directory and install the keys file as a
+kubernetes secret.
+
+```shell script
+kubectl create secret generic funcx-sdk-tokens --from-file=funcx_sdk_tokens.json
+```
+
+### Install the helm chart
+You need to add the funcx helm chart repo to your helm
+
+```shell script
+repo add funcx http://funcx.org/funcx-helm-charts/
+repo update
+```
+
+Create a local values.yaml file to set any specific values you wish to
+override.
+
+Then invoke the chart installation with:
+
+```shell script
+helm install -f covid19-mesa-values.yaml funcx funcx/funcx_endpoint
+```
+
+Once the pods start you can view your endpoint UID with 
+
+
+The notes that are printed with the installation will tell you how to access the
+logs for the endpoint to see the UID.
+
+
 ## Values
 The deployment is configured via values.yaml file.
 
