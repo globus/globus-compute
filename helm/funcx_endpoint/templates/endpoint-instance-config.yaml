@@ -28,6 +28,7 @@ data:
             namespace='{{ .Values.workerNamespace }}'
         ),
         strategy=KubeSimpleStrategy(max_idletime=3600),
+        max_workers_per_node={{ .Values.maxWorkersPerPod }},
         scheduler_mode='hard',
         heartbeat_period=15,
         heartbeat_threshold=200,

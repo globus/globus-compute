@@ -69,3 +69,5 @@ The deployment is configured via values.yaml file.
 | initCPU | Initial CPUs to allocate to worker pod | 1 |  
 | maxCPU | Maximum CPUs to allocate to worker pod | 2 |
 | maxBlocks | Maximum number of worker pods to spawn | 100 |
+| maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
+

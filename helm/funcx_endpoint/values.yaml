@@ -6,8 +6,8 @@ replicaCount: 1
 funcXServiceAddress: https://api.funcx.org
 image:
   repository: funcx/kube-endpoint
-  tag: endpoint_helm
-  pullPolicy: Always
+  tag: dev
+  pullPolicy: IfNotPresent
 
 workerImage: python:3.6-buster
 workerInit: pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0
@@ -25,4 +25,4 @@ maxCPU: 2
 initBlocks: 0
 minBlocks: 1
 maxBlocks: 100
-
+maxWorkersPerPod: 1
