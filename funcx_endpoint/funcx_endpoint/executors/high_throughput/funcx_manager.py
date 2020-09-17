@@ -305,6 +305,7 @@ class Manager(object):
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
             self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
+                                                                     mode=self.worker_mode,
                                                                      debug=self.debug,
                                                                      address=self.address,
                                                                      uid=self.uid,

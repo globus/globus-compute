@@ -26,6 +26,7 @@ def naive_interchange_task_dispatch(interesting_managers,
     elif scheduler_mode == 'soft':
         task_dispatch, dispatched_tasks = {}, 0
         for loop in ['first', 'second']:
+        # for loop in ['second']:
             task_dispatch, dispatched_tasks = dispatch(interesting_managers,
                                                        pending_task_queue,
                                                        ready_manager_queue,
