@@ -3,6 +3,7 @@ from globus_sdk import SearchAPIError
 from globus_sdk.search import SearchClient
 from texttable import Texttable
 
+from funcx.utils.errors import InvalidScopeException
 from funcx.serialize import FuncXSerializer
 
 SEARCH_SCOPE = 'urn:globus:auth:scope:search.api.globus.org:all'
@@ -144,9 +145,9 @@ class SearchHelper:
         elif scope == 'shared-by-me':
             # TODO: filter for owner=self._owner_uuid AND len(shared_with) > 0
             # but...how to filter for length of list...
-            raise Exception('This scope has not been implemented')
+            raise InvalidScopeException('This scope has not been implemented')
         elif scope != 'all':
-            raise Exception('This scope is invalid')
+            raise InvalidScopeException('This scope is invalid')
 
         if scope_filter:
             query['filters'].append(scope_filter)

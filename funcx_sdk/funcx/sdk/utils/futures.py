@@ -2,6 +2,7 @@
 
 Credit: Logan Ward
 """
+from funcx.utils.error import UserCancelledException
 from globus_sdk import GlobusAPIError
 from concurrent.futures import Future
 from threading import Thread
@@ -93,4 +94,4 @@ class FuncXFuture(Future):
 
     def cancel(self):
         """Stop the execution of the function"""
-        self.set_exception(Exception('Cancelled by user'))
+        self.set_exception()
