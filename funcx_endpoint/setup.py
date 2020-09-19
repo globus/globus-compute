@@ -10,7 +10,7 @@ with open('requirements.txt') as f:
     install_requires = f.readlines()
 
 setup(
-    name='funcx-endpoint',
+    name='funcx-endpoint-dummy-ben',
     version=version,
     packages=find_namespace_packages(include=['funcx_endpoint.*']),
     description='funcX: High Performance Function Serving for Science',
