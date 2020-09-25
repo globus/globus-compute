@@ -327,12 +327,12 @@ class Manager(object):
 
                 else:
                     task_recv_counter += len(tasks)
-                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t['task_id'] for t in tasks],
+                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t.task_id for t in tasks],
                                                                                  task_recv_counter))
 
                     for task in tasks:
                         # Set default type to raw
-                        task_type = task['container']
+                        task_type = task.container_id
 
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
@@ -342,7 +342,7 @@ class Manager(object):
                             self.outstanding_task_count[task_type] = 0
                         self.task_queues[task_type].put(task)
                         self.outstanding_task_count[task_type] += 1
-                        self.task_type_mapping[task['task_id']] = task_type
+                        self.task_type_mapping[task.task_id] = task_type
                         logger.debug("Got task: Outstanding task counts: {}".format(self.outstanding_task_count))
                         logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
@@ -410,12 +410,15 @@ class Manager(object):
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
 
-                            logger.debug("Sending task {} to {}".format(task['task_id'], worker_id))
-                            to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
+                            logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
+
+                            #TODO: YADU: Avoid redoing the work
+                            to_send = [worker_id,
+                                       task.pack()]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
-                            logger.debug(f"Set task {task['task_id']} to RUNNING")
-                            self.task_status_deltas[task['task_id']] = TaskStatusCode.RUNNING
+                            logger.debug(f"Set task {task.task_id} to RUNNING")
+                            self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
                             logger.debug("Sending complete!")
 
     def _status_report_loop(self, kill_event):

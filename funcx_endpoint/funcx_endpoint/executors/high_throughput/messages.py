@@ -3,7 +3,7 @@ import uuid
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from struct import Struct
-
+from typing import Tuple
 MESSAGE_TYPE_FORMATTER = Struct('b')
 
 
@@ -12,6 +12,7 @@ class MessageType(Enum):
     HEARTBEAT = auto()
     EP_STATUS_REPORT = auto()
     MANAGER_STATUS_REPORT = auto()
+    TASK = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -67,12 +68,44 @@ class Message(ABC):
             return EPStatusReport.unpack(remaining)
         elif message_type is MessageType.MANAGER_STATUS_REPORT:
             return ManagerStatusReport.unpack(remaining)
+        elif message_type is MessageType.TASK:
+            return Task.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
     @abstractmethod
     def pack(self):
         raise NotImplementedError()
+
+
+class Task(Message):
+    """
+    Task message from the forwarder->interchange
+    """
+    type = MessageType.TASK
+
+    def __init__(self, task_id : str, container_id : str, task_buffer : str):
+        super().__init__()
+        self.task_id = task_id
+        self.container_id = container_id
+        self.task_buffer = task_buffer
+
+    @classmethod
+    def unpack(cls, msg):
+        endpoint_id = str(uuid.UUID(bytes=msg[:16]))
+        msg = msg[16:]
+        jsonified = msg.decode("ascii")
+        ep_status, task_statuses = json.loads(jsonified)
+        return cls(endpoint_id, ep_status, task_statuses)
+
+    def pack(self) -> bytes:
+        add_ons = f'TID={self.task_id};CID={self.container_id};{self.task_buffer}'
+        return self.type.pack() + add_ons.encode('utf-8')
+
+    @classmethod
+    def unpack(cls, msg: bytes):
+        b_tid, b_cid, task_buf = msg.decode('utf-8').split(';', 2)
+        return cls(b_tid[4:], b_cid[4:], task_buf)
 
 
 class HeartbeatReq(Message):

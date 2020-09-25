@@ -19,11 +19,12 @@ import collections
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat, \
-    TaskStatusCode
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
+from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.executors.high_throughput.taskqueue import TaskQueue
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
@@ -78,7 +79,7 @@ class Interchange(object):
     5. Be aware of requests worker resource capacity,
        eg. schedule only jobs that fit into walltime.
 
-    TODO: We most likely need a PUB channel to send out global commands, like shutdown
+    TODO: We most likely need a PUB channel to send out global commandzs, like shutdown
     """
 
     def __init__(self,
@@ -89,7 +90,6 @@ class Interchange(object):
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  cores_per_worker=1.0,
-                 worker_debug=False,
                  launch_cmd=None,
                  logdir=".",
                  logging_level=logging.INFO,
@@ -124,9 +124,6 @@ class Interchange(object):
         cores_per_worker : float
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
-
-        worker_debug : Bool
-             Enables worker debug logging.
 
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'
@@ -166,23 +163,35 @@ class Interchange(object):
         self.serializer = FuncXSerializer()
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
             client_address, client_ports[0], client_ports[1], client_ports[2]))
-        self.context = zmq.Context()
-        self.task_incoming = self.context.socket(zmq.DEALER)
-        self.task_incoming.set_hwm(0)
-        self.task_incoming.RCVTIMEO = 10  # in milliseconds
+
+        self.task_incoming = TaskQueue(client_address,
+                                       port=client_ports[0],
+                                       identity=endpoint_id,
+                                       mode='client',
+                                       set_hwm=0,
+                                       RCVTIMEO=10)
+        self.context = self.task_incoming.zmq_context()
         logger.info("Task incoming on tcp://{}:{}".format(client_address, client_ports[0]))
-        self.task_incoming.connect("tcp://{}:{}".format(client_address, client_ports[0]))
 
-        self.results_outgoing = self.context.socket(zmq.DEALER)
-        self.results_outgoing.set_hwm(0)
-        logger.info("Results outgoing on tcp://{}:{}".format(client_address, client_ports[1]))
-        self.results_outgoing.connect("tcp://{}:{}".format(client_address, client_ports[1]))
+        self.results_outgoing = TaskQueue(client_address,
+                                          port=client_ports[1],
+                                          identity=endpoint_id,
+                                          mode='client',
+                                          set_hwm=0)
 
-        self.command_channel = self.context.socket(zmq.DEALER)
-        self.command_channel.RCVTIMEO = 1000  # in milliseconds
-        # self.command_channel.set_hwm(0)
-        logger.info("Command channel on tcp://{}:{}".format(client_address, client_ports[2]))
-        self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
+
+        self.command_channel = TaskQueue(client_address,
+                                         port=client_ports[2],
+                                         identity=endpoint_id,
+                                         mode='client',
+                                         RCVTIMEO=1000,  # in milliseconds
+                                         set_hwm=0)
+
+        # TODO :Register all channels with the authentication string.
+        self.task_incoming.put('forwarder', b'')
+        self.results_outgoing.put('forwarder', b'')
+        self.command_channel.put('forwarder', b'')
+
         logger.info("Connected to client")
 
         self.pending_task_queue = {}
@@ -338,6 +347,9 @@ class Interchange(object):
         poller = zmq.Poller()
         poller.register(self.task_incoming, zmq.POLLIN)
 
+        # TODO : Update this to be a proper registration message with client key
+        # added to tie in auth.
+        # msg = self.task_incoming.put('forwarder', b'hello from worker')
         while not kill_event.is_set():
             # Check when the last heartbeat was.
             # logger.debug(f"[TASK_PULL_THREAD] Last heartbeat: {self.last_heartbeat}")
@@ -347,7 +359,8 @@ class Interchange(object):
                 break
 
             try:
-                msg = self.task_incoming.recv_pyobj()
+                # TODO : Check the kwarg options for get
+                msg = self.task_incoming.get()[0]
                 self.last_heartbeat = time.time()
             except zmq.Again:
                 # We just timed out while attempting to receive
@@ -357,7 +370,8 @@ class Interchange(object):
             try:
                 msg = Message.unpack(msg)
                 logger.debug("[TASK_PULL_THREAD] received Message/Heartbeat? on task queue")
-            except Exception:
+            except Exception as e:
+                logger.exception("Failed to unpack message from forwarder")
                 pass
 
             if msg == 'STOP':
@@ -365,17 +379,17 @@ class Interchange(object):
                 break
             elif isinstance(msg, Heartbeat):
                 logger.info("Got heartbeat")
-            else:
-                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
-                task_type = self.get_container(msg['task_id'].split(";")[1])
-                msg['container'] = task_type
-                if task_type not in self.pending_task_queue:
-                    self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
 
-                self.pending_task_queue[task_type].put(msg)
+            elif isinstance(msg, Task):
+                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
+                self.get_container(msg.container_id)
+                if msg.container_id not in self.pending_task_queue:
+                    self.pending_task_queue[msg.container_id] = queue.Queue(maxsize=10 ** 6)
+
+                self.pending_task_queue[msg.container_id].put(msg)
                 self.total_pending_task_count += 1
-                self.task_status_deltas[msg['task_id']] = TaskStatusCode.WAITING_FOR_NODES
-                logger.debug(f"[TASK_PULL_THREAD] task {msg['task_id']} is now WAITING_FOR_NODES")
+                self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
+                logger.debug(f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES")
                 logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
@@ -487,12 +501,13 @@ class Interchange(object):
 
         while not kill_event.is_set():
             try:
-                buffer = self.command_channel.recv()
+                # Wait for 1000 ms
+                buffer = self.command_channel.get(timeout=1000)
                 logger.debug(f"[COMMAND] Received command request {buffer}")
                 command = Message.unpack(buffer)
                 if command.type not in COMMAND_TYPES:
                     logger.error("Received incorrect message type on command channel")
-                    self.command_channel.send(bytes())
+                    self.command_channel.put(bytes())
                     continue
 
                 if command.type is MessageType.HEARTBEAT_REQ:
@@ -501,7 +516,7 @@ class Interchange(object):
                     reply = Heartbeat(self.endpoint_id)
 
                 logger.debug("[COMMAND] Reply: {}".format(reply))
-                self.command_channel.send(reply.pack())
+                self.command_channel.put(reply.pack())
 
             except zmq.Again:
                 logger.debug("[COMMAND] is alive")
@@ -521,6 +536,21 @@ class Interchange(object):
         ----------
         poll_period : int
            poll_period in milliseconds
+        """
+
+        print("In start")
+        """
+        self.task_incoming.put('forwarder', b'hello from worker')
+        for i in range(100):
+            logger.info("Sending message")
+            try:
+                x= self.task_incoming.get()
+                print("Got message from server : ", x)
+            except:
+                print("Sleeping")
+
+           time.sleep(5)
+        print("End debug")
         """
         logger.info("Incoming ports bound")
 
@@ -609,7 +639,7 @@ class Interchange(object):
                                 result_package = {'task_id': -1,
                                                   'exception': self.serializer.serialize(e)}
                                 pkl_package = pickle.dumps(result_package)
-                                self.results_outgoing.send(pkl_package)
+                                self.results_outgoing.put('forwarder', pkl_package)
                                 logger.warning("[MAIN] Sent failure reports, unregistering manager")
                             else:
                                 logger.debug("[MAIN] Suppressing shutdown due to version incompatibility")
@@ -623,7 +653,7 @@ class Interchange(object):
                             result_package = {'task_id': -1,
                                               'exception': self.serializer.serialize(e)}
                             pkl_package = pickle.dumps(result_package)
-                            self.results_outgoing.send(pkl_package)
+                            self.results_outgoing.put('forwarder', pkl_package)
                         else:
                             logger.debug("[MAIN] Suppressing bad registration from manager:{}".format(
                                 manager))
@@ -658,7 +688,7 @@ class Interchange(object):
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
                     self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
                     for task in tasks:
-                        task_id = task["task_id"]
+                        task_id = task.task_id
                         logger.debug(f"[MAIN] Task {task_id} is now WAITING_FOR_LAUNCH")
                         self.task_status_deltas[task_id] = TaskStatusCode.WAITING_FOR_LAUNCH
 
@@ -684,16 +714,18 @@ class Interchange(object):
                     logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
-                        # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
-                        task_type = self.containers[r['task_id'].split(';')[1]]
+                        logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
+                        logger.debug(f"[MAIN] Results : {r}")
+                        task_type = self.containers[r['container_id']]
                         if r['task_id'] in self.task_status_deltas:
                             del self.task_status_deltas[r['task_id']]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
+                        self.results_outgoing.put('forwarder', b_message)
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
 
                     # TODO: handle this with a Task message or something?
-                    # previously used this; switched to mono-message, self.results_outgoing.send_multipart(b_messages)
-                    self.results_outgoing.send(pickle.dumps(b_messages))
+                    # previously used this; switched to mono-message, # self.results_outgoing.send_multipart(b_messages)
+
                     logger.debug("[MAIN] Current tasks: {}".format(self._ready_manager_queue[manager]['tasks']))
                 logger.debug("[MAIN] leaving results_incoming section")
 
@@ -701,7 +733,7 @@ class Interchange(object):
             try:
                 packed_status_report = status_report_queue.get(block=False)
                 logger.debug(f"[MAIN] forwarding status report queue: {packed_status_report}")
-                self.results_outgoing.send(packed_status_report)
+                self.results_outgoing.put('forwarder', packed_status_report)
             except queue.Empty:
                 pass
 
@@ -930,7 +962,7 @@ def cli_run():
                         help="OPTIONAL, pair of workers ports to listen on, eg --worker_ports=50001,50005")
     parser.add_argument("--suppress_failure", action='store_true',
                         help="Enables suppression of failures")
-    parser.add_argument("--endpoint_id", default=None,
+    parser.add_argument("--endpoint_id", required=True,
                         help="Endpoint ID, used to identify the endpoint to the remote broker")
     parser.add_argument("--hb_threshold",
                         help="Heartbeat threshold in seconds")
@@ -948,7 +980,27 @@ def cli_run():
     optionals['client_address'] = args.client_address
     optionals['client_ports'] = [int(i) for i in args.client_ports.split(',')]
     optionals['endpoint_id'] = args.endpoint_id
-    optionals['config'] = args.config
+
+    # DEBUG ONLY : TODO: FIX
+    if args.config is None:
+        from funcx_endpoint.endpoint.utils.config import Config
+        from parsl.providers import LocalProvider
+
+        config = Config(
+            worker_debug=True,
+            scaling_enabled=True,
+            provider=LocalProvider(
+                init_blocks=1,
+                min_blocks=1,
+                max_blocks=1,
+            ),
+            max_workers_per_node=2,
+            #funcx_service_address='https://api.funcx.org/v1'
+            funcx_service_address='http://127.0.0.1:8080'
+        )
+        optionals['config'] = config
+    else:
+        optionals['config'] = args.config
 
     if args.debug:
         optionals['logging_level'] = logging.DEBUG
@@ -957,6 +1009,10 @@ def cli_run():
     if args.worker_port_range:
         optionals['worker_port_range'] = [int(i) for i in args.worker_port_range.split(',')]
 
+
+    ic = Interchange(**optionals)
+    ic.start()
+
+    """
     with daemon.DaemonContext():
-        ic = Interchange(**optionals)
-        ic.start()
+    """
