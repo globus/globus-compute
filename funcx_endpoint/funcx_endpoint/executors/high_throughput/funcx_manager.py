@@ -555,6 +555,7 @@ def cli_run():
     try:
         global logger
         logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
+                                 name='funcx_endpoint',
                                  level=logging.DEBUG if args.debug is True else logging.INFO)
 
         logger.info("Python version: {}".format(sys.version))
