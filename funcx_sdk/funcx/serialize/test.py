@@ -59,7 +59,7 @@ for i in range(len(serializers)):
 print("\n")
 
 class testSerializers(unittest.TestCase):
-    
+
     def test_serializer02(self):
         for j in range(len(test_functions)):
             for i in range(6, 9):
@@ -227,8 +227,6 @@ class testSerializers(unittest.TestCase):
             self.assertTrue('input is too large' in \
             str(context.exception))
             fp.close()
-
-    #def test_serializer03_func
 
 if __name__ == '__main__':
     unittest.main()
