@@ -13,6 +13,9 @@ import numpy
 from create_serials import (serializers, test_functions, func_args,
                             expected_outputs)
 
+def func0(x, y={'a': 3}):
+    return math.floor(math.log(x)) * y['a']
+
 def func1(x):
     return numpy.linalg.det(x)
 
@@ -44,9 +47,9 @@ def func6(x):
 # Compare serials of different versions
 for i in range(len(serializers)):
     for j in range(len(test_functions)):
-        f_name36 = "serials/3.6/func" + str(j) + "_0" + str(i) + ".txt"
-        f_name37 = "serials/3.7/func" + str(j) + "_0" + str(i) + ".txt"
-        f_name38 = "serials/3.8/func" + str(j) + "_0" + str(i) + ".txt"
+        f_name36 = "serials/3.6/func" + str(j) + "_0" + str(i+2) + ".txt"
+        f_name37 = "serials/3.7/func" + str(j) + "_0" + str(i+2) + ".txt"
+        f_name38 = "serials/3.8/func" + str(j) + "_0" + str(i+2) + ".txt"
         compare3637 = filecmp.cmp(f_name36, f_name37, shallow = False)
         compare3638 = filecmp.cmp(f_name36, f_name38, shallow = False)
         print("3.6/3.7 comparison(serializer:", str(i+1),
@@ -59,6 +62,7 @@ class testSerializers(unittest.TestCase):
 
     # tests deserialization of all functions across different versions using
     # serializer 02
+
     def test_serializer02(self):
         for j in range(len(test_functions)):
             for i in range(6, 9):
@@ -135,6 +139,8 @@ class testSerializers(unittest.TestCase):
                                                        expected_outputs[j])
                 fp.close()
     """
+
+    # Tests for individual functions on serializers 03/04
 
     def test_serializer03_func2(self):
         for i in range(6, 9):
