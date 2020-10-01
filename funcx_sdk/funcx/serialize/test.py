@@ -60,9 +60,8 @@ print("\n")
 
 class testSerializers(unittest.TestCase):
 
-    # tests deserialization of all functions across different versions using
+    # Tests deserialization of all functions across different versions using
     # serializer 02
-
     def test_serializer02(self):
         for j in range(len(test_functions)):
             for i in range(6, 9):
@@ -141,7 +140,6 @@ class testSerializers(unittest.TestCase):
     """
 
     # Tests for individual functions on serializers 03/04
-
     def test_serializer03_func2(self):
         for i in range(6, 9):
             f_name = "serials/3." + str(i) + "/func2" + "_03.txt"
