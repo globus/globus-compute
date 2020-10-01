@@ -13,9 +13,6 @@ import numpy
 from create_serials import (serializers, test_functions, func_args,
                             expected_outputs)
 
-def func0(x, y={'a': 3}):
-    return math.floor(math.log(x)) * y['a']
-
 def func1(x):
     return numpy.linalg.det(x)
 
@@ -60,6 +57,8 @@ print("\n")
 
 class testSerializers(unittest.TestCase):
 
+    # tests deserialization of all functions across different versions using
+    # serializer 02
     def test_serializer02(self):
         for j in range(len(test_functions)):
             for i in range(6, 9):
@@ -84,6 +83,9 @@ class testSerializers(unittest.TestCase):
                                                        expected_outputs[j])
                 fp.close()
 
+
+    # Testing for func0, func1, func4 fail for serializers 03/04 since they
+    # rely on external modules or are recursive
     """
     def test_serializer03(self):
         for j in range(len(test_functions)):
