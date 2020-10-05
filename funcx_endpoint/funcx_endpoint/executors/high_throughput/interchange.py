@@ -806,7 +806,7 @@ class Interchange(object):
                     internal_block = self.config.provider.submit(launch_cmd, 1, task_type)
                 logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
                 if not internal_block:
-                    raise(ScalingFailed(self.provider.label,
+                    raise(ScalingFailed(self.config.provider.label,
                                         "Attempts to provision nodes via provider has failed"))
                 self.blocks[external_block_id] = internal_block
                 self.block_id_map[internal_block] = external_block_id
