@@ -37,3 +37,66 @@ class MalformedResponse(FuncxError):
 
     def __repr__(self):
         return "FuncX remote service responded with Malformed Response {}".format(self.response)
+
+
+class VersionMismatch(FuncxError):
+    """Either client and endpoint version mismatch, or version cannot be retrieved.
+    """
+
+    def __init__(self, version_message):
+        self.version_message = version_message
+
+    def __repr__(self):
+        return "FuncX Versioning Issue: {}".format(self.version_message)
+
+
+class SerializationError(FuncxError):
+    """Something failed during serialization or deserialization.
+    """
+
+    def __init__(self, message):
+        self.message = message
+
+    def __repr__(self):
+        return "Serialization Error during: {}".format(self.message)
+
+
+class UserCancelledException(FuncxError):
+    """User cancelled execution
+    """
+
+    def __repr__(self):
+        return "Task Exception: User Cancelled Execution"
+
+
+class InvalidScopeException(FuncxError):
+    """Invalid API Scope
+    """
+
+    def __init__(self, message):
+        self.message = message
+
+    def __repr__(self):
+        return "Invalid Scope: {}".format(self.message)
+
+
+class HTTPError(FuncxError):
+    """An HTTP Request Failed
+    """
+
+    def __init__(self, message):
+        self.message = message
+
+    def __repr__(self):
+        return "HTTP request failed: {}".format(self.message)
+
+
+class InvalidScopeException(FuncxError):
+    """Invalid API Scope
+    """
+
+    def __init__(self, message):
+        self.message = message
+
+    def __repr__(self):
+        return "Invalid Scope: {}".format(self.message)
