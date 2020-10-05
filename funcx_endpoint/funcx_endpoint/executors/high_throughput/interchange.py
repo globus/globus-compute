@@ -266,6 +266,8 @@ class Interchange(object):
             working_dir = "{}/{}".format(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
+        logger.info(f"Here is the config info: {dir(config)}"
+
         self.config.provider.script_dir = working_dir
         if hasattr(self.config.provider, 'channel'):
             self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
