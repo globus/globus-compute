@@ -16,6 +16,8 @@ import json
 import daemon
 import collections
 
+from logging.handlers import RotatingFileHandler
+
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -146,8 +148,13 @@ class Interchange(object):
         except FileExistsError:
             pass
 
-        start_file_logger("{}/interchange.log".format(self.logdir), level=logging_level)
-        logger.info("logger location {}".format(logger.handlers))
+        start_file_logger("{}/interchange.log".format(self.logdir),
+                          level=logging_level,
+                          max_bytes=config.log_max_bytes,
+                          backup_count=config.log_backup_count)
+        logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
+                                                                                              config.log_max_bytes,
+                                                                                              config.log_backup_count))
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -236,6 +243,8 @@ class Interchange(object):
                                "--hb_threshold={heartbeat_threshold} "
                                "--worker_mode={worker_mode} "
                                "--scheduler_mode={scheduler_mode} "
+                               "--log_max_bytes={log_max_bytes} "
+                               "--log_backup_count={log_backup_count} "
                                "--worker_type={{worker_type}} ")
 
         self.current_platform = {'parsl_v': PARSL_VERSION,
@@ -292,7 +301,9 @@ class Interchange(object):
                                        poll_period=self.config.poll_period,
                                        worker_mode=self.config.worker_mode,
                                        scheduler_mode=self.config.scheduler_mode,
-                                       logdir=working_dir)
+                                       logdir=working_dir,
+                                       log_max_bytes=self.config.log_max_bytes,
+                                       log_backup_count=self.config.log_backup_count)
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))
 
@@ -867,7 +878,12 @@ class Interchange(object):
         return status
 
 
-def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_string=None):
+def start_file_logger(filename,
+                      name="interchange",
+                      level=logging.DEBUG,
+                      format_string=None,
+                      max_bytes=256*1024*1024,
+                      backup_count=1):
     """Add a stream log handler.
 
     Parameters
@@ -882,6 +898,10 @@ def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_
         - format_string (string): Set the format string
     format_string: string
         Format string to use.
+    max_bytes: float
+        The maximum bytes per logger file, default: 256MB
+    backup_count: int
+        The number of backup (must be non-zero) per logger file, default: 1
 
     Returns
     -------
@@ -894,7 +914,7 @@ def start_file_logger(filename, name="interchange", level=logging.DEBUG, format_
     logger = logging.getLogger(name)
     logger.setLevel(level)
     if not len(logger.handlers):
-        handler = logging.FileHandler(filename)
+        handler = RotatingFileHandler(filename, maxBytes=max_bytes, backupCount=backup_count)
         handler.setLevel(level)
         formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
         handler.setFormatter(formatter)

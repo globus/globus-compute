@@ -544,6 +544,10 @@ def cli_run():
                               "(hard, soft"))
     parser.add_argument("-r", "--result_url", required=True,
                         help="REQUIRED: ZMQ url for posting results")
+    parser.add_argument("--log_max_bytes", default=256*1024*1024,
+                        help="The maximum bytes per logger file in bytes")
+    parser.add_argument("--log_backup_count", default=1,
+                        help="The number of backup (must be non-zero) per logger file")
 
     args = parser.parse_args()
 
@@ -556,7 +560,9 @@ def cli_run():
         global logger
         logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
                                  name='funcx_endpoint',
-                                 level=logging.DEBUG if args.debug is True else logging.INFO)
+                                 level=logging.DEBUG if args.debug is True else logging.INFO,
+                                 max_bytes=float(args.log_max_bytes),
+                                 backup_count=int(args.log_backup_count))
 
         logger.info("Python version: {}".format(sys.version))
         logger.info("Debug logging: {}".format(args.debug))
@@ -573,6 +579,8 @@ def cli_run():
         logger.info("worker_mode: {}".format(args.worker_mode))
         logger.info("scheduler_mode: {}".format(args.scheduler_mode))
         logger.info("worker_type: {}".format(args.worker_type))
+        logger.info("log_max_bytes: {}".format(args.log_max_bytes))
+        logger.info("log_backup_count: {}".format(args.log_backup_count))
 
         manager = Manager(task_q_url=args.task_url,
                           result_q_url=args.result_url,

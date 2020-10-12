@@ -68,6 +68,8 @@ class Config(RepresentationMixin):
                  heartbeat_threshold=120,
                  poll_period=10,
                  # Logging info
+                 log_max_bytes=256*1024*1024,  # in bytes
+                 log_backup_count=1,
                  working_dir=None,
                  worker_debug=False):
         # Scaling mechanics
@@ -96,5 +98,7 @@ class Config(RepresentationMixin):
         self.poll_period = poll_period
 
         # Logging info
+        self.log_max_bytes = log_max_bytes
+        self.log_backup_count = log_backup_count
         self.working_dir = working_dir
         self.worker_debug = worker_debug
