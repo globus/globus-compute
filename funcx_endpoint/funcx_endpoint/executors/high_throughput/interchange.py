@@ -882,7 +882,7 @@ def start_file_logger(filename,
                       name="interchange",
                       level=logging.DEBUG,
                       format_string=None,
-                      max_bytes=256*1024*1024,
+                      max_bytes=256 * 1024 * 1024,
                       backup_count=1):
     """Add a stream log handler.
 

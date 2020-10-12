@@ -544,7 +544,7 @@ def cli_run():
                               "(hard, soft"))
     parser.add_argument("-r", "--result_url", required=True,
                         help="REQUIRED: ZMQ url for posting results")
-    parser.add_argument("--log_max_bytes", default=256*1024*1024,
+    parser.add_argument("--log_max_bytes", default=256 * 1024 * 1024,
                         help="The maximum bytes per logger file in bytes")
     parser.add_argument("--log_backup_count", default=1,
                         help="The number of backup (must be non-zero) per logger file")
