@@ -141,7 +141,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         else:
             r_dict = return_msg
 
-        r_status = r_dict['status']
+        r_status = r_dict.get('status', 'unknown')
         status = {'pending': True,
                   'status': r_status}
 
