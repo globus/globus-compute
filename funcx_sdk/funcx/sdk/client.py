@@ -149,7 +149,9 @@ class FuncXClient(throttling.ThrottledBaseClient):
         else:
             r_dict = return_msg
 
-        status = {'pending': True}
+        r_status = r_dict.get('status', 'unknown')
+        status = {'pending': True,
+                  'status': r_status}
 
         if 'result' in r_dict:
             try:
@@ -219,7 +221,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         """
         task = self.get_task(task_id)
         if task['pending'] is True:
-            raise Exception("Task pending")
+            raise Exception(task['status'])
         else:
             if 'result' in task:
                 return task['result']
