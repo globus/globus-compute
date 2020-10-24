@@ -340,7 +340,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         r = self.post(servable_path, json_body=data)
         if r.http_status != 200:
             raise HTTPError(r)
-        if r.get("status", "Failure") == "Failure":
+        if r.get("status", "Failed") == "Failed":
             raise MalformedResponse("FuncX Request failed: {}".format(r.get("reason", "Unknown")))
         return r['task_uuids']
 
@@ -386,7 +386,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         if r.http_status != 200:
             raise Exception(r)
 
-        if r.get("status", "Failure") == "Failure":
+        if r.get("status", "Failed") == "Failed":
             raise MalformedResponse("FuncX Request failed: {}".format(r.get("reason", "Unknown")))
         return r['task_uuids']
 
