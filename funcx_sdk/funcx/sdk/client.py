@@ -39,6 +39,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
                  force_login=False, fx_authorizer=None, search_authorizer=None,
                  openid_authorizer=None,
+                 need_transfer=False,
                  funcx_service_address='https://api.funcx.org/v1',
                  **kwargs):
         """ Initialize the client
@@ -85,7 +86,10 @@ class FuncXClient(throttling.ThrottledBaseClient):
         # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
         fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
         search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
+        transfer_scope = 'urn:globus:auth:scope:transfer.api.globus.org:all'
         scopes = [fx_scope, search_scope, "openid"]
+        if need_transfer:
+            scopes.append(transfer_scope)
 
         if not fx_authorizer or not search_authorizer or not openid_authorizer:
             self.native_client.login(requested_scopes=scopes,

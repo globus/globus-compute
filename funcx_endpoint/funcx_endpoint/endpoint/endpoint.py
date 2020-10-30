@@ -230,7 +230,7 @@ def start_endpoint(
     endpoint_uuid : str
     """
 
-    funcx_client = FuncXClient()
+    funcx_client = FuncXClient(need_transfer=True)
 
     endpoint_dir = os.path.join(State.FUNCX_DIR, name)
     endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
