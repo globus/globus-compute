@@ -26,6 +26,7 @@ class GlobusTransferClient:
     def __init__(self,
                  local_path='.',
                  dst_ep=None,
+                 funcx_ep_id=None,
                  sync_level='checksum',
                  **kwargs):
         """ Initialize a globus transfer client
@@ -58,6 +59,7 @@ class GlobusTransferClient:
         os.makedirs(self.local_path, exist_ok=True)
         logger.info("Local globus data path {} created.".format(self.local_path))
         self.dst_ep = dst_ep
+        self.funcx_ep_id = funcx_ep_id
 
         self.sync_level = sync_level
         logger.info("Initiated Globus transfer client for EP {} with local data path {}".format(
@@ -66,7 +68,7 @@ class GlobusTransferClient:
     def transfer(self, src_ep, src_path, basename, recursive=False):
         tdata = globus_sdk.TransferData(self.transfer_client,
                                         src_ep, self.dst_ep,
-                                        label='FuncX Endpoint Transfer',
+                                        label='Transfer on funcX Endpoint {}'.format(self.funcx_ep_id),
                                         sync_level=self.sync_level)
 
         dst_path = "{}/{}".format(self.local_path, basename)

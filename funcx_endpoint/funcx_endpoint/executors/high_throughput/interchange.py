@@ -220,7 +220,8 @@ class Interchange(object):
             if self.globus_data_path is None:
                 self.globus_data_path = "{}/data/".format(self.logdir)
             self.gtc = GlobusTransferClient(dst_ep=self.config.globus_ep_id,
-                                            local_path=self.globus_data_path)
+                                            local_path=self.globus_data_path,
+                                            funcx_ep_id=endpoint_id)
 
         self.globus_polling_interval = self.config.globus_polling_interval
         self.active_transfers = {}
