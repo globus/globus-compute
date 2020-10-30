@@ -70,7 +70,7 @@ class GlobusTransferClient:
                                         sync_level=self.sync_level)
 
         dst_path = "{}/{}".format(self.local_path, basename)
-        tdata.add_item(src_path, dst_path, recursive=True)
+        tdata.add_item(src_path, dst_path, recursive=recursive)
         transfer_result = None
         try:
             task = self.transfer_client.submit_transfer(tdata)

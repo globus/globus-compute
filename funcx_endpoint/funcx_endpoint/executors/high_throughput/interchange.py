@@ -417,6 +417,7 @@ class Interchange(object):
                 continue
             else:
                 data_url = msg['task_id'].split(";")[3]
+                recursive = True if msg['task_id'].split(";")[4] == 'True' else False
 
             try:
                 parsed_url = urlparse(data_url)
@@ -428,7 +429,7 @@ class Interchange(object):
                 self.failed_transfer_tasks[msg['task_id']] = GlobusTransferFailure(e)
             else:
                 try:
-                    info = self.gtc.transfer(src_ep, src_path, basename)
+                    info = self.gtc.transfer(src_ep, src_path, basename, recursive=recursive)
                 except Exception as e:
                     logger.exception("[TRANSFER_SUBMIT_THREAD] Failed to submit transfer for task {}".format(msg['task_id']))
                     self.failed_transfer_tasks[msg['task_id']] = GlobusTransferFailure(e)
