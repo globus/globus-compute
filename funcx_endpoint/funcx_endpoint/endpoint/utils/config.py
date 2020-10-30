@@ -43,6 +43,15 @@ class Config(RepresentationMixin):
         Allow Interchange to manage resource provisioning. If set to False, interchange
         will not do any scaling.
         Default: True
+
+    globus_ep_id : str
+        Globus endpoint ID. Default: None
+
+    globus_polling_interval : float
+        The interval (in seconds) to poll data transfer status. Default: 10, minimum 1
+
+    local_data_path : str
+        The local path to store the data. Default: None
     """
 
     def __init__(self,
@@ -71,7 +80,11 @@ class Config(RepresentationMixin):
                  log_max_bytes=256 * 1024 * 1024,  # in bytes
                  log_backup_count=1,
                  working_dir=None,
-                 worker_debug=False):
+                 worker_debug=False,
+                 # Globus transfer info
+                 globus_ep_id=None,
+                 globus_polling_interval=10,
+                 local_data_path=None):
         # Scaling mechanics
         self.provider = provider
         self.scaling_enabled = scaling_enabled
@@ -102,3 +115,8 @@ class Config(RepresentationMixin):
         self.log_backup_count = log_backup_count
         self.working_dir = working_dir
         self.worker_debug = worker_debug
+
+        # Globus transfer info
+        self.globus_ep_id = globus_ep_id
+        self.globus_polling_interval = globus_polling_interval
+        self.local_data_path = local_data_path
