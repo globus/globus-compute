@@ -21,6 +21,7 @@ from logging.handlers import RotatingFileHandler
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
+from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
@@ -44,6 +45,9 @@ class ShutdownRequest(Exception):
     def __repr__(self):
         return "Shutdown request received at {}".format(self.tstamp)
 
+    def __str__(self):
+        return self.__repr__()
+
 
 class ManagerLost(Exception):
     """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
@@ -55,7 +59,10 @@ class ManagerLost(Exception):
         self.tstamp = time.time()
 
     def __repr__(self):
-        return "Task failure due to loss of worker {}".format(self.worker_id)
+        return "Task failure due to loss of manager {}".format(self.worker_id)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class GlobusTransferFailure(Exception):
@@ -82,6 +89,9 @@ class BadRegistration(Exception):
     def __repr__(self):
         return "Manager:{} caused a {} failure".format(self.worker_id,
                                                        self.handled)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class Interchange(object):
@@ -866,10 +876,13 @@ class Interchange(object):
                 e = ManagerLost(manager)
                 for task_type in self._ready_manager_queue[manager]['tasks']:
                     for tid in self._ready_manager_queue[manager]['tasks'][task_type]:
-                        result_package = {'task_id': tid, 'exception': self.serializer.serialize(e)}
-                        pkl_package = pickle.dumps(result_package)
-                        bad_manager_msgs.append(pkl_package)
-                logger.warning("[MAIN] Sent failure reports, unregistering manager")
+                        try:
+                            raise ManagerLost(manager)
+                        except Exception:
+                            result_package = {'task_id': tid, 'exception': self.serializer.serialize(RemoteExceptionWrapper(*sys.exc_info()))}
+                            pkl_package = pickle.dumps(result_package)
+                            bad_manager_msgs.append(pkl_package)
+                logger.warning("[MAIN] Sent failure reports, unregistering manager {}".format(manager))
                 self._ready_manager_queue.pop(manager, 'None')
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
