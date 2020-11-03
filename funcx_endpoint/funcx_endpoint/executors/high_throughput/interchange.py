@@ -20,6 +20,7 @@ from logging.handlers import RotatingFileHandler
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
+from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat, \
     TaskStatusCode
@@ -42,6 +43,9 @@ class ShutdownRequest(Exception):
     def __repr__(self):
         return "Shutdown request received at {}".format(self.tstamp)
 
+    def __str__(self):
+        return self.__repr__()
+
 
 class ManagerLost(Exception):
     """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
@@ -53,7 +57,10 @@ class ManagerLost(Exception):
         self.tstamp = time.time()
 
     def __repr__(self):
-        return "Task failure due to loss of worker {}".format(self.worker_id)
+        return "Task failure due to loss of manager {}".format(self.worker_id)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class BadRegistration(Exception):
@@ -68,6 +75,9 @@ class BadRegistration(Exception):
     def __repr__(self):
         return "Manager:{} caused a {} failure".format(self.worker_id,
                                                        self.handled)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class Interchange(object):
@@ -623,7 +633,7 @@ class Interchange(object):
                                 result_package = {'task_id': -1,
                                                   'exception': self.serializer.serialize(e)}
                                 pkl_package = pickle.dumps(result_package)
-                                self.results_outgoing.send(pkl_package)
+                                self.results_outgoing.send(pickle.dumps([pkl_package]))
                                 logger.warning("[MAIN] Sent failure reports, unregistering manager")
                             else:
                                 logger.debug("[MAIN] Suppressing shutdown due to version incompatibility")
@@ -637,7 +647,7 @@ class Interchange(object):
                             result_package = {'task_id': -1,
                                               'exception': self.serializer.serialize(e)}
                             pkl_package = pickle.dumps(result_package)
-                            self.results_outgoing.send(pkl_package)
+                            self.results_outgoing.send(pickle.dumps([pkl_package]))
                         else:
                             logger.debug("[MAIN] Suppressing bad registration from manager:{}".format(
                                 manager))
@@ -724,19 +734,25 @@ class Interchange(object):
             # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [manager for manager in self._ready_manager_queue if
                             time.time() - self._ready_manager_queue[manager]['last'] > self.heartbeat_threshold]
+            bad_manager_msgs = []
             for manager in bad_managers:
                 logger.debug("[MAIN] Last: {} Current: {}".format(self._ready_manager_queue[manager]['last'], time.time()))
                 logger.warning("[MAIN] Too many heartbeats missed for manager {}".format(manager))
                 e = ManagerLost(manager)
                 for task_type in self._ready_manager_queue[manager]['tasks']:
                     for tid in self._ready_manager_queue[manager]['tasks'][task_type]:
-                        result_package = {'task_id': tid, 'exception': self.serializer.serialize(e)}
-                        pkl_package = pickle.dumps(result_package)
-                        self.results_outgoing.send(pkl_package)
-                logger.warning("[MAIN] Sent failure reports, unregistering manager")
+                        try:
+                            raise ManagerLost(manager)
+                        except Exception:
+                            result_package = {'task_id': tid, 'exception': self.serializer.serialize(RemoteExceptionWrapper(*sys.exc_info()))}
+                            pkl_package = pickle.dumps(result_package)
+                            bad_manager_msgs.append(pkl_package)
+                logger.warning("[MAIN] Sent failure reports, unregistering manager {}".format(manager))
                 self._ready_manager_queue.pop(manager, 'None')
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
+            if bad_manager_msgs:
+                self.results_outgoing.send(pickle.dumps(bad_manager_msgs))
             logger.debug("[MAIN] ending one main loop iteration")
 
             if self._status_request.is_set():
