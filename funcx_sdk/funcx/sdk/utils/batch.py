@@ -1,6 +1,7 @@
 from funcx.serialize import FuncXSerializer
 from funcx.sdk.file import GlobusFile
 
+
 class Batch:
     """Utility class for creating batch submission in funcX"""
 

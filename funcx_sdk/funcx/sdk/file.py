@@ -5,7 +5,7 @@ class GlobusFile:
     """The Globus File Class.
 
     This represents the globus filpath to a file.
-    """    
+    """
     def __init__(self,
                  endpoint,
                  path,

@@ -45,7 +45,7 @@ class GlobusTransferClient:
         self.native_client = NativeClient(client_id=CLIENT_ID,
                                           app_name="funcX data transfer",
                                           token_storage=JSONTokenStorage(TOKEN_LOC))
-        
+
         self.native_client.login(requested_scopes=scopes,
                                  no_local_server=True,
                                  no_browser=True,
@@ -73,7 +73,6 @@ class GlobusTransferClient:
 
         dst_path = "{}/{}".format(self.local_path, basename)
         tdata.add_item(src_path, dst_path, recursive=recursive)
-        transfer_result = None
         try:
             task = self.transfer_client.submit_transfer(tdata)
             logger.info('Submitted Globus transfer from {}{} to {}{}'.format(
@@ -83,7 +82,7 @@ class GlobusTransferClient:
             logger.exception('Globus transfer from {}{} to {}{} failed due to error: {}'.format(
                 src_ep, src_path, self.dst_ep, self.local_path, e))
             raise Exception('Globus transfer from {}{} to {}{} failed due to error: {}'.format(
-                src_ep, src_path, self.dst_ep, self.local_path, e)) 
+                src_ep, src_path, self.dst_ep, self.local_path, e))
 
         return (task, src_ep, src_path, self.dst_ep, dst_path)
 

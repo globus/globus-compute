@@ -503,9 +503,9 @@ class Interchange(object):
                 data_url = msg['task_id'].split(";")[3]
                 if data_url != "None":
                     if not self.data_staging:
-                        logger.exception("[TASK_PULL_THREAD] Destination Globus Endpoint ID not specified. " \
+                        logger.exception("[TASK_PULL_THREAD] Destination Globus Endpoint ID not specified. "
                                          "Please specify it in config")
-                        e = GlobusTransferFailure("Destination Globus Endpoint ID not specified. " \
+                        e = GlobusTransferFailure("Destination Globus Endpoint ID not specified. "
                                                   "Please specify it in config")
                         self.failed_transfer_tasks[msg['task_id']] = GlobusTransferFailure(e)
                     else:
