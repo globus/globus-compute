@@ -76,6 +76,9 @@ class GlobusTransferFailure(Exception):
     def __repr__(self):
         return "Task failure due to {}".format(self.reason)
 
+    def __str__(self):
+        return self.__repr__()
+
 
 class BadRegistration(Exception):
     ''' A new Manager tried to join the executor with a BadRegistration message
@@ -857,12 +860,15 @@ class Interchange(object):
             # Failed transfer task section
             failed_transfer_msgs = []
             for tid, reason in list(self.failed_transfer_tasks.items()):
-                result_package = {'task_id': tid, 'exception': self.serializer.serialize(reason)}
-                pkl_package = pickle.dumps(result_package)
-                failed_transfer_msgs.append(pkl_package)
-                logger.info("[MAIN] Sending result for failed transfer task: {}, result: {}".format(tid, result_package))
-                self.failed_transfer_tasks.pop(tid, 'None')
-                self.total_pending_task_count -= 1
+                try:
+                    raise reason
+                except Exception:
+                    result_package = {'task_id': tid, 'exception': self.serializer.serialize(reason)}
+                    pkl_package = pickle.dumps(result_package)
+                    failed_transfer_msgs.append(pkl_package)
+                    logger.info("[MAIN] Sending result for failed transfer task: {}, result: {}".format(tid, result_package))
+                    self.failed_transfer_tasks.pop(tid, 'None')
+                    self.total_pending_task_count -= 1
             if failed_transfer_msgs:
                 self.results_outgoing.send(pickle.dumps(failed_transfer_msgs))
 
