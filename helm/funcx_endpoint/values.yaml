@@ -11,7 +11,7 @@ image:
 
 workerImage: python:3.6-buster
 workerInit: pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0
-workerNamespace: default
+workerNamespace: parsl
 workingDir: /tmp/worker_logs
 
 rbacEnabled: true
