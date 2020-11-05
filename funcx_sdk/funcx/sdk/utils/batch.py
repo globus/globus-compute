@@ -36,7 +36,8 @@ class Batch:
         """
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
-        assert isinstance(remote_data, GlobusFile), "Please use GlobusFile to define your remote data"
+        if remote_data:
+            assert isinstance(remote_data, GlobusFile), "Please use GlobusFile to define your remote data"
 
         ser_args = self.fx_serializer.serialize(args)
         ser_kwargs = self.fx_serializer.serialize(kwargs)
