@@ -43,7 +43,7 @@ class Batch:
         payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
 
         data_url = remote_data.generate_url() if remote_data else None
-        recursive = remote_data.generate_recursive() if remote_data else False
+        recursive = remote_data.get_recursive() if remote_data else False
 
         data = {'endpoint': endpoint_id,
                 'function': function_id,
