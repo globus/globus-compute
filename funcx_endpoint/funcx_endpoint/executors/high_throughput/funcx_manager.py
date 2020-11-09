@@ -20,6 +20,8 @@ import subprocess
 from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
 from funcx_endpoint.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
+from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
 
 from parsl.version import VERSION as PARSL_VERSION
@@ -314,18 +316,21 @@ class Manager(object):
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
                 poll_timer = 0
                 _, pkl_msg = self.task_incoming.recv_multipart()
-                tasks = pickle.loads(pkl_msg)
+                message = pickle.loads(pkl_msg)
                 last_interchange_contact = time.time()
 
-                if tasks == 'STOP':
+                if message == 'STOP':
                     logger.critical("[TASK_PULL_THREAD] Received stop request")
                     kill_event.set()
                     break
 
-                elif tasks == HEARTBEAT_CODE:
+                elif message == HEARTBEAT_CODE:
                     logger.debug("Got heartbeat from interchange")
 
                 else:
+                    logger.warning("YADU: RAW Tasks {}".format(message))
+                    tasks = [Message.unpack(rt) for rt in message]
+
                     task_recv_counter += len(tasks)
                     logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t.task_id for t in tasks],
                                                                                  task_recv_counter))
@@ -411,10 +416,8 @@ class Manager(object):
                             worker_id = self.worker_map.get_worker(task_type)
 
                             logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
-
-                            #TODO: YADU: Avoid redoing the work
-                            to_send = [worker_id,
-                                       task.pack()]
+                            #TODO: Some duplication of work could be avoided here
+                            to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
                             logger.debug(f"Set task {task.task_id} to RUNNING")
@@ -547,6 +550,10 @@ def cli_run():
                               "(hard, soft"))
     parser.add_argument("-r", "--result_url", required=True,
                         help="REQUIRED: ZMQ url for posting results")
+    parser.add_argument("--log_max_bytes", default=256 * 1024 * 1024,
+                        help="The maximum bytes per logger file in bytes")
+    parser.add_argument("--log_backup_count", default=1,
+                        help="The number of backup (must be non-zero) per logger file")
 
     args = parser.parse_args()
 
@@ -557,8 +564,13 @@ def cli_run():
 
     try:
         global logger
+        # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
         logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
-                                 level=logging.DEBUG if args.debug is True else logging.INFO)
+                                 name='funcx_manager',
+                                 level=logging.DEBUG if args.debug is True else logging.INFO,
+                                 # max_bytes=float(args.log_max_bytes),
+                                 # backup_count=int(args.log_backup_count))
+                                 )
 
         logger.info("Python version: {}".format(sys.version))
         logger.info("Debug logging: {}".format(args.debug))
@@ -575,6 +587,8 @@ def cli_run():
         logger.info("worker_mode: {}".format(args.worker_mode))
         logger.info("scheduler_mode: {}".format(args.scheduler_mode))
         logger.info("worker_type: {}".format(args.worker_type))
+        logger.info("log_max_bytes: {}".format(args.log_max_bytes))
+        logger.info("log_backup_count: {}".format(args.log_backup_count))
 
         manager = Manager(task_q_url=args.task_url,
                           result_q_url=args.result_url,

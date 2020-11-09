@@ -10,7 +10,8 @@ from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx.utils.loggers import set_file_logger
 from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors.high_throughput.messages import Message, Task
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
+
 
 class FuncXWorker(object):
     """ The FuncX worker
@@ -45,7 +46,7 @@ class FuncXWorker(object):
         self.address = address
         self.port = port
         self.logdir = logdir
-        self.debug = True  #YADU : DEBUG FIX THIS.
+        self.debug = debug
         self.worker_type = worker_type
         self.serializer = FuncXSerializer()
         self.serialize = self.serializer.serialize
@@ -96,14 +97,13 @@ class FuncXWorker(object):
                 # Kill the worker after accepting death in message to manager.
                 exit()
 
-            try:
-                logger.debug("Waiting for task")
-                msg = self.task_socket.recv_multipart()
-                task = Message.unpack(msg[0])
-                logger.info(f"DEBUG: YADU: received tid {task.task_id}")
-            except Exception:
-                logger.exception("Unpacking failed. Critical")
-                continue
+            logger.debug("Waiting for task")
+            p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
+            task_id = pickle.loads(p_task_id)
+            container_id = pickle.loads(p_container_id)
+            logger.warning(f"YADU: DEBUG task_id:{task_id} msg:{msg}")
+            logger.debug(
+                "Received task_id:{} with task:{}".format(task_id, msg))
 
             if msg == b"KILL":
                 logger.info("[KILL] -- Worker KILL message received! ")
@@ -111,23 +111,22 @@ class FuncXWorker(object):
                 result = None
                 continue
 
-            logger.info("Executing task...")
+            logger.debug("Executing task...")
 
             try:
-                result = self.execute_task(task.task_buffer)
+                result = self.execute_task(msg)
                 serialized_result = self.serialize(result)
             except Exception as e:
                 logger.exception(f"Caught an exception {e}")
-                result_package = {'task_id': task.task_id,
-                                  'container_id': task.container_id,
+                result_package = {'task_id': task_id,
+                                  'container_id': container_id,
                                   'exception': self.serialize(
                     RemoteExceptionWrapper(*sys.exc_info()))}
             else:
-                logger.info("Execution completed without exception")
-                result_package = {'task_id': task.task_id,
-                                  'container_id': task.container_id,
+                logger.debug("Execution completed without exception")
+                result_package = {'task_id': task_id,
+                                  'container_id': container_id,
                                   'result': serialized_result}
-
             result = result_package
             task_type = b'TASK_RET'
 
@@ -138,13 +137,8 @@ class FuncXWorker(object):
 
         Returns the result or throws exception.
         """
-
-        user_ns = locals()
-        user_ns.update({'__builtins__': __builtins__})
-
-        # decoded = message.decode()
-        f, args, kwargs = self.serializer.unpack_and_deserialize(message)
-
+        task = Message.unpack(message)
+        f, args, kwargs = self.serializer.unpack_and_deserialize(task.task_buffer.decode('utf-8'))
         return f(*args, **kwargs)
 
 
