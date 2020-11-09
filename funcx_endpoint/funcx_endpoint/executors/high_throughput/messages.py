@@ -84,28 +84,28 @@ class Task(Message):
     """
     type = MessageType.TASK
 
-    def __init__(self, task_id : str, container_id : str, task_buffer : str):
+    def __init__(self, task_id : str, container_id : str, task_buffer : str, raw_buffer=None):
         super().__init__()
         self.task_id = task_id
         self.container_id = container_id
         self.task_buffer = task_buffer
-
-    @classmethod
-    def unpack(cls, msg):
-        endpoint_id = str(uuid.UUID(bytes=msg[:16]))
-        msg = msg[16:]
-        jsonified = msg.decode("ascii")
-        ep_status, task_statuses = json.loads(jsonified)
-        return cls(endpoint_id, ep_status, task_statuses)
+        self.raw_buffer = raw_buffer
 
     def pack(self) -> bytes:
-        add_ons = f'TID={self.task_id};CID={self.container_id};{self.task_buffer}'
-        return self.type.pack() + add_ons.encode('utf-8')
+
+        if self.raw_buffer is None:
+            add_ons = f'TID={self.task_id};CID={self.container_id};{self.task_buffer}'
+            self.raw_buffer = add_ons.encode('utf-8')
+
+        return self.type.pack() + self.raw_buffer
 
     @classmethod
-    def unpack(cls, msg: bytes):
-        b_tid, b_cid, task_buf = msg.decode('utf-8').split(';', 2)
-        return cls(b_tid[4:], b_cid[4:], task_buf)
+    def unpack(cls, raw_buffer: bytes):
+        b_tid, b_cid, task_buf = raw_buffer.decode('utf-8').split(';', 2)
+        return cls(b_tid[4:], b_cid[4:], task_buf.encode('utf-8'), raw_buffer=raw_buffer)
+
+    def set_local_container(self, container_id):
+        self.local_container = container_id
 
 
 class HeartbeatReq(Message):
