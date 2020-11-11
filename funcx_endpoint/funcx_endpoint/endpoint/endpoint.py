@@ -304,13 +304,7 @@ def start_endpoint(
                                              State.FUNCX_CONFIG['broker_address'],
                                              State.FUNCX_CONFIG['redis_host'])
             else:
-                metadata = None
-                try:
-                    metadata = endpoint_config.meta
-                except AttributeError:
-                    logger.info("Did not find associated endpoint metadata")
-
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, metadata, endpoint_dir)
+                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
 
             logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
@@ -333,15 +327,10 @@ def start_endpoint(
             logger.critical("Interchange terminated.")
             time.sleep(10)
 
-    stdout.close()
-    stderr.close()
-
-    logger.critical(f"Shutting down endpoint {endpoint_uuid}")
-
 
 # Avoid a race condition when starting the endpoint alongside the web service
 @retry(delay=5, logger=logging.getLogger('funcx'))
-def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, metadata, endpoint_dir):
+def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """Register the endpoint and return the registration info.
 
     Parameters
