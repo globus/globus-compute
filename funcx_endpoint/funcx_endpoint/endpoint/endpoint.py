@@ -18,6 +18,7 @@ import psutil
 import requests
 import texttable as tt
 import typer
+from retry import retry
 
 import funcx
 from funcx.utils.errors import *
@@ -248,7 +249,6 @@ def start_endpoint(
                                        os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
 
     funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
-    print(funcx_client)
 
     # If pervious registration info exists, use that
     if os.path.exists(endpoint_json):
@@ -300,6 +300,7 @@ def start_endpoint(
                     metadata = endpoint_config.meta
                 except AttributeError:
                     logger.info("Did not find associated endpoint metadata")
+
                 reg_info = register_endpoint(funcx_client, name, endpoint_uuid, metadata, endpoint_dir)
 
             logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
@@ -329,6 +330,8 @@ def start_endpoint(
     logger.critical(f"Shutting down endpoint {endpoint_uuid}")
 
 
+# Avoid a race condition when starting the endpoint alongside the web service
+@retry(delay=5, logger=logging.getLogger('funcx'))
 def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, metadata, endpoint_dir):
     """Register the endpoint and return the registration info.
 
