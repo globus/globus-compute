@@ -11,3 +11,4 @@ fair_research_login
 dill>=0.3
 typer>=0.3.0
 funcx>=0.0.3
+retry
