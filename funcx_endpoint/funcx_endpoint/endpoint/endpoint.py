@@ -262,16 +262,25 @@ def start_endpoint(
     logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
     # Create a daemon context
-    stdout = open(os.path.join(endpoint_dir, './interchange.stdout'), 'w+')
-    stderr = open(os.path.join(endpoint_dir, './interchange.stderr'), 'w+')
+    # If we are running a full detached daemon then we will send the output to
+    # log files, otherwise we can piggy back on our stdout
+    if endpoint_config.config.detach_endpoint:
+        stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'w+')
+        stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'w+')
+    else:
+        stdout = sys.stdout
+        stderr = sys.stderr
+
     try:
         context = daemon.DaemonContext(working_directory=endpoint_dir,
                                        umask=0o002,
                                        # lockfile.FileLock(
-                                       pidfile=daemon.pidfile.PIDLockFile(os.path.join(endpoint_dir,
-                                                                                       'daemon.pid')),
+                                       pidfile=daemon.pidfile.PIDLockFile(
+                                           os.path.join(endpoint_dir,
+                                                        'daemon.pid')),
                                        stdout=stdout,
                                        stderr=stderr,
+                                       detach_process=endpoint_config.config.detach_endpoint
                                        )
     except Exception as e:
         logger.critical("Caught exception while trying to setup endpoint context dirs")
@@ -287,7 +296,7 @@ def start_endpoint(
     with context:
         while True:
             # Register the endpoint
-            logger.debug("Registering endpoint")
+            logger.info("Registering endpoint")
             if State.FUNCX_CONFIG.get('broker_test', False) is True:
                 logger.warning("**************** BROKER State.DEBUG MODE *******************")
                 reg_info = register_with_hub(endpoint_uuid,
