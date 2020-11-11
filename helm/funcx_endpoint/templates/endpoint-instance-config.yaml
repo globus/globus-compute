@@ -33,7 +33,8 @@ data:
         heartbeat_period=15,
         heartbeat_threshold=200,
         working_dir='{{ .Values.workingDir }}',
-        funcx_service_address="{{ .Values.funcXServiceAddress }}/v1"
+        funcx_service_address="{{ .Values.funcXServiceAddress }}/v1",
+        detach_endpoint=False
     )
 
     # For now, visible_to must be a list of URNs for globus auth users or groups, e.g.:
