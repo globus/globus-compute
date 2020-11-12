@@ -89,7 +89,8 @@ class Config(RepresentationMixin):
                  worker_debug=False,
                  stdout="./interchange.stdout",
                  stderr="./interchange.stderr",
-                 detach_endpoint=True):
+                 detach_endpoint=True,
+                 interchange_file_logger=True):
         # Scaling mechanics
         self.provider = provider
         self.scaling_enabled = scaling_enabled
@@ -122,6 +123,7 @@ class Config(RepresentationMixin):
         self.worker_debug = worker_debug
         self.stdout = stdout
         self.stderr = stderr
+        self.interchange_file_logger = interchange_file_logger
 
         # Endpoint behavior
         self.detach_endpoint = detach_endpoint
