@@ -143,9 +143,9 @@ class Interchange(object):
              When set to True, the interchange will attempt to suppress failures. Default: False
         """
 
+        self.logdir = logdir
         if config.interchange_file_logger:
             logpath = "{}/interchange.log".format(self.logdir)
-            self.logdir = logdir
             try:
                 os.makedirs(self.logdir)
             except FileExistsError:
