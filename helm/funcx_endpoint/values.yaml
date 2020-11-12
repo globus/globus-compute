@@ -10,7 +10,7 @@ image:
   pullPolicy: IfNotPresent
 
 workerImage: python:3.6-buster
-workerInit: pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0
+workerInit: pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0 funcx-endpoint>=0.0.3
 workerNamespace: default
 workingDir: /tmp/worker_logs
 
