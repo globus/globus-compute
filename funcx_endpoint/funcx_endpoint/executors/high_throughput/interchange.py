@@ -142,19 +142,22 @@ class Interchange(object):
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
         """
-        self.logdir = logdir
-        try:
-            os.makedirs(self.logdir)
-        except FileExistsError:
-            pass
 
-        start_file_logger("{}/interchange.log".format(self.logdir),
+        if config.interchange_file_logger:
+            logpath = "{}/interchange.log".format(self.logdir)
+            self.logdir = logdir
+            try:
+                os.makedirs(self.logdir)
+            except FileExistsError:
+                pass
+        else:
+            logpath = None
+
+        start_file_logger(logpath,
                           level=logging_level,
                           max_bytes=config.log_max_bytes,
                           backup_count=config.log_backup_count)
-        logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
-                                                                                              config.log_max_bytes,
-                                                                                              config.log_backup_count))
+
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -171,7 +174,7 @@ class Interchange(object):
         self.last_heartbeat = time.time()
 
         self.serializer = FuncXSerializer()
-        logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
+        logger.info("Attempting connection to forwarder at {} on ports: {},{},{}".format(
             client_address, client_ports[0], client_ports[1], client_ports[2]))
         self.context = zmq.Context()
         self.task_incoming = self.context.socket(zmq.DEALER)
@@ -190,7 +193,7 @@ class Interchange(object):
         # self.command_channel.set_hwm(0)
         logger.info("Command channel on tcp://{}:{}".format(client_address, client_ports[2]))
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
-        logger.info("Connected to client")
+        logger.info("Connected to forwarder")
 
         self.pending_task_queue = {}
         self.containers = {}
@@ -375,7 +378,7 @@ class Interchange(object):
                 kill_event.set()
                 break
             elif isinstance(msg, Heartbeat):
-                logger.info("Got heartbeat")
+                logger.debug("Got heartbeat")
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
                 task_type = self.get_container(msg['task_id'].split(";")[1])
@@ -480,7 +483,7 @@ class Interchange(object):
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.info("[STATUS] Sending status report to forwarder, and clearing task deltas.")
+            logger.debug("[STATUS] Sending status report to forwarder, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
@@ -685,14 +688,16 @@ class Interchange(object):
                     try:
                         logger.debug("[MAIN] Trying to unpack ")
                         manager_report = Message.unpack(b_messages[0])
-                        logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
+                        if manager_report.task_statuses:
+                            logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
                         self.task_status_deltas.update(manager_report.task_statuses)
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                         b_messages = b_messages[1:]
                         self._ready_manager_queue[manager]['last'] = time.time()
                     except Exception:
                         pass
-                    logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
+                    if len(b_messages):
+                        logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
@@ -890,7 +895,8 @@ def start_file_logger(filename,
     ---------
 
     filename: string
-        Name of the file to write logs to. Required.
+        Name of the file to write logs to. Set to None to have interchange logging
+        merged in with endpoint logging.
     name: string
         Logger name. Default="parsl.executors.interchange"
     level: logging.LEVEL
@@ -898,7 +904,7 @@ def start_file_logger(filename,
         - format_string (string): Set the format string
     format_string: string
         Format string to use.
-    max_bytes: float
+    max_bytes: int
         The maximum bytes per logger file, default: 256MB
     backup_count: int
         The number of backup (must be non-zero) per logger file, default: 1
@@ -913,12 +919,23 @@ def start_file_logger(filename,
     global logger
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    if not len(logger.handlers):
-        handler = RotatingFileHandler(filename, maxBytes=max_bytes, backupCount=backup_count)
+    formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
+
+    if not filename:
+        handler = logging.StreamHandler()
         handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+    elif not len(logger.handlers):
+        handler = RotatingFileHandler(filename,
+                                      maxBytes=max_bytes,
+                                      backupCount=backup_count)
+        handler.setLevel(level)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.info(
+            "logger location {}, logger filesize: {}, logger backup count: {}".format(
+                logger.handlers, max_bytes, backup_count))
 
 
 def starter(comm_q, *args, **kwargs):
