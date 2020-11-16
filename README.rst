@@ -16,7 +16,7 @@ on existing infrastructure including clouds, clusters, and supercomputers.
    :target: https://funcx.readthedocs.io/en/latest/
    :alt: Documentation Status
 .. |launch| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2FTutorial.ipynb
+   :target: https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb
    :alt: Launch in Binder
 .. |NSF-2004894| image:: https://img.shields.io/badge/NSF-2004894-blue.svg
    :target: https://nsf.gov/awardsearch/showAward?AWD_ID=2004894
