@@ -863,7 +863,7 @@ class Interchange(object):
                 try:
                     raise reason
                 except Exception:
-                    result_package = {'task_id': tid, 'exception': self.serializer.serialize(reason)}
+                    result_package = {'task_id': tid, 'exception': self.serializer.serialize(RemoteExceptionWrapper(*sys.exc_info()))}
                     pkl_package = pickle.dumps(result_package)
                     failed_transfer_msgs.append(pkl_package)
                     logger.info("[MAIN] Sending result for failed transfer task: {}, result: {}".format(tid, result_package))
