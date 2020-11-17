@@ -2,6 +2,7 @@ from funcx_endpoint.endpoint.utils.config import Config
 from parsl.providers import LocalProvider
 
 config = Config(
+    executors=[],
     scaling_enabled=True,
     provider=LocalProvider(
         init_blocks=1,
