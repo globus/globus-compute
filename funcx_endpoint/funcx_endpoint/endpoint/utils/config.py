@@ -1,7 +1,7 @@
 from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
 from funcx_endpoint.strategies.simple import SimpleStrategy
-
+from funcx_endpoint.executors import HighThroughputExecutor
 
 class Config(RepresentationMixin):
     """ Specification of FuncX configuration options.
@@ -46,6 +46,10 @@ class Config(RepresentationMixin):
     """
 
     def __init__(self,
+
+                 # Execution backed
+                 executors: list=[HighThroughputExecutor()],
+
                  # Scaling mechanics
                  provider=LocalProvider(),
                  scaling_enabled=True,
@@ -53,12 +57,7 @@ class Config(RepresentationMixin):
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  funcx_service_address='https://api.funcx.org/v1',
-                 # Scaling info
-                 strategy=SimpleStrategy(),
-                 max_workers_per_node=float('inf'),
-                 cores_per_worker=1.0,
-                 mem_per_worker=None,
-                 launch_cmd=None,
+
                  # Tuning info
                  worker_mode='no_container',
                  scheduler_mode='hard',
@@ -69,7 +68,13 @@ class Config(RepresentationMixin):
                  poll_period=10,
                  # Logging info
                  working_dir=None,
+                 log_max_bytes=256 * (10 ** 6),
+                 log_backup_count=1,
                  worker_debug=False):
+
+        # Execution backends
+        self.executors = executors # List of executors
+
         # Scaling mechanics
         self.provider = provider
         self.scaling_enabled = scaling_enabled
@@ -78,13 +83,6 @@ class Config(RepresentationMixin):
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
         self.funcx_service_address = funcx_service_address
-
-        # Scaling info
-        self.strategy = strategy
-        self.max_workers_per_node = max_workers_per_node
-        self.cores_per_worker = cores_per_worker
-        self.mem_per_worker = mem_per_worker
-        self.launch_cmd = launch_cmd
 
         # Tuning info
         self.worker_mode = worker_mode
@@ -98,3 +96,5 @@ class Config(RepresentationMixin):
         # Logging info
         self.working_dir = working_dir
         self.worker_debug = worker_debug
+        self.log_max_bytes = log_max_bytes
+        self.log_backup_count = log_backup_count
