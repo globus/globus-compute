@@ -84,12 +84,13 @@ class Task(Message):
     """
     type = MessageType.TASK
 
-    def __init__(self, task_id : str, container_id : str, task_buffer : str, raw_buffer=None):
+    def __init__(self, task_id: str, container_id: str, task_buffer: str, raw_buffer=None):
         super().__init__()
         self.task_id = task_id
         self.container_id = container_id
         self.task_buffer = task_buffer
         self.raw_buffer = raw_buffer
+
 
     def pack(self) -> bytes:
 
