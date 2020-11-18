@@ -15,8 +15,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     config = Config()
 
-    ic = Interchange(config,
-                     client_address=args.address,
+    ic = Interchange(client_address=args.address,
                      client_ports=[int(i) for i in args.client_ports.split(',')],
                       )
     ic.start()
