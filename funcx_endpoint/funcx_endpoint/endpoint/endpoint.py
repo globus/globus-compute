@@ -20,12 +20,14 @@ import texttable as tt
 import typer
 
 import funcx
+import zmq
+
 from funcx.utils.errors import *
 from funcx_endpoint.executors.high_throughput import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
-from funcx_endpoint.executors.high_throughput.interchange import Interchange
+from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx.sdk.client import FuncXClient
-
+from funcx_endpoint import server_certs
 
 FUNCX_CONFIG_FILE_NAME = 'config.py'
 
@@ -103,6 +105,12 @@ def init_endpoint_dir(endpoint_name, endpoint_config=None):
     with open(endpoint_config_target_file, "w") as w:
         w.write(endpoint_config_template)
 
+    cert_dir = os.path.join(endpoint_dir, 'certificates')
+    logger.debug(f"Copying over certificates to {cert_dir}")
+    for cpaths in server_certs.__path__:
+        print(f"Copying from {cpaths}")
+        shutil.copytree(cpaths, cert_dir)
+
     return endpoint_dir
 
 
@@ -144,6 +152,7 @@ def init_endpoint():
 
 
 def register_with_hub(endpoint_uuid, endpoint_dir, address,
+                      client_public_key=None,
                       redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
     """ This currently registers directly with the Forwarder micro service.
 
@@ -159,6 +168,7 @@ def register_with_hub(endpoint_uuid, endpoint_dir, address,
         r = requests.post(address + '/register',
                           json={'endpoint_id': endpoint_uuid,
                                 'endpoint_addr': ip_addr,
+                                'client_public_key': client_public_key,
                                 'redis_address': redis_host})
     except requests.exceptions.ConnectionError:
         logger.critical("Unable to reach the funcX hub at {}".format(address))
@@ -220,8 +230,8 @@ def start_endpoint(
           1     4                 6
           |     v                 |
     +-----+-----+-----+           v
-    |      Start      |---5---> Interchange
-    |     Endpoint    |        daemon
+    |      Start      |---5---> EndpointInterchange
+    |     Endpoint    |         daemon
     +-----------------+
 
     Parameters
@@ -244,8 +254,19 @@ def start_endpoint(
         '''.format(name))
         return
 
+    # These certs need to be recreated for every registration
+    keys_dir = os.path.join(endpoint_dir, 'certificates')
+    os.makedirs(keys_dir, exist_ok=True)
+    client_public_file, client_secret_file = zmq.auth.create_certificates(keys_dir, "endpoint")
+    client_public_key, _ = zmq.auth.load_certificate(client_public_file)
+    client_public_key = client_public_key.decode('utf-8')
+
     endpoint_config = SourceFileLoader('config',
                                        os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
+
+    # This is to ensure that at least 1 executor is defined
+    if not endpoint_config.config.executors:
+        raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
     funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
     print(funcx_client)
@@ -288,12 +309,14 @@ def start_endpoint(
         while True:
             # Register the endpoint
             logger.debug("Registering endpoint")
+            print("Registering")
             if State.FUNCX_CONFIG.get('broker_test', False) is True:
                 logger.warning("**************** BROKER State.DEBUG MODE *******************")
                 reg_info = register_with_hub(endpoint_uuid,
                                              endpoint_dir,
                                              State.FUNCX_CONFIG['broker_address'],
-                                             State.FUNCX_CONFIG['redis_host'])
+                                             client_public_key=client_public_key,
+                                             redis_host=State.FUNCX_CONFIG['redis_host'])
             else:
                 metadata = None
                 try:
@@ -306,8 +329,8 @@ def start_endpoint(
 
             # Configure the parameters for the interchange
             optionals = {}
-            optionals['client_address'] = reg_info['address']
-            optionals['client_ports'] = reg_info['client_ports'].split(',')
+            optionals['client_address'] = reg_info['public_ip']
+            optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
             if 'endpoint_address' in State.FUNCX_CONFIG:
                 optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
 
@@ -316,7 +339,10 @@ def start_endpoint(
             if State.DEBUG:
                 optionals['logging_level'] = logging.DEBUG
 
-            ic = Interchange(endpoint_config.config, endpoint_id=endpoint_uuid, **optionals)
+            ic = EndpointInterchange(endpoint_config.config,
+                                     endpoint_id=endpoint_uuid,
+                                     keys_dir=keys_dir,
+                                     **optionals)
             ic.start()
             ic.stop()
 
