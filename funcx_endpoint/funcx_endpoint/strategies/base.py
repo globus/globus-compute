@@ -72,11 +72,11 @@ class BaseStrategy(object):
             Interchange to bind the strategy to
         """
         self.interchange = interchange
-        if hasattr(interchange.config, 'provider'):
+        if hasattr(interchange, 'provider'):
             logger.debug("Strategy bounds-> init:{}, min:{}, max:{}".format(
-                interchange.config.provider.init_blocks,
-                interchange.config.provider.min_blocks,
-                interchange.config.provider.max_blocks))
+                interchange.provider.init_blocks,
+                interchange.provider.min_blocks,
+                interchange.provider.max_blocks))
         self._thread.start()
 
     def strategize(self, *args, **kwargs):
