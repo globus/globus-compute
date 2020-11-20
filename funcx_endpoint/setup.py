@@ -2,7 +2,7 @@ import os
 from setuptools import setup, find_namespace_packages
 
 version_ns = {}
-with open(os.path.join("funcx_endpoint", "endpoint", "version.py")) as f:
+with open(os.path.join("funcx_endpoint", "version.py")) as f:
     exec(f.read(), version_ns)
 version = version_ns['VERSION']
 
@@ -37,6 +37,10 @@ setup(
                    'funcx-worker=funcx_endpoint.executors.high_throughput.funcx_worker:cli_run',
                   ]
     },
+    #package_data={'funcx_endpoint':
+    #              ['server_certs/server.key']
+    #},
+    include_package_data=True,
     author='funcX team',
     author_email='labs@globus.org',
     license="Apache License, Version 2.0",
