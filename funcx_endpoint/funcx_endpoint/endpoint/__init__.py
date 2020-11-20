@@ -1,1 +1,1 @@
-from .version import VERSION
+
