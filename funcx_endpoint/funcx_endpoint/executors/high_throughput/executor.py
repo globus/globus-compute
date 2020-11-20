@@ -44,7 +44,7 @@ from funcx.utils.loggers import set_file_logger
 # "logging" python3 self.stream.flush() OSError: [Errno 9] Bad file descriptor
 
 logger = logging.getLogger(__name__)
-#if not logger.hasHandlers():
+# if not logger.hasHandlers():
 #    logger = set_file_logger("executor.log", name=__name__)
 
 
@@ -202,7 +202,6 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
         logger.debug("Initializing HighThroughputExecutor")
 
-
         self.label = label
         self.launch_cmd = launch_cmd
         self.provider = provider
@@ -359,14 +358,13 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                                           "heartbeat_period": self.heartbeat_period,
                                           "heartbeat_threshold": self.heartbeat_threshold,
                                           "working_dir": self.working_dir,
-                                          "provider": self.provider,
                                           "worker_debug": self.worker_debug,
                                           "max_workers_per_node": self.max_workers_per_node,
                                           "mem_per_worker": self.mem_per_worker,
                                           "cores_per_worker": self.cores_per_worker,
                                           "prefetch_capacity": self.prefetch_capacity,
-                                          #"log_max_bytes": self.log_max_bytes,
-                                          #"log_backup_count": self.log_backup_count,
+                                          # "log_max_bytes": self.log_max_bytes,
+                                          # "log_backup_count": self.log_backup_count,
                                           "scheduler_mode": self.scheduler_mode,
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
@@ -478,8 +476,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                     return
                 elif isinstance(msgs, EPStatusReport):
                     logger.debug("[MTHREAD] Received EPStatusReport")
-                    #TODO:YADU We are not propagating task status reports
-                    #if len(msgs.task_statuses):
+                    # TODO:YADU We are not propagating task status reports
+                    # if len(msgs.task_statuses):
                     #    self.task_status_queue.put(msgs.task_statuses)
 
                 else:
@@ -511,7 +509,6 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                             for task in self.tasks:
                                 self.tasks[task].set_exception(self._executor_exception)
                             break
-
 
                         if self.passthrough is True:
                             logger.debug(f"[MTHREAD] Pushing results for task:{tid}")
@@ -595,8 +592,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Got managers: {}".format(workers))
         return workers
 
-
-    def submit(self, func, *args, container_id: str='RAW', task_id: str=None, **kwargs):
+    def submit(self, func, *args, container_id: str = 'RAW', task_id: str = None, **kwargs):
         """ Submits the function and it's params for execution.
         """
         self._task_counter += 1
@@ -607,7 +603,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         fn_code = fx_serializer.serialize(func)
         ser_code = fx_serializer.pack_buffers([fn_code])
         ser_params = fx_serializer.pack_buffers([fx_serializer.serialize(args),
-                                                  fx_serializer.serialize(kwargs)])
+                                                 fx_serializer.serialize(kwargs)])
         payload = Task(task_id,
                        container_id,
                        ser_code + ser_params)
@@ -616,7 +612,6 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self.tasks[task_id] = Future()
 
         return self.tasks[task_id]
-
 
     def submit_raw(self, packed_task):
         """Submits work to the the outgoing_q.

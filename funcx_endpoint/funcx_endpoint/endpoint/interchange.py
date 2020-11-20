@@ -260,13 +260,13 @@ class EndpointInterchange(object):
                     # We just timed out while attempting to receive
                     logger.debug("[TASK_PULL_THREAD] {} tasks in internal queue".format(self.total_pending_task_count))
                     continue
-                except:
+                except Exception:
                     logger.exception("[TASK_PULL_THREAD] Unknown exception while waiting for tasks")
 
-                #YADU: TODO We need to do the routing here
+                # YADU: TODO We need to do the routing here
                 try:
                     msg = Message.unpack(raw_msg)
-                except Exception as e:
+                except Exception:
                     logger.exception("[TASK_PULL_THREAD] Failed to unpack message from forwarder")
                     # continue
                     pass
@@ -289,11 +289,9 @@ class EndpointInterchange(object):
                 else:
                     logger.warning(f"[TASK_PULL_THREAD] Unknown message type received: {msg}")
 
-            except:
-                logger.exception("[TASK_PULL_THREAD] ################Something really bad happened#######################")
+            except Exception:
+                logger.exception("[TASK_PULL_THREAD] Something really bad happened")
                 continue
-
-
 
     def get_container(self, container_uuid):
         """ Get the container image location if it is not known to the interchange"""
@@ -409,7 +407,7 @@ class EndpointInterchange(object):
 
         executor = list(self.executors.values())[0]
         last = time.time()
-        nonce = pickle.dumps({})
+
         while True:
             if last + self.heartbeat_threshold < time.time():
                 logger.debug("[MAIN] alive")
@@ -423,7 +421,7 @@ class EndpointInterchange(object):
                 executor.submit_raw(task.pack())
             except queue.Empty:
                 pass
-            except:
+            except Exception:
                 logger.exception("[MAIN] Unhandled issue while waiting for pending tasks")
                 pass
 
@@ -437,10 +435,10 @@ class EndpointInterchange(object):
                 # self.results_outgoing.put('forwarder', nonce)
 
             except queue.Empty:
-                #logger.debug(f"[MAIN] no results in {self.results_passthrough}")
                 pass
-            except:
-                logger.exception(f"[MAIN] Something broke while forwarding results from executor to forwarder queues")
+
+            except Exception:
+                logger.exception("[MAIN] Something broke while forwarding results from executor to forwarder queues")
                 continue
 
         delta = time.time() - start
@@ -619,8 +617,8 @@ def starter(comm_q, *args, **kwargs):
     The executor is expected to call this function. The args, kwargs match that of the Interchange.__init__
     """
     # logger = multiprocessing.get_logger()
-    ic = Interchange(*args, **kwargs)
-    #comm_q.put((ic.worker_task_port,
+    ic = EndpointInterchange(*args, **kwargs)
+    # comm_q.put((ic.worker_task_port,
     #            ic.worker_result_port))
     ic.start()
 
@@ -675,7 +673,7 @@ def cli_run():
                 max_blocks=1,
             ),
             max_workers_per_node=2,
-            #funcx_service_address='https://api.funcx.org/v1'
+            # funcx_service_address='https://api.funcx.org/v1'
             funcx_service_address='http://127.0.0.1:8080'
         )
         optionals['config'] = config
@@ -689,9 +687,7 @@ def cli_run():
     if args.worker_port_range:
         optionals['worker_port_range'] = [int(i) for i in args.worker_port_range.split(',')]
 
-
-
-    ic = Interchange(**optionals)
+    ic = EndpointInterchange(**optionals)
     ic.start()
 
     """

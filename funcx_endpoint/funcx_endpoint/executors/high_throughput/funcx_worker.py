@@ -121,7 +121,7 @@ class FuncXWorker(object):
                 result_package = {'task_id': task_id,
                                   'container_id': container_id,
                                   'exception': self.serialize(
-                    RemoteExceptionWrapper(*sys.exc_info()))}
+                                      RemoteExceptionWrapper(*sys.exc_info()))}
             else:
                 logger.debug("Execution completed without exception")
                 result_package = {'task_id': task_id,

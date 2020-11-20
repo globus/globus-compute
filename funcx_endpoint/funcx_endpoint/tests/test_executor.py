@@ -2,8 +2,10 @@ from funcx_endpoint.executors.high_throughput.executor import HighThroughputExec
 import logging
 from funcx.utils.loggers import set_file_logger
 
+
 def double(x):
     return x * 2
+
 
 if __name__ == "__main__":
 

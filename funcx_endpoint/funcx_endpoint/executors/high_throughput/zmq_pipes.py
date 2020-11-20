@@ -150,7 +150,7 @@ class ResultsIncoming(object):
         except pickle.UnpicklingError:
             try:
                 res = Message.unpack(block_messages)
-            except Exception as e:
+            except Exception:
                 logger.exception(f"Message in results queue is not pickle/Message formatted:{block_messages}")
         return res
 

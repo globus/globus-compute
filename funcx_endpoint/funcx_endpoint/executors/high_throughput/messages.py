@@ -91,7 +91,6 @@ class Task(Message):
         self.task_buffer = task_buffer
         self.raw_buffer = raw_buffer
 
-
     def pack(self) -> bytes:
 
         if self.raw_buffer is None:

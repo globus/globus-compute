@@ -416,7 +416,7 @@ class Manager(object):
                             worker_id = self.worker_map.get_worker(task_type)
 
                             logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
-                            #TODO: Some duplication of work could be avoided here
+                            # TODO: Some duplication of work could be avoided here
                             to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)

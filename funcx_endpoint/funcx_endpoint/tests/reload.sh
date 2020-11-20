@@ -1,4 +1,8 @@
 pushd .
-cd ~/src/funcX
-yes | pip uninstall funcx && pip install .
-popd 
+cd ~/src/funcx
+./reinstall.sh
+popd
+echo "Removing $PWD/HighThroughputExecutor"
+rm -rf $PWD/HighThroughputExecutor
+killall -u $USER funcx-worker -9
+killall -u $USER funcx-manager -9

@@ -3,6 +3,7 @@ from parsl.providers import LocalProvider
 from funcx_endpoint.strategies.simple import SimpleStrategy
 from funcx_endpoint.executors import HighThroughputExecutor
 
+
 class Config(RepresentationMixin):
     """ Specification of FuncX configuration options.
 
@@ -48,7 +49,7 @@ class Config(RepresentationMixin):
     def __init__(self,
 
                  # Execution backed
-                 executors: list=[HighThroughputExecutor()],
+                 executors: list = [HighThroughputExecutor()],
 
                  # Scaling mechanics
                  provider=LocalProvider(),
@@ -73,7 +74,7 @@ class Config(RepresentationMixin):
                  worker_debug=False):
 
         # Execution backends
-        self.executors = executors # List of executors
+        self.executors = executors  # List of executors
 
         # Scaling mechanics
         self.provider = provider

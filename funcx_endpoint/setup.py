@@ -37,9 +37,6 @@ setup(
                    'funcx-worker=funcx_endpoint.executors.high_throughput.funcx_worker:cli_run',
                   ]
     },
-    #package_data={'funcx_endpoint':
-    #              ['server_certs/server.key']
-    #},
     include_package_data=True,
     author='funcX team',
     author_email='labs@globus.org',

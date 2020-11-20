@@ -8,8 +8,10 @@ import time
 import pickle
 from multiprocessing import Queue
 
+
 def double(x):
     return x * 2
+
 
 if __name__ == "__main__":
 
@@ -22,7 +24,6 @@ if __name__ == "__main__":
     htex._start_remote_interchange_process()
     fx_serializer = FuncXSerializer()
 
-
     for i in range(10):
         task_id = str(uuid.uuid4())
         args = (i,)
@@ -32,7 +33,6 @@ if __name__ == "__main__":
         ser_code = fx_serializer.pack_buffers([fn_code])
         ser_params = fx_serializer.pack_buffers([fx_serializer.serialize(args),
                                                  fx_serializer.serialize(kwargs)])
-
 
         payload = Task(task_id,
                        'RAW',
@@ -46,6 +46,5 @@ if __name__ == "__main__":
         r = pickle.loads(result_package)
         result = fx_serializer.deserialize(r['result'])
         print(f"Result:{i}: {result}")
-
 
     print("All done")

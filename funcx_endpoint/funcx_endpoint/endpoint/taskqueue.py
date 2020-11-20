@@ -15,12 +15,12 @@ class TaskQueue(object):
 
     def __init__(self,
                  address: str,
-                 port:int = 55001,
+                 port: int = 55001,
                  identity: str = str(uuid.uuid4()),
-                 zmq_context = None,
-                 set_hwm = False,
-                 RCVTIMEO = None,
-                 SNDTIMEO = None,
+                 zmq_context=None,
+                 set_hwm=False,
+                 RCVTIMEO=None,
+                 SNDTIMEO=None,
                  ironhouse: bool = False,
                  keys_dir: str = os.path.abspath('.curve'),
                  mode: str = 'client'):
@@ -99,7 +99,7 @@ class TaskQueue(object):
                 f.write(client_key)
             try:
                 self.auth.configure_curve(domain='*', location=self.keys_dir)
-            except:
+            except Exception:
                 logger.exception("Failed to load keys from {self.keys_dir}")
         return
 
@@ -155,10 +155,8 @@ class TaskQueue(object):
         else:
             raise zmq.Again
 
-
     def register_client(self, message):
         return self.zmq_socket.send_multipart([message])
-
 
     def put(self, dest, message, max_timeout=1000):
         """ This function needs to be fast at the same time aware of the possibility of
@@ -191,7 +189,6 @@ class TaskQueue(object):
             return self.zmq_socket.send_multipart([message])
         else:
             return self.zmq_socket.send_multipart([dest, message])
-
 
     def close(self):
         self.zmq_socket.close()

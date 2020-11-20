@@ -390,7 +390,7 @@ class Interchange(object):
             try:
                 msg = Message.unpack(raw_msg)
                 logger.debug("[TASK_PULL_THREAD] received Message/Heartbeat? on task queue")
-            except Exception as e:
+            except Exception:
                 logger.exception("Failed to unpack message")
                 pass
 
@@ -408,7 +408,7 @@ class Interchange(object):
                     self.pending_task_queue[local_container] = queue.Queue(maxsize=10 ** 6)
 
                 # We pass the raw message along
-                self.pending_task_queue[local_container].put({'task_id':msg.task_id,
+                self.pending_task_queue[local_container].put({'task_id': msg.task_id,
                                                               'container_id': msg.container_id,
                                                               'raw_buffer': raw_msg})
                 self.total_pending_task_count += 1
@@ -587,7 +587,7 @@ class Interchange(object):
         try:
             logger.info("Starting strategy.")
             self.strategy.start(self)
-        except RuntimeError as e:
+        except RuntimeError:
             # This is raised when re-registering an endpoint as strategy already exists
             logger.exception("Failed to start strategy.")
 
