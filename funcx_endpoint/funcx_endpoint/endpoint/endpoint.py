@@ -44,8 +44,8 @@ class State:
 
 def version_callback(value):
     if value:
-        from funcx_endpoint.endpoint import VERSION
-        typer.echo("FuncX endpoint version: {}".format(VERSION))
+        import funcx_endpoint
+        typer.echo("FuncX endpoint version: {}".format(funcx_endpoint.__version__))
         raise typer.Exit()
 
 
