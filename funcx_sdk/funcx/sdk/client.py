@@ -16,7 +16,7 @@ from funcx.sdk.utils.batch import Batch
 from funcx.utils.errors import MalformedResponse
 
 try:
-    from funcx.endpoint import VERSION as ENDPOINT_VERSION
+    from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
 except ModuleNotFoundError:
     ENDPOINT_VERSION = None
 
