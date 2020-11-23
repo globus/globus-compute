@@ -1,5 +1,5 @@
 import os
-from setuptools import setup, find_namespace_packages
+from setuptools import setup, find_packages
 
 version_ns = {}
 with open(os.path.join("funcx_endpoint", "version.py")) as f:
@@ -12,7 +12,7 @@ with open('requirements.txt') as f:
 setup(
     name='funcx-endpoint',
     version=version,
-    packages=find_namespace_packages(include=['funcx_endpoint.*']),
+    packages=find_packages(),
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
     python_requires=">=3.6.0",
