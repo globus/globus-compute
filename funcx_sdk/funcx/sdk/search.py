@@ -16,11 +16,7 @@ DEFAULT_SEARCH_LIMIT = 10
 
 
 class SearchHelper:
-    """Utility class for interacting with Globus search
-
-    Searching should now be done via the funcx web service, but this client-side
-    implementation is helpful for local debugging
-    """
+    """Utility class for interacting with Globus search"""
 
     FUNCTION_SEARCH_INDEX_NAME = 'funcx'
     FUNCTION_SEARCH_INDEX_ID = '673a4b58-3231-421d-9473-9df1b6fa3a9d'
