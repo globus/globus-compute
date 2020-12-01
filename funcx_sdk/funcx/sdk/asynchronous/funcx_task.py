@@ -1,7 +1,7 @@
 import asyncio
 
 
-class FuncXTask:
+class FuncXTask(asyncio.Future):
     """
     Represents a submitted funcX task with an asychio wrapper
     """
@@ -12,7 +12,7 @@ class FuncXTask:
         task_id : uuid str
             The uuid of the funcX task this instance is shadowing
         """
-        self.future = asyncio.Future()
+        super(FuncXTask, self).__init__()
         self.task_id = task_id
 
     def __str__(self):
@@ -24,5 +24,5 @@ class FuncXTask:
         :return:
             result : Any
         """
-        await self.future
-        return self.future.result()
+        await self
+        return self.result()
