@@ -26,8 +26,6 @@ fx_serializer = FuncXSerializer()
 
 # from parsl.executors.high_throughput import interchange
 from funcx_endpoint.executors.high_throughput import interchange
-# from funcx_endpoint.executors.high_throughput.default_config import config
-
 
 from parsl.executors.errors import *
 from parsl.executors.base import ParslExecutor
