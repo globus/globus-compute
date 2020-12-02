@@ -309,7 +309,6 @@ def start_endpoint(
         while True:
             # Register the endpoint
             logger.debug("Registering endpoint")
-            print("Registering")
             if State.FUNCX_CONFIG.get('broker_test', False) is True:
                 logger.warning("**************** BROKER State.DEBUG MODE *******************")
                 reg_info = register_with_hub(endpoint_uuid,
@@ -376,10 +375,10 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, metadata, endp
     """
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
-    from funcx_endpoint.endpoint.version import VERSION as ENDPOINT_VERSION
+    import funcx_endpoint
     reg_info = funcx_client.register_endpoint(endpoint_name,
                                               endpoint_uuid,
-                                              endpoint_version=ENDPOINT_VERSION)
+                                              endpoint_version=funcx_endpoint.__version__)
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
