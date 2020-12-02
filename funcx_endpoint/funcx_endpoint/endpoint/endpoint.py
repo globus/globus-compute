@@ -23,7 +23,7 @@ import funcx
 import zmq
 
 from funcx.utils.errors import *
-from funcx_endpoint.executors.high_throughput import default_config as endpoint_default_config
+from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx.sdk.client import FuncXClient
