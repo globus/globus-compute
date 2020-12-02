@@ -236,7 +236,7 @@ class EndpointInterchange(object):
                                        keys_dir=self.keys_dir,
                                        RCVTIMEO=1000)
         self.task_incoming.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
-        logger.info("Task incoming on tcp://{self.client_address}:{self.client_ports[0]}")
+        logger.info(f"Task incoming on tcp://{self.client_address}:{self.client_ports[0]}")
 
         poller = zmq.Poller()
         poller.register(self.task_incoming, zmq.POLLIN)
