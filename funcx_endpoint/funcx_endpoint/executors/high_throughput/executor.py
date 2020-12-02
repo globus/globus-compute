@@ -106,11 +106,12 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         launch_cmd="process_worker_pool.py {debug} -c {cores_per_worker} --task_url={task_url} --result_url={result_url}"
 
     address : string
-        An address to connect to the main Parsl process which is reachable from the network in which
+        An address of the host on which the executor runs, which is reachable from the network in which
         workers will be running. This can be either a hostname as returned by `hostname` or an
         IP address. Most login nodes on clusters have several network interfaces available, only
         some of which can be reached from the compute nodes.  Some trial and error might be
         necessary to indentify what addresses are reachable from compute nodes.
+
     worker_ports : (int, int)
         Specify the ports to be used by workers to connect to Parsl. If this option is specified,
         worker_port_range will not be honored.
@@ -134,7 +135,10 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         cores to be assigned to each worker. Oversubscription is possible
         by setting cores_per_worker < 1.0. Default=1
 
-    max_workers : int
+    mem_per_worker : float
+        Memory to be assigned to each worker. Default=None(no limits)
+
+    max_workers_per_node : int
         Caps the number of workers launched by the manager. Default: infinity
 
     suppress_failure : Bool
@@ -155,12 +159,35 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     container_image : str
         Path or identfier to the container image to be used by the workers
 
+    scheduler_mode: str
+        Scheduling mode to be used by the node manager. Options: 'hard', 'soft'
+        'hard' -> managers cannot replace worker's container types
+        'soft' -> managers can replace unused worker's containers based on demand
+
     worker_mode : str
         Select the mode of operation from no_container, singularity_reuse, singularity_single_use
         Default: singularity_reuse
 
     task_status_queue : queue.Queue
         Queue to pass updates to task statuses back to the forwarder.
+
+    strategy: Stategy Object
+        Specify the scaling strategy to use for this executor.
+
+    launch_cmd: str
+        Specify the launch command as using f-string format that will be used to specify command to
+        launch managers. Default: None
+
+    prefetch_capacity: int
+        Number of tasks that can be fetched by managers in excess of available workers is a
+        prefetching optimization. This option can cause poor load-balancing for long running functions.
+        Default: 10
+
+    provider: Provider object
+        Provider determines how managers can be provisioned, say LocalProvider offers forked processes,
+        and SlurmProvider interfaces to request resources from the Slurm batch scheduler.
+        Default: LocalProvider
+
     """
 
     def __init__(self,
@@ -196,8 +223,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                  suppress_failure=False,
                  endpoint_id=None,
                  managed=True,
-                 interchange_local=False,
-                 passthrough=False,
+                 interchange_local=True,
+                 passthrough=True,
                  task_status_queue=None):
 
         logger.debug("Initializing HighThroughputExecutor")
