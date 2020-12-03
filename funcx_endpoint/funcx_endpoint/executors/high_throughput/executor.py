@@ -439,8 +439,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                                 self.tasks[task].set_exception(self._executor_exception)
                             break
 
-                        logger.warning("YADU: HERE with {}".format(tid))
-                        task_fut = self.tasks[tid]
+                        task_fut = self.tasks.pop(tid)
 
                         if 'result' in msg or 'exception' in msg:
                             task_fut.set_result(msg)
