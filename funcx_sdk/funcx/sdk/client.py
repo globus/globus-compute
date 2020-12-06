@@ -33,8 +33,14 @@ class FuncXClient(throttling.ThrottledBaseClient):
     """
 
     TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
-    TOKEN_FILENAME = 'funcx_sdk_tokens.json'
-    CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
+    TOKEN_FILENAME = "funcx_sdk_tokens.json"
+    FUNCX_SDK_CLIENT_ID = os.environ.get(
+        "FUNCX_SDK_CLIENT_ID", "4cf29807-cf21-49ec-9443-ff9a3fb9f81c"
+    )
+    FUNCX_SCOPE = os.environ.get(
+        "FUNCX_SCOPE",
+        "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
+    )
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
                  force_login=False, fx_authorizer=None, search_authorizer=None,
@@ -78,14 +84,13 @@ class FuncXClient(throttling.ThrottledBaseClient):
             os.makedirs(self.TOKEN_DIR)
 
         tokens_filename = os.path.join(self.TOKEN_DIR, self.TOKEN_FILENAME)
-        self.native_client = NativeClient(client_id=self.CLIENT_ID,
+        self.native_client = NativeClient(client_id=self.FUNCX_SDK_CLIENT_ID,
                                           app_name="FuncX SDK",
                                           token_storage=JSONTokenStorage(tokens_filename))
 
         # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
-        fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
         search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
-        scopes = [fx_scope, search_scope, "openid"]
+        scopes = [self.FUNCX_SCOPE, search_scope, "openid"]
 
         if not fx_authorizer or not search_authorizer or not openid_authorizer:
             self.native_client.login(requested_scopes=scopes,
@@ -95,7 +100,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
                                      force=force_login)
 
             all_authorizers = self.native_client.get_authorizers_by_scope(requested_scopes=scopes)
-            fx_authorizer = all_authorizers[fx_scope]
+            fx_authorizer = all_authorizers[self.FUNCX_SCOPE]
             search_authorizer = all_authorizers[search_scope]
             openid_authorizer = all_authorizers["openid"]
 
