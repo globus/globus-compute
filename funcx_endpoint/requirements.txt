@@ -12,3 +12,4 @@ dill>=0.3
 typer>=0.3.0
 funcx>=0.0.6a0
 pyzmq>=19.0.0,<20.0.0
+retry

@@ -20,6 +20,7 @@ from logging.handlers import RotatingFileHandler
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
+from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
@@ -42,6 +43,9 @@ class ShutdownRequest(Exception):
     def __repr__(self):
         return "Shutdown request received at {}".format(self.tstamp)
 
+    def __str__(self):
+        return self.__repr__()
+
 
 class ManagerLost(Exception):
     """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
@@ -53,7 +57,10 @@ class ManagerLost(Exception):
         self.tstamp = time.time()
 
     def __repr__(self):
-        return "Task failure due to loss of worker {}".format(self.worker_id)
+        return "Task failure due to loss of manager {}".format(self.worker_id)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class BadRegistration(Exception):
@@ -68,6 +75,9 @@ class BadRegistration(Exception):
     def __repr__(self):
         return "Manager:{} caused a {} failure".format(self.worker_id,
                                                        self.handled)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class Interchange(object):
@@ -157,11 +167,16 @@ class Interchange(object):
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
         """
+
         self.logdir = logdir
-        try:
-            os.makedirs(self.logdir)
-        except FileExistsError:
-            pass
+        if config.interchange_file_logger:
+            logpath = "{}/interchange.log".format(self.logdir)
+            try:
+                os.makedirs(self.logdir)
+            except FileExistsError:
+                pass
+        else:
+            logpath = None
 
         start_file_logger("{}/interchange.log".format(self.logdir),
                           level=logging_level,
@@ -170,6 +185,7 @@ class Interchange(object):
         logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
                                                                                               log_max_bytes,
                                                                                               log_backup_count))
+
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
 
         #
@@ -199,7 +215,7 @@ class Interchange(object):
         self.last_heartbeat = time.time()
 
         self.serializer = FuncXSerializer()
-        logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
+        logger.info("Attempting connection to forwarder at {} on ports: {},{},{}".format(
             client_address, client_ports[0], client_ports[1], client_ports[2]))
         self.context = zmq.Context()
         self.task_incoming = self.context.socket(zmq.DEALER)
@@ -218,7 +234,7 @@ class Interchange(object):
         # self.command_channel.set_hwm(0)
         logger.info("Command channel on tcp://{}:{}".format(client_address, client_ports[2]))
         self.command_channel.connect("tcp://{}:{}".format(client_address, client_ports[2]))
-        logger.info("Connected to client")
+        logger.info("Connected to forwarder")
 
         self.pending_task_queue = {}
         self.containers = {}
@@ -332,6 +348,7 @@ class Interchange(object):
                                        logdir=working_dir,
                                        log_max_bytes=self.log_max_bytes,
                                        log_backup_count=self.log_backup_count)
+
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))
 
@@ -399,7 +416,7 @@ class Interchange(object):
                 kill_event.set()
                 break
             elif isinstance(msg, Heartbeat):
-                logger.info("Got heartbeat")
+                logger.debug("Got heartbeat")
             else:
                 logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
                 local_container = self.get_container(msg.container_id)
@@ -508,7 +525,7 @@ class Interchange(object):
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.info("[STATUS] Sending status report to forwarder, and clearing task deltas.")
+            logger.debug("[STATUS] Sending status report to forwarder, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
@@ -647,7 +664,7 @@ class Interchange(object):
                                 result_package = {'task_id': -1,
                                                   'exception': self.serializer.serialize(e)}
                                 pkl_package = pickle.dumps(result_package)
-                                self.results_outgoing.send(pkl_package)
+                                self.results_outgoing.send(pickle.dumps([pkl_package]))
                                 logger.warning("[MAIN] Sent failure reports, unregistering manager")
                             else:
                                 logger.debug("[MAIN] Suppressing shutdown due to version incompatibility")
@@ -661,7 +678,7 @@ class Interchange(object):
                             result_package = {'task_id': -1,
                                               'exception': self.serializer.serialize(e)}
                             pkl_package = pickle.dumps(result_package)
-                            self.results_outgoing.send(pkl_package)
+                            self.results_outgoing.send(pickle.dumps([pkl_package]))
                         else:
                             logger.debug("[MAIN] Suppressing bad registration from manager:{}".format(
                                 manager))
@@ -715,14 +732,16 @@ class Interchange(object):
                     try:
                         logger.debug("[MAIN] Trying to unpack ")
                         manager_report = Message.unpack(b_messages[0])
-                        logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
+                        if manager_report.task_statuses:
+                            logger.info(f"[MAIN] Got manager status report: {manager_report.task_statuses}")
                         self.task_status_deltas.update(manager_report.task_statuses)
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                         b_messages = b_messages[1:]
                         self._ready_manager_queue[manager]['last'] = time.time()
                     except Exception:
                         pass
-                    logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
+                    if len(b_messages):
+                        logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         logger.warning(f"[YADU DEBUG]: result message: {r}")
@@ -750,19 +769,25 @@ class Interchange(object):
             # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [manager for manager in self._ready_manager_queue if
                             time.time() - self._ready_manager_queue[manager]['last'] > self.heartbeat_threshold]
+            bad_manager_msgs = []
             for manager in bad_managers:
                 logger.debug("[MAIN] Last: {} Current: {}".format(self._ready_manager_queue[manager]['last'], time.time()))
                 logger.warning("[MAIN] Too many heartbeats missed for manager {}".format(manager))
                 e = ManagerLost(manager)
                 for task_type in self._ready_manager_queue[manager]['tasks']:
                     for tid in self._ready_manager_queue[manager]['tasks'][task_type]:
-                        result_package = {'task_id': tid, 'exception': self.serializer.serialize(e)}
-                        pkl_package = pickle.dumps(result_package)
-                        self.results_outgoing.send(pkl_package)
-                logger.warning("[MAIN] Sent failure reports, unregistering manager")
+                        try:
+                            raise ManagerLost(manager)
+                        except Exception:
+                            result_package = {'task_id': tid, 'exception': self.serializer.serialize(RemoteExceptionWrapper(*sys.exc_info()))}
+                            pkl_package = pickle.dumps(result_package)
+                            bad_manager_msgs.append(pkl_package)
+                logger.warning("[MAIN] Sent failure reports, unregistering manager {}".format(manager))
                 self._ready_manager_queue.pop(manager, 'None')
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
+            if bad_manager_msgs:
+                self.results_outgoing.send(pickle.dumps(bad_manager_msgs))
             logger.debug("[MAIN] ending one main loop iteration")
 
             if self._status_request.is_set():
@@ -846,7 +871,7 @@ class Interchange(object):
                     internal_block = self.provider.submit(launch_cmd, 1, task_type)
                 logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
                 if not internal_block:
-                    raise(ScalingFailed(self.provider.label,
+                    raise(ScalingFailed(self.config.provider.label,
                                         "Attempts to provision nodes via provider has failed"))
                 self.blocks[external_block_id] = internal_block
                 self.block_id_map[internal_block] = external_block_id
@@ -921,7 +946,8 @@ def start_file_logger(filename,
     ---------
 
     filename: string
-        Name of the file to write logs to. Required.
+        Name of the file to write logs to. Set to None to have interchange logging
+        merged in with endpoint logging.
     name: string
         Logger name. Default="parsl.executors.interchange"
     level: logging.LEVEL
@@ -929,7 +955,7 @@ def start_file_logger(filename,
         - format_string (string): Set the format string
     format_string: string
         Format string to use.
-    max_bytes: float
+    max_bytes: int
         The maximum bytes per logger file, default: 256MB
     backup_count: int
         The number of backup (must be non-zero) per logger file, default: 1
@@ -947,9 +973,11 @@ def start_file_logger(filename,
     if not len(logger.handlers):
         handler = RotatingFileHandler(filename, maxBytes=max_bytes, backupCount=backup_count)
         handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+        logger.info(
+            "logger location {}, logger filesize: {}, logger backup count: {}".format(
+                logger.handlers, max_bytes, backup_count))
 
 
 def starter(comm_q, *args, **kwargs):

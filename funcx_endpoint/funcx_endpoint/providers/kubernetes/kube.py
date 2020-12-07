@@ -91,11 +91,15 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                  group_id: Optional[str] = None,
                  run_as_non_root: bool = False,
                  secret: Optional[str] = None,
+                 incluster_config: Optional[bool] = True,
                  persistent_volumes: List[Tuple[str, str]] = []) -> None:
         if not _kubernetes_enabled:
             raise OptionalModuleMissing(['kubernetes'],
                                         "Kubernetes provider requires kubernetes module and config.")
-        config.load_kube_config()
+        if incluster_config:
+            config.load_incluster_config()
+        else:
+            config.load_kube_config()
 
         self.namespace = namespace
         self.image = image
@@ -110,6 +114,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         self.parallelism = parallelism
         self.worker_init = worker_init
         self.secret = secret
+        self.incluster_config = incluster_config
         self.pod_name = pod_name
         self.user_id = user_id
         self.group_id = group_id
@@ -123,7 +128,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         # Dictionary that keeps track of jobs, keyed on task_type
         self.resources_by_task_type = {}
 
-    def submit(self, cmd_string, tasks_per_node, task_type, job_name="FuncX"):
+    def submit(self, cmd_string, tasks_per_node, task_type, job_name="funcx"):
         """ Submit a job
         Args:
              - cmd_string  :(String) - Name of the container to initiate
