@@ -2,7 +2,6 @@ from funcx_endpoint.strategies.base import BaseStrategy
 import math
 import logging
 import time
-import collections
 
 logger = logging.getLogger("interchange.strategy.KubeSimple")
 
@@ -45,89 +44,68 @@ class KubeSimpleStrategy(BaseStrategy):
             pass
 
     def _strategize(self, *args, **kwargs):
-        task_breakdown = self.interchange.get_outstanding_breakdown()
-        logger.debug(f"Task breakdown {task_breakdown}")
+        max_pods = self.interchange.config.provider.max_blocks
+        min_pods = self.interchange.config.provider.min_blocks
 
-        min_blocks = self.interchange.config.provider.min_blocks
-        max_blocks = self.interchange.config.provider.max_blocks
+        # Kubernetes provider doesn't really know how to keep track of pods by container
+        # so best to allow it to shut them all down when quiet
+        assert min_pods == 0
 
-        # Here we assume that each node has atleast 4 workers
+        # Kubernetes provider only supports one manager in a pod
+        managers_per_pod = 1
 
-        tasks_per_node = self.interchange.config.max_workers_per_node
-        if self.interchange.config.max_workers_per_node == float('inf'):
-            tasks_per_node = 1
+        tasks_per_pod = self.interchange.config.max_workers_per_node
+        if tasks_per_pod == float('inf'):
+            tasks_per_pod = 1
 
-        nodes_per_block = self.interchange.config.provider.nodes_per_block
         parallelism = self.interchange.config.provider.parallelism
 
         active_tasks = self.interchange.get_total_tasks_outstanding()
         logger.debug(f"Pending tasks : {active_tasks}")
+
         status = self.interchange.provider_status()
         logger.debug(f"Provider status : {status}")
 
-        for task_type in active_tasks:
-            active_blocks = status.get(task_type, 0)
-            active_slots = active_blocks * tasks_per_node * nodes_per_block
-            active_tasks_per_type = active_tasks[task_type]
+        for task_type in active_tasks.keys():
+            active_workers = status[task_type]
+            active_slots = active_workers * tasks_per_pod * managers_per_pod
+            active_tasks = active_tasks[task_type]
 
-            logger.debug('Endpoint has {} active tasks of {}, {} active blocks, {} connected workers'.format(
-                active_tasks_per_type, task_type, active_blocks, self.interchange.get_total_live_workers()))
+            logger.debug(
+                'Endpoint has {} active tasks of {}, {} active blocks, {} connected workers for {}'.format(
+                    active_tasks, task_type, active_workers,
+                    self.interchange.get_total_live_workers(), task_type))
 
-            if active_tasks_per_type > 0:
+            # Reset the idle time if we are currently running tasks
+            if active_tasks > 0:
                 self.executors_idle_since[task_type] = None
 
-            # Case 1
-            # No tasks.
-            if active_tasks_per_type == 0:
-                # Case 1a
-                # Fewer blocks that min_blocks
-                if active_blocks <= min_blocks:
-                    # Ignore
-                    # logger.debug("Strategy: Case.1a")
-                    pass
+            # Scale down only if there are no active tasks to avoid having to find which
+            # workers are unoccupied
+            if active_tasks == 0 and active_workers > min_pods:
+                # We want to make sure that max_idletime is reached before killing off resources
+                if not self.executors_idle_since[task_type]:
+                    logger.debug(
+                        "Endpoint has 0 active tasks of task type {}; starting kill timer (if idle time exceeds {}s, resources will be removed)".
+                        format(task_type, self.max_idletime))
+                    self.executors_idle_since[task_type] = time.time()
 
-                # Case 1b
-                # More blocks than min_blocks. Scale down
-                else:
-                    # We want to make sure that max_idletime is reached
-                    # before killing off resources
-                    if not self.executors_idle_since[task_type]:
-                        logger.debug(
-                            f"Endpoint has 0 active tasks of task type {task_type}; starting kill timer (if idle time "
-                            f"exceeds {self.max_idletime}s, resources will be removed)"
-                        )
-                        self.executors_idle_since[task_type] = time.time()
-
-                    idle_since = self.executors_idle_since[task_type]
-                    if (time.time() - idle_since) > self.max_idletime:
-                        # We have resources idle for the max duration,
-                        # we have to scale_in now.
-                        logger.info("Idle time has reached {}s; removing resources of task type {}".format(
+                # If we have resources idle for the max duration we have to scale_in now.
+                if (time.time() - self.executors_idle_since[task_type]) > self.max_idletime:
+                    logger.info(
+                        "Idle time has reached {}s; removing resources of task type {}".format(
                             self.max_idletime, task_type)
-                        )
-                        self.interchange.scale_in(active_blocks - min_blocks, task_type=task_type)
-
-                    else:
-                        pass
-                        # logger.debug("Strategy: Case.1b. Waiting for timer : {0}".format(idle_since))
-
-            # Case 2
+                    )
+                    self.interchange.scale_in(active_workers - min_pods, task_type=task_type)
             # More tasks than the available slots.
-            elif (float(active_slots) / active_tasks_per_type) < parallelism:
-                excess = math.ceil((active_tasks_per_type * parallelism) - active_slots)
-                excess_blocks = math.ceil(float(excess) / (tasks_per_node * nodes_per_block))
-                excess_blocks = min(excess_blocks, max_blocks - active_blocks)
-                logger.info("Requesting {} more blocks".format(excess_blocks))
-                self.interchange.scale_out(excess_blocks, task_type=task_type)
-
-            elif active_slots == 0 and active_tasks_per_type > 0:
-                # Case 4
-                # Check if slots are being lost quickly ?
-                logger.info("Requesting single slot")
-                if active_blocks < max_blocks:
-                    self.interchange.scale_out(1, task_type=task_type)
-            # Case 3
-            # tasks ~ slots
-            else:
-                # logger.debug("Strategy: Case 3")
-                pass
+            elif (float(active_slots) / active_tasks) < parallelism:
+                if active_workers < max_pods:
+                    excess = math.ceil((active_tasks * parallelism) - active_slots)
+                    excess_blocks = math.ceil(float(excess) / (tasks_per_pod * managers_per_pod))
+                    excess_blocks = min(excess_blocks, max_pods - active_workers)
+                    logger.info("Requesting {} more blocks".format(excess_blocks))
+                    self.interchange.scale_out(excess_blocks, task_type=task_type)
+            # Immediatly scale if we are stuck with zero pods and work to do
+            elif active_slots == 0 and active_tasks > 0:
+                logger.info("Requesting single pod")
+                self.interchange.scale_out(1, task_type=task_type)
