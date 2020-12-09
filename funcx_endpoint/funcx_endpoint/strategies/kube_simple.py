@@ -114,21 +114,11 @@ class KubeSimpleStrategy(BaseStrategy):
             # Case 2
             # More tasks than the available slots.
             elif (float(active_slots) / active_tasks_per_type) < parallelism:
-                # Case 2a
-                # We have the max blocks possible
-                if active_blocks >= max_blocks:
-                    # Ignore since we already have the max nodes
-                    # logger.debug("Strategy: Case.2a")
-                    pass
-
-                # Case 2b
-                else:
-                    # logger.debug("Strategy: Case.2b")
-                    excess = math.ceil((active_tasks_per_type * parallelism) - active_slots)
-                    excess_blocks = math.ceil(float(excess) / (tasks_per_node * nodes_per_block))
-                    excess_blocks = min(excess_blocks, max_blocks - active_blocks)
-                    logger.info("Requesting {} more blocks".format(excess_blocks))
-                    self.interchange.scale_out(excess_blocks, task_type=task_type)
+                excess = math.ceil((active_tasks_per_type * parallelism) - active_slots)
+                excess_blocks = math.ceil(float(excess) / (tasks_per_node * nodes_per_block))
+                excess_blocks = min(excess_blocks, max_blocks - active_blocks)
+                logger.info("Requesting {} more blocks".format(excess_blocks))
+                self.interchange.scale_out(excess_blocks, task_type=task_type)
 
             elif active_slots == 0 and active_tasks_per_type > 0:
                 # Case 4
