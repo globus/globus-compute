@@ -82,6 +82,7 @@ class Config(RepresentationMixin):
                  heartbeat_period=30,
                  heartbeat_threshold=120,
                  poll_period=10,
+                 detach_endpoint=False,
                  # Logging info
                  log_max_bytes=256 * 1024 * 1024,  # in bytes
                  log_backup_count=1,
@@ -110,6 +111,7 @@ class Config(RepresentationMixin):
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
+        self.detach_endpoint = detach_endpoint
 
         # Logging info
         self.log_max_bytes = log_max_bytes
