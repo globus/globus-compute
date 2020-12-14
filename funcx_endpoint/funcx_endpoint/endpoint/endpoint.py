@@ -28,7 +28,6 @@ from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx.sdk.client import FuncXClient
-from funcx_endpoint import server_certs
 
 FUNCX_CONFIG_FILE_NAME = 'config.py'
 
@@ -105,12 +104,6 @@ def init_endpoint_dir(endpoint_name, endpoint_config=None):
     endpoint_config_template = endpoint_config_template.substitute(name=endpoint_name)
     with open(endpoint_config_target_file, "w") as w:
         w.write(endpoint_config_template)
-
-    cert_dir = os.path.join(endpoint_dir, 'certificates')
-    logger.debug(f"Copying over certificates to {cert_dir}")
-    for cpaths in server_certs.__path__:
-        print(f"Copying from {cpaths}")
-        shutil.copytree(cpaths, cert_dir)
 
     return endpoint_dir
 
@@ -384,6 +377,17 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
         logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
+
+    certs_dir = os.path.join(endpoint_dir, 'certificates')
+    os.makedirs(certs_dir, exist_ok=True)
+    server_keyfile = os.path.join(certs_dir, 'server.key')
+    logger.debug(f"Writing server key to {server_keyfile}")
+    try:
+        with open(server_keyfile, 'w') as f:
+            f.write(reg_info['forwarder_pubkey'])
+            os.chmod(server_keyfile, 0o600)
+    except Exception:
+        logger.exception("Failed to write server certificate")
 
     return reg_info
 
