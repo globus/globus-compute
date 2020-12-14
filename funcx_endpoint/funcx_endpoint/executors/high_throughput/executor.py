@@ -534,14 +534,14 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                             for task in self.tasks:
                                 self.tasks[task].set_exception(self._executor_exception)
                             break
-                            
+
                         if self.passthrough is True:
                             logger.debug(f"[MTHREAD] Pushing results for task:{tid}")
                             x = self.results_passthrough.put(serialized_msg)
                             logger.debug(f"[MTHREAD] task:{tid} ret value: {x}")
                             logger.debug(f"[MTHREAD] task:{tid} items in queue: {self.results_passthrough.qsize()}")
                             continue
-              
+
                         task_fut = self.tasks.pop(tid)
 
                         if 'result' in msg:
