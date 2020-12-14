@@ -169,15 +169,7 @@ class Interchange(object):
         """
 
         self.logdir = logdir
-        if config.interchange_file_logger:
-            logpath = "{}/interchange.log".format(self.logdir)
-            try:
-                os.makedirs(self.logdir)
-            except FileExistsError:
-                pass
-        else:
-            logpath = None
-
+        os.makedirs(self.logdir, exist_ok=True)
         start_file_logger("{}/interchange.log".format(self.logdir),
                           level=logging_level,
                           max_bytes=log_max_bytes,
@@ -973,6 +965,7 @@ def start_file_logger(filename,
     if not len(logger.handlers):
         handler = RotatingFileHandler(filename, maxBytes=max_bytes, backupCount=backup_count)
         handler.setLevel(level)
+        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.info(
