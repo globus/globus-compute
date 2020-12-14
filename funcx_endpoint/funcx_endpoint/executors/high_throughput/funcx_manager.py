@@ -568,9 +568,8 @@ def cli_run():
         logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
                                  name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,
-                                 max_bytes=float(args.log_max_bytes), # TODO: Test if this still works on forwarder_rearch_1
-                                 backup_count=int(args.log_backup_count)) # TODO: Test if this still works on forwarder_rearch_1
-                                 )
+                                 max_bytes=float(args.log_max_bytes),  # TODO: Test if this still works on forwarder_rearch_1
+                                 backup_count=int(args.log_backup_count))  # TODO: Test if this still works on forwarder_rearch_1
 
         logger.info("Python version: {}".format(sys.version))
         logger.info("Debug logging: {}".format(args.debug))
