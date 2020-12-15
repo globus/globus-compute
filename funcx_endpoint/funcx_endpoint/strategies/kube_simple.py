@@ -47,10 +47,6 @@ class KubeSimpleStrategy(BaseStrategy):
         max_pods = self.interchange.config.provider.max_blocks
         min_pods = self.interchange.config.provider.min_blocks
 
-        # Kubernetes provider doesn't really know how to keep track of pods by container
-        # so best to allow it to shut them all down when quiet
-        assert min_pods == 0
-
         # Kubernetes provider only supports one manager in a pod
         managers_per_pod = 1
 
