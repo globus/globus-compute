@@ -106,7 +106,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         self.nodes_per_block = nodes_per_block
         self.init_blocks = init_blocks
         
-        # Kubernetes provider doesn't really know which pods by container to scale
+        # Kubernetes provider doesn't really know which pods by container to initialize
         # so best to set init_blocks to 0
         assert init_blocks == 0
         
