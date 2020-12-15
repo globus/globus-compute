@@ -94,7 +94,7 @@ class KubeSimpleStrategy(BaseStrategy):
                     )
                     self.interchange.scale_in(active_pods - min_pods, task_type=task_type)
             # More tasks than the available slots.
-            elif (float(active_slots) / active_tasks) < parallelism:
+            elif active_tasks > 0 and (float(active_slots) / active_tasks) < parallelism:
                 if active_pods < max_pods:
                     excess = math.ceil((active_tasks * parallelism) - active_slots)
                     excess_blocks = math.ceil(float(excess) / (workers_per_pod * managers_per_pod))
