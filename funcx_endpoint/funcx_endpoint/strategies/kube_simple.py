@@ -63,7 +63,7 @@ class KubeSimpleStrategy(BaseStrategy):
         logger.debug(f"Provider status : {status}")
 
         for task_type in active_tasks.keys():
-            active_pods = status[task_type]
+            active_pods = status.get(task_type, 0)
             active_slots = active_pods * workers_per_pod * managers_per_pod
             active_tasks = active_tasks[task_type]
 
