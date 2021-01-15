@@ -300,16 +300,6 @@ class Manager(object):
                 except Exception as e:
                     logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
-            # Spin up any new workers according to the worker queue.
-            # Returns the total number of containers that have spun up.
-            self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
-                                                                     debug=self.debug,
-                                                                     address=self.address,
-                                                                     uid=self.uid,
-                                                                     logdir=self.logdir,
-                                                                     worker_port=self.worker_port))
-            logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
-
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
                 poll_timer = 0
@@ -377,6 +367,16 @@ class Manager(object):
 
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
             self.next_worker_q, need_more = self.worker_map.get_next_worker_q(new_worker_map)
+
+            # Spin up any new workers according to the worker queue.
+            # Returns the total number of containers that have spun up.
+            self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
+                                                                     debug=self.debug,
+                                                                     address=self.address,
+                                                                     uid=self.uid,
+                                                                     logdir=self.logdir,
+                                                                     worker_port=self.worker_port))
+            logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
 
             #  Count the workers of each type that need to be removed
             spin_downs = self.worker_map.spin_down_workers(new_worker_map,
