@@ -278,7 +278,7 @@ class Manager(object):
                         task_done_counter += 1
                         task_id = pickle.loads(message)['task_id']
                         task_type = self.task_type_mapping.pop(task_id)
-                        del self.task_status_deltas[task_id]
+                        self.task_status_deltas.pop(task_id, None)
                         logger.debug("Task type: {}".format(task_type))
                         self.outstanding_task_count[task_type] -= 1
                         logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
