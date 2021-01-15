@@ -390,7 +390,7 @@ class Interchange(object):
             elif isinstance(msg, Heartbeat):
                 logger.debug("Got heartbeat")
             else:
-                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
+                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg['task_id']))
                 task_type = self.get_container(msg['task_id'].split(";")[1])
                 msg['container'] = task_type
                 if task_type not in self.pending_task_queue:

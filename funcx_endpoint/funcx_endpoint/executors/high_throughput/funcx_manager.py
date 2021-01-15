@@ -278,7 +278,7 @@ class Manager(object):
                         task_done_counter += 1
                         task_id = pickle.loads(message)['task_id']
                         task_type = self.task_type_mapping.pop(task_id)
-                        del self.task_status_deltas[task_id]
+                        self.task_status_deltas.pop(task_id, None)
                         logger.debug("Task type: {}".format(task_type))
                         self.outstanding_task_count[task_type] -= 1
                         logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
@@ -298,7 +298,7 @@ class Manager(object):
                         logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
                 except Exception as e:
-                    logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+                    logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
@@ -414,8 +414,9 @@ class Manager(object):
                             to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
-                            logger.debug(f"Set task {task['task_id']} to RUNNING")
-                            self.task_status_deltas[task['task_id']] = TaskStatusCode.RUNNING
+                            if task['task_id'] != pickle.dumps(b"KILL"):
+                                logger.debug(f"Set task {task['task_id']} to RUNNING")
+                                self.task_status_deltas[task['task_id']] = TaskStatusCode.RUNNING
                             logger.debug("Sending complete!")
 
     def _status_report_loop(self, kill_event):
@@ -603,8 +604,8 @@ def cli_run():
         logger.exception("Caught error: {}".format(e))
         raise
     else:
-        logger.info("process_worker_pool exiting")
-        print("PROCESS_WORKER_POOL exiting")
+        logger.info("process_worker_pool main event loop exiting normally")
+        print("PROCESS_WORKER_POOL main event loop exiting normally")
 
 
 if __name__ == "__main__":
