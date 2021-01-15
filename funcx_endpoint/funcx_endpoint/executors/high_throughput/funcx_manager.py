@@ -256,8 +256,9 @@ class Manager(object):
                 pending_task_count, ready_worker_count))
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
-                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(self.worker_map.ready_worker_type_counts))
-                msg = pickle.dumps(self.worker_map.ready_worker_type_counts)
+                ads = self.worker_map.advertisement()
+                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ads))
+                msg = pickle.dumps(ads)
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any

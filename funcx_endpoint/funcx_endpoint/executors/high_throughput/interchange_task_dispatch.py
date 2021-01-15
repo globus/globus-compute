@@ -139,9 +139,12 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='first')
 
     # first round to dispatch tasks -- dispatch tasks of available types on manager
     if loop == 'first':
-        for task_type in manager_ads['free_capacity']:
-            if task_type != 'unused' and task_type != 'total_workers' and real_capacity > 0:
-                while manager_ads['free_capacity'][task_type] > 0 and real_capacity > 0:
+        for task_type in manager_ads['free_capacity']['free']:
+            if task_type != 'unused':
+                type_inflight = len(manager_ads['tasks'].get(task_type, set()))
+                type_capacity = min(manager_ads['free_capacity']['free'][task_type],
+                                    manager_ads['free_capacity']['total'][task_type] - type_inflight)
+                while manager_ads['free_capacity'][task_type] > 0 and real_capacity > 0 and type_capacity > 0:
                     try:
                         if task_type not in pending_task_queue:
                             break
@@ -152,14 +155,36 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='first')
                         logger.debug("Get task {}".format(x))
                         tasks.append(x)
                         tids[task_type].add(x['task_id'])
-                        manager_ads['free_capacity'][task_type] -= 1
+                        manager_ads['free_capacity']['free'][task_type] -= 1
                         manager_ads['free_capacity']['total_workers'] -= 1
                         real_capacity -= 1
+                        type_capacity -= 1
+            # Dispatch tasks to unused slots on the manager
+            else:
+                task_types = list(pending_task_queue.keys())
+                random.shuffle(task_types)
+                for task_type in task_types:
+                    while (manager_ads['free_capacity']['free']['unused'] > 0 and
+                           manager_ads['free_capacity']['total_workers'] > 0 and real_capacity > 0):
+                        try:
+                            x = pending_task_queue[task_type].get(block=False)
+                        except queue.Empty:
+                            break
+                        else:
+                            logger.debug("Get task {}".format(x))
+                            tasks.append(x)
+                            tids[task_type].add(x['task_id'])
+                            manager_ads['free_capacity']['free']['unused'] -= 1
+                            manager_ads['free_capacity']['total_workers'] -= 1
+                            real_capacity -= 1
         return tasks, tids
 
-    # second round: allocate tasks to unused slots based on the manager type
+    # second round: allocate random tasks to unassigned workers on the manager
+    # This will possibly cause container switching on the manager
     logger.debug("Second round of task fetching!")
-    for task_type in pending_task_queue:
+    task_types = list(pending_task_queue.keys())
+    random.shuffle(task_types)
+    for task_type in task_types:
         while manager_ads['free_capacity']['total_workers'] > 0 and real_capacity > 0:
             try:
                 x = pending_task_queue[task_type].get(block=False)
@@ -169,7 +194,6 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='first')
                 logger.debug("Get task {}".format(x))
                 tasks.append(x)
                 tids[task_type].add(x['task_id'])
-                manager_ads['free_capacity'][task_type] = manager_ads['free_capacity'].get(task_type, 0) - 1
                 manager_ads['free_capacity']['total_workers'] -= 1
                 real_capacity -= 1
     return tasks, tids
