@@ -168,7 +168,7 @@ class WorkerMap(object):
             for i in range(num_remove):
                 spin_downs.append(worker_type)
             if not check_idle:
-               container_switch_count += num_remove
+                container_switch_count += num_remove
         return spin_downs, container_switch_count
 
     def add_worker(self, worker_id=str(random.random()),
