@@ -11,7 +11,8 @@ logger.info("Interchange task dispatch started")
 def naive_interchange_task_dispatch(interesting_managers,
                                     pending_task_queue,
                                     ready_manager_queue,
-                                    scheduler_mode='hard'):
+                                    scheduler_mode='hard',
+                                    two_loop=False):
     """
     This is an initial task dispatching algorithm for interchange.
     It returns a dictionary, whose key is manager, and the value is the list of tasks to be sent to manager,
@@ -25,7 +26,8 @@ def naive_interchange_task_dispatch(interesting_managers,
 
     elif scheduler_mode == 'soft':
         task_dispatch, dispatched_tasks = {}, 0
-        for loop in ['first', 'second']:
+        loops = ['first'] if not two_loop else ['first', 'second']
+        for loop in loops:
             task_dispatch, dispatched_tasks = dispatch(interesting_managers,
                                                        pending_task_queue,
                                                        ready_manager_queue,

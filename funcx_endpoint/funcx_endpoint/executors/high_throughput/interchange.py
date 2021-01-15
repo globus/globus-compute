@@ -588,6 +588,12 @@ class Interchange(object):
         # onto this list.
         interesting_managers = set()
 
+        # This value records when the last two loop scheduling in soft mode happens
+        # When two loop scheduling in soft mode happens, it may cause container switch
+        # This is to reduce the number idle workers of specific types when there are not enough
+        # tasks of those types on interchange
+        last_two_loop_time = time.time()
+
         while not self._kill_event.is_set():
             self.socks = dict(poller.poll(timeout=poll_period))
 
@@ -670,10 +676,19 @@ class Interchange(object):
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
-            task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
-                                                                             self.pending_task_queue,
-                                                                             self._ready_manager_queue,
-                                                                             scheduler_mode=self.config.scheduler_mode)
+            if time.time() - last_two_loop_time > self.config.two_loop_interval:
+                task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                                 self.pending_task_queue,
+                                                                                 self._ready_manager_queue,
+                                                                                 scheduler_mode=self.config.scheduler_mode,
+                                                                                 two_loop=True)
+                last_two_loop_time = time.time()
+            else:
+                task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                                 self.pending_task_queue,
+                                                                                 self._ready_manager_queue,
+                                                                                 scheduler_mode=self.config.scheduler_mode,
+                                                                                 two_loop=False)
             self.total_pending_task_count -= dispatched_task
 
             for manager in task_dispatch:
