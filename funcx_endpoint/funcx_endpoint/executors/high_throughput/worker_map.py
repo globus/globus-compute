@@ -146,6 +146,7 @@ class WorkerMap(object):
         List of removed worker types.
         """
         spin_downs = []
+        container_switch_count = 0
         for worker_type in self.total_worker_type_counts:
             if worker_type == 'unused':
                 continue
@@ -163,7 +164,9 @@ class WorkerMap(object):
                 logger.debug("[SPIN DOWN] Removing {} workers of type {}".format(num_remove, worker_type))
             for i in range(num_remove):
                 spin_downs.append(worker_type)
-        return spin_downs
+            if not check_idle:
+               container_switch_count += num_remove
+        return spin_downs, container_switch_count
 
     def add_worker(self, worker_id=str(random.random()),
                    mode='no_container',

@@ -278,6 +278,7 @@ class Interchange(object):
 
         self.tasks = set()
         self.task_status_deltas = {}
+        self.container_switch_count = {}
 
     def load_config(self):
         """ Load the config
@@ -719,6 +720,8 @@ class Interchange(object):
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                         b_messages = b_messages[1:]
                         self._ready_manager_queue[manager]['last'] = time.time()
+                        self.container_switch_count[manager] = manager_report.container_switch_count
+                        logger.info(f"[MAIN] Got container switch count: {self.container_switch_count}")
                     except Exception:
                         pass
                     if len(b_messages):

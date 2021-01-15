@@ -192,6 +192,7 @@ class Manager(object):
             target=self._status_report_loop,
             args=(self._kill_event,)
         )
+        self.container_switch_count = 0
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -380,10 +381,12 @@ class Manager(object):
             logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
 
             #  Count the workers of each type that need to be removed
-            spin_downs = self.worker_map.spin_down_workers(new_worker_map,
-                                                           worker_max_idletime=self.worker_max_idletime,
-                                                           need_more=need_more,
-                                                           scheduler_mode=self.scheduler_mode)
+            spin_downs, container_switch_count = self.worker_map.spin_down_workers(new_worker_map,
+                                                                                   worker_max_idletime=self.worker_max_idletime,
+                                                                                   need_more=need_more,
+                                                                                   scheduler_mode=self.scheduler_mode)
+            self.container_switch_count += container_switch_count
+            logger.debug("Container switch count: total {}, cur {}".format(self.container_switch_count, container_switch_count))
 
             for w_type in spin_downs:
                 self.remove_worker_init(w_type)
@@ -425,7 +428,8 @@ class Manager(object):
 
         while not kill_event.is_set():
             msg = ManagerStatusReport(
-                self.task_status_deltas
+                self.task_status_deltas,
+                self.container_switch_count,
             )
             logger.info(f"[STATUS] Sending status report to interchange: {msg.task_statuses}")
             self.pending_result_queue.put(msg)
