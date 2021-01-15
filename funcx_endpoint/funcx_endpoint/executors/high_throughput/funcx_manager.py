@@ -604,8 +604,8 @@ def cli_run():
         logger.exception("Caught error: {}".format(e))
         raise
     else:
-        logger.info("process_worker_pool exiting")
-        print("PROCESS_WORKER_POOL exiting")
+        logger.info("process_worker_pool main event loop exiting normally")
+        print("PROCESS_WORKER_POOL main event loop exiting normally")
 
 
 if __name__ == "__main__":
