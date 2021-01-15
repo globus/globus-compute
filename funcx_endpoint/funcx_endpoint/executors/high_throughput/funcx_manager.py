@@ -298,7 +298,7 @@ class Manager(object):
                         logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
                 except Exception as e:
-                    logger.warning("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+                    logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
