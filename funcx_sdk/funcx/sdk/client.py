@@ -229,7 +229,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 logger.warning("We have an exception : {}".format(task['exception']))
                 task['exception'].reraise()
 
-    def get_batch_status(self, task_id_list):
+    def get_batch_result(self, task_id_list):
         """ Request status for a batch of task_ids
         """
         assert isinstance(task_id_list, list), "get_batch_status expects a list of task ids"
@@ -259,11 +259,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 results[task_id] = self.func_table[task_id]
 
         return results
-
-    def get_batch_result(self, task_id_list):
-        """ Request results for a batch of task_ids
-        """
-        pass
 
     def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
         """Initiate an invocation
