@@ -259,7 +259,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 results[task_id] = self.func_table[task_id]
 
         return results
-        
+
     def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
         """Initiate an invocation
 
