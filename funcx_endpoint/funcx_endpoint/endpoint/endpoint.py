@@ -18,7 +18,6 @@ import psutil
 import requests
 import texttable as tt
 import typer
-from retry import retry
 
 import funcx
 import zmq
@@ -264,7 +263,7 @@ def start_endpoint(
 
     funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
 
-    # If pervious registration info exists, use that
+    # If previous registration info exists, use that
     if os.path.exists(endpoint_json):
         with open(endpoint_json, 'r') as fp:
             logger.debug("Connection info loaded from prior registration record")
@@ -274,6 +273,14 @@ def start_endpoint(
         endpoint_uuid = str(uuid.uuid4())
 
     logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
+
+    # attempt the first registration before the daemon is started
+    try:
+        reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
+    except Exception as e:
+        # the registration handler already logs this as a critical error, so
+        # no additional logging is needed here
+        return
 
     # Create a daemon context
     # If we are running a full detached daemon then we will send the output to
@@ -309,19 +316,10 @@ def start_endpoint(
 
     with context:
         while True:
-            # Register the endpoint
-            logger.info("Registering endpoint")
-            if State.FUNCX_CONFIG.get('broker_test', False) is True:
-                logger.warning("**************** BROKER State.DEBUG MODE *******************")
-                reg_info = register_with_hub(endpoint_uuid,
-                                             endpoint_dir,
-                                             State.FUNCX_CONFIG['broker_address'],
-                                             client_public_key=client_public_key,
-                                             redis_host=State.FUNCX_CONFIG['redis_host'])
-            else:
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
-
-            logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+            if reg_info is None:
+                # this registration will continue retrying every 5s until the
+                # endpoint is successfully registered with the service
+                reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, True)
 
             # Configure the parameters for the interchange
             optionals = {}
@@ -344,10 +342,39 @@ def start_endpoint(
 
             logger.critical("Interchange terminated.")
             time.sleep(10)
+            # clear reg_info so that registration will happen again in the next loop iteration
+            reg_info = None
+
+
+def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, retry=False):
+    # Register the endpoint
+    logger.info("Registering endpoint")
+    if State.FUNCX_CONFIG.get('broker_test', False) is True:
+        logger.warning("**************** BROKER State.DEBUG MODE *******************")
+        reg_info = register_with_hub(endpoint_uuid,
+                                        endpoint_dir,
+                                        State.FUNCX_CONFIG['broker_address'],
+                                        State.FUNCX_CONFIG['redis_host'])
+    elif retry:
+
+        # this will retry the registration process every 5s until it succeeds
+        while True:
+            try:
+                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+                break
+            except Exception as e:
+                logger.warning("Retrying registration in 5s")
+                time.sleep(5)
+                continue
+    else:
+        reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+
+    logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+
+    return reg_info
 
 
 # Avoid a race condition when starting the endpoint alongside the web service
-@retry(delay=5, logger=logging.getLogger('funcx'))
 def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """Register the endpoint and return the registration info.
 
@@ -373,6 +400,13 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     reg_info = funcx_client.register_endpoint(endpoint_name,
                                               endpoint_uuid,
                                               endpoint_version=funcx_endpoint.__version__)
+
+    if 'status' in reg_info and reg_info['status'] == 'error':
+        msg = "Endpoint registration failed."
+        if 'reason' in reg_info:
+            msg = "Endpoint registration failed. Service fail reason provided: {}".format(reg_info['reason'])
+        logger.critical(msg)
+        raise Exception(msg)
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
