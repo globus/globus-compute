@@ -307,6 +307,9 @@ def start_endpoint(
 
     pid_path = os.path.join(endpoint_dir, 'daemon.pid')
 
+    # if the pidfile exists, we should return early because we don't
+    # want to attempt to create a new daemon when one is already
+    # potentially running with the existing pidfile
     if check_pidfile(pid_path, endpoint_name=name, log=True)['exists']:
         return
 
