@@ -68,10 +68,10 @@ def check_pidfile(filepath, match_name='funcx-endpoint', endpoint_name='', log=F
 
     match_name : str
        Name of the process to check for if pidfile exists
-    
+
     endpoint_name : str
         endpoint name for debugging purposes
-    
+
     log : bool
         whether or not to log instructions for user if pidfile exists
 
@@ -89,7 +89,7 @@ def check_pidfile(filepath, match_name='funcx-endpoint', endpoint_name='', log=F
         proc = psutil.Process(older_pid)
         if proc.name() == match_name:
             # this is the only case where the endpoint is active.
-            # Ff the process name does not match or no process exists,
+            # If the process name does not match or no process exists,
             # it means the endpoint has been terminated without proper cleanup
             proc_found = True
 
@@ -109,7 +109,7 @@ def check_pidfile(filepath, match_name='funcx-endpoint', endpoint_name='', log=F
             "exists": 1,
             "active": 1,
         }
-    
+
     return {
         "exists": 1,
         "active": 0,
