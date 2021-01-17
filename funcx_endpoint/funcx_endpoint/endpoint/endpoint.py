@@ -278,8 +278,7 @@ def start_endpoint(
     try:
         reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
     except Exception as e:
-        # the registration handler already logs this as a critical error, so
-        # no additional logging is needed here
+        logger.critical(e)
         return
 
     # Create a daemon context
@@ -305,7 +304,7 @@ def start_endpoint(
                                        )
     except Exception as e:
         logger.critical("Caught exception while trying to setup endpoint context dirs")
-        logger.critical("Exception : ", e)
+        logger.critical("Exception: ", e)
 
     check_pidfile(context.pidfile.path, "funcx-endpoint", name)
 
@@ -352,9 +351,9 @@ def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, r
     if State.FUNCX_CONFIG.get('broker_test', False) is True:
         logger.warning("**************** BROKER State.DEBUG MODE *******************")
         reg_info = register_with_hub(endpoint_uuid,
-                                        endpoint_dir,
-                                        State.FUNCX_CONFIG['broker_address'],
-                                        State.FUNCX_CONFIG['redis_host'])
+                                     endpoint_dir,
+                                     State.FUNCX_CONFIG['broker_address'],
+                                     State.FUNCX_CONFIG['redis_host'])
     elif retry:
 
         # this will retry the registration process every 5s until it succeeds
@@ -363,6 +362,7 @@ def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, r
                 reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
                 break
             except Exception as e:
+                logger.critical(e)
                 logger.warning("Retrying registration in 5s")
                 time.sleep(5)
                 continue
@@ -407,14 +407,12 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
         msg = "Endpoint registration failed."
         if 'reason' in reg_info:
             msg = "Endpoint registration failed. Service fail reason provided: {}".format(reg_info['reason'])
-        logger.critical(msg)
         raise Exception(msg)
 
     # this is a backup error handler in case an endpoint ID is not sent back
     # from the service
-    if not 'endpoint_id' in reg_info:
+    if 'endpoint_id' not in reg_info:
         msg = "Endpoint ID was not included in the service's registration response."
-        logger.critical(msg)
         raise Exception(msg)
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
