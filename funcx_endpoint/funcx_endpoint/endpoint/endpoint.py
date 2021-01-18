@@ -393,10 +393,11 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
         raise Exception(msg)
 
     # this is a backup error handler in case an endpoint ID is not sent back
-    # from the service
+    # from the service or a bad ID is sent back
     if 'endpoint_id' not in reg_info:
-        msg = "Endpoint ID was not included in the service's registration response."
-        raise Exception(msg)
+        raise Exception("Endpoint ID was not included in the service's registration response.")
+    elif not isinstance(reg_info['endpoint_id'], str):
+        raise Exception("Endpoint ID sent by the service was not a string.")
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
