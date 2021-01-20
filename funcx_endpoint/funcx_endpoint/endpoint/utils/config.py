@@ -82,7 +82,7 @@ class Config(RepresentationMixin):
                  heartbeat_period=30,
                  heartbeat_threshold=120,
                  poll_period=10,
-                 detach_endpoint=False,
+                 detach_endpoint=True,
                  # Logging info
                  log_max_bytes=256 * 1024 * 1024,  # in bytes
                  log_backup_count=1,
