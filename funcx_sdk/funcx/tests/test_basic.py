@@ -2,10 +2,12 @@ from funcx.sdk.client import FuncXClient
 import pytest
 import time
 
+
 def hello_world() -> str:
     return 'Hello World'
 
-def wait_for_task(fxc, task_id, walltime: int=2):
+
+def wait_for_task(fxc, task_id, walltime: int = 2):
     import time
     start = time.time()
     while True:
@@ -13,7 +15,7 @@ def wait_for_task(fxc, task_id, walltime: int=2):
             raise Exception("Timeout")
         try:
             r = fxc.get_result(task_id)
-        except:
+        except Exception:
             print("Not available yet")
             time.sleep(1)
         else:
@@ -45,6 +47,7 @@ def test_non_blocking(fxc, endpoint):
         else:
             print(f"Result: {result}")
             break
+
 
 if __name__ == '__main__':
 

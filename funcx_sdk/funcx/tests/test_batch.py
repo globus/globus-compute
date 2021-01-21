@@ -2,6 +2,7 @@ from funcx.sdk.client import FuncXClient
 import pytest
 import time
 
+
 def fn_batch1(a, b, c=2, d=2):
     return a + b + c + d
 

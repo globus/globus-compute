@@ -1,9 +1,10 @@
 import time
-
 from funcx.tests.fn_module import imported_fn
+
 
 def local_fn():
     return True
+
 
 def test_imported_function(fxc, endpoint):
 
@@ -17,10 +18,11 @@ def test_imported_function(fxc, endpoint):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
-        except Exception as e:
+        except Exception:
             time.sleep(2)
         else:
             break
+
 
 def test_local_function(fxc, endpoint):
 
@@ -34,10 +36,11 @@ def test_local_function(fxc, endpoint):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
-        except Exception as e:
+        except Exception:
             time.sleep(2)
         else:
             break
+
 
 def test_nested_scope_function(fxc, endpoint):
 
@@ -54,8 +57,7 @@ def test_nested_scope_function(fxc, endpoint):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
-        except Exception as e:
+        except Exception:
             time.sleep(2)
         else:
             break
-

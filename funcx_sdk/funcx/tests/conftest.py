@@ -7,6 +7,7 @@ config = {
     'endpoint_uuid': 'e5d141b6-d87c-4aec-8e50-5cc2b37a207d',
 }
 
+
 @pytest.fixture(autouse=True, scope='session')
 def load_funcx_session(request, pytestconfig):
     """Load funcX sdk client for the entire test suite,
@@ -17,6 +18,7 @@ def load_funcx_session(request, pytestconfig):
     """
 
     # config = pytestconfig.getoption('config')[0]
+
 
 def pytest_addoption(parser):
     """Add funcx-specific command-line options to pytest.
@@ -35,6 +37,7 @@ def pytest_addoption(parser):
 def fxc():
     fxc = FuncXClient(funcx_service_address=config['funcx_service_address'])
     return fxc
+
 
 @pytest.fixture
 def endpoint(pytestconfig):

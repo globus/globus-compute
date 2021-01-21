@@ -6,6 +6,7 @@ import time
 def double(x):
     return x * 2
 
+
 @pytest.mark.parametrize('task_count', [(10), (100), (1000)])
 def test_performance(fxc, endpoint, task_count):
 
@@ -21,6 +22,8 @@ def test_performance(fxc, endpoint, task_count):
     task_ids = fxc.batch_run(batch)
     t_batch_submit = time.time() - t_batch_create
 
+    print(f"Time to create batch: {t_batch_create}s")
+    print(f"Time to submit batch: {t_batch_submit}s")
     for i in range(10):
         x = fxc.get_batch_status(task_ids)
         complete_count = sum([1 for t in task_ids if t in x and x[t].get('pending', False)])
