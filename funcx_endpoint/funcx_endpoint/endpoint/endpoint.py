@@ -18,6 +18,7 @@ import psutil
 import requests
 import texttable as tt
 import typer
+from retry import retry
 
 import funcx
 import zmq
@@ -144,6 +145,7 @@ def init_endpoint():
     init_endpoint_dir("default")
 
 
+@retry(delay=10, max_delay=300, backoff=1.2, logger=logging.getLogger('funcx'))
 def register_with_hub(endpoint_uuid, endpoint_dir, address,
                       client_public_key=None,
                       redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
@@ -274,13 +276,6 @@ def start_endpoint(
 
     logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
-    # attempt the first registration before the daemon is started
-    try:
-        reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
-    except Exception as e:
-        logger.critical(e)
-        return
-
     # Create a daemon context
     # If we are running a full detached daemon then we will send the output to
     # log files, otherwise we can piggy back on our stdout
@@ -302,9 +297,8 @@ def start_endpoint(
                                        stderr=stderr,
                                        detach_process=endpoint_config.config.detach_endpoint
                                        )
-    except Exception as e:
-        logger.critical("Caught exception while trying to setup endpoint context dirs")
-        logger.critical("Exception: ", e)
+    except Exception:
+        logger.exception("Caught exception while trying to setup endpoint context dirs")
 
     check_pidfile(context.pidfile.path, "funcx-endpoint", name)
 
@@ -314,38 +308,31 @@ def start_endpoint(
         os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
 
     with context:
-        while True:
-            if reg_info is None:
-                # this registration will continue retrying every 5s until the
-                # endpoint is successfully registered with the service
-                reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, True)
+        reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
 
-            # Configure the parameters for the interchange
-            optionals = {}
-            optionals['client_address'] = reg_info['public_ip']
-            optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
-            if 'endpoint_address' in State.FUNCX_CONFIG:
-                optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
+        # Configure the parameters for the interchange
+        optionals = {}
+        optionals['client_address'] = reg_info['public_ip']
+        optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
+        if 'endpoint_address' in State.FUNCX_CONFIG:
+            optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
 
-            optionals['logdir'] = endpoint_dir
+        optionals['logdir'] = endpoint_dir
 
-            if State.DEBUG:
-                optionals['logging_level'] = logging.DEBUG
+        if State.DEBUG:
+            optionals['logging_level'] = logging.DEBUG
 
-            ic = EndpointInterchange(endpoint_config.config,
-                                     endpoint_id=endpoint_uuid,
-                                     keys_dir=keys_dir,
-                                     **optionals)
-            ic.start()
-            ic.stop()
+        ic = EndpointInterchange(endpoint_config.config,
+                                 endpoint_id=endpoint_uuid,
+                                 keys_dir=keys_dir,
+                                 **optionals)
+        ic.start()
+        ic.stop()
 
-            logger.critical("Interchange terminated.")
-            time.sleep(10)
-            # clear reg_info so that registration will happen again in the next loop iteration
-            reg_info = None
+        logger.critical("Interchange terminated.")
 
 
-def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, retry=False):
+def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir):
     # Register the endpoint
     logger.info("Registering endpoint")
     if State.FUNCX_CONFIG.get('broker_test', False) is True:
@@ -353,19 +340,8 @@ def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, r
         reg_info = register_with_hub(endpoint_uuid,
                                      endpoint_dir,
                                      State.FUNCX_CONFIG['broker_address'],
-                                     State.FUNCX_CONFIG['redis_host'])
-    elif retry:
-
-        # this will retry the registration process every 5s until it succeeds
-        while True:
-            try:
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
-                break
-            except Exception as e:
-                logger.critical(e)
-                logger.warning("Retrying registration in 5s")
-                time.sleep(5)
-                continue
+                                     client_public_key=client_public_key,
+                                     redis_host=State.FUNCX_CONFIG['redis_host'])
     else:
         reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
 
@@ -375,6 +351,7 @@ def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, r
 
 
 # Avoid a race condition when starting the endpoint alongside the web service
+@retry(delay=10, max_delay=300, backoff=1.2, logger=logging.getLogger('funcx'))
 def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """Register the endpoint and return the registration info.
 
@@ -453,8 +430,9 @@ def stop_endpoint(name: str = typer.Argument("default", autocompletion=complete_
             logger.debug("Signalling process: {}".format(pid))
             os.kill(pid, signal.SIGTERM)
             time.sleep(0.1)
-            os.kill(pid, signal.SIGKILL)
-            time.sleep(0.1)
+            if os.path.exists(pid_file):
+                os.kill(pid, signal.SIGKILL)
+                time.sleep(0.1)
             # Wait to confirm that the pid file disappears
             if not os.path.exists(pid_file):
                 logger.info("Endpoint <{}> is now stopped".format(name))
