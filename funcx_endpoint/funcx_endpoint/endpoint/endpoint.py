@@ -145,6 +145,7 @@ def init_endpoint():
     init_endpoint_dir("default")
 
 
+@retry(delay=10, max_delay=300, backoff=1.2, logger=logging.getLogger('funcx'))
 def register_with_hub(endpoint_uuid, endpoint_dir, address,
                       client_public_key=None,
                       redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
@@ -264,7 +265,7 @@ def start_endpoint(
 
     funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
 
-    # If pervious registration info exists, use that
+    # If previous registration info exists, use that
     if os.path.exists(endpoint_json):
         with open(endpoint_json, 'r') as fp:
             logger.debug("Connection info loaded from prior registration record")
@@ -296,9 +297,8 @@ def start_endpoint(
                                        stderr=stderr,
                                        detach_process=endpoint_config.config.detach_endpoint
                                        )
-    except Exception as e:
-        logger.critical("Caught exception while trying to setup endpoint context dirs")
-        logger.critical("Exception : ", e)
+    except Exception:
+        logger.exception("Caught exception while trying to setup endpoint context dirs")
 
     check_pidfile(context.pidfile.path, "funcx-endpoint", name)
 
@@ -308,46 +308,50 @@ def start_endpoint(
         os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
 
     with context:
-        while True:
-            # Register the endpoint
-            logger.info("Registering endpoint")
-            if State.FUNCX_CONFIG.get('broker_test', False) is True:
-                logger.warning("**************** BROKER State.DEBUG MODE *******************")
-                reg_info = register_with_hub(endpoint_uuid,
-                                             endpoint_dir,
-                                             State.FUNCX_CONFIG['broker_address'],
-                                             client_public_key=client_public_key,
-                                             redis_host=State.FUNCX_CONFIG['redis_host'])
-            else:
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+        reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
 
-            logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+        # Configure the parameters for the interchange
+        optionals = {}
+        optionals['client_address'] = reg_info['public_ip']
+        optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
+        if 'endpoint_address' in State.FUNCX_CONFIG:
+            optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
 
-            # Configure the parameters for the interchange
-            optionals = {}
-            optionals['client_address'] = reg_info['public_ip']
-            optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
-            if 'endpoint_address' in State.FUNCX_CONFIG:
-                optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
+        optionals['logdir'] = endpoint_dir
 
-            optionals['logdir'] = endpoint_dir
+        if State.DEBUG:
+            optionals['logging_level'] = logging.DEBUG
 
-            if State.DEBUG:
-                optionals['logging_level'] = logging.DEBUG
+        ic = EndpointInterchange(endpoint_config.config,
+                                 endpoint_id=endpoint_uuid,
+                                 keys_dir=keys_dir,
+                                 **optionals)
+        ic.start()
+        ic.stop()
 
-            ic = EndpointInterchange(endpoint_config.config,
-                                     endpoint_id=endpoint_uuid,
-                                     keys_dir=keys_dir,
-                                     **optionals)
-            ic.start()
-            ic.stop()
+        logger.critical("Interchange terminated.")
 
-            logger.critical("Interchange terminated.")
-            time.sleep(10)
+
+def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir):
+    # Register the endpoint
+    logger.info("Registering endpoint")
+    if State.FUNCX_CONFIG.get('broker_test', False) is True:
+        logger.warning("**************** BROKER State.DEBUG MODE *******************")
+        reg_info = register_with_hub(endpoint_uuid,
+                                     endpoint_dir,
+                                     State.FUNCX_CONFIG['broker_address'],
+                                     client_public_key=client_public_key,
+                                     redis_host=State.FUNCX_CONFIG['redis_host'])
+    else:
+        reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+
+    logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+
+    return reg_info
 
 
 # Avoid a race condition when starting the endpoint alongside the web service
-@retry(delay=5, logger=logging.getLogger('funcx'))
+@retry(delay=10, max_delay=300, backoff=1.2, logger=logging.getLogger('funcx'))
 def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """Register the endpoint and return the registration info.
 
@@ -373,6 +377,21 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     reg_info = funcx_client.register_endpoint(endpoint_name,
                                               endpoint_uuid,
                                               endpoint_version=funcx_endpoint.__version__)
+
+    # the service will send back a message with a 'status'='error'
+    # property if something went wrong
+    if 'status' in reg_info and reg_info['status'] == 'error':
+        msg = "Endpoint registration failed."
+        if 'reason' in reg_info:
+            msg = "Endpoint registration failed. Service fail reason provided: {}".format(reg_info['reason'])
+        raise Exception(msg)
+
+    # this is a backup error handler in case an endpoint ID is not sent back
+    # from the service or a bad ID is sent back
+    if 'endpoint_id' not in reg_info:
+        raise Exception("Endpoint ID was not included in the service's registration response.")
+    elif not isinstance(reg_info['endpoint_id'], str):
+        raise Exception("Endpoint ID sent by the service was not a string.")
 
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
@@ -411,8 +430,9 @@ def stop_endpoint(name: str = typer.Argument("default", autocompletion=complete_
             logger.debug("Signalling process: {}".format(pid))
             os.kill(pid, signal.SIGTERM)
             time.sleep(0.1)
-            os.kill(pid, signal.SIGKILL)
-            time.sleep(0.1)
+            if os.path.exists(pid_file):
+                os.kill(pid, signal.SIGKILL)
+                time.sleep(0.1)
             # Wait to confirm that the pid file disappears
             if not os.path.exists(pid_file):
                 logger.info("Endpoint <{}> is now stopped".format(name))
