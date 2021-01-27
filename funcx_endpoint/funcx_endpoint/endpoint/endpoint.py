@@ -145,42 +145,6 @@ def init_endpoint():
     init_endpoint_dir("default")
 
 
-@retry(delay=10, max_delay=300, backoff=1.2, logger=logging.getLogger('funcx'))
-def register_with_hub(endpoint_uuid, endpoint_dir, address,
-                      client_public_key=None,
-                      redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
-    """ This currently registers directly with the Forwarder micro service.
-
-    Can be used as an example of how to make calls this it, while the main API
-    is updated to do this calling on behalf of the endpoint in the second iteration.
-    """
-    print("Picking source as a mock site")
-    sites = ['128.135.112.73', '140.221.69.24',
-             '52.86.208.63', '129.114.63.99',
-             '128.219.134.72', '134.79.129.79']
-    ip_addr = random.choice(sites)
-    try:
-        r = requests.post(address + '/register',
-                          json={'endpoint_id': endpoint_uuid,
-                                'endpoint_addr': ip_addr,
-                                'client_public_key': client_public_key,
-                                'redis_address': redis_host})
-    except requests.exceptions.ConnectionError:
-        logger.critical("Unable to reach the funcX hub at {}".format(address))
-        exit(-1)
-
-    if r.status_code != 200:
-        print(dir(r))
-        print(r)
-        raise RegistrationError(r.reason)
-
-    with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
-        json.dump(r.json(), fp)
-        logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
-
-    return r.json()
-
-
 @app.command(name="configure", help="Configure an endpoint")
 def configure_endpoint(
         name: str = typer.Argument("default", help="endpoint name", autocompletion=complete_endpoint_name),
@@ -308,7 +272,10 @@ def start_endpoint(
         os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
 
     with context:
-        reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
+        # Register the endpoint
+        logger.info("Registering endpoint")
+        reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+        logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
         # Configure the parameters for the interchange
         optionals = {}
@@ -330,24 +297,6 @@ def start_endpoint(
         ic.stop()
 
         logger.critical("Interchange terminated.")
-
-
-def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir):
-    # Register the endpoint
-    logger.info("Registering endpoint")
-    if State.FUNCX_CONFIG.get('broker_test', False) is True:
-        logger.warning("**************** BROKER State.DEBUG MODE *******************")
-        reg_info = register_with_hub(endpoint_uuid,
-                                     endpoint_dir,
-                                     State.FUNCX_CONFIG['broker_address'],
-                                     client_public_key=client_public_key,
-                                     redis_host=State.FUNCX_CONFIG['redis_host'])
-    else:
-        reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
-
-    logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
-
-    return reg_info
 
 
 # Avoid a race condition when starting the endpoint alongside the web service
