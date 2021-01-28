@@ -41,5 +41,5 @@ def fxc():
 
 @pytest.fixture
 def endpoint(pytestconfig):
-    endpoint = pytestconfig.getoption('--endpoint')[0]
+    endpoint = pytestconfig.getoption('--endpoint')
     return endpoint
