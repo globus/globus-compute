@@ -28,7 +28,7 @@ def pytest_addoption(parser):
         action='store',
         metavar='endpoint',
         nargs=1,
-        default=config['endpoint_uuid'],
+        default=[config['endpoint_uuid']],
         help="Specify an active endpoint UUID"
     )
 
