@@ -36,7 +36,18 @@ class MalformedResponse(FuncxError):
         self.response = response
 
     def __repr__(self):
-        return "FuncX remote service responded with Malformed Response {}".format(self.response)
+        return "FuncX remote service responded with Malformed Response: {}".format(self.response)
+
+
+class FailureResponse(FuncxError):
+    """ FuncX remote service responded with a failure
+    """
+
+    def __init__(self, response):
+        self.response = response
+
+    def __repr__(self):
+        return "FuncX remote service failed to fulfill request: {}".format(self.response)
 
 
 class VersionMismatch(FuncxError):
