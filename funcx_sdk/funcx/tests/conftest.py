@@ -28,7 +28,7 @@ def pytest_addoption(parser):
         action='store',
         metavar='endpoint',
         nargs=1,
-        default=config['endpoint_uuid'],
+        default=[config['endpoint_uuid']],
         help="Specify an active endpoint UUID"
     )
 
@@ -41,5 +41,5 @@ def fxc():
 
 @pytest.fixture
 def endpoint(pytestconfig):
-    endpoint = pytestconfig.getoption('--endpoint')
+    endpoint = pytestconfig.getoption('--endpoint')[0]
     return endpoint
