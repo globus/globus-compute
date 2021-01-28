@@ -32,10 +32,19 @@ def pytest_addoption(parser):
         help="Specify an active endpoint UUID"
     )
 
+    parser.addoption(
+        '--service-address',
+        action='store',
+        metavar='service-address',
+        nargs=1,
+        default=[config['funcx_service_address']],
+        help="Specify a funcX service address"
+    )
+
 
 @pytest.fixture
-def fxc():
-    fxc = FuncXClient(funcx_service_address=config['funcx_service_address'])
+def fxc(pytestconfig):
+    fxc = FuncXClient(funcx_service_address=pytestconfig.getoption('--service-address')[0])
     return fxc
 
 

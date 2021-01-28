@@ -18,3 +18,10 @@ How to run the tests
 
    >>> pytest . --endpoint='<ENDPOINT_UUID>'
 
+   set the funcX service address with:
+
+   >>> pytest . --service-address='<FUNCX_SERVICE_ADDRESS>'
+
+   Example:
+
+   >>> pytest . --endpoint='4b116d3c-1703-4f8f-9f6f-39921e5864df' --service-address='https://api.funcx.org/v1'
