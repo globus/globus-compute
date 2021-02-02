@@ -28,7 +28,8 @@ fx_serializer = FuncXSerializer()
 from funcx_endpoint.executors.high_throughput import interchange
 
 from parsl.executors.errors import *
-from parsl.executors.base import ParslExecutor
+# from parsl.executors.base import ParslExecutor
+from parsl.executors.status_handling import StatusHandlingExecutor
 from parsl.dataflow.error import ConfigurationError
 
 from parsl.utils import RepresentationMixin
@@ -50,7 +51,8 @@ BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
 
 
-class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
+#class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
+class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
     """Executor designed for cluster-scale
 
     The HighThroughputExecutor system has the following components:
@@ -226,10 +228,10 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                  task_status_queue=None):
 
         logger.debug("Initializing HighThroughputExecutor")
+        StatusHandlingExecutor.__init__(self, provider)
 
         self.label = label
         self.launch_cmd = launch_cmd
-        self.provider = provider
         self.worker_debug = worker_debug
         self.max_workers_per_node = max_workers_per_node
 
@@ -250,7 +252,6 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self.working_dir = working_dir
         self.managed = managed
         self.blocks = []
-        self.tasks = {}
         self.cores_per_worker = cores_per_worker
         self.endpoint_id = endpoint_id if endpoint_id else str(uuid.uuid4())
         self._task_counter = 0
@@ -712,6 +713,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         if self.provider:
             r = self.provider.cancel(to_kill)
         return r
+
+    def _get_job_ids(self):
+        return list(self.block.values())
 
     def status(self):
         """Return status of all blocks."""
