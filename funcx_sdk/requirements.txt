@@ -9,4 +9,4 @@ fair_research_login
 dill>=0.3
 typer>=0.3.0
 pyzmq>=19.0.0,<20.0.0
-parsl>=1.0.0
+parsl>=1.1.0a0
