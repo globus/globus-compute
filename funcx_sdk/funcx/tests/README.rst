@@ -25,3 +25,8 @@ How to run the tests
    Example:
 
    >>> pytest . --endpoint='4b116d3c-1703-4f8f-9f6f-39921e5864df' --service-address='https://api.funcx.org/v1'
+
+4. Follow instructions from `Parsl config documentation <https://parsl.readthedocs.io/en/stable/userguide/configuring.html>` to create a config
+   that matches the site you are testing on, and re-run the tests. Once done, please add your configs to the test-issue on github and docs.
+   
+
