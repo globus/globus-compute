@@ -5,7 +5,7 @@ An endpoint is a persistent service launched by the user on their compute system
 and executing functions to their compute system. This could be their laptop, the login node of a campus cluster,
 grid, or supercomputing facility.
 
-The endpoint can be configured to connect to the funcX API webs ervice at `funcx.org <https://api.funcx.org/v1>`_.
+The endpoint can be configured to connect to the funcX API web service at `funcx.org <https://api.funcx.org/v1>`_.
 Once the endpoint is registered you can invoke functions to be executed on it.
 
 To install the funcX endpoint agent software::
