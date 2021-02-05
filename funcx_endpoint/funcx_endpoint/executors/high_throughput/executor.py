@@ -15,9 +15,6 @@ import daemon
 import uuid
 from multiprocessing import Process, Queue
 
-# from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
-from ipyparallel.serialize import deserialize_object  # ,serialize_object
-
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task
 from funcx.serialize import FuncXSerializer
@@ -526,7 +523,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             # TODO: This could be handled better we are essentially shutting down the
                             # client with little indication to the user.
                             logger.warning("[MTHREAD] Executor shutting down due to version mismatch in interchange")
-                            self._executor_exception, _ = deserialize_object(msg['exception'])
+                            self._executor_exception, _ = fx_serializer.deserialize(msg['exception'])
                             logger.exception("[MTHREAD] Exception: {}".format(self._executor_exception))
                             # Set bad state to prevent new tasks from being submitted
                             self._executor_bad_state.set()
