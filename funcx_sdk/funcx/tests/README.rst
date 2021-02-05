@@ -9,19 +9,20 @@ Installing and setting up
 
 First clone the funcx repo:
 
-```bash
-git clone https://github.com/funcx-faas/funcX.git
-git checkout forwarder_rearch_1
-cd funcX
-```
+.. code-block:: bash
+		
+   git clone https://github.com/funcx-faas/funcX.git
+   git checkout forwarder_rearch_1
+   cd funcX
+
 
 Here's a sequence of steps that should be copy-pastable:
 
-```bash
-conda create -y --name funcx_testing_py3.8 python=3.8
-pip install ./funcx_sdk/
-pip install ./funcx_endpoint/
-```
+.. code-block:: bash
+		
+    conda create -y --name funcx_testing_py3.8 python=3.8
+    pip install ./funcx_sdk/
+    pip install ./funcx_endpoint/
 
 
 Setup an endpoint
