@@ -65,20 +65,20 @@ class KubeSimpleStrategy(BaseStrategy):
         for task_type in active_tasks.keys():
             active_pods = status.get(task_type, 0)
             active_slots = active_pods * workers_per_pod * managers_per_pod
-            active_tasks = active_tasks[task_type]
+            active_tasks_per_type = active_tasks[task_type]
 
             logger.debug(
                 'Endpoint has {} active tasks of {}, {} active blocks, {} connected workers for {}'.format(
-                    active_tasks, task_type, active_pods,
+                    active_tasks_per_type, task_type, active_pods,
                     self.interchange.get_total_live_workers(), task_type))
 
             # Reset the idle time if we are currently running tasks
-            if active_tasks > 0:
+            if active_tasks_per_type > 0:
                 self.executors_idle_since[task_type] = None
 
             # Scale down only if there are no active tasks to avoid having to find which
             # workers are unoccupied
-            if active_tasks == 0 and active_pods > min_pods:
+            if active_tasks_per_type == 0 and active_pods > min_pods:
                 # We want to make sure that max_idletime is reached before killing off resources
                 if not self.executors_idle_since[task_type]:
                     logger.debug(
@@ -94,14 +94,14 @@ class KubeSimpleStrategy(BaseStrategy):
                     )
                     self.interchange.scale_in(active_pods - min_pods, task_type=task_type)
             # More tasks than the available slots.
-            elif active_tasks > 0 and (float(active_slots) / active_tasks) < parallelism:
+            elif active_tasks_per_type > 0 and (float(active_slots) / active_tasks_per_type) < parallelism:
                 if active_pods < max_pods:
-                    excess = math.ceil((active_tasks * parallelism) - active_slots)
+                    excess = math.ceil((active_tasks_per_type * parallelism) - active_slots)
                     excess_blocks = math.ceil(float(excess) / (workers_per_pod * managers_per_pod))
                     excess_blocks = min(excess_blocks, max_pods - active_pods)
                     logger.info("Requesting {} more blocks".format(excess_blocks))
                     self.interchange.scale_out(excess_blocks, task_type=task_type)
             # Immediatly scale if we are stuck with zero pods and work to do
-            elif active_slots == 0 and active_tasks > 0:
+            elif active_slots == 0 and active_tasks_per_type > 0:
                 logger.info("Requesting single pod")
                 self.interchange.scale_out(1, task_type=task_type)
