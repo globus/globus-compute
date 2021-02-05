@@ -32,7 +32,7 @@ Setup an endpoint
 
    >>> funcx-endpoint configure test_local
 
-2. Update the config, by opening up the `~/.funcx/test_eks_deployment/config.py` file and updating the following:
+2. Update the config, by opening up the `~/.funcx/test_local/config.py` file and updating the following:
 
    >>> # funcx_service_address='https://api.funcx.org/v1'                          
    >>> funcx_service_address="http://k8s-dev.funcx.org/api/v1",
