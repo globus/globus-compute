@@ -408,7 +408,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         Returns
         -------
         A dict
-            {'endopoint_id' : <>,
+            {'endpoint_id' : <>,
              'address' : <>,
              'client_ports': <>}
         """
