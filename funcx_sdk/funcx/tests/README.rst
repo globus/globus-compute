@@ -3,20 +3,59 @@ Using the test-suite
 
 This test-suite is built using the `pytest` package. Please refer `here <https://docs.pytest.org/en/stable/>`_ for pytest specific docs.
 
-How to run the tests
---------------------
 
-1. Start an endpoint, make sure that the endpoint is set to point at the `funcx_service_address` for testing.
+Installing and setting up
+-------------------------
 
-2. Update the `config` dict in the `funcx/funcx_sdk/funcx/tests/conftest.py` with the correct `funcx_service_address` and the `endpoint_uuid`.
+First clone the funcx repo:
 
-3. Run individual tests with:
+```bash
+git clone https://github.com/funcx-faas/funcX.git
+git checkout forwarder_rearch_1
+cd funcX
+```
 
-   >>> pytest test_basic.py --endpoint='<ENDPOINT_UUID>'
+Here's a sequence of steps that should be copy-pastable:
+
+```bash
+conda create -y --name funcx_testing_py3.8 python=3.8
+pip install ./funcx_sdk/
+pip install ./funcx_endpoint/
+```
+
+
+Setup an endpoint
+-----------------
+
+1. Configure an endpoint:
+
+   >>> funcx-endpoint configure test_local
+
+2. Update the config, by opening up the `~/.funcx/test_eks_deployment/config.py` file and updating the following:
+
+   >>> # funcx_service_address='https://api.funcx.org/v1'                          
+   >>> funcx_service_address="http://k8s-dev.funcx.org/api/v1",
+
+3. Start an endpoint
+
+   >>> funcx-endpoint start test_local
+
+4. Grab the endpoint UUID that's reported!
+   
+Run tests
+---------
+
+1. Go to the tests dir:
+
+   >>> cd funcX/funcx_sdk/funcx/tests
+   
+2. Run individual tests with:
+
+   >>> pytest test_basic.py --service-address="http://k8s-dev.funcx.org/api/v1" --endpoint="<ENDPOINT_UUID>"
 
    or, run the whole test-suite with:
 
-   >>> pytest . --endpoint='<ENDPOINT_UUID>'
+   >>> pytest . --service-address="http://k8s-dev.funcx.org/api/v1" --endpoint="<ENDPOINT_UUID>"
 
    set the funcX service address with:
 
