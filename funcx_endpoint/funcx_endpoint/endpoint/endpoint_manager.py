@@ -22,6 +22,7 @@ import zmq
 
 import funcx_endpoint
 from funcx.utils.errors import *
+from funcx.utils.handle_service_response import handle_response_errors
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
@@ -239,11 +240,7 @@ class EndpointManager:
 
         # the service will send back a message with a 'status'='error'
         # property if something went wrong
-        if 'status' in reg_info and reg_info['status'] == 'error':
-            msg = "Endpoint registration failed."
-            if 'reason' in reg_info:
-                msg = "Endpoint registration failed. Service fail reason provided: {}".format(reg_info['reason'])
-            raise Exception(msg)
+        handle_response_errors(reg_info)
 
         # this is a backup error handler in case an endpoint ID is not sent back
         # from the service or a bad ID is sent back
