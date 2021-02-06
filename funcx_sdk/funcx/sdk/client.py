@@ -14,6 +14,7 @@ from funcx.serialize import FuncXSerializer
 from funcx.sdk.utils import throttling
 from funcx.sdk.utils.batch import Batch
 from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError, HTTPError
+from funcx.utils.handle_service_response import handle_response_errors
 
 try:
     from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
@@ -342,7 +343,10 @@ class FuncXClient(throttling.ThrottledBaseClient):
         if r.http_status != 200:
             raise HTTPError(r)
         if r.get("status", "Failed") == "Failed":
-            raise FailureResponse(r.get("reason", "Unknown reason for failure"))
+            if 'data' in r:
+                handle_response_errors(r.data)
+            else:
+                raise FailureResponse(r.get("reason", "Unknown reason for failure"))
         return r['task_uuids']
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
@@ -388,7 +392,10 @@ class FuncXClient(throttling.ThrottledBaseClient):
             raise Exception(r)
 
         if r.get("status", "Failed") == "Failed":
-            raise FailureResponse(r.get("reason", "Unknown reason for failure"))
+            if 'data' in r:
+                handle_response_errors(r.data)
+            else:
+                raise FailureResponse(r.get("reason", "Unknown reason for failure"))
         return r['task_uuids']
 
     def register_endpoint(self, name, endpoint_uuid, metadata=None, endpoint_version=None):

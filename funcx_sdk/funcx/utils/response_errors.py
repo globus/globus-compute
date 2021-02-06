@@ -8,9 +8,15 @@ class ResponseErrorCode(int, Enum):
     USER_NOT_FOUND = 1
     FUNCTION_NOT_FOUND = 2
     ENDPOINT_NOT_FOUND = 3
-    FUNCTION_NOT_PERMITTED = 4
-    FORWARDER_REGISTRATION_ERROR = 5
-    REQUEST_KEY_ERROR = 6
+    UNAUTHORIZED_FUNCTION_ACCESS = 4
+    UNAUTHORIZED_ENDPOINT_ACCESS = 5
+    FUNCTION_NOT_PERMITTED = 6
+    FORWARDER_REGISTRATION_ERROR = 7
+    FORWARDER_CONTACT_ERROR = 8
+    ENDPOINT_STATS_ERROR = 9
+    LIVENESS_STATS_ERROR = 10
+    REQUEST_KEY_ERROR = 11
+    REQUEST_MALFORMED = 12
 
 
 class FuncxResponseError(Exception, ABC):
@@ -52,12 +58,24 @@ class FuncxResponseError(Exception, ABC):
                         error_class = FunctionNotFound
                     elif res_error_code is ResponseErrorCode.ENDPOINT_NOT_FOUND:
                         error_class = EndpointNotFound
+                    elif res_error_code is ResponseErrorCode.UNAUTHORIZED_FUNCTION_ACCESS:
+                        error_class = UnauthorizedFunctionAccess
+                    elif res_error_code is ResponseErrorCode.UNAUTHORIZED_ENDPOINT_ACCESS:
+                        error_class = UnauthorizedEndpointAccess
                     elif res_error_code is ResponseErrorCode.FUNCTION_NOT_PERMITTED:
                         error_class = FunctionNotPermitted
                     elif res_error_code is ResponseErrorCode.FORWARDER_REGISTRATION_ERROR:
                         error_class = ForwarderRegistrationError
+                    elif res_error_code is ResponseErrorCode.FORWARDER_CONTACT_ERROR:
+                        error_class = ForwarderContactError
+                    elif res_error_code is ResponseErrorCode.ENDPOINT_STATS_ERROR:
+                        error_class = EndpointStatsError
+                    elif res_error_code is ResponseErrorCode.LIVENESS_STATS_ERROR:
+                        error_class = LivenessStatsError
                     elif res_error_code is ResponseErrorCode.REQUEST_KEY_ERROR:
                         error_class = RequestKeyError
+                    elif res_error_code is ResponseErrorCode.REQUEST_MALFORMED:
+                        error_class = RequestMalformed
 
                     if error_class is not None:
                         return error_class(*res_data['error_args'])
@@ -92,7 +110,7 @@ class FunctionNotFound(FuncxResponseError):
 
     def __init__(self, uuid):
         self.error_args = [uuid]
-        self.reason = "Function {} could not be resolved".format(uuid)
+        self.reason = f"Function {uuid} could not be resolved"
         self.uuid = uuid
 
 
@@ -103,7 +121,29 @@ class EndpointNotFound(FuncxResponseError):
 
     def __init__(self, uuid):
         self.error_args = [uuid]
-        self.reason = "Endpoint {} could not be resolved".format(uuid)
+        self.reason = f"Endpoint {uuid} could not be resolved"
+        self.uuid = uuid
+
+
+class UnauthorizedFunctionAccess(FuncxResponseError):
+    """ Unauthorized function access by user
+    """
+    code = ResponseErrorCode.UNAUTHORIZED_FUNCTION_ACCESS
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"Unauthorized access to function {uuid}"
+        self.uuid = uuid
+
+
+class UnauthorizedEndpointAccess(FuncxResponseError):
+    """ Unauthorized endpoint access by user
+    """
+    code = ResponseErrorCode.UNAUTHORIZED_ENDPOINT_ACCESS
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"Unauthorized access to endpoint {uuid}"
         self.uuid = uuid
 
 
@@ -114,7 +154,7 @@ class FunctionNotPermitted(FuncxResponseError):
 
     def __init__(self, function_uuid, endpoint_uuid):
         self.error_args = [function_uuid, endpoint_uuid]
-        self.reason = "Function {} not permitted on endpoint {}".format(function_uuid, endpoint_uuid)
+        self.reason = f"Function {function_uuid} not permitted on endpoint {endpoint_uuid}"
         self.function_uuid = function_uuid
         self.endpoint_uuid = endpoint_uuid
 
@@ -124,9 +164,39 @@ class ForwarderRegistrationError(FuncxResponseError):
     """
     code = ResponseErrorCode.FORWARDER_REGISTRATION_ERROR
 
-    def __init__(self, forwarder_reason):
-        self.error_args = [forwarder_reason]
-        self.reason = "Endpoint registration with forwarder failed - {}".format(forwarder_reason)
+    def __init__(self, error_reason):
+        self.error_args = [error_reason]
+        self.reason = f"Endpoint registration with forwarder failed - {error_reason}"
+
+
+class ForwarderContactError(FuncxResponseError):
+    """ Contacting the forwarder failed
+    """
+    code = ResponseErrorCode.FORWARDER_CONTACT_ERROR
+
+    def __init__(self, error_reason):
+        self.error_args = [error_reason]
+        self.reason = f"Contacting forwarder failed with {error_reason}"
+
+
+class EndpointStatsError(FuncxResponseError):
+    """ Error while retrieving endpoint stats
+    """
+    code = ResponseErrorCode.ENDPOINT_STATS_ERROR
+
+    def __init__(self, endpoint_uuid, error_reason):
+        self.error_args = [endpoint_uuid, error_reason]
+        self.reason = f"Unable to retrieve endpoint stats: {endpoint_id}. {e}"
+
+
+class LivenessStatsError(FuncxResponseError):
+    """ Error while retrieving endpoint stats
+    """
+    code = ResponseErrorCode.LIVENESS_STATS_ERROR
+
+    def __init__(self, http_status_code):
+        self.error_args = [http_status_code]
+        self.reason = "Forwarder did not respond with liveness stats"
 
 
 class RequestKeyError(FuncxResponseError):
@@ -136,4 +206,14 @@ class RequestKeyError(FuncxResponseError):
 
     def __init__(self, key_error_reason):
         self.error_args = [key_error_reason]
-        self.reason = "Missing key in JSON request - {}".format(key_error_reason)
+        self.reason = f"Missing key in JSON request - {key_error_reason}"
+
+
+class RequestMalformed(FuncxResponseError):
+    """ User request malformed
+    """
+    code = ResponseErrorCode.REQUEST_MALFORMED
+
+    def __init__(self, malformed_reason):
+        self.error_args = [malformed_reason]
+        self.reason = f"Request Malformed. Missing critical information: {malformed_reason}"
