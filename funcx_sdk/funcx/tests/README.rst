@@ -21,9 +21,10 @@ Here's a sequence of steps that should be copy-pastable:
 .. code-block:: bash
 		
     conda create -y --name funcx_testing_py3.8 python=3.8
+    conda activate funcx_testing_py3.8
     pip install ./funcx_sdk/
     pip install ./funcx_endpoint/
-
+    pip install -r ./funcx_sdk/test-requirements.txt
 
 Setup an endpoint
 -----------------
