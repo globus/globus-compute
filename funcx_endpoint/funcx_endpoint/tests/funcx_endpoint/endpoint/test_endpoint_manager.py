@@ -39,7 +39,7 @@ class TestStart:
         mock_client.return_value.register_endpoint.return_value = {'endpoint_id': 'abcde12345',
                                                                    'address': 'localhost',
                                                                    'client_ports': '8080'}
-        
+
         mock_zmq_create = mocker.patch("zmq.auth.create_certificates",
                                        return_value=(None, None))
         mock_zmq_load = mocker.patch("zmq.auth.load_certificate",

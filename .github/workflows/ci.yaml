@@ -63,7 +63,7 @@ jobs:
         cd ..
     - name: Lint with Flake8
       run: |
-        flake8
+        flake8 funcx_endpoint
 #    - name: Test with pytest
 #      run: |
 #        pytest
