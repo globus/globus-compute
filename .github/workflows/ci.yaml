@@ -64,9 +64,9 @@ jobs:
     - name: Lint with Flake8
       run: |
         flake8 funcx_endpoint
-#    - name: Test with pytest
-#      run: |
-#        pytest
+    - name: Test with pytest
+      run: |
+        PYTHONPATH=funcx_endpoint python -m pytest funcx_endpoint/tests/funcx_endpoint
 
   publish:
     needs: test
