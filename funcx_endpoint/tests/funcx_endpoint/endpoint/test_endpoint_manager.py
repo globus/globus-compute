@@ -53,21 +53,20 @@ class TestStart:
         mock_daemon = mocker.patch.object(EndpointManager, 'daemon_launch',
                                           return_value=None)
 
-        with mock_client, mock_zmq_create, mock_zmq_load, mock_context, mock_daemon:
-            manager = EndpointManager(logger)
-            manager.funcx_dir = f'{os.getcwd()}'
-            config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        manager = EndpointManager(logger)
+        manager.funcx_dir = f'{os.getcwd()}'
+        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
-            manager.configure_endpoint("mock_endpoint", None)
-            manager.start_endpoint("mock_endpoint", None)
+        manager.configure_endpoint("mock_endpoint", None)
+        manager.start_endpoint("mock_endpoint", None)
 
-            assert mock_zmq_create.call_count == 1
-            assert mock_zmq_load.call_count == 1
-            assert mock_daemon.call_count == 1
-            args, kwargs = mock_daemon.call_args
-            assert mock_client() in args
-            assert config_dir in args
-            assert os.path.join(config_dir, "certificates") in args
+        assert mock_zmq_create.call_count == 1
+        assert mock_zmq_load.call_count == 1
+        assert mock_daemon.call_count == 1
+        args, kwargs = mock_daemon.call_args
+        assert mock_client() in args
+        assert config_dir in args
+        assert os.path.join(config_dir, "certificates") in args
 
-            shutil.rmtree(config_dir)
-            assert not os.path.exists(config_dir)
+        shutil.rmtree(config_dir)
+        assert not os.path.exists(config_dir)
