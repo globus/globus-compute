@@ -57,7 +57,7 @@ def configure_endpoint(
     The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
     """
     manager.configure_endpoint(name, endpoint_config)
-    
+
 
 @app.command(name="start", help="Start an endpoint by name")
 def start_endpoint(
@@ -126,7 +126,7 @@ def delete_endpoint(
         typer.confirm(f"Are you sure you want to delete the endpoint <{name}>?", abort=True)
 
     manager.delete_endpoint(name)
-    
+
 
 @app.callback()
 def main(

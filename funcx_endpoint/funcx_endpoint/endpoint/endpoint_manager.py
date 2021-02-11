@@ -144,7 +144,7 @@ class EndpointManager:
         client_public_key = client_public_key.decode('utf-8')
 
         endpoint_config = SourceFileLoader('config',
-                os.path.join(endpoint_dir, self.funcx_config_file_name)).load_module()
+                                           os.path.join(endpoint_dir, self.funcx_config_file_name)).load_module()
 
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.config.executors:
