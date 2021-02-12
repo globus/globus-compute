@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import pathlib
-import random
 import shutil
 import signal
 import sys
@@ -15,10 +14,9 @@ from string import Template
 import daemon
 import daemon.pidfile
 import psutil
-import requests
 import texttable as tt
 import typer
-from retry import retry
+from retry.api import retry_call
 
 import funcx
 import zmq
@@ -120,10 +118,18 @@ class EndpointManager:
         shutil.copyfile(self.funcx_default_config_template, self.funcx_config_file)
         init_endpoint_dir(self.name)
 
+    def check_endpoint_json(self, endpoint_json, endpoint_uuid):
+        if os.path.exists(endpoint_json):
+            with open(endpoint_json, 'r') as fp:
+                self.logger.debug("Connection info loaded from prior registration record")
+                reg_info = json.load(fp)
+                endpoint_uuid = reg_info['endpoint_id']
+        elif not endpoint_uuid:
+            endpoint_uuid = str(uuid.uuid4())
+        return endpoint_uuid
+
     def start_endpoint(self, name, endpoint_uuid):
         self.name = name
-
-        funcx_client = FuncXClient()
 
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
@@ -153,13 +159,14 @@ class EndpointManager:
         funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
 
         # If previous registration info exists, use that
-        if os.path.exists(endpoint_json):
-            with open(endpoint_json, 'r') as fp:
-                self.logger.debug("Connection info loaded from prior registration record")
-                reg_info = json.load(fp)
-                endpoint_uuid = reg_info['endpoint_id']
-        elif not endpoint_uuid:
-            endpoint_uuid = str(uuid.uuid4())
+        # if os.path.exists(endpoint_json):
+        #     with open(endpoint_json, 'r') as fp:
+        #         self.logger.debug("Connection info loaded from prior registration record")
+        #         reg_info = json.load(fp)
+        #         endpoint_uuid = reg_info['endpoint_id']
+        # elif not endpoint_uuid:
+        #     endpoint_uuid = str(uuid.uuid4())
+        endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
@@ -198,7 +205,7 @@ class EndpointManager:
 
         # Register the endpoint
         self.logger.info("Registering endpoint")
-        reg_info = self.register_endpoint(funcx_client, endpoint_uuid, endpoint_dir)
+        reg_info = retry_call(self.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
         self.logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
         # Configure the parameters for the interchange
@@ -223,7 +230,6 @@ class EndpointManager:
         self.logger.critical("Interchange terminated.")
 
     # Avoid a race condition when starting the endpoint alongside the web service
-    @retry(delay=10, max_delay=300, backoff=1.2)
     def register_endpoint(self, funcx_client, endpoint_uuid, endpoint_dir):
         """Register the endpoint and return the registration info.
 
