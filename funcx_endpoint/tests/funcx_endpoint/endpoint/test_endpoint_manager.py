@@ -116,12 +116,12 @@ class TestStart:
             manager.start_endpoint("mock_endpoint", None)
 
     def test_daemon_launch(self, mocker):
-        mock_register_endpoint = mocker.patch.object(EndpointManager, 'register_endpoint',
-                                                     return_value={'endpoint_id': 'abcde12345',
-                                                                   'public_ip': '127.0.0.1',
-                                                                   'tasks_port': 8080,
-                                                                   'results_port': 8081,
-                                                                   'commands_port': 8082, })
+        mock_register_endpoint = mocker.patch.object(EndpointManager, 'register_endpoint')
+        mock_register_endpoint.return_value = {'endpoint_id': 'abcde12345',
+                                               'public_ip': '127.0.0.1',
+                                               'tasks_port': 8080,
+                                               'results_port': 8081,
+                                               'commands_port': 8082, }
 
         mock_interchange = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.EndpointInterchange')
         mock_interchange.return_value.start.return_value = None
@@ -188,7 +188,8 @@ class TestStart:
             manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
 
     def test_check_endpoint_json_no_json_no_uuid(self, mocker):
-        mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4', return_value=123456)
+        mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4')
+        mock_uuid.return_value=123456
 
         manager = EndpointManager(logger)
         manager.funcx_dir = f'{os.getcwd()}'
