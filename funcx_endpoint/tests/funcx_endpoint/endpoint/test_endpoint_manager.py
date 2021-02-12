@@ -189,7 +189,7 @@ class TestStart:
 
     def test_check_endpoint_json_no_json_no_uuid(self, mocker):
         mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4')
-        mock_uuid.return_value=123456
+        mock_uuid.return_value = 123456
 
         manager = EndpointManager(logger)
         manager.funcx_dir = f'{os.getcwd()}'
