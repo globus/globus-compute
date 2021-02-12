@@ -28,8 +28,10 @@ on existing infrastructure including clouds, clusters, and supercomputers.
 
 .. image:: docs/img/funcx-logo.png
   :target: https://www.funcx.org
+  :width: 400
 
 Website: https://www.funcx.org
+
 Documentation: https://funcx.readthedocs.io/en/latest/
 
 Quickstart
