@@ -1,4 +1,3 @@
-funcx
 bottle
 cherrypy
 nbsphinx
