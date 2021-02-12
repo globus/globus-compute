@@ -158,14 +158,6 @@ class EndpointManager:
 
         funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
 
-        # If previous registration info exists, use that
-        # if os.path.exists(endpoint_json):
-        #     with open(endpoint_json, 'r') as fp:
-        #         self.logger.debug("Connection info loaded from prior registration record")
-        #         reg_info = json.load(fp)
-        #         endpoint_uuid = reg_info['endpoint_id']
-        # elif not endpoint_uuid:
-        #     endpoint_uuid = str(uuid.uuid4())
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
