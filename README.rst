@@ -28,7 +28,7 @@ on existing infrastructure including clouds, clusters, and supercomputers.
 
 .. image:: docs/img/funcx-logo.png
   :target: https://www.funcx.org
-  :width: 400
+  :width: 200
 
 Website: https://www.funcx.org
 
