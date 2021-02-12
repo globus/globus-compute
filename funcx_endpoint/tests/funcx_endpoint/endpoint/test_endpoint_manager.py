@@ -1,5 +1,4 @@
 from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
-from funcx_endpoint.endpoint.endpoint_manager import uuid
 import os
 import logging
 import sys
@@ -87,11 +86,6 @@ class TestStart:
                                                                    'address': 'localhost',
                                                                    'client_ports': '8080'}
 
-        mock_zmq_create = mocker.patch("zmq.auth.create_certificates",
-                                       return_value=("public/key/file", None))
-        mock_zmq_load = mocker.patch("zmq.auth.load_certificate",
-                                     return_value=("12345abcde".encode(), "12345abcde".encode()))
-
         mock_context = mocker.patch("daemon.DaemonContext")
 
         # Allow this mock to be used in a with statement
@@ -99,9 +93,6 @@ class TestStart:
         mock_context.return_value.__exit__.return_value = None
 
         mock_context.return_value.pidfile.path = ''
-
-        mock_daemon = mocker.patch.object(EndpointManager, 'daemon_launch',
-                                          return_value=None)
 
         class mock_load():
             def load_module(self):
@@ -113,7 +104,8 @@ class TestStart:
                         self.config = mock_executors()
                 return mock_config()
 
-        mock_config_load = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.SourceFileLoader', return_value=mock_load())
+        mock_config_load = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.SourceFileLoader')
+        mock_config_load.return_value = mock_load()
 
         manager = EndpointManager(logger)
         manager.funcx_dir = f'{os.getcwd()}'
@@ -129,7 +121,7 @@ class TestStart:
                                                                    'public_ip': '127.0.0.1',
                                                                    'tasks_port': 8080,
                                                                    'results_port': 8081,
-                                                                   'commands_port': 8082,})
+                                                                   'commands_port': 8082, })
 
         mock_interchange = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.EndpointInterchange')
         mock_interchange.return_value.start.return_value = None
@@ -155,7 +147,7 @@ class TestStart:
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
-        reg_info = manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
+        manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
 
     def test_register_endpoint_status_error(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
@@ -168,7 +160,7 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         with pytest.raises(Exception, match='Endpoint registration failed. Service fail reason provided: unknown'):
-            ref_info = manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
+            manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
 
     def test_register_endpoint_no_endpoint_id(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
@@ -180,7 +172,7 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         with pytest.raises(Exception, match='Endpoint ID was not included in the service\'s registration response.'):
-            ref_info = manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
+            manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
 
     def test_register_endpoint_int_endpoint_id(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
@@ -193,10 +185,10 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         with pytest.raises(Exception, match='Endpoint ID sent by the service was not a string.'):
-            ref_info = manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
+            manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
 
     def test_check_endpoint_json_no_json_no_uuid(self, mocker):
-        mock_uuid = mocker.patch.object(uuid, 'uuid4', return_value=123456)
+        mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4', return_value=123456)
 
         manager = EndpointManager(logger)
         manager.funcx_dir = f'{os.getcwd()}'
@@ -206,8 +198,6 @@ class TestStart:
         assert '123456' == manager.check_endpoint_json(os.path.join(config_dir, 'endpoint.json'), None)
 
     def test_check_endpoint_json_no_json_given_uuid(self, mocker):
-        mock_uuid = mocker.patch.object(uuid, 'uuid4', return_value=123456)
-
         manager = EndpointManager(logger)
         manager.funcx_dir = f'{os.getcwd()}'
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
