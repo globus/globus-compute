@@ -15,14 +15,15 @@ class ResponseErrorCode(int, Enum):
     FUNCTION_ACCESS_FORBIDDEN = 8
     ENDPOINT_ACCESS_FORBIDDEN = 9
     FUNCTION_NOT_PERMITTED = 10
-    FORWARDER_REGISTRATION_ERROR = 11
-    FORWARDER_CONTACT_ERROR = 12
-    ENDPOINT_STATS_ERROR = 13
-    LIVENESS_STATS_ERROR = 14
-    REQUEST_KEY_ERROR = 15
-    REQUEST_MALFORMED = 16
-    INTERNAL_ERROR = 17
-    ENDPOINT_OUTDATED = 18
+    ENDPOINT_ALREADY_REGISTERED = 11
+    FORWARDER_REGISTRATION_ERROR = 12
+    FORWARDER_CONTACT_ERROR = 13
+    ENDPOINT_STATS_ERROR = 14
+    LIVENESS_STATS_ERROR = 15
+    REQUEST_KEY_ERROR = 16
+    REQUEST_MALFORMED = 17
+    INTERNAL_ERROR = 18
+    ENDPOINT_OUTDATED = 19
 
 
 # a collection of the HTTP status error codes that the service would make use of
@@ -84,6 +85,8 @@ class FuncxResponseError(Exception, ABC):
                         error_class = UserNotFound
                     elif res_error_code is ResponseErrorCode.FUNCTION_NOT_FOUND:
                         error_class = FunctionNotFound
+                    elif res_error_code is ResponseErrorCode.ENDPOINT_ALREADY_REGISTERED:
+                        error_class = EndpointAlreadyRegistered
                     elif res_error_code is ResponseErrorCode.ENDPOINT_NOT_FOUND:
                         error_class = EndpointNotFound
                     elif res_error_code is ResponseErrorCode.CONTAINER_NOT_FOUND:
@@ -256,6 +259,18 @@ class FunctionNotPermitted(FuncxResponseError):
         self.reason = f"Function {function_uuid} not permitted on endpoint {endpoint_uuid}"
         self.function_uuid = function_uuid
         self.endpoint_uuid = endpoint_uuid
+
+
+class EndpointAlreadyRegistered(FuncxResponseError):
+    """ Endpoint with specified uuid already registered by a different user
+    """
+    code = ResponseErrorCode.ENDPOINT_ALREADY_REGISTERED
+    http_status_code = HTTPStatusCode.BAD_REQUEST
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"Endpoint {uuid} was already registered by a different user"
+        self.uuid = uuid
 
 
 class ForwarderRegistrationError(FuncxResponseError):
