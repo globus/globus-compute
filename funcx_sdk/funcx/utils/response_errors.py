@@ -8,8 +8,8 @@ class ResponseErrorCode(int, Enum):
     USER_NOT_FOUND = 1
     FUNCTION_NOT_FOUND = 2
     ENDPOINT_NOT_FOUND = 3
-    UNAUTHORIZED_FUNCTION_ACCESS = 4
-    UNAUTHORIZED_ENDPOINT_ACCESS = 5
+    FUNCTION_ACCESS_FORBIDDEN = 4
+    ENDPOINT_ACCESS_FORBIDDEN = 5
     FUNCTION_NOT_PERMITTED = 6
     FORWARDER_REGISTRATION_ERROR = 7
     FORWARDER_CONTACT_ERROR = 8
@@ -19,11 +19,31 @@ class ResponseErrorCode(int, Enum):
     REQUEST_MALFORMED = 12
 
 
+# a collection of the HTTP status error codes that the service would make use of
+class HTTPStatusCode(int, Enum):
+    BAD_REQUEST = 400
+    # semantically this response means "unauthenticated", according to the spec
+    UNAUTHORIZED = 401
+    FORBIDDEN = 403
+    NOT_FOUND = 404
+    REQUEST_TIMEOUT = 408
+    TOO_MANY_REQUESTS = 429
+    INTERNAL_SERVER_ERROR = 500
+    NOT_IMPLEMENTED = 501
+    BAD_GATEWAY = 502
+    SERVICE_UNAVAILABLE = 503
+    GATEWAY_TIMEOUT = 504
+
+
 class FuncxResponseError(Exception, ABC):
     """ Base class for all web service response exceptions
     """
     @property
     def code(self):
+        raise NotImplementedError()
+    
+    @property
+    def http_status_code(self):
         raise NotImplementedError()
 
     def __init__(self, reason):
@@ -97,8 +117,10 @@ class UserNotFound(FuncxResponseError):
     """ User not found exception
     """
     code = ResponseErrorCode.USER_NOT_FOUND
+    http_status_code = HTTPStatusCode.NOT_FOUND
 
     def __init__(self, reason):
+        reason = str(reason)
         self.error_args = [reason]
         self.reason = reason
 
@@ -107,6 +129,7 @@ class FunctionNotFound(FuncxResponseError):
     """ Function could not be resolved from the database
     """
     code = ResponseErrorCode.FUNCTION_NOT_FOUND
+    http_status_code = HTTPStatusCode.NOT_FOUND
 
     def __init__(self, uuid):
         self.error_args = [uuid]
@@ -118,6 +141,7 @@ class EndpointNotFound(FuncxResponseError):
     """ Endpoint could not be resolved from the database
     """
     code = ResponseErrorCode.ENDPOINT_NOT_FOUND
+    http_status_code = HTTPStatusCode.NOT_FOUND
 
     def __init__(self, uuid):
         self.error_args = [uuid]
@@ -125,10 +149,11 @@ class EndpointNotFound(FuncxResponseError):
         self.uuid = uuid
 
 
-class UnauthorizedFunctionAccess(FuncxResponseError):
+class FunctionAccessForbidden(FuncxResponseError):
     """ Unauthorized function access by user
     """
-    code = ResponseErrorCode.UNAUTHORIZED_FUNCTION_ACCESS
+    code = ResponseErrorCode.FUNCTION_ACCESS_FORBIDDEN
+    http_status_code = HTTPStatusCode.FORBIDDEN
 
     def __init__(self, uuid):
         self.error_args = [uuid]
@@ -136,10 +161,11 @@ class UnauthorizedFunctionAccess(FuncxResponseError):
         self.uuid = uuid
 
 
-class UnauthorizedEndpointAccess(FuncxResponseError):
+class EndpointAccessForbidden(FuncxResponseError):
     """ Unauthorized endpoint access by user
     """
-    code = ResponseErrorCode.UNAUTHORIZED_ENDPOINT_ACCESS
+    code = ResponseErrorCode.ENDPOINT_ACCESS_FORBIDDEN
+    http_status_code = HTTPStatusCode.FORBIDDEN
 
     def __init__(self, uuid):
         self.error_args = [uuid]
@@ -151,6 +177,7 @@ class FunctionNotPermitted(FuncxResponseError):
     """ Function not permitted on endpoint
     """
     code = ResponseErrorCode.FUNCTION_NOT_PERMITTED
+    http_status_code = HTTPStatusCode.FORBIDDEN
 
     def __init__(self, function_uuid, endpoint_uuid):
         self.error_args = [function_uuid, endpoint_uuid]
@@ -163,8 +190,10 @@ class ForwarderRegistrationError(FuncxResponseError):
     """ Registering the endpoint with the forwarder has failed
     """
     code = ResponseErrorCode.FORWARDER_REGISTRATION_ERROR
+    http_status_code = HTTPStatusCode.BAD_GATEWAY
 
     def __init__(self, error_reason):
+        error_reason = str(error_reason)
         self.error_args = [error_reason]
         self.reason = f"Endpoint registration with forwarder failed - {error_reason}"
 
@@ -173,8 +202,10 @@ class ForwarderContactError(FuncxResponseError):
     """ Contacting the forwarder failed
     """
     code = ResponseErrorCode.FORWARDER_CONTACT_ERROR
+    http_status_code = HTTPStatusCode.BAD_GATEWAY
 
     def __init__(self, error_reason):
+        error_reason = str(error_reason)
         self.error_args = [error_reason]
         self.reason = f"Contacting forwarder failed with {error_reason}"
 
@@ -183,16 +214,19 @@ class EndpointStatsError(FuncxResponseError):
     """ Error while retrieving endpoint stats
     """
     code = ResponseErrorCode.ENDPOINT_STATS_ERROR
+    http_status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR
 
     def __init__(self, endpoint_uuid, error_reason):
+        error_reason = str(error_reason)
         self.error_args = [endpoint_uuid, error_reason]
-        self.reason = f"Unable to retrieve endpoint stats: {endpoint_id}. {e}"
+        self.reason = f"Unable to retrieve stats for endpoint: {endpoint_id}. {e}"
 
 
 class LivenessStatsError(FuncxResponseError):
     """ Error while retrieving endpoint stats
     """
     code = ResponseErrorCode.LIVENESS_STATS_ERROR
+    http_status_code = HTTPStatusCode.BAD_GATEWAY
 
     def __init__(self, http_status_code):
         self.error_args = [http_status_code]
@@ -203,8 +237,10 @@ class RequestKeyError(FuncxResponseError):
     """ User request JSON KeyError exception
     """
     code = ResponseErrorCode.REQUEST_KEY_ERROR
+    http_status_code = HTTPStatusCode.BAD_REQUEST
 
     def __init__(self, key_error_reason):
+        key_error_reason = str(key_error_reason)
         self.error_args = [key_error_reason]
         self.reason = f"Missing key in JSON request - {key_error_reason}"
 
@@ -213,7 +249,9 @@ class RequestMalformed(FuncxResponseError):
     """ User request malformed
     """
     code = ResponseErrorCode.REQUEST_MALFORMED
+    http_status_code = HTTPStatusCode.BAD_REQUEST
 
     def __init__(self, malformed_reason):
+        malformed_reason = str(malformed_reason)
         self.error_args = [malformed_reason]
         self.reason = f"Request Malformed. Missing critical information: {malformed_reason}"
