@@ -5,18 +5,24 @@ from enum import Enum
 # changing existing error codes will cause problems with users that have older SDK versions
 class ResponseErrorCode(int, Enum):
     UNKNOWN_ERROR = 0
-    USER_NOT_FOUND = 1
-    FUNCTION_NOT_FOUND = 2
-    ENDPOINT_NOT_FOUND = 3
-    FUNCTION_ACCESS_FORBIDDEN = 4
-    ENDPOINT_ACCESS_FORBIDDEN = 5
-    FUNCTION_NOT_PERMITTED = 6
-    FORWARDER_REGISTRATION_ERROR = 7
-    FORWARDER_CONTACT_ERROR = 8
-    ENDPOINT_STATS_ERROR = 9
-    LIVENESS_STATS_ERROR = 10
-    REQUEST_KEY_ERROR = 11
-    REQUEST_MALFORMED = 12
+    USER_UNAUTHENTICATED = 1
+    USER_NOT_FOUND = 2
+    FUNCTION_NOT_FOUND = 3
+    ENDPOINT_NOT_FOUND = 4
+    CONTAINER_NOT_FOUND = 5
+    TASK_NOT_FOUND = 6
+    AUTH_GROUP_NOT_FOUND = 7
+    FUNCTION_ACCESS_FORBIDDEN = 8
+    ENDPOINT_ACCESS_FORBIDDEN = 9
+    FUNCTION_NOT_PERMITTED = 10
+    FORWARDER_REGISTRATION_ERROR = 11
+    FORWARDER_CONTACT_ERROR = 12
+    ENDPOINT_STATS_ERROR = 13
+    LIVENESS_STATS_ERROR = 14
+    REQUEST_KEY_ERROR = 15
+    REQUEST_MALFORMED = 16
+    INTERNAL_ERROR = 17
+    ENDPOINT_OUTDATED = 18
 
 
 # a collection of the HTTP status error codes that the service would make use of
@@ -72,12 +78,20 @@ class FuncxResponseError(Exception, ABC):
                     # which we will pass in order to give the user a generic exception below
                     res_error_code = ResponseErrorCode(res_data['code'])
                     error_class = None
-                    if res_error_code is ResponseErrorCode.USER_NOT_FOUND:
+                    if res_error_code is ResponseErrorCode.USER_UNAUTHENTICATED:
+                        error_class = UserUnauthenticated
+                    elif res_error_code is ResponseErrorCode.USER_NOT_FOUND:
                         error_class = UserNotFound
                     elif res_error_code is ResponseErrorCode.FUNCTION_NOT_FOUND:
                         error_class = FunctionNotFound
                     elif res_error_code is ResponseErrorCode.ENDPOINT_NOT_FOUND:
                         error_class = EndpointNotFound
+                    elif res_error_code is ResponseErrorCode.CONTAINER_NOT_FOUND:
+                        error_class = ContainerNotFound
+                    elif res_error_code is ResponseErrorCode.TASK_NOT_FOUND:
+                        error_class = TaskNotFound
+                    elif res_error_code is ResponseErrorCode.AUTH_GROUP_NOT_FOUND:
+                        error_class = AuthGroupNotFound
                     elif res_error_code is ResponseErrorCode.UNAUTHORIZED_FUNCTION_ACCESS:
                         error_class = UnauthorizedFunctionAccess
                     elif res_error_code is ResponseErrorCode.UNAUTHORIZED_ENDPOINT_ACCESS:
@@ -96,6 +110,10 @@ class FuncxResponseError(Exception, ABC):
                         error_class = RequestKeyError
                     elif res_error_code is ResponseErrorCode.REQUEST_MALFORMED:
                         error_class = RequestMalformed
+                    elif res_error_code is ResponseErrorCode.INTERNAL_ERROR:
+                        error_class = InternalError
+                    elif res_error_code is ResponseErrorCode.ENDPOINT_OUTDATED:
+                        error_class = EndpointOutdated
 
                     if error_class is not None:
                         return error_class(*res_data['error_args'])
@@ -113,8 +131,26 @@ class FuncxResponseError(Exception, ABC):
         return None
 
 
+class UserUnauthenticated(FuncxResponseError):
+    """ User unauthenticated. This differs from UserNotFound in that it has a 401 HTTP
+    status code, whereas UserNotFound has a 404 status code. This error should be used
+    when the user's request failed because the user was unauthenticated, regardless of
+    whether the request itself required looking up user info.
+    """
+    code = ResponseErrorCode.USER_UNAUTHENTICATED
+    # this HTTP status code is called unauthorized but really means "unauthenticated"
+    # according to the spec
+    http_status_code = HTTPStatusCode.UNAUTHORIZED
+
+    def __init__(self):
+        self.error_args = []
+        self.reason = "Could not find user. You must be logged in to perform this function."
+
+
 class UserNotFound(FuncxResponseError):
-    """ User not found exception
+    """ User not found exception. This error should only be used when the server must
+    look up a user in order to fulfill the user's request body. If the request only
+    fails because the user is unauthenticated, UserUnauthenticated should be used instead.
     """
     code = ResponseErrorCode.USER_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
@@ -146,6 +182,42 @@ class EndpointNotFound(FuncxResponseError):
     def __init__(self, uuid):
         self.error_args = [uuid]
         self.reason = f"Endpoint {uuid} could not be resolved"
+        self.uuid = uuid
+
+
+class ContainerNotFound(FuncxResponseError):
+    """ Container could not be resolved
+    """
+    code = ResponseErrorCode.CONTAINER_NOT_FOUND
+    http_status_code = HTTPStatusCode.NOT_FOUND
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"Container {uuid} not found"
+        self.uuid = uuid
+
+
+class TaskNotFound(FuncxResponseError):
+    """ Task could not be resolved
+    """
+    code = ResponseErrorCode.TASK_NOT_FOUND
+    http_status_code = HTTPStatusCode.NOT_FOUND
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"Task {uuid} not found"
+        self.uuid = uuid
+
+
+class AuthGroupNotFound(FuncxResponseError):
+    """ AuthGroup could not be resolved
+    """
+    code = ResponseErrorCode.AUTH_GROUP_NOT_FOUND
+    http_status_code = HTTPStatusCode.NOT_FOUND
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"AuthGroup {uuid} not found"
         self.uuid = uuid
 
 
@@ -219,7 +291,7 @@ class EndpointStatsError(FuncxResponseError):
     def __init__(self, endpoint_uuid, error_reason):
         error_reason = str(error_reason)
         self.error_args = [endpoint_uuid, error_reason]
-        self.reason = f"Unable to retrieve stats for endpoint: {endpoint_id}. {e}"
+        self.reason = f"Unable to retrieve stats for endpoint: {endpoint_uuid}. {error_reason}"
 
 
 class LivenessStatsError(FuncxResponseError):
@@ -255,3 +327,26 @@ class RequestMalformed(FuncxResponseError):
         malformed_reason = str(malformed_reason)
         self.error_args = [malformed_reason]
         self.reason = f"Request Malformed. Missing critical information: {malformed_reason}"
+
+
+class InternalError(FuncxResponseError):
+    """ Internal server error
+    """
+    code = ResponseErrorCode.INTERNAL_ERROR
+    http_status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR
+
+    def __init__(self, error_reason):
+        error_reason = str(error_reason)
+        self.error_args = [error_reason]
+        self.reason = f"Internal server error: {error_reason}"
+
+
+class EndpointOutdated(FuncxResponseError):
+    """ Internal server error
+    """
+    code = ResponseErrorCode.ENDPOINT_OUTDATED
+    http_status_code = HTTPStatusCode.BAD_REQUEST
+
+    def __init__(self, min_ep_version):
+        self.error_args = [min_ep_version]
+        self.reason = f"Endpoint is out of date. Minimum supported endpoint version is {min_ep_version}"
