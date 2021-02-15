@@ -1,6 +1,7 @@
 from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
 from funcx_endpoint.strategies.simple import SimpleStrategy
+from funcx_endpoint.executors import HighThroughputExecutor
 
 
 class Config(RepresentationMixin):
@@ -61,6 +62,10 @@ class Config(RepresentationMixin):
     """
 
     def __init__(self,
+
+                 # Execution backed
+                 executors: list = [HighThroughputExecutor()],
+
                  # Scaling mechanics
                  provider=LocalProvider(),
                  scaling_enabled=True,
@@ -68,12 +73,7 @@ class Config(RepresentationMixin):
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
                  funcx_service_address='https://api.funcx.org/v1',
-                 # Scaling info
-                 strategy=SimpleStrategy(),
-                 max_workers_per_node=float('inf'),
-                 cores_per_worker=1.0,
-                 mem_per_worker=None,
-                 launch_cmd=None,
+
                  # Tuning info
                  worker_mode='no_container',
                  scheduler_mode='hard',
@@ -82,15 +82,18 @@ class Config(RepresentationMixin):
                  heartbeat_period=30,
                  heartbeat_threshold=120,
                  poll_period=10,
+                 detach_endpoint=True,
                  # Logging info
                  log_max_bytes=256 * 1024 * 1024,  # in bytes
                  log_backup_count=1,
                  working_dir=None,
-                 worker_debug=False,
                  stdout="./interchange.stdout",
                  stderr="./interchange.stderr",
-                 detach_endpoint=True,
-                 interchange_file_logger=True):
+                 worker_debug=False):
+
+        # Execution backends
+        self.executors = executors  # List of executors
+
         # Scaling mechanics
         self.provider = provider
         self.scaling_enabled = scaling_enabled
@@ -100,13 +103,6 @@ class Config(RepresentationMixin):
         self.worker_port_range = worker_port_range
         self.funcx_service_address = funcx_service_address
 
-        # Scaling info
-        self.strategy = strategy
-        self.max_workers_per_node = max_workers_per_node
-        self.cores_per_worker = cores_per_worker
-        self.mem_per_worker = mem_per_worker
-        self.launch_cmd = launch_cmd
-
         # Tuning info
         self.worker_mode = worker_mode
         self.scheduler_mode = scheduler_mode
@@ -115,6 +111,7 @@ class Config(RepresentationMixin):
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
+        self.detach_endpoint = detach_endpoint
 
         # Logging info
         self.log_max_bytes = log_max_bytes
@@ -123,7 +120,3 @@ class Config(RepresentationMixin):
         self.worker_debug = worker_debug
         self.stdout = stdout
         self.stderr = stderr
-        self.interchange_file_logger = interchange_file_logger
-
-        # Endpoint behavior
-        self.detach_endpoint = detach_endpoint

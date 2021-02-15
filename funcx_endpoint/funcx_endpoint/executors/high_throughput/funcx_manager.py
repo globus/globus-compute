@@ -20,6 +20,8 @@ import subprocess
 from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
 from funcx_endpoint.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
+from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
 
 from parsl.version import VERSION as PARSL_VERSION
@@ -314,25 +316,28 @@ class Manager(object):
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
                 poll_timer = 0
                 _, pkl_msg = self.task_incoming.recv_multipart()
-                tasks = pickle.loads(pkl_msg)
+                message = pickle.loads(pkl_msg)
                 last_interchange_contact = time.time()
 
-                if tasks == 'STOP':
+                if message == 'STOP':
                     logger.critical("[TASK_PULL_THREAD] Received stop request")
                     kill_event.set()
                     break
 
-                elif tasks == HEARTBEAT_CODE:
+                elif message == HEARTBEAT_CODE:
                     logger.debug("Got heartbeat from interchange")
 
                 else:
+                    logger.warning("YADU: RAW Tasks {}".format(message))
+                    tasks = [Message.unpack(rt) for rt in message]
+
                     task_recv_counter += len(tasks)
-                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t['task_id'] for t in tasks],
+                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t.task_id for t in tasks],
                                                                                  task_recv_counter))
 
                     for task in tasks:
                         # Set default type to raw
-                        task_type = task['container']
+                        task_type = task.container_id
 
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
@@ -342,7 +347,7 @@ class Manager(object):
                             self.outstanding_task_count[task_type] = 0
                         self.task_queues[task_type].put(task)
                         self.outstanding_task_count[task_type] += 1
-                        self.task_type_mapping[task['task_id']] = task_type
+                        self.task_type_mapping[task.task_id] = task_type
                         logger.debug("Got task: Outstanding task counts: {}".format(self.outstanding_task_count))
                         logger.debug("Task {} pushed to a task queue {}".format(task, task_type))
 
@@ -410,8 +415,9 @@ class Manager(object):
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
 
-                            logger.debug("Sending task {} to {}".format(task['task_id'], worker_id))
-                            to_send = [worker_id, pickle.dumps(task['task_id']), task['buffer']]
+                            logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
+                            # TODO: Some duplication of work could be avoided here
+                            to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
                             if task['task_id'] != pickle.dumps(b"KILL"):
@@ -559,11 +565,12 @@ def cli_run():
 
     try:
         global logger
+        # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
         logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
-                                 name='funcx_endpoint',
+                                 name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,
-                                 max_bytes=float(args.log_max_bytes),
-                                 backup_count=int(args.log_backup_count))
+                                 max_bytes=float(args.log_max_bytes),  # TODO: Test if this still works on forwarder_rearch_1
+                                 backup_count=int(args.log_backup_count))  # TODO: Test if this still works on forwarder_rearch_1
 
         logger.info("Python version: {}".format(sys.version))
         logger.info("Debug logging: {}".format(args.debug))

@@ -20,12 +20,13 @@ import texttable as tt
 import typer
 
 import funcx
-from funcx.utils.errors import *
-from funcx_endpoint.executors.high_throughput import default_config as endpoint_default_config
-from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
-from funcx_endpoint.executors.high_throughput.interchange import Interchange
-from funcx.sdk.client import FuncXClient
+import zmq
 
+from funcx.utils.errors import *
+from funcx_endpoint.endpoint import default_config as endpoint_default_config
+from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
+from funcx_endpoint.endpoint.interchange import EndpointInterchange
+from funcx.sdk.client import FuncXClient
 
 FUNCX_CONFIG_FILE_NAME = 'config.py'
 
@@ -42,8 +43,8 @@ class State:
 
 def version_callback(value):
     if value:
-        from funcx_endpoint.endpoint import VERSION
-        typer.echo("FuncX endpoint version: {}".format(VERSION))
+        import funcx_endpoint
+        typer.echo("FuncX endpoint version: {}".format(funcx_endpoint.__version__))
         raise typer.Exit()
 
 
@@ -143,39 +144,6 @@ def init_endpoint():
     init_endpoint_dir("default")
 
 
-def register_with_hub(endpoint_uuid, endpoint_dir, address,
-                      redis_host='funcx-redis.wtgh6h.0001.use1.cache.amazonaws.com'):
-    """ This currently registers directly with the Forwarder micro service.
-
-    Can be used as an example of how to make calls this it, while the main API
-    is updated to do this calling on behalf of the endpoint in the second iteration.
-    """
-    print("Picking source as a mock site")
-    sites = ['128.135.112.73', '140.221.69.24',
-             '52.86.208.63', '129.114.63.99',
-             '128.219.134.72', '134.79.129.79']
-    ip_addr = random.choice(sites)
-    try:
-        r = requests.post(address + '/register',
-                          json={'endpoint_id': endpoint_uuid,
-                                'endpoint_addr': ip_addr,
-                                'redis_address': redis_host})
-    except requests.exceptions.ConnectionError:
-        logger.critical("Unable to reach the funcX hub at {}".format(address))
-        exit(-1)
-
-    if r.status_code != 200:
-        print(dir(r))
-        print(r)
-        raise RegistrationError(r.reason)
-
-    with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
-        json.dump(r.json(), fp)
-        logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
-
-    return r.json()
-
-
 @app.command(name="configure", help="Configure an endpoint")
 def configure_endpoint(
         name: str = typer.Argument("default", help="endpoint name", autocompletion=complete_endpoint_name),
@@ -220,8 +188,8 @@ def start_endpoint(
           1     4                 6
           |     v                 |
     +-----+-----+-----+           v
-    |      Start      |---5---> Interchange
-    |     Endpoint    |        daemon
+    |      Start      |---5---> EndpointInterchange
+    |     Endpoint    |         daemon
     +-----------------+
 
     Parameters
@@ -244,8 +212,19 @@ def start_endpoint(
         '''.format(name))
         return
 
+    # These certs need to be recreated for every registration
+    keys_dir = os.path.join(endpoint_dir, 'certificates')
+    os.makedirs(keys_dir, exist_ok=True)
+    client_public_file, client_secret_file = zmq.auth.create_certificates(keys_dir, "endpoint")
+    client_public_key, _ = zmq.auth.load_certificate(client_public_file)
+    client_public_key = client_public_key.decode('utf-8')
+
     endpoint_config = SourceFileLoader('config',
                                        os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
+
+    # This is to ensure that at least 1 executor is defined
+    if not endpoint_config.config.executors:
+        raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
     funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
 
@@ -288,9 +267,8 @@ def start_endpoint(
                                        stderr=stderr,
                                        detach_process=endpoint_config.config.detach_endpoint
                                        )
-    except Exception as e:
-        logger.critical("Caught exception while trying to setup endpoint context dirs")
-        logger.critical("Exception: ", e)
+    except Exception:
+        logger.exception("Caught exception while trying to setup endpoint context dirs")
 
     check_pidfile(context.pidfile.path, "funcx-endpoint", name)
 
@@ -300,64 +278,35 @@ def start_endpoint(
         os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
 
     with context:
-        while True:
-            if reg_info is None:
-                # this registration will continue retrying every 5s until the
-                # endpoint is successfully registered with the service
-                reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, True)
-
-            # Configure the parameters for the interchange
-            optionals = {}
-            optionals['client_address'] = reg_info['address']
-            optionals['client_ports'] = reg_info['client_ports'].split(',')
-            if 'endpoint_address' in State.FUNCX_CONFIG:
-                optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
-
-            optionals['logdir'] = endpoint_dir
-
-            if State.DEBUG:
-                optionals['logging_level'] = logging.DEBUG
-
-            ic = Interchange(endpoint_config.config, endpoint_id=endpoint_uuid, **optionals)
-            ic.start()
-            ic.stop()
-
-            logger.critical("Interchange terminated.")
-            time.sleep(10)
-            # clear reg_info so that registration will happen again in the next loop iteration
-            reg_info = None
-
-
-def handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir, retry=False):
-    # Register the endpoint
-    logger.info("Registering endpoint")
-    if State.FUNCX_CONFIG.get('broker_test', False) is True:
-        logger.warning("**************** BROKER State.DEBUG MODE *******************")
-        reg_info = register_with_hub(endpoint_uuid,
-                                     endpoint_dir,
-                                     State.FUNCX_CONFIG['broker_address'],
-                                     State.FUNCX_CONFIG['redis_host'])
-    elif retry:
-
-        # this will retry the registration process every 5s until it succeeds
-        while True:
-            try:
-                reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
-                break
-            except Exception as e:
-                logger.critical(e)
-                logger.warning("Retrying registration in 5s")
-                time.sleep(5)
-                continue
-    else:
+        # _endpo the endpoint
+        logger.info("Registering endpoint")
         reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
+        logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
-    logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+        # Configure the parameters for the interchange
+        optionals = {}
+        optionals['client_address'] = reg_info['public_ip']
+        optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
+        if 'endpoint_address' in State.FUNCX_CONFIG:
+            optionals['interchange_address'] = State.FUNCX_CONFIG['endpoint_address']
 
-    return reg_info
+        optionals['logdir'] = endpoint_dir
+
+        if State.DEBUG:
+            optionals['logging_level'] = logging.DEBUG
+
+        ic = EndpointInterchange(endpoint_config.config,
+                                 endpoint_id=endpoint_uuid,
+                                 keys_dir=keys_dir,
+                                 **optionals)
+        ic.start()
+        ic.stop()
+
+        logger.critical("Interchange terminated.")
 
 
 # Avoid a race condition when starting the endpoint alongside the web service
+@retry(delay=10, max_delay=300, backoff=1.2, logger=logging.getLogger('funcx'))
 def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """Register the endpoint and return the registration info.
 
@@ -379,10 +328,25 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     """
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
-    from funcx_endpoint.endpoint.version import VERSION as ENDPOINT_VERSION
+    import funcx_endpoint
     reg_info = funcx_client.register_endpoint(endpoint_name,
                                               endpoint_uuid,
-                                              endpoint_version=ENDPOINT_VERSION)
+                                              endpoint_version=funcx_endpoint.__version__)
+
+    # the service will send back a message with a 'status'='error'
+    # property if something went wrong
+    if 'status' in reg_info and reg_info['status'] == 'error':
+        msg = "Endpoint registration failed."
+        if 'reason' in reg_info:
+            msg = "Endpoint registration failed. Service fail reason provided: {}".format(reg_info['reason'])
+        raise Exception(msg)
+
+    # this is a backup error handler in case an endpoint ID is not sent back
+    # from the service or a bad ID is sent back
+    if 'endpoint_id' not in reg_info:
+        raise Exception("Endpoint ID was not included in the service's registration response.")
+    elif not isinstance(reg_info['endpoint_id'], str):
+        raise Exception("Endpoint ID sent by the service was not a string.")
 
     # the service will send back a message with a 'status'='error'
     # property if something went wrong
@@ -402,6 +366,17 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
         logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
+
+    certs_dir = os.path.join(endpoint_dir, 'certificates')
+    os.makedirs(certs_dir, exist_ok=True)
+    server_keyfile = os.path.join(certs_dir, 'server.key')
+    logger.debug(f"Writing server key to {server_keyfile}")
+    try:
+        with open(server_keyfile, 'w') as f:
+            f.write(reg_info['forwarder_pubkey'])
+            os.chmod(server_keyfile, 0o600)
+    except Exception:
+        logger.exception("Failed to write server certificate")
 
     return reg_info
 
@@ -425,8 +400,9 @@ def stop_endpoint(name: str = typer.Argument("default", autocompletion=complete_
             logger.debug("Signalling process: {}".format(pid))
             os.kill(pid, signal.SIGTERM)
             time.sleep(0.1)
-            os.kill(pid, signal.SIGKILL)
-            time.sleep(0.1)
+            if os.path.exists(pid_file):
+                os.kill(pid, signal.SIGKILL)
+                time.sleep(0.1)
             # Wait to confirm that the pid file disappears
             if not os.path.exists(pid_file):
                 logger.info("Endpoint <{}> is now stopped".format(name))
