@@ -237,9 +237,5 @@ class FunctionSearchResults(list):
 
         # if we also saved the source code of the function, we could interactively
         # generate a cell to edit the searched function
-        #ipython = get_ipython()
-        #if ipython:
-        #    ipython.set_next_input(func_source)
-        #else:
         # TODO: Strip the ipython bits and remove entirely
         print(func_source)

@@ -240,6 +240,13 @@ def start_endpoint(
 
     logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
+    # attempt the first registration before the daemon is started
+    try:
+        reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
+    except Exception as e:
+        logger.critical(e)
+        return
+
     # Create a daemon context
     # If we are running a full detached daemon then we will send the output to
     # log files, otherwise we can piggy back on our stdout
@@ -272,7 +279,7 @@ def start_endpoint(
         os.path.join(endpoint_dir, FUNCX_CONFIG_FILE_NAME)).load_module()
 
     with context:
-        # Register the endpoint
+        # _endpo the endpoint
         logger.info("Registering endpoint")
         reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
         logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
@@ -326,6 +333,21 @@ def register_endpoint(funcx_client, endpoint_name, endpoint_uuid, endpoint_dir):
     reg_info = funcx_client.register_endpoint(endpoint_name,
                                               endpoint_uuid,
                                               endpoint_version=funcx_endpoint.__version__)
+
+    # the service will send back a message with a 'status'='error'
+    # property if something went wrong
+    if 'status' in reg_info and reg_info['status'] == 'error':
+        msg = "Endpoint registration failed."
+        if 'reason' in reg_info:
+            msg = "Endpoint registration failed. Service fail reason provided: {}".format(reg_info['reason'])
+        raise Exception(msg)
+
+    # this is a backup error handler in case an endpoint ID is not sent back
+    # from the service or a bad ID is sent back
+    if 'endpoint_id' not in reg_info:
+        raise Exception("Endpoint ID was not included in the service's registration response.")
+    elif not isinstance(reg_info['endpoint_id'], str):
+        raise Exception("Endpoint ID sent by the service was not a string.")
 
     # the service will send back a message with a 'status'='error'
     # property if something went wrong
