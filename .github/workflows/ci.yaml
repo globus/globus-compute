@@ -28,10 +28,10 @@ jobs:
         python -m pip install -r funcx_sdk/requirements.txt
         python -m pip install -r funcx_sdk/test-requirements.txt
         pip list
-    - name: Check for vulnerabilities in libraries
-      run: |
-        pip install safety
-        pip freeze | safety check
+#    - name: Check for vulnerabilities in libraries
+#      run: |
+#        pip install safety
+#        pip freeze | safety check
     - name: Test sdk by just importing
       run: |
         cd funcx_sdk
@@ -50,10 +50,10 @@ jobs:
         python -m pip install -r funcx_endpoint/requirements.txt
         python -m pip install -r funcx_endpoint/test-requirements.txt
         pip list
-    - name: Check for vulnerabilities in libraries
-      run: |
-        pip install safety
-        pip freeze | safety check
+#    - name: Check for vulnerabilities in libraries
+#      run: |
+#        pip install safety
+#        pip freeze | safety check
     - name: Test funcx-endpoint by just importing
       run: |
         cd funcx_endpoint
