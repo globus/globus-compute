@@ -84,7 +84,7 @@ class TestStart:
         mock_zmq_create.assert_called_with(os.path.join(config_dir, "certificates"), "endpoint")
         mock_zmq_load.assert_called_with("public/key/file")
 
-        mock_daemon.assert_called_with(mock_client(), '123456', config_dir, os.path.join(config_dir, "certificates"))
+        mock_daemon.assert_called_with(mock_client(), '123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config)
 
         mock_context.assert_called_with(working_directory=config_dir,
                                         umask=0o002,
@@ -145,8 +145,7 @@ class TestStart:
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader('config',
                                            os.path.join(config_dir, 'config.py')).load_module()
-        manager.endpoint_config = endpoint_config
-        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir')
+        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config)
 
         mock_register_endpoint.assert_called_with(mock_client(), 'mock_endpoint_uuid', config_dir)
 
@@ -186,8 +185,7 @@ class TestStart:
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader('config',
                                            os.path.join(config_dir, 'config.py')).load_module()
-        manager.endpoint_config = endpoint_config
-        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir')
+        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config)
 
         mock_interchange.assert_called_with(endpoint_config.config,
                                             endpoint_id='mock_endpoint_uuid',

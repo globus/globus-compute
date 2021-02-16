@@ -20,6 +20,7 @@ from retry.api import retry_call
 import funcx
 import zmq
 
+import funcx_endpoint
 from funcx.utils.errors import *
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
@@ -35,7 +36,6 @@ class EndpointManager:
         self.funcx_config_file = os.path.join(self.funcx_dir, self.funcx_config_file_name)
         self.funcx_default_config_template = funcx_default_config.__file__
         self.funcx_config = {}
-        self.endpoint_config = None
         self.name = 'default'
         self.logger = logger
 
@@ -130,7 +130,6 @@ class EndpointManager:
 
     def start_endpoint(self, name, endpoint_uuid, endpoint_config):
         self.name = name
-        self.endpoint_config = endpoint_config
 
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
@@ -151,10 +150,10 @@ class EndpointManager:
         client_public_key = client_public_key.decode('utf-8')
 
         # This is to ensure that at least 1 executor is defined
-        if not self.endpoint_config.config.executors:
+        if not endpoint_config.config.executors:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
-        funcx_client = FuncXClient(funcx_service_address=self.endpoint_config.config.funcx_service_address)
+        funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
@@ -163,9 +162,9 @@ class EndpointManager:
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
-        if self.endpoint_config.config.detach_endpoint:
-            stdout = open(os.path.join(endpoint_dir, self.endpoint_config.config.stdout), 'w+')
-            stderr = open(os.path.join(endpoint_dir, self.endpoint_config.config.stderr), 'w+')
+        if endpoint_config.config.detach_endpoint:
+            stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'w+')
+            stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'w+')
         else:
             stdout = sys.stdout
             stderr = sys.stderr
@@ -177,17 +176,18 @@ class EndpointManager:
                                                os.path.join(endpoint_dir, 'daemon.pid')),
                                            stdout=stdout,
                                            stderr=stderr,
-                                           detach_process=self.endpoint_config.config.detach_endpoint)
+                                           detach_process=endpoint_config.config.detach_endpoint)
 
         except Exception:
             self.logger.exception("Caught exception while trying to setup endpoint context dirs")
+            sys.exit(-1)
 
         self.check_pidfile(context.pidfile.path, "funcx-endpoint")
 
         with context:
-            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir)
+            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config)
 
-    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir):
+    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config):
         # Register the endpoint
         self.logger.info("Registering endpoint")
         reg_info = retry_call(self.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
@@ -205,7 +205,7 @@ class EndpointManager:
         if self.DEBUG:
             optionals['logging_level'] = logging.DEBUG
 
-        ic = EndpointInterchange(self.endpoint_config.config,
+        ic = EndpointInterchange(endpoint_config.config,
                                  endpoint_id=endpoint_uuid,
                                  keys_dir=keys_dir,
                                  **optionals)
@@ -233,7 +233,6 @@ class EndpointManager:
         """
         self.logger.debug("Attempting registration")
         self.logger.debug(f"Trying with eid : {endpoint_uuid}")
-        import funcx_endpoint
         reg_info = funcx_client.register_endpoint(self.name,
                                                   endpoint_uuid,
                                                   endpoint_version=funcx_endpoint.__version__)
