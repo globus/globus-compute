@@ -2,7 +2,7 @@ import os
 from setuptools import setup, find_namespace_packages
 
 version_ns = {}
-with open(os.path.join("funcx", "endpoint", "version.py")) as f:
+with open(os.path.join("funcx_endpoint", "endpoint", "version.py")) as f:
     exec(f.read(), version_ns)
 version = version_ns['VERSION']
 
@@ -12,7 +12,7 @@ with open('requirements.txt') as f:
 setup(
     name='funcx-endpoint',
     version=version,
-    packages=find_namespace_packages(include=['funcx.*']),
+    packages=find_namespace_packages(include=['funcx_endpoint.*']),
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
     python_requires=">=3.6.0",
@@ -31,10 +31,10 @@ setup(
         "Function Serving"
     ],
     entry_points={'console_scripts':
-                  ['funcx-endpoint=funcx.endpoint.endpoint:cli_run',
-                   'funcx-interchange=funcx.executors.high_throughput.interchange:cli_run',
-                   'funcx-manager=funcx.executors.high_throughput.funcx_manager:cli_run',
-                   'funcx-worker=funcx.executors.high_throughput.funcx_worker:cli_run',
+                  ['funcx-endpoint=funcx_endpoint.endpoint.endpoint:cli_run',
+                   'funcx-interchange=funcx_endpoint.executors.high_throughput.interchange:cli_run',
+                   'funcx-manager=funcx_endpoint.executors.high_throughput.funcx_manager:cli_run',
+                   'funcx-worker=funcx_endpoint.executors.high_throughput.funcx_worker:cli_run',
                   ]
     },
     author='funcX team',
