@@ -48,7 +48,6 @@ BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
 
 
-#class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
     """Executor designed for cluster-scale
 
