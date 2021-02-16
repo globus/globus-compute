@@ -1,7 +1,5 @@
-bottle
-cherrypy
-nbsphinx
-Flask>=1.0.2
-sphinx_rtd_theme
-redis
-flake8==3.8.0
+pytest>=5.2
+coverage>=5.2
+codecov==2.1.8
+pytest-mock==3.2.0
+flake8>=3.8
