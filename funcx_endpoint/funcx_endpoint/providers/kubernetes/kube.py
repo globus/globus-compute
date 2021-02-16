@@ -326,3 +326,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
     @property
     def label(self):
         return "kubernetes"
+
+    @property
+    def status_polling_interval(self):
+        return 60

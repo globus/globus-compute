@@ -48,17 +48,17 @@ class KubeSimpleStrategy(BaseStrategy):
         task_breakdown = self.interchange.get_outstanding_breakdown()
         logger.debug(f"Task breakdown {task_breakdown}")
 
-        min_blocks = self.interchange.config.provider.min_blocks
-        max_blocks = self.interchange.config.provider.max_blocks
+        min_blocks = self.interchange.provider.min_blocks
+        max_blocks = self.interchange.provider.max_blocks
 
         # Here we assume that each node has atleast 4 workers
 
-        tasks_per_node = self.interchange.config.max_workers_per_node
-        if self.interchange.config.max_workers_per_node == float('inf'):
+        tasks_per_node = self.interchange.max_workers_per_node
+        if self.interchange.max_workers_per_node == float('inf'):
             tasks_per_node = 1
 
-        nodes_per_block = self.interchange.config.provider.nodes_per_block
-        parallelism = self.interchange.config.provider.parallelism
+        nodes_per_block = self.interchange.provider.nodes_per_block
+        parallelism = self.interchange.provider.parallelism
 
         active_tasks = self.interchange.get_total_tasks_outstanding()
         logger.debug(f"Pending tasks : {active_tasks}")
