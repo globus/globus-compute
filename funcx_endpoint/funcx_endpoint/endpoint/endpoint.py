@@ -89,8 +89,10 @@ def start_endpoint(
     name : str
     endpoint_uuid : str
     """
-
-    manager.start_endpoint(name, endpoint_uuid)
+    endpoint_dir = os.path.join(manager.funcx_dir, name)
+    endpoint_config = SourceFileLoader('config',
+                                       os.path.join(endpoint_dir, manager.funcx_config_file_name)).load_module()
+    manager.start_endpoint(name, endpoint_uuid, endpoint_config)
 
 
 @app.command(name="stop")
