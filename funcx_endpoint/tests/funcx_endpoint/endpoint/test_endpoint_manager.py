@@ -89,8 +89,8 @@ class TestStart:
         mock_context.assert_called_with(working_directory=config_dir,
                                         umask=0o002,
                                         pidfile=None,
-                                        stdout=ANY, # open(os.path.join(config_dir, './interchange.stdout'), 'w+'),
-                                        stderr=ANY, # open(os.path.join(config_dir, './interchange.stderr'), 'w+'),
+                                        stdout=ANY,  # open(os.path.join(config_dir, './interchange.stdout'), 'w+'),
+                                        stderr=ANY,  # open(os.path.join(config_dir, './interchange.stderr'), 'w+'),
                                         detach_process=True)
 
     def test_start_without_executors(self, mocker):
@@ -176,7 +176,6 @@ class TestStart:
 
         mock_funcx_config = {}
         mock_funcx_config['endpoint_address'] = '127.0.0.1'
-
 
         manager = EndpointManager(logger)
         manager.funcx_dir = f'{os.getcwd()}'
