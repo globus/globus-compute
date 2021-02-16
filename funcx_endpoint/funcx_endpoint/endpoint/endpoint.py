@@ -242,8 +242,11 @@ def start_endpoint(
 
     # attempt the first registration before the daemon is started
     try:
-        reg_info = handle_start_registration(funcx_client, name, endpoint_uuid, endpoint_dir)
+        reg_info = register_endpoint(funcx_client, name, endpoint_uuid, endpoint_dir)
     except Exception as e:
+        # register_endpoint is on a retry loop, that should block indefinitely
+        # if the remote side is unreachable. Ideally we should differentiate
+        # why the registration failed, and respond accordingly.
         logger.critical(e)
         return
 
