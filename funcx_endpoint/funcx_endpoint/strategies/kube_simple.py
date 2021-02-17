@@ -44,17 +44,17 @@ class KubeSimpleStrategy(BaseStrategy):
             pass
 
     def _strategize(self, *args, **kwargs):
-        max_pods = self.interchange.config.provider.max_blocks
-        min_pods = self.interchange.config.provider.min_blocks
+        max_pods = self.interchange.provider.max_blocks
+        min_pods = self.interchange.provider.min_blocks
 
         # Kubernetes provider only supports one manager in a pod
         managers_per_pod = 1
 
-        workers_per_pod = self.interchange.config.max_workers_per_node
+        workers_per_pod = self.interchange.max_workers_per_node
         if workers_per_pod == float('inf'):
             workers_per_pod = 1
 
-        parallelism = self.interchange.config.provider.parallelism
+        parallelism = self.interchange.provider.parallelism
 
         active_tasks = self.interchange.get_total_tasks_outstanding()
         logger.debug(f"Pending tasks : {active_tasks}")
