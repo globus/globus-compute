@@ -238,7 +238,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
     def get_batch_result(self, task_id_list):
         """ Request status for a batch of task_ids
         """
-        assert isinstance(task_id_list, list), "get_batch_status expects a list of task ids"
+        assert isinstance(task_id_list, list), "get_batch_result expects a list of task ids"
 
         pending_task_ids = [t for t in task_id_list if t not in self.func_table]
 
@@ -260,7 +260,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 except KeyError:
                     logger.debug("Task {} info was not available in the batch status")
                 except Exception:
-                    logger.exception("Failure while unpacking results fom get_batch_status")
+                    logger.exception("Failure while unpacking results fom get_batch_result")
             else:
                 results[task_id] = self.func_table[task_id]
 
