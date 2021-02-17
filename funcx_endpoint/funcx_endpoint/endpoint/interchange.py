@@ -210,6 +210,11 @@ class EndpointInterchange(object):
         self.executors = {}
         for executor in self.config.executors:
             logger.info(f"Initializing executor: {executor.label}")
+            if not executor.endpoint_id:
+                executor.endpoint_id = self.endpoint_id
+            else:
+                if not executor.endpoint_id == self.endpoint_id:
+                    raise Exception('InconsistentEndpointId')
             self.executors[executor.label] = executor
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
