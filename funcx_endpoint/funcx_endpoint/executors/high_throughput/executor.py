@@ -249,7 +249,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.managed = managed
         self.blocks = []
         self.cores_per_worker = cores_per_worker
-        self.endpoint_id = endpoint_id if endpoint_id else str(uuid.uuid4())
+        self.endpoint_id = endpoint_id
         self._task_counter = 0
         self.address = address
         self.worker_ports = worker_ports
