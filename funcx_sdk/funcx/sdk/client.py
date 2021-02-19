@@ -11,10 +11,9 @@ from funcx.sdk.search import SearchHelper, FunctionSearchResults
 
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
-from funcx.sdk.utils import throttling
+from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
 from funcx.sdk.utils.batch import Batch
-from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError, HTTPError
-from funcx.utils.handle_service_response import handle_response_errors
+from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError
 
 try:
     from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
@@ -28,7 +27,7 @@ from funcx.sdk import VERSION as SDK_VERSION
 logger = logging.getLogger(__name__)
 
 
-class FuncXClient(throttling.ThrottledBaseClient):
+class FuncXClient(FuncXErrorHandlingClient):
     """Main class for interacting with the funcX service
 
     Holds helper operations for performing common tasks with the funcX service.
@@ -340,13 +339,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
-        if r.get("status", "Failed") == "Failed":
-            if 'data' in r:
-                handle_response_errors(r.data)
-            else:
-                raise FailureResponse(r.get("reason", "Unknown reason for failure"))
         return r['task_uuids']
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
@@ -388,14 +380,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        if r.http_status != 200:
-            raise Exception(r)
-
-        if r.get("status", "Failed") == "Failed":
-            if 'data' in r:
-                handle_response_errors(r.data)
-            else:
-                raise FailureResponse(r.get("reason", "Unknown reason for failure"))
         return r['task_uuids']
 
     def register_endpoint(self, name, endpoint_uuid, metadata=None, endpoint_version=None):
@@ -430,8 +414,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
             data['meta'] = metadata
 
         r = self.post(self.ep_registration_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data
@@ -456,8 +438,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         data = {"endpoint_name": name, "description": description}
 
         r = self.post(registration_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data['endpoint_uuid'], r.data['endpoint_containers']
@@ -480,8 +460,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         container_path = f'containers/{container_uuid}/{container_type}'
 
         r = self.get(container_path)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data['container']
@@ -502,8 +480,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         stats_path = f'endpoints/{endpoint_uuid}/status'
 
         r = self.get(stats_path)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data
@@ -558,8 +534,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         logger.info("Registering function : {}".format(data))
 
         r = self.post(registration_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         func_uuid = r.data['function_uuid']
 
@@ -631,8 +605,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         payload = {'name': name, 'location': location, 'description': description, 'type': container_type}
 
         r = self.post(container_path, json_body=payload)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data['container_id']
@@ -660,8 +632,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         payload = {'func': function_ids}
 
         r = self.post(req_path, json_body=payload)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r
@@ -682,8 +652,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         req_path = f'endpoints/{endpoint_id}/whitelist'
 
         r = self.get(req_path)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r
@@ -710,8 +678,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
             req_path = f'endpoints/{endpoint_id}/whitelist/{fid}'
 
             r = self.delete(req_path)
-            if r.http_status != 200:
-                raise HTTPError(r)
             res.append(r)
 
         # Return the result

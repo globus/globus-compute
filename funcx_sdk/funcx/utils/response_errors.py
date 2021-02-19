@@ -1,6 +1,7 @@
 from abc import ABC
 from enum import Enum
 
+
 # IMPORTANT: new error codes can be added, but existing error codes must not be changed once published.
 # changing existing error codes will cause problems with users that have older SDK versions
 class ResponseErrorCode(int, Enum):
@@ -48,7 +49,7 @@ class FuncxResponseError(Exception, ABC):
     @property
     def code(self):
         raise NotImplementedError()
-    
+
     @property
     def http_status_code(self):
         raise NotImplementedError()
@@ -62,13 +63,13 @@ class FuncxResponseError(Exception, ABC):
 
     def __repr__(self):
         return self.reason
-    
+
     def pack(self):
         return {'status': 'Failed',
                 'code': int(self.code),
                 'error_args': self.error_args,
                 'reason': self.reason}
-    
+
     @classmethod
     def unpack(cls, res_data):
         if 'status' in res_data and res_data['status'] == 'Failed':
@@ -95,10 +96,10 @@ class FuncxResponseError(Exception, ABC):
                         error_class = TaskNotFound
                     elif res_error_code is ResponseErrorCode.AUTH_GROUP_NOT_FOUND:
                         error_class = AuthGroupNotFound
-                    elif res_error_code is ResponseErrorCode.UNAUTHORIZED_FUNCTION_ACCESS:
-                        error_class = UnauthorizedFunctionAccess
-                    elif res_error_code is ResponseErrorCode.UNAUTHORIZED_ENDPOINT_ACCESS:
-                        error_class = UnauthorizedEndpointAccess
+                    elif res_error_code is ResponseErrorCode.FUNCTION_ACCESS_FORBIDDEN:
+                        error_class = FunctionAccessForbidden
+                    elif res_error_code is ResponseErrorCode.ENDPOINT_ACCESS_FORBIDDEN:
+                        error_class = EndpointAccessForbidden
                     elif res_error_code is ResponseErrorCode.FUNCTION_NOT_PERMITTED:
                         error_class = FunctionNotPermitted
                     elif res_error_code is ResponseErrorCode.FORWARDER_REGISTRATION_ERROR:
@@ -122,15 +123,15 @@ class FuncxResponseError(Exception, ABC):
                         return error_class(*res_data['error_args'])
                 except Exception:
                     pass
-            
+
             # this is useful for older SDK versions to be compatible with a newer web
             # service: if the SDK does not recognize an error code, it creates a generic
             # exception with the human-readable error reason that was sent
             if 'reason' in res_data:
                 return Exception(f"The web service responded with a failure - {res_data['reason']}")
-            
+
             return Exception("The web service failed for an unknown reason")
-        
+
         return None
 
 
