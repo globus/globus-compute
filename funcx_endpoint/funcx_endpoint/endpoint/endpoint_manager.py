@@ -237,14 +237,6 @@ class EndpointManager:
                                                   endpoint_uuid,
                                                   endpoint_version=funcx_endpoint.__version__)
 
-        # the service will send back a message with a 'status'='error'
-        # property if something went wrong
-        if 'status' in reg_info and reg_info['status'] == 'error':
-            msg = "Endpoint registration failed."
-            if 'reason' in reg_info:
-                msg = "Endpoint registration failed. Service fail reason provided: {}".format(reg_info['reason'])
-            raise Exception(msg)
-
         # this is a backup error handler in case an endpoint ID is not sent back
         # from the service or a bad ID is sent back
         if 'endpoint_id' not in reg_info:

@@ -192,19 +192,6 @@ class TestStart:
                                             keys_dir='mock_keys_dir',
                                             **mock_optionals)
 
-    def test_register_endpoint_status_error(self, mocker):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
-        mock_client.return_value.register_endpoint.return_value = {'status': 'error',
-                                                                   'reason': 'unknown'}
-
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-
-        manager.configure_endpoint("mock_endpoint", None)
-        with pytest.raises(Exception, match='Endpoint registration failed. Service fail reason provided: unknown'):
-            manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
-
     def test_register_endpoint_no_endpoint_id(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
         mock_client.return_value.register_endpoint.return_value = {'status': 'okay'}
