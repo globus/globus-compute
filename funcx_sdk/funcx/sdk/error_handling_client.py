@@ -20,7 +20,9 @@ class FuncXErrorHandlingClient(ThrottledBaseClient):
             # is a fallback in case there is no raw_json property
             raise e
 
-        if r.http_status != 200:
+        # the Globus API should catch this situation already, so this is
+        # just here as a fallback (should allow 200 and 207 through)
+        if r.http_status >= 400:
             raise HTTPError(r)
 
         return r
@@ -32,7 +34,7 @@ class FuncXErrorHandlingClient(ThrottledBaseClient):
             handle_response_errors(e.raw_json)
             raise e
 
-        if r.http_status != 200:
+        if r.http_status >= 400:
             raise HTTPError(r)
 
         return r
@@ -44,7 +46,7 @@ class FuncXErrorHandlingClient(ThrottledBaseClient):
             handle_response_errors(e.raw_json)
             raise e
 
-        if r.http_status != 200:
+        if r.http_status >= 400:
             raise HTTPError(r)
 
         return r
