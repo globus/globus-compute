@@ -68,7 +68,8 @@ class FuncxResponseError(Exception, ABC):
         return {'status': 'Failed',
                 'code': int(self.code),
                 'error_args': self.error_args,
-                'reason': self.reason}
+                'reason': self.reason,
+                'http_status_code': int(self.http_status_code)}
 
     @classmethod
     def unpack(cls, res_data):
