@@ -15,7 +15,6 @@ import daemon.pidfile
 import psutil
 import texttable as tt
 import typer
-from retry.api import retry_call
 
 import funcx
 import zmq
@@ -159,6 +158,8 @@ class EndpointManager:
 
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
+        reg_info = self.register_endpoint(funcx_client, endpoint_uuid, endpoint_dir)
+
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
@@ -185,12 +186,13 @@ class EndpointManager:
         self.check_pidfile(context.pidfile.path, "funcx-endpoint")
 
         with context:
-            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config)
+            self.daemon_launch(reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config)
 
-    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config):
+    def daemon_launch(self, reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config):
         # Register the endpoint
         self.logger.info("Registering endpoint")
-        reg_info = retry_call(self.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
+        # registration should only be retried if a past registration attempt
+        # was successful
         self.logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
         # Configure the parameters for the interchange
