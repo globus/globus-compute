@@ -227,7 +227,6 @@ class FuncXClient(FuncXErrorHandlingClient):
         Exception obj: Exception due to which the task failed
         """
         task = self.get_task(task_id)
-        handle_response_errors(task)
         if task['pending'] is True:
             raise Exception(task['status'])
         else:
@@ -268,33 +267,6 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         return results
 
-    def __batch_run_with_response(self, batch):
-        """Initiate a batch of tasks to funcX
-
-        Parameters
-        ----------
-        batch: a Batch object
-
-        Returns
-        -------
-        (task_ids, batch_response): a list of task ids, along with the raw json batch response
-        """
-        servable_path = 'submit'
-        assert isinstance(batch, Batch), "Requires a Batch object as input"
-        assert len(batch.tasks) > 0, "Requires a non-empty batch"
-
-        data = batch.prepare()
-
-        # Send the data to funcX
-        r = self.post(servable_path, json_body=data)
-        task_uuids = []
-        for result in r['results']:
-            task_id = result['task_uuid']
-            task_uuids.append(task_id)
-            if result['http_status_code'] != 200:
-                self.func_table[task_id] = result
-        return task_uuids, r
-
     def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
         """Initiate an invocation
 
@@ -319,9 +291,7 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         batch = self.create_batch()
         batch.add(*args, endpoint_id=endpoint_id, function_id=function_id, **kwargs)
-        task_ids, r = self.__batch_run_with_response(batch)
-
-        handle_response_errors(r['results'][0])
+        r = self.batch_run(batch)
 
         """
         Create a future to deal with the result
@@ -334,7 +304,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         return funcx_future
         """
 
-        return task_ids[0]
+        return r[0]
 
     def create_batch(self):
         """
@@ -362,7 +332,24 @@ class FuncXClient(FuncXErrorHandlingClient):
         -------
         task_ids : a list of UUID strings that identify the tasks
         """
-        return self.__batch_run_with_response(batch)[0]
+        servable_path = 'submit'
+        assert isinstance(batch, Batch), "Requires a Batch object as input"
+        assert len(batch.tasks) > 0, "Requires a non-empty batch"
+
+        data = batch.prepare()
+
+        # Send the data to funcX
+        r = self.post(servable_path, json_body=data)
+        task_uuids = []
+        for result in r['results']:
+            task_id = result['task_uuid']
+            task_uuids.append(task_id)
+            if result['http_status_code'] != 200:
+                # this method of handling errors for a batch response is not
+                # ideal, as it will raise any error in the multi-response,
+                # but it will do until batch_run is deprecated in favor of Executer
+                handle_response_errors(result)
+        return task_uuids
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
