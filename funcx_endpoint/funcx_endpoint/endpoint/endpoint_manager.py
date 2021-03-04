@@ -230,9 +230,9 @@ class EndpointManager:
             self.logger.critical("Launching endpoint daemon process with errors noted above")
 
         with context:
-            self.daemon_launch(funcx_client, reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config)
+            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info)
 
-    def daemon_launch(self, funcx_client, reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config):
+    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info):
         if reg_info is None:
             # Register the endpoint
             self.logger.info("Retrying endpoint registration after initial registration attempt failed")
