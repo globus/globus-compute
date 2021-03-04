@@ -15,12 +15,15 @@ import daemon.pidfile
 import psutil
 import texttable as tt
 import typer
+from retry.api import retry_call
 
 import funcx
 import zmq
+from globus_sdk import GlobusAPIError, NetworkError
 
 import funcx_endpoint
 from funcx.utils.errors import *
+from funcx.utils.response_errors import FuncxResponseError
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
@@ -158,8 +161,6 @@ class EndpointManager:
 
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
-        reg_info = self.register_endpoint(funcx_client, endpoint_uuid, endpoint_dir)
-
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
@@ -185,15 +186,58 @@ class EndpointManager:
 
         self.check_pidfile(context.pidfile.path, "funcx-endpoint")
 
-        with context:
-            self.daemon_launch(reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config)
+        # place registration after everything else so that the endpoint will
+        # only be registered if everything else has been set up successfully
+        reg_info = None
+        try:
+            reg_info = self.register_endpoint(funcx_client, endpoint_uuid, endpoint_dir)
+        # if the service sends back an error response, it will be a FuncxResponseError
+        except FuncxResponseError as e:
+            # an example of an error that could conceivably occur here would be
+            # if the service could not register this endpoint with the forwarder
+            # because the forwarder was unreachable
+            if e.http_status_code >= 500:
+                self.logger.exception("Caught exception while attempting endpoint registration")
+                self.logger.critical("Endpoint registration will be retried in the new endpoint daemon "
+                                     "process. The endpoint will not work until it is successfully registered.")
+            else:
+                raise e
+        # if the service has an unexpected internal error and is unable to send
+        # back a FuncxResponseError
+        except GlobusAPIError as e:
+            if e.http_status >= 500:
+                self.logger.exception("Caught exception while attempting endpoint registration")
+                self.logger.critical("Endpoint registration will be retried in the new endpoint daemon "
+                                     "process. The endpoint will not work until it is successfully registered.")
+            else:
+                raise e
+        # if the service is unreachable due to a timeout or connection error
+        except NetworkError as e:
+            # the output of a NetworkError exception is huge and unhelpful, so
+            # it seems better to just stringify it here and get a concise error
+            self.logger.error(f"Caught exception while attempting endpoint registration: {e}")
+            self.logger.critical("Because this was a network error, endpoint registration will be "
+                                 "retried in the new endpoint daemon process. The endpoint will not "
+                                 "work until it is successfully registered. Please make sure that "
+                                 "the FuncX service address you provided is reachable for you, and "
+                                 "restart your endpoint if it is not.")
+        except Exception:
+            raise
 
-    def daemon_launch(self, reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config):
-        # Register the endpoint
-        self.logger.info("Registering endpoint")
-        # registration should only be retried if a past registration attempt
-        # was successful
-        self.logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+        if reg_info:
+            self.logger.info("Launching endpoint daemon process")
+        else:
+            self.logger.critical("Launching endpoint daemon process with errors noted above")
+
+        with context:
+            self.daemon_launch(funcx_client, reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config)
+
+    def daemon_launch(self, funcx_client, reg_info, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config):
+        if reg_info is None:
+            # Register the endpoint
+            self.logger.info("Retrying endpoint registration after initial registration attempt failed")
+            reg_info = retry_call(self.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
+            self.logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
         # Configure the parameters for the interchange
         optionals = {}
@@ -328,6 +372,7 @@ class EndpointManager:
             self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
             self.logger.info('''Please cleanup using:
         $ funcx-endpoint stop {}'''.format(self.name))
+            sys.exit(-1)
 
     def list_endpoints(self):
         table = tt.Texttable()
