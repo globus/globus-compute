@@ -216,7 +216,7 @@ class EndpointManager:
             # the output of a NetworkError exception is huge and unhelpful, so
             # it seems better to just stringify it here and get a concise error
             self.logger.exception(f"Caught exception while attempting endpoint registration: {e}")
-            self.logger.critical("funcx-endpoint is unable to reach the funcX service due a NetworkError \n"
+            self.logger.critical("funcx-endpoint is unable to reach the funcX service due to a NetworkError \n"
                                  "Please make sure that the funcX service address you provided is reachable \n"
                                  "and then attempt restarting the endpoint")
             exit(-1)
