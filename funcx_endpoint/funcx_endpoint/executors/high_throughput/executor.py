@@ -656,6 +656,16 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         # Submit task to queue
         return self.outgoing_q.put(packed_task)
 
+    def _get_block_and_job_ids(self):
+        # Not using self.blocks.keys() and self.blocks.values() simultaneously
+        # The dictionary may be changed during invoking this function
+        # As scale_in and scale_out are invoked in multiple threads
+        block_ids = list(self.blocks.keys())
+        job_ids = []  # types: List[Any]
+        for bid in block_ids:
+            job_ids.append(self.blocks[bid])
+        return block_ids, job_ids
+
     @property
     def connection_info(self):
         """ All connection info necessary for the endpoint to connect back
