@@ -3,7 +3,6 @@ Using the test-suite
 
 This test-suite is built using the `pytest` package. Please refer `here <https://docs.pytest.org/en/stable/>`_ for pytest specific docs.
 
-
 Installing and setting up
 -------------------------
 
@@ -15,6 +14,22 @@ First clone the funcx repo:
    git checkout forwarder_rearch_1
    cd funcX
 
+From Pypi
+^^^^^^^^^
+
+.. note::
+    This is the preferred mode for **release testing**
+
+.. code-block:: bash
+
+    conda create -y --name funcx_testing_py3.8 python=3.8
+    conda activate funcx_testing_py3.8
+    pip install funcx==0.0.6a2
+    pip install funcx-endpoint==0.0.6a4   
+    pip install -r ./funcx_sdk/test-requirements.txt
+
+From Source
+^^^^^^^^^^^
 
 Here's a sequence of steps that should be copy-pastable:
 
