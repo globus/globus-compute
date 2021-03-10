@@ -1,4 +1,4 @@
-funcX - Fast Function Serving
+funcX - Fast Function Serving - TEST
 =============================
 |licence| |build-status| |docs| |launch| |NSF-2004894| |NSF-2004932|
 
