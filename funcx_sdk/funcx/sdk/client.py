@@ -14,6 +14,7 @@ from funcx.serialize import FuncXSerializer
 from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
 from funcx.sdk.utils.batch import Batch
 from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError
+from funcx.utils.handle_service_response import handle_response_errors
 
 try:
     from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
@@ -140,7 +141,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         self.native_client.logout()
 
     def update_table(self, return_msg, task_id):
-        """ Parses the return message from the service and updates the internal func_tables
+        """ Parses the return message from the service and updates the internal func_table
 
         Parameters
         ----------
@@ -339,7 +340,16 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        return r['task_uuids']
+        task_uuids = []
+        for result in r['results']:
+            task_id = result['task_uuid']
+            task_uuids.append(task_id)
+            if result['http_status_code'] != 200:
+                # this method of handling errors for a batch response is not
+                # ideal, as it will raise any error in the multi-response,
+                # but it will do until batch_run is deprecated in favor of Executer
+                handle_response_errors(result)
+        return task_uuids
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
