@@ -79,7 +79,6 @@ class FuncXClient(FuncXErrorHandlingClient):
         Keyword arguments are the same as for BaseClient.
         """
         self.func_table = {}
-        self.ep_registration_path = 'register_endpoint_2'
         self.funcx_home = os.path.expanduser(funcx_home)
 
         if not os.path.exists(self.TOKEN_DIR):
@@ -423,7 +422,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         if metadata:
             data['meta'] = metadata
 
-        r = self.post(self.ep_registration_path, json_body=data)
+        r = self.post("/endpoints", json_body=data)
 
         # Return the result
         return r.data
@@ -520,8 +519,6 @@ class FuncXClient(FuncXErrorHandlingClient):
         function uuid : str
             UUID identifier for the registered function
         """
-        registration_path = 'register_function'
-
         source_code = ""
         try:
             source_code = getsource(function)
@@ -543,7 +540,7 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         logger.info("Registering function : {}".format(data))
 
-        r = self.post(registration_path, json_body=data)
+        r = self.post("/functions", json_body=data)
 
         func_uuid = r.data['function_uuid']
 
