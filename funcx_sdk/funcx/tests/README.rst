@@ -24,8 +24,8 @@ From Pypi
 
     conda create -y --name funcx_testing_py3.8 python=3.8
     conda activate funcx_testing_py3.8
-    pip install funcx==0.0.6a2
-    pip install funcx-endpoint==0.0.6a4   
+    pip install funcx==0.0.6a5
+    pip install funcx-endpoint==0.0.6a5
     pip install -r ./funcx_sdk/test-requirements.txt
 
 From Source
