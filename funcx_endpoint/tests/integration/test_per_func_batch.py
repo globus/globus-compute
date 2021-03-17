@@ -38,7 +38,7 @@ print("Time to launch {} tasks: {:8.3f} s".format(task_count * len(func_ids), de
 print("Got {} tasks_ids ".format(len(task_ids)))
 
 for i in range(10):
-    x = fx.get_batch_status(task_ids)
+    x = fx.get_batch_result(task_ids)
     complete_count = sum([1 for t in task_ids if t in x and x[t].get('pending', False)])
     print("Batch status : {}/{} complete".format(complete_count, len(task_ids)))
     if complete_count == len(task_ids):

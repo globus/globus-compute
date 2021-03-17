@@ -46,9 +46,10 @@ class TestStart:
 
     def test_start(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
-        mock_client.return_value.register_endpoint.return_value = {'endpoint_id': 'abcde12345',
-                                                                   'address': 'localhost',
-                                                                   'client_ports': '8080'}
+        reg_info = {'endpoint_id': 'abcde12345',
+                    'address': 'localhost',
+                    'client_ports': '8080'}
+        mock_client.return_value.register_endpoint.return_value = reg_info
 
         mock_zmq_create = mocker.patch("zmq.auth.create_certificates",
                                        return_value=("public/key/file", None))
@@ -84,7 +85,7 @@ class TestStart:
         mock_zmq_create.assert_called_with(os.path.join(config_dir, "certificates"), "endpoint")
         mock_zmq_load.assert_called_with("public/key/file")
 
-        mock_daemon.assert_called_with(mock_client(), '123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config)
+        mock_daemon.assert_called_with(mock_client(), '123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config, reg_info)
 
         mock_context.assert_called_with(working_directory=config_dir,
                                         umask=0o002,
@@ -145,7 +146,7 @@ class TestStart:
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader('config',
                                            os.path.join(config_dir, 'config.py')).load_module()
-        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config)
+        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None)
 
         mock_register_endpoint.assert_called_with(mock_client(), 'mock_endpoint_uuid', config_dir)
 
@@ -185,25 +186,12 @@ class TestStart:
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader('config',
                                            os.path.join(config_dir, 'config.py')).load_module()
-        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config)
+        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None)
 
         mock_interchange.assert_called_with(endpoint_config.config,
                                             endpoint_id='mock_endpoint_uuid',
                                             keys_dir='mock_keys_dir',
                                             **mock_optionals)
-
-    def test_register_endpoint_status_error(self, mocker):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
-        mock_client.return_value.register_endpoint.return_value = {'status': 'error',
-                                                                   'reason': 'unknown'}
-
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-
-        manager.configure_endpoint("mock_endpoint", None)
-        with pytest.raises(Exception, match='Endpoint registration failed. Service fail reason provided: unknown'):
-            manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
 
     def test_register_endpoint_no_endpoint_id(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")

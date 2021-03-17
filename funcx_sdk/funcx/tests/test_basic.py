@@ -46,6 +46,7 @@ def test_non_blocking(fxc, endpoint):
             time.sleep(1)
         else:
             print(f"Result: {result}")
+            assert result == hello_world(), "Result from remote function not correct"
             break
 
 
