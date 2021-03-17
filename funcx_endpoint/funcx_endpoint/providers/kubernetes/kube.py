@@ -5,7 +5,7 @@ from funcx_endpoint.providers.kubernetes.template import template_string
 
 logger = logging.getLogger("interchange.kube_provider")
 
-from parsl.providers.error import OptionalModuleMissing
+from parsl.errors import OptionalModuleMissing
 from parsl.providers.provider_base import ExecutionProvider
 from parsl.utils import RepresentationMixin
 
