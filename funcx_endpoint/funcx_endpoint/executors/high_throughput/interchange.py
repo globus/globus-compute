@@ -736,7 +736,6 @@ class Interchange(object):
                         logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
-                        logger.warning(f"[YADU DEBUG]: result message: {r}")
                         logger.debug("[MAIN] Received result for task {} from {}".format(r, manager))
                         task_type = self.containers[r['container_id']]
                         if r['task_id'] in self.task_status_deltas:

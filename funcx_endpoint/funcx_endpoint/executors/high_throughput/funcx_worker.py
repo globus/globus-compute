@@ -101,9 +101,7 @@ class FuncXWorker(object):
             p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
             task_id = pickle.loads(p_task_id)
             container_id = pickle.loads(p_container_id)
-            logger.warning(f"YADU: DEBUG task_id:{task_id} msg:{msg}")
-            logger.debug(
-                "Received task_id:{} with task:{}".format(task_id, msg))
+            logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
 
             if msg == b"KILL":
                 logger.info("[KILL] -- Worker KILL message received! ")
