@@ -10,6 +10,7 @@ from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx.utils.loggers import set_file_logger
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 
 
 class FuncXWorker(object):
@@ -97,8 +98,10 @@ class FuncXWorker(object):
                 exit()
 
             logger.debug("Waiting for task")
-            p_task_id, msg = self.task_socket.recv_multipart()
+            p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
             task_id = pickle.loads(p_task_id)
+            container_id = pickle.loads(p_container_id)
+            logger.warning(f"YADU: DEBUG task_id:{task_id} msg:{msg}")
             logger.debug(
                 "Received task_id:{} with task:{}".format(task_id, msg))
 
@@ -115,13 +118,15 @@ class FuncXWorker(object):
                 serialized_result = self.serialize(result)
             except Exception as e:
                 logger.exception(f"Caught an exception {e}")
-                result_package = {'task_id': task_id, 'exception': self.serialize(
-                    RemoteExceptionWrapper(*sys.exc_info()))}
+                result_package = {'task_id': task_id,
+                                  'container_id': container_id,
+                                  'exception': self.serialize(
+                                      RemoteExceptionWrapper(*sys.exc_info()))}
             else:
                 logger.debug("Execution completed without exception")
                 result_package = {'task_id': task_id,
+                                  'container_id': container_id,
                                   'result': serialized_result}
-
             result = result_package
             task_type = b'TASK_RET'
 
@@ -132,13 +137,8 @@ class FuncXWorker(object):
 
         Returns the result or throws exception.
         """
-
-        user_ns = locals()
-        user_ns.update({'__builtins__': __builtins__})
-
-        decoded = message.decode()
-        f, args, kwargs = self.serializer.unpack_and_deserialize(decoded)
-
+        task = Message.unpack(message)
+        f, args, kwargs = self.serializer.unpack_and_deserialize(task.task_buffer.decode('utf-8'))
         return f(*args, **kwargs)
 
 

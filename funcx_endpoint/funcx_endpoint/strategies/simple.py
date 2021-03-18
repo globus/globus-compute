@@ -1,7 +1,9 @@
-from funcx_endpoint.strategies.base import BaseStrategy
 import math
 import logging
 import time
+from parsl.providers.provider_base import JobState
+
+from funcx_endpoint.strategies.base import BaseStrategy
 
 logger = logging.getLogger("interchange.strategy.simple")
 
@@ -47,30 +49,29 @@ class SimpleStrategy(BaseStrategy):
         task_breakdown = self.interchange.get_outstanding_breakdown()
         logger.info(f"Task breakdown {task_breakdown}")
 
-        min_blocks = self.interchange.config.provider.min_blocks
-        max_blocks = self.interchange.config.provider.max_blocks
+        min_blocks = self.interchange.provider.min_blocks
+        max_blocks = self.interchange.provider.max_blocks
 
         # Here we assume that each node has atleast 4 workers
 
-        tasks_per_node = self.interchange.config.max_workers_per_node
-        if self.interchange.config.max_workers_per_node == float('inf'):
+        tasks_per_node = self.interchange.max_workers_per_node
+        if self.interchange.max_workers_per_node == float('inf'):
             tasks_per_node = 1
 
-        nodes_per_block = self.interchange.config.provider.nodes_per_block
-        parallelism = self.interchange.config.provider.parallelism
+        nodes_per_block = self.interchange.provider.nodes_per_block
+        parallelism = self.interchange.provider.parallelism
 
         active_tasks = sum(self.interchange.get_total_tasks_outstanding().values())
         status = self.interchange.provider_status()
         logger.debug(f"Provider status : {status}")
 
-        running = sum([1 for x in status if x == 'RUNNING'])
-        submitting = sum([1 for x in status if x == 'SUBMITTING'])
-        pending = sum([1 for x in status if x == 'PENDING'])
-        active_blocks = running + submitting + pending
+        running = sum([1 for x in status if x.state == JobState.RUNNING])
+        pending = sum([1 for x in status if x.state == JobState.PENDING])
+        active_blocks = running + pending
         active_slots = active_blocks * tasks_per_node * nodes_per_block
 
-        logger.debug('Endpoint has {} active tasks, {}/{}/{} running/submitted/pending blocks, and {} connected workers'.format(
-            active_tasks, running, submitting, pending, self.interchange.get_total_live_workers()))
+        logger.debug('Endpoint has {} active tasks, {}/{} running/pending blocks, and {} connected workers'.format(
+            active_tasks, running, pending, self.interchange.get_total_live_workers()))
 
         # reset kill timer if executor has active tasks
         if active_tasks > 0 and self.executors['idle_since']:

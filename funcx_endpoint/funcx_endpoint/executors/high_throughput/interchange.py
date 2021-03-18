@@ -22,8 +22,8 @@ from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 from parsl.app.errors import RemoteExceptionWrapper
 
-from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, EPStatusReport, Heartbeat, \
-    TaskStatusCode
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
+from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
@@ -94,7 +94,20 @@ class Interchange(object):
     """
 
     def __init__(self,
-                 config,
+                 #
+                 strategy=None,
+                 poll_period=None,
+                 heartbeat_period=None,
+                 heartbeat_threshold=None,
+                 working_dir=None,
+                 provider=None,
+                 max_workers_per_node=None,
+                 mem_per_worker=None,
+                 prefetch_capacity=None,
+                 scheduler_mode=None,
+                 worker_mode=None,
+                 scaling_enabled=True,
+                 #
                  client_address="127.0.0.1",
                  interchange_address="127.0.0.1",
                  client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
@@ -107,6 +120,8 @@ class Interchange(object):
                  logging_level=logging.INFO,
                  endpoint_id=None,
                  suppress_failure=False,
+                 log_max_bytes=256 * 1024 * 1024,
+                 log_backup_count=1,
                  ):
         """
         Parameters
@@ -154,32 +169,40 @@ class Interchange(object):
         """
 
         self.logdir = logdir
-        if config.interchange_file_logger:
-            logpath = "{}/interchange.log".format(self.logdir)
-            try:
-                os.makedirs(self.logdir)
-            except FileExistsError:
-                pass
-        else:
-            logpath = None
-
-        start_file_logger(logpath,
+        os.makedirs(self.logdir, exist_ok=True)
+        start_file_logger("{}/interchange.log".format(self.logdir),
                           level=logging_level,
-                          max_bytes=config.log_max_bytes,
-                          backup_count=config.log_backup_count)
+                          max_bytes=log_max_bytes,
+                          backup_count=log_backup_count)
+        logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
+                                                                                              log_max_bytes,
+                                                                                              log_backup_count))
 
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
-        self.config = config
-        logger.info("Got config : {}".format(config))
 
-        self.strategy = self.config.strategy
+        #
+        self.max_workers_per_node = max_workers_per_node
+        self.mem_per_worker = mem_per_worker
+        self.cores_per_worker = cores_per_worker
+        self.prefetch_capacity = prefetch_capacity
+        self.scheduler_mode = scheduler_mode
+        self.log_max_bytes = log_max_bytes
+        self.log_backup_count = log_backup_count
+        self.working_dir = working_dir
+        self.provider = provider
+        self.worker_debug = worker_debug
+        self.worker_mode = worker_mode
+        self.scaling_enabled = scaling_enabled
+        #
+
+        self.strategy = strategy
         self.client_address = client_address
         self.interchange_address = interchange_address
         self.suppress_failure = suppress_failure
 
-        self.poll_period = self.config.poll_period
-        self.heartbeat_period = self.config.heartbeat_period
-        self.heartbeat_threshold = self.config.heartbeat_threshold
+        self.poll_period = poll_period
+        self.heartbeat_period = heartbeat_period
+        self.heartbeat_threshold = heartbeat_threshold
         # initalize the last heartbeat time to start the loop
         self.last_heartbeat = time.time()
 
@@ -284,46 +307,47 @@ class Interchange(object):
         """ Load the config
         """
         logger.info("Loading endpoint local config")
-        working_dir = self.config.working_dir
-        if self.config.working_dir is None:
+        working_dir = self.working_dir
+        if self.working_dir is None:
             working_dir = "{}/{}".format(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
-        self.config.provider.script_dir = working_dir
-        if hasattr(self.config.provider, 'channel'):
-            self.config.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
-            self.config.provider.channel.makedirs(self.config.provider.channel.script_dir, exist_ok=True)
-            os.makedirs(self.config.provider.script_dir, exist_ok=True)
+        self.provider.script_dir = working_dir
+        if hasattr(self.provider, 'channel'):
+            self.provider.channel.script_dir = os.path.join(working_dir, 'submit_scripts')
+            self.provider.channel.makedirs(self.provider.channel.script_dir, exist_ok=True)
+            os.makedirs(self.provider.script_dir, exist_ok=True)
 
-        debug_opts = "--debug" if self.config.worker_debug else ""
-        max_workers = "" if self.config.max_workers_per_node == float('inf') \
-                      else "--max_workers={}".format(self.config.max_workers_per_node)
+        debug_opts = "--debug" if self.worker_debug else ""
+        max_workers = "" if self.max_workers_per_node == float('inf') \
+                      else "--max_workers={}".format(self.max_workers_per_node)
 
         worker_task_url = f"tcp://{self.interchange_address}:{self.worker_task_port}"
         worker_result_url = f"tcp://{self.interchange_address}:{self.worker_result_port}"
 
         l_cmd = self.launch_cmd.format(debug=debug_opts,
                                        max_workers=max_workers,
-                                       cores_per_worker=self.config.cores_per_worker,
-                                       # mem_per_worker=self.config.mem_per_worker,
-                                       prefetch_capacity=self.config.prefetch_capacity,
+                                       cores_per_worker=self.cores_per_worker,
+                                       # mem_per_worker=self.mem_per_worker,
+                                       prefetch_capacity=self.prefetch_capacity,
                                        task_url=worker_task_url,
                                        result_url=worker_result_url,
-                                       nodes_per_block=self.config.provider.nodes_per_block,
-                                       heartbeat_period=self.config.heartbeat_period,
-                                       heartbeat_threshold=self.config.heartbeat_threshold,
-                                       poll_period=self.config.poll_period,
-                                       worker_mode=self.config.worker_mode,
-                                       scheduler_mode=self.config.scheduler_mode,
+                                       nodes_per_block=self.provider.nodes_per_block,
+                                       heartbeat_period=self.heartbeat_period,
+                                       heartbeat_threshold=self.heartbeat_threshold,
+                                       poll_period=self.poll_period,
+                                       worker_mode=self.worker_mode,
+                                       scheduler_mode=self.scheduler_mode,
                                        logdir=working_dir,
-                                       log_max_bytes=self.config.log_max_bytes,
-                                       log_backup_count=self.config.log_backup_count)
+                                       log_max_bytes=self.log_max_bytes,
+                                       log_backup_count=self.log_backup_count)
+
         self.launch_cmd = l_cmd
         logger.info("Launch command: {}".format(self.launch_cmd))
 
-        if self.config.scaling_enabled:
+        if self.scaling_enabled:
             logger.info("Scaling ...")
-            self.scale_out(self.config.provider.init_blocks)
+            self.scale_out(self.provider.init_blocks)
 
     def get_tasks(self, count):
         """ Obtains a batch of tasks from the internal pending_task_queue
@@ -364,15 +388,9 @@ class Interchange(object):
         poller.register(self.task_incoming, zmq.POLLIN)
 
         while not kill_event.is_set():
-            # Check when the last heartbeat was.
-            # logger.debug(f"[TASK_PULL_THREAD] Last heartbeat: {self.last_heartbeat}")
-            if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
-                logger.critical("[TASK_PULL_THREAD] Missed too many heartbeats. Setting kill event.")
-                kill_event.set()
-                break
-
+            # We are no longer doing heartbeats on the task side.
             try:
-                msg = self.task_incoming.recv_pyobj()
+                raw_msg = self.task_incoming.recv()
                 self.last_heartbeat = time.time()
             except zmq.Again:
                 # We just timed out while attempting to receive
@@ -380,27 +398,32 @@ class Interchange(object):
                 continue
 
             try:
-                msg = Message.unpack(msg)
+                msg = Message.unpack(raw_msg)
                 logger.debug("[TASK_PULL_THREAD] received Message/Heartbeat? on task queue")
             except Exception:
+                logger.exception("Failed to unpack message")
                 pass
 
             if msg == 'STOP':
+                # TODO: Yadu. This should be replaced by a proper MessageType
                 kill_event.set()
                 break
             elif isinstance(msg, Heartbeat):
                 logger.debug("Got heartbeat")
             else:
-                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg['task_id']))
-                task_type = self.get_container(msg['task_id'].split(";")[1])
-                msg['container'] = task_type
-                if task_type not in self.pending_task_queue:
-                    self.pending_task_queue[task_type] = queue.Queue(maxsize=10 ** 6)
+                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
+                local_container = self.get_container(msg.container_id)
+                msg.set_local_container(local_container)
+                if local_container not in self.pending_task_queue:
+                    self.pending_task_queue[local_container] = queue.Queue(maxsize=10 ** 6)
 
-                self.pending_task_queue[task_type].put(msg)
+                # We pass the raw message along
+                self.pending_task_queue[local_container].put({'task_id': msg.task_id,
+                                                              'container_id': msg.container_id,
+                                                              'raw_buffer': raw_msg})
                 self.total_pending_task_count += 1
-                self.task_status_deltas[msg['task_id']] = TaskStatusCode.WAITING_FOR_NODES
-                logger.debug(f"[TASK_PULL_THREAD] task {msg['task_id']} is now WAITING_FOR_NODES")
+                self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
+                logger.debug(f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES")
                 logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
                 logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
@@ -412,7 +435,7 @@ class Interchange(object):
                 self.containers[container_uuid] = 'RAW'
             else:
                 try:
-                    container = self.fxs.get_container(container_uuid, self.config.container_type)
+                    container = self.fxs.get_container(container_uuid, self.container_type)
                 except Exception:
                     logger.exception("[FETCH_CONTAINER] Unable to resolve container location")
                     self.containers[container_uuid] = 'RAW'
@@ -489,6 +512,7 @@ class Interchange(object):
         logger.debug("[STATUS] Status reporting loop starting")
 
         while not kill_event.is_set():
+            logger.info(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
             msg = EPStatusReport(
                 self.endpoint_id,
                 self.get_status_report(),
@@ -571,12 +595,11 @@ class Interchange(object):
         self._status_report_thread.start()
 
         try:
-            logger.debug("Starting strategy.")
+            logger.info("Starting strategy.")
             self.strategy.start(self)
-        except RuntimeError as e:
+        except RuntimeError:
             # This is raised when re-registering an endpoint as strategy already exists
-            logger.debug("Failed to start strategy.")
-            logger.info(e)
+            logger.exception("Failed to start strategy.")
 
         poller = zmq.Poller()
         # poller.register(self.task_incoming, zmq.POLLIN)
@@ -690,13 +713,17 @@ class Interchange(object):
                                                                                  self._ready_manager_queue,
                                                                                  scheduler_mode=self.config.scheduler_mode,
                                                                                  two_loop=False)
+
             self.total_pending_task_count -= dispatched_task
 
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]
                 if tasks:
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
-                    self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
+                    serializd_raw_tasks_buffer = pickle.dumps([t['raw_buffer'] for t in tasks])
+                    # self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
+                    self.task_outgoing.send_multipart([manager, b'', serializd_raw_tasks_buffer])
+
                     for task in tasks:
                         task_id = task["task_id"]
                         logger.debug(f"[MAIN] Task {task_id} is now WAITING_FOR_LAUNCH")
@@ -728,8 +755,9 @@ class Interchange(object):
                         logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
-                        # logger.debug("[MAIN] Received result for task {} from {}".format(r['task_id'], manager))
-                        task_type = self.containers[r['task_id'].split(';')[1]]
+                        logger.warning(f"[YADU DEBUG]: result message: {r}")
+                        logger.debug("[MAIN] Received result for task {} from {}".format(r, manager))
+                        task_type = self.containers[r['container_id']]
                         if r['task_id'] in self.task_status_deltas:
                             del self.task_status_deltas[r['task_id']]
                         self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
@@ -818,16 +846,16 @@ class Interchange(object):
                                    'idle_workers': free_capacity,
                                    'pending_tasks': pending_tasks,
                                    'outstanding_tasks': outstanding_tasks,
-                                   'worker_mode': self.config.worker_mode,
-                                   'scheduler_mode': self.config.scheduler_mode,
-                                   'scaling_enabled': self.config.scaling_enabled,
-                                   'mem_per_worker': self.config.mem_per_worker,
-                                   'cores_per_worker': self.config.cores_per_worker,
-                                   'prefetch_capacity': self.config.prefetch_capacity,
-                                   'max_blocks': self.config.provider.max_blocks,
-                                   'min_blocks': self.config.provider.min_blocks,
-                                   'max_workers_per_node': self.config.max_workers_per_node,
-                                   'nodes_per_block': self.config.provider.nodes_per_block
+                                   'worker_mode': self.worker_mode,
+                                   'scheduler_mode': self.scheduler_mode,
+                                   'scaling_enabled': self.scaling_enabled,
+                                   'mem_per_worker': self.mem_per_worker,
+                                   'cores_per_worker': self.cores_per_worker,
+                                   'prefetch_capacity': self.prefetch_capacity,
+                                   'max_blocks': self.provider.max_blocks,
+                                   'min_blocks': self.provider.min_blocks,
+                                   'max_workers_per_node': self.max_workers_per_node,
+                                   'nodes_per_block': self.provider.nodes_per_block
         }}
 
         self.last_core_hr_counter = core_hrs
@@ -841,17 +869,17 @@ class Interchange(object):
         """
         r = []
         for i in range(blocks):
-            if self.config.provider:
+            if self.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
-                if not task_type and self.config.scheduler_mode == 'hard':
+                if not task_type and self.scheduler_mode == 'hard':
                     launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type='RAW')
                 else:
                     launch_cmd = self.launch_cmd.format(block_id=external_block_id, worker_type=task_type)
                 if not task_type:
-                    internal_block = self.config.provider.submit(launch_cmd, 1)
+                    internal_block = self.provider.submit(launch_cmd, 1)
                 else:
-                    internal_block = self.config.provider.submit(launch_cmd, 1, task_type)
+                    internal_block = self.provider.submit(launch_cmd, 1, task_type)
                 logger.debug("Launched block {}->{}".format(external_block_id, internal_block))
                 if not internal_block:
                     raise(ScalingFailed(self.config.provider.label,
@@ -876,8 +904,8 @@ class Interchange(object):
         """
         if task_type:
             logger.info("Scaling in blocks of specific task type {}. Let the provider decide which to kill".format(task_type))
-            if self.config.scaling_enabled and self.config.provider:
-                to_kill, r = self.config.provider.cancel(blocks, task_type)
+            if self.scaling_enabled and self.provider:
+                to_kill, r = self.provider.cancel(blocks, task_type)
                 logger.info("Get the killed blocks: {}, and status: {}".format(to_kill, r))
                 for job in to_kill:
                     logger.info("[scale_in] Getting the block_id map {} for job {}".format(self.block_id_map, job))
@@ -900,8 +928,8 @@ class Interchange(object):
         # Now kill via provider
         to_kill = [self.blocks.pop(bid) for bid in block_ids_to_kill]
 
-        if self.config.scaling_enabled and self.config.provider:
-            r = self.config.provider.cancel(to_kill)
+        if self.scaling_enabled and self.provider:
+            r = self.provider.cancel(to_kill)
 
         return r
 
@@ -909,9 +937,9 @@ class Interchange(object):
         """ Get status of all blocks from the provider
         """
         status = []
-        if self.config.provider:
+        if self.provider:
             logger.debug("[MAIN] Getting the status of {} blocks.".format(list(self.blocks.values())))
-            status = self.config.provider.status(list(self.blocks.values()))
+            status = self.provider.status(list(self.blocks.values()))
             logger.debug("[MAIN] The status is {}".format(status))
 
         return status
@@ -953,18 +981,10 @@ def start_file_logger(filename,
     global logger
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-
-    if not filename:
-        handler = logging.StreamHandler()
+    if not len(logger.handlers):
+        handler = RotatingFileHandler(filename, maxBytes=max_bytes, backupCount=backup_count)
         handler.setLevel(level)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    elif not len(logger.handlers):
-        handler = RotatingFileHandler(filename,
-                                      maxBytes=max_bytes,
-                                      backupCount=backup_count)
-        handler.setLevel(level)
+        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.info(

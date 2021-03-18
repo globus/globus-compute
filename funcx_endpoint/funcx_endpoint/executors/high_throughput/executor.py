@@ -12,18 +12,21 @@ import threading
 import queue
 import pickle
 import daemon
+import uuid
 from multiprocessing import Process, Queue
 
-# from ipyparallel.serialize import pack_apply_message  # ,unpack_apply_message
-from ipyparallel.serialize import deserialize_object  # ,serialize_object
-
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.strategies.simple import SimpleStrategy
 fx_serializer = FuncXSerializer()
 
-from parsl.executors.high_throughput import interchange
+# from parsl.executors.high_throughput import interchange
+from funcx_endpoint.executors.high_throughput import interchange
+
 from parsl.executors.errors import *
-from parsl.executors.base import ParslExecutor
+# from parsl.executors.base import ParslExecutor
+from parsl.executors.status_handling import StatusHandlingExecutor
 from parsl.dataflow.error import ConfigurationError
 
 from parsl.utils import RepresentationMixin
@@ -33,15 +36,19 @@ from parsl.providers import LocalProvider
 from funcx_endpoint.executors.high_throughput import zmq_pipes
 from funcx.utils.loggers import set_file_logger
 
+# TODO: YADU There's a bug here which causes some of the log messages to write out to stderr
+# "logging" python3 self.stream.flush() OSError: [Errno 9] Bad file descriptor
+
 logger = logging.getLogger(__name__)
-if not logger.hasHandlers():
-    logger = set_file_logger("executor.log", name=__name__)
+# if not logger.hasHandlers():
+#    logger = set_file_logger("executor.log", name=__name__)
+
 
 BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
 
 
-class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
+class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
     """Executor designed for cluster-scale
 
     The HighThroughputExecutor system has the following components:
@@ -95,7 +102,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         launch_cmd="process_worker_pool.py {debug} -c {cores_per_worker} --task_url={task_url} --result_url={result_url}"
 
     address : string
-        An address to connect to the main Parsl process which is reachable from the network in which
+        An address of the host on which the executor runs, which is reachable from the network in which
         workers will be running. This can be either a hostname as returned by `hostname` or an
         IP address. Most login nodes on clusters have several network interfaces available, only
         some of which can be reached from the compute nodes.  Some trial and error might be
@@ -124,7 +131,10 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         cores to be assigned to each worker. Oversubscription is possible
         by setting cores_per_worker < 1.0. Default=1
 
-    max_workers : int
+    mem_per_worker : float
+        Memory to be assigned to each worker. Default=None(no limits)
+
+    max_workers_per_node : int
         Caps the number of workers launched by the manager. Default: infinity
 
     suppress_failure : Bool
@@ -135,7 +145,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         (interchange, manager) after which the counterpart is assumed to be un-available. Default:120s
 
     heartbeat_period : int
-        Number of seconds after which a heartbeat message indicating liveness is sent to the
+        Number of seconds after which a heartbeat message indicating liveness is sent to the endpoint
         counterpart (interchange, manager). Default:30s
 
     poll_period : int
@@ -145,8 +155,10 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     container_image : str
         Path or identfier to the container image to be used by the workers
 
-    endpoint_db = None
-        Endpoint DB object
+    scheduler_mode: str
+        Scheduling mode to be used by the node manager. Options: 'hard', 'soft'
+        'hard' -> managers cannot replace worker's container types
+        'soft' -> managers can replace unused worker's containers based on demand
 
     worker_mode : str
         Select the mode of operation from no_container, singularity_reuse, singularity_single_use
@@ -154,12 +166,44 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
     task_status_queue : queue.Queue
         Queue to pass updates to task statuses back to the forwarder.
+
+    strategy: Stategy Object
+        Specify the scaling strategy to use for this executor.
+
+    launch_cmd: str
+        Specify the launch command as using f-string format that will be used to specify command to
+        launch managers. Default: None
+
+    prefetch_capacity: int
+        Number of tasks that can be fetched by managers in excess of available workers is a
+        prefetching optimization. This option can cause poor load-balancing for long running functions.
+        Default: 10
+
+    provider: Provider object
+        Provider determines how managers can be provisioned, say LocalProvider offers forked processes,
+        and SlurmProvider interfaces to request resources from the Slurm batch scheduler.
+        Default: LocalProvider
+
     """
 
     def __init__(self,
                  label='HighThroughputExecutor',
-                 provider=LocalProvider(),
+
+
+                 # NEW
+                 strategy=SimpleStrategy(),
+                 max_workers_per_node=float('inf'),
+                 mem_per_worker=None,
                  launch_cmd=None,
+
+                 # Container specific
+                 worker_mode='no_container',
+                 scheduler_mode='hard',
+                 container_type=None,
+                 # Tuning info
+                 prefetch_capacity=10,
+
+                 provider=LocalProvider(),
                  address="127.0.0.1",
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
@@ -168,35 +212,43 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                  working_dir=None,
                  worker_debug=False,
                  cores_per_worker=1.0,
-                 max_workers=float('inf'),
                  heartbeat_threshold=120,
                  heartbeat_period=30,
                  poll_period=10,
                  container_image=None,
-                 worker_mode="singularity_reuse",
                  suppress_failure=False,
                  endpoint_id=None,
-                 endpoint_db=None,
                  managed=True,
+                 interchange_local=True,
+                 passthrough=True,
                  task_status_queue=None):
 
         logger.debug("Initializing HighThroughputExecutor")
+        StatusHandlingExecutor.__init__(self, provider)
 
         self.label = label
         self.launch_cmd = launch_cmd
-        self.provider = provider
         self.worker_debug = worker_debug
+        self.max_workers_per_node = max_workers_per_node
+
+        # NEW
+        self.strategy = strategy
+        self.cores_per_worker = cores_per_worker
+        self.mem_per_worker = mem_per_worker
+
+        # Container specific
+        self.scheduler_mode = scheduler_mode
+        self.container_type = container_type
+        # Tuning info
+        self.prefetch_capacity = prefetch_capacity
+
         self.storage_access = storage_access if storage_access is not None else []
         if len(self.storage_access) > 1:
             raise ConfigurationError('Multiple storage access schemes are not supported')
         self.working_dir = working_dir
         self.managed = managed
         self.blocks = []
-        self.tasks = {}
         self.cores_per_worker = cores_per_worker
-        self.max_workers = max_workers
-        self.endpoint_db = endpoint_db
-        self.endpoint_db.connect()
         self.endpoint_id = endpoint_id
         self._task_counter = 0
         self.address = address
@@ -209,7 +261,8 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         self.suppress_failure = suppress_failure
         self.run_dir = '.'
         self.queue_proc = None
-
+        self.interchange_local = interchange_local
+        self.passthrough = passthrough
         self.task_status_queue = task_status_queue
 
         # FuncX specific options
@@ -229,12 +282,12 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                                "--mode={worker_mode} "
                                "--container_image={container_image} ")
 
-        self.ix_launch_cmd = ("htex-interchange {debug} -c={client_address} "
+        self.ix_launch_cmd = ("funcx-interchange {debug} -c={client_address} "
                               "--client_ports={client_ports} "
                               "--worker_port_range={worker_port_range} "
                               "--logdir={logdir} "
                               "{suppress_failure} "
-                              "--hb_threshold={heartbeat_threshold} ")
+                              )
 
     def initialize_scaling(self):
         """ Compose the launch command and call the scale_out
@@ -269,7 +322,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                 logger.error("Scaling out failed: {}".format(e))
                 raise e
 
-    def start(self):
+    def start(self, results_passthrough=None):
         """Create the Interchange process and connect to it.
         """
         self.outgoing_q = zmq_pipes.TasksOutgoing("0.0.0.0", self.interchange_port_range)
@@ -278,15 +331,23 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
         self.is_alive = True
 
+        if self.passthrough is True:
+            if results_passthrough is None:
+                raise Exception("Executors configured in passthrough mode, must be started with"
+                                "a multiprocessing queue for results_passthrough")
+            self.results_passthrough = results_passthrough
+            logger.debug(f"Executor:{self.label} starting in results_passthrough mode")
+
         self._executor_bad_state = threading.Event()
         self._executor_exception = None
         self._queue_management_thread = None
         self._start_queue_management_thread()
-        # We do not want to start the interchange. The user will do that via starting
-        # the endpoint.
-        # self._start_local_interchange_process()
-        print("Attempting remote start")
-        # self._start_remote_interchange_process()
+
+        if self.interchange_local is True:
+            print("Yadu : starting local interchange")
+            logger.info("Attempting local interchange start")
+            self._start_local_interchange_process()
+            print(f"Yadu : started local interchange with ports: {self.worker_task_port}. {self.worker_result_port}")
 
         logger.debug("Created management thread: {}".format(self._queue_management_thread))
 
@@ -298,6 +359,53 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
             logger.debug("Starting HighThroughputExecutor with no provider")
 
         return (self.outgoing_q.port, self.incoming_q.port, self.command_client.port)
+
+    def _start_local_interchange_process(self):
+        """ Starts the interchange process locally
+
+        Starts the interchange process locally and uses an internal command queue to
+        get the worker task and result ports that the interchange has bound to.
+        """
+        comm_q = Queue(maxsize=10)
+        print(f"Starting local interchange with endpoint id: {self.endpoint_id}")
+        self.queue_proc = Process(target=interchange.starter,
+                                  args=(comm_q,),
+                                  kwargs={"client_address": self.address,
+                                          "client_ports": (self.outgoing_q.port,
+                                                           self.incoming_q.port,
+                                                           self.command_client.port),
+                                          "provider": self.provider,
+                                          "strategy": self.strategy,
+                                          "poll_period": self.poll_period,
+                                          "heartbeat_period": self.heartbeat_period,
+                                          "heartbeat_threshold": self.heartbeat_threshold,
+                                          "working_dir": self.working_dir,
+                                          "worker_debug": self.worker_debug,
+                                          "max_workers_per_node": self.max_workers_per_node,
+                                          "mem_per_worker": self.mem_per_worker,
+                                          "cores_per_worker": self.cores_per_worker,
+                                          "prefetch_capacity": self.prefetch_capacity,
+                                          # "log_max_bytes": self.log_max_bytes,
+                                          # "log_backup_count": self.log_backup_count,
+                                          "scheduler_mode": self.scheduler_mode,
+                                          "interchange_address": self.address,
+                                          "worker_ports": self.worker_ports,
+                                          "worker_port_range": self.worker_port_range,
+                                          "logdir": "{}/{}".format(self.run_dir, self.label),
+                                          "suppress_failure": self.suppress_failure,
+                                          "endpoint_id": self.endpoint_id,
+                                          "logging_level": logging.DEBUG if self.worker_debug else logging.INFO
+                                  },
+        )
+        self.queue_proc.start()
+        try:
+            (self.worker_task_port, self.worker_result_port) = comm_q.get(block=True, timeout=120)
+        except queue.Empty:
+            logger.error("Interchange has not completed initialization in 120s. Aborting")
+            raise Exception("Interchange failed to start")
+
+        self.worker_task_url = "tcp://{}:{}".format(self.address, self.worker_task_port)
+        self.worker_result_url = "tcp://{}:{}".format(self.address, self.worker_result_port)
 
     def _start_remote_interchange_process(self):
         """ Starts the interchange process locally
@@ -320,24 +428,13 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                                                    logdir="{}/runinfo/{}/{}".format(self.provider.channel.script_dir,
                                                                                     os.path.basename(self.run_dir),
                                                                                     self.label),
-                                                   suppress_failure=suppress_failure,
-                                                   heartbeat_threshold=self.heartbeat_threshold)
+                                                   suppress_failure=suppress_failure)
 
         if self.provider.worker_init:
             launch_command = self.provider.worker_init + '\n' + launch_command
 
         logger.debug("Launch command : \n{}\n".format(launch_command))
         print("Launch command : \n{}\n".format(launch_command))
-
-        """
-        retcode, stdout, stderr = self.provider.execute_wait(launch_command)
-        if retcode == 0:
-            logger.debug("Starting Interchange remotely worked")
-
-        logger.debug("Requesting worker urls ")
-        self.worker_task_url, self.worker_result_url = self.get_worker_urls()
-        logger.debug("Got worker urls {}, {}".format(self.worker_task_url, self.worker_result_url))
-        """
         return
 
     def _queue_management_worker(self):
@@ -379,7 +476,7 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
             try:
                 msgs = self.incoming_q.get(timeout=1)
                 self.last_response_time = time.time()
-                # logger.debug("[MTHREAD] get has returned {}".format(len(msgs)))
+                logger.debug(f"[MTHREAD] [YADU:DEBUG] get has returned {msgs}")
 
             except queue.Empty:
                 logger.debug("[MTHREAD] queue empty")
@@ -401,20 +498,16 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                     return
                 elif isinstance(msgs, EPStatusReport):
                     logger.debug("[MTHREAD] Received EPStatusReport")
-                    if len(msgs.task_statuses):
-                        self.task_status_queue.put(msgs.task_statuses)
-
-                    try:
-                        if self.endpoint_db:
-                            self.endpoint_db.put(self.endpoint_id, msgs.ep_status)
-                    except Exception:
-                        logger.error("Caught error while trying to push data into redis")
+                    # TODO:YADU We are not propagating task status reports
+                    # if len(msgs.task_statuses):
+                    #    self.task_status_queue.put(msgs.task_statuses)
 
                 else:
+                    logger.debug("[MTHREAD] Unpacking results")
                     for serialized_msg in msgs:
                         try:
                             msg = pickle.loads(serialized_msg)
-                            logger.info("Got response msg : {}".format(msg))
+                            logger.debug(f"[MTHREAD] YADU: Got response msg : {msg}")
                             tid = msg['task_id']
                         except pickle.UnpicklingError:
                             raise BadMessage("Message received could not be unpickled")
@@ -423,14 +516,14 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                             raise BadMessage("Message received does not contain 'task_id' field")
 
                         if tid == -2 and 'info' in msg:
-                            logger.warning("Received info response : {}".format(msg['info']))
+                            logger.warning("[MTHREAD[ Received info response : {}".format(msg['info']))
 
                         if tid == -1 and 'exception' in msg:
                             # TODO: This could be handled better we are essentially shutting down the
                             # client with little indication to the user.
-                            logger.warning("Executor shutting down due to version mismatch in interchange")
-                            self._executor_exception, _ = deserialize_object(msg['exception'])
-                            logger.exception("Exception: {}".format(self._executor_exception))
+                            logger.warning("[MTHREAD] Executor shutting down due to version mismatch in interchange")
+                            self._executor_exception, _ = fx_serializer.deserialize(msg['exception'])
+                            logger.exception("[MTHREAD] Exception: {}".format(self._executor_exception))
                             # Set bad state to prevent new tasks from being submitted
                             self._executor_bad_state.set()
                             # We set all current tasks to this exception to make sure that
@@ -439,12 +532,23 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
                                 self.tasks[task].set_exception(self._executor_exception)
                             break
 
+                        if self.passthrough is True:
+                            logger.debug(f"[MTHREAD] Pushing results for task:{tid}")
+                            x = self.results_passthrough.put(serialized_msg)
+                            logger.debug(f"[MTHREAD] task:{tid} ret value: {x}")
+                            logger.debug(f"[MTHREAD] task:{tid} items in queue: {self.results_passthrough.qsize()}")
+                            continue
+
                         task_fut = self.tasks.pop(tid)
 
-                        if 'result' in msg or 'exception' in msg:
-                            task_fut.set_result(msg)
+                        if 'result' in msg:
+                            result = fx_serializer.deserialize(msg['result'])
+                            task_fut.set_result(result)
+                        elif 'exception' in msg:
+                            exception = fx_serializer.deserialize(msg['exception'])
+                            task_fut.set_result(exception)
                         else:
-                            raise BadMessage("Message received is neither result or exception")
+                            raise BadMessage("[MTHREAD] Message received is neither result or exception")
 
             if not self.is_alive:
                 break
@@ -455,37 +559,6 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
     def weakref_cb(self, q=None):
         """We do not use this yet."""
         q.put(None)
-
-    def _start_local_interchange_process(self):
-        """ Starts the interchange process locally
-
-        Starts the interchange process locally and uses an internal command queue to
-        get the worker task and result ports that the interchange has bound to.
-        """
-        comm_q = Queue(maxsize=10)
-        self.queue_proc = Process(target=interchange.starter,
-                                  args=(comm_q,),
-                                  kwargs={"client_ports": (self.outgoing_q.port,
-                                                           self.incoming_q.port,
-                                                           self.command_client.port),
-                                          "worker_ports": self.worker_ports,
-                                          "worker_port_range": self.worker_port_range,
-                                          "logdir": "{}/{}".format(self.run_dir, self.label),
-                                          "suppress_failure": self.suppress_failure,
-                                          "heartbeat_threshold": self.heartbeat_threshold,
-                                          "poll_period": self.poll_period,
-                                          "logging_level": logging.DEBUG if self.worker_debug else logging.INFO
-                                  },
-        )
-        self.queue_proc.start()
-        try:
-            (worker_task_port, worker_result_port) = comm_q.get(block=True, timeout=120)
-        except queue.Empty:
-            logger.error("Interchange has not completed initialization in 120s. Aborting")
-            raise Exception("Interchange failed to start")
-
-        self.worker_task_url = "tcp://{}:{}".format(self.address, worker_task_port)
-        self.worker_result_url = "tcp://{}:{}".format(self.address, worker_result_port)
 
     def _start_queue_management_thread(self):
         """Method to start the management thread as a daemon.
@@ -541,7 +614,28 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         logger.debug("Got managers: {}".format(workers))
         return workers
 
-    def submit(self, bufs, task_id=None):
+    def submit(self, func, *args, container_id: str = 'RAW', task_id: str = None, **kwargs):
+        """ Submits the function and it's params for execution.
+        """
+        self._task_counter += 1
+        if task_id is None:
+            task_id = self._task_counter
+        task_id = str(task_id)
+
+        fn_code = fx_serializer.serialize(func)
+        ser_code = fx_serializer.pack_buffers([fn_code])
+        ser_params = fx_serializer.pack_buffers([fx_serializer.serialize(args),
+                                                 fx_serializer.serialize(kwargs)])
+        payload = Task(task_id,
+                       container_id,
+                       ser_code + ser_params)
+
+        self.submit_raw(payload.pack())
+        self.tasks[task_id] = Future()
+
+        return self.tasks[task_id]
+
+    def submit_raw(self, packed_task):
         """Submits work to the the outgoing_q.
 
         The outgoing_q is an external process listens on this
@@ -550,31 +644,27 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
 
         Parameters
         ----------
-        Bufs - Pickled buffer with (b'<Function>', b'<args>', b'<kwargs>')
+        Packed Task (messages.Task) - A packed Task object which contains task_id, container_id, and serialized fn, args, kwargs packages.
 
         Returns:
-              Future
+              Submit status
         """
+        logger.debug(f"Submitting raw task : {packed_task}")
         if self._executor_bad_state.is_set():
             raise self._executor_exception
 
-        self._task_counter += 1
-        if not task_id:
-            task_id = self._task_counter
+        # Submit task to queue
+        return self.outgoing_q.put(packed_task)
 
-        self.tasks[task_id] = Future()
-
-        # This needs to be a byte buffer
-        # We want a cleaner header to the task here for the downstream systems
-        # to appropriately route tasks
-        msg = {"task_id": task_id,
-               "buffer": bufs}
-
-        # Post task to the the outgoing queue
-        self.outgoing_q.put(msg)
-
-        # Return the future
-        return self.tasks[task_id]
+    def _get_block_and_job_ids(self):
+        # Not using self.blocks.keys() and self.blocks.values() simultaneously
+        # The dictionary may be changed during invoking this function
+        # As scale_in and scale_out are invoked in multiple threads
+        block_ids = list(self.blocks.keys())
+        job_ids = []  # types: List[Any]
+        for bid in block_ids:
+            job_ids.append(self.blocks[bid])
+        return block_ids, job_ids
 
     @property
     def connection_info(self):
@@ -629,6 +719,9 @@ class HighThroughputExecutor(ParslExecutor, RepresentationMixin):
         if self.provider:
             r = self.provider.cancel(to_kill)
         return r
+
+    def _get_job_ids(self):
+        return list(self.block.values())
 
     def status(self):
         """Return status of all blocks."""

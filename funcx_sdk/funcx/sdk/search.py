@@ -1,4 +1,3 @@
-from IPython import get_ipython
 from globus_sdk import SearchAPIError
 from globus_sdk.search import SearchClient
 from texttable import Texttable
@@ -238,8 +237,5 @@ class FunctionSearchResults(list):
 
         # if we also saved the source code of the function, we could interactively
         # generate a cell to edit the searched function
-        ipython = get_ipython()
-        if ipython:
-            ipython.set_next_input(func_source)
-        else:
-            print(func_source)
+        # TODO: Strip the ipython bits and remove entirely
+        print(func_source)

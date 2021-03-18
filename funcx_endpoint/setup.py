@@ -1,8 +1,8 @@
 import os
-from setuptools import setup, find_namespace_packages
+from setuptools import setup, find_packages
 
 version_ns = {}
-with open(os.path.join("funcx_endpoint", "endpoint", "version.py")) as f:
+with open(os.path.join("funcx_endpoint", "version.py")) as f:
     exec(f.read(), version_ns)
 version = version_ns['VERSION']
 
@@ -12,7 +12,7 @@ with open('requirements.txt') as f:
 setup(
     name='funcx-endpoint',
     version=version,
-    packages=find_namespace_packages(include=['funcx_endpoint.*']),
+    packages=find_packages(),
     description='funcX: High Performance Function Serving for Science',
     install_requires=install_requires,
     python_requires=">=3.6.0",
@@ -37,6 +37,7 @@ setup(
                    'funcx-worker=funcx_endpoint.executors.high_throughput.funcx_worker:cli_run',
                   ]
     },
+    include_package_data=True,
     author='funcX team',
     author_email='labs@globus.org',
     license="Apache License, Version 2.0",

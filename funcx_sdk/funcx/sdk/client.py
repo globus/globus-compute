@@ -11,12 +11,14 @@ from funcx.sdk.search import SearchHelper, FunctionSearchResults
 
 from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
-from funcx.sdk.utils import throttling
+from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
 from funcx.sdk.utils.batch import Batch
-from funcx.utils.errors import MalformedResponse, VersionMismatch, SerializationError, HTTPError
+from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError
+from funcx.utils.handle_service_response import handle_response_errors
 
 try:
-    from funcx_endpoint.endpoint import VERSION as ENDPOINT_VERSION
+    from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
+
 except ModuleNotFoundError:
     ENDPOINT_VERSION = None
 
@@ -26,15 +28,21 @@ from funcx.sdk import VERSION as SDK_VERSION
 logger = logging.getLogger(__name__)
 
 
-class FuncXClient(throttling.ThrottledBaseClient):
+class FuncXClient(FuncXErrorHandlingClient):
     """Main class for interacting with the funcX service
 
     Holds helper operations for performing common tasks with the funcX service.
     """
 
     TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
-    TOKEN_FILENAME = 'funcx_sdk_tokens.json'
-    CLIENT_ID = '4cf29807-cf21-49ec-9443-ff9a3fb9f81c'
+    TOKEN_FILENAME = "funcx_sdk_tokens.json"
+    FUNCX_SDK_CLIENT_ID = os.environ.get(
+        "FUNCX_SDK_CLIENT_ID", "4cf29807-cf21-49ec-9443-ff9a3fb9f81c"
+    )
+    FUNCX_SCOPE = os.environ.get(
+        "FUNCX_SCOPE",
+        "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
+    )
 
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
                  force_login=False, fx_authorizer=None, search_authorizer=None,
@@ -78,14 +86,13 @@ class FuncXClient(throttling.ThrottledBaseClient):
             os.makedirs(self.TOKEN_DIR)
 
         tokens_filename = os.path.join(self.TOKEN_DIR, self.TOKEN_FILENAME)
-        self.native_client = NativeClient(client_id=self.CLIENT_ID,
+        self.native_client = NativeClient(client_id=self.FUNCX_SDK_CLIENT_ID,
                                           app_name="FuncX SDK",
                                           token_storage=JSONTokenStorage(tokens_filename))
 
         # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
-        fx_scope = "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all"
         search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
-        scopes = [fx_scope, search_scope, "openid"]
+        scopes = [self.FUNCX_SCOPE, search_scope, "openid"]
 
         if not fx_authorizer or not search_authorizer or not openid_authorizer:
             self.native_client.login(requested_scopes=scopes,
@@ -95,7 +102,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
                                      force=force_login)
 
             all_authorizers = self.native_client.get_authorizers_by_scope(requested_scopes=scopes)
-            fx_authorizer = all_authorizers[fx_scope]
+            fx_authorizer = all_authorizers[self.FUNCX_SCOPE]
             search_authorizer = all_authorizers[search_scope]
             openid_authorizer = all_authorizers["openid"]
 
@@ -134,7 +141,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         self.native_client.logout()
 
     def update_table(self, return_msg, task_id):
-        """ Parses the return message from the service and updates the internal func_tables
+        """ Parses the return message from the service and updates the internal func_table
 
         Parameters
         ----------
@@ -229,10 +236,10 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 logger.warning("We have an exception : {}".format(task['exception']))
                 task['exception'].reraise()
 
-    def get_batch_status(self, task_id_list):
+    def get_batch_result(self, task_id_list):
         """ Request status for a batch of task_ids
         """
-        assert isinstance(task_id_list, list), "get_batch_status expects a list of task ids"
+        assert isinstance(task_id_list, list), "get_batch_result expects a list of task ids"
 
         pending_task_ids = [t for t in task_id_list if t not in self.func_table]
 
@@ -254,16 +261,11 @@ class FuncXClient(throttling.ThrottledBaseClient):
                 except KeyError:
                     logger.debug("Task {} info was not available in the batch status")
                 except Exception:
-                    logger.exception("Failure while unpacking results fom get_batch_status")
+                    logger.exception("Failure while unpacking results fom get_batch_result")
             else:
                 results[task_id] = self.func_table[task_id]
 
         return results
-
-    def get_batch_result(self, task_id_list):
-        """ Request results for a batch of task_ids
-        """
-        pass
 
     def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
         """Initiate an invocation
@@ -338,11 +340,16 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
-        if r.get("status", "Failed") == "Failed":
-            raise MalformedResponse("FuncX Request failed: {}".format(r.get("reason", "Unknown")))
-        return r['task_uuids']
+        task_uuids = []
+        for result in r['results']:
+            task_id = result['task_uuid']
+            task_uuids.append(task_id)
+            if result['http_status_code'] != 200:
+                # this method of handling errors for a batch response is not
+                # ideal, as it will raise any error in the multi-response,
+                # but it will do until batch_run is deprecated in favor of Executer
+                handle_response_errors(result)
+        return task_uuids
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
@@ -383,11 +390,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        if r.http_status != 200:
-            raise Exception(r)
-
-        if r.get("status", "Failed") == "Failed":
-            raise MalformedResponse("FuncX Request failed: {}".format(r.get("reason", "Unknown")))
         return r['task_uuids']
 
     def register_endpoint(self, name, endpoint_uuid, metadata=None, endpoint_version=None):
@@ -407,7 +409,7 @@ class FuncXClient(throttling.ThrottledBaseClient):
         Returns
         -------
         A dict
-            {'endopoint_id' : <>,
+            {'endpoint_id' : <>,
              'address' : <>,
              'client_ports': <>}
         """
@@ -422,8 +424,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
             data['meta'] = metadata
 
         r = self.post(self.ep_registration_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data
@@ -448,8 +448,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         data = {"endpoint_name": name, "description": description}
 
         r = self.post(registration_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data['endpoint_uuid'], r.data['endpoint_containers']
@@ -472,8 +470,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         container_path = f'containers/{container_uuid}/{container_type}'
 
         r = self.get(container_path)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data['container']
@@ -494,8 +490,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         stats_path = f'endpoints/{endpoint_uuid}/status'
 
         r = self.get(stats_path)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data
@@ -550,8 +544,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         logger.info("Registering function : {}".format(data))
 
         r = self.post(registration_path, json_body=data)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         func_uuid = r.data['function_uuid']
 
@@ -623,8 +615,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         payload = {'name': name, 'location': location, 'description': description, 'type': container_type}
 
         r = self.post(container_path, json_body=payload)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r.data['container_id']
@@ -652,8 +642,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         payload = {'func': function_ids}
 
         r = self.post(req_path, json_body=payload)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r
@@ -674,8 +662,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
         req_path = f'endpoints/{endpoint_id}/whitelist'
 
         r = self.get(req_path)
-        if r.http_status != 200:
-            raise HTTPError(r)
 
         # Return the result
         return r
@@ -702,8 +688,6 @@ class FuncXClient(throttling.ThrottledBaseClient):
             req_path = f'endpoints/{endpoint_id}/whitelist/{fid}'
 
             r = self.delete(req_path)
-            if r.http_status != 200:
-                raise HTTPError(r)
             res.append(r)
 
         # Return the result

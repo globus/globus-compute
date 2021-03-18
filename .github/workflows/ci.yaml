@@ -40,7 +40,7 @@ jobs:
         cd ..
     - name: Lint with Flake8
       run: |
-        flake8
+        flake8 funcx_sdk
 #    - name: Test with pytest
 #      run: |
 #        pytest
@@ -58,15 +58,18 @@ jobs:
       run: |
         cd funcx_endpoint
         pip install .
-        python -c "from funcx_endpoint.endpoint.version import VERSION"
+        python -c "from funcx_endpoint.version import VERSION"
         funcx-endpoint -v
         cd ..
     - name: Lint with Flake8
       run: |
-        flake8
-#    - name: Test with pytest
-#      run: |
-#        pytest
+        flake8 funcx_endpoint
+    - name: Test with pytest
+      run: |
+        PYTHONPATH=funcx_endpoint python -m coverage run -m  pytest funcx_endpoint/tests/funcx_endpoint
+    - name: Report coverage with Codecov
+      run: |
+        codecov --token=${{ secrets.CODECOV_TOKEN }}
 
   publish:
     needs: test

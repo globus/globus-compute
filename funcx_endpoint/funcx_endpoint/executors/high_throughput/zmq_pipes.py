@@ -9,8 +9,6 @@ from funcx.utils.loggers import set_file_logger
 from funcx_endpoint.executors.high_throughput.messages import Message
 
 logger = logging.getLogger(__name__)
-if not logger.hasHandlers():
-    logger = set_file_logger("zmq_pipe.log", name=__name__)
 
 
 class CommandClient(object):
@@ -107,7 +105,7 @@ class TasksOutgoing(object):
             socks = dict(self.poller.poll(timeout=timeout_ms))
             if self.zmq_socket in socks and socks[self.zmq_socket] == zmq.POLLOUT:
                 # The copy option adds latency but reduces the risk of ZMQ overflow
-                self.zmq_socket.send_pyobj(message, copy=True)
+                self.zmq_socket.send(message, copy=True)
                 return
             else:
                 timeout_ms += 1
@@ -150,9 +148,10 @@ class ResultsIncoming(object):
         try:
             res = pickle.loads(block_messages)
         except pickle.UnpicklingError:
-            logger.debug(f"MSG unpack: {block_messages}")
-            res = Message.unpack(block_messages)
-
+            try:
+                res = Message.unpack(block_messages)
+            except Exception:
+                logger.exception(f"Message in results queue is not pickle/Message formatted:{block_messages}")
         return res
 
     def request_close(self):

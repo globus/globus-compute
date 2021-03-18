@@ -46,24 +46,36 @@ class FuncXSerializer(object):
 
     def serialize(self, data):
         serialized = None
+        serialized_flag = False
+        last_exception = None
 
         if callable(data):
             for method in self.methods_for_code.values():
                 try:
                     serialized = method.serialize(data)
-                except Exception:
+                except Exception as e:
                     logger.exception("Method {} did not work".format(method))
+                    last_exception = e
                     continue
+                else:
+                    serialized_flag = True
+                    break
+
         else:
             for method in self.methods_for_data.values():
                 try:
                     serialized = method.serialize(data)
-                except Exception:
+                except Exception as e:
                     logger.exception("Method {} did not work".format(method))
+                    last_exception = e
                     continue
+                else:
+                    serialized_flag = True
+                    break
 
-        if serialized is None:
-            raise Exception("None of serialization methods were able to serialize {}".format(data))
+        if serialized_flag is False:
+            raise last_exception
+
         return serialized
 
     def deserialize(self, payload):
