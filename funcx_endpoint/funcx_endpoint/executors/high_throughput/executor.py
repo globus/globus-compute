@@ -344,10 +344,9 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self._start_queue_management_thread()
 
         if self.interchange_local is True:
-            print("Yadu : starting local interchange")
             logger.info("Attempting local interchange start")
             self._start_local_interchange_process()
-            print(f"Yadu : started local interchange with ports: {self.worker_task_port}. {self.worker_result_port}")
+            logger.info(f"Started local interchange with ports: {self.worker_task_port}. {self.worker_result_port}")
 
         logger.debug("Created management thread: {}".format(self._queue_management_thread))
 
@@ -434,7 +433,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             launch_command = self.provider.worker_init + '\n' + launch_command
 
         logger.debug("Launch command : \n{}\n".format(launch_command))
-        print("Launch command : \n{}\n".format(launch_command))
         return
 
     def _queue_management_worker(self):
@@ -476,7 +474,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             try:
                 msgs = self.incoming_q.get(timeout=1)
                 self.last_response_time = time.time()
-                logger.debug(f"[MTHREAD] [YADU:DEBUG] get has returned {msgs}")
 
             except queue.Empty:
                 logger.debug("[MTHREAD] queue empty")
@@ -507,7 +504,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                     for serialized_msg in msgs:
                         try:
                             msg = pickle.loads(serialized_msg)
-                            logger.debug(f"[MTHREAD] YADU: Got response msg : {msg}")
                             tid = msg['task_id']
                         except pickle.UnpicklingError:
                             raise BadMessage("Message received could not be unpickled")

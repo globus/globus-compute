@@ -182,6 +182,8 @@ class EndpointInterchange(object):
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
                                                                sys.version_info.minor,
                                                                sys.version_info.micro),
+                                 'libzmq_v': zmq.zmq_version(),
+                                 'pyzmq_v': zmq.pyzmq_version(),
                                  'os': platform.system(),
                                  'hname': platform.node(),
                                  'dir': os.getcwd()}
@@ -249,8 +251,6 @@ class EndpointInterchange(object):
         while not kill_event.is_set():
 
             try:
-                # logger.debug("[TASK_PULL_THREAD] Alive")
-
                 if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
                     logger.critical("[TASK_PULL_THREAD] Missed too many heartbeats. Setting kill event.")
                     kill_event.set()
@@ -259,7 +259,6 @@ class EndpointInterchange(object):
                 try:
                     # TODO : Check the kwarg options for get
                     raw_msg = self.task_incoming.get()[0]
-                    logger.warning(f"[TASK_PULL_THREAD] YADU : DEBUG : Got message : {raw_msg}")
                     self.last_heartbeat = time.time()
                 except zmq.Again:
                     # We just timed out while attempting to receive
@@ -273,7 +272,6 @@ class EndpointInterchange(object):
                     msg = Message.unpack(raw_msg)
                 except Exception:
                     logger.exception("[TASK_PULL_THREAD] Failed to unpack message from forwarder")
-                    # continue
                     pass
 
                 if msg == 'STOP':
@@ -281,7 +279,7 @@ class EndpointInterchange(object):
                     break
 
                 elif isinstance(msg, Heartbeat):
-                    logger.info("[TASK_PULL_THREAD] Got heartbeat")
+                    logger.info("[TASK_PULL_THREAD] Got heartbeat from funcx-forwarder")
 
                 elif isinstance(msg, Task):
                     logger.info(f"[TASK_PULL_THREAD] Received task:{msg.task_id}")
@@ -400,8 +398,6 @@ class EndpointInterchange(object):
                                                       args=(self._kill_event, status_report_queue))
         self._status_report_thread.start()
 
-        logger.warning("YADU: Here")
-
         self.results_outgoing = TaskQueue(self.client_address,
                                           port=self.client_ports[1],
                                           identity=self.endpoint_id,
@@ -431,13 +427,11 @@ class EndpointInterchange(object):
                 pass
 
             try:
-                # results = self.results_passthrough.get(False)
                 results = self.results_passthrough.get(False, 0.01)
-                logger.info(f"[MAIN] Got results : {results}")
 
                 # results will be a pickled dict with task_id, container_id, and results/exception
                 self.results_outgoing.put('forwarder', results)
-                # self.results_outgoing.put('forwarder', nonce)
+                logger.info("Passing result to forwarder")
 
             except queue.Empty:
                 pass
