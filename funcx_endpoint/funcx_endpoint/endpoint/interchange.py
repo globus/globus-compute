@@ -218,7 +218,7 @@ class EndpointInterchange(object):
             self.executors[executor.label] = executor
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
-                executor._start_remote_interchange_process()
+                # executor._start_remote_interchange_process()
 
     def migrate_tasks_to_internal(self, kill_event, status_request):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
