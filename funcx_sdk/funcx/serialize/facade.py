@@ -65,7 +65,7 @@ class FuncXSerializer(object):
             for method in self.methods_for_data.values():
                 try:
                     serialized = method.serialize(data)
-                except Exception:
+                except Exception as e:
                     logger.exception("Method {} did not work".format(method))
                     last_exception = e
                     continue
