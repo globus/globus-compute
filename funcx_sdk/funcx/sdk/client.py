@@ -10,7 +10,7 @@ from globus_sdk import AuthClient
 from fair_research_login import NativeClient, JSONTokenStorage
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
-from funcx.sdk.asynchronous.polling_task import PollingTask
+from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from funcx.sdk.search import SearchHelper, FunctionSearchResults
 
 from funcx.serialize import FuncXSerializer
@@ -145,7 +145,7 @@ class FuncXClient(FuncXErrorHandlingClient):
 
             # Start up an asynchronous polling loop in the background
             # Throttle to ten calls per second
-            self.polling_task = PollingTask(self, self.loop)
+            self.polling_task = WebSocketPollingTask(self, self.loop)
         else:
             self.loop = None
 

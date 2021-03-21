@@ -10,3 +10,4 @@ pyzmq>=22.0.0
 parsl>=1.1.0a0
 packaging
 retry
+websockets==8.1
