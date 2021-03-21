@@ -13,6 +13,24 @@ class WebSocketPollingTask:
     """
     """
 
+    def __init__(self, fxc, loop: AbstractEventLoop, fx_serializer):
+        """
+
+        :param fxc: FuncXClient
+            Client instance for requesting results
+        :param loop: AbstractEventLoop
+            Asynchio event loop to manage asynchronous calls
+        """
+        self.fxc = fxc
+        self.loop = loop
+        self.fx_serializer = fx_serializer
+        self.running_tasks = asyncio.Queue()
+        self.pending_tasks = {}
+
+        self.loop.run_until_complete(self.init_ws())
+        self.loop.create_task(self.send_outgoing(self.running_tasks))
+        self.loop.create_task(self.handle_incoming())
+
     async def init_ws(self):
         uri = 'ws://localhost:6000'
         self.ws = await websockets.client.connect(uri)
@@ -27,23 +45,16 @@ class WebSocketPollingTask:
         while True:
             raw_data = await self.ws.recv()
             data = json.loads(raw_data)
-            print(data)
-
-    def __init__(self, fxc, loop: AbstractEventLoop):
-        """
-
-        :param fxc: FuncXClient
-            Client instance for requesting results
-        :param loop: AbstractEventLoop
-            Asynchio event loop to manage asynchronous calls
-        """
-        self.fxc = fxc
-        self.loop = loop
-        self.running_tasks = asyncio.Queue()
-
-        self.loop.run_until_complete(self.init_ws())
-        self.loop.create_task(self.send_outgoing(self.running_tasks))
-        self.loop.create_task(self.handle_incoming())
+            task_id = data['task_id']
+            if task_id in self.pending_tasks:
+                task = self.pending_tasks[task_id]
+                del self.pending_tasks[task_id]
+                if data['result']:
+                    task.set_result(self.fx_serializer.deserialize(data['result']))
+                elif data['exception']:
+                    task.set_exception(self.fx_serializer.deserialize(data['exception']))
+                else:
+                    task.set_exception(Exception(data['reason']))
 
     def put(self, task: FuncXTask):
         """
@@ -52,3 +63,4 @@ class WebSocketPollingTask:
             Task to be added
         """
         self.running_tasks.put_nowait(task)
+        self.pending_tasks[task.task_id] = task

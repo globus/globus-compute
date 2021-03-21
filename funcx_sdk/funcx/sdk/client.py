@@ -145,7 +145,7 @@ class FuncXClient(FuncXErrorHandlingClient):
 
             # Start up an asynchronous polling loop in the background
             # Throttle to ten calls per second
-            self.polling_task = WebSocketPollingTask(self, self.loop)
+            self.polling_task = WebSocketPollingTask(self, self.loop, self.fx_serializer)
         else:
             self.loop = None
 
