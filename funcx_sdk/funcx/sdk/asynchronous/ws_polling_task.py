@@ -8,7 +8,6 @@ from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
 logger = logging.getLogger(__name__)
 
-
 class WebSocketPollingTask:
     """
     """
@@ -27,13 +26,13 @@ class WebSocketPollingTask:
         self.running_tasks = asyncio.Queue()
         self.pending_tasks = {}
 
-        self.loop.run_until_complete(self.init_ws())
-        self.loop.create_task(self.send_outgoing(self.running_tasks))
-        self.loop.create_task(self.handle_incoming())
+        self.loop.create_task(self.init_ws())
 
     async def init_ws(self):
         uri = 'ws://localhost:6000'
         self.ws = await websockets.client.connect(uri)
+        self.loop.create_task(self.send_outgoing(self.running_tasks))
+        self.loop.create_task(self.handle_incoming())
 
     async def send_outgoing(self, queue: asyncio.Queue):
         while True:
