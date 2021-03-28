@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from asyncio import AbstractEventLoop, QueueEmpty
+import dill
 import websockets
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
@@ -51,7 +52,8 @@ class WebSocketPollingTask:
                 if data['result']:
                     task.set_result(self.fx_serializer.deserialize(data['result']))
                 elif data['exception']:
-                    task.set_exception(self.fx_serializer.deserialize(data['exception']))
+                    r_exception = self.fx_serializer.deserialize(data['exception'])
+                    task.set_exception(dill.loads(r_exception.e_value))
                 else:
                     task.set_exception(Exception(data['reason']))
 
