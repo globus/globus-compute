@@ -140,7 +140,7 @@ class FuncXClient(FuncXErrorHandlingClient):
 
             # Start up an asynchronous polling loop in the background
             # Throttle to ten calls per second
-            self.polling_task = WebSocketPollingTask(self, self.loop, self.fx_serializer)
+            self.ws_polling_task = WebSocketPollingTask(self, self.loop, self.fx_serializer)
         else:
             self.loop = None
 
@@ -329,7 +329,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             asyncio_task = self.loop.create_task(funcx_task.get_result())
 
             # Add it to the list of tasks to be polled
-            self.polling_task.put(funcx_task)
+            self.ws_polling_task.put(funcx_task)
             return asyncio_task
         else:
             return r[0]
