@@ -9,6 +9,7 @@ from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
 logger = logging.getLogger(__name__)
 
+
 class WebSocketPollingTask:
     """
     """
