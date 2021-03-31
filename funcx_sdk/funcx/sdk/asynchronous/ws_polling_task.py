@@ -32,7 +32,8 @@ class WebSocketPollingTask:
 
     async def init_ws(self):
         uri = 'ws://localhost:6000'
-        self.ws = await websockets.client.connect(uri)
+        headers = [self.get_auth_header()]
+        self.ws = await websockets.client.connect(uri, extra_headers=headers)
         self.loop.create_task(self.send_outgoing(self.running_tasks))
         self.loop.create_task(self.handle_incoming())
 
@@ -66,3 +67,9 @@ class WebSocketPollingTask:
         """
         self.running_tasks.put_nowait(task)
         self.pending_tasks[task.task_id] = task
+
+    def get_auth_header(self):
+        headers = dict()
+        self.fxc.authorizer.set_authorization_header(headers)
+        header_name = 'Authorization'
+        return (header_name, headers[header_name])
