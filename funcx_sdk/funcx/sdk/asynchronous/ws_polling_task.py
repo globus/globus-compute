@@ -69,6 +69,15 @@ class WebSocketPollingTask:
         self.pending_tasks[task.task_id] = task
 
     def get_auth_header(self):
+        """
+        Gets an Authorization header to be sent during the WebSocket handshake. Based on
+        header setting in the Globus SDK: https://github.com/globus/globus-sdk-python/blob/main/globus_sdk/base.py
+
+        Returns
+        -------
+        Key-value tuple of the Authorization header
+        (key, value)
+        """
         headers = dict()
         self.fxc.authorizer.set_authorization_header(headers)
         header_name = 'Authorization'
