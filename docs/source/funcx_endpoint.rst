@@ -1,7 +1,7 @@
-funcx.serialize
+funcx\_endpoint
 ===============
 
-.. automodule:: funcx.serialize
+.. automodule:: funcx_endpoint
 
    
    
