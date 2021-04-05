@@ -21,7 +21,7 @@ and supercomputers.
    client
    reference
    debugging
-
+   changelog
 
 Indices and tables
 ==================
