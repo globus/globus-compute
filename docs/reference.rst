@@ -9,11 +9,8 @@ Reference
     funcx.sdk
     funcx.sdk.utils
     funcx.serialize
-    funcx.endpoint
-    funcx.executors
-    funcx.providers
-    funcx.strategies
-    funcx.queues
-    funcx.mock_broker
+    funcx_endpoint
+    funcx_endpoint.executors
+    funcx_endpoint.mock_broker
 
 
