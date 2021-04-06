@@ -47,7 +47,7 @@ class FuncXClient(FuncXErrorHandlingClient):
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
                  force_login=False, fx_authorizer=None, search_authorizer=None,
                  openid_authorizer=None,
-                 funcx_service_address='https://api.funcx.org/v1',
+                 funcx_service_address='https://api.funcx.org/v2',
                  **kwargs):
         """ Initialize the client
 

@@ -30,7 +30,7 @@ version numbers need to match.
 
 To check if you have network access, run ::
 
-  >>> curl https://api.funcx.org/v1/version
+  >>> curl https://api.funcx.org/v2/version
 
 This should return a version string, for eg: ``"0.0.6"``
 

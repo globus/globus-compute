@@ -672,7 +672,6 @@ def cli_run():
                 max_blocks=1,
             ),
             max_workers_per_node=2,
-            # funcx_service_address='https://api.funcx.org/v1'
             funcx_service_address='http://127.0.0.1:8080'
         )
         optionals['config'] = config
