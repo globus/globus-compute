@@ -6,23 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class FuncXSerializer(object):
-    """
-    Information that we want to be able to ship around:
-
-
-    * Function run information ->
-    * Function id <---> Container id ? (is there a 1-1 mapping here?)
-    * Container id
-    * Endpoint id
-
-    * Function body
-    * Potentially in a byte compiled form ?
-    * All parameters ->
-    * Args  + Kwargs
-
-
-    From the client side. At function invocation we need to capture
-
+    """ Wraps several serializers for one uniform interface
     """
 
     def __init__(self):
