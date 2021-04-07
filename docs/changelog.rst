@@ -2,12 +2,12 @@ Changelog
 =========
 
 
-funcx & funcx-endpoint v0.0.6
+funcx & funcx-endpoint v0.2.0
 -----------------------------
 
 Tentative Release on April 10th, 2020
 
-funcx v0.0.6 includes contributions (code, tests, reviews, and reports) from:
+funcx v0.2.0 includes contributions (code, tests, reviews, and reports) from:
 
 Ariel Rokem <arokem@gmail.com>, Ben Blaiszik <blaiszik@uchicago.edu>, Ben Galewsky <ben@peartreestudio.net>, Ben Glick <glick@glick.cloud>, Joshua Bryan <josh@globus.org>, Kirill Nagaitsev <knagaitsev1@gmail.com>, Kyle Chard <chard@uchicago.edu>, Loonride <22580625+Loonride@users.noreply.github.com>, pratikpoojary <pratik.poojary@somaiya.edu>, Ryan <rchard@anl.gov>, Yadu Nand Babuji <yadudoc1729@gmail.com>, yongyanrao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
 
