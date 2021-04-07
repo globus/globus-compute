@@ -5,7 +5,7 @@ Changelog
 funcx & funcx-endpoint v0.2.0
 -----------------------------
 
-Tentative Release on April 10th, 2020
+Tentative Release on April 10th, 2021
 
 funcx v0.2.0 includes contributions (code, tests, reviews, and reports) from:
 
@@ -34,7 +34,7 @@ New Functionality
 
   * funcx-endpoint will connect to the funcx web-service and register itself
   * Upon registration, the endpoint receives server certificates and connection info.
-  * funcx-endpoint connects to a forwarder service over an encrypted(Curve25519 elliptic curve) ZMQ channel using the server certificates.
+  * funcx-endpoint connects to a forwarder service over an encrypted (Curve25519 elliptic curve) ZMQ channel using the server certificates.
   * If the connection is terminated this whole process repeats.
 
 * Significant changes to the `Config object`. All options related to executors have been moved from the top level Config object to the executor object. Refer to the `configuration <configuration> section for more details. Here's an example of the config change:
@@ -56,7 +56,7 @@ New Functionality
                max_blocks=1,
            ),
            max_workers_per_node=2,
-       funcx_service_address='https://api.funcx.org/v1'
+           funcx_service_address='https://api.funcx.org/v1'
        )
 
     Here is a sample config based on the updated Config object:
@@ -81,7 +81,7 @@ New Functionality
 
 * The endpoint will now log to `~/.funcx/<ENDPOINT_NAME>/EndpointInterchange.log`.
 
-    * Several updates to logging makes logs more concise and cleaner.
+* Several updates to logging make logs more concise and cleaner.
 
 * The serialization mechanism has been updated to use multiple serialization libraries (dill, pickle)
 
