@@ -47,36 +47,38 @@ class FuncXClient(FuncXErrorHandlingClient):
     def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
                  force_login=False, fx_authorizer=None, search_authorizer=None,
                  openid_authorizer=None,
-                 funcx_service_address='https://api.funcx.org/v1',
+                 funcx_service_address='https://api.funcx.org/v2',
                  **kwargs):
-        """ Initialize the client
+        """
+        Initialize the client
 
         Parameters
         ----------
         http_timeout: int
-        Timeout for any call to service in seconds.
-        Default is no timeout
+            Timeout for any call to service in seconds.
+            Default is no timeout
 
         force_login: bool
-        Whether to force a login to get new credentials.
+            Whether to force a login to get new credentials.
 
         fx_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-        A custom authorizer instance to communicate with funcX.
-        Default: ``None``, will be created.
+            A custom authorizer instance to communicate with funcX.
+            Default: ``None``, will be created.
 
         search_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-        A custom authorizer instance to communicate with Globus Search.
-        Default: ``None``, will be created.
+            A custom authorizer instance to communicate with Globus Search.
+            Default: ``None``, will be created.
 
         openid_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-        A custom authorizer instance to communicate with OpenID.
-        Default: ``None``, will be created.
+            A custom authorizer instance to communicate with OpenID.
+            Default: ``None``, will be created.
 
         funcx_service_address: str
-        The address of the funcX web service to communicate with.
-        Default: https://api.funcx.org/v1
+            The address of the funcX web service to communicate with.
+            Default: https://api.funcx.org/v2
 
         Keyword arguments are the same as for BaseClient.
+
         """
         self.func_table = {}
         self.ep_registration_path = 'register_endpoint_2'

@@ -72,7 +72,7 @@ class Config(RepresentationMixin):
                  # Connection info
                  worker_ports=None,
                  worker_port_range=(54000, 55000),
-                 funcx_service_address='https://api.funcx.org/v1',
+                 funcx_service_address='https://api.funcx.org/v2',
 
                  # Tuning info
                  worker_mode='no_container',

@@ -5,12 +5,16 @@ An endpoint is a persistent service launched by the user on their compute system
 and executing functions to their compute system. This could be their laptop, the login node of a campus cluster,
 grid, or supercomputing facility.
 
-The endpoint can be configured to connect to the funcX API web service at `funcx.org <https://api.funcx.org/v1>`_.
+The endpoint can be configured to connect to the funcX API web service at `funcx.org <https://api.funcx.org/v2>`_.
 Once the endpoint is registered you can invoke functions to be executed on it.
 
 To install the funcX endpoint agent software::
 
      $ python3 -m pip install funcx_endpoint
+
+.. note::
+
+   Please note that the funcx-endpoint is supported on Linux and MacOS, and not on Windows.
 
 First time setup
 ----------------
@@ -83,8 +87,8 @@ To generate the appropriate directories and default config template, run the fol
 The above command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/` and will instantiate a
 `config.py` file. This file should be updated with the appropriate configurations for the computational system you are
 targeting before you start the endpoint. The funcX builds on `Parsl <https://parsl-project.org>`_ and is
-configured using a :class:`~funcx.config.Config` object.
-For more information, see the :class:`~funcx.config.Config` class documentation.
+configured using a :class:`~funcx_endpoint.endpoint.utils.config.Config` object.
+For more information, see the :class:`~funcx_endpoint.endpoint.utils.config.Config` class documentation.
 
 .. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is configured.
 
