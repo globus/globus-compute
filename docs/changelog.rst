@@ -97,8 +97,7 @@ New Functionality
 
         {
           'status': 'Success',
-          'task_uuids': ['task_id_1', 'task_id_2', ...],
-          'task_uuid': ''
+          'task_uuids': ['task_id_1', 'task_id_2', ...]
         }
 
     This is the new response format, where some task submissions have failed:
