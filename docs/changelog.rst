@@ -85,7 +85,7 @@ New Functionality
 
 * The serialization mechanism has been updated to use multiple serialization libraries (dill, pickle)
 
-* The funcx-endpoint cli-tool will raise an error message to screen if endpoint registration fails rather than log to a file
+* The funcx-endpoint CLI tool will raise an error message to screen if endpoint registration fails rather than log to a file
 
 * Richer HTTP error codes and responses for failure conditions and reporting.
 
