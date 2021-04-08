@@ -13,7 +13,12 @@ import queue
 import pickle
 import daemon
 import uuid
-from multiprocessing import Process, Queue
+import platform
+from multiprocessing import Process
+if platform.system() == 'Darwin':
+    from parsl.executors.high_throughput.mac_safe_queue import MacSafeQueue as mpQueue
+else:
+    from multiprocessing import Queue as mpQueue
 
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task
@@ -367,7 +372,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         Starts the interchange process locally and uses an internal command queue to
         get the worker task and result ports that the interchange has bound to.
         """
-        comm_q = Queue(maxsize=10)
+        comm_q = mpQueue(maxsize=10)
         print(f"Starting local interchange with endpoint id: {self.endpoint_id}")
         self.queue_proc = Process(target=interchange.starter,
                                   args=(comm_q,),
