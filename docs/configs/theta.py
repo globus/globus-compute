@@ -21,7 +21,7 @@ config = Config(
             address=address_by_hostname(),
             provider=CobaltProvider(
                 queue='debug-flat-quad',
-                account=user_opts['theta']['allocation'],
+                account=user_opts['theta']['account'],
                 launcher=AprunLauncher(overrides="-d 64"),
                 # string to prepend to #COBALT blocks in the submit
                 # script to the scheduler eg: '#COBALT -t 50'
