@@ -7,10 +7,9 @@ from parsl.addresses import address_by_route
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'kube': {
-        'worker_init': 'pip install --force-reinstall git+https://github.com/funcx-faas/funcX.git#subdirectory=funcx_sdk; pip install --force-reinstall git+https://github.com/funcx-faas/funcX.git#subdirectory=funcx_endpoint;pip install numpy',
-        'scheduler_options': '#SBATCH --constraint=knl,quad,cache',
+        'worker_init': 'pip install --force-reinstall funcx_endpoint>=0.2.0',
         'image': 'python:3.8-buster',
-        'namespace': 'dlhub-privileged',
+        'namespace': 'default',
     }
 }
 
