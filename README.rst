@@ -37,7 +37,7 @@ Documentation: https://funcx.readthedocs.io/en/latest/
 Quickstart
 ==========
 
-funcX is in beta state with version `0.2.0` currently available on PyPI.
+funcX is in a beta state with version `0.2.0` currently available on PyPI.
 
 To install funcX, please ensure you have python3.6+.::
 
@@ -51,6 +51,8 @@ To use our example notebooks you will need Jupyter.::
 
    $ pip install jupyter
 
+.. note:: The funcX client is supported on MacOS, Linux and Windows.
+          The funcx-endpoint is only supported on Linux.
 
 Documentation
 =============
