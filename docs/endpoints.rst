@@ -68,30 +68,7 @@ For example
     'endpoint_address': address_by_hostname(),
   }
 
-Configuring an Endpoint
------------------------
-
-FuncX endpoints are designed to act as gateways to computational resources such as Clusters, Clouds,
-Supercomputers, and even your laptop. To make the best use of your resources, the endpoint must be
-configured to match the resources' capabilities and reflect the needs of the workloads you plan to execute.
-For example, you may want to limit the number of cores available to your endpointt.
-
-FuncX provides you a rich class based configuration model that allows you to specify the shape of the
-resources (# of nodes, # of cores per worker, walltime etc) as well as place limits on how funcX may
-scale the resources in response to changing workload demands.
-
-To generate the appropriate directories and default config template, run the following command::
-
-  $ funcx-endpoint configure <ENDPOINT_NAME>
-
-The above command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/` and will instantiate a
-`config.py` file. This file should be updated with the appropriate configurations for the computational system you are
-targeting before you start the endpoint. The funcX builds on `Parsl <https://parsl-project.org>`_ and is
-configured using a :class:`~funcx_endpoint.endpoint.utils.config.Config` object.
-For more information, see the :class:`~funcx_endpoint.endpoint.utils.config.Config` class documentation.
-
-.. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is configured.
-
+.. include:: configuring.rst
 
 Starting an Endpoint
 --------------------
