@@ -18,7 +18,7 @@ import sys
 import requests
 sys.path.insert(0, os.path.abspath('../'))
 import funcx
-import funcx_endpoint
+
 
 # -- Project information -----------------------------------------------------
 
