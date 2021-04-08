@@ -9,6 +9,8 @@ user_opts = {
     'theta': {
         'worker_init': 'source ~/setup_funcx_test_env.sh',
         'scheduler_options': '',
+        # Specify the account/allocation to which jobs should be charged
+        'account': '<YOUR_THETA_ALLOCATION>'
     }
 }
 
@@ -19,7 +21,7 @@ config = Config(
             address=address_by_hostname(),
             provider=CobaltProvider(
                 queue='debug-flat-quad',
-                account='ACCOUNT',                   <----------- use your own account
+                account=user_opts['theta']['allocation'],
                 launcher=AprunLauncher(overrides="-d 64"),
                 # string to prepend to #COBALT blocks in the submit
                 # script to the scheduler eg: '#COBALT -t 50'
