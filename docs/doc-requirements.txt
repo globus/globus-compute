@@ -1,0 +1,2 @@
+-r ../funcx_sdk/requirements.txt
+-r ../funcx_sdk/test-requirements.txt
