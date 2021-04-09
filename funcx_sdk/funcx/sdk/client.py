@@ -141,7 +141,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                                       f"minimum version for an endpoint: {min_ep_version}.  Please update. "
                                       "pip install funcx-endpoint==0.2.1")
         else:
-            if VERSION < min_ep_version:
+            if SDK_VERSION < min_ep_version:
                 raise VersionMismatch(f"Your version={VERSION} is lower than the "
                                       f"minimum version for funcx SDK: {min_ep_version}.  Please update. "
                                       "pip install funcx==0.2.1")
