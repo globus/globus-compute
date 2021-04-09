@@ -1,5 +1,4 @@
 import codecs
-import json
 import dill
 import pickle
 import inspect
@@ -10,26 +9,9 @@ logger = logging.getLogger(__name__)
 from funcx.serialize.base import fxPicker_enforcer, fxPicker_shared
 
 
-class json_base64(fxPicker_shared):
-
-    _identifier = '00\n'
-    _for_code = False
-
-    def __init__(self):
-        super().__init__()
-
-    def serialize(self, data):
-        x = json.dumps(data)
-        return self.identifier + x
-
-    def deserialize(self, payload):
-        x = json.loads(self.chomp(payload))
-        return x
-
-
 class pickle_base64(fxPicker_shared):
 
-    _identifier = '01\n'
+    _identifier = '00\n'
     _for_code = False
 
     def __init__(self):
@@ -49,7 +31,7 @@ class code_dill(fxPicker_shared):
     """ We use dill to serialize the function object
     """
 
-    _identifier = '02\n'
+    _identifier = '01\n'
     _for_code = True
 
     def __init__(self):
@@ -67,7 +49,7 @@ class code_dill(fxPicker_shared):
 
 class code_pickle(fxPicker_shared):
 
-    _identifier = '03\n'
+    _identifier = '02\n'
     _for_code = True
 
     def __init__(self):
@@ -89,7 +71,7 @@ class code_text_inspect(fxPicker_shared):
     is then returned by name.
     """
 
-    _identifier = '04\n'
+    _identifier = '03\n'
     _for_code = True
 
     def __init__(self):
@@ -115,7 +97,6 @@ def bar(x, y={'a': 3}):
 if __name__ == '__main__':
 
     bar(29)
-    # print(json_base64.identifier)
     # print(pickle_base64.identifier)
     ct = code_text_inspect()
     f = ct.serialize(bar)
