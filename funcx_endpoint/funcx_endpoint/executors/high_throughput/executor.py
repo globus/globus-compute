@@ -13,12 +13,8 @@ import queue
 import pickle
 import daemon
 import uuid
-import platform
 from multiprocessing import Process
-if platform.system() == 'Darwin':
-    from parsl.executors.high_throughput.mac_safe_queue import MacSafeQueue as mpQueue
-else:
-    from multiprocessing import Queue as mpQueue
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task

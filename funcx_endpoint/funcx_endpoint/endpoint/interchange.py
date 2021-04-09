@@ -15,10 +15,7 @@ import threading
 import json
 import daemon
 import collections
-if platform.system() == 'Darwin':
-    from parsl.executors.high_throughput.mac_safe_queue import MacSafeQueue as mpQueue
-else:
-    from multiprocessing import Queue as mpQueue
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION

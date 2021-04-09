@@ -23,10 +23,7 @@ from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
-if platform.system() == 'Darwin':
-    from parsl.executors.high_throughput.mac_safe_queue import MacSafeQueue as mpQueue
-else:
-    from multiprocessing import Queue as mpQueue
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.version import VERSION as PARSL_VERSION
 
