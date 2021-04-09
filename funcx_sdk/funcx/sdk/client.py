@@ -424,8 +424,6 @@ class FuncXClient(FuncXErrorHandlingClient):
              'address' : <>,
              'client_ports': <>}
         """
-        self.version_check()
-
         data = {
             "endpoint_name": name,
             "endpoint_uuid": endpoint_uuid,
