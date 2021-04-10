@@ -4,6 +4,7 @@ import logging
 from asyncio import AbstractEventLoop, QueueEmpty
 import dill
 import websockets
+from websockets.exceptions import InvalidHandshake
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
@@ -33,7 +34,12 @@ class WebSocketPollingTask:
     async def init_ws(self):
         uri = 'ws://localhost:6000'
         headers = [self.get_auth_header()]
-        self.ws = await websockets.client.connect(uri, extra_headers=headers)
+        try:
+            self.ws = await websockets.client.connect(uri, extra_headers=headers)
+        # initial Globus authentication happens during the HTTP portion of the handshake,
+        # so an invalid handshake means that the user was not authenticated
+        except InvalidHandshake:
+            raise Exception('Failed to authenticate user. Please ensure that you are logged in.')
         self.loop.create_task(self.send_outgoing(self.running_tasks))
         self.loop.create_task(self.handle_incoming())
 
