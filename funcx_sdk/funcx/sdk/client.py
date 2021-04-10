@@ -120,7 +120,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         user_info = authclient.oauth2_userinfo()
         self.searcher = SearchHelper(authorizer=search_authorizer, owner_uuid=user_info['sub'])
         self.funcx_service_address = funcx_service_address
-        
+
         self.version_check(check_endpoint_version=check_endpoint_version)
 
     def version_check(self, check_endpoint_version=False):
@@ -142,7 +142,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                                       "pip install funcx-endpoint==0.2.1")
         else:
             if SDK_VERSION < min_ep_version:
-                raise VersionMismatch(f"Your version={VERSION} is lower than the "
+                raise VersionMismatch(f"Your version={SDK_VERSION} is lower than the "
                                       f"minimum version for funcx SDK: {min_ep_version}.  Please update. "
                                       "pip install funcx==0.2.1")
 
