@@ -90,8 +90,14 @@ def start_endpoint(
     endpoint_uuid : str
     """
     endpoint_dir = os.path.join(manager.funcx_dir, name)
-    endpoint_config = SourceFileLoader('config',
-                                       os.path.join(endpoint_dir, manager.funcx_config_file_name)).load_module()
+    try:
+        endpoint_config = SourceFileLoader('config',
+                                           os.path.join(endpoint_dir, manager.funcx_config_file_name)).load_module()
+    except Exception:
+        manager.logger.exception('funcX v0.2.0 made several non-backwards compatible changes to the config. '
+                                 'Your config might be out of date. '
+                                 'Refer to https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx')
+        raise
     manager.start_endpoint(name, endpoint_uuid, endpoint_config)
 
 
