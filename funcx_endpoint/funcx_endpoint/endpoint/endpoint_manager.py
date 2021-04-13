@@ -9,6 +9,7 @@ import sys
 import time
 import uuid
 from string import Template
+from importlib.machinery import SourceFileLoader
 
 import daemon
 import daemon.pidfile
@@ -143,6 +144,19 @@ class EndpointManager:
             print('2. Update configuration')
             print('3. Start the endpoint.')
             return
+
+        # Error handling for loading config
+        default_address = SourceFileLoader('config', endpoint_default_config.__file__).load_module().config.funcx_service_address
+        try:
+            if hasattr(endpoint_config.config, 'provider') or hasattr(endpoint_config.config, 'max_workers_per_node'):
+                self.logger.exception('Need to update the out of date config. Refer to https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx')
+                raise AttributeError
+            elif endpoint_config.config.funcx_service_address != default_address:
+                self.logger.exception(f'Should use \'{default_address}\' in config as funcx_service_address')
+                raise AttributeError
+        except Exception:
+            self.logger.exception('Exception occurred in config, please refer to https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx')
+            raise
 
         # These certs need to be recreated for every registration
         keys_dir = os.path.join(endpoint_dir, 'certificates')
