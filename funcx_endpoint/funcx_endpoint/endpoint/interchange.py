@@ -403,6 +403,8 @@ class EndpointInterchange(object):
                                           identity=self.endpoint_id,
                                           mode='client',
                                           keys_dir=self.keys_dir,
+                                          # Fail immediately if results cannot be sent back
+                                          SNDTIMEO=0,
                                           set_hwm=True)
         self.results_outgoing.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
