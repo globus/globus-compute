@@ -415,9 +415,13 @@ class EndpointInterchange(object):
             if last + self.heartbeat_threshold < time.time():
                 logger.debug("[MAIN] alive")
                 last = time.time()
-
-            # TODO: DEBUG Remove the sleep
-            # time.sleep(0.1)
+                try:
+                    # Adding results heartbeat to essentially force a TCP keepalive
+                    # without meddling with OS TCP keepalive defaults
+                    self.results_outgoing.put('forwarder', b'HEARTBEAT')
+                except Exception:
+                    logger.exception("[MAIN] Sending heartbeat to the forwarder over the results channel has failed")
+                    raise
 
             try:
                 task = self.pending_task_queue.get(block=True, timeout=0.01)
