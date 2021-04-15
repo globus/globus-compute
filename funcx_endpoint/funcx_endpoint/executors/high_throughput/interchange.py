@@ -106,6 +106,7 @@ class Interchange(object):
                  prefetch_capacity=None,
                  scheduler_mode=None,
                  container_type=None,
+                 funcx_service_address=None,
                  worker_mode=None,
                  scaling_enabled=True,
                  #
@@ -233,7 +234,7 @@ class Interchange(object):
         self.pending_task_queue = {}
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient()
+        self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
