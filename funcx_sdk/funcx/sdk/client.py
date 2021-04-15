@@ -122,9 +122,9 @@ class FuncXClient(FuncXErrorHandlingClient):
         self.funcx_service_address = funcx_service_address
         self.check_endpoint_version = check_endpoint_version
 
-        self.version_check(check_endpoint_version=check_endpoint_version)
+        self.version_check()
 
-    def version_check(self, check_endpoint_version=False):
+    def version_check(self):
         """Check this client version meets the service's minimum supported version.
         """
         resp = self.get("version", params={"service": "all"})
@@ -133,8 +133,9 @@ class FuncXClient(FuncXErrorHandlingClient):
             raise VersionMismatch("Failed to retrieve version information from funcX service.")
 
         min_ep_version = versions['min_ep_version']
+        min_sdk_version = versions['min_sdk_version']
 
-        if check_endpoint_version:
+        if self.check_endpoint_version:
             if ENDPOINT_VERSION is None:
                 raise VersionMismatch("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
             if ENDPOINT_VERSION < min_ep_version:
@@ -142,10 +143,10 @@ class FuncXClient(FuncXErrorHandlingClient):
                                       f"minimum version for an endpoint: {min_ep_version}.  Please update. "
                                       f"pip install funcx-endpoint>={min_ep_version}")
         else:
-            if SDK_VERSION < min_ep_version:
+            if SDK_VERSION < min_sdk_version:
                 raise VersionMismatch(f"Your version={SDK_VERSION} is lower than the "
-                                      f"minimum version for funcx SDK: {min_ep_version}.  Please update. "
-                                      f"pip install funcx>={min_ep_version}")
+                                      f"minimum version for funcx SDK: {min_sdk_version}.  Please update. "
+                                      f"pip install funcx>={min_sdk_version}")
 
     def logout(self):
         """Remove credentials from your local system
@@ -425,7 +426,7 @@ class FuncXClient(FuncXErrorHandlingClient):
              'address' : <>,
              'client_ports': <>}
         """
-        self.version_check(check_endpoint_version=self.check_endpoint_version)
+        self.version_check()
 
         data = {
             "endpoint_name": name,
@@ -479,7 +480,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         dict
             The details of the containers to deploy
         """
-        self.version_check(check_endpoint_version=self.check_endpoint_version)
+        self.version_check()
 
         container_path = f'containers/{container_uuid}/{container_type}'
 
