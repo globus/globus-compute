@@ -218,7 +218,7 @@ class EndpointInterchange(object):
                 if not executor.endpoint_id == self.endpoint_id:
                     raise Exception('InconsistentEndpointId')
             self.executors[executor.label] = executor
-            executor.provider.channel.userhome = self.logdir
+            executor.run_dir = self.logdir
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
                 # executor._start_remote_interchange_process()
