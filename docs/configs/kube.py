@@ -19,6 +19,8 @@ config = Config(
             label='Kubernetes_funcX',
             max_workers_per_node=1,
             address=address_by_route(),
+            scheduler_mode='hard',
+            container_type='docker',
             strategy=KubeSimpleStrategy(max_idletime=3600),
             provider=KubernetesProvider(
                 init_blocks=0,
@@ -35,7 +37,6 @@ config = Config(
             ),
         )
     ],
-    scheduler_mode='hard',
     heartbeat_period=15,
     heartbeat_threshold=200,
     working_dir='.',

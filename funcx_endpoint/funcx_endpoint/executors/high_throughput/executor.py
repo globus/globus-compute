@@ -266,6 +266,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.task_status_queue = task_status_queue
 
         # FuncX specific options
+        self.funcx_service_address = None
         self.container_image = container_image
         self.worker_mode = worker_mode
         self.last_response_time = time.time()
@@ -387,6 +388,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           # "log_max_bytes": self.log_max_bytes,
                                           # "log_backup_count": self.log_backup_count,
                                           "scheduler_mode": self.scheduler_mode,
+                                          "container_type": self.container_type,
+                                          "funcx_service_address": self.funcx_service_address,
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
                                           "worker_port_range": self.worker_port_range,
