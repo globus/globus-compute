@@ -212,6 +212,7 @@ class EndpointInterchange(object):
         self.executors = {}
         for executor in self.config.executors:
             logger.info(f"Initializing executor: {executor.label}")
+            executor.funcx_service_address = self.config.funcx_service_address
             if not executor.endpoint_id:
                 executor.endpoint_id = self.endpoint_id
             else:
