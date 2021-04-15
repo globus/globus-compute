@@ -2,6 +2,7 @@ import json
 import os
 import logging
 from inspect import getsource
+from packaging.version import parse
 
 from globus_sdk import AuthClient
 
@@ -48,6 +49,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                  force_login=False, fx_authorizer=None, search_authorizer=None,
                  openid_authorizer=None,
                  funcx_service_address='https://api2.funcx.org/v2',
+                 check_endpoint_version=False,
                  **kwargs):
         """
         Initialize the client
@@ -119,6 +121,9 @@ class FuncXClient(FuncXErrorHandlingClient):
         user_info = authclient.oauth2_userinfo()
         self.searcher = SearchHelper(authorizer=search_authorizer, owner_uuid=user_info['sub'])
         self.funcx_service_address = funcx_service_address
+        self.check_endpoint_version = check_endpoint_version
+
+        self.version_check()
 
     def version_check(self):
         """Check this client version meets the service's minimum supported version.
@@ -129,12 +134,20 @@ class FuncXClient(FuncXErrorHandlingClient):
             raise VersionMismatch("Failed to retrieve version information from funcX service.")
 
         min_ep_version = versions['min_ep_version']
+        min_sdk_version = versions['min_sdk_version']
 
-        if ENDPOINT_VERSION is None:
-            raise VersionMismatch("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
-        if ENDPOINT_VERSION < min_ep_version:
-            raise VersionMismatch(f"Your version={ENDPOINT_VERSION} is lower than the "
-                                  f"minimum version for an endpoint: {min_ep_version}.  Please update.")
+        if self.check_endpoint_version:
+            if ENDPOINT_VERSION is None:
+                raise VersionMismatch("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
+            if parse(ENDPOINT_VERSION) < parse(min_ep_version):
+                raise VersionMismatch(f"Your version={ENDPOINT_VERSION} is lower than the "
+                                      f"minimum version for an endpoint: {min_ep_version}.  Please update. "
+                                      f"pip install funcx-endpoint>={min_ep_version}")
+        else:
+            if parse(SDK_VERSION) < parse(min_sdk_version):
+                raise VersionMismatch(f"Your version={SDK_VERSION} is lower than the "
+                                      f"minimum version for funcx SDK: {min_sdk_version}.  Please update. "
+                                      f"pip install funcx>={min_sdk_version}")
 
     def logout(self):
         """Remove credentials from your local system
@@ -468,6 +481,8 @@ class FuncXClient(FuncXErrorHandlingClient):
         dict
             The details of the containers to deploy
         """
+        self.version_check()
+
         container_path = f'containers/{container_uuid}/{container_type}'
 
         r = self.get(container_path)

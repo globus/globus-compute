@@ -147,7 +147,8 @@ class EndpointManager:
         if not endpoint_config.config.executors:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
-        funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
+        funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address,
+                                   check_endpoint_version=True)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
