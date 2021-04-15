@@ -3,7 +3,7 @@ import math
 import logging
 import time
 
-logger = logging.getLogger("interchange.strategy.KubeSimple")
+logger = logging.getLogger(__name__)
 
 
 class KubeSimpleStrategy(BaseStrategy):

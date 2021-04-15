@@ -23,6 +23,7 @@ from parsl.version import VERSION as PARSL_VERSION
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
+from funcx.utils.loggers import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
@@ -136,7 +137,10 @@ class EndpointInterchange(object):
         except FileExistsError:
             pass
 
-        start_file_logger("{}/EndpointInterchange.log".format(self.logdir), name="funcx_endpoint", level=logging_level)
+        global logger
+        logger = set_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"),
+                                 name=__name__,
+                                 level=logging_level)
         logger.info("logger location {}".format(logger.handlers))
         logger.info("Initializing EndpointInterchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
@@ -205,7 +209,7 @@ class EndpointInterchange(object):
 
         working_dir = self.config.working_dir
         if self.config.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+            working_dir = os.path.join(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.results_passthrough = multiprocessing.Queue()
@@ -581,40 +585,6 @@ class EndpointInterchange(object):
             logger.debug("[MAIN] The status is {}".format(status))
 
         return status
-
-
-def start_file_logger(filename, name=__name__, level=logging.DEBUG, format_string=None):
-    """Add a stream log handler.
-
-    Parameters
-    ---------
-
-    filename: string
-        Name of the file to write logs to. Required.
-    name: string
-        Logger name. Default="parsl.executors.interchange"
-    level: logging.LEVEL
-        Set the logging level. Default=logging.DEBUG
-        - format_string (string): Set the format string
-    format_string: string
-        Format string to use.
-
-    Returns
-    -------
-        None.
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not len(logger.handlers):
-        handler = logging.FileHandler(filename)
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
 
 
 def starter(comm_q, *args, **kwargs):

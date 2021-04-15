@@ -5,7 +5,7 @@ from parsl.providers.provider_base import JobState
 
 from funcx_endpoint.strategies.base import BaseStrategy
 
-logger = logging.getLogger("interchange.strategy.simple")
+logger = logging.getLogger(__name__)
 
 
 class SimpleStrategy(BaseStrategy):

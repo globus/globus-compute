@@ -4,7 +4,7 @@ import queue
 import logging
 import collections
 
-logger = logging.getLogger("interchange.task_dispatch")
+logger = logging.getLogger(__name__)
 logger.info("Interchange task dispatch started")
 
 
