@@ -21,6 +21,8 @@ data:
                 max_workers_per_node={{ .Values.maxWorkersPerPod }},
                 address=address_by_route(),
                 strategy=KubeSimpleStrategy(max_idletime=3600),
+                container_type='docker',
+                scheduler_mode='hard',
                 provider=KubernetesProvider(
                     init_blocks={{ .Values.initBlocks }},
                     min_blocks={{ .Values.minBlocks }},
@@ -36,7 +38,6 @@ data:
                 ),
             )
         ],
-        scheduler_mode='hard',
         heartbeat_period=15,
         heartbeat_threshold=200,
         working_dir='{{ .Values.workingDir }}',
