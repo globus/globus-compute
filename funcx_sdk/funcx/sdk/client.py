@@ -120,6 +120,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         user_info = authclient.oauth2_userinfo()
         self.searcher = SearchHelper(authorizer=search_authorizer, owner_uuid=user_info['sub'])
         self.funcx_service_address = funcx_service_address
+        self.check_endpoint_version = check_endpoint_version
 
         self.version_check(check_endpoint_version=check_endpoint_version)
 
@@ -424,6 +425,8 @@ class FuncXClient(FuncXErrorHandlingClient):
              'address' : <>,
              'client_ports': <>}
         """
+        self.version_check(check_endpoint_version=self.check_endpoint_version)
+
         data = {
             "endpoint_name": name,
             "endpoint_uuid": endpoint_uuid,
@@ -476,6 +479,8 @@ class FuncXClient(FuncXErrorHandlingClient):
         dict
             The details of the containers to deploy
         """
+        self.version_check(check_endpoint_version=self.check_endpoint_version)
+
         container_path = f'containers/{container_uuid}/{container_type}'
 
         r = self.get(container_path)
