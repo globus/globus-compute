@@ -2,6 +2,7 @@ import json
 import os
 import logging
 from inspect import getsource
+from packaging.version import parse
 
 from globus_sdk import AuthClient
 
@@ -138,12 +139,12 @@ class FuncXClient(FuncXErrorHandlingClient):
         if self.check_endpoint_version:
             if ENDPOINT_VERSION is None:
                 raise VersionMismatch("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
-            if ENDPOINT_VERSION < min_ep_version:
+            if parse(ENDPOINT_VERSION) < parse(min_ep_version):
                 raise VersionMismatch(f"Your version={ENDPOINT_VERSION} is lower than the "
                                       f"minimum version for an endpoint: {min_ep_version}.  Please update. "
                                       f"pip install funcx-endpoint>={min_ep_version}")
         else:
-            if SDK_VERSION < min_sdk_version:
+            if parse(SDK_VERSION) < parse(min_sdk_version):
                 raise VersionMismatch(f"Your version={SDK_VERSION} is lower than the "
                                       f"minimum version for funcx SDK: {min_sdk_version}.  Please update. "
                                       f"pip install funcx>={min_sdk_version}")
