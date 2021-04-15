@@ -105,6 +105,7 @@ class Interchange(object):
                  mem_per_worker=None,
                  prefetch_capacity=None,
                  scheduler_mode=None,
+                 container_type=None,
                  worker_mode=None,
                  scaling_enabled=True,
                  #
@@ -186,6 +187,7 @@ class Interchange(object):
         self.cores_per_worker = cores_per_worker
         self.prefetch_capacity = prefetch_capacity
         self.scheduler_mode = scheduler_mode
+        self.container_type = container_type
         self.log_max_bytes = log_max_bytes
         self.log_backup_count = log_backup_count
         self.working_dir = working_dir

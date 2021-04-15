@@ -387,6 +387,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           # "log_max_bytes": self.log_max_bytes,
                                           # "log_backup_count": self.log_backup_count,
                                           "scheduler_mode": self.scheduler_mode,
+                                          "container_type": self.container_type,
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
                                           "worker_port_range": self.worker_port_range,
