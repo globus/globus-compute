@@ -136,14 +136,6 @@ class EndpointManager:
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
 
-        if not os.path.exists(endpoint_dir):
-            print(f'Endpoint {self.name} is not configured!')
-            print('1. Please create a configuration template with:')
-            print(f'    funcx-endpoint configure {self.name}')
-            print('2. Update configuration')
-            print('3. Start the endpoint.')
-            return
-
         # These certs need to be recreated for every registration
         keys_dir = os.path.join(endpoint_dir, 'certificates')
         os.makedirs(keys_dir, exist_ok=True)

@@ -90,6 +90,16 @@ def start_endpoint(
     endpoint_uuid : str
     """
     endpoint_dir = os.path.join(manager.funcx_dir, name)
+
+    if not os.path.exists(endpoint_dir):
+        msg = (f'\nEndpoint {name} is not configured!\n'
+               '1. Please create a configuration template with:\n'
+               f'\tfuncx-endpoint configure {name}\n'
+               '2. Update the configuration\n'
+               '3. Start the endpoint\n')
+        print(msg)
+        return
+
     endpoint_config = SourceFileLoader('config',
                                        os.path.join(endpoint_dir, manager.funcx_config_file_name)).load_module()
     manager.start_endpoint(name, endpoint_uuid, endpoint_config)
