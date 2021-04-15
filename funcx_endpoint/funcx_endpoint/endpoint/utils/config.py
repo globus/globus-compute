@@ -1,5 +1,4 @@
 from parsl.utils import RepresentationMixin
-from parsl.providers import LocalProvider
 from funcx_endpoint.strategies.simple import SimpleStrategy
 from funcx_endpoint.executors import HighThroughputExecutor
 
@@ -67,7 +66,6 @@ class Config(RepresentationMixin):
                  executors: list = [HighThroughputExecutor()],
 
                  # Scaling mechanics
-                 provider=LocalProvider(),
                  scaling_enabled=True,
                  # Connection info
                  worker_ports=None,
@@ -95,7 +93,6 @@ class Config(RepresentationMixin):
         self.executors = executors  # List of executors
 
         # Scaling mechanics
-        self.provider = provider
         self.scaling_enabled = scaling_enabled
 
         # Connection info
