@@ -422,7 +422,7 @@ class Interchange(object):
                 # We pass the raw message along
                 self.pending_task_queue[local_container].put({'task_id': msg.task_id,
                                                               'container_id': msg.container_id,
-                                                              'local_container': local_container, 
+                                                              'local_container': local_container,
                                                               'raw_buffer': raw_msg})
                 self.total_pending_task_count += 1
                 self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
