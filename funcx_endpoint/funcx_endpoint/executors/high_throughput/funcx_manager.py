@@ -329,16 +329,13 @@ class Manager(object):
 
                 else:
                     logger.warning("YADU: RAW Tasks {}".format(message))
-                    tasks = [Message.unpack(rt) for rt in message]
+                    tasks = [(rt['local_container'], Message.unpack(rt['raw_buffer'])) for rt in message]
 
                     task_recv_counter += len(tasks)
                     logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t.task_id for t in tasks],
                                                                                  task_recv_counter))
 
-                    for task in tasks:
-                        # Set default type to raw
-                        task_type = task.container_id
-
+                    for task_type, task in tasks:
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
                         if task_type not in self.task_queues:

@@ -422,6 +422,7 @@ class Interchange(object):
                 # We pass the raw message along
                 self.pending_task_queue[local_container].put({'task_id': msg.task_id,
                                                               'container_id': msg.container_id,
+                                                              'local_container': local_container, 
                                                               'raw_buffer': raw_msg})
                 self.total_pending_task_count += 1
                 self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
@@ -706,7 +707,7 @@ class Interchange(object):
                 tasks = task_dispatch[manager]
                 if tasks:
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
-                    serializd_raw_tasks_buffer = pickle.dumps([t['raw_buffer'] for t in tasks])
+                    serializd_raw_tasks_buffer = pickle.dumps(tasks)
                     # self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
                     self.task_outgoing.send_multipart([manager, b'', serializd_raw_tasks_buffer])
 
