@@ -3,7 +3,7 @@ Quickstart
 
 **funcX** is currently in Alpha and early testing releases are available on `PyPI <https://pypi.org/project/funcx/>`_.
 
-The latest version available on PyPI is ``v0.2.0``.
+The latest version available on PyPI is ``v0.2.2``.
 
 You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2FTutorial.ipynb>`_
 
@@ -32,7 +32,7 @@ To check if you have network access, run ::
 
   >>> curl https://api2.funcx.org/v2/version
 
-This should return a version string, for example: ``"0.2.0"``
+This should return a version string, for example: ``"0.2.2"``
 
 .. note:: The funcx client is supported on MacOS, Linux, and Windows. The funcx-endpoint
    is only supported on Linux.
