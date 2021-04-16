@@ -332,7 +332,7 @@ class Manager(object):
                     tasks = [(rt['local_container'], Message.unpack(rt['raw_buffer'])) for rt in message]
 
                     task_recv_counter += len(tasks)
-                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t.task_id for t in tasks],
+                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t[1].task_id for t in tasks],
                                                                                  task_recv_counter))
 
                     for task_type, task in tasks:
