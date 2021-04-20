@@ -4,38 +4,8 @@ import logging
 import argparse
 import sys
 import copy
+from globus_sdk import ConfidentialAppAuthClient, AccessTokenAuthorizer
 from funcx.sdk.client import FuncXClient
-
-# tutorial_endpoint = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
-
-
-# Generate a random real orthogonal matrix of dimension (dim x dim)
-def rvs(dim=3):
-    import numpy as np
-    random_state = np.random
-    H = np.eye(dim)
-    D = np.ones((dim,))
-    for n in range(1, dim):
-        x = random_state.normal(size=(dim - n + 1,))
-        D[n - 1] = np.sign(x[0])
-        x[0] -= D[n - 1] * np.sqrt((x * x).sum())
-        # Householder transformation
-        Hx = (np.eye(dim - n + 1) - 2. * np.outer(x, x) / (x * x).sum())
-        mat = np.eye(dim)
-        mat[n - 1:, n - 1:] = Hx
-        H = np.dot(H, mat)
-        # Fix the last sign such that the determinant is 1
-    D[-1] = (-1)**(1 - (dim % 2)) * D.prod()
-    # Equivalent to np.dot(np.diag(D), H) but faster, apparently
-    H = (D * H.T).T
-    return H
-
-
-def check_determinant():
-    import numpy as np
-    mat = rvs(24)
-    mat_inv = np.linalg.inv(mat)
-    return np.linalg.det(mat) * np.linalg.det(mat_inv)
 
 
 def identity(x):
@@ -44,7 +14,9 @@ def identity(x):
 
 class TestTutorial():
 
-    def __init__(self, endpoint_id, func, expected, args=None, timeout=15, concurrency=5, tol=1e-5):
+    def __init__(self, fx_auth, search_auth, openid_auth,
+                 endpoint_id, func, expected,
+                 args=None, timeout=15, concurrency=1, tol=1e-5):
         self.endpoint_id = endpoint_id
         self.func = func
         self.expected = expected
@@ -52,7 +24,9 @@ class TestTutorial():
         self.timeout = timeout
         self.concurrency = concurrency
         self.tol = tol
-        self.fxc = FuncXClient()
+        self.fxc = FuncXClient(fx_authorizer=fx_auth,
+                               search_authorizer=search_auth,
+                               openid_authorizer=openid_auth)
         self.func_uuid = self.fxc.register_function(self.func)
 
         self.logger = logging.getLogger(__name__)
@@ -93,6 +67,7 @@ class TestTutorial():
             self.logger.info('Cancelled by keyboard interruption')
         except Exception as e:
             self.logger.exception(f'Encountered exception: {e}')
+            raise
 
 
 if __name__ == "__main__":
@@ -100,8 +75,27 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--tutorial", required=True,
                         help="Tutorial Endpoint ID")
+    parser.add_argument("-i", "--id", required=True,
+                        help="API_CLIENT_ID for Globus")
+    parser.add_argument("-s", "--secret", required=True,
+                        help="API_CLIENT_SECRET for Globus")
     args = parser.parse_args()
 
-    rnd = numpy.random.randint(1000)
-    tt = TestTutorial(args.tutorial, identity, rnd, args=rnd)
+    client = ConfidentialAppAuthClient(args.id, args.secret)
+    scopes = ["https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
+              "urn:globus:auth:scope:search.api.globus.org:all",
+              "openid"]
+
+    token_response = client.oauth2_client_credentials_tokens(requested_scopes=scopes)
+    fx_token = token_response.by_resource_server['funcx_service']['access_token']
+    search_token = token_response.by_resource_server['search.api.globus.org']['access_token']
+    openid_token = token_response.by_resource_server['auth.globus.org']['access_token']
+
+    fx_auth = AccessTokenAuthorizer(fx_token)
+    search_auth = AccessTokenAuthorizer(search_token)
+    openid_auth = AccessTokenAuthorizer(openid_token)
+
+    rnd = numpy.random.randint(1024)
+    tt = TestTutorial(fx_auth, search_auth, openid_auth,
+                      args.tutorial, identity, rnd, args=rnd)
     tt.run()
