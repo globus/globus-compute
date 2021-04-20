@@ -2,10 +2,66 @@ Changelog
 =========
 
 
+
+
+funcx & funcx-endpoint v0.2.2
+-----------------------------
+
+Released on April 15th, 2021
+
+funcx v0.2.2 is a hotfix release that includes contributions (code, tests, reviews, and reports) from:
+
+Yadu Nand Babuji <yadudoc1729@gmail.com> and Zhuozhao Li <zhuozhao@uchicago.edu>
+
+
+Bug Fixes
+^^^^^^^^^
+
+* Fixed a missing package in the `requirements.txt` file
+
+* Updated version requirements in `funcx-endpoint` to match the `funcx` version
+
+
+funcx & funcx-endpoint v0.2.1
+-----------------------------
+
+Released on April 15th, 2021
+
+funcx v0.2.1 includes contributions (code, tests, reviews, and reports) from:
+
+Daniel S. Katz <d.katz@ieee.org>, Yadu Nand Babuji <yadudoc1729@gmail.com>,
+Yongyan Rao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
+
+New Features
+^^^^^^^^^^^^
+
+* Cleaner reporting when an older non-compatible ``Config`` object is used. Refer: `issue 427 <https://github.com/funcx-faas/funcX/issues/427>`_
+
+* Better automated checks at SDK initialization to confirm that the SDK and Endpoint versions are supported by the web-service.
+
+* Updated Kubernetes docs and example configs.
+
+
+Bug Fixes
+^^^^^^^^^
+
+* Fixed a bug in funcx-endpoint that caused the ZMQ connections to timeout and crash, terminating the endpoint.
+
+* Fixed an unsafe string based version comparison check.
+
+* Fixed an issue with poor error reporting when starting non-existent endpoints. Refer: `issue 432 <https://github.com/funcx-faas/funcX/issues/432>`_
+
+* Fixed a bug in incorrectly passing the `funcx_service_address` to the EndpointInterchange.
+
+* Several updates to the docs for clarity.
+
+* JSON serializer is removed from the FuncXSeralizer mechanism due to issues with not preserving types over serialization (tuples/lists)
+
+
 funcx & funcx-endpoint v0.2.0
 -----------------------------
 
-Tentative Release on April 10th, 2021
+Released on April 8th, 2021
 
 funcx v0.2.0 includes contributions (code, tests, reviews, and reports) from:
 
