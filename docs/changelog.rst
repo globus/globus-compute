@@ -9,7 +9,7 @@ funcx & funcx-endpoint v0.2.2
 
 Released on April 15th, 2021
 
-funcx v0.2.2 is hotfix release that includes contributions (code, tests, reviews, and reports) from:
+funcx v0.2.2 is a hotfix release that includes contributions (code, tests, reviews, and reports) from:
 
 Yadu Nand Babuji <yadudoc1729@gmail.com> and Zhuozhao Li <zhuozhao@uchicago.edu>
 
