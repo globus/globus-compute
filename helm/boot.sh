@@ -11,4 +11,9 @@ else
   funcx-endpoint start $1 --endpoint-uuid $2
 fi
 
-sleep infinity
+while pgrep funcx-endpoint >/dev/null;
+    do
+        echo "funcx-endpoint process is still alive. Next check in 600s."
+        sleep 600;
+    done
+echo "funcx-endpoint process exited. Restarting endpoint"
