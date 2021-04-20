@@ -28,3 +28,5 @@ maxBlocks: 100
 maxWorkersPerPod: 1
 
 detachEndpoint: true
+
+endpointUUID:
