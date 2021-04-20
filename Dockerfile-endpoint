@@ -1,4 +1,4 @@
-FROM python:3.6
+FROM python:3.7
 RUN mkdir /opt/funcx
 RUN pip install kubernetes
 RUN pip install --no-binary :all: --force-reinstall pyzmq
