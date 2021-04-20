@@ -4,6 +4,24 @@ Changelog
 
 
 
+funcx & funcx-endpoint v0.2.2
+-----------------------------
+
+Released on April 15th, 2021
+
+funcx v0.2.2 is hotfix release that includes contributions (code, tests, reviews, and reports) from:
+
+Yadu Nand Babuji <yadudoc1729@gmail.com> and Zhuozhao Li <zhuozhao@uchicago.edu>
+
+
+Bug Fixes
+^^^^^^^^^
+
+* Fixed a missing package in the `requirements.txt` file
+
+* Updated version requirements in `funcx-endpoint` to match the `funcx` version
+
+
 funcx & funcx-endpoint v0.2.1
 -----------------------------
 
