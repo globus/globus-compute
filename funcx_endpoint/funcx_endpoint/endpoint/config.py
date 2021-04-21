@@ -52,7 +52,6 @@ def _get_parsl_config():
             HighThroughputExecutor(
                 label="htex_local",
                 worker_debug=False,
-                poll_period=1,
                 cores_per_worker=1,
                 max_workers=1,
                 provider=LocalProvider(

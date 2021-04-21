@@ -56,7 +56,6 @@ class Config(RepresentationMixin):
                  # Tuning info
                  heartbeat_period=30,
                  heartbeat_threshold=120,
-                 poll_period=10,
                  detach_endpoint=True,
 
                  # Logging info
@@ -73,7 +72,6 @@ class Config(RepresentationMixin):
         # Tuning info
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
-        self.poll_period = poll_period
         self.detach_endpoint = detach_endpoint
 
         # Logging info
