@@ -419,7 +419,7 @@ class Manager(object):
 
                             task = self.task_queues[task_type].get()
                             worker_id = self.worker_map.get_worker(task_type)
-                            logger.info("Sending task {}".format(task, task.__repr__))
+
                             logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
                             # TODO: Some duplication of work could be avoided here
                             to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
@@ -553,7 +553,7 @@ def cli_run():
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
     parser.add_argument("--container_cmd_options", default="",
-                                    help=("Container cmd options to add to container startup cmd"))
+                        help=("Container cmd options to add to container startup cmd"))
     parser.add_argument("--scheduler_mode", default="soft",
                         help=("Choose the mode of scheduler "
                               "(hard, soft"))
