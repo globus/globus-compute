@@ -136,7 +136,7 @@ class EndpointInterchange(object):
         except FileExistsError:
             pass
 
-        start_file_logger("{}/EndpointInterchange.log".format(self.logdir), name="funcx_endpoint", level=logging_level)
+        start_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"), name="funcx_endpoint", level=logging_level)
         logger.info("Initializing EndpointInterchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -204,7 +204,7 @@ class EndpointInterchange(object):
 
         working_dir = self.config.working_dir
         if self.config.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+            working_dir = os.path.join(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.results_passthrough = multiprocessing.Queue()
@@ -218,6 +218,8 @@ class EndpointInterchange(object):
                 if not executor.endpoint_id == self.endpoint_id:
                     raise Exception('InconsistentEndpointId')
             self.executors[executor.label] = executor
+            if executor.run_dir is None:
+                executor.run_dir = self.logdir
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
                 # executor._start_remote_interchange_process()

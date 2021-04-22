@@ -37,7 +37,7 @@ class EndpointManager:
     """
 
     def __init__(self,
-                 funcx_dir='{}/.funcx'.format(pathlib.Path.home()),
+                 funcx_dir=os.path.join(pathlib.Path.home(), '.funcx'),
                  debug=False):
         """ Initialize the EndpointManager
 
@@ -303,7 +303,7 @@ class EndpointManager:
 
         with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
             json.dump(reg_info, fp)
-            self.logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
+            self.logger.debug("Registration info written to {}".format(os.path.join(endpoint_dir, 'endpoint.json')))
 
         certs_dir = os.path.join(endpoint_dir, 'certificates')
         os.makedirs(certs_dir, exist_ok=True)
@@ -391,7 +391,7 @@ class EndpointManager:
         headings = ['Endpoint Name', 'Status', 'Endpoint ID']
         table.header(headings)
 
-        config_files = glob.glob('{}/*/config.py'.format(self.funcx_dir))
+        config_files = glob.glob(os.path.join(self.funcx_dir, '*', 'config.py'))
         for config_file in config_files:
             endpoint_dir = os.path.dirname(config_file)
             endpoint_name = os.path.basename(endpoint_dir)

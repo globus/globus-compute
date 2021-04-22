@@ -217,6 +217,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  poll_period=10,
                  container_image=None,
                  suppress_failure=False,
+                 run_dir=None,
                  endpoint_id=None,
                  managed=True,
                  interchange_local=True,
@@ -259,7 +260,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.heartbeat_period = heartbeat_period
         self.poll_period = poll_period
         self.suppress_failure = suppress_failure
-        self.run_dir = '.'
+        self.run_dir = run_dir
         self.queue_proc = None
         self.interchange_local = interchange_local
         self.passthrough = passthrough
@@ -308,7 +309,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                        heartbeat_period=self.heartbeat_period,
                                        heartbeat_threshold=self.heartbeat_threshold,
                                        poll_period=self.poll_period,
-                                       logdir="{}/{}".format(self.run_dir, self.label),
+                                       logdir=os.path.join(self.run_dir, self.label),
                                        worker_mode=self.worker_mode,
                                        container_image=self.container_image)
         self.launch_cmd = l_cmd
@@ -393,7 +394,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
                                           "worker_port_range": self.worker_port_range,
-                                          "logdir": "{}/{}".format(self.run_dir, self.label),
+                                          "logdir": os.path.join(self.run_dir, self.label),
                                           "suppress_failure": self.suppress_failure,
                                           "endpoint_id": self.endpoint_id,
                                           "logging_level": logging.DEBUG if self.worker_debug else logging.INFO
@@ -427,9 +428,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                                                                   self.command_client.port),
                                                    worker_port_range="{},{}".format(self.worker_port_range[0],
                                                                                     self.worker_port_range[1]),
-                                                   logdir="{}/runinfo/{}/{}".format(self.provider.channel.script_dir,
-                                                                                    os.path.basename(self.run_dir),
-                                                                                    self.label),
+                                                   logdir=os.path.join(self.provider.channel.script_dir, 'runinfo',
+                                                                       os.path.basename(self.run_dir), self.label),
                                                    suppress_failure=suppress_failure)
 
         if self.provider.worker_init:
