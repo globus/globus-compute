@@ -5,6 +5,7 @@ import argparse
 import zmq
 import sys
 import pickle
+import os
 
 from parsl.app.errors import RemoteExceptionWrapper
 
@@ -53,7 +54,7 @@ class FuncXWorker(object):
         self.deserialize = self.serializer.deserialize
 
         global logger
-        logger = set_file_logger('{}/funcx_worker_{}.log'.format(logdir, worker_id),
+        logger = set_file_logger(os.path.join(logdir, f'funcx_worker_{worker_id}.log'),
                                  name="worker_log",
                                  level=logging.DEBUG if debug else logging.INFO)
 

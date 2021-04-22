@@ -136,7 +136,7 @@ class EndpointInterchange(object):
         except FileExistsError:
             pass
 
-        start_file_logger("{}/EndpointInterchange.log".format(self.logdir), name="funcx_endpoint", level=logging_level)
+        start_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"), name="funcx_endpoint", level=logging_level)
         logger.info("logger location {}".format(logger.handlers))
         logger.info("Initializing EndpointInterchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
@@ -205,7 +205,7 @@ class EndpointInterchange(object):
 
         working_dir = self.config.working_dir
         if self.config.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+            working_dir = os.path.join(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.results_passthrough = multiprocessing.Queue()

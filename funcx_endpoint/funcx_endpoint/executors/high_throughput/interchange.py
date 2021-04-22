@@ -172,7 +172,7 @@ class Interchange(object):
 
         self.logdir = logdir
         os.makedirs(self.logdir, exist_ok=True)
-        start_file_logger("{}/interchange.log".format(self.logdir),
+        start_file_logger(os.path.join(self.logdir, 'interchange.log'),
                           level=logging_level,
                           max_bytes=log_max_bytes,
                           backup_count=log_backup_count)
@@ -311,7 +311,7 @@ class Interchange(object):
         logger.info("Loading endpoint local config")
         working_dir = self.working_dir
         if self.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+            working_dir = os.path.join(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.provider.script_dir = working_dir

@@ -41,7 +41,7 @@ def version_callback(value):
 
 
 def complete_endpoint_name():
-    config_files = glob.glob('{}/*/config.py'.format(manager.funcx_dir))
+    config_files = glob.glob(os.path.join(manager.funcx_dir, '*', 'config.py'))
     for config_file in config_files:
         yield os.path.basename(os.path.dirname(config_file))
 
@@ -152,7 +152,7 @@ def main(
         ctx: typer.Context,
         _: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True),
         debug: bool = typer.Option(False, "--debug", "-d"),
-        config_dir: str = typer.Option('{}/.funcx'.format(pathlib.Path.home()), "--config_dir", "-c", help="override default config dir")
+        config_dir: str = typer.Option(os.path.join(pathlib.Path.home(), '.funcx'), "--config_dir", "-c", help="override default config dir")
 ):
     # Note: no docstring here; the docstring for @app.callback is used as a help message for overall app.
     # Sets up global variables in the State wrapper (debug flag, config dir, default config file).

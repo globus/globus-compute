@@ -1,5 +1,5 @@
 from funcx_endpoint.endpoint.utils.config import Config
-
+import os
 
 config = Config()
 
@@ -15,9 +15,9 @@ if __name__ == '__main__':
     endpoint_dir = "/home/yadu/.funcx/default"
 
     if config.working_dir is None:
-        working_dir = "{}/{}".format(endpoint_dir, "worker_logs")
+        working_dir = os.path.join(endpoint_dir, "worker_logs")
     # if self.worker_logdir_root is not None:
-    #      worker_logdir = "{}/{}".format(self.worker_logdir_root, self.label)
+    #      worker_logdir = os.path.join(self.worker_logdir_root, self.label)
 
     print("Loading : ", config)
     # Set script dir
