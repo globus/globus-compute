@@ -46,7 +46,7 @@ class WebSocketPollingTask:
     async def send_outgoing(self, queue: asyncio.Queue):
         while True:
             task = await queue.get()
-            data = [task.task_id]
+            data = [task.topic_id]
             await self.ws.send(json.dumps(data))
 
     async def handle_incoming(self):

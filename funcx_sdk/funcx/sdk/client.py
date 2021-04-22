@@ -339,14 +339,14 @@ class FuncXClient(FuncXErrorHandlingClient):
         # If we are presenting the asynch interface then return a asynchio task
         # that will eventually resolve to the result
         if self.asynchronous:
-            funcx_task = FuncXTask(r[0])
+            funcx_task = FuncXTask(r['results'][0]['task_uuid'], r['topic_id'])
             asyncio_task = self.loop.create_task(funcx_task.get_result())
 
             # Add it to the list of tasks to be polled
             self.ws_polling_task.put(funcx_task)
             return asyncio_task
         else:
-            return r[0]
+            return r['results'][0]['task_uuid']
 
     def create_batch(self):
         """
@@ -391,7 +391,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                 # ideal, as it will raise any error in the multi-response,
                 # but it will do until batch_run is deprecated in favor of Executer
                 handle_response_errors(result)
-        return task_uuids
+        return r
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation

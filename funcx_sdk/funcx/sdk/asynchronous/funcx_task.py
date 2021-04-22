@@ -5,7 +5,7 @@ class FuncXTask(asyncio.Future):
     """
     Represents a submitted funcX task with an asychio wrapper
     """
-    def __init__(self, task_id):
+    def __init__(self, task_id, topic_id):
         """
         Parameters
         ----------
@@ -14,6 +14,7 @@ class FuncXTask(asyncio.Future):
         """
         super(FuncXTask, self).__init__()
         self.task_id = task_id
+        self.topic_id = topic_id
 
     def __str__(self):
         return "FuncX Task ID " + self.task_id
