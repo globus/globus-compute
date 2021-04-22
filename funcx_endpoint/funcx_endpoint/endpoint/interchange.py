@@ -147,7 +147,6 @@ class EndpointInterchange(object):
         self.client_ports = client_ports
         self.suppress_failure = suppress_failure
 
-        self.poll_period = self.config.poll_period
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
         # initalize the last heartbeat time to start the loop
@@ -202,11 +201,6 @@ class EndpointInterchange(object):
         """ Load the config
         """
         logger.info("Loading endpoint local config")
-
-        working_dir = self.config.working_dir
-        if self.config.working_dir is None:
-            working_dir = os.path.join(self.logdir, "worker_logs")
-        logger.info("Setting working_dir: {}".format(working_dir))
 
         self.results_passthrough = multiprocessing.Queue()
         self.executors = {}
@@ -371,17 +365,10 @@ class EndpointInterchange(object):
         self._task_puller_thread.join()
         self._command_thread.join()
 
-    def start(self, poll_period=None):
+    def start(self):
         """ Start the Interchange
-
-        Parameters:
-        ----------
-        poll_period : int
-           poll_period in milliseconds
         """
         logger.info("Starting EndpointInterchange")
-        if poll_period is None:
-            poll_period = self.poll_period
 
         start = time.time()
         count = 0
@@ -642,8 +629,6 @@ def cli_run():
                         help="Worker port range as a tuple")
     parser.add_argument("-l", "--logdir", default="./parsl_worker_logs",
                         help="Parsl worker log directory")
-    parser.add_argument("-p", "--poll_period",
-                        help="REQUIRED: poll period used for main thread")
     parser.add_argument("--worker_ports", default=None,
                         help="OPTIONAL, pair of workers ports to listen on, eg --worker_ports=50001,50005")
     parser.add_argument("--suppress_failure", action='store_true',
