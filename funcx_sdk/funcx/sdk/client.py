@@ -336,17 +336,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         batch.add(*args, endpoint_id=endpoint_id, function_id=function_id, **kwargs)
         r = self.batch_run(batch)
 
-        # If we are presenting the asynch interface then return a asynchio task
-        # that will eventually resolve to the result
-        if self.asynchronous:
-            funcx_task = FuncXTask(r['results'][0]['task_uuid'], r['topic_id'])
-            asyncio_task = self.loop.create_task(funcx_task.get_result())
-
-            # Add it to the list of tasks to be polled
-            self.ws_polling_task.put(funcx_task)
-            return asyncio_task
-        else:
-            return r['results'][0]['task_uuid']
+        return r[0]
 
     def create_batch(self):
         """
@@ -382,6 +372,7 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
+
         task_uuids = []
         for result in r['results']:
             task_id = result['task_uuid']
@@ -391,6 +382,19 @@ class FuncXClient(FuncXErrorHandlingClient):
                 # ideal, as it will raise any error in the multi-response,
                 # but it will do until batch_run is deprecated in favor of Executer
                 handle_response_errors(result)
+
+        if self.asynchronous:
+            batch_id = r['batch_id']
+            asyncio_tasks = []
+            for task_id in task_uuids:
+                funcx_task = FuncXTask(task_id)
+                asyncio_task = self.loop.create_task(funcx_task.get_result())
+                asyncio_tasks.append(asyncio_task)
+
+                self.ws_polling_task.add_task(funcx_task)
+            self.ws_polling_task.put_batch_id(batch_id)
+            return asyncio_tasks
+        
         return r
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):

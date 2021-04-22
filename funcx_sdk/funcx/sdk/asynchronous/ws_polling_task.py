@@ -26,7 +26,7 @@ class WebSocketPollingTask:
         self.fxc = fxc
         self.loop = loop
         self.fx_serializer = fx_serializer
-        self.running_tasks = asyncio.Queue()
+        self.running_batch_ids = asyncio.Queue()
         self.pending_tasks = {}
 
         self.loop.create_task(self.init_ws())
@@ -40,14 +40,13 @@ class WebSocketPollingTask:
         # so an invalid handshake means that the user was not authenticated
         except InvalidHandshake:
             raise Exception('Failed to authenticate user. Please ensure that you are logged in.')
-        self.loop.create_task(self.send_outgoing(self.running_tasks))
+        self.loop.create_task(self.send_outgoing(self.running_batch_ids))
         self.loop.create_task(self.handle_incoming())
 
     async def send_outgoing(self, queue: asyncio.Queue):
         while True:
-            task = await queue.get()
-            data = [task.topic_id]
-            await self.ws.send(json.dumps(data))
+            batch_id = await queue.get()
+            await self.ws.send(batch_id)
 
     async def handle_incoming(self):
         while True:
@@ -65,13 +64,15 @@ class WebSocketPollingTask:
                 else:
                     task.set_exception(Exception(data['reason']))
 
-    def put(self, task: FuncXTask):
+    def put_batch_id(self, batch_id):
+        self.running_batch_ids.put_nowait(batch_id)
+
+    def add_task(self, task: FuncXTask):
         """
-        Add a funcX task to the poller
+        Add a funcX task
         :param task: FuncXTask
             Task to be added
         """
-        self.running_tasks.put_nowait(task)
         self.pending_tasks[task.task_id] = task
 
     def get_auth_header(self):
