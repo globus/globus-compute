@@ -217,6 +217,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  poll_period=10,
                  container_image=None,
                  suppress_failure=False,
+                 run_dir=None,
                  endpoint_id=None,
                  managed=True,
                  interchange_local=True,
@@ -259,7 +260,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.heartbeat_period = heartbeat_period
         self.poll_period = poll_period
         self.suppress_failure = suppress_failure
-        self.run_dir = '.'
+        self.run_dir = run_dir
         self.queue_proc = None
         self.interchange_local = interchange_local
         self.passthrough = passthrough
