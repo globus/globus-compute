@@ -202,11 +202,6 @@ class EndpointInterchange(object):
         """
         logger.info("Loading endpoint local config")
 
-        working_dir = self.config.log_dir
-        if self.config.log_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
-        logger.info("Setting working_dir: {}".format(working_dir))
-
         self.results_passthrough = multiprocessing.Queue()
         self.executors = {}
         for executor in self.config.executors:
