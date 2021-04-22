@@ -42,4 +42,3 @@ class TestEndpoint:
         result = runner.invoke(app, ["start", "newendpoint"])
         os.remove("./config.py")
         assert isinstance(result.exception, TypeError)
-        assert 'provider' in str(result.exception)
