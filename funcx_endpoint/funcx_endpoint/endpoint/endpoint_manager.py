@@ -29,7 +29,7 @@ from funcx_endpoint.executors.high_throughput import global_config as funcx_defa
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx.sdk.client import FuncXClient
 
-logger = logging.getLogger("funcx_endpoint.endpoint_manager")
+logger = logging.getLogger("endpoint.endpoint_manager")
 
 
 class EndpointManager:

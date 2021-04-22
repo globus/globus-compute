@@ -160,9 +160,9 @@ def main(
     # For commands other than `init`, we ensure the existence of the config directory and file.
 
     global logger
-    funcx.set_stream_logger(name='funcx_endpoint',
+    funcx.set_stream_logger(name='endpoint',
                             level=logging.DEBUG if debug else logging.INFO)
-    logger = logging.getLogger('funcx')
+    logger = logging.getLogger('endpoint')
     logger.debug("Command: {}".format(ctx.invoked_subcommand))
 
     global manager
