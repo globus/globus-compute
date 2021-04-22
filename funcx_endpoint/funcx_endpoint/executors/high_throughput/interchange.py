@@ -172,7 +172,7 @@ class Interchange(object):
 
         self.logdir = logdir
         os.makedirs(self.logdir, exist_ok=True)
-        start_file_logger("{}/interchange.log".format(self.logdir),
+        start_file_logger(os.path.join(self.logdir, 'interchange.log'),
                           level=logging_level,
                           max_bytes=log_max_bytes,
                           backup_count=log_backup_count)
@@ -311,7 +311,7 @@ class Interchange(object):
         logger.info("Loading endpoint local config")
         working_dir = self.working_dir
         if self.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+            working_dir = os.path.join(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.provider.script_dir = working_dir
@@ -422,6 +422,7 @@ class Interchange(object):
                 # We pass the raw message along
                 self.pending_task_queue[local_container].put({'task_id': msg.task_id,
                                                               'container_id': msg.container_id,
+                                                              'local_container': local_container,
                                                               'raw_buffer': raw_msg})
                 self.total_pending_task_count += 1
                 self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
@@ -706,7 +707,7 @@ class Interchange(object):
                 tasks = task_dispatch[manager]
                 if tasks:
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
-                    serializd_raw_tasks_buffer = pickle.dumps([t['raw_buffer'] for t in tasks])
+                    serializd_raw_tasks_buffer = pickle.dumps(tasks)
                     # self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
                     self.task_outgoing.send_multipart([manager, b'', serializd_raw_tasks_buffer])
 

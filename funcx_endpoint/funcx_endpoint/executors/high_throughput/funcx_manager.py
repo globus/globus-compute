@@ -329,16 +329,13 @@ class Manager(object):
 
                 else:
                     logger.warning("YADU: RAW Tasks {}".format(message))
-                    tasks = [Message.unpack(rt) for rt in message]
+                    tasks = [(rt['local_container'], Message.unpack(rt['raw_buffer'])) for rt in message]
 
                     task_recv_counter += len(tasks)
-                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t.task_id for t in tasks],
+                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t[1].task_id for t in tasks],
                                                                                  task_recv_counter))
 
-                    for task in tasks:
-                        # Set default type to raw
-                        task_type = task.container_id
-
+                    for task_type, task in tasks:
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
                         if task_type not in self.task_queues:
@@ -566,7 +563,7 @@ def cli_run():
     try:
         global logger
         # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
-        logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
+        logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,
                                  max_bytes=float(args.log_max_bytes),  # TODO: Test if this still works on forwarder_rearch_1

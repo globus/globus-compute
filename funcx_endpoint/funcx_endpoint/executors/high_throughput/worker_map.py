@@ -3,6 +3,7 @@ import logging
 import random
 import subprocess
 import time
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +199,7 @@ class WorkerMap(object):
                f'-a {address} '
                f'-p {worker_port} '
                f'-t {worker_type} '
-               f'--logdir={logdir}/{uid} ')
+               f'--logdir={os.path.join(logdir, uid)} ')
 
         logger.info("Command string :\n {}".format(cmd))
 
