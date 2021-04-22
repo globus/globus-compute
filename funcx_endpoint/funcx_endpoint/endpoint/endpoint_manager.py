@@ -36,15 +36,23 @@ class EndpointManager:
     """ EndpointManager is primarily responsible for configuring, launching and stopping the Endpoint.
     """
 
-    def __init__(self):
+    def __init__(self,
+                 funcx_dir='{}/.funcx'.format(pathlib.Path.home()),
+                 debug=False):
         """ Initialize the EndpointManager
 
         Parameters
         ----------
+
+        funcx_dir: str
+            Directory path to the root of the funcx dirs. Usually ~/.funcx.
+
+        debug: Bool
+            Enable debug logging. Default: False
         """
         self.funcx_config_file_name = 'config.py'
-        self.DEBUG = False
-        self.funcx_dir = '{}/.funcx'.format(pathlib.Path.home())
+        self.debug = debug
+        self.funcx_dir = funcx_dir
         self.funcx_config_file = os.path.join(self.funcx_dir, self.funcx_config_file_name)
         self.funcx_default_config_template = funcx_default_config.__file__
         self.funcx_config = {}
@@ -251,7 +259,7 @@ class EndpointManager:
 
             optionals['logdir'] = endpoint_dir
 
-        if self.DEBUG:
+        if self.debug:
             optionals['logging_level'] = logging.DEBUG
 
         ic = EndpointInterchange(endpoint_config.config,
