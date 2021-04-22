@@ -563,7 +563,7 @@ def cli_run():
     try:
         global logger
         # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
-        logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
+        logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,
                                  max_bytes=float(args.log_max_bytes),  # TODO: Test if this still works on forwarder_rearch_1
