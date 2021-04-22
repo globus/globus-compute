@@ -31,6 +31,7 @@ from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
 from funcx.sdk.client import FuncXClient
 
 app = typer.Typer()
+logger = None
 
 
 def version_callback(value):
@@ -158,12 +159,14 @@ def main(
     # Sets up global variables in the State wrapper (debug flag, config dir, default config file).
     # For commands other than `init`, we ensure the existence of the config directory and file.
 
-    funcx.set_stream_logger(level=logging.DEBUG if debug else logging.INFO)
+    global logger
+    funcx.set_stream_logger(name='funcx_endpoint',
+                            level=logging.DEBUG if debug else logging.INFO)
     logger = logging.getLogger('funcx')
     logger.debug("Command: {}".format(ctx.invoked_subcommand))
 
     global manager
-    manager = EndpointManager(logger)
+    manager = EndpointManager()
 
     # Set global state variables, to avoid passing them around as arguments all the time
     manager.DEBUG = debug

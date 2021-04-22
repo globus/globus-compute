@@ -29,9 +29,19 @@ from funcx_endpoint.executors.high_throughput import global_config as funcx_defa
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx.sdk.client import FuncXClient
 
+logger = logging.getLogger("funcx_endpoint.endpoint_manager")
+
 
 class EndpointManager:
-    def __init__(self, logger):
+    """ EndpointManager is primarily responsible for configuring, launching and stopping the Endpoint.
+    """
+
+    def __init__(self):
+        """ Initialize the EndpointManager
+
+        Parameters
+        ----------
+        """
         self.funcx_config_file_name = 'config.py'
         self.DEBUG = False
         self.funcx_dir = '{}/.funcx'.format(pathlib.Path.home())
@@ -39,6 +49,7 @@ class EndpointManager:
         self.funcx_default_config_template = funcx_default_config.__file__
         self.funcx_config = {}
         self.name = 'default'
+        global logger
         self.logger = logger
 
     def init_endpoint_dir(self, endpoint_config=None):
