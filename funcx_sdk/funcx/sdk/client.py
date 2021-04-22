@@ -52,6 +52,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                  force_login=False, fx_authorizer=None, search_authorizer=None,
                  openid_authorizer=None,
                  funcx_service_address='https://api2.funcx.org/v2',
+                 check_endpoint_version=False,
                  asynchronous=False,
                  loop=None,
                  **kwargs):
