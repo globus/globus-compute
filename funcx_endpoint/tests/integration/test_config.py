@@ -16,8 +16,6 @@ if __name__ == '__main__':
 
     if config.working_dir is None:
         working_dir = os.path.join(endpoint_dir, "worker_logs")
-    # if self.worker_logdir_root is not None:
-    #      worker_logdir = os.path.join(self.worker_logdir_root, self.label)
 
     print("Loading : ", config)
     # Set script dir
