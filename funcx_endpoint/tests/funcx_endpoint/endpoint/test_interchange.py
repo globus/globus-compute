@@ -37,8 +37,7 @@ class TestStart:
         mock_queue = mocker.patch("funcx_endpoint.endpoint.interchange.multiprocessing.Queue")
         mock_queue.return_value = None
 
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         keys_dir = os.path.join(config_dir, 'certificates')
 

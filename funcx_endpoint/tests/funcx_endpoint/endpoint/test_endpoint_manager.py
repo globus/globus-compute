@@ -27,16 +27,13 @@ class TestStart:
         shutil.rmtree(config_dir)
 
     def test_configure(self):
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-
         manager.configure_endpoint("mock_endpoint", None)
         assert os.path.exists(config_dir)
 
     def test_double_configure(self):
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -73,8 +70,7 @@ class TestStart:
         mock_pidfile = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.daemon.pidfile.PIDLockFile')
         mock_pidfile.return_value = None
 
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -113,8 +109,7 @@ class TestStart:
                 executors = None
             config = mock_executors()
 
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -139,8 +134,7 @@ class TestStart:
         mock_optionals['client_address'] = '127.0.0.1'
         mock_optionals['client_ports'] = (8080, 8081, 8082)
 
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -177,8 +171,7 @@ class TestStart:
         mock_funcx_config = {}
         mock_funcx_config['endpoint_address'] = '127.0.0.1'
 
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         mock_optionals['logdir'] = config_dir
         manager.funcx_config = mock_funcx_config
@@ -197,7 +190,7 @@ class TestStart:
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
         mock_client.return_value.register_endpoint.return_value = {'status': 'okay'}
 
-        manager = EndpointManager(logger)
+        manager = EndpointManager(funcx_dir=os.getcwd())
         manager.funcx_dir = f'{os.getcwd()}'
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
@@ -210,8 +203,7 @@ class TestStart:
         mock_client.return_value.register_endpoint.return_value = {'status': 'okay',
                                                                    'endpoint_id': 123456}
 
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -222,24 +214,21 @@ class TestStart:
         mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4')
         mock_uuid.return_value = 123456
 
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
         assert '123456' == manager.check_endpoint_json(os.path.join(config_dir, 'endpoint.json'), None)
 
     def test_check_endpoint_json_no_json_given_uuid(self, mocker):
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
         assert '234567' == manager.check_endpoint_json(os.path.join(config_dir, 'endpoint.json'), '234567')
 
     def test_check_endpoint_json_given_json(self, mocker):
-        manager = EndpointManager(logger)
-        manager.funcx_dir = f'{os.getcwd()}'
+        manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
