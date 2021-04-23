@@ -31,6 +31,7 @@ from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
 from funcx.sdk.client import FuncXClient
 
 app = typer.Typer()
+logger = None
 
 
 def version_callback(value):
@@ -158,24 +159,22 @@ def main(
     # Sets up global variables in the State wrapper (debug flag, config dir, default config file).
     # For commands other than `init`, we ensure the existence of the config directory and file.
 
-    funcx.set_stream_logger(level=logging.DEBUG if debug else logging.INFO)
-    logger = logging.getLogger('funcx')
+    global logger
+    funcx.set_stream_logger(name='endpoint',
+                            level=logging.DEBUG if debug else logging.INFO)
+    logger = logging.getLogger('endpoint')
     logger.debug("Command: {}".format(ctx.invoked_subcommand))
 
     global manager
-    manager = EndpointManager(logger)
-
-    # Set global state variables, to avoid passing them around as arguments all the time
-    manager.DEBUG = debug
-    manager.funcx_dir = config_dir
-    manager.funcx_config_file = os.path.join(manager.funcx_dir, manager.funcx_config_file_name)
+    manager = EndpointManager(funcx_dir=config_dir,
+                              debug=debug)
 
     # Otherwise, we ensure that configs exist
     if not os.path.exists(manager.funcx_config_file):
-        manager.logger.info(f"No existing configuration found at {manager.funcx_config_file}. Initializing...")
+        logger.info(f"No existing configuration found at {manager.funcx_config_file}. Initializing...")
         manager.init_endpoint()
 
-    manager.logger.debug("Loading config files from {}".format(manager.funcx_dir))
+    logger.debug("Loading config files from {}".format(manager.funcx_dir))
 
     funcx_config = SourceFileLoader('global_config', manager.funcx_config_file).load_module()
     manager.funcx_config = funcx_config.global_options

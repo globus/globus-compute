@@ -137,7 +137,6 @@ class EndpointInterchange(object):
             pass
 
         start_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"), name="funcx_endpoint", level=logging_level)
-        logger.info("logger location {}".format(logger.handlers))
         logger.info("Initializing EndpointInterchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))

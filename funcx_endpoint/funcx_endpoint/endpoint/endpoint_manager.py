@@ -29,16 +29,35 @@ from funcx_endpoint.executors.high_throughput import global_config as funcx_defa
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx.sdk.client import FuncXClient
 
+logger = logging.getLogger("endpoint.endpoint_manager")
+
 
 class EndpointManager:
-    def __init__(self, logger):
+    """ EndpointManager is primarily responsible for configuring, launching and stopping the Endpoint.
+    """
+
+    def __init__(self,
+                 funcx_dir=os.path.join(pathlib.Path.home(), '.funcx'),
+                 debug=False):
+        """ Initialize the EndpointManager
+
+        Parameters
+        ----------
+
+        funcx_dir: str
+            Directory path to the root of the funcx dirs. Usually ~/.funcx.
+
+        debug: Bool
+            Enable debug logging. Default: False
+        """
         self.funcx_config_file_name = 'config.py'
-        self.DEBUG = False
-        self.funcx_dir = os.path.join(pathlib.Path.home(), '.funcx')
+        self.debug = debug
+        self.funcx_dir = funcx_dir
         self.funcx_config_file = os.path.join(self.funcx_dir, self.funcx_config_file_name)
         self.funcx_default_config_template = funcx_default_config.__file__
         self.funcx_config = {}
         self.name = 'default'
+        global logger
         self.logger = logger
 
     def init_endpoint_dir(self, endpoint_config=None):
@@ -240,7 +259,7 @@ class EndpointManager:
 
             optionals['logdir'] = endpoint_dir
 
-        if self.DEBUG:
+        if self.debug:
             optionals['logging_level'] = logging.DEBUG
 
         ic = EndpointInterchange(endpoint_config.config,
