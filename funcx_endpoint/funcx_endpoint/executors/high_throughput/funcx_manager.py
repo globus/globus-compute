@@ -34,6 +34,9 @@ TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2 ** 32) - 1
 
 
+logger = logging.getLogger("funcx_manager")
+
+
 class Manager(object):
     """ Manager manages task execution by the workers
 
@@ -487,8 +490,14 @@ class Manager(object):
 
         logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue {}".format(worker_type))
         self.worker_map.to_die_count[worker_type] += 1
-        self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
-                                           "buffer": b'KILL'})
+        task_id = "KILL"
+        cont_id = "RAW"
+        task_buf = "KILL"
+        raw_buf = f'{task_id};{cont_id};{task_buf}'
+        task_buf = task_buf.encode('utf-8')
+        raw_buf = raw_buf.encode('utf-8')
+        self.task_queues[worker_type].put(Task(task_id, cont_id, task_buf,
+                                               raw_buffer=raw_buf))
 
     def start(self):
         """
@@ -561,7 +570,6 @@ def cli_run():
         pass
 
     try:
-        global logger
         # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
         logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
