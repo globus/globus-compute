@@ -137,7 +137,6 @@ class EndpointManager:
             print("[FuncX] Caught exception during registration {}".format(e))
 
         shutil.copyfile(self.funcx_default_config_template, self.funcx_config_file)
-        self.init_endpoint_dir()
 
     def check_endpoint_json(self, endpoint_json, endpoint_uuid):
         if os.path.exists(endpoint_json):
