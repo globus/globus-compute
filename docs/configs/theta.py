@@ -39,5 +39,4 @@ config = Config(
             ),
         )
     ],
-    scaling_enabled=True
 )

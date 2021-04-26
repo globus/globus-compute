@@ -39,6 +39,5 @@ config = Config(
     ],
     heartbeat_period=15,
     heartbeat_threshold=200,
-    working_dir='.',
-    scaling_enabled=True,
+    log_dir='.',
 )

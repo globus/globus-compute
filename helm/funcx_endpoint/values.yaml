@@ -12,7 +12,7 @@ image:
 workerImage: python:3.6-buster
 workerInit: pip install funcx-endpoint>=0.2.0
 workerNamespace: default
-workingDir: /tmp/worker_logs
+logDir: /tmp/worker_logs
 
 rbacEnabled: true
 nameOverride: funcx-endpoint
