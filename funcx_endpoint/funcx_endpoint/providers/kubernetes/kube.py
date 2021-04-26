@@ -30,7 +30,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
     nodes_per_block : int
         Nodes to provision per block.
     init_blocks : int
-        Number of blocks to provision at the start of the run. Default is 1.
+        Number of blocks to provision at the start of the run. Default is 0.
     min_blocks : int
         Minimum number of blocks to maintain.
     max_blocks : int
@@ -77,7 +77,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                  image: str,
                  namespace: str = 'default',
                  nodes_per_block: int = 1,
-                 init_blocks: int = 4,
+                 init_blocks: int = 0,
                  min_blocks: int = 0,
                  max_blocks: int = 10,
                  max_cpu: float = 2,
