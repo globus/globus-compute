@@ -26,7 +26,7 @@ from funcx.serialize import FuncXSerializer
 
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 
 
 RESULT_TAG = 10
@@ -562,7 +562,6 @@ def cli_run():
 
     try:
         global logger
-        # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
         logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,
