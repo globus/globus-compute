@@ -562,6 +562,7 @@ def cli_run():
 
     try:
         global logger
+        # TODO The config options for the rotatingfilehandler need to be implemented and checked so that it is user configurable
         logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,

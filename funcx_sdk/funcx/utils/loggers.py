@@ -62,3 +62,6 @@ def set_stream_logger(name='funcx', level=logging.DEBUG, format_string=None):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
+
+
+logging.getLogger('funcx').addHandler(logging.NullHandler())
