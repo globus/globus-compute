@@ -18,5 +18,5 @@ class TestManager:
         assert isinstance(task, Task)
         assert task.task_id == "KILL"
         assert task.container_id == "RAW"
-        assert task.task_buffer.decode('utf-8') == "KILL"
-        assert task.raw_buffer.decode('utf-8') == "KILL;RAW;KILL"
+        assert task.task_buffer == "KILL"
+        assert task.raw_buffer.decode('utf-8') == 'TID=KILL;CID=RAW;KILL'
