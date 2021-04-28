@@ -123,8 +123,11 @@ class Manager(object):
         """
 
         global logger
+        # This is expected to be used only in unit test
         if logger is None:
-            logger = logging.getLogger("funcx_manager")
+            logger = set_file_logger(os.path.join(logdir, uid, 'manager.log'),
+                                     name='funcx_manager',
+                                     level=logging.DEBUG)
 
         logger.info("Manager started")
 
@@ -497,7 +500,6 @@ class Manager(object):
         task = Task(task_id='KILL',
                     container_id='RAW',
                     task_buffer='KILL')
-        task.pack()
         self.task_queues[worker_type].put(task)
 
     def start(self):
@@ -571,6 +573,7 @@ def cli_run():
         pass
 
     try:
+        global logger
         # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
         logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
