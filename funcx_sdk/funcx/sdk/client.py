@@ -394,7 +394,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             self.ws_polling_task.put_batch_id(batch_id)
             return asyncio_tasks
 
-        return r
+        return task_uuids
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
         """Initiate an invocation
