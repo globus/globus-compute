@@ -145,7 +145,6 @@ class FuncXClient(FuncXErrorHandlingClient):
             self.loop = loop if loop else asyncio.get_event_loop()
 
             # Start up an asynchronous polling loop in the background
-            # Throttle to ten calls per second
             self.ws_polling_task = WebSocketPollingTask(self, self.loop, self.fx_serializer)
         else:
             self.loop = None
@@ -394,7 +393,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                 self.ws_polling_task.add_task(funcx_task)
             self.ws_polling_task.put_batch_id(batch_id)
             return asyncio_tasks
-        
+
         return r
 
     def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
