@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import logging
+import uuid
 from inspect import getsource
 from packaging.version import parse
 
@@ -99,6 +100,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         self.func_table = {}
         self.funcx_home = os.path.expanduser(funcx_home)
+        self.taskgroup_id = str(uuid.uuid4())
 
         if not os.path.exists(self.TOKEN_DIR):
             os.makedirs(self.TOKEN_DIR)
@@ -337,19 +339,26 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         return r[0]
 
-    def create_batch(self):
+    def create_batch(self, batch_id=None):
         """
         Create a Batch instance to handle batch submission in funcX
 
         Parameters
         ----------
 
+        batch_id : str
+            Override the batch_id with from the default of using a session wide taskgroup_id.
+            If batch_id is not specified, it will default to using the clients taskgroup_id
+
         Returns
         -------
         Batch instance
             Status block containing "status" key.
         """
-        batch = Batch()
+        if not batch_id:
+            batch_id = self.taskgroup_id
+
+        batch = Batch(batch_id=batch_id)
         return batch
 
     def batch_run(self, batch):
