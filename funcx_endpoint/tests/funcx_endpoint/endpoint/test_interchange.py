@@ -34,7 +34,7 @@ class TestStart:
         mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
         mock_client.return_value = None
 
-        mock_queue = mocker.patch("funcx_endpoint.endpoint.interchange.multiprocessing.Queue")
+        mock_queue = mocker.patch("funcx_endpoint.endpoint.interchange.mpQueue")
         mock_queue.return_value = None
 
         manager = EndpointManager(funcx_dir=os.getcwd())

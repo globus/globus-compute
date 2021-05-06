@@ -15,7 +15,7 @@ import threading
 import json
 import daemon
 import collections
-import multiprocessing
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
@@ -201,7 +201,7 @@ class EndpointInterchange(object):
         """
         logger.info("Loading endpoint local config")
 
-        self.results_passthrough = multiprocessing.Queue()
+        self.results_passthrough = mpQueue()
         self.executors = {}
         for executor in self.config.executors:
             logger.info(f"Initializing executor: {executor.label}")

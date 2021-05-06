@@ -23,6 +23,7 @@ from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -171,7 +172,7 @@ class Manager(object):
         self.outstanding_task_count = {}
         self.task_type_mapping = {}
 
-        self.pending_result_queue = multiprocessing.Queue()
+        self.pending_result_queue = mpQueue()
 
         self.max_queue_size = max_queue_size + self.max_worker_count
         self.tasks_per_round = 1
