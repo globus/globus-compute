@@ -2,12 +2,17 @@ import time
 import threading
 import os
 import uuid
+import sys
 from concurrent.futures import Future
 import concurrent
 import logging
+import asyncio
 import websockets
+import json
+import dill
 from websockets.exceptions import InvalidHandshake
 import multiprocessing as mp
+import atexit
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +63,18 @@ class FuncXExecutor(concurrent.futures.Executor):
         # Currently we need to put the batch id's we launch into this queue
         # to tell the web_socket_poller to listen on them. Later we'll associate
 
+        """
         self.task_group_queue = mp.Queue()
         self.thread = threading.Thread(target=self.web_socket_poller,
                                        args=(self._kill_event, self.task_group_queue, ))
         self.thread.start()
+        """
+        eventloop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.event_loop_thread,
+                                       args=(eventloop, ))
+        self.thread.start()
+        self.poller_future = asyncio.run_coroutine_threadsafe(self.web_socket_poller(), eventloop)
+        atexit.register(self.shutdown)
         logger.debug("Started web_socket_poller thread")
 
     def get_auth_header(self):
@@ -79,15 +92,49 @@ class FuncXExecutor(concurrent.futures.Executor):
         header_name = 'Authorization'
         return (header_name, headers[header_name])
 
-    def web_socket_poller(self, kill_event, task_group_queue):
+    def event_loop_thread(self, eventloop):
+        asyncio.set_event_loop(eventloop)
+        eventloop.run_forever()
 
+    @asyncio.coroutine
+    async def web_socket_poller(self):
+        # print("[WSP]: In poller ")
         headers = self.get_auth_header()
         try:
-            self.ws = websockets.client.connect(self.results_ws_uri, extra_headers=[headers])
+            web_socket = await websockets.client.connect(self.results_ws_uri, extra_headers=[headers])
             # initial Globus authentication happens during the HTTP portion of the handshake,
             # so an invalid handshake means that the user was not authenticated
         except InvalidHandshake:
+            logger.exception("Connecting to the results web socket failed")
             raise Exception('Failed to authenticate user. Please ensure that you are logged in.')
+
+        # print("[WSP]: connected ")
+        # Send the task_group_id
+        await web_socket.send(self.task_group_id)
+        # print(f"[WSP] Sent task_group_id:{self.task_group_id} over ws")
+
+        while True:
+            # print("Waiting for data")
+            raw_data = await web_socket.recv()
+            # print(f"[WSP] Received raw_data : {type(raw_data)} : {raw_data}")
+            data = json.loads(raw_data)
+            task_id = data['task_id']
+
+            if task_id in self._function_future_map:
+                future = self._function_future_map[task_id]
+                del self._function_future_map[task_id]
+                try:
+                    if data['result']:
+                        future.set_result(self.funcx_client.serializer().deserialize(data['result']))
+                    elif data['exception']:
+                        r_exception = self.funcx_client.serializer().deserialize(data['exception'])
+                        future.set_exception(dill.loads(r_exception.e_value))
+                    else:
+                        future.set_exception(Exception(data['reason']))
+                except Exception as e:
+                    print("Caught exception : ", e)
+            else:
+                print("[MISSING FUTURE]")
 
     def submit(self, function, *args, endpoint_id=None, container_uuid=None, **kwargs):
         """Initiate an invocation
@@ -139,7 +186,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         return self._function_future_map[task_uuid]
 
     def shutdown(self):
-
+        print("In shutdown")
+        self.poller_future.cancel()
         self._kill_event.set()
         logger.debug(f"Executor:{self.label} shutting down")
 
@@ -154,16 +202,19 @@ if __name__ == '__main__':
     from funcx import set_stream_logger
     import time
 
-    set_stream_logger()
+    # set_stream_logger()
     fx = FuncXExecutor(FuncXClient(funcx_service_address='http://localhost:5000/v2'))
 
-    endpoint_id = 'c6c7888a-1134-40a7-b062-8f3ecfc4b6c2'
+    print("In main")
+    endpoint_id = '1cdafe1a-d208-4392-b2e4-950e798a0086'
     future = fx.submit(double, 5, endpoint_id=endpoint_id)
+    print("Got future back : ", future)
 
     for i in range(5):
-        time.sleep(1)
+        time.sleep(0.2)
         # Non-blocking check whether future is done
         print("Is the future done? :", future.done())
 
-    print("This next blocking call will fail with a TimeoutError because the backend isn't working")
-    future.result(timeout=2)     # <--- This is a blocking call
+    print("Blocking for result")
+    x = future.result()     # <--- This is a blocking call
+    print("Result : ", x)
