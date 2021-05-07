@@ -70,6 +70,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.thread.start()
         """
         eventloop = asyncio.new_event_loop()
+        self.eventloop = eventloop
         self.thread = threading.Thread(target=self.event_loop_thread,
                                        args=(eventloop, ))
         self.thread.start()
@@ -102,6 +103,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         headers = self.get_auth_header()
         try:
             web_socket = await websockets.client.connect(self.results_ws_uri, extra_headers=[headers])
+            self.ws = web_socket
             # initial Globus authentication happens during the HTTP portion of the handshake,
             # so an invalid handshake means that the user was not authenticated
         except InvalidHandshake:
@@ -125,9 +127,9 @@ class FuncXExecutor(concurrent.futures.Executor):
                 del self._function_future_map[task_id]
                 try:
                     if data['result']:
-                        future.set_result(self.funcx_client.serializer().deserialize(data['result']))
+                        future.set_result(self.funcx_client.fx_serializer.deserialize(data['result']))
                     elif data['exception']:
-                        r_exception = self.funcx_client.serializer().deserialize(data['exception'])
+                        r_exception = self.funcx_client.fx_serializer.deserialize(data['exception'])
                         future.set_exception(dill.loads(r_exception.e_value))
                     else:
                         future.set_exception(Exception(data['reason']))
@@ -206,7 +208,7 @@ if __name__ == '__main__':
     fx = FuncXExecutor(FuncXClient(funcx_service_address='http://localhost:5000/v2'))
 
     print("In main")
-    endpoint_id = '1cdafe1a-d208-4392-b2e4-950e798a0086'
+    endpoint_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
     future = fx.submit(double, 5, endpoint_id=endpoint_id)
     print("Got future back : ", future)
 
@@ -218,3 +220,7 @@ if __name__ == '__main__':
     print("Blocking for result")
     x = future.result()     # <--- This is a blocking call
     print("Result : ", x)
+    ws_close_future = asyncio.run_coroutine_threadsafe(fx.ws.close(), fx.eventloop)
+    ws_close_future.result()
+    fx.poller_future.cancel()
+    fx.eventloop.call_soon_threadsafe(fx.eventloop.stop)
