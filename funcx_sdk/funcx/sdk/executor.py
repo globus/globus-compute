@@ -188,7 +188,13 @@ class FuncXExecutor(concurrent.futures.Executor):
         return self._function_future_map[task_uuid]
 
     def shutdown(self):
+        if self._kill_event.is_set():
+            return
         print("In shutdown")
+        ws_close_future = asyncio.run_coroutine_threadsafe(self.ws.close(), self.eventloop)
+        ws_close_future.result()
+        self.poller_future.cancel()
+        self.eventloop.call_soon_threadsafe(self.eventloop.stop)
         self.poller_future.cancel()
         self._kill_event.set()
         logger.debug(f"Executor:{self.label} shutting down")
@@ -200,15 +206,27 @@ def double(x):
 
 if __name__ == '__main__':
 
+    import argparse
     from funcx import FuncXClient
     from funcx import set_stream_logger
     import time
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--service_url", default='http://localhost:5000/v2',
+                        help="URL at which the funcx-web-service is hosted")
+    parser.add_argument("-e", "--endpoint_id", required=True,
+                        help="Target endpoint to send functions to")
+    parser.add_argument("-d", "--debug", action='store_true',
+                        help="Count of apps to launch")
+    args = parser.parse_args()
+
+    endpoint_id = args.endpoint_id
+
     # set_stream_logger()
-    fx = FuncXExecutor(FuncXClient(funcx_service_address='http://localhost:5000/v2'))
+    fx = FuncXExecutor(FuncXClient(funcx_service_address=args.service_url))
 
     print("In main")
-    endpoint_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    endpoint_id = '766debbe-f01f-4b99-9f49-f806bcad99b5'
     future = fx.submit(double, 5, endpoint_id=endpoint_id)
     print("Got future back : ", future)
 
@@ -220,7 +238,5 @@ if __name__ == '__main__':
     print("Blocking for result")
     x = future.result()     # <--- This is a blocking call
     print("Result : ", x)
-    ws_close_future = asyncio.run_coroutine_threadsafe(fx.ws.close(), fx.eventloop)
-    ws_close_future.result()
-    fx.poller_future.cancel()
-    fx.eventloop.call_soon_threadsafe(fx.eventloop.stop)
+
+    fx.shutdown()
