@@ -147,7 +147,6 @@ class ExecutorPollerThread():
         self.closed = False
         self.start()
 
-
     def start(self):
         """ Start the result polling threads
         """
@@ -163,7 +162,6 @@ class ExecutorPollerThread():
         # atexit.register(self.shutdown)
 
         logger.debug("Started web_socket_poller thread")
-        
 
     def get_auth_header(self):
         """
