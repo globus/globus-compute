@@ -141,7 +141,6 @@ class ExecutorPollerThread():
 
         self.start()
 
-
     def start(self):
         """ Start the result polling thread
         """
