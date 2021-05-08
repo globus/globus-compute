@@ -100,7 +100,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         self.func_table = {}
         self.funcx_home = os.path.expanduser(funcx_home)
-        self.taskgroup_id = str(uuid.uuid4())
+        self.task_group_id = str(uuid.uuid4())
 
         if not os.path.exists(self.TOKEN_DIR):
             os.makedirs(self.TOKEN_DIR)
@@ -147,7 +147,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             self.loop = loop if loop else asyncio.get_event_loop()
 
             # Start up an asynchronous polling loop in the background
-            self.ws_polling_task = WebSocketPollingTask(self, self.loop, self.fx_serializer)
+            self.ws_polling_task = WebSocketPollingTask(self, self.loop, self.task_group_id)
         else:
             self.loop = None
 
@@ -347,8 +347,8 @@ class FuncXClient(FuncXErrorHandlingClient):
         ----------
 
         batch_id : str
-            Override the batch_id with from the default of using a session wide taskgroup_id.
-            If batch_id is not specified, it will default to using the clients taskgroup_id
+            Override the batch_id with from the default of using a session wide task_group_id.
+            If batch_id is not specified, it will default to using the clients task_group_id
 
         Returns
         -------
@@ -356,7 +356,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             Status block containing "status" key.
         """
         if not batch_id:
-            batch_id = self.taskgroup_id
+            batch_id = self.task_group_id
 
         batch = Batch(batch_id=batch_id)
         return batch
