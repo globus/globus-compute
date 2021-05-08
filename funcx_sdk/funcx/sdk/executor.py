@@ -25,8 +25,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
     def __init__(self, funcx_client,
                  results_ws_uri: str = 'ws://localhost:6000',
-                 label: str = 'FuncXExecutor',
-                 auto_start: bool = True):
+                 label: str = 'FuncXExecutor'):
         """
         Parameters
         ==========
@@ -40,11 +39,6 @@ class FuncXExecutor(concurrent.futures.Executor):
         label : str
             Optional string label to name the executor.
             Default: 'FuncXExecutor'
-
-        auto_start : Bool
-            Set this to start the result poller thread at init. If disabled the poller thread
-            must be started by calling FuncXExecutor_object.start()
-            Default: True
         """
 
         self.funcx_client = funcx_client
@@ -53,7 +47,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._tasks = {}
         self._function_registry = {}
         self._function_future_map = {}
-        self.task_group_id = str(uuid.uuid4())  # we need to associate all batch launches with this id
+        self.task_group_id = self.funcx_client.session_task_group_id # we need to associate all batch launches with this id
 
         self.poller_thread = None
         atexit.register(self.shutdown)
@@ -92,7 +86,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             logger.debug(f"Function registered with id:{function_uuid}")
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
-        batch = self.funcx_client.create_batch(batch_id=self.task_group_id)
+        batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
         batch.add(*args,
                   endpoint_id=endpoint_id,
                   function_id=self._function_registry[function],
@@ -137,7 +131,7 @@ class ExecutorPollerThread():
         self.funcx_client = funcx_client
         self.results_ws_uri = results_ws_uri
         self._function_future_map = _function_future_map
-        self.task_group_id = task_group_id  # we need to associate all batch launches with this id
+        self.task_group_id = task_group_id
 
         self.start()
 

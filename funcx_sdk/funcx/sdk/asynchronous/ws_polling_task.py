@@ -17,22 +17,41 @@ class WebSocketPollingTask:
 
     def __init__(self, funcx_client,
                  loop: AbstractEventLoop,
-                 task_group_id: str = None,
+                 init_task_group_id: str = None,
                  results_ws_uri: str = 'ws://localhost:6000',
                  auto_start: bool = True):
         """
+        Parameters
+        ==========
 
-        :param fxc: FuncXClient
-            Client instance for requesting results
-        :param loop: AbstractEventLoop
-            Asynchio event loop to manage asynchronous calls
+        funcx_client : client object
+            Instance of FuncXClient to be used by the executor
+
+        loop : event loop
+            The asnycio event loop that the WebSocket client will run on
+
+        init_task_group_id : str
+            Optional task_group_id UUID string that the WebSocket client
+            can immediately poll for after initialization
+
+        results_ws_uri : str
+            Web sockets URI for the results
+
+        auto_start : Bool
+            Set this to start the WebSocket client immediately.
+            Otherwise init_ws must be called.
+            Default: True
         """
         self.funcx_client = funcx_client
         self.loop = loop
-        self.task_group_id = task_group_id
+        self.init_task_group_id = init_task_group_id
         self.results_ws_uri = results_ws_uri
         self.auto_start = auto_start
-        self.running_batch_ids = asyncio.Queue()
+        self.running_task_group_ids = set()
+        # add the initial task group id, as this will be sent to
+        # the WebSocket server immediately
+        self.running_task_group_ids.add(self.init_task_group_id)
+        self.task_group_ids_queue = asyncio.Queue()
         self.pending_tasks = {}
 
         self.ws = None
@@ -50,17 +69,17 @@ class WebSocketPollingTask:
         except InvalidHandshake:
             raise Exception('Failed to authenticate user. Please ensure that you are logged in.')
 
-        if self.task_group_id:
-            await self.ws.send(self.task_group_id)
+        if self.init_task_group_id:
+            await self.ws.send(self.init_task_group_id)
 
         if start_message_handlers:
-            self.loop.create_task(self.send_outgoing(self.running_batch_ids))
+            self.loop.create_task(self.send_outgoing(self.task_group_ids_queue))
             self.loop.create_task(self.handle_incoming(self.pending_tasks))
 
     async def send_outgoing(self, queue: asyncio.Queue):
         while True:
-            batch_id = await queue.get()
-            await self.ws.send(batch_id)
+            task_group_id = await queue.get()
+            await self.ws.send(task_group_id)
 
     async def handle_incoming(self, pending_futures, auto_close=False):
         while True:
@@ -89,8 +108,12 @@ class WebSocketPollingTask:
             else:
                 print("[MISSING FUTURE]")
 
-    def put_batch_id(self, batch_id):
-        self.running_batch_ids.put_nowait(batch_id)
+    def put_task_group_id(self, task_group_id):
+        # prevent the task_group_id from being sent to the WebSocket server
+        # multiple times
+        if task_group_id not in self.running_task_group_ids:
+            self.running_task_group_ids.add(task_group_id)
+            self.task_group_ids_queue.put_nowait(task_group_id)
 
     def add_task(self, task: FuncXTask):
         """

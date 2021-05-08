@@ -4,10 +4,17 @@ from funcx.serialize import FuncXSerializer
 class Batch:
     """Utility class for creating batch submission in funcX"""
 
-    def __init__(self, batch_id=None):
+    def __init__(self, task_group_id=None):
+        """
+        Parameters
+        ==========
+
+        task_group_id : str
+            UUID indicating the task group that this batch belongs to
+        """
         self.tasks = []
         self.fx_serializer = FuncXSerializer()
-        self.batch_id = batch_id
+        self.task_group_id = task_group_id
 
     def add(self, *args, endpoint_id=None, function_id=None, **kwargs):
         """Add an function invocation to a batch submission
@@ -51,7 +58,7 @@ class Batch:
         payloads in dictionary, Dict[str, list]
         """
         data = {
-            'batch_id': self.batch_id,
+            'task_group_id': self.task_group_id,
             'tasks': []
         }
 

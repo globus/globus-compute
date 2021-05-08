@@ -100,7 +100,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         self.func_table = {}
         self.funcx_home = os.path.expanduser(funcx_home)
-        self.task_group_id = str(uuid.uuid4())
+        self.session_task_group_id = str(uuid.uuid4())
 
         if not os.path.exists(self.TOKEN_DIR):
             os.makedirs(self.TOKEN_DIR)
@@ -147,7 +147,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             self.loop = loop if loop else asyncio.get_event_loop()
 
             # Start up an asynchronous polling loop in the background
-            self.ws_polling_task = WebSocketPollingTask(self, self.loop, self.task_group_id)
+            self.ws_polling_task = WebSocketPollingTask(self, self.loop, self.session_task_group_id)
         else:
             self.loop = None
 
@@ -339,26 +339,26 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         return r[0]
 
-    def create_batch(self, batch_id=None):
+    def create_batch(self, task_group_id=None):
         """
         Create a Batch instance to handle batch submission in funcX
 
         Parameters
         ----------
 
-        batch_id : str
-            Override the batch_id with from the default of using a session wide task_group_id.
-            If batch_id is not specified, it will default to using the clients task_group_id
+        task_group_id : str
+            Override the session wide session_task_group_id with a different task_group_id for this batch.
+            If task_group_id is not specified, it will default to using the client's session_task_group_id
 
         Returns
         -------
         Batch instance
             Status block containing "status" key.
         """
-        if not batch_id:
-            batch_id = self.task_group_id
+        if not task_group_id:
+            task_group_id = self.session_task_group_id
 
-        batch = Batch(batch_id=batch_id)
+        batch = Batch(task_group_id=task_group_id)
         return batch
 
     def batch_run(self, batch):
@@ -392,7 +392,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                 handle_response_errors(result)
 
         if self.asynchronous:
-            batch_id = r['batch_id']
+            task_group_id = r['task_group_id']
             asyncio_tasks = []
             for task_id in task_uuids:
                 funcx_task = FuncXTask(task_id)
@@ -400,7 +400,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                 asyncio_tasks.append(asyncio_task)
 
                 self.ws_polling_task.add_task(funcx_task)
-            self.ws_polling_task.put_batch_id(batch_id)
+            self.ws_polling_task.put_task_group_id(task_group_id)
             return asyncio_tasks
 
         return task_uuids
