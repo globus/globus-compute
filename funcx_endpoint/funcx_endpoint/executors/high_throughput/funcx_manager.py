@@ -206,6 +206,10 @@ class Manager(object):
             args=(self._kill_event,)
         )
 
+        self.poller = zmq.Poller()
+        self.poller.register(self.task_incoming, zmq.POLLIN)
+        self.poller.register(self.funcx_task_socket, zmq.POLLIN)
+
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
         """
@@ -245,9 +249,6 @@ class Manager(object):
               Event to let the thread know when it is time to die.
         """
         logger.info("[TASK PULL THREAD] starting")
-        poller = zmq.Poller()
-        poller.register(self.task_incoming, zmq.POLLIN)
-        poller.register(self.funcx_task_socket, zmq.POLLIN)
 
         # Send a registration message
         msg = self.create_reg_message()
@@ -274,44 +275,10 @@ class Manager(object):
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
-            socks = dict(poller.poll(timeout=poll_timer))
+            socks = dict(self.poller.poll(timeout=poll_timer))
+
             if self.funcx_task_socket in socks and socks[self.funcx_task_socket] == zmq.POLLIN:
-                try:
-                    w_id, m_type, message = self.funcx_task_socket.recv_multipart()
-                    if m_type == b'REGISTER':
-                        reg_info = pickle.loads(message)
-                        logger.debug("Registration received from worker:{} {}".format(w_id, reg_info))
-                        self.worker_map.register_worker(w_id, reg_info['worker_type'])
-
-                    elif m_type == b'TASK_RET':
-                        logger.debug("Result received from worker: {}".format(w_id))
-                        logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
-                        self.pending_result_queue.put(message)
-                        self.worker_map.put_worker(w_id)
-                        task_done_counter += 1
-                        task_id = pickle.loads(message)['task_id']
-                        task_type = self.task_type_mapping.pop(task_id)
-                        self.task_status_deltas.pop(task_id, None)
-                        logger.debug("Task type: {}".format(task_type))
-                        self.outstanding_task_count[task_type] -= 1
-                        logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
-
-                    elif m_type == b'WRKR_DIE':
-                        logger.debug("[WORKER_REMOVE] Removing worker {} from worker_map...".format(w_id))
-                        logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
-                        logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
-                        self.worker_map.remove_worker(w_id)
-                        proc = self.worker_procs.pop(w_id.decode())
-                        if not proc.poll():
-                            try:
-                                proc.wait(timeout=1)
-                            except subprocess.TimeoutExpired:
-                                logger.warning(f"[WORKER_REMOVE] Timeout waiting for worker {w_id} process to terminate")
-                        logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
-                        logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
-
-                except Exception as e:
-                    logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+                _ = self.poll_funcx_task_socket(task_done_counter)
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
@@ -325,6 +292,9 @@ class Manager(object):
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
+
+                # If we want to wrap the task_incoming polling into a separate function, we need to
+                # self.poll_task_incoming(poll_timer, last_interchange_contact, kill_event, task_revc_counter)
                 poll_timer = 0
                 _, pkl_msg = self.task_incoming.recv_multipart()
                 message = pickle.loads(pkl_msg)
@@ -420,18 +390,61 @@ class Manager(object):
                             logger.debug("... and available workers: {}"
                                          .format(self.worker_map.worker_queues[task_type].qsize()))
 
-                            task = self.task_queues[task_type].get()
-                            worker_id = self.worker_map.get_worker(task_type)
+                            self.send_task_to_worker(task_type)
 
-                            logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
-                            # TODO: Some duplication of work could be avoided here
-                            to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
-                            self.funcx_task_socket.send_multipart(to_send)
-                            self.worker_map.update_worker_idle(task_type)
-                            if task.task_id != "KILL":
-                                logger.debug(f"Set task {task.task_id} to RUNNING")
-                                self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
-                            logger.debug("Sending complete!")
+    def poll_funcx_task_socket(self, task_done_counter):
+        try:
+            w_id, m_type, message = self.funcx_task_socket.recv_multipart()
+            if m_type == b'REGISTER':
+                reg_info = pickle.loads(message)
+                logger.debug("Registration received from worker:{} {}".format(w_id, reg_info))
+                self.worker_map.register_worker(w_id, reg_info['worker_type'])
+
+            elif m_type == b'TASK_RET':
+                logger.debug("Result received from worker: {}".format(w_id))
+                logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
+                self.pending_result_queue.put(message)
+                self.worker_map.put_worker(w_id)
+                task_done_counter += 1
+                task_id = pickle.loads(message)['task_id']
+                task_type = self.task_type_mapping.pop(task_id)
+                self.task_status_deltas.pop(task_id, None)
+                logger.debug("Task type: {}".format(task_type))
+                self.outstanding_task_count[task_type] -= 1
+                logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
+
+            elif m_type == b'WRKR_DIE':
+                logger.debug("[WORKER_REMOVE] Removing worker {} from worker_map...".format(w_id))
+                logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
+                logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
+                self.worker_map.remove_worker(w_id)
+                proc = self.worker_procs.pop(w_id.decode())
+                if not proc.poll():
+                    try:
+                        proc.wait(timeout=1)
+                    except subprocess.TimeoutExpired:
+                        logger.warning(f"[WORKER_REMOVE] Timeout waiting for worker {w_id} process to terminate")
+                logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
+                logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
+
+            return pickle.loads(message)
+
+        except Exception as e:
+            logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+
+    def send_task_to_worker(self, task_type):
+        task = self.task_queues[task_type].get()
+        worker_id = self.worker_map.get_worker(task_type)
+
+        logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
+        # TODO: Some duplication of work could be avoided here
+        to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
+        self.funcx_task_socket.send_multipart(to_send)
+        self.worker_map.update_worker_idle(task_type)
+        if task.task_id != "KILL":
+            logger.debug(f"Set task {task.task_id} to RUNNING")
+            self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
+        logger.debug("Sending complete!")
 
     def _status_report_loop(self, kill_event):
         logger.debug("[STATUS] Manager status reporting loop starting")
