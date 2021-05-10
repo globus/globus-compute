@@ -26,7 +26,7 @@ A clear and concise description of what you expected to happen.
  - Python version @ client
  - Python version @ endpoint
  - funcx version @ client
- - funcx-endpoint version @endpoint
+ - funcx-endpoint version @ endpoint
 
 **Distributed Environment**
 - Where are you running the funcX script from? [e.g. Laptop/Workstation, Login node, Compute node]
