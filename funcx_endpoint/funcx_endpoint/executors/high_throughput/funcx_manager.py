@@ -418,7 +418,7 @@ class Manager(object):
                             to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
-                            if task.task_id != pickle.dumps(b"KILL"):
+                            if task.task_id != "KILL":
                                 logger.debug(f"Set task {task.task_id} to RUNNING")
                                 self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
                             logger.debug("Sending complete!")
