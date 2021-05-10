@@ -30,7 +30,7 @@ A clear and concise description of what you expected to happen.
 
 **Distributed Environment**
 - Where are you running the funcX script from? [e.g. Laptop/Workstation, Login node, Compute node]
-- Where does the endpoint run ? [e.g. Laptop/Workstation, Login node]
+- Where does the endpoint run? [e.g. Laptop/Workstation, Login node]
 - Specify endpoint-uuid
 - Attach endpoint logs at `~/.funcx/<ENDPOINT_NAME>` if this is an endpoint issue.
   Please let us know if you'd prefer to share logs privately.
