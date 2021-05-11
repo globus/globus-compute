@@ -28,6 +28,14 @@ class pickle_base64(fxPicker_shared):
 
 
 class code_dill_source(fxPicker_shared):
+    """ This method uses dill's getsource method to extract the function body and
+    then serializes it.
+
+    Code from interpretor/main        : Yes
+    Code from notebooks               : No
+    Works with mismatching py versions: Yes
+    Decorated fns                     : No
+    """
 
     _identifier = '04\n'
     _for_code = True
@@ -49,9 +57,13 @@ class code_dill_source(fxPicker_shared):
 
 
 class code_text_inspect(fxPicker_shared):
-    """ We use dill to get the source code out of the function object
-    and then exec the function body to load it in. The function object
-    is then returned by name.
+    """ This method uses the inspect library to extract the function body and
+    then serializes it.
+
+    Code from interpretor/main        : ?
+    Code from notebooks               : Yes
+    Works with mismatching py versions: Yes
+    Decorated fns                     : No
     """
 
     _identifier = '03\n'
@@ -74,7 +86,12 @@ class code_text_inspect(fxPicker_shared):
 
 
 class code_dill(fxPicker_shared):
-    """ We use dill to serialize the function object
+    """ This method uses dill to directly serialize a function.
+
+    Code from interpretor/main        : No
+    Code from notebooks               : Yes
+    Works with mismatching py versions: No
+    Decorated fns                     : Yes
     """
 
     _identifier = '01\n'
@@ -94,6 +111,15 @@ class code_dill(fxPicker_shared):
 
 
 class code_pickle(fxPicker_shared):
+    """ This method uses pickle to directly serialize a function.
+    Could be deprecated in favor of just using dill, but pickle is a little bit
+    faster.
+
+    Code from interpretor/main        : No
+    Code from notebooks               : Yes
+    Works with mismatching py versions: No
+    Decorated fns                     : Yes
+    """
 
     _identifier = '02\n'
     _for_code = True
@@ -113,15 +139,3 @@ class code_pickle(fxPicker_shared):
 
 def bar(x, y={'a': 3}):
     return x * y['a']
-
-
-if __name__ == '__main__':
-
-    bar(29)
-    # print(pickle_base64.identifier)
-    ct = code_text_inspect()
-    f = ct.serialize(bar)
-    # print("Serialized : ", f)
-    new_bar = ct.deserialize(f)
-    print("After deserialization : ", new_bar)
-    print("FN() : ", new_bar(10))
