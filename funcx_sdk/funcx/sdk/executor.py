@@ -47,7 +47,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._tasks = {}
         self._function_registry = {}
         self._function_future_map = {}
-        self.task_group_id = self.funcx_client.session_task_group_id # we need to associate all batch launches with this id
+        self.task_group_id = self.funcx_client.session_task_group_id  # we need to associate all batch launches with this id
 
         self.poller_thread = None
         atexit.register(self.shutdown)
