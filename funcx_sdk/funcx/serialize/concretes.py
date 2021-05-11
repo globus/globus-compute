@@ -135,7 +135,3 @@ class code_pickle(fxPicker_shared):
         chomped = self.chomp(payload)
         data = pickle.loads(codecs.decode(chomped.encode(), 'base64'))
         return data
-
-
-def bar(x, y={'a': 3}):
-    return x * y['a']
