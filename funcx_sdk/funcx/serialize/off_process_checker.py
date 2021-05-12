@@ -9,7 +9,7 @@ import pickle
 def server(port=0, host='', debug=False, datasize=102400):
 
     from funcx.serialize import FuncXSerializer
-    fxs = FuncXSerializer()
+    fxs = FuncXSerializer(use_offprocess_checker=False)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
         bound_port = s.getsockname()[1]
