@@ -515,13 +515,13 @@ class Interchange(object):
         logger.debug("[STATUS] Status reporting loop starting")
 
         while not kill_event.is_set():
-            logger.info(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
+            logger.debug(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
             msg = EPStatusReport(
                 self.endpoint_id,
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.debug("[STATUS] Sending status report to forwarder, and clearing task deltas.")
+            logger.info("[STATUS] Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
@@ -756,7 +756,7 @@ class Interchange(object):
             # Send status reports from this main thread to avoid thread-safety on zmq sockets
             try:
                 packed_status_report = status_report_queue.get(block=False)
-                logger.debug(f"[MAIN] forwarding status report queue: {packed_status_report}")
+                logger.info(f"[MAIN] forwarding status report: {packed_status_report}")
                 self.results_outgoing.send(packed_status_report)
             except queue.Empty:
                 pass
