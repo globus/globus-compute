@@ -17,7 +17,6 @@ def server(port=0, host='', debug=False, datasize=102400):
         s.listen(1)
         conn, addr = s.accept()  # we only expect one incoming connection here.
         with conn:
-            print('Connected by', addr)
             while True:
 
                 b_msg = conn.recv(datasize)
@@ -28,11 +27,10 @@ def server(port=0, host='', debug=False, datasize=102400):
                 msg = pickle.loads(b_msg)
 
                 if msg == 'PING':
-                    ret_value = (('PING', None))
+                    ret_value = (('PONG', None))
                 else:
                     try:
-                        method = fxs.deserialize(msg)
-                        print("Deserialization result: ", method)
+                        method = fxs.deserialize(msg)  # noqa
                         del method
                     except Exception as e:
                         ret_value = (('DESERIALIZE_FAIL', str(e)))
