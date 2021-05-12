@@ -61,6 +61,8 @@ class FuncXSerializer(object):
                         _, port = line.strip().split(':')
                         port = int(port)
                         return port
+                    elif 'CRITICAL ERROR' in line:
+                        raise Exception(line)
 
         raise Exception("Failed to determine off_process_checker's port")
 

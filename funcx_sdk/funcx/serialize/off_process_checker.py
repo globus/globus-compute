@@ -4,42 +4,47 @@ import logging
 import socket
 import argparse
 import pickle
+import sys
 
 
 def server(port=0, host='', debug=False, datasize=102400):
 
-    from funcx.serialize import FuncXSerializer
-    fxs = FuncXSerializer(use_offprocess_checker=False)
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((host, port))
-        bound_port = s.getsockname()[1]
-        print(f"BINDING TO:{bound_port}", flush=True)
-        s.listen(1)
-        conn, addr = s.accept()  # we only expect one incoming connection here.
-        with conn:
-            while True:
+    try:
+        from funcx.serialize import FuncXSerializer
+        fxs = FuncXSerializer(use_offprocess_checker=False)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((host, port))
+            bound_port = s.getsockname()[1]
+            print(f"BINDING TO:{bound_port}", flush=True)
+            s.listen(1)
+            conn, addr = s.accept()  # we only expect one incoming connection here.
+            with conn:
+                while True:
 
-                b_msg = conn.recv(datasize)
-                if not b_msg:
-                    print("Exiting")
-                    return
+                    b_msg = conn.recv(datasize)
+                    if not b_msg:
+                        print("Exiting")
+                        return
 
-                msg = pickle.loads(b_msg)
+                    msg = pickle.loads(b_msg)
 
-                if msg == 'PING':
-                    ret_value = (('PONG', None))
-                else:
-                    try:
-                        method = fxs.deserialize(msg)  # noqa
-                        del method
-                    except Exception as e:
-                        ret_value = (('DESERIALIZE_FAIL', str(e)))
-
+                    if msg == 'PING':
+                        ret_value = (('PONG', None))
                     else:
-                        ret_value = (('SUCCESS', None))
+                        try:
+                            method = fxs.deserialize(msg)  # noqa
+                            del method
+                        except Exception as e:
+                            ret_value = (('DESERIALIZE_FAIL', str(e)))
 
-                ret_buf = pickle.dumps(ret_value)
-                conn.sendall(ret_buf)
+                        else:
+                            ret_value = (('SUCCESS', None))
+
+                    ret_buf = pickle.dumps(ret_value)
+                    conn.sendall(ret_buf)
+    except Exception as e:
+        print(f"OFF_PROCESS_CHECKER FAILURE, Exception:{e}")
+        sys.exit()
 
 
 class OffProcessClient(object):
