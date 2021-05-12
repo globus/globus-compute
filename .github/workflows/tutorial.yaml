@@ -38,4 +38,4 @@ jobs:
         cd ..
     - name: Test tutorial endpoint
       run: |
-        python funcx_endpoint/tests/tutorial_ep/test_tutotial_ep.py -t '4b116d3c-1703-4f8f-9f6f-39921e5864df' -i ${{ secrets.API_CLIENT_ID }} -s ${{ secrets.API_CLIENT_SECRET }}
+        timeout 300 python funcx_endpoint/tests/tutorial_ep/test_tutotial_ep.py -t '4b116d3c-1703-4f8f-9f6f-39921e5864df' -i ${{ secrets.API_CLIENT_ID }} -s ${{ secrets.API_CLIENT_SECRET }}
