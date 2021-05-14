@@ -501,7 +501,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 elif isinstance(msgs, EPStatusReport):
                     logger.info("[MTHREAD] Received EPStatusReport {}".format(msgs))
                     if self.passthrough:
-                        self.results_passthrough.put(msgs)
+                        self.results_passthrough.put(pickle.dumps(msgs))
 
                 else:
                     logger.debug("[MTHREAD] Unpacking results")
