@@ -30,7 +30,7 @@ class FuncXSerializer(object):
             try:
                 port = self._start_off_process_checker()
             except Exception:
-                logger.exception("Off_process_checker instantiation failed")
+                logger.exception("[NON-CRITICAL] Off_process_checker instantiation failed. Continuing...")
                 self.use_offprocess_checker = False
             else:
                 self.off_proc_client = OffProcessClient(port)
