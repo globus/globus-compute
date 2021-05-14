@@ -56,6 +56,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                  check_endpoint_version=False,
                  asynchronous=False,
                  loop=None,
+                 use_offprocess_checker=True,
                  **kwargs):
         """
         Initialize the client
@@ -94,11 +95,17 @@ class FuncXClient(FuncXErrorHandlingClient):
         If asynchronous mode is requested, then you can provide an optional event loop
         instance. If None, then we will access asyncio.get_event_loop()
         Default: None
+        
+        use_offprocess_checker: Bool,
+            Use this option to disable the offprocess_checker in the FuncXSerializer used
+            by the client.
+            Default: True
 
         Keyword arguments are the same as for BaseClient.
 
         """
         self.func_table = {}
+        self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
         self.session_task_group_id = str(uuid.uuid4())
 
@@ -132,7 +139,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                                           http_timeout=http_timeout,
                                           base_url=funcx_service_address,
                                           **kwargs)
-        self.fx_serializer = FuncXSerializer()
+        self.fx_serializer = FuncXSerializer(use_offprocess_checker=self.use_offprocess_checker)
 
         authclient = AuthClient(authorizer=openid_authorizer)
         user_info = authclient.oauth2_userinfo()

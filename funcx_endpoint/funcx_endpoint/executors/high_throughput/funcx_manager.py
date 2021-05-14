@@ -23,6 +23,7 @@ from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -32,6 +33,9 @@ from funcx.utils.loggers import set_file_logger
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2 ** 32) - 1
+
+
+logger = None
 
 
 class Manager(object):
@@ -119,6 +123,13 @@ class Manager(object):
              Timeout period used by the manager in milliseconds. Default: 10ms
         """
 
+        global logger
+        # This is expected to be used only in unit test
+        if logger is None:
+            logger = set_file_logger(os.path.join(logdir, uid, 'manager.log'),
+                                     name='funcx_manager',
+                                     level=logging.DEBUG)
+
         logger.info("Manager started")
 
         self.context = zmq.Context()
@@ -171,7 +182,7 @@ class Manager(object):
         self.outstanding_task_count = {}
         self.task_type_mapping = {}
 
-        self.pending_result_queue = multiprocessing.Queue()
+        self.pending_result_queue = mpQueue()
 
         self.max_queue_size = max_queue_size + self.max_worker_count
         self.tasks_per_round = 1
@@ -417,7 +428,7 @@ class Manager(object):
                             to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
-                            if task.task_id != pickle.dumps(b"KILL"):
+                            if task.task_id != "KILL":
                                 logger.debug(f"Set task {task.task_id} to RUNNING")
                                 self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
                             logger.debug("Sending complete!")
@@ -487,8 +498,10 @@ class Manager(object):
 
         logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue {}".format(worker_type))
         self.worker_map.to_die_count[worker_type] += 1
-        self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
-                                           "buffer": b'KILL'})
+        task = Task(task_id='KILL',
+                    container_id='RAW',
+                    task_buffer='KILL')
+        self.task_queues[worker_type].put(task)
 
     def start(self):
         """
