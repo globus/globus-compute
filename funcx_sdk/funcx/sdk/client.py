@@ -50,6 +50,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                  openid_authorizer=None,
                  funcx_service_address='https://api2.funcx.org/v2',
                  check_endpoint_version=False,
+                 use_offprocess_checker=True,
                  **kwargs):
         """
         Initialize the client
@@ -79,10 +80,16 @@ class FuncXClient(FuncXErrorHandlingClient):
             The address of the funcX web service to communicate with.
             Default: https://api.funcx.org/v2
 
+        use_offprocess_checker: Bool,
+            Use this option to disable the offprocess_checker in the FuncXSerializer used
+            by the client.
+            Default: True
+
         Keyword arguments are the same as for BaseClient.
 
         """
         self.func_table = {}
+        self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
 
         if not os.path.exists(self.TOKEN_DIR):
@@ -115,7 +122,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                                           http_timeout=http_timeout,
                                           base_url=funcx_service_address,
                                           **kwargs)
-        self.fx_serializer = FuncXSerializer()
+        self.fx_serializer = FuncXSerializer(use_offprocess_checker=self.use_offprocess_checker)
 
         authclient = AuthClient(authorizer=openid_authorizer)
         user_info = authclient.oauth2_userinfo()

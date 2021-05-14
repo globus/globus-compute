@@ -30,6 +30,8 @@ def test_params(fxc, endpoint, param):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
+
+        # This is pretty terrible, until we fix the exception to differentiate TypeError
         except Exception:
             time.sleep(2)
         else:

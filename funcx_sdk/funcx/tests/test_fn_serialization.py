@@ -61,3 +61,37 @@ def test_nested_scope_function(fxc, endpoint):
             time.sleep(2)
         else:
             break
+
+
+def increment_decorator(func):
+    def wrapper(*args, **kwargs):
+        x = func(*args, **kwargs)
+        return x + 1
+    return wrapper
+
+
+@increment_decorator
+def double(x):
+    return x * 2
+
+
+def test_decorated_function(fxc, endpoint):
+
+    x = 42
+    fn_uuid = fxc.register_function(double, endpoint, description='platinfo')
+    task_id = fxc.run(x,
+                      endpoint_id=endpoint,
+                      function_id=fn_uuid)
+
+    print("Task_id: ", task_id)
+
+    for i in range(5):
+        try:
+            r = fxc.get_result(task_id)
+            print(f"result : {r}")
+        except Exception:
+            time.sleep(2)
+        else:
+            break
+
+    assert r == double(x), "Results don't match"
