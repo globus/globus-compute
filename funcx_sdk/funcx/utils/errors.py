@@ -111,3 +111,14 @@ class InvalidScopeException(FuncxError):
 
     def __repr__(self):
         return "Invalid Scope: {}".format(self.message)
+
+
+class TaskPending(FuncxError):
+    """Task is pending and no result is available yet
+    """
+
+    def __init__(self, reason):
+        self.reason = reason
+
+    def __repr__(self):
+        return "TaskPending due to {self.reason}"
