@@ -499,7 +499,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                     return
 
                 elif isinstance(msgs, EPStatusReport):
-                    logger.info("[MTHREAD] Received EPStatusReport {}".format(msgs))
+                    logger.debug("[MTHREAD] Received EPStatusReport {}".format(msgs))
                     if self.passthrough:
                         self.results_passthrough.put(pickle.dumps(msgs))
 
