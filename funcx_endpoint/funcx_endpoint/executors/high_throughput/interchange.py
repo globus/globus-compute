@@ -521,7 +521,7 @@ class Interchange(object):
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.info("[STATUS] Sending status report to executor, and clearing task deltas.")
+            logger.debug("[STATUS] Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
@@ -756,7 +756,7 @@ class Interchange(object):
             # Send status reports from this main thread to avoid thread-safety on zmq sockets
             try:
                 packed_status_report = status_report_queue.get(block=False)
-                logger.info(f"[MAIN] forwarding status report: {packed_status_report}")
+                logger.debug(f"[MAIN] forwarding status report: {packed_status_report}")
                 self.results_outgoing.send(packed_status_report)
             except queue.Empty:
                 pass
