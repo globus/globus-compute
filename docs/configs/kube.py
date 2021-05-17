@@ -30,7 +30,7 @@ config = Config(
                 max_cpu=4,
                 init_mem="1024Mi",
                 max_mem="4096Mi",
-                image=user_opts['kube']['image']
+                image=user_opts['kube']['image'],
                 worker_init=user_opts['kube']['worker_init'],
                 namespace=user_opts['kube']['namespace'],
                 incluster_config=False,
@@ -39,6 +39,5 @@ config = Config(
     ],
     heartbeat_period=15,
     heartbeat_threshold=200,
-    working_dir='.',
-    scaling_enabled=True,
+    log_dir='.',
 )

@@ -77,7 +77,7 @@ Kubernetes is an open-source system for container management, such as automating
 The snippet below shows an example configuration for deploying pods as workers on a Kubernetes cluster.
 The KubernetesProvider exploits the Python Kubernetes API, which assumes that you have kube config in ``~/.kube/config``.
 
-.. literalinclude:: configs/kubernetes.py
+.. literalinclude:: configs/kube.py
 
 
 Theta (ALCF)

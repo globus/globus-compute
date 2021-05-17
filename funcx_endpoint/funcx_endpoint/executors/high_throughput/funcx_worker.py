@@ -5,10 +5,11 @@ import argparse
 import zmq
 import sys
 import pickle
+import os
 
 from parsl.app.errors import RemoteExceptionWrapper
 
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 
@@ -53,7 +54,7 @@ class FuncXWorker(object):
         self.deserialize = self.serializer.deserialize
 
         global logger
-        logger = set_file_logger('{}/funcx_worker_{}.log'.format(logdir, worker_id),
+        logger = set_file_logger(os.path.join(logdir, f'funcx_worker_{worker_id}.log'),
                                  name="worker_log",
                                  level=logging.DEBUG if debug else logging.INFO)
 
@@ -103,11 +104,13 @@ class FuncXWorker(object):
             container_id = pickle.loads(p_container_id)
             logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
 
-            if msg == b"KILL":
-                logger.info("[KILL] -- Worker KILL message received! ")
-                task_type = b'WRKR_DIE'
-                result = None
-                continue
+            if task_id == "KILL":
+                task = Message.unpack(msg)
+                if task.task_buffer.decode('utf-8') == "KILL":
+                    logger.info("[KILL] -- Worker KILL message received! ")
+                    task_type = b'WRKR_DIE'
+                    result = None
+                    continue
 
             logger.debug("Executing task...")
 

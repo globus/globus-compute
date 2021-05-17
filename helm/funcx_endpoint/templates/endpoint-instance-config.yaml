@@ -40,9 +40,8 @@ data:
         ],
         heartbeat_period=15,
         heartbeat_threshold=200,
-        working_dir='{{ .Values.workingDir }}',
+        log_dir='{{ .Values.logDir }}',
         funcx_service_address="{{ .Values.funcXServiceAddress }}/v2",
-        scaling_enabled=True,
         detach_endpoint={{- ternary "True" "False" .Values.detachEndpoint }}
     )
 

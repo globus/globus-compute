@@ -15,7 +15,7 @@ import threading
 import json
 import daemon
 import collections
-import multiprocessing
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
@@ -23,6 +23,7 @@ from parsl.version import VERSION as PARSL_VERSION
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
+from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
@@ -136,8 +137,9 @@ class EndpointInterchange(object):
         except FileExistsError:
             pass
 
-        start_file_logger("{}/EndpointInterchange.log".format(self.logdir), name="funcx_endpoint", level=logging_level)
-        logger.info("logger location {}".format(logger.handlers))
+        global logger
+
+        logger = set_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"), name="funcx_endpoint", level=logging_level)
         logger.info("Initializing EndpointInterchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -147,7 +149,6 @@ class EndpointInterchange(object):
         self.client_ports = client_ports
         self.suppress_failure = suppress_failure
 
-        self.poll_period = self.config.poll_period
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
         # initalize the last heartbeat time to start the loop
@@ -203,12 +204,7 @@ class EndpointInterchange(object):
         """
         logger.info("Loading endpoint local config")
 
-        working_dir = self.config.working_dir
-        if self.config.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
-        logger.info("Setting working_dir: {}".format(working_dir))
-
-        self.results_passthrough = multiprocessing.Queue()
+        self.results_passthrough = mpQueue()
         self.executors = {}
         for executor in self.config.executors:
             logger.info(f"Initializing executor: {executor.label}")
@@ -219,6 +215,8 @@ class EndpointInterchange(object):
                 if not executor.endpoint_id == self.endpoint_id:
                     raise Exception('InconsistentEndpointId')
             self.executors[executor.label] = executor
+            if executor.run_dir is None:
+                executor.run_dir = self.logdir
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
                 # executor._start_remote_interchange_process()
@@ -369,17 +367,10 @@ class EndpointInterchange(object):
         self._task_puller_thread.join()
         self._command_thread.join()
 
-    def start(self, poll_period=None):
+    def start(self):
         """ Start the Interchange
-
-        Parameters:
-        ----------
-        poll_period : int
-           poll_period in milliseconds
         """
         logger.info("Starting EndpointInterchange")
-        if poll_period is None:
-            poll_period = self.poll_period
 
         start = time.time()
         count = 0
@@ -583,40 +574,6 @@ class EndpointInterchange(object):
         return status
 
 
-def start_file_logger(filename, name=__name__, level=logging.DEBUG, format_string=None):
-    """Add a stream log handler.
-
-    Parameters
-    ---------
-
-    filename: string
-        Name of the file to write logs to. Required.
-    name: string
-        Logger name. Default="parsl.executors.interchange"
-    level: logging.LEVEL
-        Set the logging level. Default=logging.DEBUG
-        - format_string (string): Set the format string
-    format_string: string
-        Format string to use.
-
-    Returns
-    -------
-        None.
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not len(logger.handlers):
-        handler = logging.FileHandler(filename)
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-
 def starter(comm_q, *args, **kwargs):
     """Start the interchange process
 
@@ -640,8 +597,6 @@ def cli_run():
                         help="Worker port range as a tuple")
     parser.add_argument("-l", "--logdir", default="./parsl_worker_logs",
                         help="Parsl worker log directory")
-    parser.add_argument("-p", "--poll_period",
-                        help="REQUIRED: poll period used for main thread")
     parser.add_argument("--worker_ports", default=None,
                         help="OPTIONAL, pair of workers ports to listen on, eg --worker_ports=50001,50005")
     parser.add_argument("--suppress_failure", action='store_true',

@@ -209,7 +209,7 @@ class WorkerMap(object):
                f'-a {address} '
                f'-p {worker_port} '
                f'-t {worker_type} '
-               f'--logdir={logdir}/{uid} ')
+               f'--logdir={os.path.join(logdir, uid)} ')
 
         container_uri = None
         if worker_type != 'RAW':

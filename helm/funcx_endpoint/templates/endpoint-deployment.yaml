@@ -17,7 +17,11 @@ spec:
       - name: {{ .Release.Name }}-endpoint
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         command: [ "/bin/bash", "-c", "--" ]
-        args: [ "mkdir ~/.funcx; mkdir ~/.funcx/{{ .Release.Name }}; mkdir ~/.funcx/credentials; cp /funcx/config/config.py ~/.funcx; cp /funcx/{{ .Release.Name }}/* ~/.funcx/{{ .Release.Name }}; cp /funcx/credentials/* ~/.funcx/credentials; funcx-endpoint start {{ .Release.Name }}; sleep infinity"]
+        {{- if .Values.endpointUUID }}
+        args: [ "/home/funcx/boot.sh {{ .Release.Name }} {{ .Values.endpointUUID }}" ]
+        {{- else }}
+        args: [ "/home/funcx/boot.sh {{ .Release.Name }}" ]
+        {{- end }}
         tty: true
         stdin: true
         imagePullPolicy: {{ .Values.image.pullPolicy }}

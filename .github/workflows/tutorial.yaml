@@ -1,0 +1,41 @@
+name: tutorial_test
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        python-version: [3.7]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: main
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies for funcx-sdk
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -r funcx_sdk/requirements.txt
+        python -m pip install -r funcx_sdk/test-requirements.txt
+        pip list
+    - name: Check for vulnerabilities in libraries
+      run: |
+        pip install safety
+        pip freeze | safety check
+    - name: Test sdk by just importing
+      run: |
+        cd funcx_sdk
+        pip install .
+        python -c "from funcx.sdk.client import FuncXClient"
+        cd ..
+    - name: Test tutorial endpoint
+      run: |
+        timeout 300 python funcx_endpoint/tests/tutorial_ep/test_tutotial_ep.py -t '4b116d3c-1703-4f8f-9f6f-39921e5864df' -i ${{ secrets.API_CLIENT_ID }} -s ${{ secrets.API_CLIENT_SECRET }}
