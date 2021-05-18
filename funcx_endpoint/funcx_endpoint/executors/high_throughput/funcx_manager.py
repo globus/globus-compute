@@ -278,7 +278,7 @@ class Manager(object):
             socks = dict(self.poller.poll(timeout=poll_timer))
 
             if self.funcx_task_socket in socks and socks[self.funcx_task_socket] == zmq.POLLIN:
-                _ = self.poll_funcx_task_socket(task_done_counter)
+                _, task_done_counter = self.poll_funcx_task_socket(task_done_counter)
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
@@ -427,7 +427,7 @@ class Manager(object):
                 logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
                 logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
-            return pickle.loads(message)
+            return pickle.loads(message), task_done_counter
 
         except Exception as e:
             logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
