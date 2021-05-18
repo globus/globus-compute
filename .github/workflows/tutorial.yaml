@@ -23,8 +23,6 @@ jobs:
     - name: Install dependencies for funcx-sdk
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        # python -m pip install -r funcx_sdk/requirements.txt
-        # python -m pip install -r funcx_sdk/test-requirements.txt
         pip list
     - name: Check for vulnerabilities in libraries
       run: |
