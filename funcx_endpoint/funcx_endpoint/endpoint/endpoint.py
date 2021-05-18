@@ -42,7 +42,10 @@ def version_callback(value):
 
 
 def complete_endpoint_name():
-    config_files = glob.glob(os.path.join(manager.funcx_dir, '*', 'config.py'))
+    # Manager context is not initialized at this point, so we assume the default
+    # the funcx_dir path of ~/.funcx
+    funcx_dir = os.path.join(pathlib.Path.home(), '.funcx')
+    config_files = glob.glob(os.path.join(funcx_dir, '*', 'config.py'))
     for config_file in config_files:
         yield os.path.basename(os.path.dirname(config_file))
 
