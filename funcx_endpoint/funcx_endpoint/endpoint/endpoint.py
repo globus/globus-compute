@@ -125,8 +125,8 @@ def stop_endpoint(name: str = typer.Argument("default", autocompletion=complete_
 @app.command(name="restart")
 def restart_endpoint(name: str = typer.Argument("default", autocompletion=complete_endpoint_name)):
     """Restarts an endpoint"""
-    manager.stop_endpoint(name)
-    manager.start_endpoint(name)
+    stop_endpoint(name)
+    start_endpoint(name)
 
 
 @app.command(name="list")
