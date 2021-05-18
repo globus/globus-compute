@@ -210,6 +210,8 @@ class Manager(object):
         self.poller.register(self.task_incoming, zmq.POLLIN)
         self.poller.register(self.funcx_task_socket, zmq.POLLIN)
 
+        self.task_done_counter = 0
+
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
         """
@@ -256,7 +258,6 @@ class Manager(object):
         self.task_incoming.send(msg)
         last_interchange_contact = time.time()
         task_recv_counter = 0
-        task_done_counter = 0
 
         poll_timer = self.poll_period
 
@@ -264,7 +265,7 @@ class Manager(object):
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
             logger.debug("[TASK_PULL_THREAD] Loop start")
-            pending_task_count = task_recv_counter - task_done_counter
+            pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
             logger.debug("[TASK_PULL_THREAD pending_task_count: {}, Ready_worker_count: {}".format(
                 pending_task_count, ready_worker_count))
@@ -278,7 +279,7 @@ class Manager(object):
             socks = dict(self.poller.poll(timeout=poll_timer))
 
             if self.funcx_task_socket in socks and socks[self.funcx_task_socket] == zmq.POLLIN:
-                _, task_done_counter = self.poll_funcx_task_socket(task_done_counter)
+                self.poll_funcx_task_socket()
 
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
@@ -392,7 +393,7 @@ class Manager(object):
 
                             self.send_task_to_worker(task_type)
 
-    def poll_funcx_task_socket(self, task_done_counter):
+    def poll_funcx_task_socket(self, test=False):
         try:
             w_id, m_type, message = self.funcx_task_socket.recv_multipart()
             if m_type == b'REGISTER':
@@ -405,7 +406,7 @@ class Manager(object):
                 logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
                 self.pending_result_queue.put(message)
                 self.worker_map.put_worker(w_id)
-                task_done_counter += 1
+                self.task_done_counter += 1
                 task_id = pickle.loads(message)['task_id']
                 task_type = self.task_type_mapping.pop(task_id)
                 self.task_status_deltas.pop(task_id, None)
@@ -427,7 +428,8 @@ class Manager(object):
                 logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
                 logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
-            return pickle.loads(message), task_done_counter
+            if test:
+                return pickle.loads(message)
 
         except Exception as e:
             logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))

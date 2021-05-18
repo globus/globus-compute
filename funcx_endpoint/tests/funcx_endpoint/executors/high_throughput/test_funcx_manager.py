@@ -48,18 +48,15 @@ class TestManager:
         manager.worker_procs.update(worker)
         assert len(manager.worker_procs) == 1
 
-        task_done_count = 0
-        reg_info, task_done_count = manager.poll_funcx_task_socket(task_done_count)
+        reg_info = manager.poll_funcx_task_socket(test=True)
         assert reg_info['worker_id'] == '0'
         assert reg_info['worker_type'] == 'RAW'
-        assert task_done_count == 0
 
         # Begin testing removing worker process
         task_type = "RAW"
         manager.remove_worker_init(task_type)
         manager.send_task_to_worker(task_type)
 
-        reg_info, task_done_count = manager.poll_funcx_task_socket(task_done_count)
-        assert reg_info is None
+        remove_info = manager.poll_funcx_task_socket(test=True)
+        assert remove_info is None
         assert len(manager.worker_procs) == 0
-        assert task_done_count == 0
