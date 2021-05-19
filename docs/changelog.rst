@@ -36,7 +36,7 @@ New Functionality
 
 * ``FuncXClient.get_result(<TASK_ID>)`` will now raise a ``TaskPending`` exception if the task is not complete.
 
-* Multiple improvement to function serialization: Refer `issue#479 <https://github.com/funcx-faas/funcX/pull/479>`_
+* Multiple improvement to function serialization. See `issue#479 <https://github.com/funcx-faas/funcX/pull/479>`_
 
   * ``FuncXSerializer`` has been updated to prioritize source based function serialization methods that offer
     more reliable behavior when the python version across the client and endpoint do not match.
