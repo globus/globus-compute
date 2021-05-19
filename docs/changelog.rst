@@ -22,7 +22,7 @@ Bug Fixes
 
 * ``funcx-endpoint`` commandline autocomplete has been fixed. See `issue#496 <https://github.com/funcx-faas/funcX/issues/496>`_
 
-* ``funcx-endpoint restart`` failure is fixed. Refer `issue#488 <https://github.com/funcx-faas/funcX/issues/488>`_
+* ``funcx-endpoint restart`` failure is fixed. See `issue#488 <https://github.com/funcx-faas/funcX/issues/488>`_
 
 * Several fixes and improvements to worker terminate messages which caused workers to crash silently `issue#462 <https://github.com/funcx-faas/funcX/pull/462>`_
 
@@ -226,4 +226,3 @@ New Functionality
 
 
 * `get_batch_status` has been renamed to `get_batch_result`
-
