@@ -20,7 +20,7 @@ Bug Fixes
 
 * Updated version requirements in ``funcx-endpoint`` to match the ``funcx`` version
 
-* ``funcx-endpoint`` commandline autocomplete has been fixed. Refer `issue#496 <https://github.com/funcx-faas/funcX/issues/496>`_
+* ``funcx-endpoint`` commandline autocomplete has been fixed. See `issue#496 <https://github.com/funcx-faas/funcX/issues/496>`_
 
 * ``funcx-endpoint restart`` failure is fixed. Refer `issue#488 <https://github.com/funcx-faas/funcX/issues/488>`_
 
@@ -226,5 +226,4 @@ New Functionality
 
 
 * `get_batch_status` has been renamed to `get_batch_result`
-
 
