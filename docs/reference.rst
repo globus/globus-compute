@@ -8,7 +8,7 @@ Reference
     funcx
     funcx.sdk.client.FuncXClient
     funcx.sdk.error_handling_client.FuncXErrorHandlingClient
-    funcx.sdk.errors.TaskPending
+    funcx.utils.errors.TaskPending
     funcx.sdk.utils.batch.Batch
     funcx.serialize.base
     funcx.serialize.concretes

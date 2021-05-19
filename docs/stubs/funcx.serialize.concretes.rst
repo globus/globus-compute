@@ -5,11 +5,9 @@ funcx.serialize.concretes
 
    
    
-   .. rubric:: Functions
-
-   .. autosummary::
    
-      bar
+
+   
    
    
 
@@ -20,9 +18,9 @@ funcx.serialize.concretes
    .. autosummary::
    
       code_dill
+      code_dill_source
       code_pickle
       code_text_inspect
-      json_base64
       pickle_base64
    
    
@@ -30,3 +28,6 @@ funcx.serialize.concretes
    
    
    
+
+
+
