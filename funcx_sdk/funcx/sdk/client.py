@@ -14,7 +14,7 @@ from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
 from funcx.sdk.utils.batch import Batch
-from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError
+from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError, TaskPending
 from funcx.utils.handle_service_response import handle_response_errors
 
 try:
@@ -249,7 +249,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         task = self.get_task(task_id)
         if task['pending'] is True:
-            raise Exception(task['status'])
+            raise TaskPending(task['status'])
         else:
             if 'result' in task:
                 return task['result']
