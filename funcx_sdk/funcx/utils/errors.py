@@ -121,4 +121,4 @@ class TaskPending(FuncxError):
         self.reason = reason
 
     def __repr__(self):
-        return "Task is pending due to {self.reason}"
+        return f"Task is pending due to {self.reason}"
