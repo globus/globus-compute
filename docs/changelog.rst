@@ -43,7 +43,7 @@ New Functionality
 
   * ``FuncXSerializer`` now attempts deserialization on an isolated process to preempt failures on a remote worker.
 
-* More consistent worker task message types `PR#462 <https://github.com/funcx-faas/funcX/pull/462>`_
+* More consistent worker task message types. See `PR#462 <https://github.com/funcx-faas/funcX/pull/462>`_
 
 * Better OS agnostic path joining `PR#458 <https://github.com/funcx-faas/funcX/pull/458>`_
 
