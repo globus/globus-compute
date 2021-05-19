@@ -38,7 +38,7 @@ New Functionality
 
 * Multiple improvement to function serialization. See `issue#479 <https://github.com/funcx-faas/funcX/pull/479>`_
 
-  * ``FuncXSerializer`` has been updated to prioritize source based function serialization methods that offer
+  * ``FuncXSerializer`` has been updated to prioritize source-based function serialization methods that offer
     more reliable behavior when the python version across the client and endpoint do not match.
 
   * ``FuncXSerializer`` now attempt deserialization on an isolated process to pre-empt failures on a remote worker.
