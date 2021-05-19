@@ -26,7 +26,7 @@ Bug Fixes
 
 * Several fixes and improvements to worker terminate messages which caused workers to crash silently. See `issue#462 <https://github.com/funcx-faas/funcX/pull/462>`_
 
-* Fixed ``KubernetesProvider`` to use a default of ``init_blocks=0`` `issue#237 <https://github.com/funcx-faas/funcX/issues/237>`_
+* Fixed ``KubernetesProvider`` to use a default of ``init_blocks=0``. See `issue#237 <https://github.com/funcx-faas/funcX/issues/237>`_
 
 
 
