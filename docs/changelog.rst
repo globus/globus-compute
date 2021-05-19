@@ -45,7 +45,7 @@ New Functionality
 
 * More consistent worker task message types. See `PR#462 <https://github.com/funcx-faas/funcX/pull/462>`_
 
-* Better OS agnostic path joining `PR#458 <https://github.com/funcx-faas/funcX/pull/458>`_
+* Better OS agnostic path joining. See `PR#458 <https://github.com/funcx-faas/funcX/pull/458>`_
 
 
 
