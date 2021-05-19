@@ -6,7 +6,7 @@ Changelog
 funcx & funcx-endpoint v0.2.3
 -----------------------------
 
-Released on May 20th, 2021
+Released on May 19th, 2021
 
 funcx v0.2.3 is a minor release that includes contributions (code, tests, reviews, and reports) from:
 Ben Galewsky <ben@peartreestudio.net>, Ryan Chard <rchard@anl.gov>, Weinan Si <siweinan@gmail.com>,

@@ -3,7 +3,7 @@ Quickstart
 
 **funcX** is currently in Alpha and early testing releases are available on `PyPI <https://pypi.org/project/funcx/>`_.
 
-The latest version available on PyPI is ``v0.2.2``.
+The latest version available on PyPI is ``v0.2.3``.
 
 You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2FTutorial.ipynb>`_
 
