@@ -14,6 +14,19 @@ from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 
 
+class MaxResultSizeExceeded(Exception):
+
+    def __init__(self, result_size, result_size_limit):
+        self.result_size = result_size
+        self.result_size_limit = result_size_limit
+
+    def __repr__(self):
+        return f"Task result of {self.result_size}B exceeded current limit of {self.result_size_limit}B"
+
+    def __str__(self):
+        return self.__repr__()
+
+
 class FuncXWorker(object):
     """ The FuncX worker
     Parameters
@@ -34,6 +47,10 @@ class FuncXWorker(object):
     debug : Bool
      Enables debug logging
 
+    result_size_limit : int
+     Maximum result size allowed in Bytes
+     Default = 10 MB == 2**20 Bytes
+
 
     Funcx worker will use the REP sockets to:
          task = recv ()
@@ -41,7 +58,7 @@ class FuncXWorker(object):
          send(result)
     """
 
-    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW'):
+    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=2 ** 20):
 
         self.worker_id = worker_id
         self.address = address
@@ -52,6 +69,7 @@ class FuncXWorker(object):
         self.serializer = FuncXSerializer()
         self.serialize = self.serializer.serialize
         self.deserialize = self.serializer.deserialize
+        self.result_size_limit = result_size_limit
 
         global logger
         logger = set_file_logger(os.path.join(logdir, f'funcx_worker_{worker_id}.log'),
@@ -117,6 +135,10 @@ class FuncXWorker(object):
             try:
                 result = self.execute_task(msg)
                 serialized_result = self.serialize(result)
+
+                if sys.getsizeof(serialized_result) > self.result_size_limit:
+                    raise MaxResultSizeExceeded(sys.getsizeof(serialized_result),
+                                                self.result_size_limit)
             except Exception as e:
                 logger.exception(f"Caught an exception {e}")
                 result_package = {'task_id': task_id,
