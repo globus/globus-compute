@@ -41,7 +41,7 @@ New Functionality
   * ``FuncXSerializer`` has been updated to prioritize source-based function serialization methods that offer
     more reliable behavior when the python version across the client and endpoint do not match.
 
-  * ``FuncXSerializer`` now attempt deserialization on an isolated process to pre-empt failures on a remote worker.
+  * ``FuncXSerializer`` now attempts deserialization on an isolated process to preempt failures on a remote worker.
 
 * More consistent worker task message types `PR#462 <https://github.com/funcx-faas/funcX/pull/462>`_
 
