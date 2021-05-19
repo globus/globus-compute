@@ -3,6 +3,51 @@ Changelog
 
 
 
+funcx & funcx-endpoint v0.2.3
+-----------------------------
+
+Released on May 20th, 2021
+
+funcx v0.2.3 is a minor release that includes contributions (code, tests, reviews, and reports) from:
+Ben Galewsky <ben@peartreestudio.net>, Ryan Chard <rchard@anl.gov>, Weinan Si <siweinan@gmail.com>,
+Yongyan Rao <yongyan.rao@gmail.com> Yadu Nand Babuji <yadudoc1729@gmail.com> and Zhuozhao Li <zhuozhao@uchicago.edu>
+
+
+Bug Fixes
+^^^^^^^^^
+
+* Fixed a missing package in the ``requirements.txt`` file
+
+* Updated version requirements in ``funcx-endpoint`` to match the ``funcx`` version
+
+* ``funcx-endpoint`` commandline autocomplete has been fixed. Refer `issue#496 <https://github.com/funcx-faas/funcX/issues/496>`_
+
+* ``funcx-endpoint restart`` failure is fixed. Refer `issue#488 <https://github.com/funcx-faas/funcX/issues/488>`_
+
+* Several fixes and improvements to worker terminate messages which caused workers to crash silently `issue#462 <https://github.com/funcx-faas/funcX/pull/462>`_
+
+* Fixed ``KubernetesProvider`` to use a default of ``init_blocks=0`` `issue#237 <https://github.com/funcx-faas/funcX/issues/237>`_
+
+
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+
+* ``FuncXClient.get_result(<TASK_ID>)`` will now raise a ``TaskPending`` exception if the task is not complete.
+
+* Multiple improvement to function serialization: Refer `issue#479 <https://github.com/funcx-faas/funcX/pull/479>`_
+
+  * ``FuncXSerializer`` has been updated to prioritize source based function serialization methods that offer
+    more reliable behavior when the python version across the client and endpoint do not match.
+
+  * ``FuncXSerializer`` now attempt deserialization on an isolated process to pre-empt failures on a remote worker.
+
+* More consistent worker task message types `PR#462 <https://github.com/funcx-faas/funcX/pull/462>`_
+
+* Better OS agnostic path joining `PR#458 <https://github.com/funcx-faas/funcX/pull/458>`_
+
+
 
 funcx & funcx-endpoint v0.2.2
 -----------------------------
