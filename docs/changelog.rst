@@ -24,7 +24,7 @@ Bug Fixes
 
 * ``funcx-endpoint restart`` failure is fixed. See `issue#488 <https://github.com/funcx-faas/funcX/issues/488>`_
 
-* Several fixes and improvements to worker terminate messages which caused workers to crash silently `issue#462 <https://github.com/funcx-faas/funcX/pull/462>`_
+* Several fixes and improvements to worker terminate messages which caused workers to crash silently. See `issue#462 <https://github.com/funcx-faas/funcX/pull/462>`_
 
 * Fixed ``KubernetesProvider`` to use a default of ``init_blocks=0`` `issue#237 <https://github.com/funcx-faas/funcX/issues/237>`_
 
