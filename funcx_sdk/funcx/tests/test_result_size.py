@@ -24,7 +24,7 @@ def wait_for_task(fxc, task_id, walltime: int = 2):
             return r
 
 
-def test_large_result(fxc, endpoint, size=(2 ** 21)):
+def test_large_result(fxc, endpoint, size=(11 * (2 ** 20))):
     fn_uuid = fxc.register_function(large_result_producer, endpoint, description='LargeResultProducer')
     task_id = fxc.run(size,  # This is the current result size limit
                       endpoint_id=endpoint,

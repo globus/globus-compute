@@ -49,7 +49,7 @@ class FuncXWorker(object):
 
     result_size_limit : int
      Maximum result size allowed in Bytes
-     Default = 10 MB == 2**20 Bytes
+     Default = 10 MB == 10 * (2**20) Bytes
 
 
     Funcx worker will use the REP sockets to:
@@ -58,7 +58,7 @@ class FuncXWorker(object):
          send(result)
     """
 
-    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=2 ** 20):
+    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=10 * (2 ** 20)):
 
         self.worker_id = worker_id
         self.address = address
