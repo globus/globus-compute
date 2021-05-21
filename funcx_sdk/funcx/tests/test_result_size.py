@@ -46,4 +46,4 @@ if __name__ == '__main__':
     fxc = FuncXClient()
     endpoint = args.endpoint_id
     test_large_result(fxc, endpoint, 2**10)
-    test_large_result(fxc, endpoint, 2**21)
+    test_large_result(fxc, endpoint, 11 * (2**20))  # 11 MB exceeds the limit
