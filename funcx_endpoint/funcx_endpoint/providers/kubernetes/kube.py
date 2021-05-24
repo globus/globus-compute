@@ -164,11 +164,11 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                                                worker_init=self.worker_init)
 
         logger.info("[KUBERNETES] Scaling out a pod with name :{}".format(pod_name))
-        self._create_job(image=image,
-                         pod_name=pod_name,
-                         job_name=job_name,
-                         cmd_string=formatted_cmd,
-                         volumes=self.persistent_volumes)
+        self._create(image=image,
+                     pod_name=pod_name,
+                     job_name=job_name,
+                     cmd_string=formatted_cmd,
+                     volumes=self.persistent_volumes)
 
         self.resources_by_pod_name[pod_name] = {'status': 'RUNNING', 'task_type': task_type}
         if task_type not in self.resources_by_task_type:
@@ -222,7 +222,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         for job in job_ids:
             logger.debug("Terminating job/proc_id: {0}".format(job))
             # Here we are assuming that for local, the job_ids are the process id's
-            self._delete_job(job)
+            self._delete(job)
 
             self.resources_by_pod_name[job]['status'] = 'CANCELLED'
             del self.resources_by_pod_name[job]
@@ -245,13 +245,13 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         raise NotImplementedError()
         # do something to get the deployment's status
 
-    def _create_pod(self,
-                    image,
-                    pod_name,
-                    job_name,
-                    port=80,
-                    cmd_string=None,
-                    volumes=[]):
+    def _create(self,
+                image,
+                pod_name,
+                job_name,
+                port=80,
+                cmd_string=None,
+                volumes=[]):
         """ Create a kubernetes job for the provider job submit.
         Args:
               - image (string) : Docker image to launch
@@ -334,7 +334,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                                                               body=job)
         logger.debug("Job created. status='{0}'".format(str(api_response.status)))
 
-    def _delete_job(self, job_name):
+    def _delete(self, job_name):
         """Delete a job"""
 
         api_response = self.kube_client.delete_namespaced_job(name=job_name,
