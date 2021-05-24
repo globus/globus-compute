@@ -164,7 +164,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                                                worker_init=self.worker_init)
 
         logger.info("[KUBERNETES] Scaling out a pod with name :{}".format(pod_name))
-        self._create_pod(image=image,
+        self._create_job(image=image,
                          pod_name=pod_name,
                          job_name=job_name,
                          cmd_string=formatted_cmd,
@@ -222,7 +222,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         for job in job_ids:
             logger.debug("Terminating job/proc_id: {0}".format(job))
             # Here we are assuming that for local, the job_ids are the process id's
-            self._delete_pod(job)
+            self._delete_job(job)
 
             self.resources_by_pod_name[job]['status'] = 'CANCELLED'
             del self.resources_by_pod_name[job]
@@ -252,7 +252,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                     port=80,
                     cmd_string=None,
                     volumes=[]):
-        """ Create a kubernetes pod for the job.
+        """ Create a kubernetes job for the provider job submit.
         Args:
               - image (string) : Docker image to launch
               - pod_name (string) : Name of the pod
@@ -317,18 +317,27 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                                 restart_policy='Never',
         )
 
-        pod = client.V1Pod(spec=spec, metadata=metadata)
-        api_response = self.kube_client.create_namespaced_pod(namespace=self.namespace,
-                                                              body=pod)
-        logger.debug("Pod created. status='{0}'".format(str(api_response.status)))
+        # Create and configurate a spec section
+        template = client.V1PodTemplateSpec(spec=spec, metadata=metadata)
 
-    def _delete_pod(self, pod_name):
-        """Delete a pod"""
+        # Create the specification of deployment
+        job_spec = client.V1JobSpec(template=template, backoff_limit=0)
 
-        api_response = self.kube_client.delete_namespaced_pod(name=pod_name,
+        # Instantiate the job object
+        job = client.V1Job(spec=job_spec, metadata=metadata)
+
+        # Create a job
+        api_response = self.kube_client.create_namespaced_job(namespace=self.namespace,
+                                                              body=job)
+        logger.debug("Job created. status='{0}'".format(str(api_response.status)))
+
+    def _delete_job(self, job_name):
+        """Delete a job"""
+
+        api_response = self.kube_client.delete_namespaced_job(name=job_name,
                                                               namespace=self.namespace,
                                                               body=client.V1DeleteOptions())
-        logger.debug("Pod deleted. status='{0}'".format(str(api_response.status)))
+        logger.debug("Job deleted. status='{0}'".format(str(api_response.status)))
 
     @property
     def label(self):
