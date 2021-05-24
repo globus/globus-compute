@@ -321,7 +321,10 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         template = client.V1PodTemplateSpec(spec=spec, metadata=metadata)
 
         # Create the specification of deployment
-        job_spec = client.V1JobSpec(template=template, backoff_limit=0)
+        job_spec = client.V1JobSpec(template=template,
+                                    backoff_limit=0,
+                                    ttl_seconds_after_finished=60,
+        )
 
         # Instantiate the job object
         job = client.V1Job(spec=job_spec, metadata=metadata)
