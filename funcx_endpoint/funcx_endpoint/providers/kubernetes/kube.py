@@ -126,7 +126,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         self.run_as_non_root = run_as_non_root
         self.persistent_volumes = persistent_volumes
 
-        self.kube_client = client.CoreV1Api()
+        self.kube_client = client.BatchV1Api()
 
         # Dictionary that keeps track of jobs, keyed on job_id
         self.resources_by_pod_name = {}
