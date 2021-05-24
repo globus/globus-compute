@@ -310,10 +310,12 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
 
         metadata = client.V1ObjectMeta(name=pod_name,
                                        labels={"app": job_name})
+
         spec = client.V1PodSpec(containers=[container],
                                 image_pull_secrets=[secret],
-                                volumes=volume_defs
-                                )
+                                volumes=volume_defs,
+                                restart_policy='Never',
+        )
 
         pod = client.V1Pod(spec=spec, metadata=metadata)
         api_response = self.kube_client.create_namespaced_pod(namespace=self.namespace,
