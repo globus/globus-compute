@@ -327,7 +327,10 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         )
 
         # Instantiate the job object
-        job = client.V1Job(spec=job_spec, metadata=metadata)
+        job = client.V1Job(api_version="batch/v1",
+                           kind="Job",
+                           spec=job_spec,
+                           metadata=metadata)
 
         # Create a job
         api_response = self.kube_client.create_namespaced_job(namespace=self.namespace,
