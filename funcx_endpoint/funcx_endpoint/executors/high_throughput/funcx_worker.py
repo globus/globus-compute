@@ -124,6 +124,7 @@ class FuncXWorker(object):
                     task_type = b'WRKR_DIE'
                 else:
                     logger.exception("Caught an exception of non-KILL message for KILL task")
+                    continue
             else:
                 logger.debug("Executing task...")
 
@@ -147,9 +148,6 @@ class FuncXWorker(object):
                                       'result': serialized_result}
                 result = result_package
                 task_type = b'TASK_RET'
-
-            if task_type is None:
-                continue
 
             logger.debug("Sending result")
 
