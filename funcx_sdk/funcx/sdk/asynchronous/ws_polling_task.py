@@ -8,7 +8,7 @@ from websockets.exceptions import InvalidHandshake
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("asyncio")
 
 
 class WebSocketPollingTask:

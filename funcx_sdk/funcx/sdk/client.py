@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 from funcx.sdk import VERSION as SDK_VERSION
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("asyncio")
 
 
 class FuncXClient(FuncXErrorHandlingClient):
@@ -95,7 +95,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         If asynchronous mode is requested, then you can provide an optional event loop
         instance. If None, then we will access asyncio.get_event_loop()
         Default: None
-        
+
         use_offprocess_checker: Bool,
             Use this option to disable the offprocess_checker in the FuncXSerializer used
             by the client.

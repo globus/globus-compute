@@ -32,6 +32,9 @@ def set_file_logger(filename, name='funcx', level=logging.DEBUG, format_string=N
     formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
+    ws_logger = logging.getLogger("asyncio")
+    ws_logger.addHandler(handler)
     return logger
 
 
@@ -57,6 +60,9 @@ def set_stream_logger(name='funcx', level=logging.DEBUG, format_string=None):
     formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
+    ws_logger = logging.getLogger("asyncio")
+    ws_logger.addHandler(handler)
     return logger
 
 
