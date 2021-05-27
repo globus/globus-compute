@@ -69,6 +69,7 @@ class Manager(object):
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
                  worker_mode="singularity_reuse",
+                 container_cmd_options="",
                  scheduler_mode="hard",
                  worker_type=None,
                  worker_max_idletime=60,
@@ -110,6 +111,10 @@ class Manager(object):
               1. no_container : Worker launched without containers
               2. singularity_reuse : Worker launched inside a singularity container that will be reused
               3. singularity_single_use : Each worker and task runs inside a new container instance.
+
+        container_cmd_options: str
+              Container command strings to be added to associated container command.
+              For example, singularity exec {container_cmd_options}
 
         scheduler_mode : str
              Pick between 2 supported modes for the manager:
@@ -153,6 +158,7 @@ class Manager(object):
         self.uid = uid
 
         self.worker_mode = worker_mode
+        self.container_cmd_options = container_cmd_options
         self.scheduler_mode = scheduler_mode
         self.worker_type = worker_type
         self.worker_max_idletime = worker_max_idletime
@@ -316,6 +322,8 @@ class Manager(object):
             # Spin up any new workers according to the worker queue.
             # Returns the total number of containers that have spun up.
             self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
+                                                                     mode=self.worker_mode,
+                                                                     container_cmd_options=self.container_cmd_options,
                                                                      debug=self.debug,
                                                                      address=self.address,
                                                                      uid=self.uid,
@@ -515,6 +523,7 @@ class Manager(object):
             logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
             self.worker_procs.update(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
                                                                 worker_type=self.worker_type,
+                                                                container_cmd_options=self.container_cmd_options,
                                                                 address=self.address,
                                                                 debug=self.debug,
                                                                 uid=self.uid,
@@ -556,6 +565,8 @@ def cli_run():
     parser.add_argument("--worker_mode", default="singularity_reuse",
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
+    parser.add_argument("--container_cmd_options", default="",
+                        help=("Container cmd options to add to container startup cmd"))
     parser.add_argument("--scheduler_mode", default="soft",
                         help=("Choose the mode of scheduler "
                               "(hard, soft"))
@@ -595,6 +606,7 @@ def cli_run():
         logger.info("max_workers: {}".format(args.max_workers))
         logger.info("poll_period: {}".format(args.poll))
         logger.info("worker_mode: {}".format(args.worker_mode))
+        logger.info("container_cmd_options: {}".format(args.container_cmd_options))
         logger.info("scheduler_mode: {}".format(args.scheduler_mode))
         logger.info("worker_type: {}".format(args.worker_type))
         logger.info("log_max_bytes: {}".format(args.log_max_bytes))
@@ -611,6 +623,7 @@ def cli_run():
                           logdir=args.logdir,
                           debug=args.debug,
                           worker_mode=args.worker_mode,
+                          container_cmd_options=args.container_cmd_options,
                           scheduler_mode=args.scheduler_mode,
                           worker_type=args.worker_type,
                           poll_period=int(args.poll))
