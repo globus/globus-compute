@@ -28,9 +28,7 @@ except ModuleNotFoundError:
     ENDPOINT_VERSION = None
 
 from funcx.sdk import VERSION as SDK_VERSION
-
-
-logger = logging.getLogger("asyncio")
+logger = logging.getLogger(__name__)
 
 
 class FuncXClient(FuncXErrorHandlingClient):
