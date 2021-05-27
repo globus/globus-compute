@@ -15,8 +15,36 @@ import multiprocessing as mp
 import atexit
 
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
+logger = logging.getLogger("asyncio")
 
-logger = logging.getLogger(__name__)
+
+class AtomicController():
+
+    def __init__(self, start_callback, stop_callback, init_value=0):
+        self._value = 0
+        self.lock = threading.Lock()
+        self.start_callback = start_callback
+        self.stop_callback = stop_callback
+
+    def increment(self):
+        with self.lock:
+            if self._value == 0:
+                self.start_callback()
+            self._value += 1
+
+    def decrement(self):
+        with self.lock:
+            self._value -= 1
+            if self._value == 0:
+                self.stop_callback()
+            return self._value
+
+    def value(self):
+        with self.lock:
+            return self._value
+
+    def __repr__(self):
+        return f"AtomicController value:{self._value}"
 
 
 class FuncXExecutor(concurrent.futures.Executor):
@@ -49,7 +77,10 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._function_future_map = {}
         self.task_group_id = self.funcx_client.session_task_group_id  # we need to associate all batch launches with this id
 
-        self.poller_thread = None
+        self.poller_thread = ExecutorPollerThread(self.funcx_client,
+                                                  self._function_future_map,
+                                                  self.results_ws_uri,
+                                                  self.task_group_id)
         atexit.register(self.shutdown)
 
     def submit(self, function, *args, endpoint_id=None, container_uuid=None, **kwargs):
@@ -100,6 +131,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         # the poller before the future is added to the future_map
         self._function_future_map[task_uuid] = Future()
 
+        self.poller_thread.atomic_controller.increment()
         res = self._function_future_map[task_uuid]
 
         if not self.poller_thread or self.poller_thread.ws_handler.closed:
@@ -110,6 +142,10 @@ class FuncXExecutor(concurrent.futures.Executor):
         if self.poller_thread:
             self.poller_thread.shutdown()
         logger.debug(f"Executor:{self.label} shutting down")
+
+
+def noop():
+    return
 
 
 class ExecutorPollerThread():
@@ -132,24 +168,27 @@ class ExecutorPollerThread():
         self.results_ws_uri = results_ws_uri
         self._function_future_map = _function_future_map
         self.task_group_id = task_group_id
-
-        self.start()
+        self.eventloop = None
+        self.atomic_controller = AtomicController(self.start,
+                                                  noop)
 
     def start(self):
         """ Start the result polling thread
         """
-
         # Currently we need to put the batch id's we launch into this queue
         # to tell the web_socket_poller to listen on them. Later we'll associate
 
         eventloop = asyncio.new_event_loop()
         self.eventloop = eventloop
-        self.ws_handler = WebSocketPollingTask(self.funcx_client, eventloop, self.task_group_id,
-                                               self.results_ws_uri, auto_start=False)
+        self.ws_handler = WebSocketPollingTask(self.funcx_client,
+                                               eventloop,
+                                               self.atomic_controller,
+                                               init_task_group_id=self.task_group_id,
+                                               results_ws_uri=self.results_ws_uri,
+                                               auto_start=False)
         self.thread = threading.Thread(target=self.event_loop_thread,
                                        args=(eventloop, ))
         self.thread.start()
-
         logger.debug("Started web_socket_poller thread")
 
     def event_loop_thread(self, eventloop):
