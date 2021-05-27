@@ -17,6 +17,7 @@ class WebSocketPollingTask:
 
     def __init__(self, funcx_client,
                  loop: AbstractEventLoop,
+                 atomic_controller,
                  init_task_group_id: str = None,
                  results_ws_uri: str = 'ws://localhost:6000',
                  auto_start: bool = True):
@@ -44,6 +45,7 @@ class WebSocketPollingTask:
         """
         self.funcx_client = funcx_client
         self.loop = loop
+        self.atomic_controller = atomic_controller
         self.init_task_group_id = init_task_group_id
         self.results_ws_uri = results_ws_uri
         self.auto_start = auto_start
@@ -97,13 +99,15 @@ class WebSocketPollingTask:
                         future.set_exception(dill.loads(r_exception.e_value))
                     else:
                         future.set_exception(Exception(data['reason']))
-                except Exception as e:
-                    print("Caught exception : ", e)
+                except Exception:
+                    logger.exception("Caught unexpected while setting results")
 
-                if auto_close and len(pending_futures) == 0:
+                # When the counter hits 0 we always exit. This guarantees that that
+                # if the counter increments to 1 on the executor, this handler needs to be restarted.
+                count = self.atomic_controller.decrement()
+                if count == 0:
                     await self.ws.close()
                     self.ws = None
-                    self.closed = True
                     return
             else:
                 print("[MISSING FUTURE]")
