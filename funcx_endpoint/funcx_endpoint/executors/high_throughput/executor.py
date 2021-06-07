@@ -13,7 +13,7 @@ import queue
 import pickle
 import daemon
 import uuid
-from multiprocessing import Process
+from funcx_endpoint.executors.high_throughput.mac_safe_process import mpProcess
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
@@ -377,38 +377,38 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         """
         comm_q = mpQueue(maxsize=10)
         print(f"Starting local interchange with endpoint id: {self.endpoint_id}")
-        self.queue_proc = Process(target=interchange.starter,
-                                  args=(comm_q,),
-                                  kwargs={"client_address": self.address,
-                                          "client_ports": (self.outgoing_q.port,
-                                                           self.incoming_q.port,
-                                                           self.command_client.port),
-                                          "provider": self.provider,
-                                          "strategy": self.strategy,
-                                          "poll_period": self.poll_period,
-                                          "heartbeat_period": self.heartbeat_period,
-                                          "heartbeat_threshold": self.heartbeat_threshold,
-                                          "working_dir": self.working_dir,
-                                          "worker_debug": self.worker_debug,
-                                          "max_workers_per_node": self.max_workers_per_node,
-                                          "mem_per_worker": self.mem_per_worker,
-                                          "cores_per_worker": self.cores_per_worker,
-                                          "prefetch_capacity": self.prefetch_capacity,
-                                          # "log_max_bytes": self.log_max_bytes,
-                                          # "log_backup_count": self.log_backup_count,
-                                          "scheduler_mode": self.scheduler_mode,
-                                          "worker_mode": self.worker_mode,
-                                          "container_type": self.container_type,
-                                          "container_cmd_options": self.container_cmd_options,
-                                          "funcx_service_address": self.funcx_service_address,
-                                          "interchange_address": self.address,
-                                          "worker_ports": self.worker_ports,
-                                          "worker_port_range": self.worker_port_range,
-                                          "logdir": os.path.join(self.run_dir, self.label),
-                                          "suppress_failure": self.suppress_failure,
-                                          "endpoint_id": self.endpoint_id,
-                                          "logging_level": logging.DEBUG if self.worker_debug else logging.INFO
-                                  },
+        self.queue_proc = mpProcess(target=interchange.starter,
+                                    args=(comm_q,),
+                                    kwargs={"client_address": self.address,
+                                            "client_ports": (self.outgoing_q.port,
+                                                             self.incoming_q.port,
+                                                             self.command_client.port),
+                                            "provider": self.provider,
+                                            "strategy": self.strategy,
+                                            "poll_period": self.poll_period,
+                                            "heartbeat_period": self.heartbeat_period,
+                                            "heartbeat_threshold": self.heartbeat_threshold,
+                                            "working_dir": self.working_dir,
+                                            "worker_debug": self.worker_debug,
+                                            "max_workers_per_node": self.max_workers_per_node,
+                                            "mem_per_worker": self.mem_per_worker,
+                                            "cores_per_worker": self.cores_per_worker,
+                                            "prefetch_capacity": self.prefetch_capacity,
+                                            # "log_max_bytes": self.log_max_bytes,
+                                            # "log_backup_count": self.log_backup_count,
+                                            "scheduler_mode": self.scheduler_mode,
+                                            "worker_mode": self.worker_mode,
+                                            "container_type": self.container_type,
+                                            "container_cmd_options": self.container_cmd_options,
+                                            "funcx_service_address": self.funcx_service_address,
+                                            "interchange_address": self.address,
+                                            "worker_ports": self.worker_ports,
+                                            "worker_port_range": self.worker_port_range,
+                                            "logdir": os.path.join(self.run_dir, self.label),
+                                            "suppress_failure": self.suppress_failure,
+                                            "endpoint_id": self.endpoint_id,
+                                            "logging_level": logging.DEBUG if self.worker_debug else logging.INFO
+                                    },
         )
         self.queue_proc.start()
         try:
