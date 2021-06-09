@@ -506,11 +506,11 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 if msgs is None:
                     logger.debug("[MTHREAD] Got None, exiting")
                     return
+
                 elif isinstance(msgs, EPStatusReport):
-                    logger.debug("[MTHREAD] Received EPStatusReport")
-                    # TODO:YADU We are not propagating task status reports
-                    # if len(msgs.task_statuses):
-                    #    self.task_status_queue.put(msgs.task_statuses)
+                    logger.debug("[MTHREAD] Received EPStatusReport {}".format(msgs))
+                    if self.passthrough:
+                        self.results_passthrough.put(pickle.dumps(msgs))
 
                 else:
                     logger.debug("[MTHREAD] Unpacking results")
