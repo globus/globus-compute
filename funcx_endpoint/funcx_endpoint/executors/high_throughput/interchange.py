@@ -25,7 +25,7 @@ from parsl.app.errors import RemoteExceptionWrapper
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
-from funcx import set_file_logger
+from funcx import set_file_logger, set_stream_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 
@@ -122,6 +122,7 @@ class Interchange(object):
                  cores_per_worker=1.0,
                  worker_debug=False,
                  launch_cmd=None,
+                 interchange_log_to_file=True,
                  logdir=".",
                  logging_level=logging.INFO,
                  endpoint_id=None,
@@ -179,18 +180,22 @@ class Interchange(object):
         """
 
         self.logdir = logdir
-        os.makedirs(self.logdir, exist_ok=True)
 
         global logger
-        logger = set_file_logger(os.path.join(self.logdir, 'interchange.log'),
-                                 name="interchange",
-                                 level=logging_level,
-                                 max_bytes=log_max_bytes,
-                                 backup_count=log_backup_count)
+        if interchange_log_to_file:
+            os.makedirs(self.logdir, exist_ok=True)
 
-        logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
-                                                                                              log_max_bytes,
-                                                                                              log_backup_count))
+            logger = set_file_logger(os.path.join(self.logdir, 'interchange.log'),
+                                     name="interchange",
+                                     level=logging_level,
+                                     max_bytes=log_max_bytes,
+                                     backup_count=log_backup_count)
+
+            logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
+                                                                                                  log_max_bytes,
+                                                                                                  log_backup_count))
+        else:
+            logger = set_stream_logger(name="interchange", level=logging_level)
 
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
 

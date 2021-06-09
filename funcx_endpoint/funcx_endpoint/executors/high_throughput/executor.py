@@ -224,6 +224,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  poll_period=10,
                  container_image=None,
                  suppress_failure=False,
+                 interchange_log_to_file=True,
                  run_dir=None,
                  endpoint_id=None,
                  managed=True,
@@ -268,6 +269,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.heartbeat_period = heartbeat_period
         self.poll_period = poll_period
         self.suppress_failure = suppress_failure
+        self.interchange_log_to_file = interchange_log_to_file
         self.run_dir = run_dir
         self.queue_proc = None
         self.interchange_local = interchange_local
@@ -404,6 +406,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
                                           "worker_port_range": self.worker_port_range,
+                                          "interchange_log_to_file": self.interchange_log_to_file,
                                           "logdir": os.path.join(self.run_dir, self.label),
                                           "suppress_failure": self.suppress_failure,
                                           "endpoint_id": self.endpoint_id,
