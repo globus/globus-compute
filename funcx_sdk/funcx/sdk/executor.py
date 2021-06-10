@@ -19,6 +19,9 @@ logger = logging.getLogger("asyncio")
 
 
 class AtomicController():
+    """ This is used to synchronize between the FuncXExecutor which starts WebSocketPollingTasks
+    and the WebSocketPollingTask which closes itself when there are 0 tasks.
+    """
 
     def __init__(self, start_callback, stop_callback, init_value=0):
         self._value = 0
@@ -48,7 +51,10 @@ class AtomicController():
 
 
 class FuncXExecutor(concurrent.futures.Executor):
-    """ An executor
+    """ Extends the concurrent.futures.Executor class to layer this interface
+    over funcX. The executor returns future objects that are asynchronously
+    updated with results by the WebSocketPollingTask using a websockets connection
+    to the hosted funcx-websocket-service.
     """
 
     def __init__(self, funcx_client,
@@ -149,7 +155,9 @@ def noop():
 
 
 class ExecutorPollerThread():
-    """ An executor
+    """ This encapsulates the creation of the thread on which event loop lives,
+    the instantiation of the WebSocketPollingTask onto the event loop and the
+    synchronization primitives used (AtomicController)
     """
 
     def __init__(self, funcx_client, _function_future_map, results_ws_uri, task_group_id):
