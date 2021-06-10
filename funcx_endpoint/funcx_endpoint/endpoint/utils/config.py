@@ -21,6 +21,7 @@ class Config(RepresentationMixin):
     heartbeat_period: int (seconds)
         The interval at which heartbeat messages are sent from the endpoint to the funcx-web-service
         Default: 30s
+
     heartbeat_threshold: int (seconds)
         Seconds since the last hearbeat message from the funcx-web-service after which the connection
         is assumed to be disconnected.
