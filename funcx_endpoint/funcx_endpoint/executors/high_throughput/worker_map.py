@@ -135,7 +135,8 @@ class WorkerMap(object):
         ----------
         new_worker_map : dict
            {worker_type: total_number_of_containers,...}.
-
+        need_more: bool
+            whether the manager needs to spin down some warm containers
         Returns
         ---------
         List of removed worker types.
@@ -153,7 +154,11 @@ class WorkerMap(object):
         new_worker_map : dict
            {worker_type: total_number_of_containers,...}.
         check_idle : boolean
-           A boolean to indicate whether to check the idle time or not
+           A boolean to indicate whether to check the idle time of containers or not
+           If checked, that means the workloads are not so busy,
+           and we can leave the container workers alive until the worker_max_idletime is reached.
+           Otherwise, that means the workloads are busy and we need to turn of some containers to acommodate
+           the workers, regardless of if it reaches the worker_max_idletime.
         Returns
         ---------
         List of removed worker types.
@@ -170,6 +175,7 @@ class WorkerMap(object):
                 continue
             num_remove = max(0, self.total_worker_type_counts[worker_type] - self.to_die_count.get(worker_type, 0) - new_worker_map.get(worker_type, 0))
             if scheduler_mode == 'hard':
+                # Leave at least one worker alive in hard mode
                 max_remove = max(0, self.total_worker_type_counts[worker_type] - 1)
                 num_remove = min(num_remove, max_remove)
 
@@ -177,6 +183,10 @@ class WorkerMap(object):
                 logger.debug("[SPIN DOWN] Removing {} workers of type {}".format(num_remove, worker_type))
             for i in range(num_remove):
                 spin_downs.append(worker_type)
+            # A container switching is defined as a warm container must be
+            # switched to another container to accommodate the workloads.
+            # If a container worker has been idle for worker_max_idletime,
+            # Then it is not counted as a container switching
             if not check_idle:
                 container_switch_count += num_remove
         return spin_downs, container_switch_count
@@ -286,6 +296,8 @@ class WorkerMap(object):
                     # Add worker
                     new_worker_list.append(worker_type)
 
+        # need_more is to reflect if a manager needs more workers than the current unused slots
+        # If yes, that means the manager needs to turn off some warm workers to serve the requests
         need_more = False
         if len(new_worker_list) > self.total_worker_type_counts['unused']:
             need_more = True
