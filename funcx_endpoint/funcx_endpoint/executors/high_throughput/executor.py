@@ -531,7 +531,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             # TODO: This could be handled better we are essentially shutting down the
                             # client with little indication to the user.
                             logger.warning("[MTHREAD] Executor shutting down due to version mismatch in interchange")
-                            self._executor_exception, _ = fx_serializer.deserialize(msg['exception'])
+                            self._executor_exception = fx_serializer.deserialize(msg['exception'])
                             logger.exception("[MTHREAD] Exception: {}".format(self._executor_exception))
                             # Set bad state to prevent new tasks from being submitted
                             self._executor_bad_state.set()
