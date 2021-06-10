@@ -12,14 +12,17 @@ logger = logging.getLogger("asyncio")
 
 
 class WebSocketPollingTask:
-    """
+    """ The WebSocketPollingTask is used by the FuncXExecutor and the FuncXClient
+    to asynchronously listen to a stream of results. It uses a synchronized counter
+    to identify when there are no more tasks and exit to avoid blocking the main thread
+    from exiting.
     """
 
     def __init__(self, funcx_client,
                  loop: AbstractEventLoop,
                  atomic_controller,
                  init_task_group_id: str = None,
-                 results_ws_uri: str = 'ws://localhost:6000',
+                 results_ws_uri: str = 'wss://api.funcx.org/ws/v2',
                  auto_start: bool = True):
         """
         Parameters
@@ -31,12 +34,17 @@ class WebSocketPollingTask:
         loop : event loop
             The asnycio event loop that the WebSocket client will run on
 
+        atomic_controller: AtomicController object
+            A synchronized counter object used to identify when there are 0 tasks
+            remaining and to exit the polling loop.
+
         init_task_group_id : str
             Optional task_group_id UUID string that the WebSocket client
             can immediately poll for after initialization
 
         results_ws_uri : str
-            Web sockets URI for the results
+            Web sockets URI for the results.
+            Default: wss://api.funcx.org/ws/v2
 
         auto_start : Bool
             Set this to start the WebSocket client immediately.
@@ -89,8 +97,7 @@ class WebSocketPollingTask:
             data = json.loads(raw_data)
             task_id = data['task_id']
             if task_id in pending_futures:
-                future = pending_futures[task_id]
-                del pending_futures[task_id]
+                future = pending_futures.pop(task_id)
                 try:
                     if data['result']:
                         future.set_result(self.funcx_client.fx_serializer.deserialize(data['result']))
