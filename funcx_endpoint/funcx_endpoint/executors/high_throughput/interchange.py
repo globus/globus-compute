@@ -110,7 +110,7 @@ class Interchange(object):
                  container_type=None,
                  container_cmd_options='',
                  worker_mode=None,
-                 routing_interval=10.0,
+                 cold_routing_interval=10.0,
 
                  funcx_service_address=None,
                  scaling_enabled=True,
@@ -213,6 +213,7 @@ class Interchange(object):
         self.container_type = container_type
         self.container_cmd_options = container_cmd_options
         self.worker_mode = worker_mode
+        self.cold_routing_interval = cold_routing_interval
 
         self.log_max_bytes = log_max_bytes
         self.log_backup_count = log_backup_count
