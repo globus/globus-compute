@@ -16,7 +16,7 @@ on existing infrastructure including clouds, clusters, and supercomputers.
    :target: https://funcx.readthedocs.io/en/latest/
    :alt: Documentation Status
 .. |launch| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2FTutorial.ipynb
+   :target: https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb
    :alt: Launch in Binder
 .. |NSF-2004894| image:: https://img.shields.io/badge/NSF-2004894-blue.svg
    :target: https://nsf.gov/awardsearch/showAward?AWD_ID=2004894
@@ -37,7 +37,7 @@ Documentation: https://funcx.readthedocs.io/en/latest/
 Quickstart
 ==========
 
-funcX is in alpha state with version `0.0.5` currently available on PyPI.
+funcX is in a beta state with version `0.2.3` currently available on PyPI.
 
 To install funcX, please ensure you have python3.6+.::
 
@@ -51,6 +51,8 @@ To use our example notebooks you will need Jupyter.::
 
    $ pip install jupyter
 
+.. note:: The funcX client is supported on MacOS, Linux and Windows.
+          The funcx-endpoint is only supported on Linux.
 
 Documentation
 =============

@@ -3,16 +3,16 @@
 # Declare variables to be passed into your templates.
 
 replicaCount: 1
-funcXServiceAddress: https://api.funcx.org
+funcXServiceAddress: https://api2.funcx.org
 image:
   repository: funcx/kube-endpoint
-  tag: dev
-  pullPolicy: IfNotPresent
+  tag: main
+  pullPolicy: Always
 
 workerImage: python:3.6-buster
-workerInit: pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0 funcx-endpoint>=0.0.3
+workerInit: pip install funcx-endpoint>=0.2.0
 workerNamespace: default
-workingDir: /tmp/worker_logs
+logDir: /tmp/worker_logs
 
 rbacEnabled: true
 nameOverride: funcx-endpoint
@@ -26,3 +26,7 @@ initBlocks: 0
 minBlocks: 1
 maxBlocks: 100
 maxWorkersPerPod: 1
+
+detachEndpoint: true
+
+endpointUUID:

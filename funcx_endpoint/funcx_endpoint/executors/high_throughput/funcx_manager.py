@@ -23,15 +23,19 @@ from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2 ** 32) - 1
+
+
+logger = None
 
 
 class Manager(object):
@@ -65,6 +69,7 @@ class Manager(object):
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
                  worker_mode="singularity_reuse",
+                 container_cmd_options="",
                  scheduler_mode="hard",
                  worker_type=None,
                  worker_max_idletime=60,
@@ -107,6 +112,10 @@ class Manager(object):
               2. singularity_reuse : Worker launched inside a singularity container that will be reused
               3. singularity_single_use : Each worker and task runs inside a new container instance.
 
+        container_cmd_options: str
+              Container command strings to be added to associated container command.
+              For example, singularity exec {container_cmd_options}
+
         scheduler_mode : str
              Pick between 2 supported modes for the manager:
               1. hard: the manager cannot change the launched container type
@@ -118,6 +127,13 @@ class Manager(object):
         poll_period : int
              Timeout period used by the manager in milliseconds. Default: 10ms
         """
+
+        global logger
+        # This is expected to be used only in unit test
+        if logger is None:
+            logger = set_file_logger(os.path.join(logdir, uid, 'manager.log'),
+                                     name='funcx_manager',
+                                     level=logging.DEBUG)
 
         logger.info("Manager started")
 
@@ -142,6 +158,7 @@ class Manager(object):
         self.uid = uid
 
         self.worker_mode = worker_mode
+        self.container_cmd_options = container_cmd_options
         self.scheduler_mode = scheduler_mode
         self.worker_type = worker_type
         self.worker_max_idletime = worker_max_idletime
@@ -171,7 +188,7 @@ class Manager(object):
         self.outstanding_task_count = {}
         self.task_type_mapping = {}
 
-        self.pending_result_queue = multiprocessing.Queue()
+        self.pending_result_queue = mpQueue()
 
         self.max_queue_size = max_queue_size + self.max_worker_count
         self.tasks_per_round = 1
@@ -321,16 +338,13 @@ class Manager(object):
 
                 else:
                     logger.warning("YADU: RAW Tasks {}".format(message))
-                    tasks = [Message.unpack(rt) for rt in message]
+                    tasks = [(rt['local_container'], Message.unpack(rt['raw_buffer'])) for rt in message]
 
                     task_recv_counter += len(tasks)
-                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t.task_id for t in tasks],
+                    logger.debug("[TASK_PULL_THREAD] Got tasks: {} of {}".format([t[1].task_id for t in tasks],
                                                                                  task_recv_counter))
 
-                    for task in tasks:
-                        # Set default type to raw
-                        task_type = task.container_id
-
+                    for task_type, task in tasks:
                         logger.debug("[TASK DEBUG] Task is of type: {}".format(task_type))
 
                         if task_type not in self.task_queues:
@@ -424,7 +438,7 @@ class Manager(object):
                             to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
                             self.funcx_task_socket.send_multipart(to_send)
                             self.worker_map.update_worker_idle(task_type)
-                            if task.task_id != pickle.dumps(b"KILL"):
+                            if task.task_id != "KILL":
                                 logger.debug(f"Set task {task.task_id} to RUNNING")
                                 self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
                             logger.debug("Sending complete!")
@@ -495,8 +509,10 @@ class Manager(object):
 
         logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue {}".format(worker_type))
         self.worker_map.to_die_count[worker_type] += 1
-        self.task_queues[worker_type].put({"task_id": pickle.dumps(b"KILL"),
-                                           "buffer": b'KILL'})
+        task = Task(task_id='KILL',
+                    container_id='RAW',
+                    task_buffer='KILL')
+        self.task_queues[worker_type].put(task)
 
     def start(self):
         """
@@ -510,6 +526,7 @@ class Manager(object):
             logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
             self.worker_procs.update(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
                                                                 worker_type=self.worker_type,
+                                                                container_cmd_options=self.container_cmd_options,
                                                                 address=self.address,
                                                                 debug=self.debug,
                                                                 uid=self.uid,
@@ -551,6 +568,8 @@ def cli_run():
     parser.add_argument("--worker_mode", default="singularity_reuse",
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
+    parser.add_argument("--container_cmd_options", default="",
+                        help=("Container cmd options to add to container startup cmd"))
     parser.add_argument("--scheduler_mode", default="soft",
                         help=("Choose the mode of scheduler "
                               "(hard, soft"))
@@ -570,8 +589,8 @@ def cli_run():
 
     try:
         global logger
-        # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
-        logger = set_file_logger('{}/{}/manager.log'.format(args.logdir, args.uid),
+        # TODO The config options for the rotatingfilehandler need to be implemented and checked so that it is user configurable
+        logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,
                                  max_bytes=float(args.log_max_bytes),  # TODO: Test if this still works on forwarder_rearch_1
@@ -590,6 +609,7 @@ def cli_run():
         logger.info("max_workers: {}".format(args.max_workers))
         logger.info("poll_period: {}".format(args.poll))
         logger.info("worker_mode: {}".format(args.worker_mode))
+        logger.info("container_cmd_options: {}".format(args.container_cmd_options))
         logger.info("scheduler_mode: {}".format(args.scheduler_mode))
         logger.info("worker_type: {}".format(args.worker_type))
         logger.info("log_max_bytes: {}".format(args.log_max_bytes))
@@ -606,6 +626,7 @@ def cli_run():
                           logdir=args.logdir,
                           debug=args.debug,
                           worker_mode=args.worker_mode,
+                          container_cmd_options=args.container_cmd_options,
                           scheduler_mode=args.scheduler_mode,
                           worker_type=args.worker_type,
                           poll_period=int(args.poll))

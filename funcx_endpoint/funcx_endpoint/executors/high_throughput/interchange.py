@@ -25,6 +25,7 @@ from parsl.app.errors import RemoteExceptionWrapper
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
+from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 
@@ -104,8 +105,13 @@ class Interchange(object):
                  max_workers_per_node=None,
                  mem_per_worker=None,
                  prefetch_capacity=None,
+
                  scheduler_mode=None,
+                 container_type=None,
+                 container_cmd_options='',
                  worker_mode=None,
+
+                 funcx_service_address=None,
                  scaling_enabled=True,
                  #
                  client_address="127.0.0.1",
@@ -152,6 +158,10 @@ class Interchange(object):
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
 
+        container_cmd_options: str
+            Container command strings to be added to associated container command.
+            For example, singularity exec {container_cmd_options}
+
         worker_debug : Bool
              Enables worker debug logging.
 
@@ -170,10 +180,14 @@ class Interchange(object):
 
         self.logdir = logdir
         os.makedirs(self.logdir, exist_ok=True)
-        start_file_logger("{}/interchange.log".format(self.logdir),
-                          level=logging_level,
-                          max_bytes=log_max_bytes,
-                          backup_count=log_backup_count)
+
+        global logger
+        logger = set_file_logger(os.path.join(self.logdir, 'interchange.log'),
+                                 name="interchange",
+                                 level=logging_level,
+                                 max_bytes=log_max_bytes,
+                                 backup_count=log_backup_count)
+
         logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
                                                                                               log_max_bytes,
                                                                                               log_backup_count))
@@ -185,13 +199,17 @@ class Interchange(object):
         self.mem_per_worker = mem_per_worker
         self.cores_per_worker = cores_per_worker
         self.prefetch_capacity = prefetch_capacity
+
         self.scheduler_mode = scheduler_mode
+        self.container_type = container_type
+        self.container_cmd_options = container_cmd_options
+        self.worker_mode = worker_mode
+
         self.log_max_bytes = log_max_bytes
         self.log_backup_count = log_backup_count
         self.working_dir = working_dir
         self.provider = provider
         self.worker_debug = worker_debug
-        self.worker_mode = worker_mode
         self.scaling_enabled = scaling_enabled
         #
 
@@ -231,7 +249,7 @@ class Interchange(object):
         self.pending_task_queue = {}
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient()
+        self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
@@ -278,6 +296,7 @@ class Interchange(object):
                                "--hb_period={heartbeat_period} "
                                "--hb_threshold={heartbeat_threshold} "
                                "--worker_mode={worker_mode} "
+                               "--container_cmd_options='{container_cmd_options}' "
                                "--scheduler_mode={scheduler_mode} "
                                "--log_max_bytes={log_max_bytes} "
                                "--log_backup_count={log_backup_count} "
@@ -309,7 +328,7 @@ class Interchange(object):
         logger.info("Loading endpoint local config")
         working_dir = self.working_dir
         if self.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
+            working_dir = os.path.join(self.logdir, "worker_logs")
         logger.info("Setting working_dir: {}".format(working_dir))
 
         self.provider.script_dir = working_dir
@@ -337,6 +356,7 @@ class Interchange(object):
                                        heartbeat_threshold=self.heartbeat_threshold,
                                        poll_period=self.poll_period,
                                        worker_mode=self.worker_mode,
+                                       container_cmd_options=self.container_cmd_options,
                                        scheduler_mode=self.scheduler_mode,
                                        logdir=working_dir,
                                        log_max_bytes=self.log_max_bytes,
@@ -420,6 +440,7 @@ class Interchange(object):
                 # We pass the raw message along
                 self.pending_task_queue[local_container].put({'task_id': msg.task_id,
                                                               'container_id': msg.container_id,
+                                                              'local_container': local_container,
                                                               'raw_buffer': raw_msg})
                 self.total_pending_task_count += 1
                 self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
@@ -512,13 +533,13 @@ class Interchange(object):
         logger.debug("[STATUS] Status reporting loop starting")
 
         while not kill_event.is_set():
-            logger.info(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
+            logger.debug(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
             msg = EPStatusReport(
                 self.endpoint_id,
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.debug("[STATUS] Sending status report to forwarder, and clearing task deltas.")
+            logger.debug("[STATUS] Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
@@ -720,7 +741,7 @@ class Interchange(object):
                 tasks = task_dispatch[manager]
                 if tasks:
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
-                    serializd_raw_tasks_buffer = pickle.dumps([t['raw_buffer'] for t in tasks])
+                    serializd_raw_tasks_buffer = pickle.dumps(tasks)
                     # self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
                     self.task_outgoing.send_multipart([manager, b'', serializd_raw_tasks_buffer])
 
@@ -755,7 +776,6 @@ class Interchange(object):
                         logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
-                        logger.warning(f"[YADU DEBUG]: result message: {r}")
                         logger.debug("[MAIN] Received result for task {} from {}".format(r, manager))
                         task_type = self.containers[r['container_id']]
                         if r['task_id'] in self.task_status_deltas:
@@ -772,7 +792,7 @@ class Interchange(object):
             # Send status reports from this main thread to avoid thread-safety on zmq sockets
             try:
                 packed_status_report = status_report_queue.get(block=False)
-                logger.debug(f"[MAIN] forwarding status report queue: {packed_status_report}")
+                logger.debug(f"[MAIN] forwarding status report: {packed_status_report}")
                 self.results_outgoing.send(packed_status_report)
             except queue.Empty:
                 pass
@@ -943,53 +963,6 @@ class Interchange(object):
             logger.debug("[MAIN] The status is {}".format(status))
 
         return status
-
-
-def start_file_logger(filename,
-                      name="interchange",
-                      level=logging.DEBUG,
-                      format_string=None,
-                      max_bytes=256 * 1024 * 1024,
-                      backup_count=1):
-    """Add a stream log handler.
-
-    Parameters
-    ---------
-
-    filename: string
-        Name of the file to write logs to. Set to None to have interchange logging
-        merged in with endpoint logging.
-    name: string
-        Logger name. Default="parsl.executors.interchange"
-    level: logging.LEVEL
-        Set the logging level. Default=logging.DEBUG
-        - format_string (string): Set the format string
-    format_string: string
-        Format string to use.
-    max_bytes: int
-        The maximum bytes per logger file, default: 256MB
-    backup_count: int
-        The number of backup (must be non-zero) per logger file, default: 1
-
-    Returns
-    -------
-        None.
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not len(logger.handlers):
-        handler = RotatingFileHandler(filename, maxBytes=max_bytes, backupCount=backup_count)
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.info(
-            "logger location {}, logger filesize: {}, logger backup count: {}".format(
-                logger.handlers, max_bytes, backup_count))
 
 
 def starter(comm_q, *args, **kwargs):

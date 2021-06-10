@@ -5,12 +5,26 @@ import argparse
 import zmq
 import sys
 import pickle
+import os
 
 from parsl.app.errors import RemoteExceptionWrapper
 
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
+
+
+class MaxResultSizeExceeded(Exception):
+
+    def __init__(self, result_size, result_size_limit):
+        self.result_size = result_size
+        self.result_size_limit = result_size_limit
+
+    def __repr__(self):
+        return f"Task result of {self.result_size}B exceeded current limit of {self.result_size_limit}B"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class FuncXWorker(object):
@@ -33,6 +47,10 @@ class FuncXWorker(object):
     debug : Bool
      Enables debug logging
 
+    result_size_limit : int
+     Maximum result size allowed in Bytes
+     Default = 10 MB == 10 * (2**20) Bytes
+
 
     Funcx worker will use the REP sockets to:
          task = recv ()
@@ -40,7 +58,7 @@ class FuncXWorker(object):
          send(result)
     """
 
-    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW'):
+    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=10 * (2 ** 20)):
 
         self.worker_id = worker_id
         self.address = address
@@ -51,9 +69,10 @@ class FuncXWorker(object):
         self.serializer = FuncXSerializer()
         self.serialize = self.serializer.serialize
         self.deserialize = self.serializer.deserialize
+        self.result_size_limit = result_size_limit
 
         global logger
-        logger = set_file_logger('{}/funcx_worker_{}.log'.format(logdir, worker_id),
+        logger = set_file_logger(os.path.join(logdir, f'funcx_worker_{worker_id}.log'),
                                  name="worker_log",
                                  level=logging.DEBUG if debug else logging.INFO)
 
@@ -84,8 +103,51 @@ class FuncXWorker(object):
 
         result = self.registration_message()
         task_type = b'REGISTER'
+        logger.debug("Sending registration")
+        self.task_socket.send_multipart([task_type,  # Byte encoded
+                                         pickle.dumps(result)])
 
         while True:
+
+            logger.debug("Waiting for task")
+            p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
+            task_id = pickle.loads(p_task_id)
+            container_id = pickle.loads(p_container_id)
+            logger.debug("Received task_id:{} with task:{}".format(task_id, msg))
+
+            result = None
+            task_type = None
+            if task_id == "KILL":
+                task = Message.unpack(msg)
+                if task.task_buffer.decode('utf-8') == "KILL":
+                    logger.info("[KILL] -- Worker KILL message received! ")
+                    task_type = b'WRKR_DIE'
+                else:
+                    logger.exception("Caught an exception of non-KILL message for KILL task")
+                    continue
+            else:
+                logger.debug("Executing task...")
+
+                try:
+                    result = self.execute_task(msg)
+                    serialized_result = self.serialize(result)
+
+                    if sys.getsizeof(serialized_result) > self.result_size_limit:
+                        raise MaxResultSizeExceeded(sys.getsizeof(serialized_result),
+                                                    self.result_size_limit)
+                except Exception as e:
+                    logger.exception(f"Caught an exception {e}")
+                    result_package = {'task_id': task_id,
+                                      'container_id': container_id,
+                                      'exception': self.serialize(
+                                          RemoteExceptionWrapper(*sys.exc_info()))}
+                else:
+                    logger.debug("Execution completed without exception")
+                    result_package = {'task_id': task_id,
+                                      'container_id': container_id,
+                                      'result': serialized_result}
+                result = result_package
+                task_type = b'TASK_RET'
 
             logger.debug("Sending result")
 
@@ -96,39 +158,6 @@ class FuncXWorker(object):
                 logger.info("*** WORKER {} ABOUT TO DIE ***".format(self.worker_id))
                 # Kill the worker after accepting death in message to manager.
                 exit()
-
-            logger.debug("Waiting for task")
-            p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
-            task_id = pickle.loads(p_task_id)
-            container_id = pickle.loads(p_container_id)
-            logger.warning(f"YADU: DEBUG task_id:{task_id} msg:{msg}")
-            logger.debug(
-                "Received task_id:{} with task:{}".format(task_id, msg))
-
-            if msg == b"KILL":
-                logger.info("[KILL] -- Worker KILL message received! ")
-                task_type = b'WRKR_DIE'
-                result = None
-                continue
-
-            logger.debug("Executing task...")
-
-            try:
-                result = self.execute_task(msg)
-                serialized_result = self.serialize(result)
-            except Exception as e:
-                logger.exception(f"Caught an exception {e}")
-                result_package = {'task_id': task_id,
-                                  'container_id': container_id,
-                                  'exception': self.serialize(
-                                      RemoteExceptionWrapper(*sys.exc_info()))}
-            else:
-                logger.debug("Execution completed without exception")
-                result_package = {'task_id': task_id,
-                                  'container_id': container_id,
-                                  'result': serialized_result}
-            result = result_package
-            task_type = b'TASK_RET'
 
         logger.warning("Broke out of the loop... dying")
 

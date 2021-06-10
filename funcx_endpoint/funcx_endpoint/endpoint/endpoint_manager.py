@@ -29,16 +29,35 @@ from funcx_endpoint.executors.high_throughput import global_config as funcx_defa
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx.sdk.client import FuncXClient
 
+logger = logging.getLogger("endpoint.endpoint_manager")
+
 
 class EndpointManager:
-    def __init__(self, logger):
+    """ EndpointManager is primarily responsible for configuring, launching and stopping the Endpoint.
+    """
+
+    def __init__(self,
+                 funcx_dir=os.path.join(pathlib.Path.home(), '.funcx'),
+                 debug=False):
+        """ Initialize the EndpointManager
+
+        Parameters
+        ----------
+
+        funcx_dir: str
+            Directory path to the root of the funcx dirs. Usually ~/.funcx.
+
+        debug: Bool
+            Enable debug logging. Default: False
+        """
         self.funcx_config_file_name = 'config.py'
-        self.DEBUG = False
-        self.funcx_dir = '{}/.funcx'.format(pathlib.Path.home())
+        self.debug = debug
+        self.funcx_dir = funcx_dir
         self.funcx_config_file = os.path.join(self.funcx_dir, self.funcx_config_file_name)
         self.funcx_default_config_template = funcx_default_config.__file__
         self.funcx_config = {}
         self.name = 'default'
+        global logger
         self.logger = logger
 
     def init_endpoint_dir(self, endpoint_config=None):
@@ -118,7 +137,6 @@ class EndpointManager:
             print("[FuncX] Caught exception during registration {}".format(e))
 
         shutil.copyfile(self.funcx_default_config_template, self.funcx_config_file)
-        self.init_endpoint_dir()
 
     def check_endpoint_json(self, endpoint_json, endpoint_uuid):
         if os.path.exists(endpoint_json):
@@ -136,14 +154,6 @@ class EndpointManager:
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
 
-        if not os.path.exists(endpoint_dir):
-            print(f'Endpoint {self.name} is not configured!')
-            print('1. Please create a configuration template with:')
-            print(f'    funcx-endpoint configure {self.name}')
-            print('2. Update configuration')
-            print('3. Start the endpoint.')
-            return
-
         # These certs need to be recreated for every registration
         keys_dir = os.path.join(endpoint_dir, 'certificates')
         os.makedirs(keys_dir, exist_ok=True)
@@ -155,7 +165,8 @@ class EndpointManager:
         if not endpoint_config.config.executors:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
-        funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address)
+        funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address,
+                                   check_endpoint_version=True)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
@@ -247,7 +258,7 @@ class EndpointManager:
 
             optionals['logdir'] = endpoint_dir
 
-        if self.DEBUG:
+        if self.debug:
             optionals['logging_level'] = logging.DEBUG
 
         ic = EndpointInterchange(endpoint_config.config,
@@ -291,7 +302,7 @@ class EndpointManager:
 
         with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
             json.dump(reg_info, fp)
-            self.logger.debug("Registration info written to {}/endpoint.json".format(endpoint_dir))
+            self.logger.debug("Registration info written to {}".format(os.path.join(endpoint_dir, 'endpoint.json')))
 
         certs_dir = os.path.join(endpoint_dir, 'certificates')
         os.makedirs(certs_dir, exist_ok=True)
@@ -379,7 +390,7 @@ class EndpointManager:
         headings = ['Endpoint Name', 'Status', 'Endpoint ID']
         table.header(headings)
 
-        config_files = glob.glob('{}/*/config.py'.format(self.funcx_dir))
+        config_files = glob.glob(os.path.join(self.funcx_dir, '*', 'config.py'))
         for config_file in config_files:
             endpoint_dir = os.path.dirname(config_file)
             endpoint_name = os.path.basename(endpoint_dir)

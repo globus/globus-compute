@@ -31,6 +31,7 @@ from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
 from funcx.sdk.client import FuncXClient
 
 app = typer.Typer()
+logger = None
 
 
 def version_callback(value):
@@ -41,7 +42,10 @@ def version_callback(value):
 
 
 def complete_endpoint_name():
-    config_files = glob.glob('{}/*/config.py'.format(manager.funcx_dir))
+    # Manager context is not initialized at this point, so we assume the default
+    # the funcx_dir path of ~/.funcx
+    funcx_dir = os.path.join(pathlib.Path.home(), '.funcx')
+    config_files = glob.glob(os.path.join(funcx_dir, '*', 'config.py'))
     for config_file in config_files:
         yield os.path.basename(os.path.dirname(config_file))
 
@@ -90,8 +94,25 @@ def start_endpoint(
     endpoint_uuid : str
     """
     endpoint_dir = os.path.join(manager.funcx_dir, name)
-    endpoint_config = SourceFileLoader('config',
-                                       os.path.join(endpoint_dir, manager.funcx_config_file_name)).load_module()
+
+    if not os.path.exists(endpoint_dir):
+        msg = (f'\nEndpoint {name} is not configured!\n'
+               '1. Please create a configuration template with:\n'
+               f'\tfuncx-endpoint configure {name}\n'
+               '2. Update the configuration\n'
+               '3. Start the endpoint\n')
+        print(msg)
+        return
+
+    try:
+        endpoint_config = SourceFileLoader('config',
+                                           os.path.join(endpoint_dir, manager.funcx_config_file_name)).load_module()
+    except Exception:
+        manager.logger.exception('funcX v0.2.0 made several non-backwards compatible changes to the config. '
+                                 'Your config might be out of date. '
+                                 'Refer to https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx')
+        raise
+
     manager.start_endpoint(name, endpoint_uuid, endpoint_config)
 
 
@@ -107,8 +128,8 @@ def stop_endpoint(name: str = typer.Argument("default", autocompletion=complete_
 @app.command(name="restart")
 def restart_endpoint(name: str = typer.Argument("default", autocompletion=complete_endpoint_name)):
     """Restarts an endpoint"""
-    manager.stop_endpoint(name)
-    manager.start_endpoint(name)
+    stop_endpoint(name)
+    start_endpoint(name)
 
 
 @app.command(name="list")
@@ -135,30 +156,28 @@ def main(
         ctx: typer.Context,
         _: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True),
         debug: bool = typer.Option(False, "--debug", "-d"),
-        config_dir: str = typer.Option('{}/.funcx'.format(pathlib.Path.home()), "--config_dir", "-c", help="override default config dir")
+        config_dir: str = typer.Option(os.path.join(pathlib.Path.home(), '.funcx'), "--config_dir", "-c", help="override default config dir")
 ):
     # Note: no docstring here; the docstring for @app.callback is used as a help message for overall app.
     # Sets up global variables in the State wrapper (debug flag, config dir, default config file).
     # For commands other than `init`, we ensure the existence of the config directory and file.
 
-    funcx.set_stream_logger(level=logging.DEBUG if debug else logging.INFO)
-    logger = logging.getLogger('funcx')
+    global logger
+    funcx.set_stream_logger(name='endpoint',
+                            level=logging.DEBUG if debug else logging.INFO)
+    logger = logging.getLogger('endpoint')
     logger.debug("Command: {}".format(ctx.invoked_subcommand))
 
     global manager
-    manager = EndpointManager(logger)
-
-    # Set global state variables, to avoid passing them around as arguments all the time
-    manager.DEBUG = debug
-    manager.funcx_dir = config_dir
-    manager.funcx_config_file = os.path.join(manager.funcx_dir, manager.funcx_config_file_name)
+    manager = EndpointManager(funcx_dir=config_dir,
+                              debug=debug)
 
     # Otherwise, we ensure that configs exist
     if not os.path.exists(manager.funcx_config_file):
-        manager.logger.info(f"No existing configuration found at {manager.funcx_config_file}. Initializing...")
+        logger.info(f"No existing configuration found at {manager.funcx_config_file}. Initializing...")
         manager.init_endpoint()
 
-    manager.logger.debug("Loading config files from {}".format(manager.funcx_dir))
+    logger.debug("Loading config files from {}".format(manager.funcx_dir))
 
     funcx_config = SourceFileLoader('global_config', manager.funcx_config_file).load_module()
     manager.funcx_config = funcx_config.global_options

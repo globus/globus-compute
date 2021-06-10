@@ -13,7 +13,8 @@ import queue
 import pickle
 import daemon
 import uuid
-from multiprocessing import Process, Queue
+from multiprocessing import Process
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task
@@ -34,7 +35,7 @@ from parsl.providers import LocalProvider
 
 
 from funcx_endpoint.executors.high_throughput import zmq_pipes
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 
 # TODO: YADU There's a bug here which causes some of the log messages to write out to stderr
 # "logging" python3 self.stream.flush() OSError: [Errno 9] Bad file descriptor
@@ -164,6 +165,10 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         Select the mode of operation from no_container, singularity_reuse, singularity_single_use
         Default: singularity_reuse
 
+    container_cmd_options: str
+        Container command strings to be added to associated container command.
+        For example, singularity exec {container_cmd_options}
+
     task_status_queue : queue.Queue
         Queue to pass updates to task statuses back to the forwarder.
 
@@ -200,6 +205,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  worker_mode='no_container',
                  scheduler_mode='hard',
                  container_type=None,
+                 container_cmd_options='',
+
                  # Tuning info
                  prefetch_capacity=10,
 
@@ -217,6 +224,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  poll_period=10,
                  container_image=None,
                  suppress_failure=False,
+                 run_dir=None,
                  endpoint_id=None,
                  managed=True,
                  interchange_local=True,
@@ -239,6 +247,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         # Container specific
         self.scheduler_mode = scheduler_mode
         self.container_type = container_type
+        self.container_cmd_options = container_cmd_options
         # Tuning info
         self.prefetch_capacity = prefetch_capacity
 
@@ -259,13 +268,14 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.heartbeat_period = heartbeat_period
         self.poll_period = poll_period
         self.suppress_failure = suppress_failure
-        self.run_dir = '.'
+        self.run_dir = run_dir
         self.queue_proc = None
         self.interchange_local = interchange_local
         self.passthrough = passthrough
         self.task_status_queue = task_status_queue
 
         # FuncX specific options
+        self.funcx_service_address = None
         self.container_image = container_image
         self.worker_mode = worker_mode
         self.last_response_time = time.time()
@@ -307,7 +317,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                        heartbeat_period=self.heartbeat_period,
                                        heartbeat_threshold=self.heartbeat_threshold,
                                        poll_period=self.poll_period,
-                                       logdir="{}/{}".format(self.run_dir, self.label),
+                                       logdir=os.path.join(self.run_dir, self.label),
                                        worker_mode=self.worker_mode,
                                        container_image=self.container_image)
         self.launch_cmd = l_cmd
@@ -344,10 +354,9 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self._start_queue_management_thread()
 
         if self.interchange_local is True:
-            print("Yadu : starting local interchange")
             logger.info("Attempting local interchange start")
             self._start_local_interchange_process()
-            print(f"Yadu : started local interchange with ports: {self.worker_task_port}. {self.worker_result_port}")
+            logger.info(f"Started local interchange with ports: {self.worker_task_port}. {self.worker_result_port}")
 
         logger.debug("Created management thread: {}".format(self._queue_management_thread))
 
@@ -366,7 +375,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         Starts the interchange process locally and uses an internal command queue to
         get the worker task and result ports that the interchange has bound to.
         """
-        comm_q = Queue(maxsize=10)
+        comm_q = mpQueue(maxsize=10)
         print(f"Starting local interchange with endpoint id: {self.endpoint_id}")
         self.queue_proc = Process(target=interchange.starter,
                                   args=(comm_q,),
@@ -388,10 +397,14 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           # "log_max_bytes": self.log_max_bytes,
                                           # "log_backup_count": self.log_backup_count,
                                           "scheduler_mode": self.scheduler_mode,
+                                          "worker_mode": self.worker_mode,
+                                          "container_type": self.container_type,
+                                          "container_cmd_options": self.container_cmd_options,
+                                          "funcx_service_address": self.funcx_service_address,
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
                                           "worker_port_range": self.worker_port_range,
-                                          "logdir": "{}/{}".format(self.run_dir, self.label),
+                                          "logdir": os.path.join(self.run_dir, self.label),
                                           "suppress_failure": self.suppress_failure,
                                           "endpoint_id": self.endpoint_id,
                                           "logging_level": logging.DEBUG if self.worker_debug else logging.INFO
@@ -425,16 +438,14 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                                                                   self.command_client.port),
                                                    worker_port_range="{},{}".format(self.worker_port_range[0],
                                                                                     self.worker_port_range[1]),
-                                                   logdir="{}/runinfo/{}/{}".format(self.provider.channel.script_dir,
-                                                                                    os.path.basename(self.run_dir),
-                                                                                    self.label),
+                                                   logdir=os.path.join(self.provider.channel.script_dir, 'runinfo',
+                                                                       os.path.basename(self.run_dir), self.label),
                                                    suppress_failure=suppress_failure)
 
         if self.provider.worker_init:
             launch_command = self.provider.worker_init + '\n' + launch_command
 
         logger.debug("Launch command : \n{}\n".format(launch_command))
-        print("Launch command : \n{}\n".format(launch_command))
         return
 
     def _queue_management_worker(self):
@@ -476,7 +487,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             try:
                 msgs = self.incoming_q.get(timeout=1)
                 self.last_response_time = time.time()
-                logger.debug(f"[MTHREAD] [YADU:DEBUG] get has returned {msgs}")
 
             except queue.Empty:
                 logger.debug("[MTHREAD] queue empty")
@@ -496,18 +506,17 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 if msgs is None:
                     logger.debug("[MTHREAD] Got None, exiting")
                     return
+
                 elif isinstance(msgs, EPStatusReport):
-                    logger.debug("[MTHREAD] Received EPStatusReport")
-                    # TODO:YADU We are not propagating task status reports
-                    # if len(msgs.task_statuses):
-                    #    self.task_status_queue.put(msgs.task_statuses)
+                    logger.debug("[MTHREAD] Received EPStatusReport {}".format(msgs))
+                    if self.passthrough:
+                        self.results_passthrough.put(pickle.dumps(msgs))
 
                 else:
                     logger.debug("[MTHREAD] Unpacking results")
                     for serialized_msg in msgs:
                         try:
                             msg = pickle.loads(serialized_msg)
-                            logger.debug(f"[MTHREAD] YADU: Got response msg : {msg}")
                             tid = msg['task_id']
                         except pickle.UnpicklingError:
                             raise BadMessage("Message received could not be unpickled")
@@ -756,8 +765,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
-
-    from funcx.utils.loggers import set_file_logger
 
     stdout = open(os.path.join(logdir, "executor.{}.stdout".format(endpoint_id)), 'w')
     stderr = open(os.path.join(logdir, "executor.{}.stderr".format(endpoint_id)), 'w')

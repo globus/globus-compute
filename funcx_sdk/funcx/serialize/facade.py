@@ -1,37 +1,41 @@
+import atexit
+import multiprocessing as mp
+import subprocess
+import uuid
+import time
 from funcx.serialize.concretes import *
 from funcx.serialize.base import METHODS_MAP_DATA, METHODS_MAP_CODE
+from funcx.serialize.off_process_checker import OffProcessClient
 import logging
-
 logger = logging.getLogger(__name__)
 
 
 class FuncXSerializer(object):
-    """
-    Information that we want to be able to ship around:
-
-
-    * Function run information ->
-    * Function id <---> Container id ? (is there a 1-1 mapping here?)
-    * Container id
-    * Endpoint id
-
-    * Function body
-    * Potentially in a byte compiled form ?
-    * All parameters ->
-    * Args  + Kwargs
-
-
-    From the client side. At function invocation we need to capture
-
+    """ Wraps several serializers for one uniform interface
     """
 
-    def __init__(self):
+    def __init__(self, use_offprocess_checker=False):
         """ Instantiate the appropriate classes
         """
 
         # Do we want to do a check on header size here ? Probably overkill
         headers = list(METHODS_MAP_CODE.keys()) + list(METHODS_MAP_DATA.keys())
         self.header_size = len(headers[0])
+        self.use_offprocess_checker = use_offprocess_checker
+
+        if self.use_offprocess_checker:
+            self.serialize_lock = mp.Lock()
+
+            logger.debug("Starting off_process_checker")
+            try:
+                port = self._start_off_process_checker()
+            except Exception:
+                logger.exception("[NON-CRITICAL] Off_process_checker instantiation failed. Continuing...")
+                self.use_offprocess_checker = False
+            else:
+                self.off_proc_client = OffProcessClient(port)
+                self.off_proc_client.connect()
+                atexit.register(self.cleanup)
 
         self.methods_for_code = {}
         self.methods_for_data = {}
@@ -41,8 +45,58 @@ class FuncXSerializer(object):
         for key in METHODS_MAP_DATA:
             self.methods_for_data[key] = METHODS_MAP_DATA[key]()
 
+    def _start_off_process_checker(self):
+        """ Kicks off off_process_checker using subprocess and returns the port on which it
+        is listening.
+        """
+        std_file = f'/tmp/{uuid.uuid4()}'
+        logger.debug(f"Writing off_process_checker logs to: {std_file}")
+        std_out = open(std_file, 'w')
+        self.serialize_proc = subprocess.Popen(['off_process_checker.py'], stdout=std_out, stderr=subprocess.STDOUT)
+        with open(std_file) as f:
+            for i in range(200, 3000, 200):
+                time.sleep(i / 100)  # Sleep incrementally waiting for process start
+                for line in f.readlines():
+                    if 'BINDING TO' in line:
+                        _, port = line.strip().split(':')
+                        port = int(port)
+                        return port
+                    elif 'OFF_PROCESS_CHECKER FAILURE' in line:
+                        raise Exception(line)
+
+        raise Exception("Failed to determine off_process_checker's port")
+
     def _list_methods(self):
         return self.methods_for_code, self.methods_for_data
+
+    def cleanup(self):
+        logger.debug("Cleaning up")
+        if self.use_offprocess_checker:
+            self.off_proc_client.close()
+            self.serialize_proc.terminate()
+
+    def deserialize_check(self, serialized_msg, timeout=1):
+        """
+        Parameters
+        ----------
+        serialized_msg
+
+        timeout : int
+           timeout in seconds to wait for result
+        """
+        if not self.use_offprocess_checker:
+            return False
+
+        with self.serialize_lock:
+            status, info = self.off_proc_client.send_recv(serialized_msg)
+
+            if status == 'SUCCESS':
+                return True
+            if status == 'PONG':
+                return status
+            else:
+                logger.exception("Got exception while attempting deserialization")
+                raise Exception(info)
 
     def serialize(self, data):
         serialized = None
@@ -53,8 +107,9 @@ class FuncXSerializer(object):
             for method in self.methods_for_code.values():
                 try:
                     serialized = method.serialize(data)
+                    self.deserialize_check(serialized)
                 except Exception as e:
-                    logger.exception("Method {} did not work".format(method))
+                    logger.debug(f"[NON-CRITICAL] Method {method} failed with exception: {e}")
                     last_exception = e
                     continue
                 else:

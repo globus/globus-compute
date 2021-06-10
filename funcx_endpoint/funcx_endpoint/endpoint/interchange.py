@@ -15,7 +15,7 @@ import threading
 import json
 import daemon
 import collections
-import multiprocessing
+from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
@@ -23,6 +23,7 @@ from parsl.version import VERSION as PARSL_VERSION
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
+from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
@@ -136,8 +137,9 @@ class EndpointInterchange(object):
         except FileExistsError:
             pass
 
-        start_file_logger("{}/EndpointInterchange.log".format(self.logdir), name="funcx_endpoint", level=logging_level)
-        logger.info("logger location {}".format(logger.handlers))
+        global logger
+
+        logger = set_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"), name="funcx_endpoint", level=logging_level)
         logger.info("Initializing EndpointInterchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -147,7 +149,6 @@ class EndpointInterchange(object):
         self.client_ports = client_ports
         self.suppress_failure = suppress_failure
 
-        self.poll_period = self.config.poll_period
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
         # initalize the last heartbeat time to start the loop
@@ -182,6 +183,8 @@ class EndpointInterchange(object):
                                  'python_v': "{}.{}.{}".format(sys.version_info.major,
                                                                sys.version_info.minor,
                                                                sys.version_info.micro),
+                                 'libzmq_v': zmq.zmq_version(),
+                                 'pyzmq_v': zmq.pyzmq_version(),
                                  'os': platform.system(),
                                  'hname': platform.node(),
                                  'dir': os.getcwd()}
@@ -201,21 +204,19 @@ class EndpointInterchange(object):
         """
         logger.info("Loading endpoint local config")
 
-        working_dir = self.config.working_dir
-        if self.config.working_dir is None:
-            working_dir = "{}/{}".format(self.logdir, "worker_logs")
-        logger.info("Setting working_dir: {}".format(working_dir))
-
-        self.results_passthrough = multiprocessing.Queue()
+        self.results_passthrough = mpQueue()
         self.executors = {}
         for executor in self.config.executors:
             logger.info(f"Initializing executor: {executor.label}")
+            executor.funcx_service_address = self.config.funcx_service_address
             if not executor.endpoint_id:
                 executor.endpoint_id = self.endpoint_id
             else:
                 if not executor.endpoint_id == self.endpoint_id:
                     raise Exception('InconsistentEndpointId')
             self.executors[executor.label] = executor
+            if executor.run_dir is None:
+                executor.run_dir = self.logdir
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
                 # executor._start_remote_interchange_process()
@@ -249,8 +250,6 @@ class EndpointInterchange(object):
         while not kill_event.is_set():
 
             try:
-                # logger.debug("[TASK_PULL_THREAD] Alive")
-
                 if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
                     logger.critical("[TASK_PULL_THREAD] Missed too many heartbeats. Setting kill event.")
                     kill_event.set()
@@ -259,7 +258,6 @@ class EndpointInterchange(object):
                 try:
                     # TODO : Check the kwarg options for get
                     raw_msg = self.task_incoming.get()[0]
-                    logger.warning(f"[TASK_PULL_THREAD] YADU : DEBUG : Got message : {raw_msg}")
                     self.last_heartbeat = time.time()
                 except zmq.Again:
                     # We just timed out while attempting to receive
@@ -273,7 +271,6 @@ class EndpointInterchange(object):
                     msg = Message.unpack(raw_msg)
                 except Exception:
                     logger.exception("[TASK_PULL_THREAD] Failed to unpack message from forwarder")
-                    # continue
                     pass
 
                 if msg == 'STOP':
@@ -281,7 +278,7 @@ class EndpointInterchange(object):
                     break
 
                 elif isinstance(msg, Heartbeat):
-                    logger.info("[TASK_PULL_THREAD] Got heartbeat")
+                    logger.info("[TASK_PULL_THREAD] Got heartbeat from funcx-forwarder")
 
                 elif isinstance(msg, Task):
                     logger.info(f"[TASK_PULL_THREAD] Received task:{msg.task_id}")
@@ -370,17 +367,10 @@ class EndpointInterchange(object):
         self._task_puller_thread.join()
         self._command_thread.join()
 
-    def start(self, poll_period=None):
+    def start(self):
         """ Start the Interchange
-
-        Parameters:
-        ----------
-        poll_period : int
-           poll_period in milliseconds
         """
         logger.info("Starting EndpointInterchange")
-        if poll_period is None:
-            poll_period = self.poll_period
 
         start = time.time()
         count = 0
@@ -400,13 +390,13 @@ class EndpointInterchange(object):
                                                       args=(self._kill_event, status_report_queue))
         self._status_report_thread.start()
 
-        logger.warning("YADU: Here")
-
         self.results_outgoing = TaskQueue(self.client_address,
                                           port=self.client_ports[1],
                                           identity=self.endpoint_id,
                                           mode='client',
                                           keys_dir=self.keys_dir,
+                                          # Fail immediately if results cannot be sent back
+                                          SNDTIMEO=0,
                                           set_hwm=True)
         self.results_outgoing.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
@@ -417,9 +407,13 @@ class EndpointInterchange(object):
             if last + self.heartbeat_threshold < time.time():
                 logger.debug("[MAIN] alive")
                 last = time.time()
-
-            # TODO: DEBUG Remove the sleep
-            # time.sleep(0.1)
+                try:
+                    # Adding results heartbeat to essentially force a TCP keepalive
+                    # without meddling with OS TCP keepalive defaults
+                    self.results_outgoing.put('forwarder', b'HEARTBEAT')
+                except Exception:
+                    logger.exception("[MAIN] Sending heartbeat to the forwarder over the results channel has failed")
+                    raise
 
             try:
                 task = self.pending_task_queue.get(block=True, timeout=0.01)
@@ -431,13 +425,11 @@ class EndpointInterchange(object):
                 pass
 
             try:
-                # results = self.results_passthrough.get(False)
                 results = self.results_passthrough.get(False, 0.01)
-                logger.info(f"[MAIN] Got results : {results}")
 
                 # results will be a pickled dict with task_id, container_id, and results/exception
                 self.results_outgoing.put('forwarder', results)
-                # self.results_outgoing.put('forwarder', nonce)
+                logger.info("Passing result to forwarder")
 
             except queue.Empty:
                 pass
@@ -582,40 +574,6 @@ class EndpointInterchange(object):
         return status
 
 
-def start_file_logger(filename, name=__name__, level=logging.DEBUG, format_string=None):
-    """Add a stream log handler.
-
-    Parameters
-    ---------
-
-    filename: string
-        Name of the file to write logs to. Required.
-    name: string
-        Logger name. Default="parsl.executors.interchange"
-    level: logging.LEVEL
-        Set the logging level. Default=logging.DEBUG
-        - format_string (string): Set the format string
-    format_string: string
-        Format string to use.
-
-    Returns
-    -------
-        None.
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not len(logger.handlers):
-        handler = logging.FileHandler(filename)
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-
 def starter(comm_q, *args, **kwargs):
     """Start the interchange process
 
@@ -639,8 +597,6 @@ def cli_run():
                         help="Worker port range as a tuple")
     parser.add_argument("-l", "--logdir", default="./parsl_worker_logs",
                         help="Parsl worker log directory")
-    parser.add_argument("-p", "--poll_period",
-                        help="REQUIRED: poll period used for main thread")
     parser.add_argument("--worker_ports", default=None,
                         help="OPTIONAL, pair of workers ports to listen on, eg --worker_ports=50001,50005")
     parser.add_argument("--suppress_failure", action='store_true',
@@ -678,7 +634,6 @@ def cli_run():
                 max_blocks=1,
             ),
             max_workers_per_node=2,
-            # funcx_service_address='https://api.funcx.org/v1'
             funcx_service_address='http://127.0.0.1:8080'
         )
         optionals['config'] = config

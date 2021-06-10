@@ -70,4 +70,6 @@ The deployment is configured via values.yaml file.
 | maxCPU | Maximum CPUs to allocate to worker pod | 2 |
 | maxBlocks | Maximum number of worker pods to spawn | 100 |
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
+| detachEndpoint | Run the endpoint as a daemon inside the pod? | true | 
+| endpointUUID   | Specify an existing UUID to this endpoint. Leave blank to generate a new one | |
 

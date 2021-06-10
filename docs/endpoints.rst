@@ -5,12 +5,16 @@ An endpoint is a persistent service launched by the user on their compute system
 and executing functions to their compute system. This could be their laptop, the login node of a campus cluster,
 grid, or supercomputing facility.
 
-The endpoint can be configured to connect to the funcX API web service at `funcx.org <https://api.funcx.org/v1>`_.
+The endpoint can be configured to connect to the funcX API web service at `funcx.org <https://api2.funcx.org/v2>`_.
 Once the endpoint is registered you can invoke functions to be executed on it.
 
 To install the funcX endpoint agent software::
 
      $ python3 -m pip install funcx_endpoint
+
+.. note::
+
+   Please note that the funcx-endpoint is supported on Linux and MacOS, and not on Windows.
 
 First time setup
 ----------------
@@ -64,30 +68,7 @@ For example
     'endpoint_address': address_by_hostname(),
   }
 
-Configuring an Endpoint
------------------------
-
-FuncX endpoints are designed to act as gateways to computational resources such as Clusters, Clouds,
-Supercomputers, and even your laptop. To make the best use of your resources, the endpoint must be
-configured to match the resources' capabilities and reflect the needs of the workloads you plan to execute.
-For example, you may want to limit the number of cores available to your endpointt.
-
-FuncX provides you a rich class based configuration model that allows you to specify the shape of the
-resources (# of nodes, # of cores per worker, walltime etc) as well as place limits on how funcX may
-scale the resources in response to changing workload demands.
-
-To generate the appropriate directories and default config template, run the following command::
-
-  $ funcx-endpoint configure <ENDPOINT_NAME>
-
-The above command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/` and will instantiate a
-`config.py` file. This file should be updated with the appropriate configurations for the computational system you are
-targeting before you start the endpoint. The funcX builds on `Parsl <https://parsl-project.org>`_ and is
-configured using a :class:`~funcx.config.Config` object.
-For more information, see the :class:`~funcx.config.Config` class documentation.
-
-.. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is configured.
-
+.. include:: configuring.rst
 
 Starting an Endpoint
 --------------------

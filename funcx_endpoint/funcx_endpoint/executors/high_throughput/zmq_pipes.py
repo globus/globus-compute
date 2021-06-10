@@ -5,7 +5,7 @@ import time
 import pickle
 import logging
 
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.messages import Message
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,6 @@ class TasksOutgoing(object):
         """
         timeout_ms = 0
         current_wait = 0
-        logger.info("Putting task into queue")
         while current_wait < max_timeout:
             socks = dict(self.poller.poll(timeout=timeout_ms))
             if self.zmq_socket in socks and socks[self.zmq_socket] == zmq.POLLOUT:
