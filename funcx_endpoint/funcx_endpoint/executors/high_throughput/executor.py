@@ -206,6 +206,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  scheduler_mode='hard',
                  container_type=None,
                  container_cmd_options='',
+                 cold_routing_interval=10.0,
 
                  # Tuning info
                  prefetch_capacity=10,
@@ -248,6 +249,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.scheduler_mode = scheduler_mode
         self.container_type = container_type
         self.container_cmd_options = container_cmd_options
+        self.cold_routing_interval = cold_routing_interval
+
         # Tuning info
         self.prefetch_capacity = prefetch_capacity
 
@@ -400,6 +403,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           "worker_mode": self.worker_mode,
                                           "container_type": self.container_type,
                                           "container_cmd_options": self.container_cmd_options,
+                                          "cold_routing_interval": self.cold_routing_interval,
                                           "funcx_service_address": self.funcx_service_address,
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
