@@ -329,6 +329,16 @@ class WorkerMap(object):
         return sum(self.ready_worker_type_counts.values())
 
     def advertisement(self):
+        """ Manager capacity advertisement to interchange
+        The advertisement includes two parts. One is the read_worker_type_counts,
+        which reflects the capacity of different types of containers on the manager.
+        The other is the total number of workers of each type.
+        This include all the pending workers and to_die workers when advertising.
+        We need this "total" advertisement because we use killer tasks mechanisms to kill a worker.
+        When a manager is advertising, there may be some killer tssks in queue,
+        we want to ensure that the manager does not over-advertise its actualy capacity,
+        and let interchange decide if it is sending too many tasks to the manager.
+        """
         ads = {'total': {}, 'free': {}}
         total = dict(self.total_worker_type_counts)
         for worker_type in self.pending_worker_type_counts:
