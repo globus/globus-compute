@@ -42,7 +42,7 @@ data:
         heartbeat_threshold=200,
         log_dir='{{ .Values.logDir }}',
         funcx_service_address="{{ .Values.funcXServiceAddress }}/v2",
-        detach_endpoint={{- ternary "True" "False" .Values.detachEndpoint }}
+        log_to_std_streams={{- ternary "False" "True" .Values.detachEndpoint }}
     )
 
     # For now, visible_to must be a list of URNs for globus auth users or groups, e.g.:

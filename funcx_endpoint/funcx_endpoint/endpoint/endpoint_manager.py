@@ -175,12 +175,12 @@ class EndpointManager:
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
-        if endpoint_config.config.detach_endpoint:
-            stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'w+')
-            stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'w+')
-        else:
+        if endpoint_config.config.log_to_std_streams:
             stdout = sys.stdout
             stderr = sys.stderr
+        else:
+            stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'w+')
+            stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'w+')
 
         try:
             context = daemon.DaemonContext(working_directory=endpoint_dir,
@@ -189,7 +189,7 @@ class EndpointManager:
                                                os.path.join(endpoint_dir, 'daemon.pid')),
                                            stdout=stdout,
                                            stderr=stderr,
-                                           detach_process=endpoint_config.config.detach_endpoint)
+                                           detach_process=True)
 
         except Exception:
             self.logger.exception("Caught exception while trying to setup endpoint context dirs")

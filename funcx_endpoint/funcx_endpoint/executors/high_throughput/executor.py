@@ -141,6 +141,10 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
     suppress_failure : Bool
         If set, the interchange will suppress failures rather than terminate early. Default: False
 
+    log_to_std_streams : Bool
+        If set, the interchange's log will go to standard streams. Otherwise,
+        it goes to log file. Default: False
+
     heartbeat_threshold : int
         Seconds since the last message from the counterpart in the communication pair:
         (interchange, manager) after which the counterpart is assumed to be un-available. Default:120s
@@ -224,7 +228,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  poll_period=10,
                  container_image=None,
                  suppress_failure=False,
-                 interchange_log_to_file=True,
+                 log_to_std_streams=False,
                  run_dir=None,
                  endpoint_id=None,
                  managed=True,
@@ -269,7 +273,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.heartbeat_period = heartbeat_period
         self.poll_period = poll_period
         self.suppress_failure = suppress_failure
-        self.interchange_log_to_file = interchange_log_to_file
+        self.log_to_std_streams = log_to_std_streams
         self.run_dir = run_dir
         self.queue_proc = None
         self.interchange_local = interchange_local
@@ -406,7 +410,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
                                           "worker_port_range": self.worker_port_range,
-                                          "interchange_log_to_file": self.interchange_log_to_file,
+                                          "log_to_std_streams": self.log_to_std_streams,
                                           "logdir": os.path.join(self.run_dir, self.label),
                                           "suppress_failure": self.suppress_failure,
                                           "endpoint_id": self.endpoint_id,

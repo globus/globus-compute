@@ -35,10 +35,9 @@ class Config(RepresentationMixin):
         Path where the endpoint's stderr should be written
         Default: ./interchange.stderr
 
-    detach_endpoint : Bool
-        Should the endpoint deamon be run as a detached process? This is good for
-        a real edge node, but an anti-pattern for kubernetes pods
-        Default: True
+    log_to_std_streams : Bool
+        Should the endpoint log to standard streams (stdout and stderr)?
+        Default: False
 
     log_dir : str
         Optional path string to the top-level directory where logs should be written to.
@@ -56,7 +55,7 @@ class Config(RepresentationMixin):
                  # Tuning info
                  heartbeat_period=30,
                  heartbeat_threshold=120,
-                 detach_endpoint=True,
+                 log_to_std_streams=False,
 
                  # Logging info
                  log_dir=None,
@@ -72,7 +71,7 @@ class Config(RepresentationMixin):
         # Tuning info
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
-        self.detach_endpoint = detach_endpoint
+        self.log_to_std_streams = log_to_std_streams
 
         # Logging info
         self.log_dir = log_dir

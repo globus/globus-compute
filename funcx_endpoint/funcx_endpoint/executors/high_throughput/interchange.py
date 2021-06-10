@@ -122,7 +122,7 @@ class Interchange(object):
                  cores_per_worker=1.0,
                  worker_debug=False,
                  launch_cmd=None,
-                 interchange_log_to_file=True,
+                 log_to_std_streams=False,
                  logdir=".",
                  logging_level=logging.INFO,
                  endpoint_id=None,
@@ -182,7 +182,9 @@ class Interchange(object):
         self.logdir = logdir
 
         global logger
-        if interchange_log_to_file:
+        if log_to_std_streams:
+            logger = set_stream_logger(name="interchange", level=logging_level)
+        else:
             os.makedirs(self.logdir, exist_ok=True)
 
             logger = set_file_logger(os.path.join(self.logdir, 'interchange.log'),
@@ -194,8 +196,6 @@ class Interchange(object):
             logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
                                                                                                   log_max_bytes,
                                                                                                   log_backup_count))
-        else:
-            logger = set_stream_logger(name="interchange", level=logging_level)
 
         logger.info("Initializing Interchange process with Endpoint ID: {}".format(endpoint_id))
 
