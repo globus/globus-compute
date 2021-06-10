@@ -183,7 +183,7 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='warm'):
         return tasks, tids
 
     # Cold routing round: allocate tasks of random types 
-    # to workers that are of a different types on the manager
+    # to workers that are of different types on the manager
     # This will possibly cause container switching on the manager
     # This is needed to avoid workers being idle for too long
     # Potential issues may be that it could kill containers of short tasks frequently
