@@ -12,7 +12,7 @@ def naive_interchange_task_dispatch(interesting_managers,
                                     pending_task_queue,
                                     ready_manager_queue,
                                     scheduler_mode='hard',
-                                    two_loop=False):
+                                    cold_routing=False):
     """
     This is an initial task dispatching algorithm for interchange.
     It returns a dictionary, whose key is manager, and the value is the list of tasks to be sent to manager,
@@ -26,7 +26,7 @@ def naive_interchange_task_dispatch(interesting_managers,
 
     elif scheduler_mode == 'soft':
         task_dispatch, dispatched_tasks = {}, 0
-        loops = ['first'] if not two_loop else ['first', 'second']
+        loops = ['warm'] if not cold_routing else ['warm', 'cold']
         for loop in loops:
             task_dispatch, dispatched_tasks = dispatch(interesting_managers,
                                                        pending_task_queue,
@@ -42,7 +42,7 @@ def dispatch(interesting_managers,
              pending_task_queue,
              ready_manager_queue,
              scheduler_mode='hard',
-             loop='first',
+             loop='warm',
              task_dispatch=None,
              dispatched_tasks=0):
     """
@@ -135,13 +135,14 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
     return tasks, tids
 
 
-def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='first'):
+def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='warm'):
     tasks = []
     tids = collections.defaultdict(set)
 
-    # first round to dispatch tasks -- dispatch tasks of available types on manager
-    if loop == 'first':
+    # Warm routing to dispatch tasks
+    if loop == 'warm':
         for task_type in manager_ads['free_capacity']['free']:
+            # Dispatch tasks that are of the available container types on the manager
             if task_type != 'unused':
                 type_inflight = len(manager_ads['tasks'].get(task_type, set()))
                 type_capacity = min(manager_ads['free_capacity']['free'][task_type],
@@ -161,7 +162,7 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='first')
                         manager_ads['free_capacity']['total_workers'] -= 1
                         real_capacity -= 1
                         type_capacity -= 1
-            # Dispatch tasks to unused slots on the manager
+            # Dispatch tasks to unused container slots on the manager
             else:
                 task_types = list(pending_task_queue.keys())
                 random.shuffle(task_types)
@@ -181,9 +182,13 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop='first')
                             real_capacity -= 1
         return tasks, tids
 
-    # second round: allocate random tasks to unassigned workers on the manager
+    # Cold routing round: allocate tasks of random types 
+    # to workers that are of a different types on the manager
     # This will possibly cause container switching on the manager
-    logger.debug("Second round of task fetching!")
+    # This is needed to avoid workers being idle for too long
+    # Potential issues may be that it could kill containers of short tasks frequently
+    # Tune cold_routing_interval in the config to balance such a tradeoff
+    logger.debug("Cold function routing!")
     task_types = list(pending_task_queue.keys())
     random.shuffle(task_types)
     for task_type in task_types:
