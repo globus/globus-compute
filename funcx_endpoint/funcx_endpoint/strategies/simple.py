@@ -47,7 +47,13 @@ class SimpleStrategy(BaseStrategy):
 
     def _strategize(self, *args, **kwargs):
         task_breakdown = self.interchange.get_outstanding_breakdown()
-        logger.info(f"Task breakdown {task_breakdown}")
+        num_tasks = 0
+        for breakdown_item in task_breakdown:
+            num_tasks += breakdown_item[1]
+        if num_tasks > 0:
+            logger.info(f"Task breakdown {task_breakdown}")
+        else:
+            logger.debug(f"Task breakdown {task_breakdown}")
 
         min_blocks = self.interchange.provider.min_blocks
         max_blocks = self.interchange.provider.max_blocks
