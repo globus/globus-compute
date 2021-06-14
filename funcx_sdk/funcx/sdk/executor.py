@@ -58,7 +58,6 @@ class FuncXExecutor(concurrent.futures.Executor):
     """
 
     def __init__(self, funcx_client,
-                 results_ws_uri: str = 'ws://localhost:6000',
                  label: str = 'FuncXExecutor'):
         """
         Parameters
@@ -76,7 +75,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
 
         self.funcx_client = funcx_client
-        self.results_ws_uri = results_ws_uri
+        self.results_ws_uri = self.funcx_client.results_ws_uri
         self.label = label
         self._tasks = {}
         self._function_registry = {}
@@ -190,7 +189,7 @@ class ExecutorPollerThread():
         self.eventloop = eventloop
         self.ws_handler = WebSocketPollingTask(self.funcx_client,
                                                eventloop,
-                                               self.atomic_controller,
+                                               atomic_controller=self.atomic_controller,
                                                init_task_group_id=self.task_group_id,
                                                results_ws_uri=self.results_ws_uri,
                                                auto_start=False)
@@ -203,8 +202,9 @@ class ExecutorPollerThread():
         asyncio.set_event_loop(eventloop)
         eventloop.run_until_complete(self.web_socket_poller())
 
-    @asyncio.coroutine
     async def web_socket_poller(self):
+        # TODO: if WebSocket connection fails, we should either retry connecting and back off
+        # or we should set an exception to all of the outstanding futures
         await self.ws_handler.init_ws(start_message_handlers=False)
         await self.ws_handler.handle_incoming(self._function_future_map, auto_close=True)
 

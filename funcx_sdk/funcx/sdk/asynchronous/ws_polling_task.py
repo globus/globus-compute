@@ -3,8 +3,8 @@ import json
 import logging
 from asyncio import AbstractEventLoop, QueueEmpty
 import dill
-import websockets
-from websockets.exceptions import InvalidHandshake
+from websockets.client import connect
+from websockets.exceptions import InvalidHandshake, InvalidStatusCode
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
@@ -20,9 +20,9 @@ class WebSocketPollingTask:
 
     def __init__(self, funcx_client,
                  loop: AbstractEventLoop,
-                 atomic_controller,
+                 atomic_controller = None,
                  init_task_group_id: str = None,
-                 results_ws_uri: str = 'wss://api.funcx.org/ws/v2',
+                 results_ws_uri: str = 'wss://api.funcx.org/ws/v2/',
                  auto_start: bool = True):
         """
         Parameters
@@ -73,9 +73,12 @@ class WebSocketPollingTask:
     async def init_ws(self, start_message_handlers=True):
         headers = [self.get_auth_header()]
         try:
-            self.ws = await websockets.client.connect(self.results_ws_uri, extra_headers=headers)
+            self.ws = await connect(self.results_ws_uri, extra_headers=headers)
         # initial Globus authentication happens during the HTTP portion of the handshake,
         # so an invalid handshake means that the user was not authenticated
+        except InvalidStatusCode as e:
+            if e.status_code == 404:
+                raise Exception('WebSocket service responsed with a 404. Please ensure you set the correct results_ws_uri')
         except InvalidHandshake:
             raise Exception('Failed to authenticate user. Please ensure that you are logged in.')
 
@@ -111,11 +114,12 @@ class WebSocketPollingTask:
 
                 # When the counter hits 0 we always exit. This guarantees that that
                 # if the counter increments to 1 on the executor, this handler needs to be restarted.
-                count = self.atomic_controller.decrement()
-                if count == 0:
-                    await self.ws.close()
-                    self.ws = None
-                    return
+                if self.atomic_controller is not None:
+                    count = self.atomic_controller.decrement()
+                    if count == 0:
+                        await self.ws.close()
+                        self.ws = None
+                        return
             else:
                 print("[MISSING FUTURE]")
 
