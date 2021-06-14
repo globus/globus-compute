@@ -79,7 +79,9 @@ class WorkerMap(object):
         Parameters
         ----------
         new_worker_q : queue.Queue()
-           Queue of worker types to be spun up next.
+            Queue of worker types to be spun up next.
+        mode : str
+            Mode of the worker, no_container, singularity, etc.
         address : str
             Address at which to connect to the workers.
         debug : bool
@@ -133,7 +135,8 @@ class WorkerMap(object):
         ----------
         new_worker_map : dict
            {worker_type: total_number_of_containers,...}.
-
+        need_more: bool
+            whether the manager needs to spin down some warm containers
         Returns
         ---------
         List of removed worker types.
@@ -151,12 +154,17 @@ class WorkerMap(object):
         new_worker_map : dict
            {worker_type: total_number_of_containers,...}.
         check_idle : boolean
-           A boolean to indicate whether to check the idle time or not
+           A boolean to indicate whether to check the idle time of containers or not
+           If checked, that means the workloads are not so busy,
+           and we can leave the container workers alive until the worker_max_idletime is reached.
+           Otherwise, that means the workloads are busy and we need to turn of some containers to acommodate
+           the workers, regardless of if it reaches the worker_max_idletime.
         Returns
         ---------
         List of removed worker types.
         """
         spin_downs = []
+        container_switch_count = 0
         for worker_type in self.total_worker_type_counts:
             if worker_type == 'unused':
                 continue
@@ -167,6 +175,7 @@ class WorkerMap(object):
                 continue
             num_remove = max(0, self.total_worker_type_counts[worker_type] - self.to_die_count.get(worker_type, 0) - new_worker_map.get(worker_type, 0))
             if scheduler_mode == 'hard':
+                # Leave at least one worker alive in hard mode
                 max_remove = max(0, self.total_worker_type_counts[worker_type] - 1)
                 num_remove = min(num_remove, max_remove)
 
@@ -174,7 +183,13 @@ class WorkerMap(object):
                 logger.debug("[SPIN DOWN] Removing {} workers of type {}".format(num_remove, worker_type))
             for i in range(num_remove):
                 spin_downs.append(worker_type)
-        return spin_downs
+            # A container switching is defined as a warm container must be
+            # switched to another container to accommodate the workloads.
+            # If a container worker has been idle for worker_max_idletime,
+            # Then it is not counted as a container switching
+            if not check_idle:
+                container_switch_count += num_remove
+        return spin_downs, container_switch_count
 
     def add_worker(self, worker_id=str(random.random()),
                    mode='no_container',
@@ -281,6 +296,8 @@ class WorkerMap(object):
                     # Add worker
                     new_worker_list.append(worker_type)
 
+        # need_more is to reflect if a manager needs more workers than the current unused slots
+        # If yes, that means the manager needs to turn off some warm workers to serve the requests
         need_more = False
         if len(new_worker_list) > self.total_worker_type_counts['unused']:
             need_more = True
@@ -322,3 +339,22 @@ class WorkerMap(object):
 
     def ready_worker_count(self):
         return sum(self.ready_worker_type_counts.values())
+
+    def advertisement(self):
+        """ Manager capacity advertisement to interchange
+        The advertisement includes two parts. One is the read_worker_type_counts,
+        which reflects the capacity of different types of containers on the manager.
+        The other is the total number of workers of each type.
+        This include all the pending workers and to_die workers when advertising.
+        We need this "total" advertisement because we use killer tasks mechanisms to kill a worker.
+        When a manager is advertising, there may be some killer tssks in queue,
+        we want to ensure that the manager does not over-advertise its actualy capacity,
+        and let interchange decide if it is sending too many tasks to the manager.
+        """
+        ads = {'total': {}, 'free': {}}
+        total = dict(self.total_worker_type_counts)
+        for worker_type in self.pending_worker_type_counts:
+            total[worker_type] = total.get(worker_type, 0) + self.pending_worker_type_counts[worker_type] - self.to_die_count.get(worker_type, 0)
+        ads['total'].update(total)
+        ads['free'].update(self.ready_worker_type_counts)
+        return ads
