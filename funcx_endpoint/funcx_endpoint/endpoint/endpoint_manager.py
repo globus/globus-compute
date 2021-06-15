@@ -325,8 +325,10 @@ class EndpointManager:
         self.name = name
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         pid_file = os.path.join(endpoint_dir, "daemon.pid")
+        pid_check = self.check_pidfile(pid_file)
 
-        if os.path.exists(pid_file):
+        # The process is active if the PID file exists and the process it points to is a funcx-endpoint
+        if pid_check['active']:
             self.logger.debug(f"{self.name} has a daemon.pid file")
             pid = None
             with open(pid_file, 'r') as f:
@@ -351,10 +353,14 @@ class EndpointManager:
                     self.logger.info("Endpoint <{}> is now stopped".format(self.name))
 
             except OSError:
-                self.logger.warning("Endpoint {} could not be terminated".format(self.name))
-                self.logger.warning("Attempting Endpoint {} cleanup".format(self.name))
+                self.logger.warning("Endpoint <{}> could not be terminated".format(self.name))
+                self.logger.warning("Attempting Endpoint <{}> cleanup".format(self.name))
                 os.remove(pid_file)
                 sys.exit(-1)
+        # The process is not active, but the PID file exists and needs to be deleted
+        elif pid_check['exists']:
+            os.remove(pid_file)
+            self.logger.info("Endpoint <{}> has been cleaned up.".format(self.name))
         else:
             self.logger.info("Endpoint <{}> is not active.".format(self.name))
 
@@ -362,13 +368,16 @@ class EndpointManager:
         self.name = name
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
 
-        # If endpoint currently running, stop it.
-        pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        active = os.path.exists(pid_file)
-        if active:
-            self.stop_endpoint(self.name)
+        if not os.path.exists(endpoint_dir):
+            self.logger.warning("Endpoint <{}> does not exist".format(self.name))
+            sys.exit(-1)
+
+        # stopping the endpoint should handle all of the process cleanup before
+        # deletion of the directory
+        self.stop_endpoint(self.name)
 
         shutil.rmtree(endpoint_dir)
+        self.logger.info("Endpoint <{}> has been deleted.".format(self.name))
 
     def check_pidfile(self, filepath, match_name='funcx-endpoint', log=False):
         """ Helper function to identify possible dead endpoints
