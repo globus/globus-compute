@@ -20,7 +20,7 @@ class WebSocketPollingTask:
 
     def __init__(self, funcx_client,
                  loop: AbstractEventLoop,
-                 atomic_controller = None,
+                 atomic_controller=None,
                  init_task_group_id: str = None,
                  results_ws_uri: str = 'wss://api.funcx.org/ws/v2/',
                  auto_start: bool = True):
