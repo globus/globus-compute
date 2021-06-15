@@ -172,6 +172,13 @@ class EndpointManager:
 
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
+        pid_path = os.path.join(endpoint_dir, 'daemon.pid')
+        # if the pidfile exists, we should return early because we don't
+        # want to attempt to create a new daemon when one is already
+        # potentially running with the existing pidfile
+        if self.check_pidfile(pid_path, log=True)['exists']:
+            return
+
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
@@ -185,8 +192,7 @@ class EndpointManager:
         try:
             context = daemon.DaemonContext(working_directory=endpoint_dir,
                                            umask=0o002,
-                                           pidfile=daemon.pidfile.PIDLockFile(
-                                               os.path.join(endpoint_dir, 'daemon.pid')),
+                                           pidfile=daemon.pidfile.PIDLockFile(pid_path),
                                            stdout=stdout,
                                            stderr=stderr,
                                            detach_process=endpoint_config.config.detach_endpoint)
@@ -194,8 +200,6 @@ class EndpointManager:
         except Exception:
             self.logger.exception("Caught exception while trying to setup endpoint context dirs")
             sys.exit(-1)
-
-        self.check_pidfile(context.pidfile.path, "funcx-endpoint")
 
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
@@ -362,7 +366,7 @@ class EndpointManager:
         pid_file = os.path.join(endpoint_dir, "daemon.pid")
         active = os.path.exists(pid_file)
         if active:
-            stop_endpoint(self.name)
+            self.stop_endpoint(self.name)
 
         shutil.rmtree(endpoint_dir)
 
@@ -388,19 +392,42 @@ class EndpointManager:
             whether or not to log instructions for user if pidfile exists
         """
         if not os.path.exists(filepath):
-            return
+            return {
+                "exists": False,
+                "active": False
+            }
 
         older_pid = int(open(filepath, 'r').read().strip())
 
+        proc_found = False
         try:
             proc = psutil.Process(older_pid)
             if proc.name() == match_name:
-                self.logger.info("Endpoint is already active")
+                # this is the only case where the endpoint is active.
+                # If the process name does not match or no process exists,
+                # it means the endpoint has been terminated without proper cleanup
+                proc_found = True
         except psutil.NoSuchProcess:
-            self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
-            self.logger.info('''Please cleanup using:
+            pass
+
+        if log:
+            if proc_found:
+                self.logger.info("Endpoint is already active")
+            else:
+                self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
+                self.logger.info('''Please cleanup using:
         $ funcx-endpoint stop {}'''.format(self.name))
-            sys.exit(-1)
+
+        if proc_found:
+            return {
+                "exists": True,
+                "active": True
+            }
+
+        return {
+            "exists": True,
+            "active": False
+        }
 
     def list_endpoints(self):
         table = tt.Texttable()
@@ -420,7 +447,7 @@ class EndpointManager:
                 with open(endpoint_json, 'r') as f:
                     endpoint_info = json.load(f)
                     endpoint_id = endpoint_info['endpoint_id']
-                if os.path.exists(os.path.join(endpoint_dir, 'daemon.pid')):
+                if self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'))['active']:
                     status = 'Active'
                 else:
                     status = 'Inactive'
