@@ -366,8 +366,26 @@ class EndpointManager:
 
         shutil.rmtree(endpoint_dir)
 
-    def check_pidfile(self, filepath, match_name):
+    def check_pidfile(self, filepath, match_name='funcx-endpoint', log=False):
         """ Helper function to identify possible dead endpoints
+
+        Returns a record with 'exists' and 'active' fields indicating
+        whether the pidfile exists, and whether the process is active if it does exist
+        (The endpoint can only start correctly if there is no pidfile)
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the pidfile
+
+        match_name : str
+            Name of the process to check for if pidfile exists
+
+        endpoint_name : str
+            endpoint name for debugging purposes
+
+        log : bool
+            whether or not to log instructions for user if pidfile exists
         """
         if not os.path.exists(filepath):
             return
