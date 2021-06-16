@@ -176,7 +176,7 @@ class EndpointManager:
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
         # potentially running with the existing pidfile
-        if self.check_pidfile(pid_path, log=True)['exists']:
+        if self.check_pidfile(pid_path)['exists']:
             return
 
         # Create a daemon context
@@ -325,7 +325,7 @@ class EndpointManager:
         self.name = name
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        pid_check = self.check_pidfile(pid_file)
+        pid_check = self.check_pidfile(pid_file, log=False)
 
         # The process is active if the PID file exists and the process it points to is a funcx-endpoint
         if pid_check['active']:
@@ -379,7 +379,7 @@ class EndpointManager:
         shutil.rmtree(endpoint_dir)
         self.logger.info("Endpoint <{}> has been deleted.".format(self.name))
 
-    def check_pidfile(self, filepath, match_name='funcx-endpoint', log=False):
+    def check_pidfile(self, filepath, match_name='funcx-endpoint', log=True):
         """ Helper function to identify possible dead endpoints
 
         Returns a record with 'exists' and 'active' fields indicating
@@ -456,7 +456,7 @@ class EndpointManager:
                 with open(endpoint_json, 'r') as f:
                     endpoint_info = json.load(f)
                     endpoint_id = endpoint_info['endpoint_id']
-                if self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'))['active']:
+                if self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'), log=False)['active']:
                     status = 'Active'
                 else:
                     status = 'Inactive'
