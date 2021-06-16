@@ -455,8 +455,11 @@ class EndpointManager:
                 with open(endpoint_json, 'r') as f:
                     endpoint_info = json.load(f)
                     endpoint_id = endpoint_info['endpoint_id']
-                if self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'))['active']:
+                pid_check = self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'))
+                if pid_check['active']:
                     status = 'Active'
+                elif pid_check['exists']:
+                    status = 'Disconnected'
                 else:
                     status = 'Inactive'
 
