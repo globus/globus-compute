@@ -173,11 +173,19 @@ class EndpointManager:
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
         pid_path = os.path.join(endpoint_dir, 'daemon.pid')
+        pid_check = self.check_pidfile(pid_path)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
         # potentially running with the existing pidfile
-        if self.check_pidfile(pid_path)['exists']:
-            return
+        if pid_check['exists']:
+            if pid_check['active']:
+                self.logger.info("Endpoint is already active")
+            else:
+                self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
+                self.logger.info('''Please cleanup using:
+        $ funcx-endpoint stop {}'''.format(self.name))
+
+            sys.exit(-1)
 
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
@@ -325,7 +333,7 @@ class EndpointManager:
         self.name = name
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        pid_check = self.check_pidfile(pid_file, log=False)
+        pid_check = self.check_pidfile(pid_file)
 
         # The process is active if the PID file exists and the process it points to is a funcx-endpoint
         if pid_check['active']:
@@ -347,7 +355,12 @@ class EndpointManager:
                     p.send_signal(signal.SIGTERM)
                 terminated, alive = psutil.wait_procs(processes, timeout=0.2)
                 for p in alive:
-                    p.send_signal(signal.SIGKILL)
+                    # sometimes a process that was marked as alive before can terminate
+                    # before this signal is sent
+                    try:
+                        p.send_signal(signal.SIGKILL)
+                    except psutil.NoSuchProcess:
+                        pass
                 # Wait to confirm that the pid file disappears
                 if not os.path.exists(pid_file):
                     self.logger.info("Endpoint <{}> is now stopped".format(self.name))
@@ -379,7 +392,7 @@ class EndpointManager:
         shutil.rmtree(endpoint_dir)
         self.logger.info("Endpoint <{}> has been deleted.".format(self.name))
 
-    def check_pidfile(self, filepath, match_name='funcx-endpoint', log=True):
+    def check_pidfile(self, filepath, match_name='funcx-endpoint'):
         """ Helper function to identify possible dead endpoints
 
         Returns a record with 'exists' and 'active' fields indicating
@@ -408,34 +421,20 @@ class EndpointManager:
 
         older_pid = int(open(filepath, 'r').read().strip())
 
-        proc_found = False
+        active = False
         try:
             proc = psutil.Process(older_pid)
             if proc.name() == match_name:
                 # this is the only case where the endpoint is active.
                 # If the process name does not match or no process exists,
                 # it means the endpoint has been terminated without proper cleanup
-                proc_found = True
+                active = True
         except psutil.NoSuchProcess:
             pass
 
-        if log:
-            if proc_found:
-                self.logger.info("Endpoint is already active")
-            else:
-                self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
-                self.logger.info('''Please cleanup using:
-        $ funcx-endpoint stop {}'''.format(self.name))
-
-        if proc_found:
-            return {
-                "exists": True,
-                "active": True
-            }
-
         return {
             "exists": True,
-            "active": False
+            "active": active
         }
 
     def list_endpoints(self):
@@ -456,7 +455,7 @@ class EndpointManager:
                 with open(endpoint_json, 'r') as f:
                     endpoint_info = json.load(f)
                     endpoint_id = endpoint_info['endpoint_id']
-                if self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'), log=False)['active']:
+                if self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'))['active']:
                     status = 'Active'
                 else:
                     status = 'Inactive'
