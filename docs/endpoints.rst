@@ -102,6 +102,12 @@ To stop an endpoint, run the following command::
 
   $ funcx-endpoint stop <ENDPOINT_NAME>
 
+If the endpoint is not running and was stopped correctly previously, this command does nothing.
+
+If the endpoint is not running but was not stopped correctly previously (e.g. after a computer restart
+when the endpoint was running), this command will clean up the endpoint directory such that the endpoint
+can be started cleanly again.
+
 .. note:: If the ENDPOINT_NAME is not specified, the default endpoint is stopped.
 
 .. warning:: Run the ``funcx-endpoint stop`` command **twice** to ensure that the endpoint is shutdown.
@@ -126,7 +132,10 @@ Endpoints can be the following states:
 
 * **Initialized**: This status means that the endpoint has been created, but not started
   following configuration and not registered with the `funcx service`
-* **Active**: This status means that the endpoint is active and available for executing
+* **Running**: This status means that the endpoint is active and available for executing
   functions
-* **Inactive**: This status means that endpoint is not running right now and therefore,
-  cannot service any functions.
+* **Stopped**: This status means that the endpoint was stopped by the user. It is not running
+  right now and therefore, cannot service any functions. It can be started again without issues.
+* **Disconnected**: This status means that endpoint disconnected unexpectedly. It is not running
+  right now and therefore, cannot service any functions. It will need cleanup via
+  ``funcx-endpoint stop <ENDPOINT_NAME>`` before it can be started again.
