@@ -92,6 +92,8 @@ and communicate command information.
 
 Once started, the endpoint uses a daemon process to run in the background.
 
+.. note:: If the endpoint was not stopped correctly previously (e.g. after a computer restart when the endpoint was running), the endpoint directory will be cleaned up to allow a fresh start
+
 .. warning:: Only the owner of an endpoint is authorized to start an endpoint. Thus if you register with a different Globus Auth identity and try to start an endpoint owned by another identity, it will fail.
 
 
@@ -136,6 +138,6 @@ Endpoints can be the following states:
   functions
 * **Stopped**: This status means that the endpoint was stopped by the user. It is not running
   right now and therefore, cannot service any functions. It can be started again without issues.
-* **Disconnected**: This status means that endpoint disconnected unexpectedly. It is not running
-  right now and therefore, cannot service any functions. It will need cleanup via
-  ``funcx-endpoint stop <ENDPOINT_NAME>`` before it can be started again.
+* **Disconnected**: This status means that the endpoint disconnected unexpectedly. It is not running
+  right now and therefore, cannot service any functions. Starting this endpoint will first invoke
+  necessary endpoint cleanup, since it was not stopped correctly previously.
