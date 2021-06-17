@@ -172,20 +172,18 @@ class EndpointManager:
 
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
-        pid_path = os.path.join(endpoint_dir, 'daemon.pid')
-        pid_check = self.check_pidfile(pid_path)
+        pid_file = os.path.join(endpoint_dir, 'daemon.pid')
+        pid_check = self.check_pidfile(pid_file)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
         # potentially running with the existing pidfile
         if pid_check['exists']:
             if pid_check['active']:
                 self.logger.info("Endpoint is already active")
+                sys.exit(-1)
             else:
-                self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
-                self.logger.info('''Please cleanup using:
-        $ funcx-endpoint stop {}'''.format(self.name))
-
-            sys.exit(-1)
+                self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup. Cleaning up now.")
+                self.pidfile_cleanup(pid_file)
 
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
@@ -200,7 +198,7 @@ class EndpointManager:
         try:
             context = daemon.DaemonContext(working_directory=endpoint_dir,
                                            umask=0o002,
-                                           pidfile=daemon.pidfile.PIDLockFile(pid_path),
+                                           pidfile=daemon.pidfile.PIDLockFile(pid_file),
                                            stdout=stdout,
                                            stderr=stderr,
                                            detach_process=endpoint_config.config.detach_endpoint)
@@ -372,8 +370,7 @@ class EndpointManager:
                 sys.exit(-1)
         # The process is not active, but the PID file exists and needs to be deleted
         elif pid_check['exists']:
-            os.remove(pid_file)
-            self.logger.info("Endpoint <{}> has been cleaned up.".format(self.name))
+            self.pidfile_cleanup(pid_file)
         else:
             self.logger.info("Endpoint <{}> is not active.".format(self.name))
 
@@ -436,6 +433,10 @@ class EndpointManager:
             "exists": True,
             "active": active
         }
+
+    def pidfile_cleanup(self, filepath):
+        os.remove(filepath)
+        self.logger.info("Endpoint <{}> has been cleaned up.".format(self.name))
 
     def list_endpoints(self):
         table = tt.Texttable()
