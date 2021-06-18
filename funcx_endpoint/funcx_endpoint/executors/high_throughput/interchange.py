@@ -110,6 +110,7 @@ class Interchange(object):
                  container_type=None,
                  container_cmd_options='',
                  worker_mode=None,
+                 cold_routing_interval=10.0,
 
                  funcx_service_address=None,
                  scaling_enabled=True,
@@ -162,6 +163,14 @@ class Interchange(object):
             Container command strings to be added to associated container command.
             For example, singularity exec {container_cmd_options}
 
+        cold_routing_interval: float
+            The time interval between warm and cold function routing in SOFT scheduler_mode.
+            It is ONLY used when using soft scheduler_mode.
+            We need this to avoid container workers being idle for too long.
+            But we dont't want this cold routing to occur too often,
+            since this may cause many warm container workers to switch to a new one.
+            Default: 10.0 seconds
+
         worker_debug : Bool
              Enables worker debug logging.
 
@@ -204,6 +213,7 @@ class Interchange(object):
         self.container_type = container_type
         self.container_cmd_options = container_cmd_options
         self.worker_mode = worker_mode
+        self.cold_routing_interval = cold_routing_interval
 
         self.log_max_bytes = log_max_bytes
         self.log_backup_count = log_backup_count
@@ -320,6 +330,7 @@ class Interchange(object):
 
         self.tasks = set()
         self.task_status_deltas = {}
+        self.container_switch_count = {}
 
     def load_config(self):
         """ Load the config
@@ -632,6 +643,12 @@ class Interchange(object):
         # onto this list.
         interesting_managers = set()
 
+        # This value records when the last cold routing in soft mode happens
+        # When the cold routing in soft mode happens, it may cause worker containers to switch
+        # Cold routing is to reduce the number idle workers of specific task types on the managers
+        # when there are not enough tasks of those types in the task queues on interchange
+        last_cold_routing_time = time.time()
+
         while not self._kill_event.is_set():
             self.socks = dict(poller.poll(timeout=poll_period))
 
@@ -705,7 +722,7 @@ class Interchange(object):
                         manager_adv = pickle.loads(message[1])
                         logger.debug("[MAIN] Manager {} requested {}".format(manager, manager_adv))
                         self._ready_manager_queue[manager]['free_capacity'].update(manager_adv)
-                        self._ready_manager_queue[manager]['free_capacity']['total_workers'] = sum(manager_adv.values())
+                        self._ready_manager_queue[manager]['free_capacity']['total_workers'] = sum(manager_adv['free'].values())
                         interesting_managers.add(manager)
 
             # If we had received any requests, check if there are tasks that could be passed
@@ -714,10 +731,20 @@ class Interchange(object):
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
-            task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
-                                                                             self.pending_task_queue,
-                                                                             self._ready_manager_queue,
-                                                                             scheduler_mode=self.scheduler_mode)
+            if time.time() - last_cold_routing_time > self.cold_routing_interval:
+                task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                                 self.pending_task_queue,
+                                                                                 self._ready_manager_queue,
+                                                                                 scheduler_mode=self.scheduler_mode,
+                                                                                 cold_routing=True)
+                last_cold_routing_time = time.time()
+            else:
+                task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                                 self.pending_task_queue,
+                                                                                 self._ready_manager_queue,
+                                                                                 scheduler_mode=self.scheduler_mode,
+                                                                                 cold_routing=False)
+
             self.total_pending_task_count -= dispatched_task
 
             for manager in task_dispatch:
@@ -751,6 +778,8 @@ class Interchange(object):
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                         b_messages = b_messages[1:]
                         self._ready_manager_queue[manager]['last'] = time.time()
+                        self.container_switch_count[manager] = manager_report.container_switch_count
+                        logger.info(f"[MAIN] Got container switch count: {self.container_switch_count}")
                     except Exception:
                         pass
                     if len(b_messages):
