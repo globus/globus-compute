@@ -79,6 +79,8 @@ class WebSocketPollingTask:
         except InvalidStatusCode as e:
             if e.status_code == 404:
                 raise Exception('WebSocket service responsed with a 404. Please ensure you set the correct results_ws_uri')
+            else:
+                raise e
         except InvalidHandshake:
             raise Exception('Failed to authenticate user. Please ensure that you are logged in.')
 
