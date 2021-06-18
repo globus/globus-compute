@@ -455,11 +455,11 @@ class EndpointManager:
                     endpoint_id = endpoint_info['endpoint_id']
                 pid_check = self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'))
                 if pid_check['active']:
-                    status = 'Active'
+                    status = 'Running'
                 elif pid_check['exists']:
                     status = 'Disconnected'
                 else:
-                    status = 'Inactive'
+                    status = 'Stopped'
 
             table.add_row([endpoint_name, status, endpoint_id])
 
