@@ -141,3 +141,25 @@ Endpoints can be the following states:
 * **Disconnected**: This status means that the endpoint disconnected unexpectedly. It is not running
   right now and therefore, cannot service any functions. Starting this endpoint will first invoke
   necessary endpoint cleanup, since it was not stopped correctly previously.
+
+
+Container behaviors and routing
+-------------------------------
+
+The funcX endpoint supports various technologies of containers (e.g., docker and singularity) and also raw processes on clusters (e.g., laptop, Kubernetes, and Supercomputers).
+The funcX endpoint also supports different routing mechanisms for different use cases.
+
+Raw worker processes (`worker_mode=no_container`):
+
+* Hard routing: All worker processes are of the same type "RAW". It this case, the funcx endpoint simply routes function tasks to any available worker processes. The is the default mode of a funcx endpoint.
+* Soft routing: It is the same as hard routing.
+
+Under Kubernetes (docker):
+
+* Hard routing: Both the manager and the worker are deployed within a pod and thus the manager cannot change the type of worker containers. In this case, a set of managers are deployed with specific container images and the funcx endpoint simply routes tasks to corresponding managers (to match their types).
+* Soft routing: NOT SUPPORTED.
+
+Without Kubernetes, native container support (docker, singularity, shifter):
+
+* Hard routing: In this case, each manager (on a compute node) can only launch worker containers of a specific type and thus each manager can serve only one type of function tasks.
+* Soft routing: When receiving a task of a specific container type, the funcx endpoint attempts to send the task to a manager that has a suitable warm container to minimize the   total number of container cold starts. If there are not any warmed containers in any connected managers, the funcX endpoint chooses one manager randomly to dispatch the task.
