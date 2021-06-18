@@ -47,8 +47,8 @@ class HTTPStatusCode(int, Enum):
 
 
 class FuncxResponseError(Exception, ABC):
-    """ Base class for all web service response exceptions
-    """
+    """Base class for all web service response exceptions"""
+
     @property
     def code(self):
         raise NotImplementedError()
@@ -68,21 +68,27 @@ class FuncxResponseError(Exception, ABC):
         return self.reason
 
     def pack(self):
-        return {'status': 'Failed',
-                'code': int(self.code),
-                'error_args': self.error_args,
-                'reason': self.reason,
-                'http_status_code': int(self.http_status_code)}
+        return {
+            "status": "Failed",
+            "code": int(self.code),
+            "error_args": self.error_args,
+            "reason": self.reason,
+            "http_status_code": int(self.http_status_code),
+        }
 
     @classmethod
     def unpack(cls, res_data):
-        if 'status' in res_data and res_data['status'] == 'Failed':
-            if 'code' in res_data and res_data['code'] != 0 and 'error_args' in res_data:
+        if "status" in res_data and res_data["status"] == "Failed":
+            if (
+                "code" in res_data
+                and res_data["code"] != 0
+                and "error_args" in res_data
+            ):
                 try:
                     # if the response error code is not recognized here because the
                     # user is not using the latest SDK version, an exception will occur here
                     # which we will pass in order to give the user a generic exception below
-                    res_error_code = ResponseErrorCode(res_data['code'])
+                    res_error_code = ResponseErrorCode(res_data["code"])
                     error_class = None
                     if res_error_code is ResponseErrorCode.USER_UNAUTHENTICATED:
                         error_class = UserUnauthenticated
@@ -90,7 +96,9 @@ class FuncxResponseError(Exception, ABC):
                         error_class = UserNotFound
                     elif res_error_code is ResponseErrorCode.FUNCTION_NOT_FOUND:
                         error_class = FunctionNotFound
-                    elif res_error_code is ResponseErrorCode.ENDPOINT_ALREADY_REGISTERED:
+                    elif (
+                        res_error_code is ResponseErrorCode.ENDPOINT_ALREADY_REGISTERED
+                    ):
                         error_class = EndpointAlreadyRegistered
                     elif res_error_code is ResponseErrorCode.ENDPOINT_NOT_FOUND:
                         error_class = EndpointNotFound
@@ -106,7 +114,9 @@ class FuncxResponseError(Exception, ABC):
                         error_class = EndpointAccessForbidden
                     elif res_error_code is ResponseErrorCode.FUNCTION_NOT_PERMITTED:
                         error_class = FunctionNotPermitted
-                    elif res_error_code is ResponseErrorCode.FORWARDER_REGISTRATION_ERROR:
+                    elif (
+                        res_error_code is ResponseErrorCode.FORWARDER_REGISTRATION_ERROR
+                    ):
                         error_class = ForwarderRegistrationError
                     elif res_error_code is ResponseErrorCode.FORWARDER_CONTACT_ERROR:
                         error_class = ForwarderContactError
@@ -130,15 +140,17 @@ class FuncxResponseError(Exception, ABC):
                         error_class = InvalidUUID
 
                     if error_class is not None:
-                        return error_class(*res_data['error_args'])
+                        return error_class(*res_data["error_args"])
                 except Exception:
                     pass
 
             # this is useful for older SDK versions to be compatible with a newer web
             # service: if the SDK does not recognize an error code, it creates a generic
             # exception with the human-readable error reason that was sent
-            if 'reason' in res_data:
-                return Exception(f"The web service responded with a failure - {res_data['reason']}")
+            if "reason" in res_data:
+                return Exception(
+                    f"The web service responded with a failure - {res_data['reason']}"
+                )
 
             return Exception("The web service failed for an unknown reason")
 
@@ -146,11 +158,12 @@ class FuncxResponseError(Exception, ABC):
 
 
 class UserUnauthenticated(FuncxResponseError):
-    """ User unauthenticated. This differs from UserNotFound in that it has a 401 HTTP
+    """User unauthenticated. This differs from UserNotFound in that it has a 401 HTTP
     status code, whereas UserNotFound has a 404 status code. This error should be used
     when the user's request failed because the user was unauthenticated, regardless of
     whether the request itself required looking up user info.
     """
+
     code = ResponseErrorCode.USER_UNAUTHENTICATED
     # this HTTP status code is called unauthorized but really means "unauthenticated"
     # according to the spec
@@ -158,14 +171,17 @@ class UserUnauthenticated(FuncxResponseError):
 
     def __init__(self):
         self.error_args = []
-        self.reason = "Could not find user. You must be logged in to perform this function."
+        self.reason = (
+            "Could not find user. You must be logged in to perform this function."
+        )
 
 
 class UserNotFound(FuncxResponseError):
-    """ User not found exception. This error should only be used when the server must
+    """User not found exception. This error should only be used when the server must
     look up a user in order to fulfill the user's request body. If the request only
     fails because the user is unauthenticated, UserUnauthenticated should be used instead.
     """
+
     code = ResponseErrorCode.USER_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
 
@@ -176,8 +192,8 @@ class UserNotFound(FuncxResponseError):
 
 
 class FunctionNotFound(FuncxResponseError):
-    """ Function could not be resolved from the database
-    """
+    """Function could not be resolved from the database"""
+
     code = ResponseErrorCode.FUNCTION_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
 
@@ -188,8 +204,8 @@ class FunctionNotFound(FuncxResponseError):
 
 
 class EndpointNotFound(FuncxResponseError):
-    """ Endpoint could not be resolved from the database
-    """
+    """Endpoint could not be resolved from the database"""
+
     code = ResponseErrorCode.ENDPOINT_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
 
@@ -200,8 +216,8 @@ class EndpointNotFound(FuncxResponseError):
 
 
 class ContainerNotFound(FuncxResponseError):
-    """ Container could not be resolved
-    """
+    """Container could not be resolved"""
+
     code = ResponseErrorCode.CONTAINER_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
 
@@ -212,8 +228,8 @@ class ContainerNotFound(FuncxResponseError):
 
 
 class TaskNotFound(FuncxResponseError):
-    """ Task could not be resolved
-    """
+    """Task could not be resolved"""
+
     code = ResponseErrorCode.TASK_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
 
@@ -224,8 +240,8 @@ class TaskNotFound(FuncxResponseError):
 
 
 class AuthGroupNotFound(FuncxResponseError):
-    """ AuthGroup could not be resolved
-    """
+    """AuthGroup could not be resolved"""
+
     code = ResponseErrorCode.AUTH_GROUP_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
 
@@ -236,8 +252,8 @@ class AuthGroupNotFound(FuncxResponseError):
 
 
 class FunctionAccessForbidden(FuncxResponseError):
-    """ Unauthorized function access by user
-    """
+    """Unauthorized function access by user"""
+
     code = ResponseErrorCode.FUNCTION_ACCESS_FORBIDDEN
     http_status_code = HTTPStatusCode.FORBIDDEN
 
@@ -248,8 +264,8 @@ class FunctionAccessForbidden(FuncxResponseError):
 
 
 class EndpointAccessForbidden(FuncxResponseError):
-    """ Unauthorized endpoint access by user
-    """
+    """Unauthorized endpoint access by user"""
+
     code = ResponseErrorCode.ENDPOINT_ACCESS_FORBIDDEN
     http_status_code = HTTPStatusCode.FORBIDDEN
 
@@ -260,21 +276,23 @@ class EndpointAccessForbidden(FuncxResponseError):
 
 
 class FunctionNotPermitted(FuncxResponseError):
-    """ Function not permitted on endpoint
-    """
+    """Function not permitted on endpoint"""
+
     code = ResponseErrorCode.FUNCTION_NOT_PERMITTED
     http_status_code = HTTPStatusCode.FORBIDDEN
 
     def __init__(self, function_uuid, endpoint_uuid):
         self.error_args = [function_uuid, endpoint_uuid]
-        self.reason = f"Function {function_uuid} not permitted on endpoint {endpoint_uuid}"
+        self.reason = (
+            f"Function {function_uuid} not permitted on endpoint {endpoint_uuid}"
+        )
         self.function_uuid = function_uuid
         self.endpoint_uuid = endpoint_uuid
 
 
 class EndpointAlreadyRegistered(FuncxResponseError):
-    """ Endpoint with specified uuid already registered by a different user
-    """
+    """Endpoint with specified uuid already registered by a different user"""
+
     code = ResponseErrorCode.ENDPOINT_ALREADY_REGISTERED
     http_status_code = HTTPStatusCode.BAD_REQUEST
 
@@ -285,8 +303,8 @@ class EndpointAlreadyRegistered(FuncxResponseError):
 
 
 class ForwarderRegistrationError(FuncxResponseError):
-    """ Registering the endpoint with the forwarder has failed
-    """
+    """Registering the endpoint with the forwarder has failed"""
+
     code = ResponseErrorCode.FORWARDER_REGISTRATION_ERROR
     http_status_code = HTTPStatusCode.BAD_GATEWAY
 
@@ -297,8 +315,8 @@ class ForwarderRegistrationError(FuncxResponseError):
 
 
 class ForwarderContactError(FuncxResponseError):
-    """ Contacting the forwarder failed
-    """
+    """Contacting the forwarder failed"""
+
     code = ResponseErrorCode.FORWARDER_CONTACT_ERROR
     http_status_code = HTTPStatusCode.BAD_GATEWAY
 
@@ -309,20 +327,22 @@ class ForwarderContactError(FuncxResponseError):
 
 
 class EndpointStatsError(FuncxResponseError):
-    """ Error while retrieving endpoint stats
-    """
+    """Error while retrieving endpoint stats"""
+
     code = ResponseErrorCode.ENDPOINT_STATS_ERROR
     http_status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR
 
     def __init__(self, endpoint_uuid, error_reason):
         error_reason = str(error_reason)
         self.error_args = [endpoint_uuid, error_reason]
-        self.reason = f"Unable to retrieve stats for endpoint: {endpoint_uuid}. {error_reason}"
+        self.reason = (
+            f"Unable to retrieve stats for endpoint: {endpoint_uuid}. {error_reason}"
+        )
 
 
 class LivenessStatsError(FuncxResponseError):
-    """ Error while retrieving endpoint stats
-    """
+    """Error while retrieving endpoint stats"""
+
     code = ResponseErrorCode.LIVENESS_STATS_ERROR
     http_status_code = HTTPStatusCode.BAD_GATEWAY
 
@@ -332,8 +352,8 @@ class LivenessStatsError(FuncxResponseError):
 
 
 class RequestKeyError(FuncxResponseError):
-    """ User request JSON KeyError exception
-    """
+    """User request JSON KeyError exception"""
+
     code = ResponseErrorCode.REQUEST_KEY_ERROR
     http_status_code = HTTPStatusCode.BAD_REQUEST
 
@@ -344,20 +364,22 @@ class RequestKeyError(FuncxResponseError):
 
 
 class RequestMalformed(FuncxResponseError):
-    """ User request malformed
-    """
+    """User request malformed"""
+
     code = ResponseErrorCode.REQUEST_MALFORMED
     http_status_code = HTTPStatusCode.BAD_REQUEST
 
     def __init__(self, malformed_reason):
         malformed_reason = str(malformed_reason)
         self.error_args = [malformed_reason]
-        self.reason = f"Request Malformed. Missing critical information: {malformed_reason}"
+        self.reason = (
+            f"Request Malformed. Missing critical information: {malformed_reason}"
+        )
 
 
 class InternalError(FuncxResponseError):
-    """ Internal server error
-    """
+    """Internal server error"""
+
     code = ResponseErrorCode.INTERNAL_ERROR
     http_status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR
 
@@ -368,8 +390,8 @@ class InternalError(FuncxResponseError):
 
 
 class EndpointOutdated(FuncxResponseError):
-    """ Internal server error
-    """
+    """Internal server error"""
+
     code = ResponseErrorCode.ENDPOINT_OUTDATED
     http_status_code = HTTPStatusCode.BAD_REQUEST
 

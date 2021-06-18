@@ -1,14 +1,17 @@
-from funcx.sdk.client import FuncXClient
-import pytest
 import time
+
+import pytest
+
+from funcx.sdk.client import FuncXClient
 
 
 def hello_world() -> str:
-    return 'Hello World'
+    return "Hello World"
 
 
 def wait_for_task(fxc, task_id, walltime: int = 2):
     import time
+
     start = time.time()
     while True:
         if time.time() > start + walltime:
@@ -23,9 +26,8 @@ def wait_for_task(fxc, task_id, walltime: int = 2):
 
 
 def test_blocking(fxc, endpoint):
-    fn_uuid = fxc.register_function(hello_world, endpoint, description='Hello')
-    task_id = fxc.run(endpoint_id=endpoint,
-                      function_id=fn_uuid)
+    fn_uuid = fxc.register_function(hello_world, endpoint, description="Hello")
+    task_id = fxc.run(endpoint_id=endpoint, function_id=fn_uuid)
 
     print("Task_id: ", task_id)
     time.sleep(2)
@@ -34,9 +36,8 @@ def test_blocking(fxc, endpoint):
 
 
 def test_non_blocking(fxc, endpoint):
-    fn_uuid = fxc.register_function(hello_world, endpoint, description='Hello')
-    task_id = fxc.run(endpoint_id=endpoint,
-                      function_id=fn_uuid)
+    fn_uuid = fxc.register_function(hello_world, endpoint, description="Hello")
+    task_id = fxc.run(endpoint_id=endpoint, function_id=fn_uuid)
 
     for i in range(5):
         try:
@@ -50,8 +51,8 @@ def test_non_blocking(fxc, endpoint):
             break
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    fxc = FuncXClient(funcx_service_address='http://k8s-dev.funcx.org/api/v1')
-    endpoint = '968cdce1-f87b-4bda-9c99-3ed332ee3df2'
+    fxc = FuncXClient(funcx_service_address="http://k8s-dev.funcx.org/api/v1")
+    endpoint = "968cdce1-f87b-4bda-9c99-3ed332ee3df2"
     test_blocking(fxc, endpoint)

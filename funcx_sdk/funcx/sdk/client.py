@@ -1,24 +1,28 @@
 import asyncio
 import json
-import os
 import logging
+import os
 import uuid
 from inspect import getsource
-from packaging.version import parse
 
+from fair_research_login import JSONTokenStorage, NativeClient
 from globus_sdk import AuthClient
-
-from fair_research_login import NativeClient, JSONTokenStorage
+from packaging.version import parse
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
-from funcx.sdk.search import SearchHelper, FunctionSearchResults
 
-from funcx.serialize import FuncXSerializer
 # from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
+from funcx.sdk.search import FunctionSearchResults, SearchHelper
 from funcx.sdk.utils.batch import Batch
-from funcx.utils.errors import FailureResponse, VersionMismatch, SerializationError, TaskPending
+from funcx.serialize import FuncXSerializer
+from funcx.utils.errors import (
+    FailureResponse,
+    SerializationError,
+    TaskPending,
+    VersionMismatch,
+)
 from funcx.utils.handle_service_response import handle_response_errors
 
 try:
@@ -28,6 +32,7 @@ except ModuleNotFoundError:
     ENDPOINT_VERSION = None
 
 from funcx.sdk import VERSION as SDK_VERSION
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,16 +52,22 @@ class FuncXClient(FuncXErrorHandlingClient):
         "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
     )
 
-    def __init__(self, http_timeout=None, funcx_home=os.path.join('~', '.funcx'),
-                 force_login=False, fx_authorizer=None, search_authorizer=None,
-                 openid_authorizer=None,
-                 funcx_service_address='https://api2.funcx.org/v2',
-                 check_endpoint_version=False,
-                 asynchronous=False,
-                 loop=None,
-                 results_ws_uri='wss://api.funcx.org/ws/v2/',
-                 use_offprocess_checker=True,
-                 **kwargs):
+    def __init__(
+        self,
+        http_timeout=None,
+        funcx_home=os.path.join("~", ".funcx"),
+        force_login=False,
+        fx_authorizer=None,
+        search_authorizer=None,
+        openid_authorizer=None,
+        funcx_service_address="https://api2.funcx.org/v2",
+        check_endpoint_version=False,
+        asynchronous=False,
+        loop=None,
+        results_ws_uri="wss://api.funcx.org/ws/v2/",
+        use_offprocess_checker=True,
+        **kwargs,
+    ):
         """
         Initialize the client
 
@@ -112,37 +123,49 @@ class FuncXClient(FuncXErrorHandlingClient):
             os.makedirs(self.TOKEN_DIR)
 
         tokens_filename = os.path.join(self.TOKEN_DIR, self.TOKEN_FILENAME)
-        self.native_client = NativeClient(client_id=self.FUNCX_SDK_CLIENT_ID,
-                                          app_name="FuncX SDK",
-                                          token_storage=JSONTokenStorage(tokens_filename))
+        self.native_client = NativeClient(
+            client_id=self.FUNCX_SDK_CLIENT_ID,
+            app_name="FuncX SDK",
+            token_storage=JSONTokenStorage(tokens_filename),
+        )
 
         # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
         search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
         scopes = [self.FUNCX_SCOPE, search_scope, "openid"]
 
         if not fx_authorizer or not search_authorizer or not openid_authorizer:
-            self.native_client.login(requested_scopes=scopes,
-                                     no_local_server=kwargs.get("no_local_server", True),
-                                     no_browser=kwargs.get("no_browser", True),
-                                     refresh_tokens=kwargs.get("refresh_tokens", True),
-                                     force=force_login)
+            self.native_client.login(
+                requested_scopes=scopes,
+                no_local_server=kwargs.get("no_local_server", True),
+                no_browser=kwargs.get("no_browser", True),
+                refresh_tokens=kwargs.get("refresh_tokens", True),
+                force=force_login,
+            )
 
-            all_authorizers = self.native_client.get_authorizers_by_scope(requested_scopes=scopes)
+            all_authorizers = self.native_client.get_authorizers_by_scope(
+                requested_scopes=scopes
+            )
             fx_authorizer = all_authorizers[self.FUNCX_SCOPE]
             search_authorizer = all_authorizers[search_scope]
             openid_authorizer = all_authorizers["openid"]
 
-        super(FuncXClient, self).__init__("funcX",
-                                          environment='funcx',
-                                          authorizer=fx_authorizer,
-                                          http_timeout=http_timeout,
-                                          base_url=funcx_service_address,
-                                          **kwargs)
-        self.fx_serializer = FuncXSerializer(use_offprocess_checker=self.use_offprocess_checker)
+        super().__init__(
+            "funcX",
+            environment="funcx",
+            authorizer=fx_authorizer,
+            http_timeout=http_timeout,
+            base_url=funcx_service_address,
+            **kwargs,
+        )
+        self.fx_serializer = FuncXSerializer(
+            use_offprocess_checker=self.use_offprocess_checker
+        )
 
         authclient = AuthClient(authorizer=openid_authorizer)
         user_info = authclient.oauth2_userinfo()
-        self.searcher = SearchHelper(authorizer=search_authorizer, owner_uuid=user_info['sub'])
+        self.searcher = SearchHelper(
+            authorizer=search_authorizer, owner_uuid=user_info["sub"]
+        )
         self.funcx_service_address = funcx_service_address
         self.check_endpoint_version = check_endpoint_version
 
@@ -154,41 +177,52 @@ class FuncXClient(FuncXErrorHandlingClient):
             self.loop = loop if loop else asyncio.get_event_loop()
 
             # Start up an asynchronous polling loop in the background
-            self.ws_polling_task = WebSocketPollingTask(self, self.loop, init_task_group_id=self.session_task_group_id, results_ws_uri=self.results_ws_uri)
+            self.ws_polling_task = WebSocketPollingTask(
+                self,
+                self.loop,
+                init_task_group_id=self.session_task_group_id,
+                results_ws_uri=self.results_ws_uri,
+            )
         else:
             self.loop = None
 
     def version_check(self):
-        """Check this client version meets the service's minimum supported version.
-        """
+        """Check this client version meets the service's minimum supported version."""
         resp = self.get("version", params={"service": "all"})
         versions = resp.data
         if "min_ep_version" not in versions:
-            raise VersionMismatch("Failed to retrieve version information from funcX service.")
+            raise VersionMismatch(
+                "Failed to retrieve version information from funcX service."
+            )
 
-        min_ep_version = versions['min_ep_version']
-        min_sdk_version = versions['min_sdk_version']
+        min_ep_version = versions["min_ep_version"]
+        min_sdk_version = versions["min_sdk_version"]
 
         if self.check_endpoint_version:
             if ENDPOINT_VERSION is None:
-                raise VersionMismatch("You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'.")
+                raise VersionMismatch(
+                    "You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'."
+                )
             if parse(ENDPOINT_VERSION) < parse(min_ep_version):
-                raise VersionMismatch(f"Your version={ENDPOINT_VERSION} is lower than the "
-                                      f"minimum version for an endpoint: {min_ep_version}.  Please update. "
-                                      f"pip install funcx-endpoint>={min_ep_version}")
+                raise VersionMismatch(
+                    f"Your version={ENDPOINT_VERSION} is lower than the "
+                    f"minimum version for an endpoint: {min_ep_version}.  Please update. "
+                    f"pip install funcx-endpoint>={min_ep_version}"
+                )
         else:
             if parse(SDK_VERSION) < parse(min_sdk_version):
-                raise VersionMismatch(f"Your version={SDK_VERSION} is lower than the "
-                                      f"minimum version for funcx SDK: {min_sdk_version}.  Please update. "
-                                      f"pip install funcx>={min_sdk_version}")
+                raise VersionMismatch(
+                    f"Your version={SDK_VERSION} is lower than the "
+                    f"minimum version for funcx SDK: {min_sdk_version}.  Please update. "
+                    f"pip install funcx>={min_sdk_version}"
+                )
 
     def logout(self):
-        """Remove credentials from your local system
-        """
+        """Remove credentials from your local system"""
         self.native_client.logout()
 
     def update_table(self, return_msg, task_id):
-        """ Parses the return message from the service and updates the internal func_table
+        """Parses the return message from the service and updates the internal func_table
 
         Parameters
         ----------
@@ -203,33 +237,36 @@ class FuncXClient(FuncXErrorHandlingClient):
         else:
             r_dict = return_msg
 
-        r_status = r_dict.get('status', 'unknown')
-        status = {'pending': True,
-                  'status': r_status}
+        r_status = r_dict.get("status", "unknown")
+        status = {"pending": True, "status": r_status}
 
-        if 'result' in r_dict:
+        if "result" in r_dict:
             try:
-                r_obj = self.fx_serializer.deserialize(r_dict['result'])
-                completion_t = r_dict['completion_t']
+                r_obj = self.fx_serializer.deserialize(r_dict["result"])
+                completion_t = r_dict["completion_t"]
             except Exception:
                 raise SerializationError("Result Object Deserialization")
             else:
-                status.update({'pending': False,
-                               'result': r_obj,
-                               'completion_t': completion_t})
+                status.update(
+                    {"pending": False, "result": r_obj, "completion_t": completion_t}
+                )
                 self.func_table[task_id] = status
 
-        elif 'exception' in r_dict:
+        elif "exception" in r_dict:
             try:
-                r_exception = self.fx_serializer.deserialize(r_dict['exception'])
-                completion_t = r_dict['completion_t']
+                r_exception = self.fx_serializer.deserialize(r_dict["exception"])
+                completion_t = r_dict["completion_t"]
                 logger.info(f"Exception : {r_exception}")
             except Exception:
                 raise SerializationError("Task's exception object deserialization")
             else:
-                status.update({'pending': False,
-                               'exception': r_exception,
-                               'completion_t': completion_t})
+                status.update(
+                    {
+                        "pending": False,
+                        "exception": r_exception,
+                        "completion_t": completion_t,
+                    }
+                )
                 self.func_table[task_id] = status
         return status
 
@@ -249,8 +286,8 @@ class FuncXClient(FuncXErrorHandlingClient):
         if task_id in self.func_table:
             return self.func_table[task_id]
 
-        r = self.get("tasks/{task_id}".format(task_id=task_id))
-        logger.debug("Response string : {}".format(r))
+        r = self.get(f"tasks/{task_id}")
+        logger.debug(f"Response string : {r}")
         try:
             rets = self.update_table(r.text, task_id)
         except Exception as e:
@@ -258,7 +295,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         return rets
 
     def get_result(self, task_id):
-        """ Get the result of a funcX task
+        """Get the result of a funcX task
 
         Parameters
         ----------
@@ -274,41 +311,44 @@ class FuncXClient(FuncXErrorHandlingClient):
         Exception obj: Exception due to which the task failed
         """
         task = self.get_task(task_id)
-        if task['pending'] is True:
-            raise TaskPending(task['status'])
+        if task["pending"] is True:
+            raise TaskPending(task["status"])
         else:
-            if 'result' in task:
-                return task['result']
+            if "result" in task:
+                return task["result"]
             else:
-                logger.warning("We have an exception : {}".format(task['exception']))
-                task['exception'].reraise()
+                logger.warning("We have an exception : {}".format(task["exception"]))
+                task["exception"].reraise()
 
     def get_batch_result(self, task_id_list):
-        """ Request status for a batch of task_ids
-        """
-        assert isinstance(task_id_list, list), "get_batch_result expects a list of task ids"
+        """Request status for a batch of task_ids"""
+        assert isinstance(
+            task_id_list, list
+        ), "get_batch_result expects a list of task ids"
 
         pending_task_ids = [t for t in task_id_list if t not in self.func_table]
 
         results = {}
 
         if pending_task_ids:
-            payload = {'task_ids': pending_task_ids}
+            payload = {"task_ids": pending_task_ids}
             r = self.post("/batch_status", json_body=payload)
-            logger.debug("Response string : {}".format(r))
+            logger.debug(f"Response string : {r}")
 
         pending_task_ids = set(pending_task_ids)
 
         for task_id in task_id_list:
             if task_id in pending_task_ids:
                 try:
-                    data = r['results'][task_id]
+                    data = r["results"][task_id]
                     rets = self.update_table(data, task_id)
                     results[task_id] = rets
                 except KeyError:
                     logger.debug("Task {} info was not available in the batch status")
                 except Exception:
-                    logger.exception("Failure while unpacking results fom get_batch_result")
+                    logger.exception(
+                        "Failure while unpacking results fom get_batch_result"
+                    )
             else:
                 results[task_id] = self.func_table[task_id]
 
@@ -379,7 +419,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         -------
         task_ids : a list of UUID strings that identify the tasks
         """
-        servable_path = 'submit'
+        servable_path = "submit"
         assert isinstance(batch, Batch), "Requires a Batch object as input"
         assert len(batch.tasks) > 0, "Requires a non-empty batch"
 
@@ -389,17 +429,17 @@ class FuncXClient(FuncXErrorHandlingClient):
         r = self.post(servable_path, json_body=data)
 
         task_uuids = []
-        for result in r['results']:
-            task_id = result['task_uuid']
+        for result in r["results"]:
+            task_id = result["task_uuid"]
             task_uuids.append(task_id)
-            if result['http_status_code'] != 200:
+            if result["http_status_code"] != 200:
                 # this method of handling errors for a batch response is not
                 # ideal, as it will raise any error in the multi-response,
                 # but it will do until batch_run is deprecated in favor of Executer
                 handle_response_errors(result)
 
         if self.asynchronous:
-            task_group_id = r['task_group_id']
+            task_group_id = r["task_group_id"]
             asyncio_tasks = []
             for task_id in task_uuids:
                 funcx_task = FuncXTask(task_id)
@@ -412,7 +452,9 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         return task_uuids
 
-    def map_run(self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs):
+    def map_run(
+        self, *args, endpoint_id=None, function_id=None, asynchronous=False, **kwargs
+    ):
         """Initiate an invocation
 
         Parameters
@@ -431,7 +473,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         task_id : str
         UUID string that identifies the task
         """
-        servable_path = 'submit_batch'
+        servable_path = "submit_batch"
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
@@ -444,16 +486,20 @@ class FuncXClient(FuncXErrorHandlingClient):
             payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
             batch_payload.append(payload)
 
-        data = {'endpoints': [endpoint_id],
-                'func': function_id,
-                'payload': batch_payload,
-                'is_async': asynchronous}
+        data = {
+            "endpoints": [endpoint_id],
+            "func": function_id,
+            "payload": batch_payload,
+            "is_async": asynchronous,
+        }
 
         # Send the data to funcX
         r = self.post(servable_path, json_body=data)
-        return r['task_uuids']
+        return r["task_uuids"]
 
-    def register_endpoint(self, name, endpoint_uuid, metadata=None, endpoint_version=None):
+    def register_endpoint(
+        self, name, endpoint_uuid, metadata=None, endpoint_version=None
+    ):
         """Register an endpoint with the funcX service.
 
         Parameters
@@ -479,10 +525,10 @@ class FuncXClient(FuncXErrorHandlingClient):
         data = {
             "endpoint_name": name,
             "endpoint_uuid": endpoint_uuid,
-            "version": endpoint_version
+            "version": endpoint_version,
         }
         if metadata:
-            data['meta'] = metadata
+            data["meta"] = metadata
 
         r = self.post("/endpoints", json_body=data)
 
@@ -504,14 +550,14 @@ class FuncXClient(FuncXErrorHandlingClient):
         int
             The port to connect to and a list of containers
         """
-        registration_path = 'get_containers'
+        registration_path = "get_containers"
 
         data = {"endpoint_name": name, "description": description}
 
         r = self.post(registration_path, json_body=data)
 
         # Return the result
-        return r.data['endpoint_uuid'], r.data['endpoint_containers']
+        return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
     def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
@@ -530,12 +576,12 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         self.version_check()
 
-        container_path = f'containers/{container_uuid}/{container_type}'
+        container_path = f"containers/{container_uuid}/{container_type}"
 
         r = self.get(container_path)
 
         # Return the result
-        return r.data['container']
+        return r.data["container"]
 
     def get_endpoint_status(self, endpoint_uuid):
         """Get the status reports for an endpoint.
@@ -550,15 +596,23 @@ class FuncXClient(FuncXErrorHandlingClient):
         dict
             The details of the endpoint's stats
         """
-        stats_path = f'endpoints/{endpoint_uuid}/status'
+        stats_path = f"endpoints/{endpoint_uuid}/status"
 
         r = self.get(stats_path)
 
         # Return the result
         return r.data
 
-    def register_function(self, function, function_name=None, container_uuid=None, description=None,
-                          public=False, group=None, searchable=True):
+    def register_function(
+        self,
+        function,
+        function_name=None,
+        container_uuid=None,
+        description=None,
+        public=False,
+        group=None,
+        searchable=True,
+    ):
         """Register a function code with the funcX service.
 
         Parameters
@@ -592,21 +646,23 @@ class FuncXClient(FuncXErrorHandlingClient):
         serialized_fn = self.fx_serializer.serialize(function)
         packed_code = self.fx_serializer.pack_buffers([serialized_fn])
 
-        data = {"function_name": function.__name__,
-                "function_code": packed_code,
-                "function_source": source_code,
-                "container_uuid": container_uuid,
-                "entry_point": function_name if function_name else function.__name__,
-                "description": description,
-                "public": public,
-                "group": group,
-                "searchable": searchable}
+        data = {
+            "function_name": function.__name__,
+            "function_code": packed_code,
+            "function_source": source_code,
+            "container_uuid": container_uuid,
+            "entry_point": function_name if function_name else function.__name__,
+            "description": description,
+            "public": public,
+            "group": group,
+            "searchable": searchable,
+        }
 
-        logger.info("Registering function : {}".format(data))
+        logger.info(f"Registering function : {data}")
 
         r = self.post("/functions", json_body=data)
 
-        func_uuid = r.data['function_uuid']
+        func_uuid = r.data["function_uuid"]
 
         # Return the result
         return func_uuid
@@ -632,9 +688,11 @@ class FuncXClient(FuncXErrorHandlingClient):
         -------
         FunctionSearchResults
         """
-        return self.searcher.search_function(q, offset=offset, limit=limit, advanced=advanced)
+        return self.searcher.search_function(
+            q, offset=offset, limit=limit, advanced=advanced
+        )
 
-    def search_endpoint(self, q, scope='all', owner_id=None):
+    def search_endpoint(self, q, scope="all", owner_id=None):
         """
 
         Parameters
@@ -651,7 +709,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         return self.searcher.search_endpoint(q, scope=scope, owner_id=owner_id)
 
-    def register_container(self, location, container_type, name='', description=''):
+    def register_container(self, location, container_type, name="", description=""):
         """Register a container with the funcX service.
 
         Parameters
@@ -671,14 +729,19 @@ class FuncXClient(FuncXErrorHandlingClient):
         str
             The id of the container
         """
-        container_path = 'containers'
+        container_path = "containers"
 
-        payload = {'name': name, 'location': location, 'description': description, 'type': container_type}
+        payload = {
+            "name": name,
+            "location": location,
+            "description": description,
+            "type": container_type,
+        }
 
         r = self.post(container_path, json_body=payload)
 
         # Return the result
-        return r.data['container_id']
+        return r.data["container_id"]
 
     def add_to_whitelist(self, endpoint_id, function_ids):
         """Adds the function to the endpoint's whitelist
@@ -695,12 +758,12 @@ class FuncXClient(FuncXErrorHandlingClient):
         json
             The response of the request
         """
-        req_path = f'endpoints/{endpoint_id}/whitelist'
+        req_path = f"endpoints/{endpoint_id}/whitelist"
 
         if not isinstance(function_ids, list):
             function_ids = [function_ids]
 
-        payload = {'func': function_ids}
+        payload = {"func": function_ids}
 
         r = self.post(req_path, json_body=payload)
 
@@ -720,7 +783,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         json
             The response of the request
         """
-        req_path = f'endpoints/{endpoint_id}/whitelist'
+        req_path = f"endpoints/{endpoint_id}/whitelist"
 
         r = self.get(req_path)
 
@@ -746,7 +809,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             function_ids = [function_ids]
         res = []
         for fid in function_ids:
-            req_path = f'endpoints/{endpoint_id}/whitelist/{fid}'
+            req_path = f"endpoints/{endpoint_id}/whitelist/{fid}"
 
             r = self.delete(req_path)
             res.append(r)

@@ -1,13 +1,12 @@
 from globus_sdk import GlobusAPIError
 
 from funcx.sdk.utils.throttling import ThrottledBaseClient
-from funcx.utils.handle_service_response import handle_response_errors
 from funcx.utils.errors import HTTPError
+from funcx.utils.handle_service_response import handle_response_errors
 
 
 class FuncXErrorHandlingClient(ThrottledBaseClient):
-    """Class which handles errors from GET, POST, and DELETE requests before proceeding
-    """
+    """Class which handles errors from GET, POST, and DELETE requests before proceeding"""
 
     def get(self, path, **kwargs):
         try:

@@ -1,16 +1,18 @@
-from funcx.sdk.client import FuncXClient
-import pytest
 import time
+
+import pytest
+
+from funcx.sdk.client import FuncXClient
 
 
 def double(x):
     return x * 2
 
 
-@pytest.mark.parametrize('task_count', [(10), (100), (1000)])
+@pytest.mark.parametrize("task_count", [(10), (100), (1000)])
 def test_performance(fxc, endpoint, task_count):
 
-    func_id = fxc.register_function(double, description='double')
+    func_id = fxc.register_function(double, description="double")
 
     start = time.time()
     batch = fxc.create_batch()
@@ -26,12 +28,14 @@ def test_performance(fxc, endpoint, task_count):
     print(f"Time to submit batch: {t_batch_submit}s")
     for i in range(10):
         x = fxc.get_batch_result(task_ids)
-        complete_count = sum([1 for t in task_ids if t in x and not x[t].get('pending', False)])
-        print("Batch status : {}/{} complete".format(complete_count, len(task_ids)))
+        complete_count = sum(
+            [1 for t in task_ids if t in x and not x[t].get("pending", False)]
+        )
+        print(f"Batch status : {complete_count}/{len(task_ids)} complete")
         if complete_count == len(task_ids):
             print(x)
             break
         time.sleep(2)
     t_finish = time.time() - start
-    print("Time to launch {} tasks: {:8.3f} s".format(task_count, t_finish))
-    print("Got {} tasks_ids ".format(len(task_ids)))
+    print(f"Time to launch {task_count} tasks: {t_finish:8.3f} s")
+    print(f"Got {len(task_ids)} tasks_ids ")

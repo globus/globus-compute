@@ -5,14 +5,14 @@ funcx\_endpoint.endpoint.interchange.EndpointInterchange
 
 .. autoclass:: EndpointInterchange
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~EndpointInterchange.__init__
       ~EndpointInterchange.get_container
       ~EndpointInterchange.get_status_report
@@ -23,9 +23,8 @@ funcx\_endpoint.endpoint.interchange.EndpointInterchange
       ~EndpointInterchange.scale_out
       ~EndpointInterchange.start
       ~EndpointInterchange.stop
-   
-   
 
-   
-   
-   
+
+
+
+
