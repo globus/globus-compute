@@ -3,10 +3,11 @@ import json
 import logging
 from asyncio import AbstractEventLoop, QueueEmpty
 import dill
-from websockets.client import connect
+import websockets
 from websockets.exceptions import InvalidHandshake, InvalidStatusCode
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
+from funcx.sdk.executor import AtomicController
 
 logger = logging.getLogger("asyncio")
 
@@ -20,7 +21,7 @@ class WebSocketPollingTask:
 
     def __init__(self, funcx_client,
                  loop: AbstractEventLoop,
-                 atomic_controller=None,
+                 atomic_controller: AtomicController = None,
                  init_task_group_id: str = None,
                  results_ws_uri: str = 'wss://api.funcx.org/ws/v2/',
                  auto_start: bool = True):
@@ -37,6 +38,8 @@ class WebSocketPollingTask:
         atomic_controller: AtomicController object
             A synchronized counter object used to identify when there are 0 tasks
             remaining and to exit the polling loop.
+            An atomic_controller is required when this is called from a non-async
+            environment.
 
         init_task_group_id : str
             Optional task_group_id UUID string that the WebSocket client
@@ -73,7 +76,7 @@ class WebSocketPollingTask:
     async def init_ws(self, start_message_handlers=True):
         headers = [self.get_auth_header()]
         try:
-            self.ws = await connect(self.results_ws_uri, extra_headers=headers)
+            self.ws = await websockets.client.connect(self.results_ws_uri, extra_headers=headers)
         # initial Globus authentication happens during the HTTP portion of the handshake,
         # so an invalid handshake means that the user was not authenticated
         except InvalidStatusCode as e:
