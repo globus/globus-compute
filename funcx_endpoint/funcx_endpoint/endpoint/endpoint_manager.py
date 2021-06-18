@@ -172,6 +172,19 @@ class EndpointManager:
 
         self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
+        pid_file = os.path.join(endpoint_dir, 'daemon.pid')
+        pid_check = self.check_pidfile(pid_file)
+        # if the pidfile exists, we should return early because we don't
+        # want to attempt to create a new daemon when one is already
+        # potentially running with the existing pidfile
+        if pid_check['exists']:
+            if pid_check['active']:
+                self.logger.info("Endpoint is already active")
+                sys.exit(-1)
+            else:
+                self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup. Cleaning up now.")
+                self.pidfile_cleanup(pid_file)
+
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
@@ -185,8 +198,7 @@ class EndpointManager:
         try:
             context = daemon.DaemonContext(working_directory=endpoint_dir,
                                            umask=0o002,
-                                           pidfile=daemon.pidfile.PIDLockFile(
-                                               os.path.join(endpoint_dir, 'daemon.pid')),
+                                           pidfile=daemon.pidfile.PIDLockFile(pid_file),
                                            stdout=stdout,
                                            stderr=stderr,
                                            detach_process=endpoint_config.config.detach_endpoint)
@@ -194,8 +206,6 @@ class EndpointManager:
         except Exception:
             self.logger.exception("Caught exception while trying to setup endpoint context dirs")
             sys.exit(-1)
-
-        self.check_pidfile(context.pidfile.path, "funcx-endpoint")
 
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
@@ -321,8 +331,10 @@ class EndpointManager:
         self.name = name
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         pid_file = os.path.join(endpoint_dir, "daemon.pid")
+        pid_check = self.check_pidfile(pid_file)
 
-        if os.path.exists(pid_file):
+        # The process is active if the PID file exists and the process it points to is a funcx-endpoint
+        if pid_check['active']:
             self.logger.debug(f"{self.name} has a daemon.pid file")
             pid = None
             with open(pid_file, 'r') as f:
@@ -341,16 +353,24 @@ class EndpointManager:
                     p.send_signal(signal.SIGTERM)
                 terminated, alive = psutil.wait_procs(processes, timeout=0.2)
                 for p in alive:
-                    p.send_signal(signal.SIGKILL)
+                    # sometimes a process that was marked as alive before can terminate
+                    # before this signal is sent
+                    try:
+                        p.send_signal(signal.SIGKILL)
+                    except psutil.NoSuchProcess:
+                        pass
                 # Wait to confirm that the pid file disappears
                 if not os.path.exists(pid_file):
                     self.logger.info("Endpoint <{}> is now stopped".format(self.name))
 
             except OSError:
-                self.logger.warning("Endpoint {} could not be terminated".format(self.name))
-                self.logger.warning("Attempting Endpoint {} cleanup".format(self.name))
+                self.logger.warning("Endpoint <{}> could not be terminated".format(self.name))
+                self.logger.warning("Attempting Endpoint <{}> cleanup".format(self.name))
                 os.remove(pid_file)
                 sys.exit(-1)
+        # The process is not active, but the PID file exists and needs to be deleted
+        elif pid_check['exists']:
+            self.pidfile_cleanup(pid_file)
         else:
             self.logger.info("Endpoint <{}> is not active.".format(self.name))
 
@@ -358,31 +378,62 @@ class EndpointManager:
         self.name = name
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
 
-        # If endpoint currently running, stop it.
-        pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        active = os.path.exists(pid_file)
-        if active:
-            stop_endpoint(self.name)
+        if not os.path.exists(endpoint_dir):
+            self.logger.warning("Endpoint <{}> does not exist".format(self.name))
+            sys.exit(-1)
+
+        # stopping the endpoint should handle all of the process cleanup before
+        # deletion of the directory
+        self.stop_endpoint(self.name)
 
         shutil.rmtree(endpoint_dir)
+        self.logger.info("Endpoint <{}> has been deleted.".format(self.name))
 
-    def check_pidfile(self, filepath, match_name):
+    def check_pidfile(self, filepath, match_name='funcx-endpoint'):
         """ Helper function to identify possible dead endpoints
+
+        Returns a record with 'exists' and 'active' fields indicating
+        whether the pidfile exists, and whether the process is active if it does exist
+        (The endpoint can only start correctly if there is no pidfile)
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the pidfile
+
+        match_name : str
+            Name of the process to check for if pidfile exists
+
+        endpoint_name : str
+            endpoint name for debugging purposes
         """
         if not os.path.exists(filepath):
-            return
+            return {
+                "exists": False,
+                "active": False
+            }
 
         older_pid = int(open(filepath, 'r').read().strip())
 
+        active = False
         try:
             proc = psutil.Process(older_pid)
             if proc.name() == match_name:
-                self.logger.info("Endpoint is already active")
+                # this is the only case where the endpoint is active.
+                # If the process name does not match or no process exists,
+                # it means the endpoint has been terminated without proper cleanup
+                active = True
         except psutil.NoSuchProcess:
-            self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup")
-            self.logger.info('''Please cleanup using:
-        $ funcx-endpoint stop {}'''.format(self.name))
-            sys.exit(-1)
+            pass
+
+        return {
+            "exists": True,
+            "active": active
+        }
+
+    def pidfile_cleanup(self, filepath):
+        os.remove(filepath)
+        self.logger.info("Endpoint <{}> has been cleaned up.".format(self.name))
 
     def list_endpoints(self):
         table = tt.Texttable()
@@ -402,8 +453,11 @@ class EndpointManager:
                 with open(endpoint_json, 'r') as f:
                     endpoint_info = json.load(f)
                     endpoint_id = endpoint_info['endpoint_id']
-                if os.path.exists(os.path.join(endpoint_dir, 'daemon.pid')):
+                pid_check = self.check_pidfile(os.path.join(endpoint_dir, 'daemon.pid'))
+                if pid_check['active']:
                     status = 'Active'
+                elif pid_check['exists']:
+                    status = 'Disconnected'
                 else:
                     status = 'Inactive'
 
