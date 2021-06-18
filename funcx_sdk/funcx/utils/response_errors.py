@@ -25,6 +25,9 @@ class ResponseErrorCode(int, Enum):
     REQUEST_MALFORMED = 17
     INTERNAL_ERROR = 18
     ENDPOINT_OUTDATED = 19
+    TASK_GROUP_NOT_FOUND = 20
+    TASK_GROUP_ACCESS_FORBIDDEN = 21
+    INVALID_UUID = 22
 
 
 # a collection of the HTTP status error codes that the service would make use of
@@ -119,6 +122,12 @@ class FuncxResponseError(Exception, ABC):
                         error_class = InternalError
                     elif res_error_code is ResponseErrorCode.ENDPOINT_OUTDATED:
                         error_class = EndpointOutdated
+                    elif res_error_code is ResponseErrorCode.TASK_GROUP_NOT_FOUND:
+                        error_class = TaskGroupNotFound
+                    elif res_error_code is ResponseErrorCode.TASK_GROUP_ACCESS_FORBIDDEN:
+                        error_class = TaskGroupAccessForbidden
+                    elif res_error_code is ResponseErrorCode.INVALID_UUID:
+                        error_class = InvalidUUID
 
                     if error_class is not None:
                         return error_class(*res_data['error_args'])
@@ -367,3 +376,39 @@ class EndpointOutdated(FuncxResponseError):
     def __init__(self, min_ep_version):
         self.error_args = [min_ep_version]
         self.reason = f"Endpoint is out of date. Minimum supported endpoint version is {min_ep_version}"
+
+
+class TaskGroupNotFound(FuncxResponseError):
+    """ Task Group was not found in redis
+    """
+    code = ResponseErrorCode.TASK_GROUP_NOT_FOUND
+    http_status_code = HTTPStatusCode.NOT_FOUND
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"Task Group {uuid} could not be resolved"
+        self.uuid = uuid
+
+
+class TaskGroupAccessForbidden(FuncxResponseError):
+    """ Unauthorized Task Group access by user
+    """
+    code = ResponseErrorCode.TASK_GROUP_ACCESS_FORBIDDEN
+    http_status_code = HTTPStatusCode.FORBIDDEN
+
+    def __init__(self, uuid):
+        self.error_args = [uuid]
+        self.reason = f"Unauthorized access to Task Group {uuid}"
+        self.uuid = uuid
+
+
+class InvalidUUID(FuncxResponseError):
+    """ Invalid UUID provided by user
+    """
+    code = ResponseErrorCode.INVALID_UUID
+    http_status_code = HTTPStatusCode.BAD_REQUEST
+
+    def __init__(self, reason):
+        reason = str(reason)
+        self.error_args = [reason]
+        self.reason = reason
