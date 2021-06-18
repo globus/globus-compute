@@ -406,9 +406,6 @@ class EndpointManager:
 
         endpoint_name : str
             endpoint name for debugging purposes
-
-        log : bool
-            whether or not to log instructions for user if pidfile exists
         """
         if not os.path.exists(filepath):
             return {
