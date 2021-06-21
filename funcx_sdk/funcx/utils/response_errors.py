@@ -134,7 +134,9 @@ class FuncxResponseError(Exception, ABC):
                         error_class = EndpointOutdated
                     elif res_error_code is ResponseErrorCode.TASK_GROUP_NOT_FOUND:
                         error_class = TaskGroupNotFound
-                    elif res_error_code is ResponseErrorCode.TASK_GROUP_ACCESS_FORBIDDEN:
+                    elif (
+                        res_error_code is ResponseErrorCode.TASK_GROUP_ACCESS_FORBIDDEN
+                    ):
                         error_class = TaskGroupAccessForbidden
                     elif res_error_code is ResponseErrorCode.INVALID_UUID:
                         error_class = InvalidUUID
@@ -401,8 +403,8 @@ class EndpointOutdated(FuncxResponseError):
 
 
 class TaskGroupNotFound(FuncxResponseError):
-    """ Task Group was not found in redis
-    """
+    """Task Group was not found in redis"""
+
     code = ResponseErrorCode.TASK_GROUP_NOT_FOUND
     http_status_code = HTTPStatusCode.NOT_FOUND
 
@@ -413,8 +415,8 @@ class TaskGroupNotFound(FuncxResponseError):
 
 
 class TaskGroupAccessForbidden(FuncxResponseError):
-    """ Unauthorized Task Group access by user
-    """
+    """Unauthorized Task Group access by user"""
+
     code = ResponseErrorCode.TASK_GROUP_ACCESS_FORBIDDEN
     http_status_code = HTTPStatusCode.FORBIDDEN
 
@@ -425,8 +427,8 @@ class TaskGroupAccessForbidden(FuncxResponseError):
 
 
 class InvalidUUID(FuncxResponseError):
-    """ Invalid UUID provided by user
-    """
+    """Invalid UUID provided by user"""
+
     code = ResponseErrorCode.INVALID_UUID
     http_status_code = HTTPStatusCode.BAD_REQUEST
 
