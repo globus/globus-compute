@@ -26,7 +26,7 @@ def test(fxc, ep_id, task_count=10):
     print("Time to launch {} tasks: {:8.3f} s".format(task_count, delta))
     print("Got {} tasks_ids ".format(len(task_ids)))
 
-    for i in range(3):
+    for _i in range(3):
         x = fxc.get_batch_result(task_ids)
         complete_count = sum([1 for t in task_ids if t in x and x[t].get('pending', False)])
         print("Batch status : {}/{} complete".format(complete_count, len(task_ids)))

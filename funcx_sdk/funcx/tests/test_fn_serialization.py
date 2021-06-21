@@ -14,7 +14,7 @@ def test_imported_function(fxc, endpoint):
 
     print("Task_id: ", task_id)
 
-    for i in range(5):
+    for _i in range(5):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
@@ -31,7 +31,7 @@ def test_local_function(fxc, endpoint):
 
     print("Task_id: ", task_id)
 
-    for i in range(5):
+    for _i in range(5):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
@@ -50,7 +50,7 @@ def test_nested_scope_function(fxc, endpoint):
 
     print("Task_id: ", task_id)
 
-    for i in range(5):
+    for _i in range(5):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
@@ -81,7 +81,7 @@ def test_decorated_function(fxc, endpoint):
 
     print("Task_id: ", task_id)
 
-    for i in range(5):
+    for _i in range(5):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")

@@ -393,7 +393,7 @@ class Manager(object):
                     logger.debug("Available workers of type {}: {}".format(task_type,
                                                                            available_workers))
 
-                    for i in range(available_workers):
+                    for _i in range(available_workers):
                         if task_type in self.task_queues and not self.task_queues[task_type].qsize() == 0 \
                                 and not self.worker_map.worker_queues[task_type].qsize() == 0:
 

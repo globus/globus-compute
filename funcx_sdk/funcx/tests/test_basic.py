@@ -1,7 +1,5 @@
 import time
 
-import pytest
-
 from funcx.sdk.client import FuncXClient
 
 
@@ -39,7 +37,7 @@ def test_non_blocking(fxc, endpoint):
     fn_uuid = fxc.register_function(hello_world, endpoint, description="Hello")
     task_id = fxc.run(endpoint_id=endpoint, function_id=fn_uuid)
 
-    for i in range(5):
+    for _i in range(5):
         try:
             result = fxc.get_task_status(task_id)
         except Exception as e:

@@ -6,10 +6,11 @@ import time
 import uuid
 
 from funcx.serialize.base import METHODS_MAP_CODE, METHODS_MAP_DATA
-from funcx.serialize.concretes import *
+from funcx.serialize.concretes import ensure_all_concrete_serializers_registered
 from funcx.serialize.off_process_checker import OffProcessClient
 
 logger = logging.getLogger(__name__)
+ensure_all_concrete_serializers_registered()
 
 
 class FuncXSerializer:
@@ -31,7 +32,8 @@ class FuncXSerializer:
                 port = self._start_off_process_checker()
             except Exception:
                 logger.exception(
-                    "[NON-CRITICAL] Off_process_checker instantiation failed. Continuing..."
+                    "[NON-CRITICAL] Off_process_checker instantiation failed. "
+                    "Continuing..."
                 )
                 self.use_offprocess_checker = False
             else:

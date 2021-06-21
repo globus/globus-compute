@@ -1,9 +1,5 @@
 import time
 
-import pytest
-
-from funcx.sdk.client import FuncXClient
-
 
 def fn_batch1(a, b, c=2, d=2):
     return a + b + c + d
@@ -39,7 +35,7 @@ def test_batch(fxc, endpoint):
     print(f"Time to launch {task_count * len(func_ids)} tasks: {delta:8.3f} s")
     print(f"Got {len(task_ids)} tasks_ids ")
 
-    for i in range(10):
+    for _i in range(10):
         x = fxc.get_batch_result(task_ids)
         complete_count = sum(
             [1 for t in task_ids if t in x and not x[t].get("pending", False)]

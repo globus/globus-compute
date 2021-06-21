@@ -11,18 +11,11 @@ from packaging.version import parse
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
-
-# from funcx.sdk.utils.futures import FuncXFuture
 from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
-from funcx.sdk.search import FunctionSearchResults, SearchHelper
+from funcx.sdk.search import SearchHelper
 from funcx.sdk.utils.batch import Batch
 from funcx.serialize import FuncXSerializer
-from funcx.utils.errors import (
-    FailureResponse,
-    SerializationError,
-    TaskPending,
-    VersionMismatch,
-)
+from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
 
 try:
@@ -80,15 +73,18 @@ class FuncXClient(FuncXErrorHandlingClient):
         force_login: bool
             Whether to force a login to get new credentials.
 
-        fx_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
+        fx_authorizer:class:`GlobusAuthorizer \
+            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
             A custom authorizer instance to communicate with funcX.
             Default: ``None``, will be created.
 
-        search_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
+        search_authorizer:class:`GlobusAuthorizer \
+            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
             A custom authorizer instance to communicate with Globus Search.
             Default: ``None``, will be created.
 
-        openid_authorizer:class:`GlobusAuthorizer <globus_sdk.authorizers.base.GlobusAuthorizer>`:
+        openid_authorizer:class:`GlobusAuthorizer \
+            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
             A custom authorizer instance to communicate with OpenID.
             Default: ``None``, will be created.
 
@@ -107,8 +103,8 @@ class FuncXClient(FuncXErrorHandlingClient):
         Default: None
 
         use_offprocess_checker: Bool,
-            Use this option to disable the offprocess_checker in the FuncXSerializer used
-            by the client.
+            Use this option to disable the offprocess_checker in the FuncXSerializer
+            used by the client.
             Default: True
 
         Keyword arguments are the same as for BaseClient.
@@ -201,19 +197,22 @@ class FuncXClient(FuncXErrorHandlingClient):
         if self.check_endpoint_version:
             if ENDPOINT_VERSION is None:
                 raise VersionMismatch(
-                    "You do not have the funcx endpoint installed.  You can use 'pip install funcx-endpoint'."
+                    "You do not have the funcx endpoint installed.  "
+                    "You can use 'pip install funcx-endpoint'."
                 )
             if parse(ENDPOINT_VERSION) < parse(min_ep_version):
                 raise VersionMismatch(
                     f"Your version={ENDPOINT_VERSION} is lower than the "
-                    f"minimum version for an endpoint: {min_ep_version}.  Please update. "
+                    f"minimum version for an endpoint: {min_ep_version}.  "
+                    "Please update. "
                     f"pip install funcx-endpoint>={min_ep_version}"
                 )
         else:
             if parse(SDK_VERSION) < parse(min_sdk_version):
                 raise VersionMismatch(
                     f"Your version={SDK_VERSION} is lower than the "
-                    f"minimum version for funcx SDK: {min_sdk_version}.  Please update. "
+                    f"minimum version for funcx SDK: {min_sdk_version}.  "
+                    "Please update. "
                     f"pip install funcx>={min_sdk_version}"
                 )
 
@@ -394,8 +393,10 @@ class FuncXClient(FuncXErrorHandlingClient):
         ----------
 
         task_group_id : str
-            Override the session wide session_task_group_id with a different task_group_id for this batch.
-            If task_group_id is not specified, it will default to using the client's session_task_group_id
+            Override the session wide session_task_group_id with a different
+            task_group_id for this batch.
+            If task_group_id is not specified, it will default to using the client's
+            session_task_group_id
 
         Returns
         -------
@@ -630,7 +631,8 @@ class FuncXClient(FuncXErrorHandlingClient):
         group : str
             A globus group uuid to share this function with
         searchable : bool
-            If true, the function will be indexed into globus search with the appropriate permissions
+            If true, the function will be indexed into globus search with the
+            appropriate permissions
 
         Returns
         -------
@@ -717,7 +719,8 @@ class FuncXClient(FuncXErrorHandlingClient):
         location : str
             The location of the container (e.g., its docker url). Required
         container_type : str
-            The type of containers that will be used (Singularity, Shifter, Docker). Required
+            The type of containers that will be used (Singularity, Shifter, Docker).
+            Required
 
         name : str
             A name for the container. Default = ''

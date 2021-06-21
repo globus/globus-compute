@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import logging
 import pickle
 import socket
 import sys
@@ -100,7 +99,7 @@ if __name__ == "__main__":
         # For test/debug only
         client = OffProcessClient(int(args.port), host=args.url, debug=args.debug)
         client.connect()
-        for i in range(100):
+        for _i in range(100):
             x = client.send_recv("PING")
 
     else:

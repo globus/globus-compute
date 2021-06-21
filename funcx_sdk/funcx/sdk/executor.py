@@ -1,19 +1,11 @@
+import argparse
 import asyncio
 import atexit
 import concurrent
-import json
 import logging
-import multiprocessing as mp
-import os
-import sys
 import threading
 import time
-import uuid
 from concurrent.futures import Future
-
-import dill
-import websockets
-from websockets.exceptions import InvalidHandshake
 
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 
@@ -21,8 +13,9 @@ logger = logging.getLogger("asyncio")
 
 
 class AtomicController:
-    """This is used to synchronize between the FuncXExecutor which starts WebSocketPollingTasks
-    and the WebSocketPollingTask which closes itself when there are 0 tasks.
+    """This is used to synchronize between the FuncXExecutor which starts
+    WebSocketPollingTasks and the WebSocketPollingTask which closes itself when there
+    are 0 tasks.
     """
 
     def __init__(self, start_callback, stop_callback, init_value=0):
@@ -117,8 +110,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
 
         if function not in self._function_registry:
-            # Please note that this is a partial implementation, not all function registration
-            # options are fleshed out here.
+            # Please note that this is a partial implementation, not all function
+            # registration options are fleshed out here.
             logger.debug("Function:{function} is not registered. Registering")
             function_uuid = self.funcx_client.register_function(
                 function, function_name=function.__name__, container_uuid=container_uuid
@@ -237,11 +230,7 @@ def double(x):
 
 
 if __name__ == "__main__":
-
-    import argparse
-    import time
-
-    from funcx import FuncXClient, set_stream_logger
+    from funcx import FuncXClient
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -271,7 +260,7 @@ if __name__ == "__main__":
     future = fx.submit(double, 5, endpoint_id=endpoint_id)
     print("Got future back : ", future)
 
-    for i in range(5):
+    for _i in range(5):
         time.sleep(0.2)
         # Non-blocking check whether future is done
         print("Is the future done? :", future.done())

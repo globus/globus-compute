@@ -5,9 +5,9 @@ import pickle
 
 import dill
 
-logger = logging.getLogger(__name__)
+from funcx.serialize.base import fxPicker_shared
 
-from funcx.serialize.base import fxPicker_enforcer, fxPicker_shared
+logger = logging.getLogger(__name__)
 
 
 class pickle_base64(fxPicker_shared):
@@ -136,3 +136,15 @@ class code_pickle(fxPicker_shared):
         chomped = self.chomp(payload)
         data = pickle.loads(codecs.decode(chomped.encode(), "base64"))
         return data
+
+
+def ensure_all_concrete_serializers_registered():
+    """
+    This function ensures that all of the concrete serializers have been
+    registered.
+
+    In fact, it is a no-op because concrete serializers are registered
+    automatically via __init_subclass__, but importing and running this
+    function serves as a neatly semantic assertion that all of the
+    de/serialization classes have been initialized.
+    """

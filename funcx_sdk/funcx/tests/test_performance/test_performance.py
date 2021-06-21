@@ -26,7 +26,7 @@ def test_performance(fxc, endpoint, task_count):
 
     print(f"Time to create batch: {t_batch_create}s")
     print(f"Time to submit batch: {t_batch_submit}s")
-    for i in range(10):
+    for _i in range(10):
         x = fxc.get_batch_result(task_ids)
         complete_count = sum(
             [1 for t in task_ids if t in x and not x[t].get("pending", False)]

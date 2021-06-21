@@ -497,7 +497,7 @@ class EndpointInterchange(object):
              NotImplementedError
         """
         r = []
-        for i in range(blocks):
+        for _i in range(blocks):
             if self.config.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
@@ -520,7 +520,7 @@ class EndpointInterchange(object):
                 r = None
         return r
 
-    def scale_in(self, blocks=None, block_ids=[], task_type=None):
+    def scale_in(self, blocks=None, block_ids=None, task_type=None):
         """Scale in the number of active blocks by specified amount.
 
         Parameters
@@ -531,6 +531,8 @@ class EndpointInterchange(object):
         block_ids : [str.. ]
             List of external block ids to terminate
         """
+        if block_ids is None:
+            block_ids = []
         if task_type:
             logger.info("Scaling in blocks of specific task type {}. Let the provider decide which to kill".format(task_type))
             if self.config.scaling_enabled and self.config.provider:

@@ -26,7 +26,7 @@ def test_params(fxc, endpoint, param):
     task_id = fxc.run(param, endpoint_id=endpoint, function_id=fn_uuid)
 
     flag = False
-    for i in range(5):
+    for _i in range(5):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
