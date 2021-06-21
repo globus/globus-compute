@@ -20,7 +20,7 @@ from logging.handlers import RotatingFileHandler
 
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
-from parsl.app.errors import RemoteExceptionWrapper
+from funcx.serialize.errors import RemoteExceptionWrapper
 
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode

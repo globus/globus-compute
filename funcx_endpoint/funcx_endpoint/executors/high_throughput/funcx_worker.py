@@ -7,7 +7,7 @@ import sys
 import pickle
 import os
 
-from parsl.app.errors import RemoteExceptionWrapper
+from funcx.serialize.errors import RemoteExceptionWrapper
 
 from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
