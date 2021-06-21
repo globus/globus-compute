@@ -7,7 +7,6 @@ import websockets
 from websockets.exceptions import InvalidHandshake, InvalidStatusCode
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
-from funcx.sdk.executor import AtomicController
 
 logger = logging.getLogger("asyncio")
 
@@ -21,7 +20,7 @@ class WebSocketPollingTask:
 
     def __init__(self, funcx_client,
                  loop: AbstractEventLoop,
-                 atomic_controller: AtomicController = None,
+                 atomic_controller=None,
                  init_task_group_id: str = None,
                  results_ws_uri: str = 'wss://api.funcx.org/ws/v2/',
                  auto_start: bool = True):
