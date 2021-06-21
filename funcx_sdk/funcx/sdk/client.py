@@ -54,6 +54,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                  check_endpoint_version=False,
                  asynchronous=False,
                  loop=None,
+                 results_ws_uri='wss://api.funcx.org/ws/v2/',
                  use_offprocess_checker=True,
                  **kwargs):
         """
@@ -147,12 +148,13 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         self.version_check()
 
+        self.results_ws_uri = results_ws_uri
         self.asynchronous = asynchronous
         if asynchronous:
             self.loop = loop if loop else asyncio.get_event_loop()
 
             # Start up an asynchronous polling loop in the background
-            self.ws_polling_task = WebSocketPollingTask(self, self.loop, self.session_task_group_id)
+            self.ws_polling_task = WebSocketPollingTask(self, self.loop, init_task_group_id=self.session_task_group_id, results_ws_uri=self.results_ws_uri)
         else:
             self.loop = None
 
