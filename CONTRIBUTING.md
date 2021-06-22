@@ -10,12 +10,7 @@ FIXME: This doc is a stub.
 
 ### Recommended
 
-- [pipx](https://pypa.github.io/pipx/)
 - [pre-commit](https://pre-commit.com/)
-
-You can install `pipx` first, and then use it to install other tools, as in
-
-    pipx install pre-commit
 
 ## Linting
 
