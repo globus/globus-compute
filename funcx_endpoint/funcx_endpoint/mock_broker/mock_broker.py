@@ -6,7 +6,7 @@ creates an appropriate forwarder to which the endpoint can connect up.
 
 
 import bottle
-from bottle import post, run, request, app, route
+from bottle import post, run, request, route
 import argparse
 import json
 import uuid

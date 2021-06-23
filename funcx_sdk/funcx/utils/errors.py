@@ -96,16 +96,6 @@ class HTTPError(FuncxError):
         return f"HTTP request failed: {self.message}"
 
 
-class InvalidScopeException(FuncxError):
-    """Invalid API Scope"""
-
-    def __init__(self, message):
-        self.message = message
-
-    def __repr__(self):
-        return f"Invalid Scope: {self.message}"
-
-
 class TaskPending(FuncxError):
     """Task is pending and no result is available yet"""
 

@@ -25,10 +25,6 @@ def test_2():
     assert fn(2) == 6, "Expected 6 got {}".format(fn(2))
 
 
-def foo(x, y=3):
-    return x * y
-
-
 def test_code_1():
     def bar(x, y=5):
         return x * 5
