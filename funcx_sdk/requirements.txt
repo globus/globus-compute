@@ -9,3 +9,4 @@ typer>=0.3.0
 pyzmq>=22.0.0
 packaging
 websockets==9.1
+tblib
