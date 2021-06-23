@@ -1,9 +1,10 @@
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
 from parsl.addresses import address_by_hostname
 from parsl.channels import LocalChannel
 from parsl.launchers import SrunLauncher
 from parsl.providers import LocalProvider, SlurmProvider
+
+from funcx_endpoint.endpoint.utils.config import Config
+from funcx_endpoint.executors import HighThroughputExecutor
 
 # fmt: off
 
