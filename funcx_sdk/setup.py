@@ -13,7 +13,7 @@ with open("requirements.txt") as f:
 setup(
     name="funcx",
     version=version,
-    packages=find_namespace_packages(include=["funcx", "funcx.*", "parsl", "parsl.*"]),
+    packages=find_namespace_packages(include=["funcx", "funcx.*"]),
     description="funcX: High Performance Function Serving for Science",
     install_requires=install_requires,
     python_requires=">=3.6.0",

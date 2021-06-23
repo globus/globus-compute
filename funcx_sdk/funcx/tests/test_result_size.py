@@ -2,9 +2,9 @@ import argparse
 import time
 
 import pytest
+from funcx_endpoint.executors.high_throughput.funcx_worker import MaxResultSizeExceeded
 
 from funcx.sdk.client import FuncXClient
-from funcx_endpoint.executors.high_throughput.funcx_worker import MaxResultSizeExceeded
 
 
 def large_result_producer(size) -> str:
