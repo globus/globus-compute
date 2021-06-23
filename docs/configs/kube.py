@@ -1,6 +1,6 @@
 from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.providers.kubernetes.kube import KubernetesProvider
 from funcx_endpoint.executors import HighThroughputExecutor
+from funcx_endpoint.providers.kubernetes.kube import KubernetesProvider
 from funcx_endpoint.strategies import KubeSimpleStrategy
 from parsl.addresses import address_by_route
 
