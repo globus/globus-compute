@@ -1,8 +1,11 @@
+from parsl.addresses import address_by_interface
+from parsl.launchers import SrunLauncher
+from parsl.providers import SlurmProvider
+
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.executors import HighThroughputExecutor
-from parsl.providers import SlurmProvider
-from parsl.launchers import SrunLauncher
-from parsl.addresses import address_by_interface
+
+# fmt: off
 
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
@@ -39,3 +42,5 @@ config = Config(
         ),
     ],
 )
+
+# fmt: on

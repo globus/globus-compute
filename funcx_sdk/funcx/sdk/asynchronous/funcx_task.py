@@ -5,6 +5,7 @@ class FuncXTask(asyncio.Future):
     """
     Represents a submitted funcX task with an asychio wrapper
     """
+
     def __init__(self, task_id):
         """
         Parameters
@@ -12,7 +13,7 @@ class FuncXTask(asyncio.Future):
         task_id : uuid str
             The uuid of the funcX task this instance is shadowing
         """
-        super(FuncXTask, self).__init__()
+        super().__init__()
         self.task_id = task_id
 
     def __str__(self):

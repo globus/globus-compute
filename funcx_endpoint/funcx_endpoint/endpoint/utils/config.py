@@ -1,10 +1,12 @@
-from parsl.utils import RepresentationMixin
-from funcx_endpoint.strategies.simple import SimpleStrategy
 from funcx_endpoint.executors import HighThroughputExecutor
+from funcx_endpoint.strategies.simple import SimpleStrategy
+from parsl.utils import RepresentationMixin
+
+_DEFAULT_EXECUTORS = [HighThroughputExecutor()]
 
 
 class Config(RepresentationMixin):
-    """ Specification of FuncX configuration options.
+    """Specification of FuncX configuration options.
 
     Parameters
     ----------
@@ -45,23 +47,21 @@ class Config(RepresentationMixin):
         Default: None
     """
 
-    def __init__(self,
-
-                 # Execution backed
-                 executors: list = [HighThroughputExecutor()],
-
-                 # Connection info
-                 funcx_service_address='https://api2.funcx.org/v2',
-
-                 # Tuning info
-                 heartbeat_period=30,
-                 heartbeat_threshold=120,
-                 detach_endpoint=True,
-
-                 # Logging info
-                 log_dir=None,
-                 stdout="./interchange.stdout",
-                 stderr="./interchange.stderr"):
+    def __init__(
+        self,
+        # Execution backed
+        executors: list = _DEFAULT_EXECUTORS,
+        # Connection info
+        funcx_service_address="https://api2.funcx.org/v2",
+        # Tuning info
+        heartbeat_period=30,
+        heartbeat_threshold=120,
+        detach_endpoint=True,
+        # Logging info
+        log_dir=None,
+        stdout="./interchange.stdout",
+        stderr="./interchange.stderr",
+    ):
 
         # Execution backends
         self.executors = executors  # List of executors

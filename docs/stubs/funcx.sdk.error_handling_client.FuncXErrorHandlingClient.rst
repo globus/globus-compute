@@ -5,14 +5,14 @@ funcx.sdk.error\_handling\_client.FuncXErrorHandlingClient
 
 .. autoclass:: FuncXErrorHandlingClient
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~FuncXErrorHandlingClient.__init__
       ~FuncXErrorHandlingClient.delete
       ~FuncXErrorHandlingClient.get
@@ -23,18 +23,17 @@ funcx.sdk.error\_handling\_client.FuncXErrorHandlingClient
       ~FuncXErrorHandlingClient.set_app_name
       ~FuncXErrorHandlingClient.throttle_max_requests
       ~FuncXErrorHandlingClient.throttle_request_size
-   
-   
 
-   
-   
+
+
+
+
    .. rubric:: Attributes
 
    .. autosummary::
-   
+
       ~FuncXErrorHandlingClient.BASE_USER_AGENT
       ~FuncXErrorHandlingClient.DEFAULT_MAX_REQUESTS
       ~FuncXErrorHandlingClient.DEFAULT_MAX_REQUEST_SIZE
       ~FuncXErrorHandlingClient.allowed_authorizer_types
-   
-   
+

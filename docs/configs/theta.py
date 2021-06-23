@@ -1,8 +1,11 @@
+from parsl.addresses import address_by_hostname
+from parsl.launchers import AprunLauncher
+from parsl.providers import CobaltProvider
+
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.executors import HighThroughputExecutor
-from parsl.providers import CobaltProvider
-from parsl.launchers import AprunLauncher
-from parsl.addresses import address_by_hostname
+
+# fmt: off
 
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
@@ -40,3 +43,5 @@ config = Config(
         )
     ],
 )
+
+# fmt: on

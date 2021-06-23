@@ -5,14 +5,14 @@ funcx\_endpoint.endpoint.taskqueue.TaskQueue
 
 .. autoclass:: TaskQueue
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~TaskQueue.__init__
       ~TaskQueue.add_client_key
       ~TaskQueue.close
@@ -22,9 +22,8 @@ funcx\_endpoint.endpoint.taskqueue.TaskQueue
       ~TaskQueue.setup_client_auth
       ~TaskQueue.setup_server_auth
       ~TaskQueue.zmq_context
-   
-   
 
-   
-   
-   
+
+
+
+

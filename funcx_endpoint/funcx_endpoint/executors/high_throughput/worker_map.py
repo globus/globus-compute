@@ -181,7 +181,7 @@ class WorkerMap(object):
 
             if num_remove > 0:
                 logger.debug("[SPIN DOWN] Removing {} workers of type {}".format(num_remove, worker_type))
-            for i in range(num_remove):
+            for _i in range(num_remove):
                 spin_downs.append(worker_type)
             # A container switching is defined as a warm container must be
             # switched to another container to accommodate the workloads.
@@ -191,16 +191,19 @@ class WorkerMap(object):
                 container_switch_count += num_remove
         return spin_downs, container_switch_count
 
-    def add_worker(self, worker_id=str(random.random()),
-                   mode='no_container',
-                   worker_type='RAW',
-                   container_cmd_options="",
-                   walltime=1,
-                   address=None,
-                   debug=None,
-                   worker_port=None,
-                   logdir=None,
-                   uid=None):
+    def add_worker(
+        self,
+        worker_id=None,
+        mode='no_container',
+        worker_type='RAW',
+        container_cmd_options="",
+        walltime=1,
+        address=None,
+        debug=None,
+        worker_port=None,
+        logdir=None,
+        uid=None
+    ):
         """ Launch the appropriate worker
 
         Parameters
@@ -213,6 +216,8 @@ class WorkerMap(object):
            Walltime in seconds before we check status
 
         """
+        if worker_id is None:
+            str(random.random())
 
         debug = ' --debug' if debug else ''
 
@@ -292,7 +297,7 @@ class WorkerMap(object):
             cur_workers = self.total_worker_type_counts.get(worker_type, 0) + self.pending_worker_type_counts.get(worker_type, 0)
             if new_worker_map[worker_type] > cur_workers:
 
-                for i in range(new_worker_map[worker_type] - cur_workers):
+                for _i in range(new_worker_map[worker_type] - cur_workers):
                     # Add worker
                     new_worker_list.append(worker_type)
 

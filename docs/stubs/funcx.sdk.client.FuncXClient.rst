@@ -5,14 +5,14 @@ funcx.sdk.client.FuncXClient
 
 .. autoclass:: FuncXClient
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~FuncXClient.__init__
       ~FuncXClient.add_to_whitelist
       ~FuncXClient.batch_run
@@ -45,15 +45,15 @@ funcx.sdk.client.FuncXClient
       ~FuncXClient.update_function
       ~FuncXClient.update_table
       ~FuncXClient.version_check
-   
-   
 
-   
-   
+
+
+
+
    .. rubric:: Attributes
 
    .. autosummary::
-   
+
       ~FuncXClient.BASE_USER_AGENT
       ~FuncXClient.DEFAULT_MAX_REQUESTS
       ~FuncXClient.DEFAULT_MAX_REQUEST_SIZE
@@ -62,5 +62,4 @@ funcx.sdk.client.FuncXClient
       ~FuncXClient.TOKEN_DIR
       ~FuncXClient.TOKEN_FILENAME
       ~FuncXClient.allowed_authorizer_types
-   
-   
+
