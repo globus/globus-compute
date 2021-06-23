@@ -41,9 +41,7 @@ class Batch:
         ser_kwargs = self.fx_serializer.serialize(kwargs)
         payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
 
-        data = {'endpoint': endpoint_id,
-                'function': function_id,
-                'payload': payload}
+        data = {"endpoint": endpoint_id, "function": function_id, "payload": payload}
 
         self.tasks.append(data)
 
@@ -57,13 +55,10 @@ class Batch:
         -------
         payloads in dictionary, Dict[str, list]
         """
-        data = {
-            'task_group_id': self.task_group_id,
-            'tasks': []
-        }
+        data = {"task_group_id": self.task_group_id, "tasks": []}
 
         for task in self.tasks:
-            new_task = (task['function'], task['endpoint'], task['payload'])
-            data['tasks'].append(new_task)
+            new_task = (task["function"], task["endpoint"], task["payload"])
+            data["tasks"].append(new_task)
 
         return data

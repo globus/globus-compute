@@ -1,4 +1,10 @@
 [flake8]
+# TODO: remove all of these ignores other than W503,W504,B008
+# `black` will handle enforcement of styling, and we will have no opinionated
+# ignore rules
+# any cases in which we actually need to ignore a rule (e.g. E402) we will mark
+# the relevant segment with noqa comments as necessary
+#
 # D203: 1 blank line required before class docstring
 # E124: closing bracket does not match visual indentation
 # E126: continuation line over-indented for hanging indent
@@ -11,8 +17,12 @@
 # E402: module level import not at top of file
 # E129: Visual indent to not match indent as next line, counter eg here:
 # https://github.com/PyCQA/pycodestyle/issues/386
-# W504: Raised by flake8 even when it is followed
-ignore = D203, E124, E126, F403, F405, F811, E402, E129, W605, W504, F401
+#
+# E203,W503,W504: conflict with black formatting sometimes
+# B008: a flake8-bugbear rule which fails on idiomatic typer usage (consider
+# re-enabling this once everything else is fixed and updating usage)
+ignore = D203, E124, E126, F403, F405, F811, E402, E129, W605, W503, W504, E203, F401, B008
+# TODO: reduce this to 88 once `black` is applied to all code
 max-line-length = 160
 exclude = parsl/executors/serialize/, test_import_fail.py
 # F632 is comparing constant literals with == instead of "is"

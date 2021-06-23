@@ -1,3 +1,9 @@
 flake8==3.8.0
 numpy
 pytest
+
+# TODO: when we refactor dev requirements to be kept in extras, move this into
+# `funcx_sdk[dev]` and the other requirements into `funcx_sdk[test]`
+# for an example of this kind of config, see attrs:
+#   https://github.com/python-attrs/attrs/blob/fb154878ebd2758d2a3b4dc518d21fd4f73e12d2/setup.py#L64-L67
+pre-commit

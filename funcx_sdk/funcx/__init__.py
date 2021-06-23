@@ -2,6 +2,7 @@
 
 """
 import logging
+
 from funcx.sdk.version import VERSION
 
 __author__ = "The funcX team"

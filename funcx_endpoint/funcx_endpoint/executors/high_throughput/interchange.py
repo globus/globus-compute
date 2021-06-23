@@ -393,7 +393,7 @@ class Interchange(object):
             eg. [{'task_id':<x>, 'buffer':<buf>} ... ]
         """
         tasks = []
-        for i in range(0, count):
+        for _i in range(0, count):
             try:
                 x = self.pending_task_queue.get(block=False)
             except queue.Empty:
@@ -898,7 +898,7 @@ class Interchange(object):
              NotImplementedError
         """
         r = []
-        for i in range(blocks):
+        for _i in range(blocks):
             if self.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
@@ -921,7 +921,7 @@ class Interchange(object):
                 r = None
         return r
 
-    def scale_in(self, blocks=None, block_ids=[], task_type=None):
+    def scale_in(self, blocks=None, block_ids=None, task_type=None):
         """Scale in the number of active blocks by specified amount.
 
         Parameters
@@ -932,6 +932,8 @@ class Interchange(object):
         block_ids : [str.. ]
             List of external block ids to terminate
         """
+        if block_ids is None:
+            block_ids = []
         if task_type:
             logger.info("Scaling in blocks of specific task type {}. Let the provider decide which to kill".format(task_type))
             if self.scaling_enabled and self.provider:

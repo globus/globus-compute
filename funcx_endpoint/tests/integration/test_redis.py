@@ -41,7 +41,7 @@ def test(endpoint_id=None, tasks=10, duration=1, hostname=None, port=None):
     print("Time to launch {} tasks: {:8.3f} s".format(tasks, d1))
 
     print(f"Launched {tasks} tasks")
-    for i in range(tasks):
+    for _i in range(tasks):
         _ = results_rq.get(timeout=300)
         # print("Result : ", res)
 

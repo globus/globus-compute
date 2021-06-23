@@ -3,21 +3,21 @@ funcx
 
 .. automodule:: funcx
 
-   
-   
-   
 
-   
-   
-   
 
-   
-   
-   
 
-   
-   
-   
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

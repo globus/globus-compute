@@ -5,14 +5,14 @@ funcx\_endpoint.endpoint.endpoint\_manager.EndpointManager
 
 .. autoclass:: EndpointManager
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~EndpointManager.__init__
       ~EndpointManager.check_endpoint_json
       ~EndpointManager.check_pidfile
@@ -25,9 +25,8 @@ funcx\_endpoint.endpoint.endpoint\_manager.EndpointManager
       ~EndpointManager.register_endpoint
       ~EndpointManager.start_endpoint
       ~EndpointManager.stop_endpoint
-   
-   
 
-   
-   
-   
+
+
+
+
