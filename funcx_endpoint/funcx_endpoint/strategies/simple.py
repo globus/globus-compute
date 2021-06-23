@@ -47,10 +47,14 @@ class SimpleStrategy(BaseStrategy):
 
     def _strategize(self, *args, **kwargs):
         task_breakdown = self.interchange.get_outstanding_breakdown()
-        num_tasks = 0
+
+        info_log = False
         for breakdown_item in task_breakdown:
-            num_tasks += breakdown_item[1]
-        if num_tasks > 0:
+            if breakdown_item[1] > 0:
+                info_log = True
+                break
+
+        if info_log:
             logger.info(f"Task breakdown {task_breakdown}")
         else:
             logger.debug(f"Task breakdown {task_breakdown}")
