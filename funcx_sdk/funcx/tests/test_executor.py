@@ -10,19 +10,19 @@ def double(x):
     return x * 2
 
 
-def test_simple(fx, endpoint_id):
+def test_simple(fx, endpoint):
 
     x = random.randint(0, 100)
-    fut = fx.submit(double, x, endpoint_id=endpoint_id)
+    fut = fx.submit(double, x, endpoint_id=endpoint)
 
     assert fut.result() == x * 2, "Got wrong answer"
 
 
-def test_loop(fx, endpoint_id, count=10):
+def test_loop(fx, endpoint, count=10):
 
     futures = []
     for i in range(count):
-        future = fx.submit(double, i, endpoint_id=endpoint_id)
+        future = fx.submit(double, i, endpoint_id=endpoint)
         futures.append(future)
 
     for fu in futures:

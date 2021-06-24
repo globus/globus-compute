@@ -1,11 +1,12 @@
 import pytest
 
 from funcx import FuncXClient
+from funcx.sdk.executor import FuncXExecutor
 
 config = {
-    # 'funcx_service_address': 'http://k8s-dev.funcx.org/api/v1',
-    "funcx_service_address": "http://127.0.0.1:5000/api/v1",  # For testing against local k8s
-    "endpoint_uuid": "e5d141b6-d87c-4aec-8e50-5cc2b37a207d",
+    "funcx_service_address": "http://127.0.0.1:5000/v2",  # For testing against local k8s
+    "endpoint_uuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    "results_ws_uri": "ws://localhost:6000"
 }
 
 
@@ -41,13 +42,35 @@ def pytest_addoption(parser):
         help="Specify a funcX service address",
     )
 
+    parser.addoption(
+        "--ws-uri",
+        action="store",
+        metavar="ws-uri",
+        nargs=1,
+        default=[config["results_ws_uri"]],
+        help="WebSocket URI to get task results",
+    )
+
 
 @pytest.fixture
-def fxc(pytestconfig):
-    fxc = FuncXClient(
-        funcx_service_address=pytestconfig.getoption("--service-address")[0]
-    )
+def fxc_args(pytestconfig):
+    fxc_args = {
+        "funcx_service_address": pytestconfig.getoption("--service-address")[0],
+        "results_ws_uri": pytestconfig.getoption("--ws-uri")[0]
+    }
+    return fxc_args
+
+
+@pytest.fixture
+def fxc(fxc_args):
+    fxc = FuncXClient(**fxc_args)
     return fxc
+
+
+@pytest.fixture
+def fx(fxc):
+    fx = FuncXExecutor(fxc)
+    return fx
 
 
 @pytest.fixture
