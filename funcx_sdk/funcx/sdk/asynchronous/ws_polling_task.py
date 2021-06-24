@@ -79,7 +79,7 @@ class WebSocketPollingTask:
     async def init_ws(self, start_message_handlers=True):
         headers = [self.get_auth_header()]
         try:
-            self.ws = await websockets.client.connect(
+            self.ws = await websockets.connect(
                 self.results_ws_uri, extra_headers=headers
             )
         # initial Globus authentication happens during the HTTP portion of the handshake,
