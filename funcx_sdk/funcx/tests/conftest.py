@@ -6,7 +6,7 @@ from funcx.sdk.executor import FuncXExecutor
 config = {
     "funcx_service_address": "http://127.0.0.1:5000/v2",  # For testing against local k8s
     "endpoint_uuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    "results_ws_uri": "ws://localhost:6000"
+    "results_ws_uri": "ws://localhost:6000",
 }
 
 
@@ -56,7 +56,7 @@ def pytest_addoption(parser):
 def fxc_args(pytestconfig):
     fxc_args = {
         "funcx_service_address": pytestconfig.getoption("--service-address")[0],
-        "results_ws_uri": pytestconfig.getoption("--ws-uri")[0]
+        "results_ws_uri": pytestconfig.getoption("--ws-uri")[0],
     }
     return fxc_args
 
