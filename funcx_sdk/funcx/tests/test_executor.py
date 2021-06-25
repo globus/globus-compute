@@ -84,7 +84,7 @@ def test_bad_ep(fx):
 
 def test_noop(fx, endpoint):
     fut = fx.submit(noop, endpoint_id=endpoint)
-    assert fut.result() == None, "Got wrong answer"
+    assert fut.result() is None, "Got wrong answer"
 
 
 def test_split(fx, endpoint):
