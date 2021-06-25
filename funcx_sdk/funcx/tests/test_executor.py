@@ -120,10 +120,12 @@ def test_timing(fx, endpoint):
     test_loop(fx, endpoint)
     s = str(uuid.uuid4())
     fut2 = fx.submit(split, s, endpoint_id=endpoint)
+    fut3 = fx.submit(delay_n, 5, endpoint_id=endpoint)
     with pytest.raises(IndexError):
         fut1.result()
     time.sleep(1)
     assert fut2.result() == split(s), "Got wrong answer"
+    assert fut3.result() == "hello", "Got wrong answer"
 
 
 # test locally: python3 test_executor.py -e <endpoint_id>

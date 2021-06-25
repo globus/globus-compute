@@ -68,6 +68,12 @@ def fxc(fxc_args):
 
 
 @pytest.fixture
+def async_fxc(fxc_args):
+    fxc = FuncXClient(**fxc_args, asynchronous=True)
+    return fxc
+
+
+@pytest.fixture
 def fx(fxc):
     fx = FuncXExecutor(fxc)
     return fx
