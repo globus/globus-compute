@@ -4,7 +4,7 @@ import time
 import uuid
 import pytest
 
-from funcx import FuncXClient, set_stream_logger
+from funcx import FuncXClient
 from funcx.sdk.executor import FuncXExecutor
 from funcx.utils.response_errors import EndpointNotFound
 
@@ -36,7 +36,11 @@ def merge(obj1, obj2):
 
 
 def random_obj():
-    return {}
+    obj = {}
+    for _ in range(random.randint(5, 10)):
+        key = str(uuid.uuid4())
+        obj[key] = random.random()
+    return obj
 
 
 def test_simple(fx, endpoint):
@@ -92,8 +96,34 @@ def test_split(fx, endpoint):
     fut = fx.submit(split, s, endpoint_id=endpoint)
     assert fut.result() == split(s), "Got wrong answer"
 
-# def test_many_merge(fx, endpoint):
-#     pass
+
+def test_many_merge(fx, endpoint):
+    expected_results = []
+    futs = []
+    for _ in range(random.randint(20, 30)):
+        obj1 = random_obj()
+        obj2 = random_obj()
+        expected_result = merge(obj1, obj2)
+        fut = fx.submit(merge, obj1, obj2, endpoint_id=endpoint)
+        expected_results.append(expected_result)
+        futs.append(fut)
+
+    for i in range(len(futs)):
+        fut = futs[i]
+        expected_result = expected_results[i]
+        assert fut.result() == expected_result, "Got wrong answer"
+
+
+def test_timing(fx, endpoint):
+    fut1 = fx.submit(failing_task, endpoint_id=endpoint)
+    time.sleep(1)
+    test_loop(fx, endpoint)
+    s = str(uuid.uuid4())
+    fut2 = fx.submit(split, s, endpoint_id=endpoint)
+    with pytest.raises(IndexError):
+        fut1.result()
+    time.sleep(1)
+    assert fut2.result() == split(s), "Got wrong answer"
 
 
 # test locally: python3 test_executor.py -e <endpoint_id>
@@ -120,7 +150,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # set_stream_logger()
     fx = FuncXExecutor(
         FuncXClient(funcx_service_address=args.service_url, results_ws_uri=args.ws_uri)
     )
