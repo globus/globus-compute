@@ -3,6 +3,7 @@ import random
 import time
 import uuid
 
+import numpy as np
 import pytest
 
 from funcx import FuncXClient
@@ -43,6 +44,18 @@ def random_obj():
         key = str(uuid.uuid4())
         obj[key] = random.random()
     return obj
+
+
+def sum_array(arr):
+    import numpy as np
+
+    return np.sum(arr)
+
+
+def get_array(x, y):
+    import numpy as np
+
+    return np.random.rand(x, y)
 
 
 def test_simple(fx, endpoint):
@@ -128,6 +141,22 @@ def test_timing(fx, endpoint):
     time.sleep(1)
     assert fut2.result() == split(s), "Got wrong answer"
     assert fut3.result() == "hello", "Got wrong answer"
+
+
+def test_large_arrays(fx, endpoint):
+    small_arr = np.random.rand(10, 2)
+    large_arr = np.random.rand(100, 100)
+    fut1 = fx.submit(sum_array, small_arr, endpoint_id=endpoint)
+    fut2 = fx.submit(sum_array, large_arr, endpoint_id=endpoint)
+
+    fut3 = fx.submit(get_array, 10, 2, endpoint_id=endpoint)
+    x, y = random.randint(50, 100), random.randint(50, 100)
+    fut4 = fx.submit(get_array, x, y, endpoint_id=endpoint)
+
+    assert fut1.result() == sum_array(small_arr), "Got wrong answer"
+    assert fut2.result() == sum_array(large_arr), "Got wrong answer"
+    assert fut3.result().shape == (10, 2), "Got wrong answer"
+    assert fut4.result().shape == (x, y), "Got wrong answer"
 
 
 # test locally: python3 test_executor.py -e <endpoint_id>
