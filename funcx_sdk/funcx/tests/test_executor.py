@@ -1,24 +1,53 @@
 import argparse
 import random
 import time
+import uuid
+import pytest
 
 from funcx import FuncXClient, set_stream_logger
 from funcx.sdk.executor import FuncXExecutor
+from funcx.utils.response_errors import EndpointNotFound
 
 
 def double(x):
     return x * 2
 
 
-def test_simple(fx, endpoint):
+def failing_task():
+    raise IndexError()
 
+
+def delay_n(n):
+    import time
+    time.sleep(n)
+    return "hello"
+
+
+def noop():
+    return
+
+
+def split(s):
+    return [c for c in s]
+
+
+def merge(obj1, obj2):
+    return obj1.update(obj2)
+
+
+def random_obj():
+    return {}
+
+
+def test_simple(fx, endpoint):
     x = random.randint(0, 100)
     fut = fx.submit(double, x, endpoint_id=endpoint)
 
     assert fut.result() == x * 2, "Got wrong answer"
 
 
-def test_loop(fx, endpoint, count=10):
+def test_loop(fx, endpoint):
+    count = 10
 
     futures = []
     for i in range(count):
@@ -27,6 +56,44 @@ def test_loop(fx, endpoint, count=10):
 
     for fu in futures:
         print(fu.result())
+
+
+def test_submit_while_waiting(fx, endpoint):
+    fut1 = fx.submit(delay_n, 10, endpoint_id=endpoint)
+    time.sleep(1)
+
+    x = random.randint(0, 100)
+    fut2 = fx.submit(double, x, endpoint_id=endpoint)
+
+    assert fut2.result() == x * 2, "Got wrong answer"
+    assert fut1.done() is False, "First task should not be done"
+    assert fut1.result() == "hello", "Got wrong answer"
+
+
+def test_failing_task(fx, endpoint):
+    fut = fx.submit(failing_task, endpoint_id=endpoint)
+    with pytest.raises(IndexError):
+        fut.result()
+
+
+def test_bad_ep(fx):
+    bad_ep = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+    with pytest.raises(EndpointNotFound):
+        fx.submit(failing_task, endpoint_id=bad_ep)
+
+
+def test_noop(fx, endpoint):
+    fut = fx.submit(noop, endpoint_id=endpoint)
+    assert fut.result() == None, "Got wrong answer"
+
+
+def test_split(fx, endpoint):
+    s = str(uuid.uuid4())
+    fut = fx.submit(split, s, endpoint_id=endpoint)
+    assert fut.result() == split(s), "Got wrong answer"
+
+# def test_many_merge(fx, endpoint):
+#     pass
 
 
 # test locally: python3 test_executor.py -e <endpoint_id>
@@ -51,10 +118,6 @@ if __name__ == "__main__":
         required=True,
         help="Target endpoint to send functions to",
     )
-    parser.add_argument("-c", "--count", default="10", help="Number of tasks to launch")
-    parser.add_argument(
-        "-d", "--debug", action="store_true", help="Count of apps to launch"
-    )
     args = parser.parse_args()
 
     # set_stream_logger()
@@ -67,4 +130,4 @@ if __name__ == "__main__":
     print("Complete")
 
     print(f"Running a test with a for loop of {args.count} tasks")
-    test_loop(fx, args.endpoint_id, count=int(args.count))
+    test_loop(fx, args.endpoint_id)
