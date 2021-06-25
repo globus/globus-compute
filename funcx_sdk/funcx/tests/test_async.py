@@ -2,11 +2,12 @@ import random
 
 
 def squared(x):
-    return x**2
+    return x ** 2
 
 
 def delay_n(n):
     import time
+
     time.sleep(n)
     return "hello"
 

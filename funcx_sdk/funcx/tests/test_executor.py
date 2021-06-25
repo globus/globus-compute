@@ -2,6 +2,7 @@ import argparse
 import random
 import time
 import uuid
+
 import pytest
 
 from funcx import FuncXClient
@@ -19,6 +20,7 @@ def failing_task():
 
 def delay_n(n):
     import time
+
     time.sleep(n)
     return "hello"
 
@@ -81,7 +83,7 @@ def test_failing_task(fx, endpoint):
 
 
 def test_bad_ep(fx):
-    bad_ep = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+    bad_ep = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     with pytest.raises(EndpointNotFound):
         fx.submit(failing_task, endpoint_id=bad_ep)
 
