@@ -1,3 +1,4 @@
+import asyncio
 import random
 
 
@@ -16,7 +17,7 @@ async def simple_task(fxc, endpoint):
     squared_function = fxc.register_function(squared)
     x = random.randint(0, 100)
     task = fxc.run(x, endpoint_id=endpoint, function_id=squared_function)
-    result = await task
+    result = await asyncio.wait_for(task, 10)
     assert result == squared(x), "Got wrong answer"
 
 
@@ -30,10 +31,12 @@ async def batch_task(fxc, endpoint):
         expected_results.append(squared(x))
     batch_res = fxc.batch_run(batch)
 
+    await asyncio.sleep(10)
+
     for i in range(len(batch_res)):
         task = batch_res[i]
         expected_result = expected_results[i]
-        result = await task
+        result = await asyncio.wait_for(task, 1)
         assert result == expected_result, "Got wrong answer"
 
 
@@ -45,9 +48,9 @@ async def submit_while_waiting_task(fxc, endpoint):
 
     x = random.randint(0, 100)
     task2 = fxc.run(x, endpoint_id=endpoint, function_id=squared_function)
-    result2 = await task2
+    result2 = await asyncio.wait_for(task2, 10)
     assert result2 == squared(x), "Got wrong answer"
-    result1 = await task1
+    result1 = await asyncio.wait_for(task1, 10)
     assert result1 == "hello", "Got wrong answer"
 
 
