@@ -26,6 +26,9 @@ repos:
   rev: 5.8.0
   hooks:
     - id: isort
+      # explicitly pass settings file so that isort does not try to deduce
+      # which settings to use based on a file's directory
+      args: ["--settings-path", ".isort.cfg"]
       # FIXME: temporary exclude to reduce conflicts, remove this
       exclude: ^funcx_endpoint/
       # end FIXME
