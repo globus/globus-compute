@@ -19,7 +19,9 @@ import sys
 import requests
 
 sys.path.insert(0, os.path.abspath("../funcx_sdk/"))
+sys.path.insert(0, os.path.abspath("../funcx_endpoint/"))
 import funcx
+import funcx_endpoint
 
 # -- Project information -----------------------------------------------------
 
@@ -53,10 +55,7 @@ extensions = [
 
 autosummary_generate = True
 
-autodoc_default_options = {
-    'members': True,
-    'undoc-members': True
-}
+autodoc_default_options = {"members": True, "undoc-members": True}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
