@@ -56,8 +56,9 @@ class FuncXExecutor(concurrent.futures.Executor):
     def __init__(self,
                  funcx_client,
                  label: str = 'FuncXExecutor',
+                 batch_enabled: bool = True,
                  batch_interval: float = 1.0,
-                 batch_size = 100,
+                 batch_size: int = 100,
         ):
         """
         Parameters
@@ -75,8 +76,12 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
 
         self.funcx_client = funcx_client
+        # Disable throttling
+        self.funcx_client.throttling_enabled = False
+
         self.results_ws_uri = self.funcx_client.results_ws_uri
         self.label = label
+        self.batch_enabled = batch_enabled
         self.batch_interval = batch_interval
         self.batch_size = batch_size
 
@@ -96,7 +101,9 @@ class FuncXExecutor(concurrent.futures.Executor):
         )
         atexit.register(self.shutdown)
 
-        self.start()
+        if self.batch_enabled:
+            logger.info("Batch submission enabled.")
+            self.start()
 
     def start(self):
         self.task_outgoing = queue.Queue()
@@ -158,12 +165,17 @@ class FuncXExecutor(concurrent.futures.Executor):
                "args": args,
                "kwargs": kwargs}
         
-        self._tasks[task_id] = Future()
+        fut = Future()
+        self._tasks[task_id] = fut
 
-        # Post task to the the outgoing queue
-        self.task_outgoing.put(msg)
+        if self.batch_enabled:
+            # Put task to the the outgoing queue
+            self.task_outgoing.put(msg)
+        else:
+            # self._submit_task takes a list of messages
+            self._submit_tasks([msg])
 
-        return self._tasks[task_id]
+        return fut
 
     def task_submit_thread(self, kill_event):
         """Task submission thread that fetch tasks from task_outgoing queue,
@@ -190,7 +202,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                 batch_tasks = self.funcx_client.batch_run(batch)
                 logger.debug(f"Batch submitted to task_group: {self.task_group_id}")
             except Exception:
-                logger.error("[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(len(messages)))
+                logger.exception("[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(len(messages)))
             else:
                 for i, msg in enumerate(messages):
                     self._function_future_map[batch_tasks[i]] = self._tasks.pop(msg['task_id'])
@@ -209,7 +221,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         messages = []
         start = time.time()
         while True:
-            if time.time() - start >= self.batch_size or len(messages) >= self.batch_interval:
+            if time.time() - start >= self.batch_interval or len(messages) >= self.batch_size:
                 break
             try:
                 x = self.task_outgoing.get(timeout=0.1)
@@ -222,7 +234,8 @@ class FuncXExecutor(concurrent.futures.Executor):
     def shutdown(self):
         if self.poller_thread:
             self.poller_thread.shutdown()
-        self._kill_event.set()
+        if self.batch_enabled:
+            self._kill_event.set()
         logger.debug(f"Executor:{self.label} shutting down")
 
 

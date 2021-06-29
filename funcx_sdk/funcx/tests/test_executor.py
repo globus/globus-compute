@@ -53,13 +53,17 @@ if __name__ == "__main__":
     )
     parser.add_argument("-c", "--count", default="10", help="Number of tasks to launch")
     parser.add_argument(
+        "-b", "--batch", action="store_true", help="Enable batch or not"
+    )
+    parser.add_argument(
         "-d", "--debug", action="store_true", help="Count of apps to launch"
     )
     args = parser.parse_args()
 
     # set_stream_logger()
     fx = FuncXExecutor(
-        FuncXClient(funcx_service_address=args.service_url, results_ws_uri=args.ws_uri)
+        FuncXClient(funcx_service_address=args.service_url, results_ws_uri=args.ws_uri),
+        batch_enabled=args.batch,
     )
 
     start = time.time()
