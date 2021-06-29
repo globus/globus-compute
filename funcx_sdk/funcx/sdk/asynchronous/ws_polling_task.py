@@ -67,6 +67,9 @@ class WebSocketPollingTask:
         # add the initial task group id, as this will be sent to
         # the WebSocket server immediately
         self.running_task_group_ids.add(self.init_task_group_id)
+
+        # Set event loop explicitly since event loop can only be fetched automatically in main thread
+        # when batch submission is enabled, the task submission is in a new thread
         asyncio.set_event_loop(self.loop)
         self.task_group_ids_queue = asyncio.Queue()
         self.pending_tasks = {}
