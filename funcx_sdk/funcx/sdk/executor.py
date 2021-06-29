@@ -1,17 +1,9 @@
-import time
-import threading
-import queue
-import os
-import uuid
-import sys
-from concurrent.futures import Future
-import concurrent
-import logging
 import argparse
 import asyncio
 import atexit
 import concurrent
 import logging
+import queue
 import threading
 import time
 from concurrent.futures import Future
@@ -19,11 +11,6 @@ from concurrent.futures import Future
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 
 logger = logging.getLogger("asyncio")
-logging.basicConfig(filename='ws.log',
-                    filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.DEBUG)
 
 
 class AtomicController:
@@ -97,7 +84,6 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._task_counter = 0
         self._function_registry = {}
         self._function_future_map = {}
-        self._function_task_uuids = {}
         self.task_group_id = (
             self.funcx_client.session_task_group_id
         )  # we need to associate all batch launches with this id
@@ -109,6 +95,8 @@ class FuncXExecutor(concurrent.futures.Executor):
             self.task_group_id,
         )
         atexit.register(self.shutdown)
+
+        self.start()
 
     def start(self):
         self.task_outgoing = queue.Queue()

@@ -61,7 +61,6 @@ if __name__ == "__main__":
     fx = FuncXExecutor(
         FuncXClient(funcx_service_address=args.service_url, results_ws_uri=args.ws_uri)
     )
-    fx.start()    
 
     start = time.time()
     print("Running simple test")
