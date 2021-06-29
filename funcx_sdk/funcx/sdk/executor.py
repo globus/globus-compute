@@ -58,8 +58,8 @@ class FuncXExecutor(concurrent.futures.Executor):
                  label: str = 'FuncXExecutor',
                  batch_enabled: bool = True,
                  batch_interval: float = 1.0,
-                 batch_size: int = 100,
-        ):
+                 batch_size: int = 100):
+
         """
         Parameters
         ==========
@@ -145,8 +145,8 @@ class FuncXExecutor(concurrent.futures.Executor):
             logger.debug(f"Function:{function} is not registered. Registering")
             try:
                 function_id = self.funcx_client.register_function(function,
-                                                                    function_name=function.__name__,
-                                                                    container_uuid=container_uuid)
+                                                                  function_name=function.__name__,
+                                                                  container_uuid=container_uuid)
             except Exception:
                 logger.error("Error in registering {}".format(function.__name__))
                 raise Exception("Error in registering {}".format(function.__name__))
@@ -164,7 +164,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                "endpoint_id": endpoint_id,
                "args": args,
                "kwargs": kwargs}
-        
+
         fut = Future()
         self._tasks[task_id] = fut
 
