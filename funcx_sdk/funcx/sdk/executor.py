@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import time
 import threading
 import queue
