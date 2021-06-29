@@ -36,7 +36,7 @@ if __name__ == '__main__':
                         help="URL at which the funcx-web-service is hosted")
     parser.add_argument("-e", "--endpoint_id", required=True,
                         help="Target endpoint to send functions to")
-    parser.add_argument("-c", "--count", default="10",
+    parser.add_argument("-c", "--count", default="15",
                         help="Number of tasks to launch")
     parser.add_argument("-d", "--debug", action='store_true',
                         help="Count of apps to launch")
@@ -44,10 +44,14 @@ if __name__ == '__main__':
 
     # set_stream_logger()
     fx = FuncXExecutor(FuncXClient(funcx_service_address=args.service_url))
+    fx.start()
 
+    start = time.time()
     print("Running simple test")
     test_simple(fx, args.endpoint_id)
-    print("Complete")
+    print(f"Complete in {time.time() - start}")
 
+    start = time.time()
     print(f"Running a test with a for loop of {args.count} tasks")
     test_loop(fx, args.endpoint_id, count=int(args.count))
+    print(f"Complete in {time.time() - start}")
