@@ -35,7 +35,7 @@ from parsl.providers import LocalProvider
 
 
 from funcx_endpoint.executors.high_throughput import zmq_pipes
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 
 # TODO: YADU There's a bug here which causes some of the log messages to write out to stderr
 # "logging" python3 self.stream.flush() OSError: [Errno 9] Bad file descriptor
@@ -165,6 +165,10 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         Select the mode of operation from no_container, singularity_reuse, singularity_single_use
         Default: singularity_reuse
 
+    container_cmd_options: str
+        Container command strings to be added to associated container command.
+        For example, singularity exec {container_cmd_options}
+
     task_status_queue : queue.Queue
         Queue to pass updates to task statuses back to the forwarder.
 
@@ -201,6 +205,9 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  worker_mode='no_container',
                  scheduler_mode='hard',
                  container_type=None,
+                 container_cmd_options='',
+                 cold_routing_interval=10.0,
+
                  # Tuning info
                  prefetch_capacity=10,
 
@@ -241,6 +248,9 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         # Container specific
         self.scheduler_mode = scheduler_mode
         self.container_type = container_type
+        self.container_cmd_options = container_cmd_options
+        self.cold_routing_interval = cold_routing_interval
+
         # Tuning info
         self.prefetch_capacity = prefetch_capacity
 
@@ -390,7 +400,10 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           # "log_max_bytes": self.log_max_bytes,
                                           # "log_backup_count": self.log_backup_count,
                                           "scheduler_mode": self.scheduler_mode,
+                                          "worker_mode": self.worker_mode,
                                           "container_type": self.container_type,
+                                          "container_cmd_options": self.container_cmd_options,
+                                          "cold_routing_interval": self.cold_routing_interval,
                                           "funcx_service_address": self.funcx_service_address,
                                           "interchange_address": self.address,
                                           "worker_ports": self.worker_ports,
@@ -497,11 +510,11 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 if msgs is None:
                     logger.debug("[MTHREAD] Got None, exiting")
                     return
+
                 elif isinstance(msgs, EPStatusReport):
-                    logger.debug("[MTHREAD] Received EPStatusReport")
-                    # TODO:YADU We are not propagating task status reports
-                    # if len(msgs.task_statuses):
-                    #    self.task_status_queue.put(msgs.task_statuses)
+                    logger.debug("[MTHREAD] Received EPStatusReport {}".format(msgs))
+                    if self.passthrough:
+                        self.results_passthrough.put(pickle.dumps(msgs))
 
                 else:
                     logger.debug("[MTHREAD] Unpacking results")
@@ -522,7 +535,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             # TODO: This could be handled better we are essentially shutting down the
                             # client with little indication to the user.
                             logger.warning("[MTHREAD] Executor shutting down due to version mismatch in interchange")
-                            self._executor_exception, _ = fx_serializer.deserialize(msg['exception'])
+                            self._executor_exception = fx_serializer.deserialize(msg['exception'])
                             logger.exception("[MTHREAD] Exception: {}".format(self._executor_exception))
                             # Set bad state to prevent new tasks from being submitted
                             self._executor_bad_state.set()
@@ -756,8 +769,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
-
-    from funcx.utils.loggers import set_file_logger
 
     stdout = open(os.path.join(logdir, "executor.{}.stdout".format(endpoint_id)), 'w')
     stderr = open(os.path.join(logdir, "executor.{}.stderr".format(endpoint_id)), 'w')

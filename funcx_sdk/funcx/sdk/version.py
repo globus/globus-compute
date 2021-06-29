@@ -1,7 +1,7 @@
 # single source of truth for package version,
 # see https://packaging.python.org/en/latest/single_source_version/
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 VERSION = __version__
 
 # app name to send as part of SDK requests
-app_name = "funcX SDK v{}".format(__version__)
+app_name = f"funcX SDK v{__version__}"

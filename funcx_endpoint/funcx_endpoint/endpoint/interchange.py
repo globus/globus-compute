@@ -23,6 +23,7 @@ from parsl.version import VERSION as PARSL_VERSION
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
+from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
@@ -136,7 +137,9 @@ class EndpointInterchange(object):
         except FileExistsError:
             pass
 
-        start_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"), name="funcx_endpoint", level=logging_level)
+        global logger
+
+        logger = set_file_logger(os.path.join(self.logdir, "EndpointInterchange.log"), name="funcx_endpoint", level=logging_level)
         logger.info("Initializing EndpointInterchange process with Endpoint ID: {}".format(endpoint_id))
         self.config = config
         logger.info("Got config : {}".format(config))
@@ -494,7 +497,7 @@ class EndpointInterchange(object):
              NotImplementedError
         """
         r = []
-        for i in range(blocks):
+        for _i in range(blocks):
             if self.config.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
@@ -517,7 +520,7 @@ class EndpointInterchange(object):
                 r = None
         return r
 
-    def scale_in(self, blocks=None, block_ids=[], task_type=None):
+    def scale_in(self, blocks=None, block_ids=None, task_type=None):
         """Scale in the number of active blocks by specified amount.
 
         Parameters
@@ -528,6 +531,8 @@ class EndpointInterchange(object):
         block_ids : [str.. ]
             List of external block ids to terminate
         """
+        if block_ids is None:
+            block_ids = []
         if task_type:
             logger.info("Scaling in blocks of specific task type {}. Let the provider decide which to kill".format(task_type))
             if self.config.scaling_enabled and self.config.provider:
@@ -569,40 +574,6 @@ class EndpointInterchange(object):
             logger.debug("[MAIN] The status is {}".format(status))
 
         return status
-
-
-def start_file_logger(filename, name=__name__, level=logging.DEBUG, format_string=None):
-    """Add a stream log handler.
-
-    Parameters
-    ---------
-
-    filename: string
-        Name of the file to write logs to. Required.
-    name: string
-        Logger name. Default="parsl.executors.interchange"
-    level: logging.LEVEL
-        Set the logging level. Default=logging.DEBUG
-        - format_string (string): Set the format string
-    format_string: string
-        Format string to use.
-
-    Returns
-    -------
-        None.
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not len(logger.handlers):
-        handler = logging.FileHandler(filename)
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
 
 
 def starter(comm_q, *args, **kwargs):

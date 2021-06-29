@@ -1,5 +1,4 @@
 import time
-import numpy
 import logging
 import argparse
 import sys
@@ -95,7 +94,7 @@ if __name__ == "__main__":
     search_auth = AccessTokenAuthorizer(search_token)
     openid_auth = AccessTokenAuthorizer(openid_token)
 
-    rnd = numpy.random.randint(1024)
+    val = 1
     tt = TestTutorial(fx_auth, search_auth, openid_auth,
-                      args.tutorial, identity, rnd, args=rnd)
+                      args.tutorial, identity, val, args=val)
     tt.run()

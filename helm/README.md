@@ -6,17 +6,17 @@ It uses Role Based Access Control to create a service account and assign it
 permissions to create the worker pod.
 
 ## How to Use
-First you need to install valid funcX credentials into the cluster's 
+First you need to install valid funcX credentials into the cluster's
 namespace. Launch a local version of the endpoint to get it to populate your
 `~/.funcx/credentials/funcx_sdk_tokens.json` with
 ```
-funcx-endpoint start 
+funcx-endpoint start
 ```
 
 It will prompt you with an authentication URL to visit and ask you to paste the
-resulting token. After it completes you can stop your endpoint with 
+resulting token. After it completes you can stop your endpoint with
 ```
-funcx-endpoint stop 
+funcx-endpoint stop
 ```
 
 cd to your `~/.funcx/credentials` directory and install the keys file as a
@@ -43,7 +43,7 @@ Then invoke the chart installation with:
 helm install -f covid19-mesa-values.yaml funcx funcx/funcx_endpoint
 ```
 
-Once the pods start you can view your endpoint UID with 
+Once the pods start you can view your endpoint UID with
 
 
 The notes that are printed with the installation will tell you how to access the
@@ -66,10 +66,10 @@ The deployment is configured via values.yaml file.
 | rbacEnabled | Create service account and roles? | true |
 | initMem | Initial memory for worker pod | 2000Mi |
 | maxMem| Maximum allowed memory for worker pod | 16000Mi |
-| initCPU | Initial CPUs to allocate to worker pod | 1 |  
+| initCPU | Initial CPUs to allocate to worker pod | 1 |
 | maxCPU | Maximum CPUs to allocate to worker pod | 2 |
 | maxBlocks | Maximum number of worker pods to spawn | 100 |
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
-| detachEndpoint | Run the endpoint as a daemon inside the pod? | true | 
+| detachEndpoint | Run the endpoint as a daemon inside the pod? | true |
 | endpointUUID   | Specify an existing UUID to this endpoint. Leave blank to generate a new one | |
 

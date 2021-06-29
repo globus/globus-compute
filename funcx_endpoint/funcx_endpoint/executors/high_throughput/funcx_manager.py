@@ -27,7 +27,7 @@ from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.utils.loggers import set_file_logger
+from funcx import set_file_logger
 
 
 RESULT_TAG = 10
@@ -69,6 +69,7 @@ class Manager(object):
                  block_id=None,
                  internal_worker_port_range=(50000, 60000),
                  worker_mode="singularity_reuse",
+                 container_cmd_options="",
                  scheduler_mode="hard",
                  worker_type=None,
                  worker_max_idletime=60,
@@ -110,6 +111,10 @@ class Manager(object):
               1. no_container : Worker launched without containers
               2. singularity_reuse : Worker launched inside a singularity container that will be reused
               3. singularity_single_use : Each worker and task runs inside a new container instance.
+
+        container_cmd_options: str
+              Container command strings to be added to associated container command.
+              For example, singularity exec {container_cmd_options}
 
         scheduler_mode : str
              Pick between 2 supported modes for the manager:
@@ -153,6 +158,7 @@ class Manager(object):
         self.uid = uid
 
         self.worker_mode = worker_mode
+        self.container_cmd_options = container_cmd_options
         self.scheduler_mode = scheduler_mode
         self.worker_type = worker_type
         self.worker_max_idletime = worker_max_idletime
@@ -205,6 +211,13 @@ class Manager(object):
             target=self._status_report_loop,
             args=(self._kill_event,)
         )
+        self.container_switch_count = 0
+
+        self.poller = zmq.Poller()
+        self.poller.register(self.task_incoming, zmq.POLLIN)
+        self.poller.register(self.funcx_task_socket, zmq.POLLIN)
+
+        self.task_done_counter = 0
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -245,9 +258,6 @@ class Manager(object):
               Event to let the thread know when it is time to die.
         """
         logger.info("[TASK PULL THREAD] starting")
-        poller = zmq.Poller()
-        poller.register(self.task_incoming, zmq.POLLIN)
-        poller.register(self.funcx_task_socket, zmq.POLLIN)
 
         # Send a registration message
         msg = self.create_reg_message()
@@ -255,7 +265,6 @@ class Manager(object):
         self.task_incoming.send(msg)
         last_interchange_contact = time.time()
         task_recv_counter = 0
-        task_done_counter = 0
 
         poll_timer = self.poll_period
 
@@ -263,68 +272,28 @@ class Manager(object):
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
             logger.debug("[TASK_PULL_THREAD] Loop start")
-            pending_task_count = task_recv_counter - task_done_counter
+            pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
             logger.debug("[TASK_PULL_THREAD pending_task_count: {}, Ready_worker_count: {}".format(
                 pending_task_count, ready_worker_count))
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
-                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(self.worker_map.ready_worker_type_counts))
-                msg = pickle.dumps(self.worker_map.ready_worker_type_counts)
+                ads = self.worker_map.advertisement()
+                logger.debug("[TASK_PULL_THREAD] Requesting tasks: {}".format(ads))
+                msg = pickle.dumps(ads)
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
-            socks = dict(poller.poll(timeout=poll_timer))
+            socks = dict(self.poller.poll(timeout=poll_timer))
+
             if self.funcx_task_socket in socks and socks[self.funcx_task_socket] == zmq.POLLIN:
-                try:
-                    w_id, m_type, message = self.funcx_task_socket.recv_multipart()
-                    if m_type == b'REGISTER':
-                        reg_info = pickle.loads(message)
-                        logger.debug("Registration received from worker:{} {}".format(w_id, reg_info))
-                        self.worker_map.register_worker(w_id, reg_info['worker_type'])
-
-                    elif m_type == b'TASK_RET':
-                        logger.debug("Result received from worker: {}".format(w_id))
-                        logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
-                        self.pending_result_queue.put(message)
-                        self.worker_map.put_worker(w_id)
-                        task_done_counter += 1
-                        task_id = pickle.loads(message)['task_id']
-                        task_type = self.task_type_mapping.pop(task_id)
-                        self.task_status_deltas.pop(task_id, None)
-                        logger.debug("Task type: {}".format(task_type))
-                        self.outstanding_task_count[task_type] -= 1
-                        logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
-
-                    elif m_type == b'WRKR_DIE':
-                        logger.debug("[WORKER_REMOVE] Removing worker {} from worker_map...".format(w_id))
-                        logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
-                        logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
-                        self.worker_map.remove_worker(w_id)
-                        proc = self.worker_procs.pop(w_id.decode())
-                        if not proc.poll():
-                            try:
-                                proc.wait(timeout=1)
-                            except subprocess.TimeoutExpired:
-                                logger.warning(f"[WORKER_REMOVE] Timeout waiting for worker {w_id} process to terminate")
-                        logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
-                        logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
-
-                except Exception as e:
-                    logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
-
-            # Spin up any new workers according to the worker queue.
-            # Returns the total number of containers that have spun up.
-            self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
-                                                                     debug=self.debug,
-                                                                     address=self.address,
-                                                                     uid=self.uid,
-                                                                     logdir=self.logdir,
-                                                                     worker_port=self.worker_port))
-            logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
+                self.poll_funcx_task_socket()
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
+
+                # If we want to wrap the task_incoming polling into a separate function, we need to
+                # self.poll_task_incoming(poll_timer, last_interchange_contact, kill_event, task_revc_counter)
                 poll_timer = 0
                 _, pkl_msg = self.task_incoming.recv_multipart()
                 message = pickle.loads(pkl_msg)
@@ -391,11 +360,24 @@ class Manager(object):
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
             self.next_worker_q, need_more = self.worker_map.get_next_worker_q(new_worker_map)
 
+            # Spin up any new workers according to the worker queue.
+            # Returns the total number of containers that have spun up.
+            self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
+                                                                     mode=self.worker_mode,
+                                                                     debug=self.debug,
+                                                                     address=self.address,
+                                                                     uid=self.uid,
+                                                                     logdir=self.logdir,
+                                                                     worker_port=self.worker_port))
+            logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
+
             #  Count the workers of each type that need to be removed
-            spin_downs = self.worker_map.spin_down_workers(new_worker_map,
-                                                           worker_max_idletime=self.worker_max_idletime,
-                                                           need_more=need_more,
-                                                           scheduler_mode=self.scheduler_mode)
+            spin_downs, container_switch_count = self.worker_map.spin_down_workers(new_worker_map,
+                                                                                   worker_max_idletime=self.worker_max_idletime,
+                                                                                   need_more=need_more,
+                                                                                   scheduler_mode=self.scheduler_mode)
+            self.container_switch_count += container_switch_count
+            logger.debug("Container switch count: total {}, cur {}".format(self.container_switch_count, container_switch_count))
 
             for w_type in spin_downs:
                 self.remove_worker_init(w_type)
@@ -411,7 +393,7 @@ class Manager(object):
                     logger.debug("Available workers of type {}: {}".format(task_type,
                                                                            available_workers))
 
-                    for i in range(available_workers):
+                    for _i in range(available_workers):
                         if task_type in self.task_queues and not self.task_queues[task_type].qsize() == 0 \
                                 and not self.worker_map.worker_queues[task_type].qsize() == 0:
 
@@ -420,25 +402,70 @@ class Manager(object):
                             logger.debug("... and available workers: {}"
                                          .format(self.worker_map.worker_queues[task_type].qsize()))
 
-                            task = self.task_queues[task_type].get()
-                            worker_id = self.worker_map.get_worker(task_type)
+                            self.send_task_to_worker(task_type)
 
-                            logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
-                            # TODO: Some duplication of work could be avoided here
-                            to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
-                            self.funcx_task_socket.send_multipart(to_send)
-                            self.worker_map.update_worker_idle(task_type)
-                            if task.task_id != "KILL":
-                                logger.debug(f"Set task {task.task_id} to RUNNING")
-                                self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
-                            logger.debug("Sending complete!")
+    def poll_funcx_task_socket(self, test=False):
+        try:
+            w_id, m_type, message = self.funcx_task_socket.recv_multipart()
+            if m_type == b'REGISTER':
+                reg_info = pickle.loads(message)
+                logger.debug("Registration received from worker:{} {}".format(w_id, reg_info))
+                self.worker_map.register_worker(w_id, reg_info['worker_type'])
+
+            elif m_type == b'TASK_RET':
+                logger.debug("Result received from worker: {}".format(w_id))
+                logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
+                self.pending_result_queue.put(message)
+                self.worker_map.put_worker(w_id)
+                self.task_done_counter += 1
+                task_id = pickle.loads(message)['task_id']
+                task_type = self.task_type_mapping.pop(task_id)
+                self.task_status_deltas.pop(task_id, None)
+                logger.debug("Task type: {}".format(task_type))
+                self.outstanding_task_count[task_type] -= 1
+                logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
+
+            elif m_type == b'WRKR_DIE':
+                logger.debug("[WORKER_REMOVE] Removing worker {} from worker_map...".format(w_id))
+                logger.debug("Ready worker counts: {}".format(self.worker_map.ready_worker_type_counts))
+                logger.debug("Total worker counts: {}".format(self.worker_map.total_worker_type_counts))
+                self.worker_map.remove_worker(w_id)
+                proc = self.worker_procs.pop(w_id.decode())
+                if not proc.poll():
+                    try:
+                        proc.wait(timeout=1)
+                    except subprocess.TimeoutExpired:
+                        logger.warning(f"[WORKER_REMOVE] Timeout waiting for worker {w_id} process to terminate")
+                logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
+                logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
+
+            if test:
+                return pickle.loads(message)
+
+        except Exception as e:
+            logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+
+    def send_task_to_worker(self, task_type):
+        task = self.task_queues[task_type].get()
+        worker_id = self.worker_map.get_worker(task_type)
+
+        logger.debug("Sending task {} to {}".format(task.task_id, worker_id))
+        # TODO: Some duplication of work could be avoided here
+        to_send = [worker_id, pickle.dumps(task.task_id), pickle.dumps(task.container_id), task.pack()]
+        self.funcx_task_socket.send_multipart(to_send)
+        self.worker_map.update_worker_idle(task_type)
+        if task.task_id != "KILL":
+            logger.debug(f"Set task {task.task_id} to RUNNING")
+            self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
+        logger.debug("Sending complete!")
 
     def _status_report_loop(self, kill_event):
         logger.debug("[STATUS] Manager status reporting loop starting")
 
         while not kill_event.is_set():
             msg = ManagerStatusReport(
-                self.task_status_deltas
+                self.task_status_deltas,
+                self.container_switch_count,
             )
             logger.info(f"[STATUS] Sending status report to interchange: {msg.task_statuses}")
             self.pending_result_queue.put(msg)
@@ -515,6 +542,7 @@ class Manager(object):
             logger.debug("[MANAGER] Start an initial worker with worker type {}".format(self.worker_type))
             self.worker_procs.update(self.worker_map.add_worker(worker_id=str(self.worker_map.worker_id_counter),
                                                                 worker_type=self.worker_type,
+                                                                container_cmd_options=self.container_cmd_options,
                                                                 address=self.address,
                                                                 debug=self.debug,
                                                                 uid=self.uid,
@@ -556,6 +584,8 @@ def cli_run():
     parser.add_argument("--worker_mode", default="singularity_reuse",
                         help=("Choose the mode of operation from "
                               "(no_container, singularity_reuse, singularity_single_use"))
+    parser.add_argument("--container_cmd_options", default="",
+                        help=("Container cmd options to add to container startup cmd"))
     parser.add_argument("--scheduler_mode", default="soft",
                         help=("Choose the mode of scheduler "
                               "(hard, soft"))
@@ -575,7 +605,7 @@ def cli_run():
 
     try:
         global logger
-        # TODO Update logger to use the RotatingFileHandler in the funcx.utils.loggers.set_file_logger
+        # TODO The config options for the rotatingfilehandler need to be implemented and checked so that it is user configurable
         logger = set_file_logger(os.path.join(args.logdir, args.uid, 'manager.log'),
                                  name='funcx_manager',
                                  level=logging.DEBUG if args.debug is True else logging.INFO,
@@ -595,6 +625,7 @@ def cli_run():
         logger.info("max_workers: {}".format(args.max_workers))
         logger.info("poll_period: {}".format(args.poll))
         logger.info("worker_mode: {}".format(args.worker_mode))
+        logger.info("container_cmd_options: {}".format(args.container_cmd_options))
         logger.info("scheduler_mode: {}".format(args.scheduler_mode))
         logger.info("worker_type: {}".format(args.worker_type))
         logger.info("log_max_bytes: {}".format(args.log_max_bytes))
@@ -611,6 +642,7 @@ def cli_run():
                           logdir=args.logdir,
                           debug=args.debug,
                           worker_mode=args.worker_mode,
+                          container_cmd_options=args.container_cmd_options,
                           scheduler_mode=args.scheduler_mode,
                           worker_type=args.worker_type,
                           poll_period=int(args.poll))

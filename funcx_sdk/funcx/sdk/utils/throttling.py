@@ -1,5 +1,6 @@
-import time
 import json
+import time
+
 import globus_sdk
 
 
@@ -34,6 +35,7 @@ class ThrottledBaseClient(globus_sdk.base.BaseClient):
     cli.throttling_enabled = False
 
     """
+
     # Max requests per second, in a 10 second period
     DEFAULT_MAX_REQUESTS = 20
     # Max size is 5Mb
@@ -63,16 +65,17 @@ class ThrottledBaseClient(globus_sdk.base.BaseClient):
 
     def throttle_request_size(self, *request_args, **request_kwargs):
         rtype, path = request_args
-        if request_kwargs.get('json_body'):
-            size = len(json.dumps(request_kwargs['json_body']))
-        elif request_kwargs.get('text_body'):
-            size = len(request_kwargs['text_body'])
+        if request_kwargs.get("json_body"):
+            size = len(json.dumps(request_kwargs["json_body"]))
+        elif request_kwargs.get("text_body"):
+            size = len(request_kwargs["text_body"])
         else:
             return
-        if rtype == 'POST' and size > self.max_request_size:
+        if rtype == "POST" and size > self.max_request_size:
             raise MaxRequestSizeExceeded(
-                f'Size of {rtype} at {path} was {size} bytes, exceeded '
-                f'limit of {self.max_request_size}.')
+                f"Size of {rtype} at {path} was {size} bytes, exceeded "
+                f"limit of {self.max_request_size}."
+            )
 
     def _request(self, *args, **kwargs):
         if self.throttling_enabled is True:

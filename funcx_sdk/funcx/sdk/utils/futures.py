@@ -2,11 +2,12 @@
 
 Credit: Logan Ward
 """
-from globus_sdk import GlobusAPIError
+import json
 from concurrent.futures import Future
 from threading import Thread
 from time import sleep
-import json
+
+from globus_sdk import GlobusAPIError
 
 
 class FuncXFuture(Future):
@@ -33,7 +34,7 @@ class FuncXFuture(Future):
 
         # Forcing the ping interval to be no less than 1s
         if ping_interval < 1:
-            assert AttributeError('Ping interval must be at least 1 second')
+            assert AttributeError("Ping interval must be at least 1 second")
 
         # Start a thread that polls status
         self._checker_thread = Thread(target=FuncXFuture._ping_server, args=(self,))
@@ -53,14 +54,14 @@ class FuncXFuture(Future):
     def running(self):
         if super().running():
             status = self.client.get_task_status(self.task_id)
-            if status['status'] == 'SUCCEEDED':
-                self.set_result(status['details']['result'])
+            if status["status"] == "SUCCEEDED":
+                self.set_result(status["details"]["result"])
                 return False
-            if status['status'] == 'FAILED':
+            if status["status"] == "FAILED":
                 try:
-                    self.set_result(status['details']['reason'])
+                    self.set_result(status["details"]["reason"])
                 except Exception:
-                    self.set_result(status['details']['result'])
+                    self.set_result(status["details"]["result"])
                 return False
             return True
         return False
@@ -93,4 +94,4 @@ class FuncXFuture(Future):
 
     def cancel(self):
         """Stop the execution of the function"""
-        self.set_exception(Exception('Cancelled by user'))
+        self.set_exception(Exception("Cancelled by user"))

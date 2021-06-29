@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import time
 import threading
 import queue
@@ -7,13 +8,14 @@ import sys
 from concurrent.futures import Future
 import concurrent
 import logging
+import argparse
 import asyncio
-import websockets
-import json
-import dill
-from websockets.exceptions import InvalidHandshake
-import multiprocessing as mp
 import atexit
+import concurrent
+import logging
+import threading
+import time
+from concurrent.futures import Future
 
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 
@@ -25,7 +27,11 @@ logging.basicConfig(filename='ws.log',
                     level=logging.DEBUG)
 
 
-class AtomicController():
+class AtomicController:
+    """This is used to synchronize between the FuncXExecutor which starts
+    WebSocketPollingTasks and the WebSocketPollingTask which closes itself when there
+    are 0 tasks.
+    """
 
     def __init__(self, start_callback, stop_callback, init_value=0):
         self._value = 0
@@ -55,12 +61,14 @@ class AtomicController():
 
 
 class FuncXExecutor(concurrent.futures.Executor):
-    """ An executor
+    """Extends the concurrent.futures.Executor class to layer this interface
+    over funcX. The executor returns future objects that are asynchronously
+    updated with results by the WebSocketPollingTask using a websockets connection
+    to the hosted funcx-websocket-service.
     """
 
     def __init__(self,
                  funcx_client,
-                 results_ws_uri: str = 'ws://localhost:6000',
                  label: str = 'FuncXExecutor',
                  batch_interval: float = 1.0,
                  batch_size = 100,
@@ -81,7 +89,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
 
         self.funcx_client = funcx_client
-        self.results_ws_uri = results_ws_uri
+        self.results_ws_uri = self.funcx_client.results_ws_uri
         self.label = label
         self.batch_interval = batch_interval
         self.batch_size = batch_size
@@ -91,14 +99,16 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._function_registry = {}
         self._function_future_map = {}
         self._function_task_uuids = {}
-        self.task_group_id = self.funcx_client.session_task_group_id  # we need to associate all batch launches with this id
+        self.task_group_id = (
+            self.funcx_client.session_task_group_id
+        )  # we need to associate all batch launches with this id
 
-        # Start the task poller thread
-        self.poller_thread = ExecutorPollerThread(self.funcx_client,
-                                                  self._function_future_map,
-                                                  self.results_ws_uri,
-                                                  self.task_group_id)
-
+        self.poller_thread = ExecutorPollerThread(
+            self.funcx_client,
+            self._function_future_map,
+            self.results_ws_uri,
+            self.task_group_id,
+        )
         atexit.register(self.shutdown)
 
     def start(self):
@@ -136,8 +146,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
 
         if function not in self._function_registry:
-            # Please note that this is a partial implementation, not all function registration
-            # options are fleshed out here.
+            # Please note that this is a partial implementation, not all function
+            # registration options are fleshed out here.
             logger.debug("Function:{function} is not registered. Registering")
             try:
                 function_id = self.funcx_client.register_function(function,
@@ -200,7 +210,12 @@ class FuncXExecutor(concurrent.futures.Executor):
                 self.poller_thread.atomic_controller.increment(len(messages))
 
                 if not self.poller_thread or self.poller_thread.ws_handler.closed:
-                    self.poller_thread = ExecutorPollerThread(self.funcx_client, self._function_future_map, self.results_ws_uri, self.task_group_id)
+                    self.poller_thread = ExecutorPollerThread(
+                        self.funcx_client,
+                        self._function_future_map,
+                        self.results_ws_uri,
+                        self.task_group_id
+                    )
 
     def _get_tasks_in_batch(self):
         """Get tasks from task_outgoing queue in batch, either by interval or by batch size"""
@@ -228,11 +243,15 @@ def noop():
     return
 
 
-class ExecutorPollerThread():
-    """ An executor
+class ExecutorPollerThread:
+    """This encapsulates the creation of the thread on which event loop lives,
+    the instantiation of the WebSocketPollingTask onto the event loop and the
+    synchronization primitives used (AtomicController)
     """
 
-    def __init__(self, funcx_client, _function_future_map, results_ws_uri, task_group_id):
+    def __init__(
+        self, funcx_client, _function_future_map, results_ws_uri, task_group_id
+    ):
         """
         Parameters
         ==========
@@ -249,25 +268,24 @@ class ExecutorPollerThread():
         self._function_future_map = _function_future_map
         self.task_group_id = task_group_id
         self.eventloop = None
-        self.atomic_controller = AtomicController(self.start,
-                                                  noop)
+        self.atomic_controller = AtomicController(self.start, noop)
 
     def start(self):
-        """ Start the result polling thread
-        """
+        """Start the result polling thread"""
         # Currently we need to put the batch id's we launch into this queue
         # to tell the web_socket_poller to listen on them. Later we'll associate
 
         eventloop = asyncio.new_event_loop()
         self.eventloop = eventloop
-        self.ws_handler = WebSocketPollingTask(self.funcx_client,
-                                               eventloop,
-                                               self.atomic_controller,
-                                               init_task_group_id=self.task_group_id,
-                                               results_ws_uri=self.results_ws_uri,
-                                               auto_start=False)
-        self.thread = threading.Thread(target=self.event_loop_thread,
-                                       args=(eventloop, ))
+        self.ws_handler = WebSocketPollingTask(
+            self.funcx_client,
+            eventloop,
+            atomic_controller=self.atomic_controller,
+            init_task_group_id=self.task_group_id,
+            results_ws_uri=self.results_ws_uri,
+            auto_start=False,
+        )
+        self.thread = threading.Thread(target=self.event_loop_thread, args=(eventloop,))
         self.thread.start()
         logger.debug("Started web_socket_poller thread")
 
@@ -275,15 +293,20 @@ class ExecutorPollerThread():
         asyncio.set_event_loop(eventloop)
         eventloop.run_until_complete(self.web_socket_poller())
 
-    @asyncio.coroutine
     async def web_socket_poller(self):
+        # TODO: if WebSocket connection fails, we should either retry connecting and back off
+        # or we should set an exception to all of the outstanding futures
         await self.ws_handler.init_ws(start_message_handlers=False)
-        await self.ws_handler.handle_incoming(self._function_future_map, auto_close=True)
+        await self.ws_handler.handle_incoming(
+            self._function_future_map, auto_close=True
+        )
 
     def shutdown(self):
         ws = self.ws_handler.ws
         if ws:
-            ws_close_future = asyncio.run_coroutine_threadsafe(ws.close(), self.eventloop)
+            ws_close_future = asyncio.run_coroutine_threadsafe(
+                ws.close(), self.eventloop
+            )
             ws_close_future.result()
 
 
@@ -291,20 +314,25 @@ def double(x):
     return x * 2
 
 
-if __name__ == '__main__':
-
-    import argparse
+if __name__ == "__main__":
     from funcx import FuncXClient
-    from funcx import set_stream_logger
-    import time
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-s", "--service_url", default='http://localhost:5000/v2',
-                        help="URL at which the funcx-web-service is hosted")
-    parser.add_argument("-e", "--endpoint_id", required=True,
-                        help="Target endpoint to send functions to")
-    parser.add_argument("-d", "--debug", action='store_true',
-                        help="Count of apps to launch")
+    parser.add_argument(
+        "-s",
+        "--service_url",
+        default="http://localhost:5000/v2",
+        help="URL at which the funcx-web-service is hosted",
+    )
+    parser.add_argument(
+        "-e",
+        "--endpoint_id",
+        required=True,
+        help="Target endpoint to send functions to",
+    )
+    parser.add_argument(
+        "-d", "--debug", action="store_true", help="Count of apps to launch"
+    )
     args = parser.parse_args()
 
     endpoint_id = args.endpoint_id
@@ -317,13 +345,13 @@ if __name__ == '__main__':
     future = fx.submit(double, 5, endpoint_id=endpoint_id)
     print("Got future back : ", future)
 
-    for i in range(5):
+    for _i in range(5):
         time.sleep(0.2)
         # Non-blocking check whether future is done
         print("Is the future done? :", future.done())
 
     print("Blocking for result")
-    x = future.result()     # <--- This is a blocking call
+    x = future.result()  # <--- This is a blocking call
     print("Result : ", x)
 
     # fx.shutdown()

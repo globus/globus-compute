@@ -1,11 +1,12 @@
+from parsl.addresses import address_by_hostname
+from parsl.channels import LocalChannel
+from parsl.launchers import SrunLauncher
+from parsl.providers import LocalProvider, SlurmProvider
+
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.executors import HighThroughputExecutor
 
-from parsl.providers import LocalProvider
-from parsl.channels import LocalChannel
-from parsl.providers import SlurmProvider
-from parsl.launchers import SrunLauncher
-from parsl.addresses import address_by_hostname
+# fmt: off
 
 
 # PLEASE CONFIGURE THESE OPTIONS BEFORE USE
@@ -14,9 +15,9 @@ GPUS_PER_NODE = 4
 GPUS_PER_WORKER = 2
 
 # Do not modify:
-TOTAL_WORKERS = int((NODES_PER_JOB*GPUS_PER_NODE)/GPUS_PER_WORKER)
+TOTAL_WORKERS = int((NODES_PER_JOB * GPUS_PER_NODE) / GPUS_PER_WORKER)
 WORKERS_PER_NODE = int(GPUS_PER_NODE / GPUS_PER_WORKER)
-GPU_MAP = ','.join([str(x) for x in range(1,TOTAL_WORKERS + 1)])
+GPU_MAP = ','.join([str(x) for x in range(1, TOTAL_WORKERS + 1)])
 
 config = Config(
     executors=[HighThroughputExecutor(
@@ -39,3 +40,5 @@ config = Config(
         ),
     )],
 )
+
+# fmt: on

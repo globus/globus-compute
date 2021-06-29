@@ -25,6 +25,7 @@ from parsl.app.errors import RemoteExceptionWrapper
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.sdk.client import FuncXClient
+from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 
@@ -104,10 +105,14 @@ class Interchange(object):
                  max_workers_per_node=None,
                  mem_per_worker=None,
                  prefetch_capacity=None,
+
                  scheduler_mode=None,
                  container_type=None,
-                 funcx_service_address=None,
+                 container_cmd_options='',
                  worker_mode=None,
+                 cold_routing_interval=10.0,
+
+                 funcx_service_address=None,
                  scaling_enabled=True,
                  #
                  client_address="127.0.0.1",
@@ -154,6 +159,18 @@ class Interchange(object):
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
 
+        container_cmd_options: str
+            Container command strings to be added to associated container command.
+            For example, singularity exec {container_cmd_options}
+
+        cold_routing_interval: float
+            The time interval between warm and cold function routing in SOFT scheduler_mode.
+            It is ONLY used when using soft scheduler_mode.
+            We need this to avoid container workers being idle for too long.
+            But we dont't want this cold routing to occur too often,
+            since this may cause many warm container workers to switch to a new one.
+            Default: 10.0 seconds
+
         worker_debug : Bool
              Enables worker debug logging.
 
@@ -172,10 +189,14 @@ class Interchange(object):
 
         self.logdir = logdir
         os.makedirs(self.logdir, exist_ok=True)
-        start_file_logger(os.path.join(self.logdir, 'interchange.log'),
-                          level=logging_level,
-                          max_bytes=log_max_bytes,
-                          backup_count=log_backup_count)
+
+        global logger
+        logger = set_file_logger(os.path.join(self.logdir, 'interchange.log'),
+                                 name="interchange",
+                                 level=logging_level,
+                                 max_bytes=log_max_bytes,
+                                 backup_count=log_backup_count)
+
         logger.info("logger location {}, logger filesize: {}, logger backup count: {}".format(logger.handlers,
                                                                                               log_max_bytes,
                                                                                               log_backup_count))
@@ -187,14 +208,18 @@ class Interchange(object):
         self.mem_per_worker = mem_per_worker
         self.cores_per_worker = cores_per_worker
         self.prefetch_capacity = prefetch_capacity
+
         self.scheduler_mode = scheduler_mode
         self.container_type = container_type
+        self.container_cmd_options = container_cmd_options
+        self.worker_mode = worker_mode
+        self.cold_routing_interval = cold_routing_interval
+
         self.log_max_bytes = log_max_bytes
         self.log_backup_count = log_backup_count
         self.working_dir = working_dir
         self.provider = provider
         self.worker_debug = worker_debug
-        self.worker_mode = worker_mode
         self.scaling_enabled = scaling_enabled
         #
 
@@ -281,6 +306,7 @@ class Interchange(object):
                                "--hb_period={heartbeat_period} "
                                "--hb_threshold={heartbeat_threshold} "
                                "--worker_mode={worker_mode} "
+                               "--container_cmd_options='{container_cmd_options}' "
                                "--scheduler_mode={scheduler_mode} "
                                "--log_max_bytes={log_max_bytes} "
                                "--log_backup_count={log_backup_count} "
@@ -304,6 +330,7 @@ class Interchange(object):
 
         self.tasks = set()
         self.task_status_deltas = {}
+        self.container_switch_count = {}
 
     def load_config(self):
         """ Load the config
@@ -339,6 +366,7 @@ class Interchange(object):
                                        heartbeat_threshold=self.heartbeat_threshold,
                                        poll_period=self.poll_period,
                                        worker_mode=self.worker_mode,
+                                       container_cmd_options=self.container_cmd_options,
                                        scheduler_mode=self.scheduler_mode,
                                        logdir=working_dir,
                                        log_max_bytes=self.log_max_bytes,
@@ -365,7 +393,7 @@ class Interchange(object):
             eg. [{'task_id':<x>, 'buffer':<buf>} ... ]
         """
         tasks = []
-        for i in range(0, count):
+        for _i in range(0, count):
             try:
                 x = self.pending_task_queue.get(block=False)
             except queue.Empty:
@@ -515,13 +543,13 @@ class Interchange(object):
         logger.debug("[STATUS] Status reporting loop starting")
 
         while not kill_event.is_set():
-            logger.info(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
+            logger.debug(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
             msg = EPStatusReport(
                 self.endpoint_id,
                 self.get_status_report(),
                 self.task_status_deltas
             )
-            logger.debug("[STATUS] Sending status report to forwarder, and clearing task deltas.")
+            logger.debug("[STATUS] Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
@@ -615,6 +643,12 @@ class Interchange(object):
         # onto this list.
         interesting_managers = set()
 
+        # This value records when the last cold routing in soft mode happens
+        # When the cold routing in soft mode happens, it may cause worker containers to switch
+        # Cold routing is to reduce the number idle workers of specific task types on the managers
+        # when there are not enough tasks of those types in the task queues on interchange
+        last_cold_routing_time = time.time()
+
         while not self._kill_event.is_set():
             self.socks = dict(poller.poll(timeout=poll_period))
 
@@ -688,7 +722,7 @@ class Interchange(object):
                         manager_adv = pickle.loads(message[1])
                         logger.debug("[MAIN] Manager {} requested {}".format(manager, manager_adv))
                         self._ready_manager_queue[manager]['free_capacity'].update(manager_adv)
-                        self._ready_manager_queue[manager]['free_capacity']['total_workers'] = sum(manager_adv.values())
+                        self._ready_manager_queue[manager]['free_capacity']['total_workers'] = sum(manager_adv['free'].values())
                         interesting_managers.add(manager)
 
             # If we had received any requests, check if there are tasks that could be passed
@@ -697,10 +731,20 @@ class Interchange(object):
                 len(self._ready_manager_queue),
                 len(interesting_managers)))
 
-            task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
-                                                                             self.pending_task_queue,
-                                                                             self._ready_manager_queue,
-                                                                             scheduler_mode=self.scheduler_mode)
+            if time.time() - last_cold_routing_time > self.cold_routing_interval:
+                task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                                 self.pending_task_queue,
+                                                                                 self._ready_manager_queue,
+                                                                                 scheduler_mode=self.scheduler_mode,
+                                                                                 cold_routing=True)
+                last_cold_routing_time = time.time()
+            else:
+                task_dispatch, dispatched_task = naive_interchange_task_dispatch(interesting_managers,
+                                                                                 self.pending_task_queue,
+                                                                                 self._ready_manager_queue,
+                                                                                 scheduler_mode=self.scheduler_mode,
+                                                                                 cold_routing=False)
+
             self.total_pending_task_count -= dispatched_task
 
             for manager in task_dispatch:
@@ -734,6 +778,8 @@ class Interchange(object):
                         self.task_outgoing.send_multipart([manager, b'', PKL_HEARTBEAT_CODE])
                         b_messages = b_messages[1:]
                         self._ready_manager_queue[manager]['last'] = time.time()
+                        self.container_switch_count[manager] = manager_report.container_switch_count
+                        logger.info(f"[MAIN] Got container switch count: {self.container_switch_count}")
                     except Exception:
                         pass
                     if len(b_messages):
@@ -756,7 +802,7 @@ class Interchange(object):
             # Send status reports from this main thread to avoid thread-safety on zmq sockets
             try:
                 packed_status_report = status_report_queue.get(block=False)
-                logger.debug(f"[MAIN] forwarding status report queue: {packed_status_report}")
+                logger.debug(f"[MAIN] forwarding status report: {packed_status_report}")
                 self.results_outgoing.send(packed_status_report)
             except queue.Empty:
                 pass
@@ -852,7 +898,7 @@ class Interchange(object):
              NotImplementedError
         """
         r = []
-        for i in range(blocks):
+        for _i in range(blocks):
             if self.provider:
                 self._block_counter += 1
                 external_block_id = str(self._block_counter)
@@ -875,7 +921,7 @@ class Interchange(object):
                 r = None
         return r
 
-    def scale_in(self, blocks=None, block_ids=[], task_type=None):
+    def scale_in(self, blocks=None, block_ids=None, task_type=None):
         """Scale in the number of active blocks by specified amount.
 
         Parameters
@@ -886,6 +932,8 @@ class Interchange(object):
         block_ids : [str.. ]
             List of external block ids to terminate
         """
+        if block_ids is None:
+            block_ids = []
         if task_type:
             logger.info("Scaling in blocks of specific task type {}. Let the provider decide which to kill".format(task_type))
             if self.scaling_enabled and self.provider:
@@ -927,53 +975,6 @@ class Interchange(object):
             logger.debug("[MAIN] The status is {}".format(status))
 
         return status
-
-
-def start_file_logger(filename,
-                      name="interchange",
-                      level=logging.DEBUG,
-                      format_string=None,
-                      max_bytes=256 * 1024 * 1024,
-                      backup_count=1):
-    """Add a stream log handler.
-
-    Parameters
-    ---------
-
-    filename: string
-        Name of the file to write logs to. Set to None to have interchange logging
-        merged in with endpoint logging.
-    name: string
-        Logger name. Default="parsl.executors.interchange"
-    level: logging.LEVEL
-        Set the logging level. Default=logging.DEBUG
-        - format_string (string): Set the format string
-    format_string: string
-        Format string to use.
-    max_bytes: int
-        The maximum bytes per logger file, default: 256MB
-    backup_count: int
-        The number of backup (must be non-zero) per logger file, default: 1
-
-    Returns
-    -------
-        None.
-    """
-    if format_string is None:
-        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d [%(levelname)s]  %(message)s"
-
-    global logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not len(logger.handlers):
-        handler = RotatingFileHandler(filename, maxBytes=max_bytes, backupCount=backup_count)
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt='%Y-%m-%d %H:%M:%S')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.info(
-            "logger location {}, logger filesize: {}, logger backup count: {}".format(
-                logger.handlers, max_bytes, backup_count))
 
 
 def starter(comm_q, *args, **kwargs):

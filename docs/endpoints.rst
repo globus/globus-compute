@@ -92,6 +92,8 @@ and communicate command information.
 
 Once started, the endpoint uses a daemon process to run in the background.
 
+.. note:: If the endpoint was not stopped correctly previously (e.g. after a computer restart when the endpoint was running), the endpoint directory will be cleaned up to allow a fresh start
+
 .. warning:: Only the owner of an endpoint is authorized to start an endpoint. Thus if you register with a different Globus Auth identity and try to start an endpoint owned by another identity, it will fail.
 
 
@@ -101,6 +103,12 @@ Stopping an Endpoint
 To stop an endpoint, run the following command::
 
   $ funcx-endpoint stop <ENDPOINT_NAME>
+
+If the endpoint is not running and was stopped correctly previously, this command does nothing.
+
+If the endpoint is not running but was not stopped correctly previously (e.g. after a computer restart
+when the endpoint was running), this command will clean up the endpoint directory such that the endpoint
+can be started cleanly again.
 
 .. note:: If the ENDPOINT_NAME is not specified, the default endpoint is stopped.
 
@@ -126,7 +134,32 @@ Endpoints can be the following states:
 
 * **Initialized**: This status means that the endpoint has been created, but not started
   following configuration and not registered with the `funcx service`
-* **Active**: This status means that the endpoint is active and available for executing
+* **Running**: This status means that the endpoint is active and available for executing
   functions
-* **Inactive**: This status means that endpoint is not running right now and therefore,
-  cannot service any functions.
+* **Stopped**: This status means that the endpoint was stopped by the user. It is not running
+  right now and therefore, cannot service any functions. It can be started again without issues.
+* **Disconnected**: This status means that the endpoint disconnected unexpectedly. It is not running
+  right now and therefore, cannot service any functions. Starting this endpoint will first invoke
+  necessary endpoint cleanup, since it was not stopped correctly previously.
+
+
+Container behaviors and routing
+-------------------------------
+
+The funcX endpoint supports various technologies of containers (e.g., docker and singularity) and also raw processes on clusters (e.g., laptop, Kubernetes, and Supercomputers).
+The funcX endpoint also supports different routing mechanisms for different use cases.
+
+Raw worker processes (`worker_mode=no_container`):
+
+* Hard routing: All worker processes are of the same type "RAW". It this case, the funcx endpoint simply routes function tasks to any available worker processes. The is the default mode of a funcx endpoint.
+* Soft routing: It is the same as hard routing.
+
+Under Kubernetes (docker):
+
+* Hard routing: Both the manager and the worker are deployed within a pod and thus the manager cannot change the type of worker containers. In this case, a set of managers are deployed with specific container images and the funcx endpoint simply routes tasks to corresponding managers (to match their types).
+* Soft routing: NOT SUPPORTED.
+
+Without Kubernetes, native container support (docker, singularity, shifter):
+
+* Hard routing: In this case, each manager (on a compute node) can only launch worker containers of a specific type and thus each manager can serve only one type of function tasks.
+* Soft routing: When receiving a task of a specific container type, the funcx endpoint attempts to send the task to a manager that has a suitable warm container to minimize the   total number of container cold starts. If there are not any warmed containers in any connected managers, the funcX endpoint chooses one manager randomly to dispatch the task.

@@ -5,20 +5,19 @@ funcx.sdk.utils.batch.Batch
 
 .. autoclass:: Batch
 
-   
+
    .. automethod:: __init__
 
-   
+
    .. rubric:: Methods
 
    .. autosummary::
-   
+
       ~Batch.__init__
       ~Batch.add
       ~Batch.prepare
-   
-   
 
-   
-   
-   
+
+
+
+

@@ -15,23 +15,24 @@
 # sys.path.insert(0, os.path.abspath('.'))
 import os
 import sys
-import requests
-sys.path.insert(0, os.path.abspath('../funcx_sdk/'))
-import funcx
 
+import requests
+
+sys.path.insert(0, os.path.abspath("../funcx_sdk/"))
+import funcx
 
 # -- Project information -----------------------------------------------------
 
-project = 'funcX'
-copyright = '2019, The University of Chicago'
-author = 'The funcX Team'
+project = "funcX"
+copyright = "2019, The University of Chicago"
+author = "The funcX Team"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = funcx.__version__.rsplit('.', 1)[0]
+version = funcx.__version__.rsplit(".", 1)[0]
 # The full version, including alpha/beta/rc tags.
 release = funcx.__version__
 
@@ -42,50 +43,50 @@ release = funcx.__version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'nbsphinx',
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.intersphinx',
+    "nbsphinx",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.intersphinx",
     # 'sphinx.ext.linkcode',
-    'sphinx.ext.napoleon'
+    "sphinx.ext.napoleon",
 ]
 
 autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
-nbsphinx_execute = 'never'
+nbsphinx_execute = "never"
 
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
+    "python": ("https://docs.python.org/3", None),
 }
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = ".rst"
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = "index"
 
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = "sphinx"
 
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+html_theme = "sphinx_rtd_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
