@@ -148,8 +148,8 @@ class FuncXExecutor(concurrent.futures.Executor):
                                                                     function_name=function.__name__,
                                                                     container_uuid=container_uuid)
             except Exception:
-                logger.error("Error in registering {}".format(func.__name__))
-                raise Exception("Error in registering {}".format(func.__name__))
+                logger.error("Error in registering {}".format(function.__name__))
+                raise Exception("Error in registering {}".format(function.__name__))
             else:
                 self._function_registry[function] = function_id
                 logger.debug(f"Function registered with id:{function_id}")
