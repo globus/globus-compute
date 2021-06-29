@@ -38,11 +38,11 @@ class AtomicController:
         self.start_callback = start_callback
         self.stop_callback = stop_callback
 
-    def increment(self, count):
+    def increment(self):
         with self.lock:
             if self._value == 0:
                 self.start_callback()
-            self._value += count
+            self._value += 1
 
     def decrement(self):
         with self.lock:
@@ -147,7 +147,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         if function not in self._function_registry:
             # Please note that this is a partial implementation, not all function
             # registration options are fleshed out here.
-            logger.debug("Function:{function} is not registered. Registering")
+            logger.debug(f"Function:{function} is not registered. Registering")
             try:
                 function_id = self.funcx_client.register_function(function,
                                                                     function_name=function.__name__,
@@ -165,7 +165,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
         msg = {"task_id": task_id,
-               "function_id": function_id,
+               "function_id": self._function_registry[function],
                "endpoint_id": endpoint_id,
                "args": args,
                "kwargs": kwargs}
@@ -206,15 +206,15 @@ class FuncXExecutor(concurrent.futures.Executor):
             else:
                 for i, msg in enumerate(messages):
                     self._function_future_map[batch_tasks[i]] = self._tasks.pop(msg['task_id'])
-                self.poller_thread.atomic_controller.increment(len(messages))
+                    self.poller_thread.atomic_controller.increment()
 
-                if not self.poller_thread or self.poller_thread.ws_handler.closed:
-                    self.poller_thread = ExecutorPollerThread(
-                        self.funcx_client,
-                        self._function_future_map,
-                        self.results_ws_uri,
-                        self.task_group_id
-                    )
+                    if not self.poller_thread or self.poller_thread.ws_handler.closed:
+                        self.poller_thread = ExecutorPollerThread(
+                            self.funcx_client,
+                            self._function_future_map,
+                            self.results_ws_uri,
+                            self.task_group_id
+                        )
 
     def _get_tasks_in_batch(self):
         """Get tasks from task_outgoing queue in batch, either by interval or by batch size"""
