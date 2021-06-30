@@ -5,7 +5,7 @@ Quickstart
 
 The latest version available on PyPI is ``v0.2.3``.
 
-You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/funcx/master?filepath=examples%2FTutorial.ipynb>`_
+You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb>`_
 
 
 Installation
