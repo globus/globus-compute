@@ -22,7 +22,6 @@ import zmq
 from globus_sdk import GlobusAPIError, NetworkError
 
 import funcx_endpoint
-from funcx.utils.errors import *
 from funcx.utils.response_errors import FuncxResponseError
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config

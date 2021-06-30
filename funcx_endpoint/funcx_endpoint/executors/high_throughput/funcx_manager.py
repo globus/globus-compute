@@ -18,10 +18,14 @@ import psutil
 import subprocess
 
 from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
-from funcx_endpoint.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
+from funcx_endpoint.executors.high_throughput.messages import (
+    EPStatusReport,
+    Heartbeat,
+    ManagerStatusReport,
+    TaskStatusCode
+)
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
-from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 

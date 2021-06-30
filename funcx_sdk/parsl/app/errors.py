@@ -4,7 +4,6 @@ from types import TracebackType
 from typing import Any, Callable, TypeVar, Union
 
 import dill
-from six import reraise
 from tblib import Traceback
 
 logger = logging.getLogger(__name__)

@@ -1,14 +1,12 @@
 from funcx_endpoint.endpoint.utils.config import Config
 import os
+import funcx
+import logging
 
 config = Config()
 
 
 if __name__ == '__main__':
-
-    import funcx
-    import os
-    import logging
     funcx.set_stream_logger()
     logger = logging.getLogger(__file__)
 
