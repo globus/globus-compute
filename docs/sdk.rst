@@ -32,7 +32,7 @@ Groups to facilitate sharing and to make authorization decisions.
 funcX allows endpoints and functions to be shared by associating a Globus Group.
 
 .. note:: funcX internally caches function, endpoint, and authorization lookups. Caches are based on user authentication tokens. To force refresh cached
-entries you can re-authenticate your client with `force_login=True`.
+          entries you can re-authenticate your client with `force_login=True`.
 
 Registering Functions
 ---------------------
@@ -86,7 +86,7 @@ task is still pending.
     print("Exception: {}".format(e))
 
 .. note:: funcX caches results in the cloud until they have been retrieved. The SDK also caches results
-during a session. However, calling `get_result()` from a new session will not be able to access the results.
+          during a session. However, calling `get_result()` from a new session will not be able to access the results.
 
 
 Arguments and data
