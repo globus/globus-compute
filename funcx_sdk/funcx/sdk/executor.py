@@ -103,9 +103,9 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         if self.batch_enabled:
             logger.info("Batch submission enabled.")
-            self.start()
+            self.start_batching_thread()
 
-    def start(self):
+    def start_batching_thread(self):
         self.task_outgoing = queue.Queue()
 
         self._kill_event = threading.Event()
@@ -149,7 +149,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                                                                   container_uuid=container_uuid)
             except Exception:
                 logger.error("Error in registering {}".format(function.__name__))
-                raise Exception("Error in registering {}".format(function.__name__))
+                raise
             else:
                 self._function_registry[function] = function_id
                 logger.debug(f"Function registered with id:{function_id}")
