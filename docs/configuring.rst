@@ -1,13 +1,12 @@
 .. _configuration-section:
-Examples
---------
 
 funcX has been used on various systems around the world. Below are example configurations
 for commonly used systems. If you would like to add your system to this list please
-contact the funcX team via Slack. 
+contact the funcX team via Slack.
 
 
-.. contents:: Examples:
+.. contents:: :local:
+
 
 .. note::
    All configuration examples below must be customized for the user's
