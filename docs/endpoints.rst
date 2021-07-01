@@ -1,12 +1,12 @@
 Endpoints
 =========
 
-An endpoint is a persistent service launched by the user on a compute to serve as a conduit for 
-executing functions on that computer. funcX supports a range of target systems enabling 
-an endpoint to be deployed on a laptop, the login node of a campus cluster, a cloud instance, 
-or a Kubernetes cluster, for example. 
+An endpoint is a persistent service launched by the user on a compute to serve as a conduit for
+executing functions on that computer. funcX supports a range of target systems enabling
+an endpoint to be deployed on a laptop, the login node of a campus cluster, a cloud instance,
+or a Kubernetes cluster, for example.
 
-The endpoint requires outbound network connectivity. That is, it must be able to connect to 
+The endpoint requires outbound network connectivity. That is, it must be able to connect to
 funcX at `funcx.org <https://api2.funcx.org/v2>`_.
 
 To install the funcX endpoint agent software ::
@@ -23,13 +23,13 @@ with existing endpoints using the `funcx-endpoint` command.
 First time setup
 ----------------
 
-You will be required to authenticate the first time you run `funcx-endpoint`. 
-If you have authenticated previously, the endpoint will cache access tokens in 
-the local configuration file. 
+You will be required to authenticate the first time you run `funcx-endpoint`.
+If you have authenticated previously, the endpoint will cache access tokens in
+the local configuration file.
 
 funcX requires authentication in order to associate
 endpoints with users and ensure only authorized users can run tasks on that endpoint. As part of this step
-we request access to your identity and Globus Groups. 
+we request access to your identity and Globus Groups.
 
 To get started you will first want to configure a new endpoint.  ::
 
@@ -46,11 +46,11 @@ Configuring an Endpoint
 ----------------------------
 
 After creating an endpoint, a configuration file will be created at `$HOME/.funcx/config.py`. This file contains
-information regarding the endpoint, such as the owner username and email address.  
+information regarding the endpoint, such as the owner username and email address.
 It also includes information about the endpoint's broker, a concept used when the endpoint controls execution
-on other nodes (e.g., in a cluster deployment). 
+on other nodes (e.g., in a cluster deployment).
 
-.. note:: If your endpoint will manage execution on other nodes you must set the endpoint address such that workers can communicate with the endpoint. 
+.. note:: If your endpoint will manage execution on other nodes you must set the endpoint address such that workers can communicate with the endpoint.
 
 .. code-block:: python
 
@@ -71,7 +71,7 @@ supercomputers, and even your laptop. To make the best use of your resources, th
 configured to match the capabilities of the resource on which it is deployed.
 
 FuncX provides a Python class-based configuration model that allows you to specify the shape of the
-resources (number of nodes, number of cores per worker, walltime, etc.) as well as allowing you to place 
+resources (number of nodes, number of cores per worker, walltime, etc.) as well as allowing you to place
 limits on how funcX may scale the resources in response to changing workload demands.
 
 To generate the appropriate directories and default configuration template, run the following command::
@@ -80,10 +80,10 @@ To generate the appropriate directories and default configuration template, run 
 
 This command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/` and will instantiate a
 `config.py` file. This file should be updated with the appropriate configurations for the computational system you are
-targeting before you start the endpoint.  
+targeting before you start the endpoint.
 funcX is configured using a :class:`~funcx_endpoint.endpoint.utils.config.Config` object.
-funcX uses `Parsl <https://parsl-project.org>`_ to manage resources. For more information, 
-see the :class:`~funcx_endpoint.endpoint.utils.config.Config` class documentation and the 
+funcX uses `Parsl <https://parsl-project.org>`_ to manage resources. For more information,
+see the :class:`~funcx_endpoint.endpoint.utils.config.Config` class documentation and the
 `Parsl documentation <hhttps://parsl.readthedocs.io/en/stable/userguide/overview.html>`_ .
 
 .. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is configured.
@@ -99,9 +99,9 @@ To start a new endpoint run the following command::
 .. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is started.
 
 Starting an endpoint will perform a registration process with funcX.
-The registration process provides funcX with information regarding the endpoint. 
+The registration process provides funcX with information regarding the endpoint.
 The endpoint establishes three outbound
-ZeroMQ channels to funcX (on the three ports returned during registration) 
+ZeroMQ channels to funcX (on the three ports returned during registration)
 to retrieve tasks, send results, and communicate command information.
 
 Once started, the endpoint uses a daemon process to run in the background.

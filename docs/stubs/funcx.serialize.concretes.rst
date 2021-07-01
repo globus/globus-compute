@@ -1,4 +1,4 @@
-funcx.serialize.concretes
+﻿funcx.serialize.concretes
 =========================
 
 .. automodule:: funcx.serialize.concretes
@@ -8,6 +8,12 @@ funcx.serialize.concretes
 
 
 
+
+   .. rubric:: Functions
+
+   .. autosummary::
+
+      ensure_all_concrete_serializers_registered
 
 
 

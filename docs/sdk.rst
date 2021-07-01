@@ -1,7 +1,7 @@
 SDK
 ============
 
-The **funcX SDK** provides a programmatic interface to funcX from Python. 
+The **funcX SDK** provides a programmatic interface to funcX from Python.
 The SDK provides a convenient Pythonic interface to:
 
 1. Register functions
@@ -12,7 +12,7 @@ The SDK provides a convenient Pythonic interface to:
 
 The SDK provides a client class for interacting with funcX. The client
 abstracts authentication and provides an interface to make funcX
-API calls without needing to know the funcX REST endpoints for those operations. 
+API calls without needing to know the funcX REST endpoints for those operations.
 You can instantiate a funcX client as follows.
 
 .. code-block:: python
@@ -21,15 +21,15 @@ You can instantiate a funcX client as follows.
   fxc = FuncXClient()
 
 Instantiating a client will start an authentication process where you will be asked to authenticate via Globus Auth.
-We require every interaction with funcX to be authenticated as it enables enforced 
-access control on both functions and endpoints. 
+We require every interaction with funcX to be authenticated as it enables enforced
+access control on both functions and endpoints.
 Globus Auth is an identity and access management platform that provides authentication brokering
-capablities enabling users to login using one of several hundred supported identities. 
+capablities enabling users to login using one of several hundred supported identities.
 It also provides group and profile management for user accounts.
 As part of the authentication process, funcX will request access
 to your identity (to retrieve your email address) and Globus Groups. funcX uses
-Groups to facilitate sharing and to make authorization decisions. 
-funcX allows endpoints and functions to be shared by associating a Globus Group. 
+Groups to facilitate sharing and to make authorization decisions.
+funcX allows endpoints and functions to be shared by associating a Globus Group.
 
 .. note:: funcX internally caches function, endpoint, and authorization lookups. Caches are based on user authentication tokens. To force refresh cached
 entries you can re-authenticate your client with `force_login=True`.
@@ -38,10 +38,10 @@ Registering Functions
 ---------------------
 
 You can register a Python function with funcX via `register_function()`. Function registration serializes the
-function body and transmits it to funcX. Once the function is registered with funcX, it is assigned a 
+function body and transmits it to funcX. Once the function is registered with funcX, it is assigned a
 UUID that can be used to manage and invoke the function.
 
-.. note:: You must import any dependencies required by the function inside the function body. 
+.. note:: You must import any dependencies required by the function inside the function body.
 
 
 The following example shows how to register a function. In this case the function simply
@@ -61,8 +61,8 @@ Running Functions
 -----------------
 You can invoke a function using the UUID returned when registering the function. The `run()` function
 requires that you specify the function (`function_id`) and endpoint (`endpoint_id`) on which to execute
-the function. funcX will return a UUID for the executing function (called a task) via which you can 
-monitor status and retrieve results.  
+the function. funcX will return a UUID for the executing function (called a task) via which you can
+monitor status and retrieve results.
 
 .. code-block:: python
 
@@ -73,8 +73,8 @@ monitor status and retrieve results.
 Retrieving Results
 -------------------
 The result of your function's invocation can be retrieved using the `get_result()` function. This will either
-return the deserialized result of your invocation or raise an exception indicating that the 
-task is still pending. 
+return the deserialized result of your invocation or raise an exception indicating that the
+task is still pending.
 
 .. note:: If your function raises an exception, get_result() will reraise it.
 
@@ -105,26 +105,26 @@ using the `run()` function. The following example shows how strings can be passe
 
   task_id = fxc.run("Bob", "Smith", endpoint_id=tutorial_endpoint, function_id=func_id)
 
-  try: 
+  try:
     print(fxc.get_result(task_id))
   except Exception as e:
     print("Exception: {}".format(e))
-		
+
 
 Sharing Functions
 -----------------
-You may share functions publicly (with anyone) or a set of users via a Globus Group.  
-You can also add a function description such that it can be discovered by others. 
+You may share functions publicly (with anyone) or a set of users via a Globus Group.
+You can also add a function description such that it can be discovered by others.
 
 To share with a group set `group=<globus_group_id>` when registering a function.
 
 .. code-block:: python
 
   fxc.register_function(funcx, description="My function", group=<globus_group_id>)
-	
 
-Upon execution, funcX will ensure that a user is authorized to execute the function by checking group membership. 
-	
+
+Upon execution, funcX will ensure that a user is authorized to execute the function by checking group membership.
+
 You can also set a function to be publicly accessible by setting `public=True` when registering the function.
 
 .. code-block:: python
@@ -135,8 +135,8 @@ You can also set a function to be publicly accessible by setting `public=True` w
 Discovering Functions
 ----------------------
 
-funcX maintains an access controlled search index of registered functions.  
-You can lookup your own functions, functions that have been shared with you, 
+funcX maintains an access controlled search index of registered functions.
+You can lookup your own functions, functions that have been shared with you,
 or publicly accessible functions via the `search_function()` function.
 
 .. code-block:: python
@@ -148,9 +148,9 @@ or publicly accessible functions via the `search_function()` function.
 Batching
 --------------
 
-The SDK includes a batch interface to reduce the overheads of executing a function many times. 
+The SDK includes a batch interface to reduce the overheads of executing a function many times.
 To use this interface you must first create a batch object and then pass that object
-to the `batch_run` function. 
+to the `batch_run` function.
 
 .. code-block:: python
 
@@ -158,7 +158,7 @@ to the `batch_run` function.
 
   for x in range(0,5):
     batch.add(x, endpoint_id=tutorial_endpoint, function_id=func_id)
-    
+
   batch_res = fxc.batch_run(batch)
 
 There is also a batch result interface to retrieve the results of a batch.
@@ -172,7 +172,7 @@ Client Throttling
 -----------------
 
 In order to avoid overloading funcX we place soft throttling restrictions on the funcX client.
-There are two key throttling measures: first, we limit the number of requests a client can make (5 requests every 5 seconds), 
+There are two key throttling measures: first, we limit the number of requests a client can make (5 requests every 5 seconds),
 and second, we limit the size of input and output transmitted through the service (2MB per request).
 
 Batching requests and status can help reduce the number of requests made to the Web Service. In addition, the limit on
@@ -189,4 +189,3 @@ FuncXClient Reference:
 
 .. autoclass:: funcx.FuncXClient
    :members:
-
