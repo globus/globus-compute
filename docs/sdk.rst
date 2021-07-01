@@ -172,8 +172,8 @@ Client Throttling
 -----------------
 
 In order to avoid overloading funcX we place soft throttling restrictions on the funcX client.
-There are two key throttling measures: first, we limit the number of requests a client can make (5 requests every 5 seconds),
-and second, we limit the size of input and output transmitted through the service (2MB per request).
+There are two key throttling measures: first, we limit the number of requests a client can make (20 requests every 10 seconds),
+and second, we limit the size of input and output transmitted through the service (5MB per request).
 
 Batching requests and status can help reduce the number of requests made to the Web Service. In addition, the limit on
 the number of requests made to the Web Service can be removed by setting `throttling_enabled` to False.
