@@ -73,6 +73,7 @@ class WebSocketPollingTask:
         asyncio.set_event_loop(self.loop)
         self.task_group_ids_queue = asyncio.Queue()
         self.pending_tasks = {}
+        self.unknown_results = {}
 
         self.ws = None
         self.closed = False
@@ -114,36 +115,66 @@ class WebSocketPollingTask:
 
     async def handle_incoming(self, pending_futures, auto_close=False):
         while True:
-            raw_data = await self.ws.recv()
-            data = json.loads(raw_data)
-            task_id = data["task_id"]
-            if task_id in pending_futures:
-                future = pending_futures.pop(task_id)
-                try:
-                    if data["result"]:
-                        future.set_result(
-                            self.funcx_client.fx_serializer.deserialize(data["result"])
-                        )
-                    elif data["exception"]:
-                        r_exception = self.funcx_client.fx_serializer.deserialize(
-                            data["exception"]
-                        )
-                        future.set_exception(dill.loads(r_exception.e_value))
-                    else:
-                        future.set_exception(Exception(data["reason"]))
-                except Exception:
-                    logger.exception("Caught unexpected while setting results")
+            try:
+                raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
+            except asyncio.TimeoutError:
+                pass
+            else:
+                data = json.loads(raw_data)
+                task_id = data["task_id"]
+                if task_id in pending_futures:
+                    self.set_result(task_id, data, pending_futures)
+
+                    # When the counter hits 0 we always exit. This guarantees that that
+                    # if the counter increments to 1 on the executor, this handler needs to be restarted.
+                    if self.atomic_controller is not None:
+                        count = self.atomic_controller.decrement()
+                        # Only close when count == 0 and unknown_results are empty
+                        if count == 0 and len(self.unknown_results) == 0:
+                           await self.ws.close()
+                           self.ws = None
+                           return
+                else:
+                    # This scenario occurs rarely using non-batching mode,
+                    # but quite often in batching mode.
+                    # When submitting tasks in batch with batch_run,
+                    # some task results may be received by websocket before the response of batch_run,
+                    # and pending_futures do not have the futures for the tasks yet.
+                    # We store these in unknown_results and process when their futures are ready.
+                    self.unknown_results[task_id] = data
+
+            # Handle the results received but not processed before
+            unprocessed_task_ids = self.unknown_results.keys() & pending_futures.keys()
+            for task_id in unprocessed_task_ids:
+                data = self.unknown_results.pop(task_id)
+                self.set_result(task_id, data, pending_futures)
 
                 # When the counter hits 0 we always exit. This guarantees that that
                 # if the counter increments to 1 on the executor, this handler needs to be restarted.
                 if self.atomic_controller is not None:
                     count = self.atomic_controller.decrement()
-                    if count == 0:
+                    # Only close when count == 0 and unknown_results are empty
+                    if count == 0 and len(self.unknown_results) == 0:
                         await self.ws.close()
                         self.ws = None
                         return
+
+    def set_result(self, task_id, data, pending_futures):
+        future = pending_futures.pop(task_id)
+        try:
+            if data["result"]:
+                future.set_result(
+                    self.funcx_client.fx_serializer.deserialize(data["result"])
+                )
+            elif data["exception"]:
+                r_exception = self.funcx_client.fx_serializer.deserialize(
+                    data["exception"]
+                )
+                future.set_exception(dill.loads(r_exception.e_value))
             else:
-                print("[MISSING FUTURE]")
+                future.set_exception(Exception(data["reason"]))
+        except Exception:
+            logger.exception("Caught unexpected while setting results")
 
     def put_task_group_id(self, task_group_id):
         # prevent the task_group_id from being sent to the WebSocket server
