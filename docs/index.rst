@@ -88,7 +88,7 @@ how to download and configure an endpoint for local (multi-process) execution. :
    :caption: Contents:
 
    quickstart
-	 sdk
+   sdk
    endpoints
    Tutorial.ipynb
    reference
