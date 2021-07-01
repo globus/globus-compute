@@ -131,9 +131,9 @@ class WebSocketPollingTask:
                         count = self.atomic_controller.decrement()
                         # Only close when count == 0 and unknown_results are empty
                         if count == 0 and len(self.unknown_results) == 0:
-                           await self.ws.close()
-                           self.ws = None
-                           return
+                            await self.ws.close()
+                            self.ws = None
+                            return
                 else:
                     # This scenario occurs rarely using non-batching mode,
                     # but quite often in batching mode.
