@@ -148,7 +148,7 @@ or publicly accessible functions via the `search_function()` function.
 Batching
 --------------
 
-The SDK includes a batch interface to reduce the overheads of executing a function many times.
+The SDK includes a batch interface to reduce the overheads of launching a function many times.
 To use this interface you must first create a batch object and then pass that object
 to the `batch_run` function.
 
