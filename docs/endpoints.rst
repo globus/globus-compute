@@ -109,7 +109,7 @@ Once started, the endpoint uses a daemon process to run in the background.
 .. note:: If the endpoint was not stopped correctly previously (e.g., after a computer restart when the endpoint was running), the endpoint directory will be cleaned up to allow a fresh start
 
 .. warning:: Only the owner of an endpoint is authorized to start an endpoint. Thus if you register an endpoint
-using a different identity and try to start an endpoint owned by another identity, it will fail.
+using one identity and try to start an endpoint owned by another identity, it will fail.
 
 
 Stopping an Endpoint
