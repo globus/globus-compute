@@ -160,7 +160,7 @@ Endpoints can be the following states:
 Container behaviors and routing
 -------------------------------
 
-The funcX endpoint can run functions using indepenent Python processes or optionally
+The funcX endpoint can run functions using independent Python processes or optionally
 inside containers. funcX supports various container technologies (e.g., docker and singularity)
 and different routing mechanisms for different use cases.
 
