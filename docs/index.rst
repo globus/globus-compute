@@ -14,7 +14,7 @@ and supercomputers.
 
 funcX is composed of two core components:
 
-* funcX cloud-hosted service provides an available, reliable, and secure interface for registering, sharing, and executing functions on remote endpoints. It implements a fire-and-forget model via which the cloud service is responsible for securely communicating with endpoints to ensure functions are successfully executed.
+* The funcX cloud-hosted service provides an available, reliable, and secure interface for registering, sharing, and executing functions on remote endpoints. It implements a fire-and-forget model via which the cloud service is responsible for securely communicating with endpoints to ensure functions are successfully executed.
 
 * funcX endpoints transform existing laptops, clouds, clusters, and supercomputers into function serving systems.  Endpoints are registered by installing the funcX_endpoint software and configuring it for the target system.
 
@@ -34,11 +34,11 @@ can be configured to execute functions locally (i.e., using multiple processes) 
 on connected computing resources (i.e., by provisioning and managing compute nodes
 from a batch scheduler or cloud API).
 
-funcX implements a reliable fire-and-forget execution model. After invoking a function
-users can close their laptop and rely on funcX to manage the execution and store the
+funcX implements a reliable fire-and-forget execution model. After invoking a function,
+a user can close their laptop and rely on funcX to manage the execution and store the
 results. funcX securely communicates with remote endpoints, waits for resources
 to become available, and can even retry execution upon failure. funcX stores results (or
-errors) in the cloud-hosted service until retrieved by the user.
+errors) in the cloud-hosted service until they are retrieved by the user.
 
 .. image:: img/funcx-model.png
 

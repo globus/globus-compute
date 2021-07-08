@@ -6,14 +6,14 @@ The SDK provides a convenient Pythonic interface to:
 
 1. Register functions
 2. Register containers and execution environments
-3. Launch registered function on accessible endpoints
-4. Check the status of launched functions and
+3. Launch registered functions on accessible endpoints
+4. Check the status of launched functions
 5. Retrieve outputs from functions
 
 The SDK provides a client class for interacting with funcX. The client
 abstracts authentication and provides an interface to make funcX
 API calls without needing to know the funcX REST endpoints for those operations.
-You can instantiate a funcX client as follows.
+You can instantiate a funcX client as follows:
 
 .. code-block:: python
 
@@ -21,7 +21,7 @@ You can instantiate a funcX client as follows.
   fxc = FuncXClient()
 
 Instantiating a client will start an authentication process where you will be asked to authenticate via Globus Auth.
-We require every interaction with funcX to be authenticated as it enables enforced
+We require every interaction with funcX to be authenticated, as this enables enforced
 access control on both functions and endpoints.
 Globus Auth is an identity and access management platform that provides authentication brokering
 capablities enabling users to login using one of several hundred supported identities.
@@ -32,7 +32,7 @@ Groups to facilitate sharing and to make authorization decisions.
 funcX allows endpoints and functions to be shared by associating a Globus Group.
 
 .. note:: funcX internally caches function, endpoint, and authorization lookups. Caches are based on user authentication tokens. To force refresh cached
-          entries you can re-authenticate your client with `force_login=True`.
+          entries, you can re-authenticate your client with `force_login=True`.
 
 Registering Functions
 ---------------------
@@ -44,7 +44,7 @@ UUID that can be used to manage and invoke the function.
 .. note:: You must import any dependencies required by the function inside the function body.
 
 
-The following example shows how to register a function. In this case the function simply
+The following example shows how to register a function. In this case, the function simply
 returns the platform information of the system on which it is executed. The function
 is defined in the same way as any Python function before being registered with funcX.
 
@@ -93,7 +93,7 @@ Arguments and data
 ------------------
 funcX functions operate the same as any other Python function. You can pass arguments \*args and \**kwargs
 and return values from functions. The only constraint is that data passed to/from a funcX function must be
-serializable (e.g., via Pickle) and less than 2MB in size.  Input arguments can be passed to the function
+serializable (e.g., via Pickle) and less than 2 MB in size.  Input arguments can be passed to the function
 using the `run()` function. The following example shows how strings can be passed to and from a function.
 
 .. code-block:: python
@@ -116,14 +116,14 @@ Sharing Functions
 You may share functions publicly (with anyone) or a set of users via a Globus Group.
 You can also add a function description such that it can be discovered by others.
 
-To share with a group set `group=<globus_group_id>` when registering a function.
+To share with a group, set `group=<globus_group_id>` when registering a function.
 
 .. code-block:: python
 
   fxc.register_function(funcx, description="My function", group=<globus_group_id>)
 
 
-Upon execution, funcX will ensure that a user is authorized to execute the function by checking group membership.
+Upon execution, funcX will check group membership to ensure that the user is authorized to execute the function.
 
 You can also set a function to be publicly accessible by setting `public=True` when registering the function.
 
@@ -136,7 +136,7 @@ Discovering Functions
 ----------------------
 
 funcX maintains an access controlled search index of registered functions.
-You can lookup your own functions, functions that have been shared with you,
+You can look up your own functions, functions that have been shared with you,
 or publicly accessible functions via the `search_function()` function.
 
 .. code-block:: python
@@ -149,7 +149,7 @@ Batching
 --------------
 
 The SDK includes a batch interface to reduce the overheads of launching a function many times.
-To use this interface you must first create a batch object and then pass that object
+To use this interface, you must first create a batch object and then pass that object
 to the `batch_run` function.
 
 .. code-block:: python
@@ -171,9 +171,9 @@ There is also a batch result interface to retrieve the results of a batch.
 Client Throttling
 -----------------
 
-In order to avoid overloading funcX we place soft throttling restrictions on the funcX client.
+In order to avoid overloading funcX, we place soft throttling restrictions on the funcX client.
 There are two key throttling measures: first, we limit the number of requests a client can make (20 requests every 10 seconds),
-and second, we limit the size of input and output transmitted through the service (5MB per request).
+and second, we limit the size of input and output transmitted through the service (5 MB per request).
 
 Batching requests and status can help reduce the number of requests made to the Web Service. In addition, the limit on
 the number of requests made to the Web Service can be removed by setting `throttling_enabled` to False.

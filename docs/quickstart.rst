@@ -11,7 +11,7 @@ You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/funcx/master
 Installation
 ------------
 
-**funcX** comes with two components: the **endpoint** is a user-managed software agent that must be deployed on a compute resource to make it accessible for function execution, and the **funcX client** that provides a Python API for registration, execution, and management of functions across **endpoints**.
+**funcX** comes with two components: the **endpoint**, a user-managed software agent that must be deployed on a compute resource to make it accessible for function execution; and the **funcX client**, which provides a Python API for registration, execution, and management of functions across **endpoints**.
 
 The pre-requisites for the `funcX endpoint` and the `funcX client` are
 
@@ -60,12 +60,12 @@ To update a previously installed funcX to a newer version, use: ``python3 -m pip
 Running a function
 ------------------------
 
-After installing the funcX SDK you can register functions and execute
-them on available endpoints.  To use the SDK you should first instantiate
+After installing the funcX SDK, you can register functions and execute
+them on available endpoints.  To use the SDK, you should first instantiate
 a funcX client and authenticate with the funcX service. funcX uses
 Globus to manage authentication and authorization, enabling you to
 authenticate using one of several hundred supported identity providers
-(e.g., institution, ORCID, Google). If you have not authenticated previously
+(e.g., institution, ORCID, Google). If you have not authenticated previously,
 funcX will present a one-time URL that you can use to authenticate
 with your chosen identity. You will then need to copy and paste the resulting
 access code into the prompt.
@@ -89,12 +89,12 @@ and register it using the SDK.
   func_uuid = fxc.register_function(add_func)
 
 
-When executing the function you must specify the function ID and the
+When executing the function, you must specify the function ID and the
 endpoint ID on which you wish to execute the function. You can pass
 arbitrary input arguments like standard Python functions. The following
 code shows how to run the add function on the tutorial endpoint.
 
-Note: the tutorial endpoint is open for anyone to use, please limit
+Note: the tutorial endpoint is open for anyone to use; please limit
 the number of functions you send to this endpoint.
 
 .. code-block:: python
@@ -108,7 +108,7 @@ or it will return the Python result from your function.
 
 Note: the tutorial endpoint is hosted on a small Kubernetes cluster and
 occasionally it becomes overwhelmed. If you are unable to retrieve the
-result please try again later (funcX will cache results until you return)
+result, please try again later (funcX will cache results until you return)
 or deploy an endpoint on local resources.
 
 .. code-block:: python
