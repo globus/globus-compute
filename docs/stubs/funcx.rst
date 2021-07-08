@@ -1,23 +1,4 @@
-funcx
+﻿funcx
 =====
 
 .. automodule:: funcx
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

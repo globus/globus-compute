@@ -1,4 +1,4 @@
-funcx\_endpoint.endpoint.taskqueue.TaskQueue
+﻿funcx\_endpoint.endpoint.taskqueue.TaskQueue
 ============================================
 
 .. currentmodule:: funcx_endpoint.endpoint.taskqueue

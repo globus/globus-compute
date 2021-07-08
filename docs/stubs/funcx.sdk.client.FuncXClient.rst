@@ -1,4 +1,4 @@
-funcx.sdk.client.FuncXClient
+﻿funcx.sdk.client.FuncXClient
 ============================
 
 .. currentmodule:: funcx.sdk.client
