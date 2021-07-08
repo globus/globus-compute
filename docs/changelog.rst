@@ -44,7 +44,7 @@ New Functionality
             return "Hello World!"
 
         fxc = FuncXClient(asynchronous=True)
-        fn_id = fxc.register(hello, <ENDPOINT_ID>, description="Hello")
+        fn_id = fxc.register_function(hello, description="Hello")
 
         # In asynchronous mode, function run returns asyncio futures
         async_future = fxc.run(5, endpoint_id=<ENDPOINT_ID>, function_id=<FUNCTION_ID>)
