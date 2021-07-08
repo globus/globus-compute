@@ -50,7 +50,7 @@ information regarding the endpoint, such as the owner username and email address
 It also includes information about the endpoint's broker, a concept used when the endpoint controls execution
 on other nodes (e.g., in a cluster deployment).
 
-.. note:: If your endpoint will manage execution on other nodes you must set the endpoint address such that workers can communicate with the endpoint.
+.. note:: If your endpoint will manage execution on other nodes, you must set the endpoint address such that workers can communicate with the endpoint.
 
 .. code-block:: python
 
