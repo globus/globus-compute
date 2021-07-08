@@ -152,7 +152,7 @@ Endpoints can be the following states:
 * **Running**: The endpoint is active and available for executing  functions.
 * **Stopped**: the endpoint was stopped by the user. It is not running
   and therefore, cannot service any functions. It can be started again without issues.
-* **Disconnected**: the endpoint disconnected unexpectedly. It is not running
+* **Disconnected**: The endpoint disconnected unexpectedly. It is not running
   and therefore, cannot service any functions. Starting this endpoint will first invoke
   necessary endpoint cleanup, since it was not stopped correctly previously.
 
