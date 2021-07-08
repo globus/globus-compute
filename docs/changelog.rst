@@ -76,7 +76,7 @@ New Functionality
 
 * Endpoint states have been renamed to ``running``, ``stopped``, and ``disconnected``. See `PR#525 <https://github.com/funcx-faas/funcX/pull/525>`_
 
-* Container routing behavior has been improved to support `soft` and `hard` routing strategies. See ``
+* Container routing behavior has been improved to support `soft` and `hard` routing strategies. See `PR#324 <https://github.com/funcx-faas/funcX/pull/324>`_
 
 funcx & funcx-endpoint v0.2.3
 -----------------------------
