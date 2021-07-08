@@ -31,7 +31,7 @@ funcX requires authentication in order to associate
 endpoints with users and ensure only authorized users can run tasks on that endpoint. As part of this step
 we request access to your identity and Globus Groups.
 
-To get started you will first want to configure a new endpoint.  ::
+To get started, you will first want to configure a new endpoint.  ::
 
   $ funcx-endpoint configure
 
