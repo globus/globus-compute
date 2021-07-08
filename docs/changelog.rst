@@ -9,8 +9,8 @@ funcx & funcx-endpoint v0.3.0
 Released on July 08th, 2021
 
 funcx v0.3.0 is a major release that includes contributions (code, tests, reviews, and reports) from:
-Ben Galewsky <ben@peartreestudio.net>, kyle chard <chard@uchicago.edu>,
-Kir Nagaitsev(@Loonride) <knagaitsev@uchicago.edu>,
+Ben Galewsky <bengal1@illinois.edu>, Kyle Chard <chard@uchicago.edu>,
+Kir Nagaitsev(@Loonride) <knagaitsev@uchicago.edu>, Daniel S. Katz <d.katz@ieee.org>,
 Stephen Rosen <sirosen@globus.org> Yadu Nand Babuji <yadudoc1729@gmail.com>,
 Yongyan Rao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
 
@@ -34,7 +34,45 @@ New Functionality
 
 * ``FuncXClient(asynchronous=True)`` now enables asynchronous result fetching using Asycio library.
 
+  Here's an example:
+
+    .. code-block:: python
+
+        from funcx import FuncXClient
+
+        def hello():
+            return "Hello World!"
+
+        fxc = FuncXClient(asynchronous=True)
+        fn_id = fxc.register(hello, <ENDPOINT_ID>, description="Hello")
+
+        # In asynchronous mode, function run returns asyncio futures
+        async_future = fxc.run(5, endpoint_id=<ENDPOINT_ID>, function_id=<FUNCTION_ID>)
+        print("Result : ", await async_future)
+
 * A new ``FuncXExecutor`` class exposes funcX functionality using the familiar executor interface from the `concurrent.futures` library.
+
+  Here's an example:
+
+    .. code-block:: python
+
+        from funcx import FuncXClient
+        from funcx.sdk.executor import FuncXExecutor
+
+        def hello():
+            return "Hello World!"
+
+        funcx_executor = FuncXExecutor(FuncXClient())
+
+        # With the executor, functions are auto-registered
+        future = funcx_executor.submit(hello, endpoint_id=<ENDPOINT_ID>)
+
+        # You can check status of your task without blocking
+        print(future.done())
+
+        # Block and wait for the result:
+        print("Result : ", future.result())
+
 
 * Endpoint states have been renamed to ``running``, ``stopped``, and ``disconnected``. See `PR#525 <https://github.com/funcx-faas/funcX/pull/525>`_
 
