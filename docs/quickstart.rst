@@ -3,7 +3,7 @@ Quickstart
 
 **funcX** client and endpoint software releases are available on `PyPI <https://pypi.org/project/funcx/>`_.
 
-The latest version available on PyPI is ``v0.2.3``.
+The latest version available on PyPI is ``v0.3.0``.
 
 You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb>`_
 
@@ -28,7 +28,7 @@ To check if your endpoint/client have network access and can connect to the func
 
   >>> curl https://api2.funcx.org/v2/version
 
-This should return a version string, for example: ``"0.2.2"``
+This should return a version string, for example: ``"0.3.0"``
 
 .. note:: The funcx client is supported on MacOS, Linux, and Windows. The funcx-endpoint
    is only supported on Linux.
