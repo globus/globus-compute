@@ -147,7 +147,7 @@ To list available endpoints on the current system, run::
 
 Endpoints can be the following states:
 
-* **Initialized**: the endpoint has been created, but not started
+* **Initialized**: The endpoint has been created, but not started
   following configuration and not registered with the `funcx service`
 * **Running**: the endpoint is active and available for executing  functions
 * **Stopped**: the endpoint was stopped by the user. It is not running
