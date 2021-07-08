@@ -45,27 +45,6 @@ You can also set up auto-completion for the `funcx-endpoint` commands in your sh
 Configuring an Endpoint
 ----------------------------
 
-After creating an endpoint, a configuration file will be created at `$HOME/.funcx/config.py`. This file contains
-information regarding the endpoint, such as the owner username and email address.
-It also includes information about the endpoint's broker, a concept used when the endpoint controls execution
-on other nodes (e.g., in a cluster deployment).
-
-.. note:: If your endpoint will manage execution on other nodes, you must set the endpoint address such that workers can communicate with the endpoint.
-
-.. code-block:: python
-
-  import getpass
-  from parsl.addresses import address_by_route, address_by_hostname
-
-  global_options = {
-    'username': getpass.getuser(),
-    'email': 'USER@USERDOMAIN.COM',
-    'broker_address': '127.0.0.1',
-    'broker_port': 8088,
-    'endpoint_address': address_by_hostname(),
-  }
-
-
 FuncX endpoints act as gateways to diverse computational resources, including clusters, clouds,
 supercomputers, and even your laptop. To make the best use of your resources, the endpoint must be
 configured to match the capabilities of the resource on which it is deployed.
