@@ -47,7 +47,7 @@ New Functionality
         fn_id = fxc.register_function(hello, description="Hello")
 
         # In asynchronous mode, function run returns asyncio futures
-        async_future = fxc.run(5, endpoint_id=<ENDPOINT_ID>, function_id=<FUNCTION_ID>)
+        async_future = fxc.run(endpoint_id=<ENDPOINT_ID>, function_id=fn_id)
         print("Result : ", await async_future)
 
 * A new ``FuncXExecutor`` class exposes funcX functionality using the familiar executor interface from the `concurrent.futures` library.
