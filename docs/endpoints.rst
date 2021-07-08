@@ -150,7 +150,7 @@ Endpoints can be the following states:
 * **Initialized**: The endpoint has been created, but not started
   following configuration and is not registered with the `funcx service`.
 * **Running**: The endpoint is active and available for executing  functions.
-* **Stopped**: the endpoint was stopped by the user. It is not running
+* **Stopped**: The endpoint was stopped by the user. It is not running
   and therefore, cannot service any functions. It can be started again without issues.
 * **Disconnected**: The endpoint disconnected unexpectedly. It is not running
   and therefore, cannot service any functions. Starting this endpoint will first invoke
