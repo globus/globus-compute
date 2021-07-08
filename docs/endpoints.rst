@@ -28,7 +28,7 @@ If you have authenticated previously, the endpoint will cache access tokens in
 the local configuration file.
 
 funcX requires authentication in order to associate
-endpoints with users and ensure only authorized users can run tasks on that endpoint. As part of this step
+endpoints with users and ensure only authorized users can run tasks on that endpoint. As part of this step,
 we request access to your identity and Globus Groups.
 
 To get started, you will first want to configure a new endpoint.  ::
