@@ -17,7 +17,7 @@ To install the funcX endpoint agent software ::
 
    Please note that the funcx endpoint is only supported on Linux and MacOS.
 
-After installing funcX endpoint you be able to deploy new endpoints and interact
+After installing funcX endpoint, you be able to deploy new endpoints and interact
 with existing endpoints using the `funcx-endpoint` command.
 
 First time setup
