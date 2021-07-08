@@ -11,7 +11,7 @@ Released on July 08th, 2021
 funcx v0.3.0 is a major release that includes contributions (code, tests, reviews, and reports) from:
 Ben Galewsky <bengal1@illinois.edu>, Kyle Chard <chard@uchicago.edu>,
 Kir Nagaitsev(@Loonride) <knagaitsev@uchicago.edu>, Daniel S. Katz <d.katz@ieee.org>,
-Stephen Rosen <sirosen@globus.org> Yadu Nand Babuji <yadudoc1729@gmail.com>,
+Stephen Rosen <sirosen@globus.org>, Yadu Nand Babuji <yadudoc1729@gmail.com>,
 Yongyan Rao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
 
 Bug Fixes
