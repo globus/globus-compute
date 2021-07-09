@@ -30,25 +30,44 @@ kubectl create secret generic funcx-sdk-tokens --from-file=funcx_sdk_tokens.json
 You need to add the funcx helm chart repo to your helm
 
 ```shell script
-repo add funcx http://funcx.org/funcx-helm-charts/
-repo update
+helm repo add funcx http://funcx.org/funcx-helm-charts/ && helm repo update
 ```
 
 Create a local values.yaml file to set any specific values you wish to
-override.
-
-Then invoke the chart installation with:
+override. Then invoke the chart installation by specifying your custom values,
+the funcx helm repo to install from, and the funcx-endpoint chart:
 
 ```shell script
-helm install -f covid19-mesa-values.yaml funcx funcx/funcx_endpoint
+helm install -f your-values.yaml funcx funcx/funcx_endpoint
 ```
 
-Once the pods start you can view your endpoint UID with
-
-
 The notes that are printed with the installation will tell you how to access the
-logs for the endpoint to see the UID.
+logs for the endpoint to see the UID. For example, to retrieve the pod name use
+the following command:
 
+```shell script
+export EP_POD_NAME=$(kubectl get pods --namespace default -l "app=funcx-endpoint" -o jsonpath="{.items[0].metadata.name}")
+```
+
+---
+**NOTE**
+
+Depending on your configuration, the namespace may be something other than
+'default'.
+
+---
+
+And view the pod's status via:
+
+```shell script
+kubectl get pods $EP_POD_NAME
+```
+
+Or its logs via:
+
+```shell script
+kubectl logs $EP_POD_NAME
+```
 
 ## Values
 The deployment is configured via values.yaml file.
