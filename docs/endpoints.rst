@@ -1,74 +1,72 @@
 Endpoints
 =========
 
-An endpoint is a persistent service launched by the user on their compute system that serves as a conduit for routing
-and executing functions to their compute system. This could be their laptop, the login node of a campus cluster,
-grid, or supercomputing facility.
+An endpoint is a persistent service launched by the user on a compute system to serve as a conduit for
+executing functions on that computer. funcX supports a range of target systems, enabling
+an endpoint to be deployed on a laptop, the login node of a campus cluster, a cloud instance,
+or a Kubernetes cluster, for example.
 
-The endpoint can be configured to connect to the funcX API web service at `funcx.org <https://api2.funcx.org/v2>`_.
-Once the endpoint is registered you can invoke functions to be executed on it.
+The endpoint requires outbound network connectivity. That is, it must be able to connect to
+funcX at `funcx.org <https://api2.funcx.org/v2>`_.
 
-To install the funcX endpoint agent software::
+To install the funcX endpoint agent software ::
 
      $ python3 -m pip install funcx_endpoint
 
 .. note::
 
-   Please note that the funcx-endpoint is supported on Linux and MacOS, and not on Windows.
+   Please note that the funcx endpoint is only supported on Linux and MacOS.
+
+After installing funcX endpoint, you be able to deploy new endpoints and interact
+with existing endpoints using the `funcx-endpoint` command.
 
 First time setup
 ----------------
 
-The first time you run any of the `funcx-endpoint` commands, if there is no existing configuration found at
-`$HOME/.funcx`, you will be prompted to authenticate.  For example, you will likely want to configure an endpoint
-so you may as well start by
+You will be required to authenticate the first time you run `funcx-endpoint`.
+If you have authenticated previously, the endpoint will cache access tokens in
+the local configuration file.
+
+funcX requires authentication in order to associate
+endpoints with users and ensure only authorized users can run tasks on that endpoint. As part of this step,
+we request access to your identity and Globus Groups.
+
+To get started, you will first want to configure a new endpoint.  ::
 
   $ funcx-endpoint configure
 
-You will be asked to authenticate with Globus Auth. We require authentication in order to associate
-endpoints with users and enforce authentication and access control on the endpoint. As part of this step
-we request access to your identity information (to retrieve your email address) and Globus Groups management.
-We use Groups information to facilitate sharing of functions and endpoints by checking the Group membership
-of a group associated with a function.
+Once you've run this command, a directory will be created at `$HOME/.funcx` and a set of default configuration files will be generated.
 
-Once you've run this command, a directory will be created at `$HOME/.funcx` and a set of configuration files will be generated.
-A default endpoint profile is also created that will be used, whenever you do not explicitly
-specify a profile to use for endpoint actions.
-
-You can also set up auto-completion for the `funcx-endpoint` commands in your shell, by using the command
+You can also set up auto-completion for the `funcx-endpoint` commands in your shell, by using the command ::
 
   $ funcx-endpoint --install-completion [zsh bash fish ...]
 
-Which will allow commands and endpoint names to autocomplete.
 
-Configuring funcX
------------------
+Configuring an Endpoint
+----------------------------
 
-A configuration file will be created at `$HOME/.funcx/config.py`. This contains
-base information regarding the endpoint, such as a username and email. By default, this includes
-an address and port for a local broker, which is used if a local broker is deployed.
-You can also set the address of the endpoint for your workers to connect to.
-This is necessary if your workers are not deployed on the
-same resource as the endpoint (e.g., when using a batch submission system, or cloud workers).
+FuncX endpoints act as gateways to diverse computational resources, including clusters, clouds,
+supercomputers, and even your laptop. To make the best use of your resources, the endpoint must be
+configured to match the capabilities of the resource on which it is deployed.
 
-.. note:: If your funcX workers are not deployed on the same resource as the endpoint you must set the endpoint address for the workers to find the endpoint. This is done by setting the endpoint_address.
+FuncX provides a Python class-based configuration model that allows you to specify the shape of the
+resources (number of nodes, number of cores per worker, walltime, etc.) as well as allowing you to place
+limits on how funcX may scale the resources in response to changing workload demands.
 
-For example
+To generate the appropriate directories and default configuration template, run the following command::
 
-.. code-block:: python
+  $ funcx-endpoint configure <ENDPOINT_NAME>
 
-  import getpass
-  from parsl.addresses import address_by_route, address_by_hostname
+This command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/` and will instantiate a
+`config.py` file. This file should be updated with the appropriate configurations for the computational system you are
+targeting before you start the endpoint.
+funcX is configured using a :class:`~funcx_endpoint.endpoint.utils.config.Config` object.
+funcX uses `Parsl <https://parsl-project.org>`_ to manage resources. For more information,
+see the :class:`~funcx_endpoint.endpoint.utils.config.Config` class documentation and the
+`Parsl documentation <hhttps://parsl.readthedocs.io/en/stable/userguide/overview.html>`_ .
 
-  global_options = {
-    'username': getpass.getuser(),
-    'email': 'USER@USERDOMAIN.COM',
-    'broker_address': '127.0.0.1',
-    'broker_port': 8088,
-    'endpoint_address': address_by_hostname(),
-  }
+.. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is configured.
 
-.. include:: configuring.rst
 
 Starting an Endpoint
 --------------------
@@ -77,24 +75,20 @@ To start a new endpoint run the following command::
 
   $ funcx-endpoint start <ENDPOINT_NAME>
 
-The above command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/config.py`.
-This file should be updated with the appropriate configurations for the computational system you are
-targeting before you start the endpoint. To launch the endpoint, simply rerun the above command.
-
 .. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is started.
 
-Starting an endpoint will perform a registration process with the funcX Web Service.
-The registration process provides funcX with information regarding the endpoint. The Web Service then creates a
-Forwarder process for the endpoint and returns a UUID and connection information to the Forwarder.
-The endpoint will use this connection information to connect to the Forwarder. The endpoint establishes three outbound
-ZeroMQ channels to the forwarder (on the three ports returned during registration) to retrieve tasks, send results,
-and communicate command information.
+Starting an endpoint will perform a registration process with funcX.
+The registration process provides funcX with information regarding the endpoint.
+The endpoint establishes three outbound
+ZeroMQ channels to funcX (on the three ports returned during registration)
+to retrieve tasks, send results, and communicate command information.
 
 Once started, the endpoint uses a daemon process to run in the background.
 
-.. note:: If the endpoint was not stopped correctly previously (e.g. after a computer restart when the endpoint was running), the endpoint directory will be cleaned up to allow a fresh start
+.. note:: If the endpoint was not stopped correctly previously (e.g., after a computer restart when the endpoint was running), the endpoint directory will be cleaned up to allow a fresh start
 
-.. warning:: Only the owner of an endpoint is authorized to start an endpoint. Thus if you register with a different Globus Auth identity and try to start an endpoint owned by another identity, it will fail.
+.. warning:: Only the owner of an endpoint is authorized to start an endpoint. Thus if you register an endpoint
+using one identity and try to start an endpoint owned by another identity, it will fail.
 
 
 Stopping an Endpoint
@@ -106,7 +100,7 @@ To stop an endpoint, run the following command::
 
 If the endpoint is not running and was stopped correctly previously, this command does nothing.
 
-If the endpoint is not running but was not stopped correctly previously (e.g. after a computer restart
+If the endpoint is not running but was not stopped correctly previously (e.g., after a computer restart
 when the endpoint was running), this command will clean up the endpoint directory such that the endpoint
 can be started cleanly again.
 
@@ -132,34 +126,40 @@ To list available endpoints on the current system, run::
 
 Endpoints can be the following states:
 
-* **Initialized**: This status means that the endpoint has been created, but not started
-  following configuration and not registered with the `funcx service`
-* **Running**: This status means that the endpoint is active and available for executing
-  functions
-* **Stopped**: This status means that the endpoint was stopped by the user. It is not running
-  right now and therefore, cannot service any functions. It can be started again without issues.
-* **Disconnected**: This status means that the endpoint disconnected unexpectedly. It is not running
-  right now and therefore, cannot service any functions. Starting this endpoint will first invoke
+* **Initialized**: The endpoint has been created, but not started
+  following configuration and is not registered with the `funcx service`.
+* **Running**: The endpoint is active and available for executing  functions.
+* **Stopped**: The endpoint was stopped by the user. It is not running
+  and therefore, cannot service any functions. It can be started again without issues.
+* **Disconnected**: The endpoint disconnected unexpectedly. It is not running
+  and therefore, cannot service any functions. Starting this endpoint will first invoke
   necessary endpoint cleanup, since it was not stopped correctly previously.
 
 
 Container behaviors and routing
 -------------------------------
 
-The funcX endpoint supports various technologies of containers (e.g., docker and singularity) and also raw processes on clusters (e.g., laptop, Kubernetes, and Supercomputers).
-The funcX endpoint also supports different routing mechanisms for different use cases.
+The funcX endpoint can run functions using independent Python processes or optionally
+inside containers. funcX supports various container technologies (e.g., docker and singularity)
+and different routing mechanisms for different use cases.
 
 Raw worker processes (`worker_mode=no_container`):
 
-* Hard routing: All worker processes are of the same type "RAW". It this case, the funcx endpoint simply routes function tasks to any available worker processes. The is the default mode of a funcx endpoint.
+* Hard routing: All worker processes are of the same type "RAW". It this case, the funcx endpoint simply routes tasks to any available worker processes. This is the default mode of a funcx endpoint.
 * Soft routing: It is the same as hard routing.
 
-Under Kubernetes (docker):
+Kubernetes (docker):
 
-* Hard routing: Both the manager and the worker are deployed within a pod and thus the manager cannot change the type of worker containers. In this case, a set of managers are deployed with specific container images and the funcx endpoint simply routes tasks to corresponding managers (to match their types).
+* Hard routing: Both the manager and the worker are deployed within a pod and thus the manager cannot change the type of worker container. In this case, a set of managers are deployed with specific container images and the funcx endpoint simply routes tasks to corresponding managers (matching their types).
 * Soft routing: NOT SUPPORTED.
 
-Without Kubernetes, native container support (docker, singularity, shifter):
+Native container support (docker, singularity, shifter):
 
-* Hard routing: In this case, each manager (on a compute node) can only launch worker containers of a specific type and thus each manager can serve only one type of function tasks.
-* Soft routing: When receiving a task of a specific container type, the funcx endpoint attempts to send the task to a manager that has a suitable warm container to minimize the   total number of container cold starts. If there are not any warmed containers in any connected managers, the funcX endpoint chooses one manager randomly to dispatch the task.
+* Hard routing: In this case, each manager (on a compute node) can only launch worker containers of a specific type and thus each manager can serve only one type of function.
+* Soft routing: When receiving a task for a specific container type, the funcx endpoint attempts to send the task to a manager that has a suitable warm container to minimize the total number of container cold starts. If there are not any warmed containers in any connected managers, the funcX endpoint chooses one manager randomly to dispatch the task.
+
+
+Example configurations
+----------------------
+
+.. include:: configuring.rst

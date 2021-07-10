@@ -18,10 +18,14 @@ import psutil
 import subprocess
 
 from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
-from funcx_endpoint.executors.high_throughput.messages import TaskStatusCode, ManagerStatusReport
+from funcx_endpoint.executors.high_throughput.messages import (
+    EPStatusReport,
+    Heartbeat,
+    ManagerStatusReport,
+    TaskStatusCode
+)
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
-from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
@@ -308,7 +312,6 @@ class Manager(object):
                     logger.debug("Got heartbeat from interchange")
 
                 else:
-                    logger.warning("YADU: RAW Tasks {}".format(message))
                     tasks = [(rt['local_container'], Message.unpack(rt['raw_buffer'])) for rt in message]
 
                     task_recv_counter += len(tasks)

@@ -269,6 +269,7 @@ class ExecutorPollerThread:
         self.task_group_id = task_group_id
         self.eventloop = None
         self.atomic_controller = AtomicController(self.start, noop)
+        self.ws_handler = None
 
     def start(self):
         """Start the result polling thread"""
@@ -302,6 +303,9 @@ class ExecutorPollerThread:
         )
 
     def shutdown(self):
+        if self.ws_handler is None:
+            return
+
         ws = self.ws_handler.ws
         if ws:
             ws_close_future = asyncio.run_coroutine_threadsafe(

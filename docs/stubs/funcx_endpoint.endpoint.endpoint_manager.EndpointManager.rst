@@ -1,4 +1,4 @@
-funcx\_endpoint.endpoint.endpoint\_manager.EndpointManager
+﻿funcx\_endpoint.endpoint.endpoint\_manager.EndpointManager
 ==========================================================
 
 .. currentmodule:: funcx_endpoint.endpoint.endpoint_manager
@@ -22,6 +22,7 @@ funcx\_endpoint.endpoint.endpoint\_manager.EndpointManager
       ~EndpointManager.init_endpoint
       ~EndpointManager.init_endpoint_dir
       ~EndpointManager.list_endpoints
+      ~EndpointManager.pidfile_cleanup
       ~EndpointManager.register_endpoint
       ~EndpointManager.start_endpoint
       ~EndpointManager.stop_endpoint

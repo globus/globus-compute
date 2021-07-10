@@ -1,4 +1,4 @@
-funcx\_endpoint.endpoint.interchange.EndpointInterchange
+﻿funcx\_endpoint.endpoint.interchange.EndpointInterchange
 ========================================================
 
 .. currentmodule:: funcx_endpoint.endpoint.interchange

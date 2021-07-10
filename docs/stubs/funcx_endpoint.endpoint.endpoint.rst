@@ -1,4 +1,4 @@
-funcx\_endpoint.endpoint.endpoint
+﻿funcx\_endpoint.endpoint.endpoint
 =================================
 
 .. automodule:: funcx_endpoint.endpoint.endpoint

@@ -1,4 +1,4 @@
-funcx.sdk.error\_handling\_client.FuncXErrorHandlingClient
+﻿funcx.sdk.error\_handling\_client.FuncXErrorHandlingClient
 ==========================================================
 
 .. currentmodule:: funcx.sdk.error_handling_client

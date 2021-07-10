@@ -25,7 +25,7 @@ fx_serializer = FuncXSerializer()
 # from parsl.executors.high_throughput import interchange
 from funcx_endpoint.executors.high_throughput import interchange
 
-from parsl.executors.errors import *
+from parsl.executors.errors import BadMessage, ScalingFailed
 # from parsl.executors.base import ParslExecutor
 from parsl.executors.status_handling import StatusHandlingExecutor
 from parsl.dataflow.error import ConfigurationError

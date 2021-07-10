@@ -1,4 +1,4 @@
-funcx\_endpoint.strategies.base.BaseStrategy
+﻿funcx\_endpoint.strategies.base.BaseStrategy
 ============================================
 
 .. currentmodule:: funcx_endpoint.strategies.base
