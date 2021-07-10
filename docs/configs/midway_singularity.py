@@ -23,7 +23,7 @@ config = Config(
             scheduler_mode='soft',
             worker_mode='singularity_reuse',
             container_type='singularity',
-            container_cmd_options="-H /home/$USER",            
+            container_cmd_options="-H /home/$USER",
             provider=SlurmProvider(
                 'broadwl',
                 launcher=SrunLauncher(),
