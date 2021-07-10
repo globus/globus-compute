@@ -119,6 +119,9 @@ class WebSocketPollingTask:
                 raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
             except asyncio.TimeoutError:
                 pass
+            except Exception:
+                logger.exception("Caught exception when waiting for results")
+                return
             else:
                 data = json.loads(raw_data)
                 task_id = data["task_id"]
