@@ -5,7 +5,7 @@ from asyncio import AbstractEventLoop, QueueEmpty
 
 import dill
 import websockets
-from websockets.exceptions import InvalidHandshake, InvalidStatusCode
+from websockets.exceptions import InvalidHandshake, InvalidStatusCode, ConnectionClosedOK
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
@@ -119,8 +119,7 @@ class WebSocketPollingTask:
                 raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
             except asyncio.TimeoutError:
                 pass
-            except Exception:
-                logger.exception("Caught exception when waiting for results")
+            except ConnectionClosedOK:
                 return
             else:
                 data = json.loads(raw_data)
