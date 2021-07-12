@@ -212,18 +212,17 @@ class FuncXExecutor(concurrent.futures.Executor):
                 batch.add(
                     *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
                 )
-                logger.debug(
-                    f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch"
-                )
+                logger.debug(f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch")
             try:
                 batch_tasks = self.funcx_client.batch_run(batch)
                 logger.debug(f"Batch submitted to task_group: {self.task_group_id}")
             except Exception:
-                logger.exception(
+                logger.error(
                     "[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(
                         len(messages)
                     )
                 )
+                raise
             else:
                 for i, msg in enumerate(messages):
                     self._function_future_map[batch_tasks[i]] = self._tasks.pop(
@@ -313,8 +312,8 @@ class ExecutorPollerThread:
             auto_start=False,
         )
         self.thread = threading.Thread(target=self.event_loop_thread, args=(eventloop,))
-        self.thread.start()
         self.thread.daemon = True
+        self.thread.start()
         logger.debug("Started web_socket_poller thread")
 
     def event_loop_thread(self, eventloop):
