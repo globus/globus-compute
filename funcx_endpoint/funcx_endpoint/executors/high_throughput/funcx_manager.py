@@ -312,7 +312,6 @@ class Manager(object):
                     logger.debug("Got heartbeat from interchange")
 
                 else:
-                    logger.warning("YADU: RAW Tasks {}".format(message))
                     tasks = [(rt['local_container'], Message.unpack(rt['raw_buffer'])) for rt in message]
 
                     task_recv_counter += len(tasks)
