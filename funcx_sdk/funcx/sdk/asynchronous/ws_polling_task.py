@@ -79,6 +79,7 @@ class WebSocketPollingTask:
         self.pending_tasks = {}
         self.unknown_results = {}
 
+        self.closed_by_main_thread = False
         self.ws = None
 
         if auto_start:
@@ -122,11 +123,11 @@ class WebSocketPollingTask:
                 raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
             except asyncio.TimeoutError:
                 pass
-            # TODO: need to add a websocket close from the service-side when a client
-            # is connected for too long. Here we need to handle either a close from
-            # the client-side or the server side
             except ConnectionClosedOK:
-                logger.debug("WebSocket Connection Closed")
+                if self.closed_by_main_thread:
+                    logger.debug("WebSocket connection closed by main thread")
+                else:
+                    logger.error("WebSocket connection closed unexpectedly")
                 return
             else:
                 data = json.loads(raw_data)

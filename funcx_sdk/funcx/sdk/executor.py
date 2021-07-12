@@ -323,7 +323,7 @@ class ExecutorPollerThread:
         if self.ws_handler is None:
             return
 
-        # TODO: set a variable here indicating that this was a normal shutdown
+        self.ws_handler.closed_by_main_thread = True
         ws = self.ws_handler.ws
         if ws:
             ws_close_future = asyncio.run_coroutine_threadsafe(
