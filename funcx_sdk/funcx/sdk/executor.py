@@ -56,7 +56,7 @@ class FuncXExecutor(concurrent.futures.Executor):
     def __init__(self,
                  funcx_client,
                  label: str = 'FuncXExecutor',
-                 batch_enabled: bool = True,
+                 batch_enabled: bool = False,
                  batch_interval: float = 1.0,
                  batch_size: int = 100):
 
