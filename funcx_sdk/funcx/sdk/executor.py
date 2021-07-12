@@ -288,6 +288,7 @@ class ExecutorPollerThread:
         )
         self.thread = threading.Thread(target=self.event_loop_thread, args=(eventloop,))
         self.thread.start()
+        self.thread.daemon = True
         logger.debug("Started web_socket_poller thread")
 
     def event_loop_thread(self, eventloop):
@@ -306,6 +307,7 @@ class ExecutorPollerThread:
         if self.ws_handler is None:
             return
 
+        # TODO: set a variable here indicating that this was a normal shutdown
         ws = self.ws_handler.ws
         if ws:
             ws_close_future = asyncio.run_coroutine_threadsafe(
