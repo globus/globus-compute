@@ -230,14 +230,6 @@ class FuncXExecutor(concurrent.futures.Executor):
                     )
                     self.poller_thread.atomic_controller.increment()
 
-                    if not self.poller_thread or self.poller_thread.ws_handler.closed:
-                        self.poller_thread = ExecutorPollerThread(
-                            self.funcx_client,
-                            self._function_future_map,
-                            self.results_ws_uri,
-                            self.task_group_id,
-                        )
-
     def _get_tasks_in_batch(self):
         """Get tasks from task_outgoing queue in batch, either by interval or by batch size"""
         messages = []
@@ -257,8 +249,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         return messages
 
     def shutdown(self):
-        if self.poller_thread:
-            self.poller_thread.shutdown()
+        self.poller_thread.shutdown()
         if self.batch_enabled:
             self._kill_event.set()
         logger.debug(f"Executor:{self.label} shutting down")

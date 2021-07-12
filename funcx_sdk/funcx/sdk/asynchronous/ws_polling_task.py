@@ -133,17 +133,8 @@ class WebSocketPollingTask:
                 data = json.loads(raw_data)
                 task_id = data["task_id"]
                 if task_id in pending_futures:
-                    self.set_result(task_id, data, pending_futures)
-
-                    # When the counter hits 0 we always exit. This guarantees that that
-                    # if the counter increments to 1 on the executor, this handler needs to be restarted.
-                    if self.atomic_controller is not None:
-                        count = self.atomic_controller.decrement()
-                        # Only close when count == 0 and unknown_results are empty
-                        if count == 0 and len(self.unknown_results) == 0:
-                            await self.ws.close()
-                            self.ws = None
-                            return
+                    if await self.set_result(task_id, data, pending_futures):
+                        return
                 else:
                     # This scenario occurs rarely using non-batching mode,
                     # but quite often in batching mode.
@@ -157,19 +148,30 @@ class WebSocketPollingTask:
             unprocessed_task_ids = self.unknown_results.keys() & pending_futures.keys()
             for task_id in unprocessed_task_ids:
                 data = self.unknown_results.pop(task_id)
-                self.set_result(task_id, data, pending_futures)
+                if await self.set_result(task_id, data, pending_futures):
+                    return
 
-                # When the counter hits 0 we always exit. This guarantees that that
-                # if the counter increments to 1 on the executor, this handler needs to be restarted.
-                if self.atomic_controller is not None:
-                    count = self.atomic_controller.decrement()
-                    # Only close when count == 0 and unknown_results are empty
-                    if count == 0 and len(self.unknown_results) == 0:
-                        await self.ws.close()
-                        self.ws = None
-                        return
+    async def set_result(self, task_id, data, pending_futures):
+        """Sets the result of a future with given task_id in the pending_futures map,
+        then decrement the atomic counter and close the WebSocket connection if needed
 
-    def set_result(self, task_id, data, pending_futures):
+        Parameters
+        ----------
+        task_id : str
+            Task ID of the future to set the result for
+
+        data : dict
+            Dict containing result/exception that should be set to future
+
+        pending_futures : dict
+            Dict of task_id keys that map to their futures
+
+        Returns
+        -------
+        bool
+            True if the WebSocket connection has closed and the thread can
+            exit, False otherwise
+        """
         future = pending_futures.pop(task_id)
         try:
             if data["result"]:
@@ -184,7 +186,18 @@ class WebSocketPollingTask:
             else:
                 future.set_exception(Exception(data["reason"]))
         except Exception:
-            logger.exception("Caught unexpected while setting results")
+            logger.exception("Caught unexpected exception while setting results")
+
+        # When the counter hits 0 we always exit. This guarantees that that
+        # if the counter increments to 1 on the executor, this handler needs to be restarted.
+        if self.atomic_controller is not None:
+            count = self.atomic_controller.decrement()
+            # Only close when count == 0 and unknown_results are empty
+            if count == 0 and len(self.unknown_results) == 0:
+                await self.ws.close()
+                self.ws = None
+                return True
+        return False
 
     def put_task_group_id(self, task_group_id):
         # prevent the task_group_id from being sent to the WebSocket server

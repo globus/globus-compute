@@ -65,7 +65,7 @@ def test_simple(fx, endpoint):
     assert fut.result() == x * 2, "Got wrong answer"
 
 
-def run_loop(fx, endpoint, count=50):
+def run_loop(fx, endpoint, count=20):
     futures = []
     for i in range(count):
         future = fx.submit(double, i, endpoint_id=endpoint)
