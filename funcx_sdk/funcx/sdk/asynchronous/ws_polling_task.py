@@ -5,7 +5,11 @@ from asyncio import AbstractEventLoop, QueueEmpty
 
 import dill
 import websockets
-from websockets.exceptions import InvalidHandshake, InvalidStatusCode, ConnectionClosedOK
+from websockets.exceptions import (
+    ConnectionClosedOK,
+    InvalidHandshake,
+    InvalidStatusCode,
+)
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 

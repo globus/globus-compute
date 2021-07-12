@@ -53,12 +53,14 @@ class FuncXExecutor(concurrent.futures.Executor):
     to the hosted funcx-websocket-service.
     """
 
-    def __init__(self,
-                 funcx_client,
-                 label: str = 'FuncXExecutor',
-                 batch_enabled: bool = False,
-                 batch_interval: float = 1.0,
-                 batch_size: int = 100):
+    def __init__(
+        self,
+        funcx_client,
+        label: str = "FuncXExecutor",
+        batch_enabled: bool = False,
+        batch_interval: float = 1.0,
+        batch_size: int = 100,
+    ):
 
         """
         Parameters
@@ -110,8 +112,9 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         self._kill_event = threading.Event()
         # Start the task submission thread
-        self.task_submit_thread = threading.Thread(target=self.task_submit_thread,
-                                                   args=(self._kill_event,))
+        self.task_submit_thread = threading.Thread(
+            target=self.task_submit_thread, args=(self._kill_event,)
+        )
         self.task_submit_thread.daemon = True
         self.task_submit_thread.start()
         logger.info("Started task submit thread")
@@ -144,11 +147,13 @@ class FuncXExecutor(concurrent.futures.Executor):
             # registration options are fleshed out here.
             logger.debug(f"Function:{function} is not registered. Registering")
             try:
-                function_id = self.funcx_client.register_function(function,
-                                                                  function_name=function.__name__,
-                                                                  container_uuid=container_uuid)
+                function_id = self.funcx_client.register_function(
+                    function,
+                    function_name=function.__name__,
+                    container_uuid=container_uuid,
+                )
             except Exception:
-                logger.error("Error in registering {}".format(function.__name__))
+                logger.error(f"Error in registering {function.__name__}")
                 raise
             else:
                 self._function_registry[function] = function_id
@@ -159,11 +164,13 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
-        msg = {"task_id": task_id,
-               "function_id": self._function_registry[function],
-               "endpoint_id": endpoint_id,
-               "args": args,
-               "kwargs": kwargs}
+        msg = {
+            "task_id": task_id,
+            "function_id": self._function_registry[function],
+            "endpoint_id": endpoint_id,
+            "args": args,
+            "kwargs": kwargs,
+        }
 
         fut = Future()
         self._tasks[task_id] = fut
@@ -183,29 +190,45 @@ class FuncXExecutor(concurrent.futures.Executor):
         while not kill_event.is_set():
             messages = self._get_tasks_in_batch()
             if messages:
-                logger.info("[TASK_SUBMIT_THREAD] Submitting {} tasks to funcX".format(len(messages)))
+                logger.info(
+                    "[TASK_SUBMIT_THREAD] Submitting {} tasks to funcX".format(
+                        len(messages)
+                    )
+                )
             self._submit_tasks(messages)
         logger.info("[TASK_SUBMIT_THREAD] Exiting")
 
     def _submit_tasks(self, messages):
-        """Submit a batch of tasks
-        """
+        """Submit a batch of tasks"""
         if messages:
             batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
             for msg in messages:
-                function_id, endpoint_id, args, kwargs = msg['function_id'], msg['endpoint_id'], msg['args'], msg['kwargs']
-                batch.add(*args, **kwargs,
-                          endpoint_id=endpoint_id,
-                          function_id=function_id)
-                logger.debug("[TASK_SUBMIT_THREAD] Adding msg {} to funcX batch".format(msg))
+                function_id, endpoint_id, args, kwargs = (
+                    msg["function_id"],
+                    msg["endpoint_id"],
+                    msg["args"],
+                    msg["kwargs"],
+                )
+                batch.add(
+                    *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
+                )
+                logger.debug(
+                    f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch"
+                )
             try:
                 batch_tasks = self.funcx_client.batch_run(batch)
                 logger.debug(f"Batch submitted to task_group: {self.task_group_id}")
             except Exception:
-                logger.exception("[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(len(messages)))
+                logger.exception(
+                    "[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(
+                        len(messages)
+                    )
+                )
             else:
                 for i, msg in enumerate(messages):
-                    self._function_future_map[batch_tasks[i]] = self._tasks.pop(msg['task_id'])
+                    self._function_future_map[batch_tasks[i]] = self._tasks.pop(
+                        msg["task_id"]
+                    )
                     self.poller_thread.atomic_controller.increment()
 
                     if not self.poller_thread or self.poller_thread.ws_handler.closed:
@@ -213,7 +236,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                             self.funcx_client,
                             self._function_future_map,
                             self.results_ws_uri,
-                            self.task_group_id
+                            self.task_group_id,
                         )
 
     def _get_tasks_in_batch(self):
@@ -221,7 +244,10 @@ class FuncXExecutor(concurrent.futures.Executor):
         messages = []
         start = time.time()
         while True:
-            if time.time() - start >= self.batch_interval or len(messages) >= self.batch_size:
+            if (
+                time.time() - start >= self.batch_interval
+                or len(messages) >= self.batch_size
+            ):
                 break
             try:
                 x = self.task_outgoing.get(timeout=0.1)
