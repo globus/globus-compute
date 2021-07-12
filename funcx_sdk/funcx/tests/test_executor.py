@@ -83,7 +83,7 @@ def test_loop(fx, endpoint):
 
 
 def test_loop_batch(batch_fx, endpoint):
-    run_loop(batch_fx, endpoint)
+    run_loop(batch_fx, endpoint, count=50)
 
 
 def test_submit_while_waiting(fx, endpoint):
@@ -141,7 +141,7 @@ def test_many_merge(fx, endpoint):
 def test_timing(fx, endpoint):
     fut1 = fx.submit(failing_task, endpoint_id=endpoint)
     time.sleep(1)
-    run_loop(fx, endpoint)
+    run_loop(fx, endpoint, count=10)
     s = str(uuid.uuid4())
     fut2 = fx.submit(split, s, endpoint_id=endpoint)
     fut3 = fx.submit(delay_n, 5, endpoint_id=endpoint)

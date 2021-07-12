@@ -80,7 +80,6 @@ class WebSocketPollingTask:
         self.unknown_results = {}
 
         self.ws = None
-        self.closed = False
 
         if auto_start:
             self.loop.create_task(self.init_ws())
