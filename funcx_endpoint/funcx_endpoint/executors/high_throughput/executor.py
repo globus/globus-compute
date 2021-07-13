@@ -17,7 +17,7 @@ from multiprocessing import Process
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
-from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task
+from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task, TaskCancel
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.strategies.simple import SimpleStrategy
 fx_serializer = FuncXSerializer()
@@ -230,6 +230,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  managed=True,
                  interchange_local=True,
                  passthrough=True,
+                 funcx_service_address=None,
                  task_status_queue=None):
 
         logger.debug("Initializing HighThroughputExecutor")
@@ -278,7 +279,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.task_status_queue = task_status_queue
 
         # FuncX specific options
-        self.funcx_service_address = None
+        self.funcx_service_address = funcx_service_address
         self.container_image = container_image
         self.worker_mode = worker_mode
         self.last_response_time = time.time()
@@ -645,6 +646,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
         self.submit_raw(payload.pack())
         self.tasks[task_id] = Future()
+        self.tasks[task_id].task_id = task_id
 
         return self.tasks[task_id]
 
@@ -766,6 +768,19 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             self.queue_proc.terminate()
         logger.info("Finished HighThroughputExecutor shutdown attempt")
         return True
+
+    def _cancel(self, future):
+        # print(future.task_id)
+        print("Sending cancel of task_id:{future.task_id} to interchange")
+
+        t = TaskCancel(future.task_id)
+        x = t.pack()
+        f = Message.unpack(x)
+        print(x)
+        print(f)
+        heartbeat = self.command_client.run(TaskCancel(future.task_id))
+        logger.debug("Attempting heartbeat to interchange")
+        return heartbeat
 
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):

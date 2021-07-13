@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 from struct import Struct
 from typing import Tuple
+
 MESSAGE_TYPE_FORMATTER = Struct('b')
 
 
@@ -13,6 +14,7 @@ class MessageType(Enum):
     EP_STATUS_REPORT = auto()
     MANAGER_STATUS_REPORT = auto()
     TASK = auto()
+    TASK_CANCEL = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -29,6 +31,7 @@ class TaskStatusCode(int, Enum):
     RUNNING = auto()
     SUCCESS = auto()
     FAILED = auto()
+    CANCELLED = auto()
 
 
 COMMAND_TYPES = {
@@ -70,6 +73,8 @@ class Message(ABC):
             return ManagerStatusReport.unpack(remaining)
         elif message_type is MessageType.TASK:
             return Task.unpack(remaining)
+        elif message_type is MessageType.TASK_CANCEL:
+            return TaskCancel.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
@@ -201,3 +206,22 @@ class ManagerStatusReport(Message):
         # TODO: do better than JSON?
         jsonified = json.dumps(self.task_statuses)
         return self.type.pack() + self.container_switch_count.to_bytes(10, 'little') + jsonified.encode("ascii")
+
+
+class TaskCancel(Message):
+    """
+    Synchronous request for a Heartbeat.  This is sent from the Forwarder to the endpoint on start to get
+    an initial connection and ensure liveness.
+    """
+    type = MessageType.TASK_CANCEL
+
+    def __init__(self, task_id):
+        super().__init__()
+        self.task_id = task_id
+
+    @classmethod
+    def unpack(cls, msg):
+        return cls(json.loads(msg.decode("ascii")))
+
+    def pack(self):
+        return self.type.pack() + json.dumps(self.task_id).encode("ascii")

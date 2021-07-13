@@ -259,7 +259,10 @@ class Interchange(object):
         self.pending_task_queue = {}
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
+        if funcx_service_address:
+            self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
+        else:
+            self.fxs = FuncXClient()
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports
