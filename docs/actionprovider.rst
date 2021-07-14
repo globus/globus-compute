@@ -4,7 +4,7 @@ Globus Flows Action Provider
 funcX exposes an asynchronous `Action Provider <https://globus-automate-client.readthedocs.io/en/latest/globus_action_providers.html>`_ 
 interface to allow functions to be used in a `Globus Flow <https://www.globus.org/platform/services/flows>`_.
 
-The funcX Action Provider interface uses ::
+The funcX Action Provider interface uses:
 
 * ``ActionUrl`` -- 'https://automate.funcx.org'
 * ``ActionScope`` -- 'https://auth.globus.org/scopes/b3db7e59-a6f1-4947-95c2-59d6b7a70f8c/action_all'
