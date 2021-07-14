@@ -42,4 +42,5 @@ Gladier
 The `Gladier <https://gladier.readthedocs.io/en/latest/>`_ toolkit provides useful tools to simplify and accelerate
 the development of flows that use funcX. For example, Gladier validates inputs prior to starting a flow and will re-register
 functions when they are modified. Additionally, it includes capabilities to automatically
-generate flow definitions. 
+generate flow definitions.
+
