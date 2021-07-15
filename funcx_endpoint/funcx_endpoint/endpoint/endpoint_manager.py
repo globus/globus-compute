@@ -412,18 +412,17 @@ class EndpointManager:
                 "active": False
             }
 
-        older_pid = int(open(filepath, 'r').read().strip())
+        pid = int(open(filepath, 'r').read().strip())
 
         active = False
         try:
-            proc = psutil.Process(older_pid)
-            if proc.name() == match_name:
-                # this is the only case where the endpoint is active.
-                # If the process name does not match or no process exists,
-                # it means the endpoint has been terminated without proper cleanup
-                active = True
+            psutil.Process(pid)
         except psutil.NoSuchProcess:
             pass
+        else:
+            # this is the only case where the endpoint is active. If no process exists,
+            # it means the endpoint has been terminated without proper cleanup
+            active = True
 
         return {
             "exists": True,
