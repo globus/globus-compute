@@ -388,7 +388,7 @@ class EndpointManager:
         shutil.rmtree(endpoint_dir)
         self.logger.info("Endpoint <{}> has been deleted.".format(self.name))
 
-    def check_pidfile(self, filepath, match_name='funcx-endpoint'):
+    def check_pidfile(self, filepath):
         """ Helper function to identify possible dead endpoints
 
         Returns a record with 'exists' and 'active' fields indicating
@@ -399,12 +399,6 @@ class EndpointManager:
         ----------
         filepath : str
             Path to the pidfile
-
-        match_name : str
-            Name of the process to check for if pidfile exists
-
-        endpoint_name : str
-            endpoint name for debugging purposes
         """
         if not os.path.exists(filepath):
             return {
