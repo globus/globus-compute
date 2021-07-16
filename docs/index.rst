@@ -91,6 +91,7 @@ how to download and configure an endpoint for local (multi-process) execution. :
    sdk
    endpoints
    Tutorial.ipynb
+   actionprovider
    reference
    debugging
    changelog
