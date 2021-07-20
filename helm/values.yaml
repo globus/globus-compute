@@ -6,7 +6,7 @@ replicaCount: 1
 funcXServiceAddress: https://api2.funcx.org
 image:
   repository: funcx/kube-endpoint
-  tag: main
+  tag: v0.3.0-3.7
   pullPolicy: Always
 
 workerImage: python:3.6-buster
@@ -22,11 +22,12 @@ maxMem: 16000Mi
 initCPU: 1
 maxCPU: 2
 
-initBlocks: 0
-minBlocks: 1
-maxBlocks: 100
+initBlocks: 2
+minBlocks: 2
+maxBlocks: 2
 maxWorkersPerPod: 1
 
 detachEndpoint: true
 
 endpointUUID: 4b116d3c-1703-4f8f-9f6f-39921e5864df
+funcxSecret: funcx-sdk-tokens-ryan

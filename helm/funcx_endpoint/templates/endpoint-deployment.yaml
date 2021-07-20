@@ -33,7 +33,7 @@ spec:
         volumeMounts:
           - mountPath: "/mnt"
             name: funcxmnt
-          - name: funcx-sdk-tokens
+          - name: {{ .Values.funcxSecret }}
             mountPath: /funcx/credentials
             readOnly: true
           - name: endpoint-config
@@ -48,9 +48,9 @@ spec:
       volumes:
         - name: funcxmnt
           emptyDir: {}
-        - name: funcx-sdk-tokens
+        - name: {{ .Values.funcxSecret }}
           secret:
-            secretName: funcx-sdk-tokens
+            secretName: {{ .Values.funcxSecret }}
         - name: endpoint-config
           configMap:
             name: {{ .Release.Name }}-endpoint-config
