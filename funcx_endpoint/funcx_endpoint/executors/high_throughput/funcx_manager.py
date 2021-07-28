@@ -30,6 +30,7 @@ from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.version import VERSION as PARSL_VERSION
+from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx import set_file_logger
 
@@ -40,6 +41,23 @@ HEARTBEAT_CODE = (2 ** 32) - 1
 
 
 logger = None
+
+
+class TaskCancelled(Exception):
+    """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
+    have been missed.
+    """
+
+    def __init__(self, worker_id, manager_id):
+        self.worker_id = worker_id
+        self.manager_id = manager_id
+        self.tstamp = time.time()
+
+    def __repr__(self):
+        return f"Task cancelled based on user request on manager:{self.manager_id}, worker:{self.worker_id}"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class Manager(object):
@@ -220,6 +238,7 @@ class Manager(object):
         self.poller = zmq.Poller()
         self.poller.register(self.task_incoming, zmq.POLLIN)
         self.poller.register(self.funcx_task_socket, zmq.POLLIN)
+        self.task_worker_map = {}
 
         self.task_done_counter = 0
 
@@ -307,6 +326,37 @@ class Manager(object):
                     logger.critical("[TASK_PULL_THREAD] Received stop request")
                     kill_event.set()
                     break
+
+                elif type(message) == tuple and message[0] == 'TASK_CANCEL':
+                    task_id = message[1]
+                    logger.warning(f"Received TASK_CANCEL request for task: {task_id}")
+                    # Cancel task by killing the worker it is on
+                    #
+                    #
+                    worker_to_kill = self.task_worker_map[task_id]['worker_id'].decode('utf-8')
+                    worker_type = self.task_worker_map[task_id]['task_type']
+                    logger.warning(f"Cancelling task running on worker:{self.task_worker_map[task_id]}")
+                    try:
+                        proc = self.worker_procs[worker_to_kill]
+                        logger.warning(f"Sending process:{proc.pid} terminate signal")
+                        proc.terminate()
+                        try:
+                            proc.wait(0.4)
+                        except Exception:
+                            logger.exception("Process did not terminate in 0.4 seconds")
+                            logger.warning(f"Sending process:{proc.pid} kill signal")
+                            proc.kill()
+                        else:
+                            logger.warning(f"Process status : {proc.returncode}")
+
+                        raise TaskCancelled(worker_to_kill, self.uid)
+                    except Exception as e:
+                        logger.exception(f"Raise exception, handling: {e}")
+                        result_package = {'task_id': task_id,
+                                          'container_id': worker_type,
+                                          'exception': self.serializer.serialize(
+                                              RemoteExceptionWrapper(*sys.exc_info()))}
+                        self.pending_result_queue.put(pickle.dumps(result_package))
 
                 elif message == HEARTBEAT_CODE:
                     logger.debug("Got heartbeat from interchange")
@@ -460,6 +510,8 @@ class Manager(object):
         if task.task_id != "KILL":
             logger.debug(f"Set task {task.task_id} to RUNNING")
             self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
+            self.task_worker_map[task.task_id] = {'worker_id': worker_id,
+                                                  'task_type': task_type}
         logger.debug("Sending complete!")
 
     def _status_report_loop(self, kill_event):
