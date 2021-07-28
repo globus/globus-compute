@@ -59,6 +59,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         loop=None,
         results_ws_uri="wss://api.funcx.org/ws/v2/",
         use_offprocess_checker=True,
+        disable_requests_verify=False,
         **kwargs,
     ):
         """
@@ -107,6 +108,10 @@ class FuncXClient(FuncXErrorHandlingClient):
             used by the client.
             Default: True
 
+        disable_requests_verify: Bool
+            Passes verify=False to the underlying requests library.
+            This disables SSL certificate verification. Default False
+
         Keyword arguments are the same as for BaseClient.
 
         """
@@ -153,6 +158,9 @@ class FuncXClient(FuncXErrorHandlingClient):
             base_url=funcx_service_address,
             **kwargs,
         )
+        self.disable_requests_verify = disable_requests_verify
+        if self.disable_requests_verify:
+            self._verify = False
         self.fx_serializer = FuncXSerializer(
             use_offprocess_checker=self.use_offprocess_checker
         )
