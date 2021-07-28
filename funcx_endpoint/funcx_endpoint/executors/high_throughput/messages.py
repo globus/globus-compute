@@ -15,6 +15,7 @@ class MessageType(Enum):
     MANAGER_STATUS_REPORT = auto()
     TASK = auto()
     TASK_CANCEL = auto()
+    BAD_COMMAND = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -35,7 +36,8 @@ class TaskStatusCode(int, Enum):
 
 
 COMMAND_TYPES = {
-    MessageType.HEARTBEAT_REQ
+    MessageType.HEARTBEAT_REQ,
+    MessageType.TASK_CANCEL
 }
 
 
@@ -75,6 +77,8 @@ class Message(ABC):
             return Task.unpack(remaining)
         elif message_type is MessageType.TASK_CANCEL:
             return TaskCancel.unpack(remaining)
+        elif message_type is MessageType.BAD_COMMAND:
+            return BadCommand.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
@@ -225,3 +229,21 @@ class TaskCancel(Message):
 
     def pack(self):
         return self.type.pack() + json.dumps(self.task_id).encode("ascii")
+
+
+class BadCommand(Message):
+    """
+    Error message send to indicate that a command is either unknown, malformed or unsupported.
+    """
+    type = MessageType.BAD_COMMAND
+
+    def __init__(self, reason: str):
+        super().__init__()
+        self.reason = reason
+
+    @classmethod
+    def unpack(cls, msg):
+        return cls(msg.decode("ascii"))
+
+    def pack(self):
+        return self.type.pack() + self.reason.encode("ascii")
