@@ -24,6 +24,7 @@ from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
+from funcx_endpoint.executors.high_throughput.messages import TaskCancel, BadCommand
 from funcx.sdk.client import FuncXClient
 from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
@@ -332,6 +333,7 @@ class Interchange(object):
             raise
 
         self.tasks = set()
+        self.task_cancel_queue = queue.Queue()
         self.task_status_deltas = {}
         self.container_switch_count = {}
 
@@ -575,10 +577,14 @@ class Interchange(object):
                 command = Message.unpack(buffer)
                 if command.type not in COMMAND_TYPES:
                     logger.error("Received incorrect message type on command channel")
-                    self.command_channel.send(bytes())
-                    continue
+                    reply = BadCommand(f"Unknown command type: {command.type}")
 
-                if command.type is MessageType.HEARTBEAT_REQ:
+                elif command.type is MessageType.TASK_CANCEL:
+                    logger.info(f"[COMMAND] Received TASK_CANCEL for task_id:{command.task_id}")
+                    self.enqueue_task_cancel(command.task_id)
+                    reply = command
+
+                elif command.type is MessageType.HEARTBEAT_REQ:
                     logger.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
                     logger.info(f"[COMMAND] Replying with Heartbeat({self.endpoint_id})")
                     reply = Heartbeat(self.endpoint_id)
@@ -589,6 +595,20 @@ class Interchange(object):
             except zmq.Again:
                 logger.debug("[COMMAND] is alive")
                 continue
+
+    def enqueue_task_cancel(self, task_id):
+        """ Cancel a task on the interchange """
+        logger.debug(f"Received task_cancel request for task:{task_id}")
+
+        for manager in self._ready_manager_queue:
+            for task_type in self._ready_manager_queue[manager]['tasks']:
+                for tid in self._ready_manager_queue[manager]['tasks'][task_type]:
+                    if tid == task_id:
+                        logger.debug("Transferring task_cancel message onto queue")
+                        self.task_cancel_queue.put((manager, task_id))
+                        break
+
+        return
 
     def stop(self):
         """Prepare the interchange for shutdown"""
@@ -750,6 +770,18 @@ class Interchange(object):
 
             self.total_pending_task_count -= dispatched_task
 
+            # Task cancel is high priority, so we'll process all requests
+            # in one go
+            while True:
+                try:
+                    manager, task_id = self.task_cancel_queue.get(block=False)
+                    logger.debug(f"Received task_cancel for Task:{task_id} on manager:{manager}")
+                    cancel_message = pickle.dumps(('TASK_CANCEL', task_id))
+                    self.task_outgoing.send_multipart([manager, b'', cancel_message])
+
+                except queue.Empty:
+                    break
+
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]
                 if tasks:
@@ -791,9 +823,13 @@ class Interchange(object):
                         r = pickle.loads(b_message)
                         logger.debug("[MAIN] Received result for task {} from {}".format(r, manager))
                         task_type = self.containers[r['container_id']]
-                        if r['task_id'] in self.task_status_deltas:
-                            del self.task_status_deltas[r['task_id']]
-                        self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
+                        logger.debug(f"[MAIN] Removing for manager:{manager} from {self._ready_manager_queue}")
+                        try:
+                            if r['task_id'] in self.task_status_deltas:
+                                del self.task_status_deltas[r['task_id']]
+                            self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
+                        except Exception:
+                            logger.exception("[MAIN] Caught exception here")
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
 
                     # TODO: handle this with a Task message or something?
