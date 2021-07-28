@@ -18,6 +18,7 @@ from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from funcx_endpoint.executors.high_throughput.messages import HeartbeatReq, EPStatusReport, Heartbeat
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, Task, TaskCancel
+from funcx_endpoint.executors.high_throughput.messages import BadCommand
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.strategies.simple import SimpleStrategy
 fx_serializer = FuncXSerializer()
@@ -553,7 +554,13 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             logger.debug(f"[MTHREAD] task:{tid} items in queue: {self.results_passthrough.qsize()}")
                             continue
 
-                        task_fut = self.tasks.pop(tid)
+                        try:
+                            task_fut = self.tasks.pop(tid)
+                        except Exception:
+                            # This is triggered when the result of a cancelled task is returned
+                            # We should log, and proceed.
+                            logger.warning(f"[MTHREAD] Task:{tid} duplicate result received. Ignoring.")
+                            continue
 
                         if 'result' in msg:
                             result = fx_serializer.deserialize(msg['result'])
@@ -770,17 +777,10 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         return True
 
     def _cancel(self, future):
-        # print(future.task_id)
-        print("Sending cancel of task_id:{future.task_id} to interchange")
-
-        t = TaskCancel(future.task_id)
-        x = t.pack()
-        f = Message.unpack(x)
-        print(x)
-        print(f)
-        heartbeat = self.command_client.run(TaskCancel(future.task_id))
-        logger.debug("Attempting heartbeat to interchange")
-        return heartbeat
+        logger.debug("Sending cancel of task_id:{future.task_id} to interchange")
+        response = self.command_client.run(TaskCancel(future.task_id))
+        logger.debug("Sent TaskCancel to interchange")
+        return response
 
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
