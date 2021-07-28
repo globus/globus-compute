@@ -5,6 +5,7 @@ import argparse
 import zmq
 import sys
 import pickle
+import signal
 import os
 
 from parsl.app.errors import RemoteExceptionWrapper
@@ -12,6 +13,7 @@ from parsl.app.errors import RemoteExceptionWrapper
 from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
+from funcx_endpoint.executors.high_throughput.funcx_manager import TaskCancelled
 
 
 class MaxResultSizeExceeded(Exception):
@@ -92,6 +94,11 @@ class FuncXWorker(object):
         logger.info('Trying to connect to : tcp://{}:{}'.format(self.address, self.port))
         self.task_socket.connect('tcp://{}:{}'.format(self.address, self.port))
         self.poller.register(self.task_socket, zmq.POLLIN)
+        signal.signal(signal.SIGTERM, self.handler)
+
+    def handler(self, signum, frame):
+        logger.error("Signal handler called with signal", signum)
+        raise TaskCancelled(0, 0)
 
     def registration_message(self):
         return {'worker_id': self.worker_id,
@@ -135,6 +142,11 @@ class FuncXWorker(object):
                     if sys.getsizeof(serialized_result) > self.result_size_limit:
                         raise MaxResultSizeExceeded(sys.getsizeof(serialized_result),
                                                     self.result_size_limit)
+
+                except TaskCancelled:
+                    logger.warning("Exiting due to TaskCancelled")
+                    exit()
+
                 except Exception as e:
                     logger.exception(f"Caught an exception {e}")
                     result_package = {'task_id': task_id,
