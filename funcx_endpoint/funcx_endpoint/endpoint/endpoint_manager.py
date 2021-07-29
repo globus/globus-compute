@@ -37,6 +37,7 @@ class EndpointManager:
 
     def __init__(self,
                  funcx_dir=os.path.join(pathlib.Path.home(), '.funcx'),
+                 disable_requests_verify=False,
                  debug=False):
         """ Initialize the EndpointManager
 
@@ -45,6 +46,9 @@ class EndpointManager:
 
         funcx_dir: str
             Directory path to the root of the funcx dirs. Usually ~/.funcx.
+
+        disable_requests_verify: Bool
+            Disable SSL certificate verification for all HTTPS calls
 
         debug: Bool
             Enable debug logging. Default: False
@@ -56,6 +60,7 @@ class EndpointManager:
         self.funcx_default_config_template = funcx_default_config.__file__
         self.funcx_config = {}
         self.name = 'default'
+        self.disable_requests_verify = disable_requests_verify
         global logger
         self.logger = logger
 
@@ -110,7 +115,7 @@ class EndpointManager:
         to ensure that multiple endpoint invocations do not mangle the funcx config files
         or the lockfile module.
         """
-        _ = FuncXClient()
+        _ = FuncXClient(disable_requests_verify=disable_requests_verify)
 
         if os.path.exists(self.funcx_config_file):
             typer.confirm(
@@ -165,6 +170,7 @@ class EndpointManager:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
         funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address,
+                                   disable_requests_verify=disable_requests_verify,
                                    check_endpoint_version=True)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)

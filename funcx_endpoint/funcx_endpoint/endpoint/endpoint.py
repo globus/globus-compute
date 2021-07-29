@@ -155,6 +155,7 @@ def main(
         ctx: typer.Context,
         _: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True),
         debug: bool = typer.Option(False, "--debug", "-d"),
+        disable_requests_verify: bool = typer.Option(False, "--disable-requests-verify", help="Disable SSL Certificate verification"),
         config_dir: str = typer.Option(os.path.join(pathlib.Path.home(), '.funcx'), "--config_dir", "-c", help="override default config dir")
 ):
     # Note: no docstring here; the docstring for @app.callback is used as a help message for overall app.
@@ -169,6 +170,7 @@ def main(
 
     global manager
     manager = EndpointManager(funcx_dir=config_dir,
+                              disable_requests_verify=disable_requests_verify,
                               debug=debug)
 
     # Otherwise, we ensure that configs exist
