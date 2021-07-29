@@ -115,7 +115,7 @@ class EndpointManager:
         to ensure that multiple endpoint invocations do not mangle the funcx config files
         or the lockfile module.
         """
-        _ = FuncXClient(disable_requests_verify=disable_requests_verify)
+        _ = FuncXClient(disable_requests_verify=self.disable_requests_verify)
 
         if os.path.exists(self.funcx_config_file):
             typer.confirm(
@@ -170,7 +170,7 @@ class EndpointManager:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
         funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address,
-                                   disable_requests_verify=disable_requests_verify,
+                                   disable_requests_verify=self.disable_requests_verify,
                                    check_endpoint_version=True)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
