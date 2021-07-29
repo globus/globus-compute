@@ -173,7 +173,7 @@ class EndpointInterchange(object):
         self.pending_task_queue = Queue()
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient()
+        self.fxs = FuncXClient(disable_requests_verify=config.disable_requests_verify)
 
         logger.info("Interchange address is {}".format(self.interchange_address))
 

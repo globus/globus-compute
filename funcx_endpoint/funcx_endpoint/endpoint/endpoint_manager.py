@@ -155,6 +155,7 @@ class EndpointManager:
     def start_endpoint(self, name, endpoint_uuid, endpoint_config):
         self.name = name
 
+        endpoint_config.disable_request_verify = self.disable_requests_verify
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         endpoint_json = os.path.join(endpoint_dir, 'endpoint.json')
 
