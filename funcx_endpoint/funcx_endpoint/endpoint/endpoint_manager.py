@@ -170,6 +170,7 @@ class EndpointManager:
         if not endpoint_config.config.executors:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
+        logger.debug("[start_endpoint] disable_requests_verify = {self.disable_requests_verify}")
         funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address,
                                    disable_requests_verify=self.disable_requests_verify,
                                    check_endpoint_version=True)
