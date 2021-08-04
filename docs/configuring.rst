@@ -72,6 +72,17 @@ using the `CobaltProvider`. This configuration assumes that the script is being 
 
 .. literalinclude:: configs/theta.py
 
+Cooley (ALCF)
+^^^^^^^^^^^^
+
+.. image:: images/31174D02-Cooley800.jpg
+
+The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
+**Cooley** cluster. This example uses the `HighThroughputExecutor` and connects to Cooley's Cobalt scheduler
+using the `CobaltProvider`. This configuration assumes that the script is being executed on the login nodes of Cooley.
+
+.. literalinclude:: configs/cooley.py
+
 Cori (NERSC)
 ^^^^^^^^^^^^
 
