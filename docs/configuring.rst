@@ -48,6 +48,10 @@ with the scheduler, and uses the `SrunLauncher` to launch workers.
 
 .. literalinclude:: configs/midway.py
 
+The following configuration is an example to use singularity container on Midway.
+
+.. literalinclude:: configs/midway_singularity.py
+
 
 Kubernetes Clusters
 ^^^^^^^^^^^^^^^^^^^
@@ -71,6 +75,11 @@ The following snippet shows an example configuration for executing on Argonne Le
 using the `CobaltProvider`. This configuration assumes that the script is being executed on the login nodes of Theta.
 
 .. literalinclude:: configs/theta.py
+
+The following configuration is an example to use singularity container on Theta.
+
+.. literalinclude:: configs/theta_singularity.py
+
 
 Cori (NERSC)
 ^^^^^^^^^^^^
