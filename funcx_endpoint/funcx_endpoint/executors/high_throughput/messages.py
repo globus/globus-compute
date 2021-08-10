@@ -71,6 +71,8 @@ class Message(ABC):
             return ManagerStatusReport.unpack(remaining)
         elif message_type is MessageType.TASK:
             return Task.unpack(remaining)
+        elif message_type is MessageType.RESULTS_ACK:
+            return ResultsAck.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
