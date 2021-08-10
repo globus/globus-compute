@@ -474,7 +474,7 @@ class EndpointInterchange(object):
                     self.results_ack_handler.put(task_id, results["message"])
 
                 # results will be a pickled dict with task_id, container_id, and results/exception
-                self.results_outgoing.put('forwarder', results)
+                self.results_outgoing.put('forwarder', results["message"])
                 logger.info("Passing result to forwarder")
 
             except queue.Empty:
