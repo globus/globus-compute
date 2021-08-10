@@ -21,7 +21,7 @@ from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
-from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
+from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode, ResultsAck
 from funcx.sdk.client import FuncXClient
 from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
@@ -175,6 +175,8 @@ class EndpointInterchange(object):
         self.total_pending_task_count = 0
         self.fxs = FuncXClient()
 
+        self.sent_results_queue = Queue()
+
         logger.info("Interchange address is {}".format(self.interchange_address))
 
         self.endpoint_id = endpoint_id
@@ -287,6 +289,9 @@ class EndpointInterchange(object):
                     self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
                     task_counter += 1
                     logger.debug(f"[TASK_PULL_THREAD] Task counter:{task_counter} Pending Tasks: {self.total_pending_task_count}")
+
+                elif isinstance(msg, ResultsAck):
+                    self._handle_results_ack(msg.task_id)
 
                 else:
                     logger.warning(f"[TASK_PULL_THREAD] Unknown message type received: {msg}")
@@ -427,6 +432,7 @@ class EndpointInterchange(object):
             try:
                 results = self.results_passthrough.get(False, 0.01)
 
+                self.sent_results_queue.put(results)
                 # results will be a pickled dict with task_id, container_id, and results/exception
                 self.results_outgoing.put('forwarder', results)
                 logger.info("Passing result to forwarder")
@@ -441,6 +447,18 @@ class EndpointInterchange(object):
         delta = time.time() - start
         logger.info("Processed {} tasks in {} seconds".format(count, delta))
         logger.warning("Exiting")
+
+    def _handle_results_ack(self, task_id):
+        try:
+            while True:
+                sent_task = pickle.loads(self.sent_results_queue.get(block=False))
+                if sent_task.id == task_id:
+                    return
+
+        except queue.Empty:
+            logger.exception("Got empty queue while acking results")
+        except Exception:
+            logger.exception("Unexpected exception caught while acking results")
 
     def get_status_report(self):
         """ Get utilization numbers
