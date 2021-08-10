@@ -27,6 +27,7 @@ from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
+from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from queue import Queue
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -163,7 +164,7 @@ class EndpointInterchange(object):
         self.total_pending_task_count = 0
         self.fxs = FuncXClient()
 
-        self.sent_results_queue = Queue()
+        self.results_ack_handler = ResultsAckHandler()
 
         logger.info("Interchange address is {}".format(self.interchange_address))
 
@@ -287,7 +288,7 @@ class EndpointInterchange(object):
                     logger.debug(f"[TASK_PULL_THREAD] Task counter:{task_counter} Pending Tasks: {self.total_pending_task_count}")
 
                 elif isinstance(msg, ResultsAck):
-                    self._handle_results_ack(msg.task_id)
+                    self.results_ack_handler.ack(msg.task_id)
 
                 else:
                     logger.warning(f"[TASK_PULL_THREAD] Unknown message type received: {msg}")
@@ -428,6 +429,11 @@ class EndpointInterchange(object):
                                           set_hwm=True)
         self.results_outgoing.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
+        resend_results_messages = self.results_ack_handler.handle_resend()
+        # TODO: this should be a multipart send rather than a loop
+        for results in resend_results_messages:
+            self.results_outgoing.put('forwarder', results)
+
         executor = list(self.executors.values())[0]
         last = time.time()
 
@@ -443,6 +449,10 @@ class EndpointInterchange(object):
                     logger.exception("[MAIN] Sending heartbeat to the forwarder over the results channel has failed")
                     raise
 
+            if self.results_ack_handler.check_windows():
+                self._kill_event.set()
+                break
+
             try:
                 task = self.pending_task_queue.get(block=True, timeout=0.01)
                 executor.submit_raw(task.pack())
@@ -454,7 +464,11 @@ class EndpointInterchange(object):
 
             try:
                 results = self.results_passthrough.get(False, 0.01)
-                self.sent_results_queue.put(results)
+
+                task_id = results["task_id"]
+                if task_id:
+                    self.results_ack_handler.put(task_id, results["message"])
+
                 # results will be a pickled dict with task_id, container_id, and results/exception
                 self.results_outgoing.put('forwarder', results)
                 logger.info("Passing result to forwarder")
@@ -473,18 +487,6 @@ class EndpointInterchange(object):
                 socket_queue_wrapper.close()
         except Exception:
             pass
-
-    def _handle_results_ack(self, task_id):
-        try:
-            while True:
-                sent_task = pickle.loads(self.sent_results_queue.get(block=False))
-                if sent_task.id == task_id:
-                    return
-
-        except queue.Empty:
-            logger.exception("Got empty queue while acking results")
-        except Exception:
-            logger.exception("Unexpected exception caught while acking results")
 
     def get_status_report(self):
         """ Get utilization numbers
