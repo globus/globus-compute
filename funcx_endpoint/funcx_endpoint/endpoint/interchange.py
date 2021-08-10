@@ -159,19 +159,6 @@ class EndpointInterchange(object):
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
             client_address, client_ports[0], client_ports[1], client_ports[2]))
 
-        self.command_channel = TaskQueue(client_address,
-                                         port=client_ports[2],
-                                         identity=endpoint_id,
-                                         mode='client',
-                                         RCVTIMEO=1000,  # in milliseconds
-                                         keys_dir=keys_dir,
-                                         set_hwm=True,
-                                         linger=0)
-
-        # TODO :Register all channels with the authentication string.
-        self.command_channel.put('forwarder', pickle.dumps({"registration": endpoint_id}))
-        logger.info(f"Connected to funcX forwarder at {client_address}")
-
         self.pending_task_queue = Queue()
         self.containers = {}
         self.total_pending_task_count = 0
@@ -225,7 +212,7 @@ class EndpointInterchange(object):
                 executor.start(results_passthrough=self.results_passthrough)
                 # executor._start_remote_interchange_process()
 
-    def migrate_tasks_to_internal(self, kill_event, status_request):
+    def migrate_tasks_to_internal(self, kill_event):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
@@ -235,6 +222,17 @@ class EndpointInterchange(object):
               Event to let the thread know when it is time to die.
         """
         logger.info("[TASK_PULL_THREAD] Starting")
+
+        self.task_incoming = None
+        try:
+            self._task_puller_loop(kill_event)
+        except Exception:
+            logger.exception("[TASK_PULL_THREAD] Unhandled exception")
+            self._handle_loop_error(kill_event, self.task_incoming)
+        else:
+            self.task_incoming.close()
+
+    def _task_puller_loop(self, kill_event):
         task_counter = 0
         # Create the incoming queue in the thread to keep
         # zmq.context in the same thread. zmq.context is not thread-safe
@@ -248,9 +246,6 @@ class EndpointInterchange(object):
                                        linger=0)
         self.task_incoming.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
         logger.info(f"Task incoming on tcp://{self.client_address}:{self.client_ports[0]}")
-
-        poller = zmq.Poller()
-        poller.register(self.task_incoming, zmq.POLLIN)
 
         while not kill_event.is_set():
 
@@ -346,6 +341,28 @@ class EndpointInterchange(object):
         """
         logger.debug("[COMMAND] Command Server Starting")
 
+        self.command_channel = None
+        try:
+            self._task_puller_loop(kill_event)
+        except Exception:
+            logger.exception("[COMMAND] Unhandled exception")
+            self._handle_loop_error(kill_event, self.command_channel)
+        else:
+            self.command_channel.close()
+
+    def _command_server_loop(self, kill_event):
+        self.command_channel = TaskQueue(self.client_address,
+                                         port=self.client_ports[2],
+                                         identity=self.endpoint_id,
+                                         mode='client',
+                                         RCVTIMEO=1000,  # in milliseconds
+                                         keys_dir=self.keys_dir,
+                                         set_hwm=True,
+                                         linger=0)
+
+        # TODO :Register all channels with the authentication string.
+        self.command_channel.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
+
         while not kill_event.is_set():
             try:
                 # Wait for 1000 ms
@@ -374,30 +391,36 @@ class EndpointInterchange(object):
         self._kill_event.set()
         self._task_puller_thread.join()
         self._command_thread.join()
+        self._kill_event.clear()
 
     def start(self):
         """ Start the Interchange
         """
         logger.info("Starting EndpointInterchange")
+        while True:
+            self._start_threads_and_main()
+            self.stop()
 
-        start = time.time()
-        count = 0
-
+    def _start_threads_and_main(self):
         self._kill_event = threading.Event()
-        self._status_request = threading.Event()
         self._task_puller_thread = threading.Thread(target=self.migrate_tasks_to_internal,
-                                                    args=(self._kill_event, self._status_request, ))
+                                                    args=(self._kill_event, ))
         self._task_puller_thread.start()
 
         self._command_thread = threading.Thread(target=self._command_server,
                                                 args=(self._kill_event, ))
         self._command_thread.start()
 
-        status_report_queue = queue.Queue()
-        self._status_report_thread = threading.Thread(target=self._status_report_loop,
-                                                      args=(self._kill_event, status_report_queue))
-        self._status_report_thread.start()
+        self.results_outgoing = None
+        try:
+            self._main_loop()
+        except Exception:
+            logger.exception("[MAIN] Unhandled exception")
+            self._handle_loop_error(self._kill_event, self.results_outgoing)
+        else:
+            self.results_outgoing.close()
 
+    def _main_loop(self):
         self.results_outgoing = TaskQueue(self.client_address,
                                           port=self.client_ports[1],
                                           identity=self.endpoint_id,
@@ -422,7 +445,7 @@ class EndpointInterchange(object):
         executor = list(self.executors.values())[0]
         last = time.time()
 
-        while True:
+        while not self._kill_event.is_set():
             if last + self.heartbeat_threshold < time.time():
                 logger.debug("[MAIN] alive")
                 last = time.time()
@@ -463,9 +486,13 @@ class EndpointInterchange(object):
                 logger.exception("[MAIN] Something broke while forwarding results from executor to forwarder queues")
                 continue
 
-        delta = time.time() - start
-        logger.info("Processed {} tasks in {} seconds".format(count, delta))
-        logger.warning("Exiting")
+    def _handle_loop_error(self, kill_event, socket_queue_wrapper=None):
+        kill_event.set()
+        try:
+            if socket_queue_wrapper:
+                socket_queue_wrapper.close()
+        except Exception:
+            pass
 
     def get_status_report(self):
         """ Get utilization numbers
