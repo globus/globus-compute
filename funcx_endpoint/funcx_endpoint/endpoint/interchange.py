@@ -407,6 +407,9 @@ class EndpointInterchange(object):
         self.results_outgoing.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
         resend_results_messages = self.results_ack_handler.handle_resend()
+        if len(resend_results_messages) > 0:
+            logger.info(f"[MAIN] Resending {len(resend_results_messages)} previously unacked results")
+
         # TODO: this should be a multipart send rather than a loop
         for results in resend_results_messages:
             self.results_outgoing.put('forwarder', results)
@@ -427,6 +430,7 @@ class EndpointInterchange(object):
                     raise
 
             if self.results_ack_handler.check_windows():
+                logger.warning("[MAIN] Prev Ack window has unacked results, resetting interchange")
                 self._kill_event.set()
                 break
 
