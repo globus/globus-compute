@@ -20,7 +20,8 @@ class ResultsAckHandler():
         if acked_task is None:
             acked_task = self.prev_window.pop(task_id, None)
         if acked_task:
-            logger.debug(f"Acked task {task_id}")
+            unacked_count = len(self.curr_window) + len(self.prev_window)
+            logger.info(f"Acked task {task_id}, Unacked count: {unacked_count}")
 
     def check_windows(self):
         now = time.time()
@@ -28,10 +29,13 @@ class ResultsAckHandler():
             if len(self.prev_window) > 0:
                 return True
 
+            unacked_count = len(self.curr_window) + len(self.prev_window)
+            logger.info(f"Shifting Ack windows, Unacked count: {unacked_count}")
+
             self.prev_window = self.curr_window
             self.curr_window = {}
             self.curr_window_start = now
-            
+
         return False
 
     def handle_resend(self):
