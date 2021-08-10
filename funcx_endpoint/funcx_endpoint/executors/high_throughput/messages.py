@@ -13,6 +13,7 @@ class MessageType(Enum):
     EP_STATUS_REPORT = auto()
     MANAGER_STATUS_REPORT = auto()
     TASK = auto()
+    RESULTS_ACK = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -201,3 +202,23 @@ class ManagerStatusReport(Message):
         # TODO: do better than JSON?
         jsonified = json.dumps(self.task_statuses)
         return self.type.pack() + self.container_switch_count.to_bytes(10, 'little') + jsonified.encode("ascii")
+
+
+class ResultsAck(Message):
+    """
+    Results acknowledgement to acknowledge the most recent task result and thus
+    those before it as well (due to zmq guaranteed order and delivery). Sent from
+    forwarder->interchange
+    """
+    type = MessageType.RESULTS_ACK
+
+    def __init__(self, task_id):
+        super().__init__()
+        self.task_id = task_id
+
+    @classmethod
+    def unpack(cls, msg):
+        return cls(msg.decode("ascii"))
+
+    def pack(self):
+        return self.type.pack() + self.task_id.encode("ascii")
