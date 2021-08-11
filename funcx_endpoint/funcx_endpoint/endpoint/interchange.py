@@ -96,6 +96,7 @@ class EndpointInterchange(object):
                  endpoint_id=None,
                  keys_dir=".curve",
                  suppress_failure=True,
+                 disable_requests_verify=False,
                  ):
         """
         Parameters
@@ -130,6 +131,9 @@ class EndpointInterchange(object):
 
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
+
+        disable_requests_verify: Bool
+            Disable SSL certificate verification for all HTTPS calls
         """
         self.logdir = logdir
         try:
@@ -148,7 +152,8 @@ class EndpointInterchange(object):
         self.interchange_address = interchange_address
         self.client_ports = client_ports
         self.suppress_failure = suppress_failure
-
+        self.disable_requests_verify = disable_requests_verify
+        
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
         # initalize the last heartbeat time to start the loop
@@ -173,7 +178,7 @@ class EndpointInterchange(object):
         self.pending_task_queue = Queue()
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient(disable_requests_verify=config.disable_requests_verify)
+        self.fxs = FuncXClient(disable_requests_verify=self.disable_requests_verify)
 
         logger.info("Interchange address is {}".format(self.interchange_address))
 

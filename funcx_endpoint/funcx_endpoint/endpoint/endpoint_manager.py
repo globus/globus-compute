@@ -270,6 +270,7 @@ class EndpointManager:
         optionals = {}
         optionals['client_address'] = reg_info['public_ip']
         optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
+        optionals['disable_requests_verify'] = self.disable_requests_verify
         if 'endpoint_address' in self.funcx_config:
             optionals['interchange_address'] = self.funcx_config['endpoint_address']
 

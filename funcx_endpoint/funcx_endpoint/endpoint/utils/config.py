@@ -45,10 +45,6 @@ class Config(RepresentationMixin):
     log_dir : str
         Optional path string to the top-level directory where logs should be written to.
         Default: None
-
-    disable_requests_verify : Bool
-        Disable SSL Certificate verification when connecting to the funcX hosted services.
-        This is equivalent to verify=False option in the requests library. Default = False
     """
 
     def __init__(
@@ -65,7 +61,6 @@ class Config(RepresentationMixin):
         log_dir=None,
         stdout="./interchange.stdout",
         stderr="./interchange.stderr",
-        disable_requests_verify=False
     ):
 
         # Execution backends
@@ -83,4 +78,3 @@ class Config(RepresentationMixin):
         self.log_dir = log_dir
         self.stdout = stdout
         self.stderr = stderr
-        self.disable_requests_verify = disable_requests_verify

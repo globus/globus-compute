@@ -129,7 +129,8 @@ class Interchange(object):
                  suppress_failure=False,
                  log_max_bytes=256 * 1024 * 1024,
                  log_backup_count=1,
-                 ):
+                 disable_requests_verify=False,
+    ):
         """
         Parameters
         ----------
@@ -185,6 +186,9 @@ class Interchange(object):
 
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
+
+        disable_requests_verify : Bool
+             Disable SSL certificate verification for HTTPS communication with the funcX hosted services
         """
 
         self.logdir = logdir
@@ -259,7 +263,9 @@ class Interchange(object):
         self.pending_task_queue = {}
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
+        self.disable_requests_verify = disable_requests_verify
+        self.fxs = FuncXClient(funcx_service_address=funcx_service_address,
+                               disable_requests_verify=self.disable_requests_verify)
 
         logger.info("Interchange address is {}".format(self.interchange_address))
         self.worker_ports = worker_ports

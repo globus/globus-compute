@@ -189,6 +189,9 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         and SlurmProvider interfaces to request resources from the Slurm batch scheduler.
         Default: LocalProvider
 
+    disable_requests_verify: Bool 
+        Disable SSL Certificate verification for HTTPS/REST requests to the funcX hosted services. 
+        Default: False
     """
 
     def __init__(self,
@@ -230,7 +233,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  managed=True,
                  interchange_local=True,
                  passthrough=True,
-                 task_status_queue=None):
+                 task_status_queue=None,
+                 disable_requests_verify=False):
 
         logger.debug("Initializing HighThroughputExecutor")
         StatusHandlingExecutor.__init__(self, provider)
@@ -282,6 +286,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.container_image = container_image
         self.worker_mode = worker_mode
         self.last_response_time = time.time()
+
+        self.disable_requests_verify = disable_requests_verify
 
         if not launch_cmd:
             self.launch_cmd = ("process_worker_pool.py {debug} {max_workers} "
@@ -411,7 +417,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                           "logdir": os.path.join(self.run_dir, self.label),
                                           "suppress_failure": self.suppress_failure,
                                           "endpoint_id": self.endpoint_id,
-                                          "logging_level": logging.DEBUG if self.worker_debug else logging.INFO
+                                          "logging_level": logging.DEBUG if self.worker_debug else logging.INFO,
+                                          "disable_requests_verify": self.disable_requests_verify
                                   },
         )
         self.queue_proc.start()
