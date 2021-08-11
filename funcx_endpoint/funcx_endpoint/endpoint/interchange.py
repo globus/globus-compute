@@ -246,6 +246,8 @@ class EndpointInterchange(object):
         self.task_incoming.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
         logger.info(f"Task incoming on tcp://{self.client_address}:{self.client_ports[0]}")
 
+        self.last_heartbeat = time.time()
+
         while not kill_event.is_set():
 
             try:
@@ -342,7 +344,7 @@ class EndpointInterchange(object):
 
         self.command_channel = None
         try:
-            self._task_puller_loop(kill_event)
+            self._command_server_loop(kill_event)
         except Exception:
             logger.exception("[COMMAND] Unhandled exception")
             self._handle_loop_error(kill_event, self.command_channel)

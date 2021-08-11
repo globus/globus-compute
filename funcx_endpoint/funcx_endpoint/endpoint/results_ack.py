@@ -4,6 +4,8 @@ import time
 logger = logging.getLogger(__name__)
 
 
+# TODO: implement writing to disk in case these windows get too large and no
+# messages are being acked
 class ResultsAckHandler():
 
     def __init__(self):
