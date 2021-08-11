@@ -14,18 +14,17 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.7
+    - name: Git branch name
+      id: git-branch-name
+      uses: EthanSK/git-branch-name-action@v1
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip build
     - name: Set the funcx version
-      env:
-        funcx_version: ${{ github.ref }}
       run: |
-        echo "funcx_version $funcx_version"
-        sed "s/__version__ *= *\".*\"/__version__ = \"$funcx_version\"/" funcx_sdk/funcx/sdk/version.py > funcx_sdk/funcx/sdk/version.py
-        sed "s/__version__ *= *\".*\"/__version__ = \"$funcx_version\"/" funcx_endpoint/funcx_endpoint/version.py > funcx_endpoint/funcx_endpoint/version.py
-      shell: bash -x
-
+        echo "funcx_version $GIT_BRANCH_NAME"
+        sed -i "s/__version__ *= *\".*\"/__version__ = \"$GIT_BRANCH_NAME\"/" funcx_sdk/funcx/sdk/version.py
+        sed -i "s/__version__ *= *\".*\"/__version__ = \"$GIT_BRANCH_NAME\"/" funcx_endpoint/funcx_endpoint/version.py
     - name: Push updated version to branch
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
@@ -33,6 +32,7 @@ jobs:
     - name: Build the sdk
       run: |
         cd funcx_sdk
+        cat funcx/sdk/version.py
         python -m build --sdist --wheel
     - name: Build the endpoint
       run: |
