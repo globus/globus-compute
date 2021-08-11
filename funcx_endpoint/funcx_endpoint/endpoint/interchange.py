@@ -250,6 +250,8 @@ class EndpointInterchange(object):
         poller = zmq.Poller()
         poller.register(self.task_incoming, zmq.POLLIN)
 
+        self.last_heartbeat = time.time()
+
         while not kill_event.is_set():
 
             try:
