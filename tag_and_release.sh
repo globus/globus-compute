@@ -47,7 +47,7 @@ verify_version() {
 
 create_release_branch () {
     echo "Creating branch"
-    git branch -b $VERSION
+    git checkout -b $VERSION
     git add funcx_endpoint/funcx_endpoint funcx_sdk/funcx
     git commit -m "Update to version $VERSION"
 
