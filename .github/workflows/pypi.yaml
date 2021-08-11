@@ -21,8 +21,10 @@ jobs:
       env:
         funcx_version: ${{ github.ref }}
       run: |
+        echo "funcx_version $funcx_version"
         sed "s/__version__ *= *\".*\"/__version__ = \"$funcx_version\"/" funcx_sdk/funcx/sdk/version.py > funcx_sdk/funcx/sdk/version.py
         sed "s/__version__ *= *\".*\"/__version__ = \"$funcx_version\"/" funcx_endpoint/funcx_endpoint/version.py > funcx_endpoint/funcx_endpoint/version.py
+      shell: bash -x
 
     - name: Push updated version to branch
       uses: stefanzweifel/git-auto-commit-action@v4
