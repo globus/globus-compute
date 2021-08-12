@@ -431,10 +431,7 @@ class EndpointInterchange(object):
                     logger.exception("[MAIN] Sending heartbeat to the forwarder over the results channel has failed")
                     raise
 
-            if self.results_ack_handler.check_windows():
-                logger.warning("[MAIN] Prev Ack window has unacked results, resetting interchange")
-                self._kill_event.set()
-                break
+            self.results_ack_handler.check_windows()
 
             try:
                 task = self.pending_task_queue.get(block=True, timeout=0.01)
