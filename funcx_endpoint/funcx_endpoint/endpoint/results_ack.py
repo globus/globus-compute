@@ -4,44 +4,35 @@ import time
 logger = logging.getLogger(__name__)
 
 
-# TODO: implement writing to disk in case these windows get too large and no
-# messages are being acked
 class ResultsAckHandler():
 
     def __init__(self):
-        self.curr_window = {}
-        self.prev_window = {}
-        self.curr_window_start = None
-        self.window_time = 60
+        self.unacked_results = {}
+        self.unacked_count_log_period = 60
+        self.last_unacked_count_log = time.time()
+        self.acked_count = 0
 
     def put(self, task_id, message):
-        self.curr_window[task_id] = message
+        self.unacked_results[task_id] = message
 
     def ack(self, task_id):
-        acked_task = self.curr_window.pop(task_id, None)
-        if acked_task is None:
-            acked_task = self.prev_window.pop(task_id, None)
+        acked_task = self.unacked_results.pop(task_id, None)
         if acked_task:
-            unacked_count = len(self.curr_window) + len(self.prev_window)
+            self.acked_count += 1
+            unacked_count = len(self.unacked_results)
             logger.info(f"Acked task {task_id}, Unacked count: {unacked_count}")
 
     def check_windows(self):
         now = time.time()
-        if self.curr_window_start and now - self.curr_window_start > self.window_time:
-            if len(self.prev_window) > 0:
-                return True
-
-            unacked_count = len(self.curr_window) + len(self.prev_window)
-            logger.info(f"Shifting Ack windows, Unacked count: {unacked_count}")
-
-            self.prev_window = self.curr_window
-            self.curr_window = {}
-            self.curr_window_start = now
-
-        return False
+        if now - self.last_unacked_count_log > self.unacked_count_log_period:
+            unacked_count = len(self.unacked_results)
+            logger.info(f"Unacked count: {unacked_count}, Acked results since last check {self.acked_count}")
+            self.acked_count = 0
+            self.last_unacked_count_log = now
 
     def handle_resend(self):
-        self.curr_window.update(self.prev_window)
-        self.prev_window = {}
-        self.curr_window_start = time.time()
-        return list(self.curr_window.values())
+        return list(self.unacked_results.values())
+
+    def persist(self):
+        # TODO: pickle dump unacked_results
+        return
