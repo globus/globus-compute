@@ -22,7 +22,7 @@ class ResultsAckHandler():
             unacked_count = len(self.unacked_results)
             logger.info(f"Acked task {task_id}, Unacked count: {unacked_count}")
 
-    def check_windows(self):
+    def check_ack_counts(self):
         now = time.time()
         if now - self.last_unacked_count_log > self.unacked_count_log_period:
             unacked_count = len(self.unacked_results)

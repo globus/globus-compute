@@ -406,6 +406,8 @@ class EndpointInterchange(object):
                                           set_hwm=True)
         self.results_outgoing.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
+        # TODO: this resend must happen after any endpoint re-registration to
+        # ensure there are not unacked results left
         resend_results_messages = self.results_ack_handler.handle_resend()
         if len(resend_results_messages) > 0:
             logger.info(f"[MAIN] Resending {len(resend_results_messages)} previously unacked results")
@@ -429,7 +431,7 @@ class EndpointInterchange(object):
                     logger.exception("[MAIN] Sending heartbeat to the forwarder over the results channel has failed")
                     raise
 
-            self.results_ack_handler.check_windows()
+            self.results_ack_handler.check_ack_counts()
 
             try:
                 task = self.pending_task_queue.get(block=True, timeout=0.01)
