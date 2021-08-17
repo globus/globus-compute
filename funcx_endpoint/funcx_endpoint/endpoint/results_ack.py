@@ -13,8 +13,9 @@ class ResultsAckHandler():
         """ Initialize results storage and timing for log updates
         """
         self.unacked_results = {}
-        self.unacked_count_log_period = 60
-        self.last_unacked_count_log = time.time()
+        # how frequently to log info about acked and unacked results
+        self.log_period = 60
+        self.last_log_timestamp = time.time()
         self.acked_count = 0
 
     def put(self, task_id, message):
@@ -50,11 +51,11 @@ class ResultsAckHandler():
         the last check
         """
         now = time.time()
-        if now - self.last_unacked_count_log > self.unacked_count_log_period:
+        if now - self.last_log_timestamp > self.log_period:
             unacked_count = len(self.unacked_results)
             logger.info(f"Unacked count: {unacked_count}, Acked results since last check {self.acked_count}")
             self.acked_count = 0
-            self.last_unacked_count_log = now
+            self.last_log_timestamp = now
 
     def get_unacked_results_list(self):
         """ Get a list of unacked results messages that can be used for resending
