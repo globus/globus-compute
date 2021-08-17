@@ -21,12 +21,13 @@ from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
-from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode
+from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode, ResultsAck
 from funcx.sdk.client import FuncXClient
 from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
+from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from queue import Queue
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -175,6 +176,8 @@ class EndpointInterchange(object):
         self.total_pending_task_count = 0
         self.fxs = FuncXClient()
 
+        self.results_ack_handler = ResultsAckHandler()
+
         logger.info("Interchange address is {}".format(self.interchange_address))
 
         self.endpoint_id = endpoint_id
@@ -288,6 +291,9 @@ class EndpointInterchange(object):
                     task_counter += 1
                     logger.debug(f"[TASK_PULL_THREAD] Task counter:{task_counter} Pending Tasks: {self.total_pending_task_count}")
 
+                elif isinstance(msg, ResultsAck):
+                    self.results_ack_handler.ack(msg.task_id)
+
                 else:
                     logger.warning(f"[TASK_PULL_THREAD] Unknown message type received: {msg}")
 
@@ -400,6 +406,16 @@ class EndpointInterchange(object):
                                           set_hwm=True)
         self.results_outgoing.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
+        # TODO: this resend must happen after any endpoint re-registration to
+        # ensure there are not unacked results left
+        resend_results_messages = self.results_ack_handler.get_unacked_results_list()
+        if len(resend_results_messages) > 0:
+            logger.info(f"[MAIN] Resending {len(resend_results_messages)} previously unacked results")
+
+        # TODO: this should be a multipart send rather than a loop
+        for results in resend_results_messages:
+            self.results_outgoing.put('forwarder', results)
+
         executor = list(self.executors.values())[0]
         last = time.time()
 
@@ -415,6 +431,8 @@ class EndpointInterchange(object):
                     logger.exception("[MAIN] Sending heartbeat to the forwarder over the results channel has failed")
                     raise
 
+            self.results_ack_handler.check_ack_counts()
+
             try:
                 task = self.pending_task_queue.get(block=True, timeout=0.01)
                 executor.submit_raw(task.pack())
@@ -427,8 +445,12 @@ class EndpointInterchange(object):
             try:
                 results = self.results_passthrough.get(False, 0.01)
 
+                task_id = results["task_id"]
+                if task_id:
+                    self.results_ack_handler.put(task_id, results["message"])
+
                 # results will be a pickled dict with task_id, container_id, and results/exception
-                self.results_outgoing.put('forwarder', results)
+                self.results_outgoing.put('forwarder', results["message"])
                 logger.info("Passing result to forwarder")
 
             except queue.Empty:
