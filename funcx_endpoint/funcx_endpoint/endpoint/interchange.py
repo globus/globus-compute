@@ -408,7 +408,7 @@ class EndpointInterchange(object):
 
         # TODO: this resend must happen after any endpoint re-registration to
         # ensure there are not unacked results left
-        resend_results_messages = self.results_ack_handler.handle_resend()
+        resend_results_messages = self.results_ack_handler.get_unacked_results_list()
         if len(resend_results_messages) > 0:
             logger.info(f"[MAIN] Resending {len(resend_results_messages)} previously unacked results")
 

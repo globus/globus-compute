@@ -208,9 +208,8 @@ class ManagerStatusReport(Message):
 
 class ResultsAck(Message):
     """
-    Results acknowledgement to acknowledge the most recent task result and thus
-    those before it as well (due to zmq guaranteed order and delivery). Sent from
-    forwarder->interchange
+    Results acknowledgement to acknowledge a task result was received by
+    the forwarder. Sent from forwarder->interchange
     """
     type = MessageType.RESULTS_ACK
 
