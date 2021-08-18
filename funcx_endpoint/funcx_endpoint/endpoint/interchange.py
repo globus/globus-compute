@@ -223,13 +223,12 @@ class EndpointInterchange(object):
         """
         logger.info("[TASK_PULL_THREAD] Starting")
 
-        self.task_incoming = None
         try:
             self._task_puller_loop(kill_event)
         except Exception:
             logger.exception("[TASK_PULL_THREAD] Unhandled exception")
-            self._handle_loop_error(kill_event, self.task_incoming)
-        else:
+            kill_event.set()
+        finally:
             self.task_incoming.close()
 
     def _task_puller_loop(self, kill_event):
@@ -343,13 +342,12 @@ class EndpointInterchange(object):
         """
         logger.debug("[COMMAND] Command Server Starting")
 
-        self.command_channel = None
         try:
             self._command_server_loop(kill_event)
         except Exception:
             logger.exception("[COMMAND] Unhandled exception")
-            self._handle_loop_error(kill_event, self.command_channel)
-        else:
+            kill_event.set()
+        finally:
             self.command_channel.close()
 
     def _command_server_loop(self, kill_event):
@@ -413,13 +411,12 @@ class EndpointInterchange(object):
                                                 args=(self._kill_event, ))
         self._command_thread.start()
 
-        self.results_outgoing = None
         try:
             self._main_loop()
         except Exception:
             logger.exception("[MAIN] Unhandled exception")
-            self._handle_loop_error(self._kill_event, self.results_outgoing)
-        else:
+            self._kill_event.set()
+        finally:
             self.results_outgoing.close()
 
     def _main_loop(self):
@@ -487,14 +484,6 @@ class EndpointInterchange(object):
             except Exception:
                 logger.exception("[MAIN] Something broke while forwarding results from executor to forwarder queues")
                 continue
-
-    def _handle_loop_error(self, kill_event, socket_queue_wrapper=None):
-        kill_event.set()
-        try:
-            if socket_queue_wrapper:
-                socket_queue_wrapper.close()
-        except Exception:
-            pass
 
     def get_status_report(self):
         """ Get utilization numbers
