@@ -206,11 +206,28 @@ class EndpointManager:
             self.logger.exception("Caught exception while trying to setup endpoint context dirs")
             sys.exit(-1)
 
+        # Configure the parameters for the interchange
+        optionals = {}
+        if 'endpoint_address' in self.funcx_config:
+            optionals['interchange_address'] = self.funcx_config['endpoint_address']
+
+        optionals['logdir'] = endpoint_dir
+
+        if self.debug:
+            optionals['logging_level'] = logging.DEBUG
+
+        interchange = EndpointInterchange(endpoint_config.config,
+                                          endpoint_id=endpoint_uuid,
+                                          keys_dir=keys_dir,
+                                          funcx_client=funcx_client,
+                                          endpoint_dir=endpoint_dir,
+                                          **optionals)
+
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
         reg_info = None
         try:
-            reg_info = self.register_endpoint(funcx_client, endpoint_uuid, endpoint_dir)
+            reg_info = interchange.register_endpoint()
         # if the service sends back an error response, it will be a FuncxResponseError
         except FuncxResponseError as e:
             # an example of an error that could conceivably occur here would be
@@ -251,79 +268,16 @@ class EndpointManager:
         with context:
             self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info)
 
-    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info):
+    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, interchange):
         if reg_info is None:
             # Register the endpoint
             self.logger.info("Retrying endpoint registration after initial registration attempt failed")
-            reg_info = retry_call(self.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
+            reg_info = retry_call(interchange.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
             self.logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
 
-        # Configure the parameters for the interchange
-        optionals = {}
-        optionals['client_address'] = reg_info['public_ip']
-        optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
-        if 'endpoint_address' in self.funcx_config:
-            optionals['interchange_address'] = self.funcx_config['endpoint_address']
-
-        optionals['logdir'] = endpoint_dir
-
-        if self.debug:
-            optionals['logging_level'] = logging.DEBUG
-
-        ic = EndpointInterchange(endpoint_config.config,
-                                 endpoint_id=endpoint_uuid,
-                                 keys_dir=keys_dir,
-                                 **optionals)
-        ic.start()
+        interchange.start()
 
         self.logger.critical("Interchange terminated.")
-
-    # Avoid a race condition when starting the endpoint alongside the web service
-    def register_endpoint(self, funcx_client, endpoint_uuid, endpoint_dir):
-        """Register the endpoint and return the registration info.
-
-        Parameters
-        ----------
-
-        funcx_client : FuncXClient
-            The auth'd client to communicate with the funcX service
-
-        endpoint_uuid : str
-            The uuid to register the endpoint with
-
-        endpoint_dir : str
-            The directory to write endpoint registration info into.
-
-        """
-        self.logger.debug("Attempting registration")
-        self.logger.debug(f"Trying with eid : {endpoint_uuid}")
-        reg_info = funcx_client.register_endpoint(self.name,
-                                                  endpoint_uuid,
-                                                  endpoint_version=funcx_endpoint.__version__)
-
-        # this is a backup error handler in case an endpoint ID is not sent back
-        # from the service or a bad ID is sent back
-        if 'endpoint_id' not in reg_info:
-            raise Exception("Endpoint ID was not included in the service's registration response.")
-        elif not isinstance(reg_info['endpoint_id'], str):
-            raise Exception("Endpoint ID sent by the service was not a string.")
-
-        with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
-            json.dump(reg_info, fp)
-            self.logger.debug("Registration info written to {}".format(os.path.join(endpoint_dir, 'endpoint.json')))
-
-        certs_dir = os.path.join(endpoint_dir, 'certificates')
-        os.makedirs(certs_dir, exist_ok=True)
-        server_keyfile = os.path.join(certs_dir, 'server.key')
-        self.logger.debug(f"Writing server key to {server_keyfile}")
-        try:
-            with open(server_keyfile, 'w') as f:
-                f.write(reg_info['forwarder_pubkey'])
-                os.chmod(server_keyfile, 0o600)
-        except Exception:
-            self.logger.exception("Failed to write server certificate")
-
-        return reg_info
 
     def stop_endpoint(self, name):
         self.name = name
