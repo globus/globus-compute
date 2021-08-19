@@ -272,6 +272,9 @@ class EndpointInterchange(object):
                     logger.exception("[TASK_PULL_THREAD] Failed to unpack message from forwarder")
                     pass
 
+                # TODO: test this command and ensure that it works
+                # The shutdown event should be called before the kill_event so that once
+                # everything is killed it does not start up again
                 if msg == 'STOP':
                     kill_event.set()
                     break
@@ -385,19 +388,30 @@ class EndpointInterchange(object):
                 continue
 
     def stop(self):
-        """Prepare the interchange for shutdown"""
+        """Prepare the interchange for a temporary stop."""
         self._kill_event.set()
         self._task_puller_thread.join()
         self._command_thread.join()
         self._kill_event.clear()
 
+    def shutdown(self):
+        """Prepare the interchange for shutdown"""
+        # TODO: perform a permanent endpoint shutdown. The start method should also be
+        # designed such that it can start the endpoint again after a full shutdown.
+        # Shutting down fully will require setting a shutdown event, setting the kill_event,
+        # and then waiting until the start method finishes
+        # We should call this method with atexit to do cleanup
+        return
+
     def start(self):
         """ Start the Interchange
         """
         logger.info("Starting EndpointInterchange")
-        while True:
-            self._start_threads_and_main()
-            self.stop()
+        # TODO: this should be in a while loop that ends the endpoint permanently
+        # on a shutdown signal, separate from kill_event (kill_event is meant for temporary
+        # stops followed by fresh starts)
+        self._start_threads_and_main()
+        self.stop()
 
     def _start_threads_and_main(self):
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
