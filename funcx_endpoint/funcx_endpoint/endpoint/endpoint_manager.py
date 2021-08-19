@@ -265,7 +265,7 @@ class EndpointManager:
         if 'endpoint_address' in self.funcx_config:
             optionals['interchange_address'] = self.funcx_config['endpoint_address']
 
-            optionals['logdir'] = endpoint_dir
+        optionals['logdir'] = endpoint_dir
 
         if self.debug:
             optionals['logging_level'] = logging.DEBUG
