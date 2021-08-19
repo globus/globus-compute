@@ -156,8 +156,6 @@ class EndpointInterchange(object):
         self.last_heartbeat = time.time()
         self.keys_dir = keys_dir
         self.serializer = FuncXSerializer()
-        logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
-            client_address, client_ports[0], client_ports[1], client_ports[2]))
 
         self.pending_task_queue = Queue()
         self.containers = {}
@@ -402,6 +400,9 @@ class EndpointInterchange(object):
             self.stop()
 
     def _start_threads_and_main(self):
+        logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
+            self.client_address, self.client_ports[0], self.client_ports[1], self.client_ports[2]))
+
         self._kill_event = threading.Event()
         self._task_puller_thread = threading.Thread(target=self.migrate_tasks_to_internal,
                                                     args=(self._kill_event, ))
