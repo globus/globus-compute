@@ -162,6 +162,9 @@ class EndpointInterchange(object):
         self.total_pending_task_count = 0
         self.fxs = FuncXClient()
 
+        self._quiesce_event = threading.Event()
+        self._kill_event = threading.Event()
+
         self.results_ack_handler = ResultsAckHandler()
 
         logger.info("Interchange address is {}".format(self.interchange_address))
@@ -206,30 +209,34 @@ class EndpointInterchange(object):
             self.executors[executor.label] = executor
             if executor.run_dir is None:
                 executor.run_dir = self.logdir
+
+    def start_executors(self):
+        logger.info("Starting Executors")
+        for executor in self.config.executors:
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
-                # executor._start_remote_interchange_process()
 
-    def migrate_tasks_to_internal(self, kill_event):
+    def migrate_tasks_to_internal(self, quiesce_event):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
         Parameters:
         -----------
-        kill_event : threading.Event
+        quiesce_event : threading.Event
               Event to let the thread know when it is time to die.
         """
         logger.info("[TASK_PULL_THREAD] Starting")
 
         try:
-            self._task_puller_loop(kill_event)
+            self._task_puller_loop(quiesce_event)
         except Exception:
             logger.exception("[TASK_PULL_THREAD] Unhandled exception")
-            kill_event.set()
         finally:
+            quiesce_event.set()
             self.task_incoming.close()
+            logger.info("[TASK_PULL_THREAD] Thread loop finished")
 
-    def _task_puller_loop(self, kill_event):
+    def _task_puller_loop(self, quiesce_event):
         task_counter = 0
         # Create the incoming queue in the thread to keep
         # zmq.context in the same thread. zmq.context is not thread-safe
@@ -246,12 +253,12 @@ class EndpointInterchange(object):
 
         self.last_heartbeat = time.time()
 
-        while not kill_event.is_set():
+        while not quiesce_event.is_set():
 
             try:
                 if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
-                    logger.critical("[TASK_PULL_THREAD] Missed too many heartbeats. Setting kill event.")
-                    kill_event.set()
+                    logger.critical("[TASK_PULL_THREAD] Missed too many heartbeats. Setting quiesce event.")
+                    quiesce_event.set()
                     break
 
                 try:
@@ -272,11 +279,9 @@ class EndpointInterchange(object):
                     logger.exception("[TASK_PULL_THREAD] Failed to unpack message from forwarder")
                     pass
 
-                # TODO: test this command and ensure that it works
-                # The shutdown event should be called before the kill_event so that once
-                # everything is killed it does not start up again
                 if msg == 'STOP':
-                    kill_event.set()
+                    self._kill_event.set()
+                    quiesce_event.set()
                     break
 
                 elif isinstance(msg, Heartbeat):
@@ -316,23 +321,7 @@ class EndpointInterchange(object):
                     self.containers[container_uuid] = container.get('location', 'RAW')
         return self.containers[container_uuid]
 
-    def _status_report_loop(self, kill_event, status_report_queue: queue.Queue):
-        logger.debug("[STATUS] Status reporting loop starting")
-        """
-        while not kill_event.is_set():
-            msg = EPStatusReport(
-                self.endpoint_id,
-                self.get_status_report(),
-                self.task_status_deltas
-            )
-            logger.info("[STATUS] Sending status report to forwarder, and clearing task deltas.")
-            status_report_queue.put(msg.pack())
-            self.task_status_deltas.clear()
-            time.sleep(self.heartbeat_period)
-        """
-        pass
-
-    def _command_server(self, kill_event):
+    def _command_server(self, quiesce_event):
         """ Command server to run async command to the interchange
 
         We want to be able to receive the following not yet implemented/updated commands:
@@ -344,14 +333,15 @@ class EndpointInterchange(object):
         logger.debug("[COMMAND] Command Server Starting")
 
         try:
-            self._command_server_loop(kill_event)
+            self._command_server_loop(quiesce_event)
         except Exception:
             logger.exception("[COMMAND] Unhandled exception")
-            kill_event.set()
         finally:
+            quiesce_event.set()
             self.command_channel.close()
+            logger.info("[COMMAND] Thread loop finished")
 
-    def _command_server_loop(self, kill_event):
+    def _command_server_loop(self, quiesce_event):
         self.command_channel = TaskQueue(self.client_address,
                                          port=self.client_ports[2],
                                          identity=self.endpoint_id,
@@ -364,7 +354,7 @@ class EndpointInterchange(object):
         # TODO :Register all channels with the authentication string.
         self.command_channel.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
-        while not kill_event.is_set():
+        while not quiesce_event.is_set():
             try:
                 # Wait for 1000 ms
                 buffer = self.command_channel.get(timeout=1000)
@@ -387,52 +377,66 @@ class EndpointInterchange(object):
                 # logger.debug("[COMMAND] is alive")
                 continue
 
-    def stop(self):
-        """Prepare the interchange for a temporary stop."""
-        self._kill_event.set()
+    def quiesce(self):
+        """Temporarily stop everything on the interchange in order to reach a consistent
+        state before attempting to start again. This must be called on the main thread
+        """
+        logger.info("Interchange Quiesce in progress (stopping and joining all threads)")
+        self._quiesce_event.set()
         self._task_puller_thread.join()
         self._command_thread.join()
-        self._kill_event.clear()
+        # this must be called last to ensure the next interchange run will occur
+        self._quiesce_event.clear()
 
-    def shutdown(self):
+    def stop(self):
         """Prepare the interchange for shutdown"""
-        # TODO: perform a permanent endpoint shutdown. The start method should also be
-        # designed such that it can start the endpoint again after a full shutdown.
-        # Shutting down fully will require setting a shutdown event, setting the kill_event,
-        # and then waiting until the start method finishes
-        # We should call this method with atexit to do cleanup
-        return
+        logger.info("Shutting down EndpointInterchange")
+
+        # TODO: shut down executors gracefully
+
+        # kill_event must be set before quiesce_event because we need to guarantee that once
+        # the quiesce is complete, the interchange will not try to start again
+        self._kill_event.set()
+        self._quiesce_event.set()
 
     def start(self):
         """ Start the Interchange
         """
         logger.info("Starting EndpointInterchange")
-        # TODO: this should be in a while loop that ends the endpoint permanently
-        # on a shutdown signal, separate from kill_event (kill_event is meant for temporary
-        # stops followed by fresh starts)
-        self._start_threads_and_main()
-        self.stop()
+        self._quiesce_event.clear()
+        self._kill_event.clear()
+
+        self.start_executors()
+
+        while not self._kill_event.is_set():
+            # TODO: remove this kill_event.set() when we have proper restart behavior.
+            # Setting this forces the interchange to only run once.
+            self._kill_event.set()
+            self._start_threads_and_main()
+            self.quiesce()
+
+        logger.info("EndpointInterchange shutdown complete.")
 
     def _start_threads_and_main(self):
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
             self.client_address, self.client_ports[0], self.client_ports[1], self.client_ports[2]))
 
-        self._kill_event = threading.Event()
         self._task_puller_thread = threading.Thread(target=self.migrate_tasks_to_internal,
-                                                    args=(self._kill_event, ))
+                                                    args=(self._quiesce_event, ))
         self._task_puller_thread.start()
 
         self._command_thread = threading.Thread(target=self._command_server,
-                                                args=(self._kill_event, ))
+                                                args=(self._quiesce_event, ))
         self._command_thread.start()
 
         try:
             self._main_loop()
         except Exception:
             logger.exception("[MAIN] Unhandled exception")
-            self._kill_event.set()
         finally:
+            self._quiesce_event.set()
             self.results_outgoing.close()
+            logger.info("[MAIN] Thread loop finished")
 
     def _main_loop(self):
         self.results_outgoing = TaskQueue(self.client_address,
@@ -459,7 +463,7 @@ class EndpointInterchange(object):
         executor = list(self.executors.values())[0]
         last = time.time()
 
-        while not self._kill_event.is_set():
+        while not self._quiesce_event.is_set():
             if last + self.heartbeat_threshold < time.time():
                 logger.debug("[MAIN] alive")
                 last = time.time()
