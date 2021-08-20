@@ -15,13 +15,11 @@ import daemon.pidfile
 import psutil
 import texttable as tt
 import typer
-from retry.api import retry_call
 
 import funcx
 import zmq
 from globus_sdk import GlobusAPIError, NetworkError
 
-import funcx_endpoint
 from funcx.utils.response_errors import FuncxResponseError
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
@@ -221,6 +219,7 @@ class EndpointManager:
                                           keys_dir=keys_dir,
                                           funcx_client=funcx_client,
                                           endpoint_dir=endpoint_dir,
+                                          name=self.name,
                                           **optionals)
 
         # place registration after everything else so that the endpoint will
@@ -266,14 +265,11 @@ class EndpointManager:
             self.logger.critical("Launching endpoint daemon process with errors noted above")
 
         with context:
-            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info)
+            self.daemon_launch(reg_info, interchange)
 
-    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, interchange):
-        if reg_info is None:
-            # Register the endpoint
-            self.logger.info("Retrying endpoint registration after initial registration attempt failed")
-            reg_info = retry_call(interchange.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
-            self.logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+    def daemon_launch(self, reg_info, interchange):
+        if reg_info is not None:
+            interchange.initial_registration_complete = True
 
         interchange.start()
 

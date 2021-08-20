@@ -15,6 +15,7 @@ import threading
 import json
 import daemon
 import collections
+from retry.api import retry_call
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
@@ -100,6 +101,7 @@ class EndpointInterchange(object):
                  suppress_failure=True,
                  funcx_client=None,
                  endpoint_dir=".",
+                 name="default",
                  ):
         """
         Parameters
@@ -155,6 +157,7 @@ class EndpointInterchange(object):
 
         self.funcx_client = funcx_client
         self.endpoint_dir = endpoint_dir
+        self.name = name
 
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
@@ -170,6 +173,7 @@ class EndpointInterchange(object):
 
         self._quiesce_event = threading.Event()
         self._kill_event = threading.Event()
+        self.initial_registration_complete = False
 
         self.results_ack_handler = ResultsAckHandler()
 
@@ -442,6 +446,14 @@ class EndpointInterchange(object):
     def start(self):
         """ Start the Interchange
         """
+        if not self.initial_registration_complete:
+            # Register the endpoint
+            logger.info("Running endpoint registration retry loop")
+            reg_info = retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
+            logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+
+        self.initial_registration_complete = False
+
         logger.info("Starting EndpointInterchange")
         self._quiesce_event.clear()
         self._kill_event.clear()
