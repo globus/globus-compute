@@ -448,10 +448,10 @@ class EndpointInterchange(object):
                 task_id = results["task_id"]
                 if task_id:
                     self.results_ack_handler.put(task_id, results["message"])
+                    logger.info(f"Passing result to forwarder for task {task_id}")
 
                 # results will be a pickled dict with task_id, container_id, and results/exception
                 self.results_outgoing.put('forwarder', results["message"])
-                logger.info("Passing result to forwarder")
 
             except queue.Empty:
                 pass
