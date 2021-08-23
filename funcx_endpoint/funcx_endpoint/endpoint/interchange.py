@@ -102,6 +102,7 @@ class EndpointInterchange(object):
                  funcx_client=None,
                  endpoint_dir=".",
                  name="default",
+                 reg_info=None,
                  ):
         """
         Parameters
@@ -159,6 +160,11 @@ class EndpointInterchange(object):
         self.endpoint_dir = endpoint_dir
         self.name = name
 
+        self.initial_registration_complete = False
+        if reg_info:
+            self.initial_registration_complete = True
+            self.apply_reg_info(reg_info)
+
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
         # initalize the last heartbeat time to start the loop
@@ -173,7 +179,6 @@ class EndpointInterchange(object):
 
         self._quiesce_event = threading.Event()
         self._kill_event = threading.Event()
-        self.initial_registration_complete = False
 
         self.results_ack_handler = ResultsAckHandler()
 
@@ -226,38 +231,13 @@ class EndpointInterchange(object):
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
 
-    def register_endpoint(self):
-        logger.debug("Attempting registration")
-        logger.debug(f"Trying with eid : {self.endpoint_id}")
-        reg_info = self.funcx_client.register_endpoint(self.name,
-                                                       self.endpoint_id,
-                                                       endpoint_version=funcx_endpoint.__version__)
-
-        # this is a backup error handler in case an endpoint ID is not sent back
-        # from the service or a bad ID is sent back
-        if 'endpoint_id' not in reg_info:
-            raise Exception("Endpoint ID was not included in the service's registration response.")
-        elif not isinstance(reg_info['endpoint_id'], str):
-            raise Exception("Endpoint ID sent by the service was not a string.")
-
-        with open(os.path.join(self.endpoint_dir, 'endpoint.json'), 'w+') as fp:
-            json.dump(reg_info, fp)
-            logger.debug("Registration info written to {}".format(os.path.join(self.endpoint_dir, 'endpoint.json')))
-
-        certs_dir = os.path.join(self.endpoint_dir, 'certificates')
-        os.makedirs(certs_dir, exist_ok=True)
-        server_keyfile = os.path.join(certs_dir, 'server.key')
-        logger.debug(f"Writing server key to {server_keyfile}")
-        try:
-            with open(server_keyfile, 'w') as f:
-                f.write(reg_info['forwarder_pubkey'])
-                os.chmod(server_keyfile, 0o600)
-        except Exception:
-            logger.exception("Failed to write server certificate")
-
+    def apply_reg_info(self, reg_info):
         self.client_address = reg_info['public_ip']
         self.client_ports = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
 
+    def register_endpoint(self):
+        reg_info = register_endpoint(logger, self.funcx_client, self.endpoint_id, self.endpoint_dir, self.name)
+        self.apply_reg_info(reg_info)
         return reg_info
 
     def migrate_tasks_to_internal(self, quiesce_event):
@@ -700,6 +680,38 @@ def starter(comm_q, *args, **kwargs):
     # comm_q.put((ic.worker_task_port,
     #            ic.worker_result_port))
     ic.start()
+
+
+def register_endpoint(logger, funcx_client, endpoint_uuid, endpoint_dir, name):
+    logger.debug("Attempting registration")
+    logger.debug(f"Trying with eid : {endpoint_uuid}")
+    reg_info = funcx_client.register_endpoint(name,
+                                              endpoint_uuid,
+                                              endpoint_version=funcx_endpoint.__version__)
+
+    # this is a backup error handler in case an endpoint ID is not sent back
+    # from the service or a bad ID is sent back
+    if 'endpoint_id' not in reg_info:
+        raise Exception("Endpoint ID was not included in the service's registration response.")
+    elif not isinstance(reg_info['endpoint_id'], str):
+        raise Exception("Endpoint ID sent by the service was not a string.")
+
+    with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
+        json.dump(reg_info, fp)
+        logger.debug("Registration info written to {}".format(os.path.join(endpoint_dir, 'endpoint.json')))
+
+    certs_dir = os.path.join(endpoint_dir, 'certificates')
+    os.makedirs(certs_dir, exist_ok=True)
+    server_keyfile = os.path.join(certs_dir, 'server.key')
+    logger.debug(f"Writing server key to {server_keyfile}")
+    try:
+        with open(server_keyfile, 'w') as f:
+            f.write(reg_info['forwarder_pubkey'])
+            os.chmod(server_keyfile, 0o600)
+    except Exception:
+        logger.exception("Failed to write server certificate")
+
+    return reg_info
 
 
 def cli_run():

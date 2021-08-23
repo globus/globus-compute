@@ -23,7 +23,7 @@ from globus_sdk import GlobusAPIError, NetworkError
 from funcx.utils.response_errors import FuncxResponseError
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
-from funcx_endpoint.endpoint.interchange import EndpointInterchange
+from funcx_endpoint.endpoint.interchange import EndpointInterchange, register_endpoint
 from funcx.sdk.client import FuncXClient
 
 logger = logging.getLogger("endpoint.endpoint_manager")
@@ -204,29 +204,11 @@ class EndpointManager:
             self.logger.exception("Caught exception while trying to setup endpoint context dirs")
             sys.exit(-1)
 
-        # Configure the parameters for the interchange
-        optionals = {}
-        if 'endpoint_address' in self.funcx_config:
-            optionals['interchange_address'] = self.funcx_config['endpoint_address']
-
-        optionals['logdir'] = endpoint_dir
-
-        if self.debug:
-            optionals['logging_level'] = logging.DEBUG
-
-        interchange = EndpointInterchange(endpoint_config.config,
-                                          endpoint_id=endpoint_uuid,
-                                          keys_dir=keys_dir,
-                                          funcx_client=funcx_client,
-                                          endpoint_dir=endpoint_dir,
-                                          name=self.name,
-                                          **optionals)
-
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
         reg_info = None
         try:
-            reg_info = interchange.register_endpoint()
+            reg_info = register_endpoint(self.logger, funcx_client, endpoint_uuid, endpoint_dir, self.name)
         # if the service sends back an error response, it will be a FuncxResponseError
         except FuncxResponseError as e:
             # an example of an error that could conceivably occur here would be
@@ -265,11 +247,27 @@ class EndpointManager:
             self.logger.critical("Launching endpoint daemon process with errors noted above")
 
         with context:
-            self.daemon_launch(reg_info, interchange)
+            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info)
 
-    def daemon_launch(self, reg_info, interchange):
-        if reg_info is not None:
-            interchange.initial_registration_complete = True
+    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info):
+        # Configure the parameters for the interchange
+        optionals = {}
+        if 'endpoint_address' in self.funcx_config:
+            optionals['interchange_address'] = self.funcx_config['endpoint_address']
+
+        optionals['logdir'] = endpoint_dir
+
+        if self.debug:
+            optionals['logging_level'] = logging.DEBUG
+
+        interchange = EndpointInterchange(endpoint_config.config,
+                                          endpoint_id=endpoint_uuid,
+                                          keys_dir=keys_dir,
+                                          funcx_client=funcx_client,
+                                          endpoint_dir=endpoint_dir,
+                                          name=self.name,
+                                          reg_info=reg_info,
+                                          **optionals)
 
         interchange.start()
 
