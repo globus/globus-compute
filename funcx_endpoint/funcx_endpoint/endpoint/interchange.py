@@ -409,11 +409,12 @@ class EndpointInterchange(object):
         self.start_executors()
 
         while not self._kill_event.is_set():
-            # TODO: remove this kill_event.set() when we have proper restart behavior.
-            # Setting this forces the interchange to only run once.
-            self._kill_event.set()
             self._start_threads_and_main()
             self.quiesce()
+            # TODO: Remove this break. It is only meant to maintain existing functionality
+            # that the interchange only runs once, but can be removed when there is a proper
+            # endpoint re-registration mechanism in place.
+            break
 
         logger.info("EndpointInterchange shutdown complete.")
 
@@ -434,7 +435,6 @@ class EndpointInterchange(object):
         except Exception:
             logger.exception("[MAIN] Unhandled exception")
         finally:
-            self._quiesce_event.set()
             self.results_outgoing.close()
             logger.info("[MAIN] Thread loop finished")
 
