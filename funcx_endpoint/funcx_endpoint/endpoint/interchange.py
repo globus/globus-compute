@@ -165,7 +165,8 @@ class EndpointInterchange(object):
                                          mode='client',
                                          RCVTIMEO=1000,  # in milliseconds
                                          keys_dir=keys_dir,
-                                         set_hwm=True)
+                                         set_hwm=True,
+                                         linger=0)
 
         # TODO :Register all channels with the authentication string.
         self.command_channel.put('forwarder', pickle.dumps({"registration": endpoint_id}))
@@ -243,7 +244,8 @@ class EndpointInterchange(object):
                                        mode='client',
                                        set_hwm=True,
                                        keys_dir=self.keys_dir,
-                                       RCVTIMEO=1000)
+                                       RCVTIMEO=1000,
+                                       linger=0)
         self.task_incoming.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
         logger.info(f"Task incoming on tcp://{self.client_address}:{self.client_ports[0]}")
 
@@ -403,7 +405,8 @@ class EndpointInterchange(object):
                                           keys_dir=self.keys_dir,
                                           # Fail immediately if results cannot be sent back
                                           SNDTIMEO=0,
-                                          set_hwm=True)
+                                          set_hwm=True,
+                                          linger=0)
         self.results_outgoing.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
 
         # TODO: this resend must happen after any endpoint re-registration to

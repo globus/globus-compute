@@ -21,6 +21,7 @@ class TaskQueue(object):
                  set_hwm=False,
                  RCVTIMEO=None,
                  SNDTIMEO=None,
+                 linger=None,
                  ironhouse: bool = False,
                  keys_dir: str = os.path.abspath('.curve'),
                  mode: str = 'client'):
@@ -80,6 +81,8 @@ class TaskQueue(object):
             self.zmq_socket.setsockopt(zmq.RCVTIMEO, RCVTIMEO)
         if SNDTIMEO is not None:
             self.zmq_socket.setsockopt(zmq.SNDTIMEO, SNDTIMEO)
+        if linger is not None:
+            self.zmq_socket.setsockopt(zmq.LINGER, linger)
 
         # all zmq setsockopt calls must be done before bind/connect is called
         if self.mode == 'server':
