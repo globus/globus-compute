@@ -260,16 +260,16 @@ class EndpointManager:
         if self.debug:
             optionals['logging_level'] = logging.DEBUG
 
-        interchange = EndpointInterchange(endpoint_config.config,
-                                          endpoint_id=endpoint_uuid,
-                                          keys_dir=keys_dir,
-                                          funcx_client=funcx_client,
-                                          endpoint_dir=endpoint_dir,
-                                          name=self.name,
-                                          reg_info=reg_info,
-                                          **optionals)
+        ic = EndpointInterchange(endpoint_config.config,
+                                 endpoint_id=endpoint_uuid,
+                                 keys_dir=keys_dir,
+                                 funcx_client=funcx_client,
+                                 endpoint_dir=endpoint_dir,
+                                 name=self.name,
+                                 reg_info=reg_info,
+                                 **optionals)
 
-        interchange.start()
+        ic.start()
 
         self.logger.critical("Interchange terminated.")
 

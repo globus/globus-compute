@@ -137,6 +137,18 @@ class EndpointInterchange(object):
 
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
+
+        funcx_client : FuncXClient
+             Client to use for endpoint registration
+
+        endpoint_dir : str
+             Endpoint directory path to store registration info in
+
+        name : str
+             Name of endpoint
+
+        reg_info : Dict
+             Registration info from initial registration on endpoint start, if it succeeded
         """
         self.logdir = logdir
         try:
@@ -683,6 +695,22 @@ def starter(comm_q, *args, **kwargs):
 
 
 def register_endpoint(logger, funcx_client, endpoint_uuid, endpoint_dir, name):
+    """Register the endpoint and return the registration info.
+
+    Parameters
+    ----------
+    funcx_client : FuncXClient
+        The auth'd client to communicate with the funcX service
+
+    endpoint_uuid : str
+        The uuid to register the endpoint with
+
+    endpoint_dir : str
+        The endpoint directory path to store data in
+
+    name : str
+        The name of the endpoint
+    """
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
     reg_info = funcx_client.register_endpoint(name,
