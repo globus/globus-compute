@@ -99,10 +99,10 @@ class EndpointInterchange(object):
                  endpoint_id=None,
                  keys_dir=".curve",
                  suppress_failure=True,
-                 funcx_client=None,
                  endpoint_dir=".",
                  name="default",
                  reg_info=None,
+                 funcx_client_options={},
                  ):
         """
         Parameters
@@ -138,9 +138,6 @@ class EndpointInterchange(object):
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
 
-        funcx_client : FuncXClient
-             Client to use for endpoint registration
-
         endpoint_dir : str
              Endpoint directory path to store registration info in
 
@@ -149,6 +146,9 @@ class EndpointInterchange(object):
 
         reg_info : Dict
              Registration info from initial registration on endpoint start, if it succeeded
+
+        funcx_client_options : Dict
+             FuncXClient initialization options
         """
         self.logdir = logdir
         try:
@@ -168,9 +168,10 @@ class EndpointInterchange(object):
         self.client_ports = client_ports
         self.suppress_failure = suppress_failure
 
-        self.funcx_client = funcx_client
         self.endpoint_dir = endpoint_dir
         self.name = name
+
+        self.funcx_client = FuncXClient(**funcx_client_options)
 
         self.initial_registration_complete = False
         if reg_info:
@@ -187,7 +188,6 @@ class EndpointInterchange(object):
         self.pending_task_queue = Queue()
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient()
 
         self._quiesce_event = threading.Event()
         self._kill_event = threading.Event()
@@ -348,7 +348,7 @@ class EndpointInterchange(object):
                 self.containers[container_uuid] = 'RAW'
             else:
                 try:
-                    container = self.fxs.get_container(container_uuid, self.config.container_type)
+                    container = self.funcx_client.get_container(container_uuid, self.config.container_type)
                 except Exception:
                     logger.exception("[FETCH_CONTAINER] Unable to resolve container location")
                     self.containers[container_uuid] = 'RAW'

@@ -162,8 +162,11 @@ class EndpointManager:
         if not endpoint_config.config.executors:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
-        funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address,
-                                   check_endpoint_version=True)
+        funcx_client_options = {
+            "funcx_service_address": endpoint_config.config.funcx_service_address,
+            "check_endpoint_version": True,
+        }
+        funcx_client = FuncXClient(**funcx_client_options)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
@@ -247,9 +250,9 @@ class EndpointManager:
             self.logger.critical("Launching endpoint daemon process with errors noted above")
 
         with context:
-            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info)
+            self.daemon_launch(endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options)
 
-    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info):
+    def daemon_launch(self, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options):
         # Configure the parameters for the interchange
         optionals = {}
         if 'endpoint_address' in self.funcx_config:
@@ -263,10 +266,10 @@ class EndpointManager:
         ic = EndpointInterchange(endpoint_config.config,
                                  endpoint_id=endpoint_uuid,
                                  keys_dir=keys_dir,
-                                 funcx_client=funcx_client,
                                  endpoint_dir=endpoint_dir,
                                  name=self.name,
                                  reg_info=reg_info,
+                                 funcx_client_options=funcx_client_options,
                                  **optionals)
 
         ic.start()
