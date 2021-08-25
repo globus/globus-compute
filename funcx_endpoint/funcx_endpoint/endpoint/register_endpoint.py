@@ -5,10 +5,16 @@ import funcx_endpoint
 
 
 def register_endpoint(logger, funcx_client, endpoint_uuid, endpoint_dir, name):
-    """Register the endpoint and return the registration info.
+    """Register the endpoint and return the registration info. This function needs
+    to be isolated (including the logger which is passed in) so that the function
+    can both be called from the endpoint start process as well as the daemon process
+    that it spawns.
 
     Parameters
     ----------
+    logger : Logger
+        Logger to use
+
     funcx_client : FuncXClient
         The auth'd client to communicate with the funcX service
 

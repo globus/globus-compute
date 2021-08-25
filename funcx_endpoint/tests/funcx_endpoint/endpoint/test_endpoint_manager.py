@@ -81,7 +81,12 @@ class TestStart:
         mock_zmq_create.assert_called_with(os.path.join(config_dir, "certificates"), "endpoint")
         mock_zmq_load.assert_called_with("public/key/file")
 
-        mock_daemon.assert_called_with(mock_client(), '123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config, reg_info)
+        funcx_client_options = {
+            "funcx_service_address": endpoint_config.config.funcx_service_address,
+            "check_endpoint_version": True,
+        }
+
+        mock_daemon.assert_called_with('123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config, reg_info, funcx_client_options)
 
         mock_context.assert_called_with(working_directory=config_dir,
                                         umask=0o002,
@@ -117,7 +122,7 @@ class TestStart:
             manager.start_endpoint("mock_endpoint", None, mock_load())
 
     def test_daemon_launch(self, mocker):
-        mock_register_endpoint = mocker.patch.object(EndpointManager, 'register_endpoint')
+        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.register_endpoint.register_endpoint')
         mock_register_endpoint.return_value = {'endpoint_id': 'abcde12345',
                                                'public_ip': '127.0.0.1',
                                                'tasks_port': 8080,
@@ -126,31 +131,34 @@ class TestStart:
 
         mock_interchange = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.EndpointInterchange')
         mock_interchange.return_value.start.return_value = None
-        mock_interchange.return_vlaue.end.return_value = None
-
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
-
-        mock_optionals = {}
-        mock_optionals['client_address'] = '127.0.0.1'
-        mock_optionals['client_ports'] = (8080, 8081, 8082)
+        mock_interchange.return_value.stop.return_value = None
 
         manager = EndpointManager(funcx_dir=os.getcwd())
+        manager.name = 'test'
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+
+        mock_optionals = {}
+        mock_optionals['logdir'] = config_dir
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader('config',
                                            os.path.join(config_dir, 'config.py')).load_module()
-        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None)
 
-        mock_register_endpoint.assert_called_with(mock_client(), 'mock_endpoint_uuid', config_dir)
+        funcx_client_options = {}
+
+        manager.daemon_launch('mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None, funcx_client_options)
 
         mock_interchange.assert_called_with(endpoint_config.config,
                                             endpoint_id='mock_endpoint_uuid',
                                             keys_dir='mock_keys_dir',
+                                            endpoint_dir=config_dir,
+                                            name=manager.name,
+                                            reg_info=None,
+                                            funcx_client_options=funcx_client_options,
                                             **mock_optionals)
 
     def test_with_funcx_config(self, mocker):
-        mock_register_endpoint = mocker.patch.object(EndpointManager, 'register_endpoint')
+        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.register_endpoint.register_endpoint')
         mock_register_endpoint.return_value = {'endpoint_id': 'abcde12345',
                                                'public_ip': '127.0.0.1',
                                                'tasks_port': 8080,
@@ -159,19 +167,16 @@ class TestStart:
 
         mock_interchange = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.EndpointInterchange')
         mock_interchange.return_value.start.return_value = None
-        mock_interchange.return_vlaue.end.return_value = None
-
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
+        mock_interchange.return_value.stop.return_value = None
 
         mock_optionals = {}
-        mock_optionals['client_address'] = '127.0.0.1'
-        mock_optionals['client_ports'] = (8080, 8081, 8082)
         mock_optionals['interchange_address'] = '127.0.0.1'
 
         mock_funcx_config = {}
         mock_funcx_config['endpoint_address'] = '127.0.0.1'
 
         manager = EndpointManager(funcx_dir=os.getcwd())
+        manager.name = 'test'
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         mock_optionals['logdir'] = config_dir
         manager.funcx_config = mock_funcx_config
@@ -179,36 +184,19 @@ class TestStart:
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader('config',
                                            os.path.join(config_dir, 'config.py')).load_module()
-        manager.daemon_launch(mock_client(), 'mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None)
+
+        funcx_client_options = {}
+
+        manager.daemon_launch('mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None, funcx_client_options)
 
         mock_interchange.assert_called_with(endpoint_config.config,
                                             endpoint_id='mock_endpoint_uuid',
                                             keys_dir='mock_keys_dir',
+                                            endpoint_dir=config_dir,
+                                            name=manager.name,
+                                            reg_info=None,
+                                            funcx_client_options=funcx_client_options,
                                             **mock_optionals)
-
-    def test_register_endpoint_no_endpoint_id(self, mocker):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
-        mock_client.return_value.register_endpoint.return_value = {'status': 'okay'}
-
-        manager = EndpointManager(funcx_dir=os.getcwd())
-        manager.funcx_dir = f'{os.getcwd()}'
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-
-        manager.configure_endpoint("mock_endpoint", None)
-        with pytest.raises(Exception, match='Endpoint ID was not included in the service\'s registration response.'):
-            manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
-
-    def test_register_endpoint_int_endpoint_id(self, mocker):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
-        mock_client.return_value.register_endpoint.return_value = {'status': 'okay',
-                                                                   'endpoint_id': 123456}
-
-        manager = EndpointManager(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-
-        manager.configure_endpoint("mock_endpoint", None)
-        with pytest.raises(Exception, match='Endpoint ID sent by the service was not a string.'):
-            manager.register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir)
 
     def test_check_endpoint_json_no_json_no_uuid(self, mocker):
         mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4')
