@@ -102,7 +102,7 @@ class EndpointInterchange(object):
                  endpoint_dir=".",
                  name="default",
                  reg_info=None,
-                 funcx_client_options={},
+                 funcx_client_options=None,
                  ):
         """
         Parameters
@@ -171,6 +171,8 @@ class EndpointInterchange(object):
         self.endpoint_dir = endpoint_dir
         self.name = name
 
+        if funcx_client_options is None:
+            funcx_client_options = {}
         self.funcx_client = FuncXClient(**funcx_client_options)
 
         self.initial_registration_complete = False
