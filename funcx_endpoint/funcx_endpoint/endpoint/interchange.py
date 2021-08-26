@@ -194,7 +194,7 @@ class EndpointInterchange(object):
         self._quiesce_event = threading.Event()
         self._kill_event = threading.Event()
 
-        self.results_ack_handler = ResultsAckHandler()
+        self.results_ack_handler = ResultsAckHandler(endpoint_dir=endpoint_dir)
 
         logger.info("Interchange address is {}".format(self.interchange_address))
 
@@ -542,6 +542,7 @@ class EndpointInterchange(object):
                 task_id = results["task_id"]
                 if task_id:
                     self.results_ack_handler.put(task_id, results["message"])
+                    self.results_ack_handler.persist()
                     logger.info(f"Passing result to forwarder for task {task_id}")
 
                 # results will be a pickled dict with task_id, container_id, and results/exception
