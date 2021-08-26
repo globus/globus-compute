@@ -234,7 +234,7 @@ class EndpointInterchange(object):
         finally:
             quiesce_event.set()
             self.task_incoming.close()
-            logger.info("[TASK_PULL_THREAD] Thread loop finished")
+            logger.info("[TASK_PULL_THREAD] Thread loop exiting")
 
     def _task_puller_loop(self, quiesce_event):
         task_counter = 0
@@ -339,7 +339,7 @@ class EndpointInterchange(object):
         finally:
             quiesce_event.set()
             self.command_channel.close()
-            logger.info("[COMMAND] Thread loop finished")
+            logger.info("[COMMAND] Thread loop exiting")
 
     def _command_server_loop(self, quiesce_event):
         self.command_channel = TaskQueue(self.client_address,
@@ -436,7 +436,7 @@ class EndpointInterchange(object):
             logger.exception("[MAIN] Unhandled exception")
         finally:
             self.results_outgoing.close()
-            logger.info("[MAIN] Thread loop finished")
+            logger.info("[MAIN] Thread loop exiting")
 
     def _main_loop(self):
         self.results_outgoing = TaskQueue(self.client_address,

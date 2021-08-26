@@ -275,7 +275,6 @@ class EndpointManager:
                                  keys_dir=keys_dir,
                                  **optionals)
         ic.start()
-        ic.stop()
 
         self.logger.critical("Interchange terminated.")
 
