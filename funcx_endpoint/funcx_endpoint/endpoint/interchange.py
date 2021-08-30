@@ -28,7 +28,6 @@ from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
-from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from queue import Queue
 
@@ -103,6 +102,7 @@ class EndpointInterchange(object):
                  endpoint_name="default",
                  reg_info=None,
                  funcx_client_options=None,
+                 results_ack_handler=None,
                  ):
         """
         Parameters
@@ -194,7 +194,7 @@ class EndpointInterchange(object):
         self._quiesce_event = threading.Event()
         self._kill_event = threading.Event()
 
-        self.results_ack_handler = ResultsAckHandler(endpoint_dir=endpoint_dir)
+        self.results_ack_handler = results_ack_handler
 
         logger.info("Interchange address is {}".format(self.interchange_address))
 
@@ -423,6 +423,10 @@ class EndpointInterchange(object):
         self._quiesce_event.set()
         self._task_puller_thread.join()
         self._command_thread.join()
+
+        logger.info("Saving unacked results to disk")
+        self.results_ack_handler.persist()
+
         # this must be called last to ensure the next interchange run will occur
         self._quiesce_event.clear()
 
@@ -542,7 +546,6 @@ class EndpointInterchange(object):
                 task_id = results["task_id"]
                 if task_id:
                     self.results_ack_handler.put(task_id, results["message"])
-                    self.results_ack_handler.persist()
                     logger.info(f"Passing result to forwarder for task {task_id}")
 
                 # results will be a pickled dict with task_id, container_id, and results/exception
