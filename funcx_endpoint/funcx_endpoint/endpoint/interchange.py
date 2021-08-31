@@ -16,6 +16,7 @@ import json
 import daemon
 import collections
 from retry.api import retry_call
+import signal
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
@@ -441,10 +442,17 @@ class EndpointInterchange(object):
         self._kill_event.set()
         self._quiesce_event.set()
 
+    def handle_sigterm(self, sig_num, curr_stack_frame):
+        logger.info("Saving unacked results to disk")
+        self.results_ack_handler.persist()
+
     def start(self):
         """ Start the Interchange
         """
         logger.info("Starting EndpointInterchange")
+
+        signal.signal(signal.SIGTERM, self.handle_sigterm)
+
         self._quiesce_event.clear()
         self._kill_event.clear()
 
