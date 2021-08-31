@@ -59,8 +59,8 @@ class Config(RepresentationMixin):
         detach_endpoint=True,
         # Logging info
         log_dir=None,
-        stdout="./EndpointInterchange.log",
-        stderr="./EndpointInterchange.log",
+        stdout="./endpoint.log",
+        stderr="./endpoint.log",
     ):
 
         # Execution backends
