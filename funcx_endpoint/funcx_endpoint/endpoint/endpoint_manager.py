@@ -268,7 +268,7 @@ class EndpointManager:
                                  endpoint_id=endpoint_uuid,
                                  keys_dir=keys_dir,
                                  endpoint_dir=endpoint_dir,
-                                 name=self.name,
+                                 endpoint_name=self.name,
                                  reg_info=reg_info,
                                  funcx_client_options=funcx_client_options,
                                  **optionals)

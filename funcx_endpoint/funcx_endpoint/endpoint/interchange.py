@@ -100,7 +100,7 @@ class EndpointInterchange(object):
                  keys_dir=".curve",
                  suppress_failure=True,
                  endpoint_dir=".",
-                 name="default",
+                 endpoint_name="default",
                  reg_info=None,
                  funcx_client_options=None,
                  ):
@@ -141,7 +141,7 @@ class EndpointInterchange(object):
         endpoint_dir : str
              Endpoint directory path to store registration info in
 
-        name : str
+        endpoint_name : str
              Name of endpoint
 
         reg_info : Dict
@@ -169,7 +169,7 @@ class EndpointInterchange(object):
         self.suppress_failure = suppress_failure
 
         self.endpoint_dir = endpoint_dir
-        self.name = name
+        self.endpoint_name = endpoint_name
 
         if funcx_client_options is None:
             funcx_client_options = {}
@@ -250,7 +250,7 @@ class EndpointInterchange(object):
         self.client_ports = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
 
     def register_endpoint(self):
-        reg_info = register_endpoint(logger, self.funcx_client, self.endpoint_id, self.endpoint_dir, self.name)
+        reg_info = register_endpoint(logger, self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name)
         self.apply_reg_info(reg_info)
         return reg_info
 
