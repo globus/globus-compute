@@ -6,6 +6,7 @@ import zmq
 import sys
 import pickle
 import os
+import sys
 
 from parsl.app.errors import RemoteExceptionWrapper
 
@@ -157,7 +158,8 @@ class FuncXWorker(object):
             if task_type == b'WRKR_DIE':
                 logger.info("*** WORKER {} ABOUT TO DIE ***".format(self.worker_id))
                 # Kill the worker after accepting death in message to manager.
-                exit()
+                sys.exit()
+                return
 
         logger.warning("Broke out of the loop... dying")
 
