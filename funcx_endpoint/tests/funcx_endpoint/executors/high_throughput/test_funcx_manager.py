@@ -17,7 +17,10 @@ class TestManager:
         yield
         shutil.rmtree(os.path.join(os.getcwd(), 'mock_uid'))
 
-    def test_remove_worker_init(self):
+    def test_remove_worker_init(self, mocker):
+        mock_thread = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.threading.Thread')
+        mock_thread.return_value = None
+
         manager = Manager(logdir='./', uid="mock_uid")
         manager.worker_map.to_die_count["RAW"] = 0
         manager.task_queues["RAW"] = queue.Queue()
@@ -28,7 +31,10 @@ class TestManager:
         assert task.task_id == "KILL"
         assert task.task_buffer == "KILL"
 
-    def test_manager_worker(self):
+    def test_manager_worker(self, mocker):
+        mock_thread = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.threading.Thread')
+        mock_thread.return_value = None
+
         manager = Manager(logdir='./', uid="mock_uid")
         manager.worker_map.to_die_count["RAW"] = 0
         manager.task_queues["RAW"] = queue.Queue()
