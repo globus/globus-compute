@@ -152,7 +152,7 @@ class TestStart:
                                             endpoint_id='mock_endpoint_uuid',
                                             keys_dir='mock_keys_dir',
                                             endpoint_dir=config_dir,
-                                            name=manager.name,
+                                            endpoint_name=manager.name,
                                             reg_info=None,
                                             funcx_client_options=funcx_client_options,
                                             **mock_optionals)
@@ -193,7 +193,7 @@ class TestStart:
                                             endpoint_id='mock_endpoint_uuid',
                                             keys_dir='mock_keys_dir',
                                             endpoint_dir=config_dir,
-                                            name=manager.name,
+                                            endpoint_name=manager.name,
                                             reg_info=None,
                                             funcx_client_options=funcx_client_options,
                                             **mock_optionals)
