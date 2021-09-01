@@ -18,12 +18,14 @@ user_opts = {
 config = Config(
     executors=[
         HighThroughputExecutor(
-            label='Cori_HTEX_multinode',
+            worker_debug=False,
             address=address_by_interface('bond0.144'),
             provider=SlurmProvider(
-                'GPU',  # Partition / QOS
-                nodes_per_block=2,
-                init_blocks=1,
+                partition='GPU',  # Partition / QOS
+
+                # We request all hyperthreads on a node.
+                launcher=SrunLauncher(overrides='-c 272'),
+                
                 # string to prepend to #SBATCH blocks in the submit
                 # script to the scheduler eg: '#SBATCH --constraint=gpu'
                 scheduler_options=user_opts['perlmutter']['scheduler_options'],
@@ -31,13 +33,19 @@ config = Config(
                 # Command to be run before starting a worker, such as:
                 # 'module load Anaconda; source activate parsl_env'.
                 worker_init=user_opts['perlmutter']['worker_init'],
-
-                # We request all hyperthreads on a node.
-                launcher=SrunLauncher(overrides='-c 272'),
-                walltime='00:10:00',
+                
                 # Slurm scheduler on Cori can be slow at times,
                 # increase the command timeouts
                 cmd_timeout=120,
+
+                # Scale between 0-1 blocks with 2 nodes per block
+                nodes_per_block=2,
+                init_blocks=0,
+                min_blocks=0,
+                max_blocks=1,
+
+                # Hold blocks for 10 minutes
+                walltime='00:10:00',
             ),
         ),
     ],

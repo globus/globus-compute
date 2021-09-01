@@ -20,16 +20,12 @@ user_opts = {
 config = Config(
     executors=[
         HighThroughputExecutor(
-            label="frontera_htex",
             max_workers_per_node=2,
+            worker_debug=False,
             address=address_by_hostname(),
             provider=SlurmProvider(
-                cmd_timeout=60,     # Add extra time for slow scheduler responses
-                nodes_per_block=2,
-                init_blocks=1,
-                min_blocks=0,
-                max_blocks=1,
-                partition=user_opts['frontera']['partition'],  # Replace with partition name
+                partition=user_opts['frontera']['partition'],
+                launcher=SrunLauncher(),
 
                 # Enter scheduler_options if needed
                 scheduler_options=user_opts['frontera']['scheduler_options'],
@@ -38,9 +34,17 @@ config = Config(
                 # 'module load Anaconda; source activate parsl_env'.
                 worker_init=user_opts['frontera']['worker_init'],
 
-                # Ideally we set the walltime to the longest supported walltime.
-                walltime='00:10:00',
-                launcher=SrunLauncher(),
+                # Add extra time for slow scheduler responses
+                cmd_timeout=60,
+
+                # Scale between 0-1 blocks with 2 nodes per block
+                nodes_per_block=2,
+                init_blocks=0,
+                min_blocks=0,
+                max_blocks=1,
+
+                # Hold blocks for 30 minutes
+                walltime='00:30:00',
             ),
         )
     ],

@@ -22,6 +22,7 @@ GPU_MAP = ','.join([str(x) for x in range(1, TOTAL_WORKERS + 1)])
 config = Config(
     executors=[HighThroughputExecutor(
         label="fe.cs.uchicago",
+        worker_debug=False,
         address=address_by_hostname(),
         provider=SlurmProvider(
             channel=LocalChannel(),
