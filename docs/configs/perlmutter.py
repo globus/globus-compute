@@ -25,7 +25,7 @@ config = Config(
 
                 # We request all hyperthreads on a node.
                 launcher=SrunLauncher(overrides='-c 272'),
-                
+
                 # string to prepend to #SBATCH blocks in the submit
                 # script to the scheduler eg: '#SBATCH --constraint=gpu'
                 scheduler_options=user_opts['perlmutter']['scheduler_options'],
@@ -33,7 +33,7 @@ config = Config(
                 # Command to be run before starting a worker, such as:
                 # 'module load Anaconda; source activate parsl_env'.
                 worker_init=user_opts['perlmutter']['worker_init'],
-                
+
                 # Slurm scheduler on Cori can be slow at times,
                 # increase the command timeouts
                 cmd_timeout=120,

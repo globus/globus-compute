@@ -27,7 +27,7 @@ config = Config(
             provider=SlurmProvider(
                 partition='broadwl',
                 launcher=SrunLauncher(),
-                
+
                 # string to prepend to #SBATCH blocks in the submit
                 # script to the scheduler eg: '#SBATCH --constraint=knl,quad,cache'
                 scheduler_options=user_opts['midway']['scheduler_options'],
@@ -41,7 +41,7 @@ config = Config(
                 init_blocks=0,
                 min_blocks=0,
                 max_blocks=1,
-                
+
                 # Hold blocks for 30 minutes
                 walltime='00:30:00'
             ),

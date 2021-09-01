@@ -31,7 +31,7 @@ config = Config(
                 queue='debug-flat-quad',
                 account=user_opts['theta']['account'],
                 launcher=AprunLauncher(overrides="-d 64"),
-                
+
                 # string to prepend to #COBALT blocks in the submit
                 # script to the scheduler eg: '#COBALT -t 50'
                 scheduler_options=user_opts['theta']['scheduler_options'],

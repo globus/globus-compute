@@ -26,7 +26,7 @@ config = Config(
 
                 # We request all hyperthreads on a node.
                 launcher=SrunLauncher(overrides='-c 272'),
-                
+
                 # string to prepend to #SBATCH blocks in the submit
                 # script to the scheduler eg: '#SBATCH --constraint=knl,quad,cache'
                 scheduler_options=user_opts['cori']['scheduler_options'],
