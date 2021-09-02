@@ -53,11 +53,8 @@ class TaskCancelled(Exception):
         self.manager_id = manager_id
         self.tstamp = time.time()
 
-    def __repr__(self):
-        return f"Task cancelled based on user request on manager:{self.manager_id}, worker:{self.worker_id}"
-
     def __str__(self):
-        return self.__repr__()
+        return f"Task cancelled based on user request on manager:{self.manager_id}, worker:{self.worker_id}"
 
 
 class Manager(object):
