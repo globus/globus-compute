@@ -212,7 +212,7 @@ class EndpointManager:
         # only be registered if everything else has been set up successfully
         reg_info = None
         try:
-            reg_info = register_endpoint(self.logger, funcx_client, endpoint_uuid, endpoint_dir, self.name)
+            reg_info = register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, self.name, logger=self.logger)
         # if the service sends back an error response, it will be a FuncxResponseError
         except FuncxResponseError as e:
             # an example of an error that could conceivably occur here would be

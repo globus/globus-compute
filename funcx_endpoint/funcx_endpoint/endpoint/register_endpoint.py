@@ -1,10 +1,13 @@
 import os
 import json
+import logging
 
 import funcx_endpoint
 
+namespace_logger = logging.getLogger(__name__)
 
-def register_endpoint(logger, funcx_client, endpoint_uuid, endpoint_dir, name):
+
+def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, name, logger=None):
     """Register the endpoint and return the registration info. This function needs
     to be isolated (including the logger which is passed in) so that the function
     can both be called from the endpoint start process as well as the daemon process
@@ -12,9 +15,6 @@ def register_endpoint(logger, funcx_client, endpoint_uuid, endpoint_dir, name):
 
     Parameters
     ----------
-    logger : Logger
-        Logger to use
-
     funcx_client : FuncXClient
         The auth'd client to communicate with the funcX service
 
@@ -26,7 +26,13 @@ def register_endpoint(logger, funcx_client, endpoint_uuid, endpoint_dir, name):
 
     name : str
         The name of the endpoint
+
+    logger : Logger
+        Logger to use
     """
+    if logger is None:
+        logger = namespace_logger
+
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
     reg_info = funcx_client.register_endpoint(name,

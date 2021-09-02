@@ -34,7 +34,7 @@ class TestRegisterEndpoint:
         config_dir = os.path.join(funcx_dir, "mock_endpoint")
 
         with pytest.raises(Exception, match='Endpoint ID was not included in the service\'s registration response.'):
-            register_endpoint(logger, mock_client(), 'mock_endpoint_uuid', config_dir, 'test')
+            register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir, 'test')
 
     def test_register_endpoint_int_endpoint_id(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
@@ -45,4 +45,4 @@ class TestRegisterEndpoint:
         config_dir = os.path.join(funcx_dir, "mock_endpoint")
 
         with pytest.raises(Exception, match='Endpoint ID sent by the service was not a string.'):
-            register_endpoint(logger, mock_client(), 'mock_endpoint_uuid', config_dir, 'test')
+            register_endpoint(mock_client(), 'mock_endpoint_uuid', config_dir, 'test')

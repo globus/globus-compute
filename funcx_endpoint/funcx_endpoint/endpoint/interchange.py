@@ -250,7 +250,7 @@ class EndpointInterchange(object):
         self.client_ports = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
 
     def register_endpoint(self):
-        reg_info = register_endpoint(logger, self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name)
+        reg_info = register_endpoint(self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name)
         self.apply_reg_info(reg_info)
         return reg_info
 
