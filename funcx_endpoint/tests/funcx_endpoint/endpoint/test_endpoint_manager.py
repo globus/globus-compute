@@ -8,6 +8,8 @@ import pytest
 import json
 from pytest import fixture
 from unittest.mock import ANY
+from globus_sdk import GlobusHTTPResponse, GlobusAPIError
+from requests import Response
 
 logger = logging.getLogger('mock_funcx')
 
@@ -95,6 +97,111 @@ class TestStart:
                                         stderr=ANY,  # open(os.path.join(config_dir, './interchange.stderr'), 'w+'),
                                         detach_process=True)
 
+    def test_start_registration_error(self, mocker):
+        mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
+
+        base_r = Response()
+        base_r.headers = {
+            "Content-Type": "json"
+        }
+        base_r.status_code = 400
+        r = GlobusHTTPResponse(base_r)
+        r.status_code = base_r.status_code
+        r.headers = base_r.headers
+
+        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.register_endpoint')
+        mock_register_endpoint.side_effect = GlobusAPIError(r)
+
+        mock_zmq_create = mocker.patch("zmq.auth.create_certificates",
+                                       return_value=("public/key/file", None))
+        mock_zmq_load = mocker.patch("zmq.auth.load_certificate",
+                                     return_value=("12345abcde".encode(), "12345abcde".encode()))
+
+        mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4')
+        mock_uuid.return_value = 123456
+
+        mock_pidfile = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.daemon.pidfile.PIDLockFile')
+        mock_pidfile.return_value = None
+
+        manager = EndpointManager(funcx_dir=os.getcwd())
+        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+
+        manager.configure_endpoint("mock_endpoint", None)
+        endpoint_config = SourceFileLoader('config',
+                                           os.path.join(config_dir, 'config.py')).load_module()
+
+        with pytest.raises(GlobusAPIError):
+            manager.start_endpoint("mock_endpoint", None, endpoint_config)
+
+        mock_zmq_create.assert_called_with(os.path.join(config_dir, "certificates"), "endpoint")
+        mock_zmq_load.assert_called_with("public/key/file")
+
+    def test_start_registration_5xx_error(self, mocker):
+        mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
+
+        base_r = Response()
+        base_r.headers = {
+            "Content-Type": "json"
+        }
+        base_r.status_code = 500
+        r = GlobusHTTPResponse(base_r)
+        r.status_code = base_r.status_code
+        r.headers = base_r.headers
+
+        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.register_endpoint')
+        mock_register_endpoint.side_effect = GlobusAPIError(r)
+
+        mock_zmq_create = mocker.patch("zmq.auth.create_certificates",
+                                       return_value=("public/key/file", None))
+        mock_zmq_load = mocker.patch("zmq.auth.load_certificate",
+                                     return_value=("12345abcde".encode(), "12345abcde".encode()))
+
+        mock_context = mocker.patch("daemon.DaemonContext")
+
+        # Allow this mock to be used in a with statement
+        mock_context.return_value.__enter__.return_value = None
+        mock_context.return_value.__exit__.return_value = None
+
+        mock_context.return_value.pidfile.path = ''
+
+        mock_daemon = mocker.patch.object(EndpointManager, 'daemon_launch',
+                                          return_value=None)
+
+        mock_uuid = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4')
+        mock_uuid.return_value = 123456
+
+        mock_pidfile = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.daemon.pidfile.PIDLockFile')
+        mock_pidfile.return_value = None
+
+        manager = EndpointManager(funcx_dir=os.getcwd())
+        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+
+        manager.configure_endpoint("mock_endpoint", None)
+        endpoint_config = SourceFileLoader('config',
+                                           os.path.join(config_dir, 'config.py')).load_module()
+
+        manager.start_endpoint("mock_endpoint", None, endpoint_config)
+
+        mock_zmq_create.assert_called_with(os.path.join(config_dir, "certificates"), "endpoint")
+        mock_zmq_load.assert_called_with("public/key/file")
+
+        funcx_client_options = {
+            "funcx_service_address": endpoint_config.config.funcx_service_address,
+            "check_endpoint_version": True,
+        }
+
+        # We should expect reg_info in this test to be None when passed into daemon_launch
+        # because a 5xx GlobusAPIError was raised during registration
+        reg_info = None
+        mock_daemon.assert_called_with('123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config, reg_info, funcx_client_options)
+
+        mock_context.assert_called_with(working_directory=config_dir,
+                                        umask=0o002,
+                                        pidfile=None,
+                                        stdout=ANY,  # open(os.path.join(config_dir, './interchange.stdout'), 'w+'),
+                                        stderr=ANY,  # open(os.path.join(config_dir, './interchange.stderr'), 'w+'),
+                                        detach_process=True)
+
     def test_start_without_executors(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
         mock_client.return_value.register_endpoint.return_value = {'endpoint_id': 'abcde12345',
@@ -122,13 +229,6 @@ class TestStart:
             manager.start_endpoint("mock_endpoint", None, mock_load())
 
     def test_daemon_launch(self, mocker):
-        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.register_endpoint.register_endpoint')
-        mock_register_endpoint.return_value = {'endpoint_id': 'abcde12345',
-                                               'public_ip': '127.0.0.1',
-                                               'tasks_port': 8080,
-                                               'results_port': 8081,
-                                               'commands_port': 8082, }
-
         mock_interchange = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.EndpointInterchange')
         mock_interchange.return_value.start.return_value = None
         mock_interchange.return_value.stop.return_value = None
@@ -158,13 +258,6 @@ class TestStart:
                                             **mock_optionals)
 
     def test_with_funcx_config(self, mocker):
-        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.register_endpoint.register_endpoint')
-        mock_register_endpoint.return_value = {'endpoint_id': 'abcde12345',
-                                               'public_ip': '127.0.0.1',
-                                               'tasks_port': 8080,
-                                               'results_port': 8081,
-                                               'commands_port': 8082, }
-
         mock_interchange = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.EndpointInterchange')
         mock_interchange.return_value.start.return_value = None
         mock_interchange.return_value.stop.return_value = None
