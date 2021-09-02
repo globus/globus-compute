@@ -652,7 +652,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                        ser_code + ser_params)
 
         self.submit_raw(payload.pack())
-        self.tasks[task_id] = Future()
+        self.tasks[task_id] = FuncXFuture(self)
         self.tasks[task_id].task_id = task_id
 
         return self.tasks[task_id]
@@ -781,6 +781,40 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         response = self.command_client.run(TaskCancel(future.task_id))
         logger.debug("Sent TaskCancel to interchange")
         return response
+
+
+CANCELLED = 'CANCELLED'
+CANCELLED_AND_NOTIFIED = 'CANCELLED_AND_NOTIFIED'
+FINISHED = 'FINISHED'
+
+
+class FuncXFuture(Future):
+
+    def __init__(self, executor):
+
+        super().__init__()
+        self.executor = executor
+
+    def cancel(self):
+
+        print("self. dir", dir(self))
+        print("self.state", self._state)
+        print("self.condition", self._condition)
+
+        self.executor._cancel(self)
+
+        with self._condition:
+            if self._state == FINISHED:
+                return False
+
+            if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
+                return True
+
+            self.executor._cancel(self)
+            self._state = CANCELLED
+            self._condition.notify_all()
+        self._invoke_callbacks()
+        return True
 
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
