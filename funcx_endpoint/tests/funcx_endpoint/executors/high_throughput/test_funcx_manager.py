@@ -18,6 +18,8 @@ class TestManager:
         shutil.rmtree(os.path.join(os.getcwd(), 'mock_uid'))
 
     def test_remove_worker_init(self, mocker):
+        mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context')
+
         mock_thread = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.threading.Thread')
         mock_thread.return_value = None
 
@@ -31,38 +33,25 @@ class TestManager:
         assert task.task_id == "KILL"
         assert task.task_buffer == "KILL"
 
-    def test_manager_worker(self, mocker):
+    def test_poll_funcx_task_socket(self, mocker):
+        mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context')
+
+        mock_worker_map = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.WorkerMap')
+
         mock_thread = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.threading.Thread')
         mock_thread.return_value = None
 
         manager = Manager(logdir='./', uid="mock_uid")
-        manager.worker_map.to_die_count["RAW"] = 0
         manager.task_queues["RAW"] = queue.Queue()
         manager.logdir = "./"
         manager.worker_type = 'RAW'
+        manager.worker_procs['0'] = 'proc'
 
-        # Manager::start()
-        worker = manager.worker_map.add_worker(worker_id="0",
-                                               worker_type=manager.worker_type,
-                                               address=manager.address,
-                                               debug=logging.DEBUG,
-                                               uid=manager.uid,
-                                               logdir=manager.logdir,
-                                               worker_port=manager.worker_port)
-        # The worker process should have been spawned above,
-        # and it should have sent out the registration message
-        manager.worker_procs.update(worker)
-        assert len(manager.worker_procs) == 1
+        manager.funcx_task_socket.recv_multipart.return_value = b'0', b'REGISTER', pickle.dumps({'worker_type': 'RAW'})
+        manager.poll_funcx_task_socket(test=True)
+        mock_worker_map.return_value.register_worker.assert_called_with(b'0', 'RAW')
 
-        reg_info = manager.poll_funcx_task_socket(test=True)
-        assert reg_info['worker_id'] == '0'
-        assert reg_info['worker_type'] == 'RAW'
-
-        # Begin testing removing worker process
-        task_type = "RAW"
-        manager.remove_worker_init(task_type)
-        manager.send_task_to_worker(task_type)
-
-        remove_info = manager.poll_funcx_task_socket(test=True)
-        assert remove_info is None
+        manager.funcx_task_socket.recv_multipart.return_value = b'0', b'WRKR_DIE', pickle.dumps(None)
+        manager.poll_funcx_task_socket(test=True)
+        mock_worker_map.return_value.remove_worker.assert_called_with(b'0')
         assert len(manager.worker_procs) == 0

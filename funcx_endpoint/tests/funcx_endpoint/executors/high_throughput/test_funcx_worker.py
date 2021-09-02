@@ -17,7 +17,6 @@ class TestWorker:
         mock_socket.recv_multipart.return_value = (pickle.dumps("KILL"), pickle.dumps("abc"), task.pack())
 
         worker = FuncXWorker('0', '127.0.0.1', 50001, os.getcwd())
-
         worker.start()
 
         call1 = [b'REGISTER', pickle.dumps(worker.registration_message())]
