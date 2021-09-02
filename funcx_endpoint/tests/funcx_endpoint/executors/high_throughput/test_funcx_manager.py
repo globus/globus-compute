@@ -18,10 +18,8 @@ class TestManager:
         shutil.rmtree(os.path.join(os.getcwd(), 'mock_uid'))
 
     def test_remove_worker_init(self, mocker):
+        # zmq is being mocked here because it was making tests hang
         mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context')
-
-        mock_thread = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.threading.Thread')
-        mock_thread.return_value = None
 
         manager = Manager(logdir='./', uid="mock_uid")
         manager.worker_map.to_die_count["RAW"] = 0
@@ -34,12 +32,10 @@ class TestManager:
         assert task.task_buffer == "KILL"
 
     def test_poll_funcx_task_socket(self, mocker):
+        # zmq is being mocked here because it was making tests hang
         mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context')
 
         mock_worker_map = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.WorkerMap')
-
-        mock_thread = mocker.patch('funcx_endpoint.executors.high_throughput.funcx_manager.threading.Thread')
-        mock_thread.return_value = None
 
         manager = Manager(logdir='./', uid="mock_uid")
         manager.task_queues["RAW"] = queue.Queue()
