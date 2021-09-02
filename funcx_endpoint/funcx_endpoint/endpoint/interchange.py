@@ -440,18 +440,13 @@ class EndpointInterchange(object):
     def start(self):
         """ Start the Interchange
         """
-        if not self.initial_registration_complete:
-            # Register the endpoint
-            logger.info("Running endpoint registration retry loop")
-            reg_info = retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
-            logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
-
-        self.initial_registration_complete = False
-
         logger.info("Starting EndpointInterchange")
         self._quiesce_event.clear()
         self._kill_event.clear()
 
+        # NOTE: currently we only start the executors once because
+        # the current behavior is to keep them running decoupled while
+        # the endpoint is waiting for reconnection
         self.start_executors()
 
         while not self._kill_event.is_set():
@@ -465,6 +460,15 @@ class EndpointInterchange(object):
         logger.info("EndpointInterchange shutdown complete.")
 
     def _start_threads_and_main(self):
+        # re-register on every loop start
+        if not self.initial_registration_complete:
+            # Register the endpoint
+            logger.info("Running endpoint registration retry loop")
+            reg_info = retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
+            logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+
+        self.initial_registration_complete = False
+
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
             self.client_address, self.client_ports[0], self.client_ports[1], self.client_ports[2]))
 
