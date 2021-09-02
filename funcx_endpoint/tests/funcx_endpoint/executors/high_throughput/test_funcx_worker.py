@@ -19,7 +19,6 @@ class TestWorker:
         worker = FuncXWorker('0', '127.0.0.1', 50001, os.getcwd())
         worker.start()
 
-        call1 = [b'REGISTER', pickle.dumps(worker.registration_message())]
-        call2 = [b'WRKR_DIE', pickle.dumps(None)]
-        mock_socket.send_multipart.assert_any_call(call1)
-        mock_socket.send_multipart.assert_any_call(call2)
+        call1 = mocker.call([b'REGISTER', pickle.dumps(worker.registration_message())])
+        call2 = mocker.call([b'WRKR_DIE', pickle.dumps(None)])
+        mock_socket.send_multipart.assert_has_calls([call1, call2])
