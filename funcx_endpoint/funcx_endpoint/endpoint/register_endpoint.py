@@ -46,6 +46,9 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, name, logger=No
     elif not isinstance(reg_info['endpoint_id'], str):
         raise Exception("Endpoint ID sent by the service was not a string.")
 
+    # NOTE: While all registration info is saved to endpoint.json, only the
+    # endpoint UUID is reused from this file. The latest forwarder URI is used
+    # every time we fetch registration info and register
     with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
         json.dump(reg_info, fp)
         logger.debug("Registration info written to {}".format(os.path.join(endpoint_dir, 'endpoint.json')))
