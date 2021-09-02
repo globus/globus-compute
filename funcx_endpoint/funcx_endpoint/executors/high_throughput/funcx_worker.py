@@ -6,7 +6,6 @@ import zmq
 import sys
 import pickle
 import os
-import sys
 
 from parsl.app.errors import RemoteExceptionWrapper
 
