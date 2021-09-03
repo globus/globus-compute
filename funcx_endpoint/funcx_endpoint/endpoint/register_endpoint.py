@@ -7,7 +7,7 @@ import funcx_endpoint
 namespace_logger = logging.getLogger(__name__)
 
 
-def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, name, logger=None):
+def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name, logger=None):
     """Register the endpoint and return the registration info. This function needs
     to be isolated (including the logger which is passed in) so that the function
     can both be called from the endpoint start process as well as the daemon process
@@ -24,7 +24,7 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, name, logger=No
     endpoint_dir : str
         The endpoint directory path to store data in
 
-    name : str
+    endpoint_name : str
         The name of the endpoint
 
     logger : Logger
@@ -35,7 +35,7 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, name, logger=No
 
     logger.debug("Attempting registration")
     logger.debug(f"Trying with eid : {endpoint_uuid}")
-    reg_info = funcx_client.register_endpoint(name,
+    reg_info = funcx_client.register_endpoint(endpoint_name,
                                               endpoint_uuid,
                                               endpoint_version=funcx_endpoint.__version__)
 
