@@ -188,8 +188,8 @@ class EndpointManager:
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
         if endpoint_config.config.detach_endpoint:
-            stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'w+')
-            stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'w+')
+            stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'a+')
+            stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'a+')
         else:
             stdout = sys.stdout
             stderr = sys.stderr
