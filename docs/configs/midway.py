@@ -18,13 +18,13 @@ user_opts = {
 config = Config(
     executors=[
         HighThroughputExecutor(
-            max_workers_per_node=10,
+            max_workers_per_node=2,
+            worker_debug=False,
             address=address_by_hostname(),
             provider=SlurmProvider(
-                'broadwl',
+                partition='broadwl',
                 launcher=SrunLauncher(),
-                nodes_per_block=2,
-                init_blocks=1,
+
                 # string to prepend to #SBATCH blocks in the submit
                 # script to the scheduler eg: '#SBATCH --constraint=knl,quad,cache'
                 scheduler_options=user_opts['midway']['scheduler_options'],
@@ -33,9 +33,14 @@ config = Config(
                 # 'module load Anaconda; source activate parsl_env'.
                 worker_init=user_opts['midway']['worker_init'],
 
-                min_blocks=1,
+                # Scale between 0-1 blocks with 2 nodes per block
+                nodes_per_block=2,
+                init_blocks=0,
+                min_blocks=0,
                 max_blocks=1,
-                walltime='00:20:00'
+
+                # Hold blocks for 30 minutes
+                walltime='00:30:00'
             ),
         )
     ],
