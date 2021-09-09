@@ -98,6 +98,12 @@ class TestStart:
                                         detach_process=True)
 
     def test_start_registration_error(self, mocker):
+        """This tests what happens if a 400 error response comes back from the
+        initial endpoint registration. It is expected that this exception should
+        be raised during endpoint start. mock_zmq_create and mock_zmq_load are
+        being asserted against because this zmq setup happens before registration
+        occurs.
+        """
         mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
 
         base_r = Response()
@@ -137,6 +143,14 @@ class TestStart:
         mock_zmq_load.assert_called_with("public/key/file")
 
     def test_start_registration_5xx_error(self, mocker):
+        """This tests what happens if a 500 error response comes back from the
+        initial endpoint registration. It is expected that this exception should
+        NOT be raised and that the interchange should be started without any registration
+        info being passed in. The registration should then be retried in the interchange
+        daemon, because a 5xx error suggests that there is a temporary service issue
+        that will resolve on its own. mock_zmq_create and mock_zmq_load are being
+        asserted against because this zmq setup happens before registration occurs.
+        """
         mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
 
         base_r = Response()
