@@ -15,6 +15,7 @@ import threading
 import json
 import daemon
 import collections
+from retry.api import retry_call
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
@@ -28,6 +29,7 @@ from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import n
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
 from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
+from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from queue import Queue
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -97,6 +99,10 @@ class EndpointInterchange(object):
                  endpoint_id=None,
                  keys_dir=".curve",
                  suppress_failure=True,
+                 endpoint_dir=".",
+                 endpoint_name="default",
+                 reg_info=None,
+                 funcx_client_options=None,
                  ):
         """
         Parameters
@@ -131,6 +137,18 @@ class EndpointInterchange(object):
 
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
+
+        endpoint_dir : str
+             Endpoint directory path to store registration info in
+
+        endpoint_name : str
+             Name of endpoint
+
+        reg_info : Dict
+             Registration info from initial registration on endpoint start, if it succeeded
+
+        funcx_client_options : Dict
+             FuncXClient initialization options
         """
         self.logdir = logdir
         try:
@@ -150,6 +168,18 @@ class EndpointInterchange(object):
         self.client_ports = client_ports
         self.suppress_failure = suppress_failure
 
+        self.endpoint_dir = endpoint_dir
+        self.endpoint_name = endpoint_name
+
+        if funcx_client_options is None:
+            funcx_client_options = {}
+        self.funcx_client = FuncXClient(**funcx_client_options)
+
+        self.initial_registration_complete = False
+        if reg_info:
+            self.initial_registration_complete = True
+            self.apply_reg_info(reg_info)
+
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
         # initalize the last heartbeat time to start the loop
@@ -160,7 +190,6 @@ class EndpointInterchange(object):
         self.pending_task_queue = Queue()
         self.containers = {}
         self.total_pending_task_count = 0
-        self.fxs = FuncXClient()
 
         self._quiesce_event = threading.Event()
         self._kill_event = threading.Event()
@@ -215,6 +244,15 @@ class EndpointInterchange(object):
         for executor in self.config.executors:
             if hasattr(executor, 'passthrough') and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
+
+    def apply_reg_info(self, reg_info):
+        self.client_address = reg_info['public_ip']
+        self.client_ports = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
+
+    def register_endpoint(self):
+        reg_info = register_endpoint(self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name)
+        self.apply_reg_info(reg_info)
+        return reg_info
 
     def migrate_tasks_to_internal(self, quiesce_event):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
@@ -312,7 +350,7 @@ class EndpointInterchange(object):
                 self.containers[container_uuid] = 'RAW'
             else:
                 try:
-                    container = self.fxs.get_container(container_uuid, self.config.container_type)
+                    container = self.funcx_client.get_container(container_uuid, self.config.container_type)
                 except Exception:
                     logger.exception("[FETCH_CONTAINER] Unable to resolve container location")
                     self.containers[container_uuid] = 'RAW'
@@ -406,6 +444,9 @@ class EndpointInterchange(object):
         self._quiesce_event.clear()
         self._kill_event.clear()
 
+        # NOTE: currently we only start the executors once because
+        # the current behavior is to keep them running decoupled while
+        # the endpoint is waiting for reconnection
         self.start_executors()
 
         while not self._kill_event.is_set():
@@ -419,6 +460,15 @@ class EndpointInterchange(object):
         logger.info("EndpointInterchange shutdown complete.")
 
     def _start_threads_and_main(self):
+        # re-register on every loop start
+        if not self.initial_registration_complete:
+            # Register the endpoint
+            logger.info("Running endpoint registration retry loop")
+            reg_info = retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
+            logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
+
+        self.initial_registration_complete = False
+
         logger.info("Attempting connection to client at {} on ports: {},{},{}".format(
             self.client_address, self.client_ports[0], self.client_ports[1], self.client_ports[2]))
 
