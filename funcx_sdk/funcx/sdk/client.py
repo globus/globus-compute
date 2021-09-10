@@ -57,7 +57,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         check_endpoint_version=False,
         asynchronous=False,
         loop=None,
-        results_ws_uri="wss://api.funcx.org/ws/v2/",
+        results_ws_uri="wss://api2.funcx.org/ws/v2/",
         use_offprocess_checker=True,
         **kwargs,
     ):
