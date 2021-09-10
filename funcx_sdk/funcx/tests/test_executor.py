@@ -160,7 +160,7 @@ def test_large_arrays(fx, endpoint):
 
 
 # test locally: python3 test_executor.py -e <endpoint_id>
-# test on dev: python3 test_executor.py -s https://api.dev.funcx.org/v2 -w wss://api.dev.funcx.org/ws/v2/ -e <endpoint_id>
+# test on dev: python3 test_executor.py -s https://api2.dev.funcx.org/v2 -w wss://api2.dev.funcx.org/ws/v2/ -e <endpoint_id>
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
