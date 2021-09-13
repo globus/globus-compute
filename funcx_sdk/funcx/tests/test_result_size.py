@@ -27,7 +27,7 @@ def wait_for_task(fxc, task_id, walltime: int = 2):
             return r
 
 
-def test_large_result(fxc, endpoint, size=(11 * (2 ** 20))):
+def test_large_result(fxc, endpoint, size=512000):
     fn_uuid = fxc.register_function(
         large_result_producer, endpoint, description="LargeResultProducer"
     )
@@ -42,15 +42,3 @@ def test_large_result(fxc, endpoint, size=(11 * (2 ** 20))):
     time.sleep(5)
     with pytest.raises(MaxResultSizeExceeded):
         fxc.get_result(task_id)
-
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--endpoint_id", required=True)
-    args = parser.parse_args()
-
-    fxc = FuncXClient()
-    endpoint = args.endpoint_id
-    test_large_result(fxc, endpoint, 2 ** 10)
-    test_large_result(fxc, endpoint, 11 * (2 ** 20))  # 11 MB exceeds the limit
