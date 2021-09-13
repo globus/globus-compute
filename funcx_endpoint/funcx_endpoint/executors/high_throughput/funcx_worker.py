@@ -20,11 +20,8 @@ class MaxResultSizeExceeded(Exception):
         self.result_size = result_size
         self.result_size_limit = result_size_limit
 
-    def __repr__(self):
-        return f"Task result of {self.result_size}B exceeded current limit of {self.result_size_limit}B"
-
     def __str__(self):
-        return self.__repr__()
+        return f"Task result of {self.result_size}B exceeded current limit of {self.result_size_limit}B"
 
 
 class FuncXWorker(object):
@@ -58,7 +55,7 @@ class FuncXWorker(object):
          send(result)
     """
 
-    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=10 * (2 ** 20)):
+    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=512000):
 
         self.worker_id = worker_id
         self.address = address
