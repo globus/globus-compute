@@ -426,7 +426,11 @@ class EndpointInterchange(object):
         self._command_thread.join()
 
         logger.info("Saving unacked results to disk")
-        self.results_ack_handler.persist()
+        try:
+            self.results_ack_handler.persist()
+        except Exception:
+            logger.exception("Caught exception while saving unacked results")
+            logger.warning("Interchange will continue without saving unacked results")
 
         # this must be called last to ensure the next interchange run will occur
         self._quiesce_event.clear()
