@@ -447,8 +447,13 @@ class EndpointInterchange(object):
         self._quiesce_event.set()
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
-        logger.info("Saving unacked results to disk")
-        self.results_ack_handler.persist()
+        logger.info("Received SIGTERM, attempting to save unacked results to disk")
+        try:
+            self.results_ack_handler.persist()
+        except Exception:
+            logger.exception("Caught exception while saving unacked results")
+        else:
+            logger.info("Unacked results successfully saved to disk")
 
     def start(self):
         """ Start the Interchange
