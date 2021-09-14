@@ -221,6 +221,8 @@ class EndpointInterchange(object):
         self.tasks = set()
         self.task_status_deltas = {}
 
+        self._test_start = False
+
     def load_config(self):
         """ Load the config
         """
@@ -473,10 +475,9 @@ class EndpointInterchange(object):
         while not self._kill_event.is_set():
             self._start_threads_and_main()
             self.quiesce()
-            # TODO: Remove this break. It is only meant to maintain existing functionality
-            # that the interchange only runs once, but can be removed when there is a proper
-            # endpoint re-registration mechanism in place.
-            break
+            # this check is solely for testing to force this loop to only run once
+            if self._test_start:
+                break
 
         logger.info("EndpointInterchange shutdown complete.")
 
