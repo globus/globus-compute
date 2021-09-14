@@ -72,6 +72,8 @@ class TestStart:
         mock_pidfile = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.daemon.pidfile.PIDLockFile')
         mock_pidfile.return_value = None
 
+        mock_results_ack_handler = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.ResultsAckHandler')
+
         manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
@@ -88,7 +90,13 @@ class TestStart:
             "check_endpoint_version": True,
         }
 
-        mock_daemon.assert_called_with('123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config, reg_info, funcx_client_options)
+        mock_daemon.assert_called_with('123456',
+                                       config_dir,
+                                       os.path.join(config_dir, "certificates"),
+                                       endpoint_config,
+                                       reg_info,
+                                       funcx_client_options,
+                                       mock_results_ack_handler.return_value)
 
         mock_context.assert_called_with(working_directory=config_dir,
                                         umask=0o002,
@@ -128,6 +136,8 @@ class TestStart:
 
         mock_pidfile = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.daemon.pidfile.PIDLockFile')
         mock_pidfile.return_value = None
+
+        mocker.patch('funcx_endpoint.endpoint.endpoint_manager.ResultsAckHandler')
 
         manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
@@ -187,6 +197,8 @@ class TestStart:
         mock_pidfile = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.daemon.pidfile.PIDLockFile')
         mock_pidfile.return_value = None
 
+        mock_results_ack_handler = mocker.patch('funcx_endpoint.endpoint.endpoint_manager.ResultsAckHandler')
+
         manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
@@ -207,7 +219,13 @@ class TestStart:
         # We should expect reg_info in this test to be None when passed into daemon_launch
         # because a 5xx GlobusAPIError was raised during registration
         reg_info = None
-        mock_daemon.assert_called_with('123456', config_dir, os.path.join(config_dir, "certificates"), endpoint_config, reg_info, funcx_client_options)
+        mock_daemon.assert_called_with('123456',
+                                       config_dir,
+                                       os.path.join(config_dir, "certificates"),
+                                       endpoint_config,
+                                       reg_info,
+                                       funcx_client_options,
+                                       mock_results_ack_handler.return_value)
 
         mock_context.assert_called_with(working_directory=config_dir,
                                         umask=0o002,
@@ -260,7 +278,7 @@ class TestStart:
 
         funcx_client_options = {}
 
-        manager.daemon_launch('mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None, funcx_client_options)
+        manager.daemon_launch('mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None, funcx_client_options, None)
 
         mock_interchange.assert_called_with(endpoint_config.config,
                                             endpoint_id='mock_endpoint_uuid',
@@ -269,6 +287,7 @@ class TestStart:
                                             endpoint_name=manager.name,
                                             reg_info=None,
                                             funcx_client_options=funcx_client_options,
+                                            results_ack_handler=None,
                                             **mock_optionals)
 
     def test_with_funcx_config(self, mocker):
@@ -294,7 +313,7 @@ class TestStart:
 
         funcx_client_options = {}
 
-        manager.daemon_launch('mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None, funcx_client_options)
+        manager.daemon_launch('mock_endpoint_uuid', config_dir, 'mock_keys_dir', endpoint_config, None, funcx_client_options, None)
 
         mock_interchange.assert_called_with(endpoint_config.config,
                                             endpoint_id='mock_endpoint_uuid',
@@ -303,6 +322,7 @@ class TestStart:
                                             endpoint_name=manager.name,
                                             reg_info=None,
                                             funcx_client_options=funcx_client_options,
+                                            results_ack_handler=None,
                                             **mock_optionals)
 
     def test_check_endpoint_json_no_json_no_uuid(self, mocker):

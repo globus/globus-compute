@@ -1,5 +1,7 @@
 import logging
 import time
+import os
+import pickle
 
 logger = logging.getLogger(__name__)
 
@@ -9,9 +11,12 @@ class ResultsAckHandler():
     Tracks task results by task ID, discarding results after they have been ack'ed
     """
 
-    def __init__(self):
+    def __init__(self, endpoint_dir):
         """ Initialize results storage and timing for log updates
         """
+        self.endpoint_dir = endpoint_dir
+        self.data_path = os.path.join(self.endpoint_dir, 'unacked_results.p')
+
         self.unacked_results = {}
         # how frequently to log info about acked and unacked results
         self.log_period = 60
@@ -70,5 +75,12 @@ class ResultsAckHandler():
     def persist(self):
         """ Save unacked results to disk
         """
-        # TODO: pickle dump unacked_results
-        return
+        with open(self.data_path, 'wb') as fp:
+            pickle.dump(self.unacked_results, fp)
+
+    def load(self):
+        """ Load unacked results from disk
+        """
+        if os.path.exists(self.data_path):
+            with open(self.data_path, 'rb') as fp:
+                self.unacked_results = pickle.load(fp)

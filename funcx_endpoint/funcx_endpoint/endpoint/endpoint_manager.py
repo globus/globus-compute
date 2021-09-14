@@ -25,6 +25,7 @@ from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
+from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from funcx.sdk.client import FuncXClient
 
 logger = logging.getLogger("endpoint.endpoint_manager")
@@ -186,6 +187,15 @@ class EndpointManager:
                 self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup. Cleaning up now.")
                 self.pidfile_cleanup(pid_file)
 
+        results_ack_handler = ResultsAckHandler(endpoint_dir=endpoint_dir)
+
+        try:
+            results_ack_handler.load()
+            results_ack_handler.persist()
+        except Exception:
+            self.logger.exception("Caught exception while attempting load and persist of outstanding results")
+            sys.exit(-1)
+
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
@@ -251,9 +261,9 @@ class EndpointManager:
             self.logger.critical("Launching endpoint daemon process with errors noted above")
 
         with context:
-            self.daemon_launch(endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options)
+            self.daemon_launch(endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options, results_ack_handler)
 
-    def daemon_launch(self, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options):
+    def daemon_launch(self, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options, results_ack_handler):
         # Configure the parameters for the interchange
         optionals = {}
         if 'endpoint_address' in self.funcx_config:
@@ -271,6 +281,7 @@ class EndpointManager:
                                  endpoint_name=self.name,
                                  reg_info=reg_info,
                                  funcx_client_options=funcx_client_options,
+                                 results_ack_handler=results_ack_handler,
                                  **optionals)
 
         ic.start()

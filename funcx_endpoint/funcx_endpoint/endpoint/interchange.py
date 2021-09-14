@@ -16,6 +16,7 @@ import json
 import daemon
 import collections
 from retry.api import retry_call
+import signal
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 from parsl.executors.errors import ScalingFailed
@@ -28,7 +29,6 @@ from funcx import set_file_logger
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
-from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from queue import Queue
 
@@ -103,6 +103,7 @@ class EndpointInterchange(object):
                  endpoint_name="default",
                  reg_info=None,
                  funcx_client_options=None,
+                 results_ack_handler=None,
                  ):
         """
         Parameters
@@ -194,7 +195,7 @@ class EndpointInterchange(object):
         self._quiesce_event = threading.Event()
         self._kill_event = threading.Event()
 
-        self.results_ack_handler = ResultsAckHandler()
+        self.results_ack_handler = results_ack_handler
 
         logger.info("Interchange address is {}".format(self.interchange_address))
 
@@ -423,6 +424,14 @@ class EndpointInterchange(object):
         self._quiesce_event.set()
         self._task_puller_thread.join()
         self._command_thread.join()
+
+        logger.info("Saving unacked results to disk")
+        try:
+            self.results_ack_handler.persist()
+        except Exception:
+            logger.exception("Caught exception while saving unacked results")
+            logger.warning("Interchange will continue without saving unacked results")
+
         # this must be called last to ensure the next interchange run will occur
         self._quiesce_event.clear()
 
@@ -437,10 +446,22 @@ class EndpointInterchange(object):
         self._kill_event.set()
         self._quiesce_event.set()
 
+    def handle_sigterm(self, sig_num, curr_stack_frame):
+        logger.warning("Received SIGTERM, attempting to save unacked results to disk")
+        try:
+            self.results_ack_handler.persist()
+        except Exception:
+            logger.exception("Caught exception while saving unacked results")
+        else:
+            logger.info("Unacked results successfully saved to disk")
+
     def start(self):
         """ Start the Interchange
         """
         logger.info("Starting EndpointInterchange")
+
+        signal.signal(signal.SIGTERM, self.handle_sigterm)
+
         self._quiesce_event.clear()
         self._kill_event.clear()
 
