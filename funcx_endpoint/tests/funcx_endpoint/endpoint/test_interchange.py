@@ -135,6 +135,8 @@ class TestStart:
 
         ic.results_outgoing = mocker.Mock()
 
+        # this must be set to force the retry loop in the start method to only run once
+        ic._test_start = True
         ic.start()
 
         # we need to ensure that retry_call is called during interchange
