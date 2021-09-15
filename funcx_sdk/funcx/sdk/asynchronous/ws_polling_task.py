@@ -139,7 +139,9 @@ class WebSocketPollingTask:
                         self.ws = None
                         return
             else:
-                print("[MISSING FUTURE]")
+                # NOTE: this occurs due to a race condition where the task result arrives
+                # before a future exists to receive the result
+                raise Exception(f"Task:{task_id} executed, but result is unrecoverable")
 
     def put_task_group_id(self, task_group_id):
         # prevent the task_group_id from being sent to the WebSocket server
