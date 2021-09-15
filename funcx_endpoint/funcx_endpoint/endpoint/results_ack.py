@@ -49,7 +49,7 @@ class ResultsAckHandler():
         if acked_task:
             self.acked_count += 1
             unacked_count = len(self.unacked_results)
-            logger.info(f"Acked task {task_id}, Unacked count: {unacked_count}")
+            logger.debug(f"Acked task {task_id}, Unacked count: {unacked_count}")
 
     def check_ack_counts(self):
         """ Log the number of currently Unacked tasks and the tasks Acked since
