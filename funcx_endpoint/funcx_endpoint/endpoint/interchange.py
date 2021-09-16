@@ -26,6 +26,8 @@ from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_T
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Heartbeat, TaskStatusCode, ResultsAck
 from funcx.sdk.client import FuncXClient
 from funcx import set_file_logger
+from funcx import __version__ as funcx_sdk_version
+from funcx_endpoint import __version__ as funcx_endpoint_version
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import naive_interchange_task_dispatch
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
@@ -209,6 +211,9 @@ class EndpointInterchange(object):
                                  'pyzmq_v': zmq.pyzmq_version(),
                                  'os': platform.system(),
                                  'hname': platform.node(),
+                                 'funcx_sdk_version': funcx_sdk_version,
+                                 'funcx_endpoint_version': funcx_endpoint_version,
+                                 'registration': self.endpoint_id,
                                  'dir': os.getcwd()}
 
         logger.info("Platform info: {}".format(self.current_platform))
@@ -289,7 +294,8 @@ class EndpointInterchange(object):
                                        keys_dir=self.keys_dir,
                                        RCVTIMEO=1000,
                                        linger=0)
-        self.task_incoming.put('forwarder', pickle.dumps({"registration": self.endpoint_id}))
+
+        self.task_incoming.put('forwarder', pickle.dumps(self.current_platform))
         logger.info(f"Task incoming on tcp://{self.client_address}:{self.client_ports[0]}")
 
         self.last_heartbeat = time.time()
