@@ -51,6 +51,8 @@ jobs:
       with:
         server_address: smtp.gmail.com
         server_port: 465
+        username: ${{secrets.MAIL_USERNAME}}
+        password: ${{secrets.MAIL_PASSWORD}}
         subject: ${{ github.job }} job of ${{ github.repository }} has ${{ job.status }}
         to: ryan.chard@gmail.com,rchard@anl.gov
         from: funcX Tests # <user@example.com>
