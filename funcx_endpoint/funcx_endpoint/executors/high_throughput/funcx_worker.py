@@ -15,7 +15,8 @@ from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_T
 
 
 class MaxResultSizeExceeded(Exception):
-
+    """ Result produced by the function exceeds the maximum supported result size threshold of 512000B
+    """
     def __init__(self, result_size, result_size_limit):
         self.result_size = result_size
         self.result_size_limit = result_size_limit
