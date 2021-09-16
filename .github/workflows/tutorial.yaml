@@ -8,6 +8,11 @@ on:
       tags:
         required: false
         description: "manual test"
+  push:
+    branches:
+      - "*"
+    tags:
+      - "*"
 
 jobs:
   test:
