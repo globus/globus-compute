@@ -40,7 +40,7 @@ jobs:
       run: |
         timeout 300 python funcx_endpoint/tests/tutorial_ep/test_tutotial_ep.py -t '4b116d3c-1703-4f8f-9f6f-39921e5864df' -i ${{ secrets.API_CLIENT_ID }} -s ${{ secrets.API_CLIENT_SECRET }}
     - name: Send mail
-      if: ${{ failure() }}
+      if: ${{ always() }}
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
