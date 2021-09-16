@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tags:
+        required: false
         description: "manual test"
 
 jobs:
