@@ -3,6 +3,10 @@ name: tutorial_test
 on:
   schedule:
     - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "manual test"
 
 jobs:
   test:
