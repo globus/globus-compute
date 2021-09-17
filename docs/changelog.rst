@@ -2,6 +2,84 @@ Changelog
 =========
 
 
+funcx & funcx-endpoint v0.3.3
+-----------------------------
+
+Released (tentatively) on September 20th, 2021
+
+funcx v0.3.3 is a minor release that includes contributions (code, tests, reviews, and reports) from:
+
+Ben Galewsky <bengal1@illinois.edu>, Kyle Chard <chard@uchicago.edu>,
+Loonride <22580625+Loonride@users.noreply.github.com>, Stephen Rosen <sirosen@globus.org>,
+Uriel Mandujano <uriel@globus.org>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
+
+
+Bug Fixes
+^^^^^^^^^
+
+* An exception is raised if results arrive over WebSocket result when no future is available to receive it `PR#590 <https://github.com/funcx-faas/funcX/pull/590>`_
+
+* Example configs have been updated to use ``init_blocks=0`` as a default. `PR#583 <https://github.com/funcx-faas/funcX/pull/583>`_
+
+* Log result passing to forwarder only for result messages `PR#577 <https://github.com/funcx-faas/funcX/pull/577>`_
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+* Endpoints will now stay running and retry connecting to funcX hosted services in a disconnection event `PR#588 <https://github.com/funcx-faas/funcX/pull/588>`_, `PR#572 <https://github.com/funcx-faas/funcX/pull/572>`_
+
+* Endpoints will now use ACK messages from the forwarder to confirm that results have been received `PR#571 <https://github.com/funcx-faas/funcX/pull/571>`_
+
+* Endpoints will persist unacked results and resend them during disconnection events `PR#580 <https://github.com/funcx-faas/funcX/pull/580>`_
+
+* Result size limits have been revised from 10MB to 512KB. If result size exceeds 512KB, a ``MaxResultSizeExceeded`` exception is returned. `PR#586 <https://github.com/funcx-faas/funcX/pull/586>`_
+
+* Add additional platform info to registration message `PR#592 <https://github.com/funcx-faas/funcX/pull/592>`_
+
+* All endpoint logs, (EndpointInterchange.log, interchange.stderr, interchange.stdout) will now be collated into a single log: ``endpoint.log`` `PR#582 <https://github.com/funcx-faas/funcX/pull/582>`_
+
+funcx & funcx-endpoint v0.3.2
+-----------------------------
+
+Released on August 11th, 2021
+
+funcx v0.3.2 is a minor release that includes contributions (code, tests, reviews, and reports) from:
+Ben Galewsky <bengal1@illinois.edu>, Rafael Vescovi <ravescovi@gmail.com>, Ryan <rchard@anl.gov>,
+Yadu Nand Babuji <yadudoc1729@gmail.com>, Zhuozhao Li <zhuozhl@clemson.edu>
+
+
+Bug Fixes
+^^^^^^^^^
+
+
+* Log result passing to forwarder only for result messages `PR#577 <https://github.com/funcx-faas/funcX/pull/577>`_
+
+* Fix zmq option setting bugs `PR#565 <https://github.com/funcx-faas/funcX/pull/565>`_
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+* Streamlined release process `PR#569 <https://github.com/funcx-faas/funcX/pull/569>`_, `PR#568 <https://github.com/funcx-faas/funcX/pull/568>`_
+
+* Added a new funcX config for ``Cooley`` at ALCF. `PR#566 <https://github.com/funcx-faas/funcX/pull/566>`_
+
+
+funcx & funcx-endpoint v0.3.1
+-----------------------------
+
+Released on July 26th, 2021
+
+funcx v0.3.1 is a minor release that includes contributions (code, tests, reviews, and reports) from:
+Ben Galewsky <bengal1@illinois.edu>, Loonride <knagaitsev@uchicago.edu>, Ryan Chard <rchard@anl.gov>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
+
+Bug Fixes
+^^^^^^^^^
+
+* Removed process check from endpoint status check for better cross platform support `PR#559 <https://github.com/funcx-faas/funcX/pull/559>`_
+
+* Fixes to ensure that ``container_cmd_options`` propagate correctly `PR#555 <https://github.com/funcx-faas/funcX/pull/555>`_
+
+
 
 funcx & funcx-endpoint v0.3.0
 -----------------------------
