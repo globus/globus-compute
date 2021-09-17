@@ -10,7 +10,7 @@ Released (tentatively) on September 20th, 2021
 funcx v0.3.3 is a minor release that includes contributions (code, tests, reviews, and reports) from:
 
 Ben Galewsky <bengal1@illinois.edu>, Kyle Chard <chard@uchicago.edu>,
-Loonride <22580625+Loonride@users.noreply.github.com>, Stephen Rosen <sirosen@globus.org>,
+Kirill Nagaitsev <knagaitsev@uchicago.edu>, Stephen Rosen <sirosen@globus.org>,
 Uriel Mandujano <uriel@globus.org>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
 
 
@@ -70,7 +70,7 @@ funcx & funcx-endpoint v0.3.1
 Released on July 26th, 2021
 
 funcx v0.3.1 is a minor release that includes contributions (code, tests, reviews, and reports) from:
-Ben Galewsky <bengal1@illinois.edu>, Loonride <knagaitsev@uchicago.edu>, Ryan Chard <rchard@anl.gov>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
+Ben Galewsky <bengal1@illinois.edu>, Kirill Nagaitsev <knagaitsev@uchicago.edu>, Ryan Chard <rchard@anl.gov>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
 
 Bug Fixes
 ^^^^^^^^^
@@ -88,7 +88,7 @@ Released on July 08th, 2021
 
 funcx v0.3.0 is a major release that includes contributions (code, tests, reviews, and reports) from:
 Ben Galewsky <bengal1@illinois.edu>, Kyle Chard <chard@uchicago.edu>,
-Kir Nagaitsev(@Loonride) <knagaitsev@uchicago.edu>, Daniel S. Katz <d.katz@ieee.org>,
+Kirill Nagaitsev <knagaitsev@uchicago.edu>, Daniel S. Katz <d.katz@ieee.org>,
 Stephen Rosen <sirosen@globus.org>, Yadu Nand Babuji <yadudoc1729@gmail.com>,
 Yongyan Rao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
 
@@ -263,7 +263,7 @@ Released on April 8th, 2021
 
 funcx v0.2.0 includes contributions (code, tests, reviews, and reports) from:
 
-Ariel Rokem <arokem@gmail.com>, Ben Blaiszik <blaiszik@uchicago.edu>, Ben Galewsky <ben@peartreestudio.net>, Ben Glick <glick@glick.cloud>, Joshua Bryan <josh@globus.org>, Kirill Nagaitsev <knagaitsev1@gmail.com>, Kyle Chard <chard@uchicago.edu>, Loonride <22580625+Loonride@users.noreply.github.com>, pratikpoojary <pratik.poojary@somaiya.edu>, Ryan <rchard@anl.gov>, Yadu Nand Babuji <yadudoc1729@gmail.com>, yongyanrao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
+Ariel Rokem <arokem@gmail.com>, Ben Blaiszik <blaiszik@uchicago.edu>, Ben Galewsky <ben@peartreestudio.net>, Ben Glick <glick@glick.cloud>, Joshua Bryan <josh@globus.org>, Kirill Nagaitsev <knagaitsev@uchicago.edu>, Kyle Chard <chard@uchicago.edu>, pratikpoojary <pratik.poojary@somaiya.edu>, Ryan <rchard@anl.gov>, Yadu Nand Babuji <yadudoc1729@gmail.com>, yongyanrao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
 
 Known Issues
 ^^^^^^^^^^^^
