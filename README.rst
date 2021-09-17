@@ -37,7 +37,7 @@ Documentation: https://funcx.readthedocs.io/en/latest/
 Quickstart
 ==========
 
-funcX is in a beta state with version `0.3.0` currently available on PyPI.
+funcX is in a beta state with version `0.3.2` currently available on PyPI.
 
 To install funcX, please ensure you have python3.6+.::
 
