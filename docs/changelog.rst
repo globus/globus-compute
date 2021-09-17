@@ -23,6 +23,8 @@ Bug Fixes
 
 * Log result passing to forwarder only for result messages `PR#577 <https://github.com/funcx-faas/funcX/pull/577>`_
 
+* Fix zmq option setting bugs `PR#565 <https://github.com/funcx-faas/funcX/pull/565>`_
+
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
@@ -47,14 +49,6 @@ funcx v0.3.2 is a minor release that includes contributions (code, tests, review
 Ben Galewsky <bengal1@illinois.edu>, Rafael Vescovi <ravescovi@gmail.com>, Ryan <rchard@anl.gov>,
 Yadu Nand Babuji <yadudoc1729@gmail.com>, Zhuozhao Li <zhuozhl@clemson.edu>
 
-
-Bug Fixes
-^^^^^^^^^
-
-
-* Log result passing to forwarder only for result messages `PR#577 <https://github.com/funcx-faas/funcX/pull/577>`_
-
-* Fix zmq option setting bugs `PR#565 <https://github.com/funcx-faas/funcX/pull/565>`_
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
