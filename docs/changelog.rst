@@ -5,7 +5,7 @@ Changelog
 funcx & funcx-endpoint v0.3.3
 -----------------------------
 
-Released (tentatively) on September 20th, 2021
+Released on September 20th, 2021
 
 funcx v0.3.3 is a minor release that includes contributions (code, tests, reviews, and reports) from:
 
