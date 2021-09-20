@@ -7,6 +7,6 @@ python-daemon
 fair_research_login
 dill>=0.3
 typer>=0.3.0
-funcx>=0.3.0
+funcx>=0.3.3,<0.4.0
 pyzmq>=22.0.0
 retry
