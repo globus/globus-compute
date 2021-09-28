@@ -683,8 +683,7 @@ class Interchange(object):
                         self._ready_manager_queue[manager].update(msg)
                         logger.info("[MAIN] Registration info for manager {}: {}".format(manager, msg))
 
-                        if (msg['python_v'].rsplit(".", 1)[0] != self.current_platform['python_v'].rsplit(".", 1)[0] or
-                            msg['parsl_v'] != self.current_platform['parsl_v']):
+                        if msg['parsl_v'] != self.current_platform['parsl_v']:
                             logger.warn("[MAIN] Manager {} has incompatible version info with the interchange".format(manager))
 
                             if self.suppress_failure is False:
