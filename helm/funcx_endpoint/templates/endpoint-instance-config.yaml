@@ -23,6 +23,7 @@ data:
                 strategy=KubeSimpleStrategy(max_idletime=3600),
                 container_type='docker',
                 scheduler_mode='hard',
+                working_dir='{{ .Values.workingDir }}',
                 provider=KubernetesProvider(
                     init_blocks={{ .Values.initBlocks }},
                     min_blocks={{ .Values.minBlocks }},
@@ -34,13 +35,13 @@ data:
                     image="{{ .Values.workerImage }}",
                     worker_init='{{ .Values.workerInit }}',
                     namespace='{{ .Values.workerNamespace }}',
+                    secret='{{ .Values.workerImageSecret }}',
                     incluster_config=True
                 ),
             )
         ],
         heartbeat_period=15,
         heartbeat_threshold=200,
-        log_dir='{{ .Values.logDir }}',
         funcx_service_address="{{ .Values.funcXServiceAddress }}/v2",
         detach_endpoint={{- ternary "True" "False" .Values.detachEndpoint }}
     )
