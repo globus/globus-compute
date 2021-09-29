@@ -170,15 +170,15 @@ corresponding to the functions in the batch with the ordering preserved.
   batch_res = fxc.batch_run(batch)
 
 
-There is also a batch result interface to retrieve the results of a batch.
+The batch result interface is useful to to fetch the results of a collection of task_ids.
 ``get_batch_result`` is called with a list of task_ids. It is non-blocking and returns
 a `dict` with task_ids as the keys and each value is a dict that contains status information
 and a result if it is available.
 
 .. code-block:: python
 
-  >>>results = fxc.get_batch_result(batch_res)
-  >>>print(results)
+  >>> results = fxc.get_batch_result(batch_res)
+  >>> print(results)
 
   {'10c9678c-b404-4e40-bfd4-81581f52f9db': {'pending': False,
                                             'status': 'success',
