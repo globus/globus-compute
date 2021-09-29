@@ -97,7 +97,7 @@ Arguments and data
 ------------------
 funcX functions operate the same as any other Python function. You can pass arguments \*args and \**kwargs
 and return values from functions. The only constraint is that data passed to/from a funcX function must be
-serializable (e.g., via Pickle) and less than 512KB in size.  Input arguments can be passed to the function
+serializable (e.g., via Pickle) and fall within :ref:`Limits` .  Input arguments can be passed to the function
 using the `run()` function. The following example shows how strings can be passed to and from a function.
 
 .. code-block:: python
@@ -156,7 +156,8 @@ Batching
 
 The SDK includes a batch interface to reduce the overheads of launching a function many times.
 To use this interface, you must first create a batch object and then pass that object
-to the ``batch_run`` function.
+to the ``batch_run`` function. ``batch_run`` is non-blocking and returns a list of task ids
+corresponding to the functions in the batch with the ordering preserved.
 
 .. code-block:: python
 
