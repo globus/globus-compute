@@ -44,7 +44,7 @@ jobs:
         python -c "from funcx.sdk.client import FuncXClient"
     - name: Test tutorial endpoint
       run: |
-        timeout 300 python funcx_endpoint/tests/tutorial_ep/test_tutotial_ep.py -t '4b116d3c-1703-4f8f-9f6f-39921e5864df' -i ${{ secrets.API_CLIENT_ID }} -s ${{ secrets.API_CLIENT_SECRET }}
+        pytest funcx_endpoint/tests/smoke_tests --api-client-id ${{ secrets.API_CLIENT_ID }} --api-client-secret ${{ secrets.API_CLIENT_SECRET }}
     - name: Send mail
       if: ${{ failure() }}
       uses: dawidd6/action-send-mail@v3
@@ -54,6 +54,6 @@ jobs:
         username: ${{secrets.MAIL_USERNAME}}
         password: ${{secrets.MAIL_PASSWORD}}
         subject: ${{ github.repository }} - Tutorial test ${{ job.status }}
-        to: ryan.chard@gmail.com,rchard@anl.gov,chard@uchicago.edu,yadudoc1729@gmail.com,josh@globus.org,bengal1@illinois.edu,benc@hawaga.org.uk,sirosen@globus.org,uriel@globus.org
+        to: yadudoc1729@gmail.com
         from: funcX Tests # <user@example.com>
         body: The ${{ github.repository }} test ${{ github.workflow }} exited with status - ${{ job.status }}!
