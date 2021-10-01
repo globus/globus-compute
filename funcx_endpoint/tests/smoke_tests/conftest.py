@@ -53,9 +53,14 @@ def _get_local_endpoint_id():
     data_path = os.path.join(
         os.path.expanduser("~"), ".funcx", local_endpoint_name, "endpoint.json"
     )
-    with open(data_path) as fp:
-        data = json.load(fp)
-    return data["endpoint_id"]
+
+    try:
+        with open(data_path) as fp:
+            data = json.load(fp)
+    except Exception:
+        return None
+    else:
+        return data["endpoint_id"]
 
 
 def pytest_addoption(parser):
