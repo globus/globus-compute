@@ -32,8 +32,8 @@ funcx-endpoint
     funcx_endpoint.strategies.kube_simple.KubeSimpleStrategy
 
 
-Exception
-=========
+Exceptions
+==========
 
 .. autosummary::
     :toctree: stubs
@@ -49,4 +49,6 @@ Exception
     funcx.utils.errors.UserCancelledException
     funcx.utils.errors.InvalidScopeException
     funcx.utils.errors.HTTPError
+    funcx.sdk.utils.throttling.MaxRequestsExceeded
+    funcx.sdk.utils.throttling.MaxRequestSizeExceeded
     funcx_endpoint.executors.high_throughput.funcx_worker.MaxResultSizeExceeded
