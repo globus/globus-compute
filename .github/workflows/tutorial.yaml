@@ -45,7 +45,7 @@ jobs:
         python -c "from funcx.sdk.client import FuncXClient"
     - name: Run smoke tests to check liveness of hosted services
       run: |
-        pytest funcx_endpoint/tests/smoke_tests --api-client-id ${{ secrets.API_CLIENT_ID }} --api-client-secret ${{ secrets.API_CLIENT_SECRET }}
+        pytest -v funcx_endpoint/tests/smoke_tests --api-client-id ${{ secrets.API_CLIENT_ID }} --api-client-secret ${{ secrets.API_CLIENT_SECRET }}
     - name: Send mail
       if: ${{ failure() }}
       uses: dawidd6/action-send-mail@v3
