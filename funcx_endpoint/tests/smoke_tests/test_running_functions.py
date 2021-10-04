@@ -1,9 +1,9 @@
 import time
 
 
-def test_run_pre_registered_function(fxc, tutorial_endpoint, tutorial_funcion_id):
+def test_run_pre_registered_function(fxc, endpoint, tutorial_funcion_id):
     """This test confirms that we are connected to the default production DB"""
-    fn_id = fxc.run(endpoint_id=tutorial_endpoint, function_id=tutorial_funcion_id)
+    fn_id = fxc.run(endpoint_id=endpoint, function_id=tutorial_funcion_id)
 
     time.sleep(10)
 
@@ -15,7 +15,7 @@ def double(x):
     return x * 2
 
 
-def test_batch(fxc, try_tutorial_endpoint):
+def test_batch(fxc, endpoint):
     """Test batch submission and get_batch_result"""
 
     double_fn = fxc.register_function(double)
@@ -24,7 +24,7 @@ def test_batch(fxc, try_tutorial_endpoint):
     batch = fxc.create_batch()
 
     for x in inputs:
-        batch.add(x, endpoint_id=try_tutorial_endpoint, function_id=double_fn)
+        batch.add(x, endpoint_id=endpoint, function_id=double_fn)
 
     batch_res = fxc.batch_run(batch)
 

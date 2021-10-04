@@ -49,9 +49,9 @@ def test_simple_function(fxc):
     assert func_uuid is not None, "Invalid function uuid returned"
 
 
-def test_ep_status(fxc, try_tutorial_endpoint):
+def test_ep_status(fxc, endpoint):
     """Test whether the tutorial EP is online and reporting status"""
-    response = fxc.get_endpoint_status(try_tutorial_endpoint)
+    response = fxc.get_endpoint_status(endpoint)
 
     assert (
         response["status"] == "online"

@@ -28,10 +28,8 @@ _CONFIGS = {
         "funcx_version": "0.3.3",
         # This fn is public and searchable
         "public_hello_fn_uuid": "b0a5d1a0-2b22-4381-b899-ba73321e41e0",
-        # Public tutorial endpoint
-        "tutorial_endpoint": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
-        # other endpoint to test
-        "endpoint_uuid": _LOCAL_ENDPOINT_ID,
+        # For production tests, the target endpoint should be the tutorial_endpoint
+        "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
     },
     "local": {
         # localhost; typical defaults for a helm deploy
@@ -110,6 +108,9 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
         config["endpoint_uuid"] = endpoint
     elif config["endpoint_uuid"] is None:
         config["endpoint_uuid"] = _get_local_endpoint_id()
+    if not config["endpoint_uuid"]:
+        # If there's no endpoint_uuid available, the smoke tests won't work
+        raise Exception("No target endpoint_uuid available to test against")
 
     # set URIs if passed
     client_args = config["client_args"]
@@ -170,29 +171,8 @@ def endpoint(funcx_test_config):
 
 
 @pytest.fixture
-def _tutorial_endpoint(funcx_test_config):
-    return funcx_test_config.get("tutorial_endpoint")
-
-
-@pytest.fixture
-def tutorial_endpoint(_tutorial_endpoint):
-    if not _tutorial_endpoint:
-        pytest.skip("test requires the tutorial_endpoint")
-    return _tutorial_endpoint
-
-
-@pytest.fixture
 def tutorial_funcion_id(funcx_test_config):
     funcid = funcx_test_config.get("public_hello_fn_uuid")
     if not funcid:
-        pytest.skip("test requires the tutorial function")
+        pytest.skip("test requires a pre-defined public hello function")
     return funcid
-
-
-@pytest.fixture
-def try_tutorial_endpoint(_tutorial_endpoint, endpoint):
-    # a variant of the tutorial_endpoint fixture which failsover to the
-    # non-tutorial endpoint if the tests are running locally, rather than skipping
-    if _tutorial_endpoint:
-        return _tutorial_endpoint
-    return endpoint
