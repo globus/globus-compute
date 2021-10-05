@@ -24,15 +24,16 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: main
+        ref: fix_tutorial_test
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies for funcx-sdk
+    - name: Install dependencies for funcx-sdk and test requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -r funcx_sdk/test-requirements.txt
         pip list
     - name: Check for vulnerabilities in libraries
       run: |
@@ -42,9 +43,9 @@ jobs:
       run: |
         python -m pip install funcx
         python -c "from funcx.sdk.client import FuncXClient"
-    - name: Test tutorial endpoint
+    - name: Run smoke tests to check liveness of hosted services
       run: |
-        timeout 300 python funcx_endpoint/tests/tutorial_ep/test_tutotial_ep.py -t '4b116d3c-1703-4f8f-9f6f-39921e5864df' -i ${{ secrets.API_CLIENT_ID }} -s ${{ secrets.API_CLIENT_SECRET }}
+        pytest -v funcx_endpoint/tests/smoke_tests --api-client-id ${{ secrets.API_CLIENT_ID }} --api-client-secret ${{ secrets.API_CLIENT_SECRET }}
     - name: Send mail
       if: ${{ failure() }}
       uses: dawidd6/action-send-mail@v3
