@@ -21,6 +21,17 @@ jobs:
       - name: run pre-commit
         run: pre-commit run -a
 
+  # ensure docs can build, imitating the RTD build as best we can
+  check-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: "3.10"
+      - name: build docs
+        run: make docs
+
   test-sdk:
     strategy:
       matrix:
