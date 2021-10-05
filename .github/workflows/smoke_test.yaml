@@ -1,4 +1,4 @@
-name: tutorial_test
+name: smoke_test
 
 on:
   schedule:
