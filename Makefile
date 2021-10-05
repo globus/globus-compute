@@ -3,7 +3,9 @@
 	.venv-docs/bin/pip install -U pip setuptools
 	.venv-docs/bin/pip install './funcx_sdk[docs]' './funcx_endpoint'
 
-.PHONY: docs
+.PHONY: lint docs
+lint:
+	pre-commit run -a
 docs: .venv-docs
 	# clean the build dir before rebuilding
 	cd docs; rm -rf _build/

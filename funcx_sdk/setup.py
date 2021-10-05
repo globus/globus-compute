@@ -17,7 +17,9 @@ REQUIRES = [
     "dill==0.3.4",
 ]
 DOCS_REQUIRES = [
-    "sphinx_rtd_theme",
+    "sphinx<5",
+    "furo==2021.09.08",
+    "nbsphinx==0.8.7",
 ]
 
 TEST_REQUIRES = [
