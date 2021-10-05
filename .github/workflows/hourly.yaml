@@ -1,4 +1,4 @@
-name: tutorial_test
+name: hourly
 
 on:
   schedule:
@@ -8,44 +8,29 @@ on:
       tags:
         required: false
         description: "manual test"
-  push:
-    branches:
-      - "*"
-    tags:
-      - "*"
 
 jobs:
-  test:
-    strategy:
-      matrix:
-        python-version: [3.7]
+  tutorial_test:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
       with:
         ref: main
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+    - uses: actions/setup-python@v1
       with:
-        python-version: ${{ matrix.python-version }}
-
+        python-version: 3.7
     - name: Install dependencies for funcx-sdk and test requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install -r funcx_sdk/test-requirements.txt
-        pip list
     - name: Check for vulnerabilities in libraries
       run: |
         pip install safety
-        pip freeze | safety check
-    - name: Test sdk by just importing
-      run: |
-        python -m pip install funcx
-        python -c "from funcx.sdk.client import FuncXClient"
+        safety check
     - name: Run smoke tests to check liveness of hosted services
       run: |
         pytest -v funcx_endpoint/tests/smoke_tests --api-client-id ${{ secrets.API_CLIENT_ID }} --api-client-secret ${{ secrets.API_CLIENT_SECRET }}
+     # FIXME: make this send to a listhost or Slack
     - name: Send mail
       if: ${{ failure() }}
       uses: dawidd6/action-send-mail@v3
