@@ -2,10 +2,15 @@ name: smoke_test
 
 on:
   push:
+    paths:
+      - 'funcx_endpoint/tests/smoke_tests/**'
     branches:
       - "*"
     tags:
       - "*"
+  pull_request:
+    paths:
+      - 'funcx_endpoint/tests/smoke_tests/**'
 
 jobs:
   test:
