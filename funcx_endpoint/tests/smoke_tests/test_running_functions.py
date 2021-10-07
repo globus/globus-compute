@@ -28,9 +28,14 @@ def test_batch(fxc, endpoint):
 
     batch_res = fxc.batch_run(batch)
 
-    time.sleep(10)
+    total = 0
+    for _i in range(12):
+        time.sleep(5)
+        results = fxc.get_batch_result(batch_res)
+        try:
+            total = sum(results[tid]["result"] for tid in results)
+            break
+        except KeyError:
+            pass
 
-    results = fxc.get_batch_result(batch_res)
-
-    total = sum(results[tid]["result"] for tid in results)
     assert total == 2 * (sum(inputs)), "Batch run results do not add up"
