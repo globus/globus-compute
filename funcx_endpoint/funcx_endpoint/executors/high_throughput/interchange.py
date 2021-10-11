@@ -333,7 +333,8 @@ class Interchange(object):
             raise
 
         self.tasks = set()
-        self.task_cancel_queue = queue.Queue()
+        self.task_cancel_running_queue = queue.Queue()
+        self.task_cancel_pending_trap = {}
         self.task_status_deltas = {}
         self.container_switch_count = {}
 
@@ -446,7 +447,7 @@ class Interchange(object):
             elif isinstance(msg, Heartbeat):
                 logger.debug("Got heartbeat")
             else:
-                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg))
+                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg.task_id))
                 local_container = self.get_container(msg.container_id)
                 msg.set_local_container(local_container)
                 if local_container not in self.pending_task_queue:
@@ -598,15 +599,21 @@ class Interchange(object):
 
     def enqueue_task_cancel(self, task_id):
         """ Cancel a task on the interchange """
-        logger.debug(f"Received task_cancel request for task:{task_id}")
+        logger.debug(f"Received task_cancel request for Task:{task_id}")
 
+        found_task = False
         for manager in self._ready_manager_queue:
             for task_type in self._ready_manager_queue[manager]['tasks']:
                 for tid in self._ready_manager_queue[manager]['tasks'][task_type]:
                     if tid == task_id:
-                        logger.debug("Transferring task_cancel message onto queue")
-                        self.task_cancel_queue.put((manager, task_id))
+                        logger.debug(f"Task:{task_id} is running, moving task_cancel message onto queue")
+                        self.task_cancel_running_queue.put((manager, task_id))
+                        found_task = True
                         break
+
+        if found_task is False:
+            logger.debug(f"Task:{task_id} is pending, moving task_cancel message onto trap")
+            self.task_cancel_pending_trap[task_id] = task_id
 
         return
 
@@ -774,8 +781,8 @@ class Interchange(object):
             # in one go
             while True:
                 try:
-                    manager, task_id = self.task_cancel_queue.get(block=False)
-                    logger.debug(f"Received task_cancel for Task:{task_id} on manager:{manager}")
+                    manager, task_id = self.task_cancel_running_queue.get(block=False)
+                    logger.debug(f"[MAIN] Task:{task_id} on manager:{manager} is now CANCELLED while running")
                     cancel_message = pickle.dumps(('TASK_CANCEL', task_id))
                     self.task_outgoing.send_multipart([manager, b'', cancel_message])
 
@@ -785,6 +792,15 @@ class Interchange(object):
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]
                 if tasks:
+                    if self.task_cancel_pending_trap:
+                        for task in tasks:
+                            task_id = task["task_id"]
+                            if task_id in self.task_cancel_pending_trap:
+                                logger.warning(f"[MAIN] Task:{task_id} CANCELLED before launch")
+                                cancel_message = pickle.dumps(('TASK_CANCEL', task_id))
+                                self.task_outgoing.send_multipart([manager, b'', cancel_message])
+                                self.task_cancel_pending_trap.pop(task_id)
+
                     logger.info("[MAIN] Sending task message {} to manager {}".format(tasks, manager))
                     serializd_raw_tasks_buffer = pickle.dumps(tasks)
                     # self.task_outgoing.send_multipart([manager, b'', pickle.dumps(tasks)])
@@ -792,7 +808,7 @@ class Interchange(object):
 
                     for task in tasks:
                         task_id = task["task_id"]
-                        logger.debug(f"[MAIN] Task {task_id} is now WAITING_FOR_LAUNCH")
+                        logger.debug(f"[MAIN] Task:{task_id} is now WAITING_FOR_LAUNCH")
                         self.task_status_deltas[task_id] = TaskStatusCode.WAITING_FOR_LAUNCH
 
             # Receive any results and forward to client
