@@ -327,14 +327,22 @@ class Manager(object):
                 elif type(message) == tuple and message[0] == 'TASK_CANCEL':
                     task_id = message[1]
                     logger.warning(f"Received TASK_CANCEL request for task: {task_id}")
+                    if task_id not in self.task_worker_map:
+                        logger.warning(f"Task:{task_id} is not in task_worker_map.")
+                        logger.warning("Possible duplicate cancel or race-condition")
+                        continue
                     # Cancel task by killing the worker it is on
                     #
                     #
+                    worker_id_raw = self.task_worker_map[task_id]['worker_id']
                     worker_to_kill = self.task_worker_map[task_id]['worker_id'].decode('utf-8')
                     worker_type = self.task_worker_map[task_id]['task_type']
                     logger.warning(f"Cancelling task running on worker:{self.task_worker_map[task_id]}")
                     try:
-                        proc = self.worker_procs[worker_to_kill]
+                        logger.info(f"Removing worker:{worker_id_raw} from map")
+                        self.worker_map.remove_worker(worker_id_raw)
+                        logger.info(f"Popping worker:{worker_to_kill} from worker_procs")
+                        proc = self.worker_procs.pop(worker_to_kill)
                         logger.warning(f"Sending process:{proc.pid} terminate signal")
                         proc.terminate()
                         try:
@@ -354,6 +362,19 @@ class Manager(object):
                                           'exception': self.serializer.serialize(
                                               RemoteExceptionWrapper(*sys.exc_info()))}
                         self.pending_result_queue.put(pickle.dumps(result_package))
+
+                    worker_proc = self.worker_map.add_worker(
+                        worker_id=str(self.worker_map.worker_id_counter),
+                        worker_type=self.worker_type,
+                        container_cmd_options=self.container_cmd_options,
+                        address=self.address,
+                        debug=self.debug,
+                        uid=self.uid,
+                        logdir=self.logdir,
+                        worker_port=self.worker_port)
+                    self.worker_procs.update(worker_proc)
+                    self.task_worker_map.pop(task_id)
+                    self.remove_task(task_id)
 
                 elif message == HEARTBEAT_CODE:
                     logger.debug("Got heartbeat from interchange")
@@ -469,10 +490,7 @@ class Manager(object):
                 self.worker_map.put_worker(w_id)
                 self.task_done_counter += 1
                 task_id = pickle.loads(message)['task_id']
-                task_type = self.task_type_mapping.pop(task_id)
-                self.task_status_deltas.pop(task_id, None)
-                logger.debug("Task type: {}".format(task_type))
-                self.outstanding_task_count[task_type] -= 1
+                self.remove_task(task_id)
                 logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
 
             elif m_type == b'WRKR_DIE':
@@ -494,6 +512,12 @@ class Manager(object):
 
         except Exception as e:
             logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+
+    def remove_task(self, task_id: str):
+        task_type = self.task_type_mapping.pop(task_id)
+        self.task_status_deltas.pop(task_id, None)
+        logger.debug(f"Task type: {task_type}")
+        self.outstanding_task_count[task_type] -= 1
 
     def send_task_to_worker(self, task_type):
         task = self.task_queues[task_type].get()
