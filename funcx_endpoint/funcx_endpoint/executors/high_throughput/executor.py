@@ -797,10 +797,6 @@ class FuncXFuture(Future):
 
     def cancel(self):
 
-        print("self. dir", dir(self))
-        print("self.state", self._state)
-        print("self.condition", self._condition)
-
         self.executor._cancel(self)
 
         with self._condition:
