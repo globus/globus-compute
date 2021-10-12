@@ -462,6 +462,7 @@ class EndpointInterchange(object):
             logger.exception("Caught exception while saving unacked results")
         else:
             logger.info("Unacked results successfully saved to disk")
+        sys.exit(1)
 
     def start(self):
         """ Start the Interchange
