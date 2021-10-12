@@ -5,6 +5,7 @@ texttable
 psutil
 python-daemon
 fair_research_login
+globus_sdk<3
 dill>=0.3
 typer>=0.3.0
 funcx>=0.3.3,<0.4.0
