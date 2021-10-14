@@ -1,6 +1,31 @@
 Changelog
 =========
 
+funcx & funcx-endpoint v0.3.4
+-----------------------------
+
+Released on October 14th, 2021
+
+funcx v0.3.4 is a minor release that includes contributions (code, tests, reviews, and reports) from:
+
+Ben Galewsky <bengal1@illinois.edu>, Kyle Chard <chard@uchicago.edu>,
+Stephen Rosen <sirosen@globus.org>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
+
+Bug Fixes
+^^^^^^^^^
+
+* Updated requirements to exclude `pyzmq==22.3.0` due to unstable wheel. `Issue#577 <https://github.com/funcx-faas/funcX/issues/611>`_
+
+* Updated requirements specification to `globus-sdk<3.0`
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+* Docs have been restructured and updated to use a cleaner theme
+
+* New smoke_tests added to test hosted services
+
+
 
 funcx & funcx-endpoint v0.3.3
 -----------------------------
