@@ -556,7 +556,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
                         try:
                             task_fut = self.tasks.pop(tid)
-                        except Exception:
+                        except KeyError:
                             # This is triggered when the result of a cancelled task is returned
                             # We should log, and proceed.
                             logger.warning(f"[MTHREAD] Task:{tid} duplicate result received. Ignoring.")
