@@ -798,18 +798,8 @@ class FuncXFuture(Future):
     def cancel(self):
 
         self.executor._cancel(self)
+        super().cancel()
 
-        with self._condition:
-            if self._state == FINISHED:
-                return False
-
-            if self._state in [CANCELLED, CANCELLED_AND_NOTIFIED]:
-                return True
-
-            self.executor._cancel(self)
-            self._state = CANCELLED
-            self._condition.notify_all()
-        self._invoke_callbacks()
         return True
 
 

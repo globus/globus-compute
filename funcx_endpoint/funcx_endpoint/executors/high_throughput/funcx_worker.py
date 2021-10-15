@@ -13,7 +13,6 @@ from parsl.app.errors import RemoteExceptionWrapper
 from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_TYPES, MessageType, Task
-from funcx_endpoint.executors.high_throughput.funcx_manager import TaskCancelled
 
 
 class MaxResultSizeExceeded(Exception):
@@ -98,7 +97,7 @@ class FuncXWorker(object):
 
     def handler(self, signum, frame):
         logger.error("Signal handler called with signal", signum)
-        raise TaskCancelled(0, 0)
+        exit(1)
 
     def registration_message(self):
         return {'worker_id': self.worker_id,
@@ -142,10 +141,6 @@ class FuncXWorker(object):
                     if sys.getsizeof(serialized_result) > self.result_size_limit:
                         raise MaxResultSizeExceeded(sys.getsizeof(serialized_result),
                                                     self.result_size_limit)
-
-                except TaskCancelled:
-                    logger.warning("Exiting due to TaskCancelled")
-                    exit()
 
                 except Exception as e:
                     logger.exception(f"Caught an exception {e}")

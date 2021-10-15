@@ -44,8 +44,7 @@ logger = None
 
 
 class TaskCancelled(Exception):
-    """ Task lost due to worker loss. Worker is considered lost when multiple heartbeats
-    have been missed.
+    """ Task is cancelled by user request.
     """
 
     def __init__(self, worker_id, manager_id):
@@ -326,7 +325,7 @@ class Manager(object):
 
                 elif type(message) == tuple and message[0] == 'TASK_CANCEL':
                     task_id = message[1]
-                    logger.warning(f"Received TASK_CANCEL request for task: {task_id}")
+                    logger.info(f"Received TASK_CANCEL request for task: {task_id}")
                     if task_id not in self.task_worker_map:
                         logger.warning(f"Task:{task_id} is not in task_worker_map.")
                         logger.warning("Possible duplicate cancel or race-condition")
@@ -337,7 +336,7 @@ class Manager(object):
                     worker_id_raw = self.task_worker_map[task_id]['worker_id']
                     worker_to_kill = self.task_worker_map[task_id]['worker_id'].decode('utf-8')
                     worker_type = self.task_worker_map[task_id]['task_type']
-                    logger.warning(f"Cancelling task running on worker:{self.task_worker_map[task_id]}")
+                    logger.debug(f"Cancelling task running on worker:{self.task_worker_map[task_id]}")
                     try:
                         logger.info(f"Removing worker:{worker_id_raw} from map")
                         self.worker_map.remove_worker(worker_id_raw)
@@ -346,9 +345,9 @@ class Manager(object):
                         logger.warning(f"Sending process:{proc.pid} terminate signal")
                         proc.terminate()
                         try:
-                            proc.wait(0.4)
-                        except Exception:
-                            logger.exception("Process did not terminate in 0.4 seconds")
+                            proc.wait(1)  # Wait 1 second before attempting SIGKILL
+                        except subprocess.TimeoutExpired:
+                            logger.exception("Process did not terminate in 1 second")
                             logger.warning(f"Sending process:{proc.pid} kill signal")
                             proc.kill()
                         else:
