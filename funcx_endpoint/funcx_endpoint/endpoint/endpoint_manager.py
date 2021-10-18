@@ -13,7 +13,7 @@ from string import Template
 import daemon
 import daemon.pidfile
 import psutil
-import texttable as tt
+import texttable
 import typer
 
 import funcx
@@ -390,7 +390,7 @@ class EndpointManager:
         self.logger.info("Endpoint <{}> has been cleaned up.".format(self.name))
 
     def list_endpoints(self):
-        table = tt.Texttable()
+        table = texttable.Texttable()
 
         headings = ['Endpoint Name', 'Status', 'Endpoint ID']
         table.header(headings)
