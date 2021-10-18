@@ -15,3 +15,7 @@ funcx>=0.3.3,<0.4.0
 # forwarder is upgraded to a newer libzmq
 pyzmq>=22.0.0,!=22.3.0
 retry
+
+# 'parsl' is a core requirement of the funcx-endpoint, essential to a range
+# of different features and functions
+parsl>=1.1.0,<2

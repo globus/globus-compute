@@ -1,13 +1,24 @@
+# request sending and authorization tools
 requests>=2.20.0
 globus-sdk<3
-jsonschema>=3.2.0
-configobj
-texttable
-python-daemon
-fair_research_login
-dill>=0.3
-typer>=0.3.0
-pyzmq>=22.0.0
-parsl>=1.1.0a0
-packaging
+
+# 'websockets' is used for the client-side websocket listener
 websockets==9.1
+
+# table printing used in search result rendering
+#
+# TODO: remove and use our own formatting code OR adjust the version bounds
+# once we know what the versioning scheme in use is
+#
+# see also:
+#   https://github.com/foutaise/texttable/issues/77
+texttable==1.6.4
+
+# versions >=0.2.3 requires globus-sdk v3
+# TODO: update pin to latest when globus-sdk is updated
+fair_research_login==0.2.2
+
+# dill is an extension of `pickle` to a wider array of native python types
+# pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
+# versioning and compatibility policy
+dill==0.3.4
