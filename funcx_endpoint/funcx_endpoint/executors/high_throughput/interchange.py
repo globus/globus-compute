@@ -576,11 +576,8 @@ class Interchange(object):
                 buffer = self.command_channel.recv()
                 logger.debug(f"[COMMAND] Received command request {buffer}")
                 command = Message.unpack(buffer)
-                if command.type not in COMMAND_TYPES:
-                    logger.error("Received incorrect message type on command channel")
-                    reply = BadCommand(f"Unknown command type: {command.type}")
 
-                elif command.type is MessageType.TASK_CANCEL:
+                if command.type is MessageType.TASK_CANCEL:
                     logger.info(f"[COMMAND] Received TASK_CANCEL for task_id:{command.task_id}")
                     self.enqueue_task_cancel(command.task_id)
                     reply = command
@@ -589,6 +586,10 @@ class Interchange(object):
                     logger.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
                     logger.info(f"[COMMAND] Replying with Heartbeat({self.endpoint_id})")
                     reply = Heartbeat(self.endpoint_id)
+
+                else:
+                    logger.error(f"Received unsupported message type:{command.type} on command channel")
+                    reply = BadCommand(f"Unknown command type: {command.type}")
 
                 logger.debug("[COMMAND] Reply: {}".format(reply))
                 self.command_channel.send(reply.pack())
@@ -840,12 +841,9 @@ class Interchange(object):
                         logger.debug("[MAIN] Received result for task {} from {}".format(r, manager))
                         task_type = self.containers[r['container_id']]
                         logger.debug(f"[MAIN] Removing for manager:{manager} from {self._ready_manager_queue}")
-                        try:
-                            if r['task_id'] in self.task_status_deltas:
-                                del self.task_status_deltas[r['task_id']]
-                            self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
-                        except Exception:
-                            logger.exception("[MAIN] Caught exception here")
+                        if r['task_id'] in self.task_status_deltas:
+                            del self.task_status_deltas[r['task_id']]
+                        self._ready_manager_queue[manager]['tasks'][task_type].remove(r['task_id'])
                     self._ready_manager_queue[manager]['total_tasks'] -= len(b_messages)
 
                     # TODO: handle this with a Task message or something?
