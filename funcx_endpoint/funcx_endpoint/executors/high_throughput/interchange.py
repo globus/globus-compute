@@ -612,7 +612,7 @@ class Interchange(object):
                         break
 
         if found_task is False:
-            logger.debug(f"Task:{task_id} is pending, moving task_cancel message onto trap")
+            logger.debug(f"Task:{task_id} not found on managers, moving task_cancel message onto trap")
             self.task_cancel_pending_trap[task_id] = task_id
 
         return
