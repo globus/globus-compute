@@ -3,11 +3,11 @@ import json
 import logging
 import os
 import uuid
+from distutils.version import LooseVersion
 from inspect import getsource
 
 from fair_research_login import JSONTokenStorage, NativeClient
 from globus_sdk import AuthClient
-from packaging.version import parse
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
@@ -200,7 +200,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                     "You do not have the funcx endpoint installed.  "
                     "You can use 'pip install funcx-endpoint'."
                 )
-            if parse(ENDPOINT_VERSION) < parse(min_ep_version):
+            if LooseVersion(ENDPOINT_VERSION) < LooseVersion(min_ep_version):
                 raise VersionMismatch(
                     f"Your version={ENDPOINT_VERSION} is lower than the "
                     f"minimum version for an endpoint: {min_ep_version}.  "
@@ -208,7 +208,7 @@ class FuncXClient(FuncXErrorHandlingClient):
                     f"pip install funcx-endpoint>={min_ep_version}"
                 )
         else:
-            if parse(SDK_VERSION) < parse(min_sdk_version):
+            if LooseVersion(SDK_VERSION) < LooseVersion(min_sdk_version):
                 raise VersionMismatch(
                     f"Your version={SDK_VERSION} is lower than the "
                     f"minimum version for funcx SDK: {min_sdk_version}.  "
