@@ -3,6 +3,7 @@ import asyncio
 import atexit
 import concurrent
 import logging
+import queue
 import threading
 import time
 from concurrent.futures import Future
@@ -52,7 +53,15 @@ class FuncXExecutor(concurrent.futures.Executor):
     to the hosted funcx-websocket-service.
     """
 
-    def __init__(self, funcx_client, label: str = "FuncXExecutor"):
+    def __init__(
+        self,
+        funcx_client,
+        label: str = "FuncXExecutor",
+        batch_enabled: bool = False,
+        batch_interval: float = 1.0,
+        batch_size: int = 100,
+    ):
+
         """
         Parameters
         ==========
@@ -69,9 +78,17 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
 
         self.funcx_client = funcx_client
+        # Disable throttling
+        self.funcx_client.throttling_enabled = False
+
         self.results_ws_uri = self.funcx_client.results_ws_uri
         self.label = label
+        self.batch_enabled = batch_enabled
+        self.batch_interval = batch_interval
+        self.batch_size = batch_size
+
         self._tasks = {}
+        self._task_counter = 0
         self._function_registry = {}
         self._function_future_map = {}
         self.task_group_id = (
@@ -85,6 +102,22 @@ class FuncXExecutor(concurrent.futures.Executor):
             self.task_group_id,
         )
         atexit.register(self.shutdown)
+
+        if self.batch_enabled:
+            logger.info("Batch submission enabled.")
+            self.start_batching_thread()
+
+    def start_batching_thread(self):
+        self.task_outgoing = queue.Queue()
+
+        self._kill_event = threading.Event()
+        # Start the task submission thread
+        self.task_submit_thread = threading.Thread(
+            target=self.task_submit_thread, args=(self._kill_event,)
+        )
+        self.task_submit_thread.daemon = True
+        self.task_submit_thread.start()
+        logger.info("Started task submit thread")
 
     def submit(self, function, *args, endpoint_id=None, container_uuid=None, **kwargs):
         """Initiate an invocation
@@ -112,45 +145,113 @@ class FuncXExecutor(concurrent.futures.Executor):
         if function not in self._function_registry:
             # Please note that this is a partial implementation, not all function
             # registration options are fleshed out here.
-            logger.debug("Function:{function} is not registered. Registering")
-            function_uuid = self.funcx_client.register_function(
-                function, function_name=function.__name__, container_uuid=container_uuid
-            )
-            self._function_registry[function] = function_uuid
-            logger.debug(f"Function registered with id:{function_uuid}")
+            logger.debug(f"Function:{function} is not registered. Registering")
+            try:
+                function_id = self.funcx_client.register_function(
+                    function,
+                    function_name=function.__name__,
+                    container_uuid=container_uuid,
+                )
+            except Exception:
+                logger.error(f"Error in registering {function.__name__}")
+                raise
+            else:
+                self._function_registry[function] = function_id
+                logger.debug(f"Function registered with id:{function_id}")
+
+        task_id = self._task_counter
+        self._task_counter += 1
+
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
-        batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
-        batch.add(
-            *args,
-            endpoint_id=endpoint_id,
-            function_id=self._function_registry[function],
-            **kwargs,
-        )
-        r = self.funcx_client.batch_run(batch)
-        logger.debug(f"Batch submitted to task_group: {self.task_group_id}")
+        msg = {
+            "task_id": task_id,
+            "function_id": self._function_registry[function],
+            "endpoint_id": endpoint_id,
+            "args": args,
+            "kwargs": kwargs,
+        }
 
-        task_uuid = r[0]
-        logger.debug(f"Waiting on results for task ID: {task_uuid}")
-        # There's a potential for a race-condition here where the result reaches
-        # the poller before the future is added to the future_map
-        self._function_future_map[task_uuid] = Future()
+        fut = Future()
+        self._tasks[task_id] = fut
 
-        self.poller_thread.atomic_controller.increment()
-        res = self._function_future_map[task_uuid]
+        if self.batch_enabled:
+            # Put task to the the outgoing queue
+            self.task_outgoing.put(msg)
+        else:
+            # self._submit_task takes a list of messages
+            self._submit_tasks([msg])
 
-        if not self.poller_thread or self.poller_thread.ws_handler.closed:
-            self.poller_thread = ExecutorPollerThread(
-                self.funcx_client,
-                self._function_future_map,
-                self.results_ws_uri,
-                self.task_group_id,
-            )
-        return res
+        return fut
+
+    def task_submit_thread(self, kill_event):
+        """Task submission thread that fetch tasks from task_outgoing queue,
+        batch function requests, and submit functions to funcX"""
+        while not kill_event.is_set():
+            messages = self._get_tasks_in_batch()
+            if messages:
+                logger.info(
+                    "[TASK_SUBMIT_THREAD] Submitting {} tasks to funcX".format(
+                        len(messages)
+                    )
+                )
+            self._submit_tasks(messages)
+        logger.info("[TASK_SUBMIT_THREAD] Exiting")
+
+    def _submit_tasks(self, messages):
+        """Submit a batch of tasks"""
+        if messages:
+            batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
+            for msg in messages:
+                function_id, endpoint_id, args, kwargs = (
+                    msg["function_id"],
+                    msg["endpoint_id"],
+                    msg["args"],
+                    msg["kwargs"],
+                )
+                batch.add(
+                    *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
+                )
+                logger.debug(f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch")
+            try:
+                batch_tasks = self.funcx_client.batch_run(batch)
+                logger.debug(f"Batch submitted to task_group: {self.task_group_id}")
+            except Exception:
+                logger.error(
+                    "[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(
+                        len(messages)
+                    )
+                )
+                raise
+            else:
+                for i, msg in enumerate(messages):
+                    self._function_future_map[batch_tasks[i]] = self._tasks.pop(
+                        msg["task_id"]
+                    )
+                    self.poller_thread.atomic_controller.increment()
+
+    def _get_tasks_in_batch(self):
+        """Get tasks from task_outgoing queue in batch, either by interval or by batch size"""
+        messages = []
+        start = time.time()
+        while True:
+            if (
+                time.time() - start >= self.batch_interval
+                or len(messages) >= self.batch_size
+            ):
+                break
+            try:
+                x = self.task_outgoing.get(timeout=0.1)
+            except queue.Empty:
+                break
+            else:
+                messages.append(x)
+        return messages
 
     def shutdown(self):
-        if self.poller_thread:
-            self.poller_thread.shutdown()
+        self.poller_thread.shutdown()
+        if self.batch_enabled:
+            self._kill_event.set()
         logger.debug(f"Executor:{self.label} shutting down")
 
 
@@ -202,6 +303,7 @@ class ExecutorPollerThread:
             auto_start=False,
         )
         self.thread = threading.Thread(target=self.event_loop_thread, args=(eventloop,))
+        self.thread.daemon = True
         self.thread.start()
         logger.debug("Started web_socket_poller thread")
 
@@ -221,6 +323,7 @@ class ExecutorPollerThread:
         if self.ws_handler is None:
             return
 
+        self.ws_handler.closed_by_main_thread = True
         ws = self.ws_handler.ws
         if ws:
             ws_close_future = asyncio.run_coroutine_threadsafe(

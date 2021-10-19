@@ -80,6 +80,12 @@ def fx(fxc):
 
 
 @pytest.fixture
+def batch_fx(fxc):
+    fx = FuncXExecutor(fxc, batch_enabled=True)
+    return fx
+
+
+@pytest.fixture
 def endpoint(pytestconfig):
     endpoint = pytestconfig.getoption("--endpoint")[0]
     return endpoint
