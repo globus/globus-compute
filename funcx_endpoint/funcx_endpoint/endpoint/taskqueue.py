@@ -91,8 +91,7 @@ class TaskQueue(object):
             self.zmq_socket.connect("tcp://{}:{}".format(address, port))
 
         self.poller = zmq.Poller()
-        self.poller.register(self.zmq_socket, zmq.POLLOUT)
-        self.poller.register(self.zmq_socket, zmq.POLLIN)
+        self.poller.register(self.zmq_socket)
         os.makedirs(self.keys_dir, exist_ok=True)
         logger.debug(f"Initializing Taskqueue:{self.mode} on port:{self.port}")
 
