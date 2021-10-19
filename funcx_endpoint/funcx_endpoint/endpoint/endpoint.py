@@ -16,7 +16,6 @@ import daemon
 import daemon.pidfile
 import psutil
 import requests
-import texttable as tt
 import typer
 from retry import retry
 
