@@ -6,13 +6,7 @@ globus-sdk<3
 websockets==9.1
 
 # table printing used in search result rendering
-#
-# TODO: remove and use our own formatting code OR adjust the version bounds
-# once we know what the versioning scheme in use is
-#
-# see also:
-#   https://github.com/foutaise/texttable/issues/77
-texttable==1.6.4
+texttable>=1.6.4,<2
 
 # versions >=0.2.3 requires globus-sdk v3
 # TODO: update pin to latest when globus-sdk is updated
