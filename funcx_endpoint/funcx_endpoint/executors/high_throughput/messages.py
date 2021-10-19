@@ -13,6 +13,7 @@ class MessageType(Enum):
     EP_STATUS_REPORT = auto()
     MANAGER_STATUS_REPORT = auto()
     TASK = auto()
+    RESULTS_ACK = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -70,6 +71,8 @@ class Message(ABC):
             return ManagerStatusReport.unpack(remaining)
         elif message_type is MessageType.TASK:
             return Task.unpack(remaining)
+        elif message_type is MessageType.RESULTS_ACK:
+            return ResultsAck.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
@@ -201,3 +204,22 @@ class ManagerStatusReport(Message):
         # TODO: do better than JSON?
         jsonified = json.dumps(self.task_statuses)
         return self.type.pack() + self.container_switch_count.to_bytes(10, 'little') + jsonified.encode("ascii")
+
+
+class ResultsAck(Message):
+    """
+    Results acknowledgement to acknowledge a task result was received by
+    the forwarder. Sent from forwarder->interchange
+    """
+    type = MessageType.RESULTS_ACK
+
+    def __init__(self, task_id):
+        super().__init__()
+        self.task_id = task_id
+
+    @classmethod
+    def unpack(cls, msg):
+        return cls(msg.decode("ascii"))
+
+    def pack(self):
+        return self.type.pack() + self.task_id.encode("ascii")

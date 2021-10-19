@@ -15,16 +15,14 @@ from funcx_endpoint.executors.high_throughput.messages import Message, COMMAND_T
 
 
 class MaxResultSizeExceeded(Exception):
-
+    """ Result produced by the function exceeds the maximum supported result size threshold of 512000B
+    """
     def __init__(self, result_size, result_size_limit):
         self.result_size = result_size
         self.result_size_limit = result_size_limit
 
-    def __repr__(self):
-        return f"Task result of {self.result_size}B exceeded current limit of {self.result_size_limit}B"
-
     def __str__(self):
-        return self.__repr__()
+        return f"Task result of {self.result_size}B exceeded current limit of {self.result_size_limit}B"
 
 
 class FuncXWorker(object):
@@ -58,7 +56,7 @@ class FuncXWorker(object):
          send(result)
     """
 
-    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=10 * (2 ** 20)):
+    def __init__(self, worker_id, address, port, logdir, debug=False, worker_type='RAW', result_size_limit=512000):
 
         self.worker_id = worker_id
         self.address = address
@@ -157,7 +155,9 @@ class FuncXWorker(object):
             if task_type == b'WRKR_DIE':
                 logger.info("*** WORKER {} ABOUT TO DIE ***".format(self.worker_id))
                 # Kill the worker after accepting death in message to manager.
-                exit()
+                sys.exit()
+                # We need to return here to allow for sys.exit mocking in tests
+                return
 
         logger.warning("Broke out of the loop... dying")
 

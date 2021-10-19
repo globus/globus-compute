@@ -15,17 +15,17 @@ import daemon.pidfile
 import psutil
 import texttable as tt
 import typer
-from retry.api import retry_call
 
 import funcx
 import zmq
 from globus_sdk import GlobusAPIError, NetworkError
 
-import funcx_endpoint
 from funcx.utils.response_errors import FuncxResponseError
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.executors.high_throughput import global_config as funcx_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
+from funcx_endpoint.endpoint.register_endpoint import register_endpoint
+from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from funcx.sdk.client import FuncXClient
 
 logger = logging.getLogger("endpoint.endpoint_manager")
@@ -164,8 +164,11 @@ class EndpointManager:
         if not endpoint_config.config.executors:
             raise Exception(f"Endpoint config file at {endpoint_dir} is missing executor definitions")
 
-        funcx_client = FuncXClient(funcx_service_address=endpoint_config.config.funcx_service_address,
-                                   check_endpoint_version=True)
+        funcx_client_options = {
+            "funcx_service_address": endpoint_config.config.funcx_service_address,
+            "check_endpoint_version": True,
+        }
+        funcx_client = FuncXClient(**funcx_client_options)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
@@ -184,12 +187,21 @@ class EndpointManager:
                 self.logger.info("A prior Endpoint instance appears to have been terminated without proper cleanup. Cleaning up now.")
                 self.pidfile_cleanup(pid_file)
 
+        results_ack_handler = ResultsAckHandler(endpoint_dir=endpoint_dir)
+
+        try:
+            results_ack_handler.load()
+            results_ack_handler.persist()
+        except Exception:
+            self.logger.exception("Caught exception while attempting load and persist of outstanding results")
+            sys.exit(-1)
+
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
         if endpoint_config.config.detach_endpoint:
-            stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'w+')
-            stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'w+')
+            stdout = open(os.path.join(endpoint_dir, endpoint_config.config.stdout), 'a+')
+            stderr = open(os.path.join(endpoint_dir, endpoint_config.config.stderr), 'a+')
         else:
             stdout = sys.stdout
             stderr = sys.stderr
@@ -210,7 +222,7 @@ class EndpointManager:
         # only be registered if everything else has been set up successfully
         reg_info = None
         try:
-            reg_info = self.register_endpoint(funcx_client, endpoint_uuid, endpoint_dir)
+            reg_info = register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, self.name, logger=self.logger)
         # if the service sends back an error response, it will be a FuncxResponseError
         except FuncxResponseError as e:
             # an example of an error that could conceivably occur here would be
@@ -249,23 +261,15 @@ class EndpointManager:
             self.logger.critical("Launching endpoint daemon process with errors noted above")
 
         with context:
-            self.daemon_launch(funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info)
+            self.daemon_launch(endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options, results_ack_handler)
 
-    def daemon_launch(self, funcx_client, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info):
-        if reg_info is None:
-            # Register the endpoint
-            self.logger.info("Retrying endpoint registration after initial registration attempt failed")
-            reg_info = retry_call(self.register_endpoint, fargs=[funcx_client, endpoint_uuid, endpoint_dir], delay=10, max_delay=300, backoff=1.2)
-            self.logger.info("Endpoint registered with UUID: {}".format(reg_info['endpoint_id']))
-
+    def daemon_launch(self, endpoint_uuid, endpoint_dir, keys_dir, endpoint_config, reg_info, funcx_client_options, results_ack_handler):
         # Configure the parameters for the interchange
         optionals = {}
-        optionals['client_address'] = reg_info['public_ip']
-        optionals['client_ports'] = reg_info['tasks_port'], reg_info['results_port'], reg_info['commands_port'],
         if 'endpoint_address' in self.funcx_config:
             optionals['interchange_address'] = self.funcx_config['endpoint_address']
 
-            optionals['logdir'] = endpoint_dir
+        optionals['logdir'] = endpoint_dir
 
         if self.debug:
             optionals['logging_level'] = logging.DEBUG
@@ -273,58 +277,16 @@ class EndpointManager:
         ic = EndpointInterchange(endpoint_config.config,
                                  endpoint_id=endpoint_uuid,
                                  keys_dir=keys_dir,
+                                 endpoint_dir=endpoint_dir,
+                                 endpoint_name=self.name,
+                                 reg_info=reg_info,
+                                 funcx_client_options=funcx_client_options,
+                                 results_ack_handler=results_ack_handler,
                                  **optionals)
+
         ic.start()
-        ic.stop()
 
         self.logger.critical("Interchange terminated.")
-
-    # Avoid a race condition when starting the endpoint alongside the web service
-    def register_endpoint(self, funcx_client, endpoint_uuid, endpoint_dir):
-        """Register the endpoint and return the registration info.
-
-        Parameters
-        ----------
-
-        funcx_client : FuncXClient
-            The auth'd client to communicate with the funcX service
-
-        endpoint_uuid : str
-            The uuid to register the endpoint with
-
-        endpoint_dir : str
-            The directory to write endpoint registration info into.
-
-        """
-        self.logger.debug("Attempting registration")
-        self.logger.debug(f"Trying with eid : {endpoint_uuid}")
-        reg_info = funcx_client.register_endpoint(self.name,
-                                                  endpoint_uuid,
-                                                  endpoint_version=funcx_endpoint.__version__)
-
-        # this is a backup error handler in case an endpoint ID is not sent back
-        # from the service or a bad ID is sent back
-        if 'endpoint_id' not in reg_info:
-            raise Exception("Endpoint ID was not included in the service's registration response.")
-        elif not isinstance(reg_info['endpoint_id'], str):
-            raise Exception("Endpoint ID sent by the service was not a string.")
-
-        with open(os.path.join(endpoint_dir, 'endpoint.json'), 'w+') as fp:
-            json.dump(reg_info, fp)
-            self.logger.debug("Registration info written to {}".format(os.path.join(endpoint_dir, 'endpoint.json')))
-
-        certs_dir = os.path.join(endpoint_dir, 'certificates')
-        os.makedirs(certs_dir, exist_ok=True)
-        server_keyfile = os.path.join(certs_dir, 'server.key')
-        self.logger.debug(f"Writing server key to {server_keyfile}")
-        try:
-            with open(server_keyfile, 'w') as f:
-                f.write(reg_info['forwarder_pubkey'])
-                os.chmod(server_keyfile, 0o600)
-        except Exception:
-            self.logger.exception("Failed to write server certificate")
-
-        return reg_info
 
     def stop_endpoint(self, name):
         self.name = name
@@ -388,7 +350,7 @@ class EndpointManager:
         shutil.rmtree(endpoint_dir)
         self.logger.info("Endpoint <{}> has been deleted.".format(self.name))
 
-    def check_pidfile(self, filepath, match_name='funcx-endpoint'):
+    def check_pidfile(self, filepath):
         """ Helper function to identify possible dead endpoints
 
         Returns a record with 'exists' and 'active' fields indicating
@@ -399,12 +361,6 @@ class EndpointManager:
         ----------
         filepath : str
             Path to the pidfile
-
-        match_name : str
-            Name of the process to check for if pidfile exists
-
-        endpoint_name : str
-            endpoint name for debugging purposes
         """
         if not os.path.exists(filepath):
             return {
@@ -412,18 +368,17 @@ class EndpointManager:
                 "active": False
             }
 
-        older_pid = int(open(filepath, 'r').read().strip())
+        pid = int(open(filepath, 'r').read().strip())
 
         active = False
         try:
-            proc = psutil.Process(older_pid)
-            if proc.name() == match_name:
-                # this is the only case where the endpoint is active.
-                # If the process name does not match or no process exists,
-                # it means the endpoint has been terminated without proper cleanup
-                active = True
+            psutil.Process(pid)
         except psutil.NoSuchProcess:
             pass
+        else:
+            # this is the only case where the endpoint is active. If no process exists,
+            # it means the endpoint has been terminated without proper cleanup
+            active = True
 
         return {
             "exists": True,

@@ -21,6 +21,7 @@ class TaskQueue(object):
                  set_hwm=False,
                  RCVTIMEO=None,
                  SNDTIMEO=None,
+                 linger=None,
                  ironhouse: bool = False,
                  keys_dir: str = os.path.abspath('.curve'),
                  mode: str = 'client'):
@@ -64,23 +65,30 @@ class TaskQueue(object):
             print("Configuring server")
             self.zmq_socket = self.context.socket(zmq.ROUTER)
             self.zmq_socket.set(zmq.ROUTER_MANDATORY, 1)
+            self.zmq_socket.set(zmq.ROUTER_HANDOVER, 1)
             print("Setting up auth-server")
             self.setup_server_auth()
-            self.zmq_socket.bind("tcp://*:{}".format(port))
         elif self.mode == 'client':
             self.zmq_socket = self.context.socket(zmq.DEALER)
             self.setup_client_auth()
             self.zmq_socket.setsockopt(zmq.IDENTITY, identity.encode('utf-8'))
-            self.zmq_socket.connect("tcp://{}:{}".format(address, port))
         else:
             raise ValueError("TaskQueue must be initialized with mode set to 'server' or 'client'")
 
         if set_hwm:
             self.zmq_socket.set_hwm(0)
         if RCVTIMEO is not None:
-            self.zmq_socket.RCVTIMEO = RCVTIMEO
+            self.zmq_socket.setsockopt(zmq.RCVTIMEO, RCVTIMEO)
         if SNDTIMEO is not None:
-            self.zmq_socket.SNDTIMEO = SNDTIMEO
+            self.zmq_socket.setsockopt(zmq.SNDTIMEO, SNDTIMEO)
+        if linger is not None:
+            self.zmq_socket.setsockopt(zmq.LINGER, linger)
+
+        # all zmq setsockopt calls must be done before bind/connect is called
+        if self.mode == 'server':
+            self.zmq_socket.bind("tcp://*:{}".format(port))
+        elif self.mode == 'client':
+            self.zmq_socket.connect("tcp://{}:{}".format(address, port))
 
         self.poller = zmq.Poller()
         self.poller.register(self.zmq_socket, zmq.POLLOUT)
