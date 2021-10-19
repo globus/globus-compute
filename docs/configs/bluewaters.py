@@ -24,16 +24,21 @@ config = Config(
             provider=TorqueProvider(
                 queue='normal',
                 launcher=AprunLauncher(overrides="-b -- bwpy-environ --"),
+
                 # string to prepend to #SBATCH blocks in the submit
                 scheduler_options=user_opts['bluewaters']['scheduler_options'],
 
                 # Command to be run before starting a worker, such as:
-                # 'module load bwpy; source activate parsl_env'.
+                # 'module load bwpy; source activate funcx env'.
                 worker_init=user_opts['bluewaters']['worker_init'],
-                init_blocks=1,
-                max_blocks=1,
-                min_blocks=1,
+
+                # Scale between 0-1 blocks with 2 nodes per block
                 nodes_per_block=2,
+                init_blocks=0,
+                min_blocks=0,
+                max_blocks=1,
+
+                # Hold blocks for 30 minutes
                 walltime='00:30:00'
             ),
         )

@@ -65,16 +65,25 @@ def test_simple(fx, endpoint):
     assert fut.result() == x * 2, "Got wrong answer"
 
 
-def test_loop(fx, endpoint):
-    count = 10
-
+def run_loop(fx, endpoint, count=20):
     futures = []
     for i in range(count):
         future = fx.submit(double, i, endpoint_id=endpoint)
         futures.append(future)
 
-    for fu in futures:
-        print(fu.result())
+    for i in range(count):
+        fut = futures[i]
+        res = fut.result()
+        assert res == i * 2, "Got wrong answer"
+        print(res)
+
+
+def test_loop(fx, endpoint):
+    run_loop(fx, endpoint)
+
+
+def test_loop_batch(batch_fx, endpoint):
+    run_loop(batch_fx, endpoint, count=50)
 
 
 def test_submit_while_waiting(fx, endpoint):
@@ -132,7 +141,7 @@ def test_many_merge(fx, endpoint):
 def test_timing(fx, endpoint):
     fut1 = fx.submit(failing_task, endpoint_id=endpoint)
     time.sleep(1)
-    test_loop(fx, endpoint)
+    run_loop(fx, endpoint, count=10)
     s = str(uuid.uuid4())
     fut2 = fx.submit(split, s, endpoint_id=endpoint)
     fut3 = fx.submit(delay_n, 5, endpoint_id=endpoint)
@@ -159,8 +168,16 @@ def test_large_arrays(fx, endpoint):
     assert fut4.result().shape == (x, y), "Got wrong answer"
 
 
+def test_batch_delays(batch_fx, endpoint):
+    fx = batch_fx
+    fut1 = fx.submit(delay_n, 10, endpoint_id=endpoint)
+    time.sleep(2)
+    run_loop(fx, endpoint)
+    assert fut1.result() == "hello", "Got wrong answer"
+
+
 # test locally: python3 test_executor.py -e <endpoint_id>
-# test on dev: python3 test_executor.py -s https://api.dev.funcx.org/v2 -w wss://api.dev.funcx.org/ws/v2/ -e <endpoint_id>
+# test on dev: python3 test_executor.py -s https://api2.dev.funcx.org/v2 -w wss://api2.dev.funcx.org/ws/v2/ -e <endpoint_id>
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -181,15 +198,21 @@ if __name__ == "__main__":
         required=True,
         help="Target endpoint to send functions to",
     )
+    parser.add_argument(
+        "-b", "--batch", action="store_true", help="Enable batch or not"
+    )
     args = parser.parse_args()
 
     fx = FuncXExecutor(
-        FuncXClient(funcx_service_address=args.service_url, results_ws_uri=args.ws_uri)
+        FuncXClient(funcx_service_address=args.service_url, results_ws_uri=args.ws_uri),
+        batch_enabled=args.batch,
     )
 
+    start = time.time()
     print("Running simple test")
     test_simple(fx, args.endpoint_id)
-    print("Complete")
+    print(f"Complete in {time.time() - start}")
 
-    print(f"Running a test with a for loop of {args.count} tasks")
-    test_loop(fx, args.endpoint_id)
+    start = time.time()
+    run_loop(fx, args.endpoint_id)
+    print(f"Complete in {time.time() - start}")

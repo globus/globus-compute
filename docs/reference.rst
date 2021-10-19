@@ -1,6 +1,10 @@
 Reference
 #########
 
+
+funcX SDK
+=========
+
 .. autosummary::
     :toctree: stubs
     :nosignatures:
@@ -8,10 +12,16 @@ Reference
     funcx
     funcx.sdk.client.FuncXClient
     funcx.sdk.error_handling_client.FuncXErrorHandlingClient
-    funcx.utils.errors.TaskPending
     funcx.sdk.utils.batch.Batch
     funcx.serialize.base
     funcx.serialize.concretes
+
+funcx-endpoint
+==============
+
+.. autosummary::
+    :toctree: stubs
+    :nosignatures:
 
     funcx_endpoint.endpoint.endpoint
     funcx_endpoint.endpoint.endpoint_manager.EndpointManager
@@ -21,3 +31,24 @@ Reference
     funcx_endpoint.strategies.simple.SimpleStrategy
     funcx_endpoint.strategies.kube_simple.KubeSimpleStrategy
 
+
+Exceptions
+==========
+
+.. autosummary::
+    :toctree: stubs
+    :nosignatures:
+
+    funcx.utils.errors.TaskPending
+    funcx.utils.errors.RegistrationError
+    funcx.utils.errors.FuncXUnreachable
+    funcx.utils.errors.MalformedResponse
+    funcx.utils.errors.FailureResponse
+    funcx.utils.errors.VersionMismatch
+    funcx.utils.errors.SerializationError
+    funcx.utils.errors.UserCancelledException
+    funcx.utils.errors.InvalidScopeException
+    funcx.utils.errors.HTTPError
+    funcx.sdk.utils.throttling.MaxRequestsExceeded
+    funcx.sdk.utils.throttling.MaxRequestSizeExceeded
+    funcx_endpoint.executors.high_throughput.funcx_worker.MaxResultSizeExceeded

@@ -435,6 +435,7 @@ class Manager(object):
             self.worker_procs.update(self.worker_map.spin_up_workers(self.next_worker_q,
                                                                      mode=self.worker_mode,
                                                                      debug=self.debug,
+                                                                     container_cmd_options=self.container_cmd_options,
                                                                      address=self.address,
                                                                      uid=self.uid,
                                                                      logdir=self.logdir,

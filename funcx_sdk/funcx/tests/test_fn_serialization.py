@@ -1,6 +1,7 @@
 import time
 
 from funcx.tests.fn_module import imported_fn
+from funcx.utils.errors import TaskPending
 
 
 def local_fn():
@@ -18,7 +19,7 @@ def test_imported_function(fxc, endpoint):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
-        except Exception:
+        except TaskPending:
             time.sleep(2)
         else:
             break
@@ -35,7 +36,7 @@ def test_local_function(fxc, endpoint):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
-        except Exception:
+        except TaskPending:
             time.sleep(2)
         else:
             break
@@ -54,7 +55,7 @@ def test_nested_scope_function(fxc, endpoint):
         try:
             r = fxc.get_result(task_id)
             print(f"result : {r}")
-        except Exception:
+        except TaskPending:
             time.sleep(2)
         else:
             break
@@ -81,13 +82,6 @@ def test_decorated_function(fxc, endpoint):
 
     print("Task_id: ", task_id)
 
-    for _i in range(5):
-        try:
-            r = fxc.get_result(task_id)
-            print(f"result : {r}")
-        except Exception:
-            time.sleep(2)
-        else:
-            break
-
-    assert r == double(x), "Results don't match"
+    time.sleep(10)
+    r = fxc.get_result(task_id)
+    assert r == double(x), "Incorrect result returned"

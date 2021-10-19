@@ -516,7 +516,10 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 elif isinstance(msgs, EPStatusReport):
                     logger.debug("[MTHREAD] Received EPStatusReport {}".format(msgs))
                     if self.passthrough:
-                        self.results_passthrough.put(pickle.dumps(msgs))
+                        self.results_passthrough.put({
+                            "task_id": None,
+                            "message": pickle.dumps(msgs)
+                        })
 
                 else:
                     logger.debug("[MTHREAD] Unpacking results")
@@ -549,7 +552,13 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
                         if self.passthrough is True:
                             logger.debug(f"[MTHREAD] Pushing results for task:{tid}")
-                            x = self.results_passthrough.put(serialized_msg)
+                            # we are only interested in actual task ids here, not identifiers
+                            # for other message types
+                            sent_task_id = tid if isinstance(tid, str) else None
+                            x = self.results_passthrough.put({
+                                "task_id": sent_task_id,
+                                "message": serialized_msg
+                            })
                             logger.debug(f"[MTHREAD] task:{tid} ret value: {x}")
                             logger.debug(f"[MTHREAD] task:{tid} items in queue: {self.results_passthrough.qsize()}")
                             continue

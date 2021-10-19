@@ -1,4 +1,4 @@
-funcx.utils.errors.TaskPending
+﻿funcx.utils.errors.TaskPending
 ==============================
 
 .. currentmodule:: funcx.utils.errors

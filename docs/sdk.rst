@@ -69,6 +69,10 @@ monitor status and retrieve results.
   tutorial_endpoint = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
   task_id = fxc.run(endpoint_id=tutorial_endpoint, function_id=func_uuid)
 
+.. note::
+   funcX places limits on the size of the functions and the rate at which functions can be submitted.
+   Please refer to the limits section for TODO:YADU
+
 
 Retrieving Results
 -------------------
@@ -93,7 +97,7 @@ Arguments and data
 ------------------
 funcX functions operate the same as any other Python function. You can pass arguments \*args and \**kwargs
 and return values from functions. The only constraint is that data passed to/from a funcX function must be
-serializable (e.g., via Pickle) and less than 2 MB in size.  Input arguments can be passed to the function
+serializable (e.g., via Pickle) and fall within :ref:`Limits` .  Input arguments can be passed to the function
 using the `run()` function. The following example shows how strings can be passed to and from a function.
 
 .. code-block:: python
@@ -145,12 +149,15 @@ or publicly accessible functions via the `search_function()` function.
   print(search_results)
 
 
+.. _batching:
+
 Batching
 --------------
 
 The SDK includes a batch interface to reduce the overheads of launching a function many times.
 To use this interface, you must first create a batch object and then pass that object
-to the `batch_run` function.
+to the ``batch_run`` function. ``batch_run`` is non-blocking and returns a list of task ids
+corresponding to the functions in the batch with the ordering preserved.
 
 .. code-block:: python
 
@@ -159,29 +166,36 @@ to the `batch_run` function.
   for x in range(0,5):
     batch.add(x, endpoint_id=tutorial_endpoint, function_id=func_id)
 
+  # batch_run returns a list task ids
   batch_res = fxc.batch_run(batch)
 
-There is also a batch result interface to retrieve the results of a batch.
+
+The batch result interface is useful to to fetch the results of a collection of task_ids.
+``get_batch_result`` is called with a list of task_ids. It is non-blocking and returns
+a `dict` with task_ids as the keys and each value is a dict that contains status information
+and a result if it is available.
 
 .. code-block:: python
 
-  fxc.get_batch_result(batch_res)
+  >>> results = fxc.get_batch_result(batch_res)
+  >>> print(results)
 
+  {'10c9678c-b404-4e40-bfd4-81581f52f9db': {'pending': False,
+                                            'status': 'success',
+                                            'result': 0,
+                                            'completion_t': '1632876695.6450012'},
+   '587afd2e-59e0-4d2d-82ab-cee409784c4c': {'pending': False,
+                                            'status': 'success',
+                                            'result': 0,
+                                            'completion_t': '1632876695.7048604'},
+   '11f34d69-913a-4442-ae79-ede046585d8f': {'pending': True,
+                                            'status': 'waiting-for-ep'},
+   'a2d86014-28a8-486d-b86e-5f38c80d0333': {'pending': True,
+                                            'status': 'waiting-for-ep'},
+   'e453a993-73e6-4149-8078-86e7b8370c35': {'pending': True,
+                                            'status': 'waiting-for-ep'}
+  }
 
-Client Throttling
------------------
-
-In order to avoid overloading funcX, we place soft throttling restrictions on the funcX client.
-There are two key throttling measures: first, we limit the number of requests a client can make (20 requests every 10 seconds),
-and second, we limit the size of input and output transmitted through the service (5 MB per request).
-
-Batching requests and status can help reduce the number of requests made to the Web Service. In addition, the limit on
-the number of requests made to the Web Service can be removed by setting `throttling_enabled` to False.
-
-.. code-block:: python
-
-  fxc = FuncXClient()
-  fxc.throttling_enabled = False
 
 
 FuncXClient Reference:

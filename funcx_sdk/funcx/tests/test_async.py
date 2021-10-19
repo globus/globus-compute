@@ -44,7 +44,7 @@ async def submit_while_waiting_task(fxc, endpoint):
     squared_function = fxc.register_function(squared)
     delay_n_function = fxc.register_function(delay_n)
 
-    task1 = fxc.run(10, endpoint_id=endpoint, function_id=delay_n_function)
+    task1 = fxc.run(3, endpoint_id=endpoint, function_id=delay_n_function)
 
     x = random.randint(0, 100)
     task2 = fxc.run(x, endpoint_id=endpoint, function_id=squared_function)

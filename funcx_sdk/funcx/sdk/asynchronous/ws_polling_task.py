@@ -5,7 +5,11 @@ from asyncio import AbstractEventLoop, QueueEmpty
 
 import dill
 import websockets
-from websockets.exceptions import InvalidHandshake, InvalidStatusCode
+from websockets.exceptions import (
+    ConnectionClosedOK,
+    InvalidHandshake,
+    InvalidStatusCode,
+)
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
@@ -25,7 +29,7 @@ class WebSocketPollingTask:
         loop: AbstractEventLoop,
         atomic_controller=None,
         init_task_group_id: str = None,
-        results_ws_uri: str = "wss://api.funcx.org/ws/v2/",
+        results_ws_uri: str = "wss://api2.funcx.org/ws/v2/",
         auto_start: bool = True,
     ):
         """
@@ -50,7 +54,7 @@ class WebSocketPollingTask:
 
         results_ws_uri : str
             Web sockets URI for the results.
-            Default: wss://api.funcx.org/ws/v2
+            Default: wss://api2.funcx.org/ws/v2
 
         auto_start : Bool
             Set this to start the WebSocket client immediately.
@@ -67,11 +71,16 @@ class WebSocketPollingTask:
         # add the initial task group id, as this will be sent to
         # the WebSocket server immediately
         self.running_task_group_ids.add(self.init_task_group_id)
+
+        # Set event loop explicitly since event loop can only be fetched automatically in main thread
+        # when batch submission is enabled, the task submission is in a new thread
+        asyncio.set_event_loop(self.loop)
         self.task_group_ids_queue = asyncio.Queue()
         self.pending_tasks = {}
+        self.unknown_results = {}
 
+        self.closed_by_main_thread = False
         self.ws = None
-        self.closed = False
 
         if auto_start:
             self.loop.create_task(self.init_ws())
@@ -110,36 +119,85 @@ class WebSocketPollingTask:
 
     async def handle_incoming(self, pending_futures, auto_close=False):
         while True:
-            raw_data = await self.ws.recv()
-            data = json.loads(raw_data)
-            task_id = data["task_id"]
-            if task_id in pending_futures:
-                future = pending_futures.pop(task_id)
-                try:
-                    if data["result"]:
-                        future.set_result(
-                            self.funcx_client.fx_serializer.deserialize(data["result"])
-                        )
-                    elif data["exception"]:
-                        r_exception = self.funcx_client.fx_serializer.deserialize(
-                            data["exception"]
-                        )
-                        future.set_exception(dill.loads(r_exception.e_value))
-                    else:
-                        future.set_exception(Exception(data["reason"]))
-                except Exception:
-                    logger.exception("Caught unexpected while setting results")
-
-                # When the counter hits 0 we always exit. This guarantees that that
-                # if the counter increments to 1 on the executor, this handler needs to be restarted.
-                if self.atomic_controller is not None:
-                    count = self.atomic_controller.decrement()
-                    if count == 0:
-                        await self.ws.close()
-                        self.ws = None
-                        return
+            try:
+                raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
+            except asyncio.TimeoutError:
+                pass
+            except ConnectionClosedOK:
+                if self.closed_by_main_thread:
+                    logger.debug("WebSocket connection closed by main thread")
+                else:
+                    logger.error("WebSocket connection closed unexpectedly")
+                return
             else:
-                print("[MISSING FUTURE]")
+                data = json.loads(raw_data)
+                task_id = data["task_id"]
+                if task_id in pending_futures:
+                    if await self.set_result(task_id, data, pending_futures):
+                        return
+                else:
+                    # This scenario occurs rarely using non-batching mode,
+                    # but quite often in batching mode.
+                    # When submitting tasks in batch with batch_run,
+                    # some task results may be received by websocket before the response of batch_run,
+                    # and pending_futures do not have the futures for the tasks yet.
+                    # We store these in unknown_results and process when their futures are ready.
+                    self.unknown_results[task_id] = data
+
+            # Handle the results received but not processed before
+            unprocessed_task_ids = self.unknown_results.keys() & pending_futures.keys()
+            for task_id in unprocessed_task_ids:
+                data = self.unknown_results.pop(task_id)
+                if await self.set_result(task_id, data, pending_futures):
+                    return
+
+    async def set_result(self, task_id, data, pending_futures):
+        """Sets the result of a future with given task_id in the pending_futures map,
+        then decrement the atomic counter and close the WebSocket connection if needed
+
+        Parameters
+        ----------
+        task_id : str
+            Task ID of the future to set the result for
+
+        data : dict
+            Dict containing result/exception that should be set to future
+
+        pending_futures : dict
+            Dict of task_id keys that map to their futures
+
+        Returns
+        -------
+        bool
+            True if the WebSocket connection has closed and the thread can
+            exit, False otherwise
+        """
+        future = pending_futures.pop(task_id)
+        try:
+            if data["result"]:
+                future.set_result(
+                    self.funcx_client.fx_serializer.deserialize(data["result"])
+                )
+            elif data["exception"]:
+                r_exception = self.funcx_client.fx_serializer.deserialize(
+                    data["exception"]
+                )
+                future.set_exception(dill.loads(r_exception.e_value))
+            else:
+                future.set_exception(Exception(data["reason"]))
+        except Exception:
+            logger.exception("Caught unexpected exception while setting results")
+
+        # When the counter hits 0 we always exit. This guarantees that that
+        # if the counter increments to 1 on the executor, this handler needs to be restarted.
+        if self.atomic_controller is not None:
+            count = self.atomic_controller.decrement()
+            # Only close when count == 0 and unknown_results are empty
+            if count == 0 and len(self.unknown_results) == 0:
+                await self.ws.close()
+                self.ws = None
+                return True
+        return False
 
     def put_task_group_id(self, task_group_id):
         # prevent the task_group_id from being sent to the WebSocket server

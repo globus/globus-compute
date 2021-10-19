@@ -23,7 +23,6 @@
       ~EndpointManager.init_endpoint_dir
       ~EndpointManager.list_endpoints
       ~EndpointManager.pidfile_cleanup
-      ~EndpointManager.register_endpoint
       ~EndpointManager.start_endpoint
       ~EndpointManager.stop_endpoint
 

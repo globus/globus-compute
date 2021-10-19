@@ -4,9 +4,9 @@ from funcx import FuncXClient
 from funcx.sdk.executor import FuncXExecutor
 
 config = {
-    "funcx_service_address": "http://127.0.0.1:5000/v2",  # For testing against local k8s
+    "funcx_service_address": "https://api2.funcx.org/v2",  # For testing against local k8s
     "endpoint_uuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    "results_ws_uri": "ws://localhost:6000",
+    "results_ws_uri": "wss://api2.funcx.org/ws/v2/",
 }
 
 
@@ -76,6 +76,12 @@ def async_fxc(fxc_args):
 @pytest.fixture
 def fx(fxc):
     fx = FuncXExecutor(fxc)
+    return fx
+
+
+@pytest.fixture
+def batch_fx(fxc):
+    fx = FuncXExecutor(fxc, batch_enabled=True)
     return fx
 
 
