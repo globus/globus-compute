@@ -214,8 +214,7 @@ class ManagerStatusReport(Message):
 
 class TaskCancel(Message):
     """
-    Synchronous request for a Heartbeat.  This is sent from the Forwarder to the endpoint on start to get
-    an initial connection and ensure liveness.
+    Synchronous request for to cancel a Task. This is sent from the Executor to the Interchange
     """
     type = MessageType.TASK_CANCEL
 
