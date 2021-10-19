@@ -214,27 +214,29 @@ class ManagerStatusReport(Message):
         jsonified = json.dumps(self.task_statuses)
         return self.type.pack() + self.container_switch_count.to_bytes(10, 'little') + jsonified.encode("ascii")
 
+
 class ResultsAck(Message):
     """
     Results acknowledgement to acknowledge a task result was received by
     the forwarder. Sent from forwarder->interchange
     """
     type = MessageType.RESULTS_ACK
-    
+
     def __init__(self, task_id):
         super().__init__()
         self.task_id = task_id
 
     @classmethod
     def unpack(cls, msg):
-	      return cls(msg.decode("ascii"))
+        return cls(msg.decode("ascii"))
 
     def pack(self):
         return self.type.pack() + self.task_id.encode("ascii")
-    
+
+
 class TaskCancel(Message):
-    """                                                                                                                                                                                                            
-    Synchronous request for to cancel a Task. This is sent from the Executor to the Interchange                                                                                                                    
+    """
+    Synchronous request for to cancel a Task. This is sent from the Executor to the Interchange
     """
     type = MessageType.TASK_CANCEL
 
@@ -251,8 +253,8 @@ class TaskCancel(Message):
 
 
 class BadCommand(Message):
-    """                                                                                                                                                                                                            
-    Error message send to indicate that a command is either unknown, malformed or unsupported.                                                                                                                     
+    """
+    Error message send to indicate that a command is either unknown, malformed or unsupported.
     """
     type = MessageType.BAD_COMMAND
 
