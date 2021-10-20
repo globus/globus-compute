@@ -661,7 +661,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                        ser_code + ser_params)
 
         self.submit_raw(payload.pack())
-        self.tasks[task_id] = FuncXFuture(self)
+        self.tasks[task_id] = HTEXFuture(self)
         self.tasks[task_id].task_id = task_id
 
         return self.tasks[task_id]
@@ -797,7 +797,7 @@ CANCELLED_AND_NOTIFIED = 'CANCELLED_AND_NOTIFIED'
 FINISHED = 'FINISHED'
 
 
-class FuncXFuture(Future):
+class HTEXFuture(Future):
 
     def __init__(self, executor):
 
