@@ -331,8 +331,6 @@ class Manager(object):
                         logger.warning("Possible duplicate cancel or race-condition")
                         continue
                     # Cancel task by killing the worker it is on
-                    #
-                    #
                     worker_id_raw = self.task_worker_map[task_id]['worker_id']
                     worker_to_kill = self.task_worker_map[task_id]['worker_id'].decode('utf-8')
                     worker_type = self.task_worker_map[task_id]['task_type']
@@ -351,7 +349,7 @@ class Manager(object):
                             logger.warning(f"Sending process:{proc.pid} kill signal")
                             proc.kill()
                         else:
-                            logger.warning(f"Process status : {proc.returncode}")
+                            logger.debug(f"Worker process exited with : {proc.returncode}")
 
                         raise TaskCancelled(worker_to_kill, self.uid)
                     except Exception as e:
