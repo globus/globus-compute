@@ -3,7 +3,9 @@ import time
 import os
 import pickle
 
-logger = logging.getLogger(__name__)
+# The logger path needs to start with endpoint. while the current path
+# start with funcx_endpoint.endpoint.
+logger = logging.getLogger("endpoint.results_ack")
 
 
 class ResultsAckHandler():
@@ -81,6 +83,9 @@ class ResultsAckHandler():
     def load(self):
         """ Load unacked results from disk
         """
-        if os.path.exists(self.data_path):
-            with open(self.data_path, 'rb') as fp:
-                self.unacked_results = pickle.load(fp)
+        try:
+            if os.path.exists(self.data_path):
+                with open(self.data_path, 'rb') as fp:
+                    self.unacked_results = pickle.load(fp)
+        except pickle.UnpicklingError:
+            logger.warning(f"Cached results {self.data_path} appear to be corrupt. Proceeding without loading cached results")
