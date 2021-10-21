@@ -3,7 +3,7 @@ import time
 import os
 import pickle
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("endpoint." + __name__)
 
 
 class ResultsAckHandler():
@@ -86,4 +86,4 @@ class ResultsAckHandler():
                 with open(self.data_path, 'rb') as fp:
                     self.unacked_results = pickle.load(fp)
         except pickle.UnpicklingError:
-            logger.warning(f"[WARNING] Cached results {self.data_path} appear to be corrupt. Proceeding without loading cached results")
+            logger.warning(f"Cached results {self.data_path} appear to be corrupt. Proceeding without loading cached results")
