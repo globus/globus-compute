@@ -2,7 +2,7 @@ import logging
 import threading
 import time
 
-logger = logging.getLogger("interchange.strategy.base")
+log = logging.getLogger(__name__)
 
 
 class BaseStrategy:
@@ -74,7 +74,7 @@ class BaseStrategy:
         """
         self.interchange = interchange
         if hasattr(interchange, "provider"):
-            logger.debug(
+            log.debug(
                 "Strategy bounds-> init:{}, min:{}, max:{}".format(
                     interchange.provider.init_blocks,
                     interchange.provider.min_blocks,
@@ -85,7 +85,7 @@ class BaseStrategy:
 
     def strategize(self, *args, **kwargs):
         """Strategize is called everytime the threshold or the interval is hit"""
-        logger.debug(f"Strategize called with {args} {kwargs}")
+        log.debug(f"Strategize called with {args} {kwargs}")
 
     def _wake_up_timer(self, kill_event):
         """
@@ -120,7 +120,7 @@ class BaseStrategy:
         self._event_buffer.extend([event_id])
         self._event_count += 1
         if self._event_count >= self.threshold:
-            logger.debug("Eventcount >= threshold")
+            log.debug("Eventcount >= threshold")
             self.make_callback(kind="event")
 
     def make_callback(self, kind=None):

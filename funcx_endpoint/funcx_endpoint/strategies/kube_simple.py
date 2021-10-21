@@ -4,7 +4,7 @@ import time
 
 from funcx_endpoint.strategies.base import BaseStrategy
 
-logger = logging.getLogger("interchange.strategy.KubeSimple")
+log = logging.getLogger(__name__)
 
 
 class KubeSimpleStrategy(BaseStrategy):
@@ -29,7 +29,7 @@ class KubeSimpleStrategy(BaseStrategy):
           default: 60s
 
         """
-        logger.info("KubeSimpleStrategy Initialized")
+        log.info("KubeSimpleStrategy Initialized")
         super().__init__(*args, threshold=threshold, interval=interval)
         self.max_idletime = max_idletime
         self.executors_idle_since = {}
@@ -38,8 +38,7 @@ class KubeSimpleStrategy(BaseStrategy):
         try:
             self._strategize(*args, **kwargs)
         except Exception as e:
-            logger.exception(f"Caught error in strategize : {e}")
-            pass
+            log.exception(f"Caught error in strategize : {e}")
 
     def _strategize(self, *args, **kwargs):
         max_pods = self.interchange.provider.max_blocks
@@ -55,17 +54,17 @@ class KubeSimpleStrategy(BaseStrategy):
         parallelism = self.interchange.provider.parallelism
 
         active_tasks = self.interchange.get_total_tasks_outstanding()
-        logger.debug(f"Pending tasks : {active_tasks}")
+        log.debug(f"Pending tasks : {active_tasks}")
 
         status = self.interchange.provider_status()
-        logger.debug(f"Provider status : {status}")
+        log.debug(f"Provider status : {status}")
 
         for task_type in active_tasks.keys():
             active_pods = status.get(task_type, 0)
             active_slots = active_pods * workers_per_pod * managers_per_pod
             active_tasks_per_type = active_tasks[task_type]
 
-            logger.debug(
+            log.debug(
                 "Endpoint has %s active tasks of %s, %s active blocks, "
                 "%s connected workers for %s",
                 active_tasks_per_type,
@@ -85,7 +84,7 @@ class KubeSimpleStrategy(BaseStrategy):
                 # We want to make sure that max_idletime is reached before killing off
                 # resources
                 if not self.executors_idle_since[task_type]:
-                    logger.debug(
+                    log.debug(
                         "Endpoint has 0 active tasks of task type %s; "
                         "starting kill timer (if idle time exceeds %s seconds, "
                         "resources will be removed)",
@@ -98,7 +97,7 @@ class KubeSimpleStrategy(BaseStrategy):
                 if (
                     time.time() - self.executors_idle_since[task_type]
                 ) > self.max_idletime:
-                    logger.info(
+                    log.info(
                         "Idle time has reached %s seconds; "
                         "removing resources of task type %s",
                         self.max_idletime,
@@ -120,9 +119,9 @@ class KubeSimpleStrategy(BaseStrategy):
                         float(excess) / (workers_per_pod * managers_per_pod)
                     )
                     excess_blocks = min(excess_blocks, max_pods - active_pods)
-                    logger.info(f"Requesting {excess_blocks} more blocks")
+                    log.info(f"Requesting {excess_blocks} more blocks")
                     self.interchange.scale_out(excess_blocks, task_type=task_type)
             # Immediatly scale if we are stuck with zero pods and work to do
             elif active_slots == 0 and active_tasks_per_type > 0:
-                logger.info("Requesting single pod")
+                log.info("Requesting single pod")
                 self.interchange.scale_out(1, task_type=task_type)

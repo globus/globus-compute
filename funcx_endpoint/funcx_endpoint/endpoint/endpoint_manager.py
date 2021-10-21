@@ -26,8 +26,9 @@ from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from funcx_endpoint.executors.high_throughput import (
     global_config as funcx_default_config,
 )
+from funcx_endpoint.logging_config import setup_logging
 
-logger = logging.getLogger("endpoint.endpoint_manager")
+log = logging.getLogger(__name__)
 
 
 class EndpointManager:
@@ -59,8 +60,6 @@ class EndpointManager:
         self.funcx_default_config_template = funcx_default_config.__file__
         self.funcx_config = {}
         self.name = "default"
-        global logger
-        self.logger = logger
 
     def init_endpoint_dir(self, endpoint_config=None):
         """Initialize a clean endpoint dir
@@ -73,7 +72,7 @@ class EndpointManager:
         """
 
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
-        self.logger.debug(f"Creating endpoint dir {endpoint_dir}")
+        log.debug(f"Creating endpoint dir {endpoint_dir}")
         os.makedirs(endpoint_dir, exist_ok=True)
 
         endpoint_config_target_file = os.path.join(
@@ -128,17 +127,17 @@ class EndpointManager:
                 f"This will erase everything in {self.funcx_dir}",
                 abort=True,
             )
-            self.logger.info(f"Wiping all current configs in {self.funcx_dir}")
+            log.info(f"Wiping all current configs in {self.funcx_dir}")
             backup_dir = self.funcx_dir + ".bak"
             try:
-                self.logger.debug(f"Removing old backups in {backup_dir}")
+                log.debug(f"Removing old backups in {backup_dir}")
                 shutil.rmtree(backup_dir)
             except OSError:
                 pass
             os.renames(self.funcx_dir, backup_dir)
 
         if os.path.exists(self.funcx_config_file):
-            self.logger.debug(f"Config file exists at {self.funcx_config_file}")
+            log.debug(f"Config file exists at {self.funcx_config_file}")
             return
 
         try:
@@ -151,9 +150,7 @@ class EndpointManager:
     def check_endpoint_json(self, endpoint_json, endpoint_uuid):
         if os.path.exists(endpoint_json):
             with open(endpoint_json) as fp:
-                self.logger.debug(
-                    "Connection info loaded from prior registration record"
-                )
+                log.debug("Connection info loaded from prior registration record")
                 reg_info = json.load(fp)
                 endpoint_uuid = reg_info["endpoint_id"]
         elif not endpoint_uuid:
@@ -190,7 +187,7 @@ class EndpointManager:
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
-        self.logger.info(f"Starting endpoint with uuid: {endpoint_uuid}")
+        log.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
         pid_file = os.path.join(endpoint_dir, "daemon.pid")
         pid_check = self.check_pidfile(pid_file)
@@ -199,10 +196,10 @@ class EndpointManager:
         # potentially running with the existing pidfile
         if pid_check["exists"]:
             if pid_check["active"]:
-                self.logger.info("Endpoint is already active")
+                log.info("Endpoint is already active")
                 sys.exit(-1)
             else:
-                self.logger.info(
+                log.info(
                     "A prior Endpoint instance appears to have been terminated without "
                     "proper cleanup. Cleaning up now."
                 )
@@ -214,7 +211,7 @@ class EndpointManager:
             results_ack_handler.load()
             results_ack_handler.persist()
         except Exception:
-            self.logger.exception(
+            log.exception(
                 "Caught exception while attempting load and persist of outstanding "
                 "results"
             )
@@ -245,7 +242,7 @@ class EndpointManager:
             )
 
         except Exception:
-            self.logger.exception(
+            log.exception(
                 "Caught exception while trying to setup endpoint context dirs"
             )
             sys.exit(-1)
@@ -255,7 +252,7 @@ class EndpointManager:
         reg_info = None
         try:
             reg_info = register_endpoint(
-                funcx_client, endpoint_uuid, endpoint_dir, self.name, logger=self.logger
+                funcx_client, endpoint_uuid, endpoint_dir, self.name
             )
         # if the service sends back an error response, it will be a FuncxResponseError
         except FuncxResponseError as e:
@@ -263,10 +260,8 @@ class EndpointManager:
             # if the service could not register this endpoint with the forwarder
             # because the forwarder was unreachable
             if e.http_status_code >= 500:
-                self.logger.exception(
-                    "Caught exception while attempting endpoint registration"
-                )
-                self.logger.critical(
+                log.exception("Caught exception while attempting endpoint registration")
+                log.critical(
                     "Endpoint registration will be retried in the new endpoint daemon "
                     "process. The endpoint will not work until it is successfully "
                     "registered."
@@ -277,10 +272,8 @@ class EndpointManager:
         # back a FuncxResponseError
         except GlobusAPIError as e:
             if e.http_status >= 500:
-                self.logger.exception(
-                    "Caught exception while attempting endpoint registration"
-                )
-                self.logger.critical(
+                log.exception("Caught exception while attempting endpoint registration")
+                log.critical(
                     "Endpoint registration will be retried in the new endpoint daemon "
                     "process. The endpoint will not work until it is successfully "
                     "registered."
@@ -291,10 +284,10 @@ class EndpointManager:
         except NetworkError as e:
             # the output of a NetworkError exception is huge and unhelpful, so
             # it seems better to just stringify it here and get a concise error
-            self.logger.exception(
+            log.exception(
                 f"Caught exception while attempting endpoint registration: {e}"
             )
-            self.logger.critical(
+            log.critical(
                 "funcx-endpoint is unable to reach the funcX service due to a "
                 "NetworkError \n"
                 "Please make sure that the funcX service address you provided is "
@@ -306,13 +299,23 @@ class EndpointManager:
             raise
 
         if reg_info:
-            self.logger.info("Launching endpoint daemon process")
+            log.info("Launching endpoint daemon process")
         else:
-            self.logger.critical(
-                "Launching endpoint daemon process with errors noted above"
-            )
+            log.critical("Launching endpoint daemon process with errors noted above")
+
+        # NOTE
+        # It's important that this log is emitted before we enter the daemon context
+        # because daemonization closes down everything, a log message inside the
+        # context won't write the currently configured loggers
+        logfile = os.path.join(endpoint_dir, "endpoint.log")
+        log.info(
+            "Logging will be reconfigured for the daemon. logfile=%s , debug=%s",
+            logfile,
+            self.debug,
+        )
 
         with context:
+            setup_logging(logfile=logfile, debug=self.debug)
             self.daemon_launch(
                 endpoint_uuid,
                 endpoint_dir,
@@ -352,12 +355,13 @@ class EndpointManager:
             reg_info=reg_info,
             funcx_client_options=funcx_client_options,
             results_ack_handler=results_ack_handler,
+            logdir=endpoint_dir,
             **optionals,
         )
 
         ic.start()
 
-        self.logger.critical("Interchange terminated.")
+        log.critical("Interchange terminated.")
 
     def stop_endpoint(self, name):
         self.name = name
@@ -368,13 +372,13 @@ class EndpointManager:
         # The process is active if the PID file exists and the process it points to is
         # a funcx-endpoint
         if pid_check["active"]:
-            self.logger.debug(f"{self.name} has a daemon.pid file")
+            log.debug(f"{self.name} has a daemon.pid file")
             pid = None
             with open(pid_file) as f:
                 pid = int(f.read())
             # Attempt terminating
             try:
-                self.logger.debug(f"Signalling process: {pid}")
+                log.debug(f"Signalling process: {pid}")
                 # For all the processes, including the deamon and its child process tree
                 # Send SIGTERM to the processes
                 # Wait for 200ms
@@ -394,25 +398,25 @@ class EndpointManager:
                         pass
                 # Wait to confirm that the pid file disappears
                 if not os.path.exists(pid_file):
-                    self.logger.info(f"Endpoint <{self.name}> is now stopped")
+                    log.info(f"Endpoint <{self.name}> is now stopped")
 
             except OSError:
-                self.logger.warning(f"Endpoint <{self.name}> could not be terminated")
-                self.logger.warning(f"Attempting Endpoint <{self.name}> cleanup")
+                log.warning(f"Endpoint <{self.name}> could not be terminated")
+                log.warning(f"Attempting Endpoint <{self.name}> cleanup")
                 os.remove(pid_file)
                 sys.exit(-1)
         # The process is not active, but the PID file exists and needs to be deleted
         elif pid_check["exists"]:
             self.pidfile_cleanup(pid_file)
         else:
-            self.logger.info(f"Endpoint <{self.name}> is not active.")
+            log.info(f"Endpoint <{self.name}> is not active.")
 
     def delete_endpoint(self, name):
         self.name = name
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
 
         if not os.path.exists(endpoint_dir):
-            self.logger.warning(f"Endpoint <{self.name}> does not exist")
+            log.warning(f"Endpoint <{self.name}> does not exist")
             sys.exit(-1)
 
         # stopping the endpoint should handle all of the process cleanup before
@@ -420,7 +424,7 @@ class EndpointManager:
         self.stop_endpoint(self.name)
 
         shutil.rmtree(endpoint_dir)
-        self.logger.info(f"Endpoint <{self.name}> has been deleted.")
+        log.info(f"Endpoint <{self.name}> has been deleted.")
 
     def check_pidfile(self, filepath):
         """Helper function to identify possible dead endpoints
@@ -453,7 +457,7 @@ class EndpointManager:
 
     def pidfile_cleanup(self, filepath):
         os.remove(filepath)
-        self.logger.info(f"Endpoint <{self.name}> has been cleaned up.")
+        log.info(f"Endpoint <{self.name}> has been cleaned up.")
 
     def list_endpoints(self):
         table = texttable.Texttable()

@@ -6,11 +6,11 @@ from importlib.machinery import SourceFileLoader
 
 import typer
 
-import funcx
 from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
+from funcx_endpoint.logging_config import setup_logging
 
 app = typer.Typer()
-logger = None
+log = logging.getLogger(__name__)
 
 
 def version_callback(value):
@@ -171,25 +171,21 @@ def main(
     # For commands other than `init`, we ensure the existence of the config directory
     # and file.
 
-    global logger
-    funcx.set_stream_logger(
-        name="endpoint", level=logging.DEBUG if debug else logging.INFO
-    )
-    logger = logging.getLogger("endpoint")
-    logger.debug(f"Command: {ctx.invoked_subcommand}")
+    setup_logging(debug=debug)
+    log.debug("Command: %s", ctx.invoked_subcommand)
 
     global manager
     manager = EndpointManager(funcx_dir=config_dir, debug=debug)
 
     # Otherwise, we ensure that configs exist
     if not os.path.exists(manager.funcx_config_file):
-        logger.info(
+        log.info(
             "No existing configuration found at %s. Initializing...",
             manager.funcx_config_file,
         )
         manager.init_endpoint()
 
-    logger.debug(f"Loading config files from {manager.funcx_dir}")
+    log.debug(f"Loading config files from {manager.funcx_dir}")
 
     funcx_config = SourceFileLoader(
         "global_config", manager.funcx_config_file
