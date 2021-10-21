@@ -3,7 +3,9 @@ import time
 import os
 import pickle
 
-logger = logging.getLogger("endpoint." + __name__)
+# The logger path needs to start with endpoint. while the current path
+# start with funcx_endpoint.endpoint.
+logger = logging.getLogger("endpoint.results_ack")
 
 
 class ResultsAckHandler():
