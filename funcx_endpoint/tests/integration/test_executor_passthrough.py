@@ -1,12 +1,11 @@
-from funcx_endpoint.executors.high_throughput.executor import HighThroughputExecutor
-import logging
-from funcx import set_file_logger
-import uuid
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors.high_throughput.messages import Message, Task
-import time
 import pickle
+import time
+import uuid
 from multiprocessing import Queue
+
+from funcx.serialize import FuncXSerializer
+from funcx_endpoint.executors.high_throughput.executor import HighThroughputExecutor
+from funcx_endpoint.executors.high_throughput.messages import Task
 
 
 def double(x):
@@ -17,8 +16,7 @@ if __name__ == "__main__":
 
     results_queue = Queue()
     #    set_file_logger('executor.log', name='funcx_endpoint', level=logging.DEBUG)
-    htex = HighThroughputExecutor(interchange_local=True,
-                                  passthrough=True)
+    htex = HighThroughputExecutor(interchange_local=True, passthrough=True)
 
     htex.start(results_passthrough=results_queue)
     htex._start_remote_interchange_process()
@@ -31,12 +29,11 @@ if __name__ == "__main__":
 
         fn_code = fx_serializer.serialize(double)
         ser_code = fx_serializer.pack_buffers([fn_code])
-        ser_params = fx_serializer.pack_buffers([fx_serializer.serialize(args),
-                                                 fx_serializer.serialize(kwargs)])
+        ser_params = fx_serializer.pack_buffers(
+            [fx_serializer.serialize(args), fx_serializer.serialize(kwargs)]
+        )
 
-        payload = Task(task_id,
-                       'RAW',
-                       ser_code + ser_params)
+        payload = Task(task_id, "RAW", ser_code + ser_params)
         f = htex.submit_raw(payload.pack())
         time.sleep(0.5)
 
@@ -44,7 +41,7 @@ if __name__ == "__main__":
         result_package = results_queue.get()
         # print("Result package : ", result_package)
         r = pickle.loads(result_package)
-        result = fx_serializer.deserialize(r['result'])
+        result = fx_serializer.deserialize(r["result"])
         print(f"Result:{i}: {result}")
 
     print("All done")

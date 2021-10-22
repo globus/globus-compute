@@ -1,5 +1,3 @@
-import json
-import sys
 import argparse
 
 from funcx.sdk.client import FuncXClient
@@ -29,16 +27,18 @@ def sum_yadu_new01(event):
 
 def test(fxc, ep_id):
 
-    fn_uuid = fxc.register_function(sum_yadu_new01,
-                                    ep_id,  # TODO: We do not need ep id here
-                                    description="New sum function defined without string spec")
+    fn_uuid = fxc.register_function(
+        sum_yadu_new01,
+        ep_id,  # TODO: We do not need ep id here
+        description="New sum function defined without string spec",
+    )
     print("FN_UUID : ", fn_uuid)
 
     res = fxc.run([1, 2, 3, 99], endpoint_id=ep_id, function_id=fn_uuid)
     print(res)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--endpoint", required=True)
     args = parser.parse_args()

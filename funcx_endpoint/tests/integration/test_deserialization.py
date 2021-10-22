@@ -1,5 +1,6 @@
-from funcx.serialize import FuncXSerializer
 import numpy as np
+
+from funcx.serialize import FuncXSerializer
 
 
 def double(x, y=3):

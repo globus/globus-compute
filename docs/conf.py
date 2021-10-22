@@ -16,10 +16,8 @@
 import os
 import sys
 
-import requests
-
 sys.path.insert(0, os.path.abspath("../funcx_sdk/"))
-import funcx
+import funcx  # noqa:E402
 
 # -- Project information -----------------------------------------------------
 

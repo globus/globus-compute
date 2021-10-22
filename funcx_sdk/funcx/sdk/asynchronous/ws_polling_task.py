@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from asyncio import AbstractEventLoop, QueueEmpty
+from asyncio import AbstractEventLoop
 
 import dill
 import websockets
@@ -72,8 +72,9 @@ class WebSocketPollingTask:
         # the WebSocket server immediately
         self.running_task_group_ids.add(self.init_task_group_id)
 
-        # Set event loop explicitly since event loop can only be fetched automatically in main thread
-        # when batch submission is enabled, the task submission is in a new thread
+        # Set event loop explicitly since event loop can only be fetched automatically
+        # in main thread when batch submission is enabled, the task submission is in a
+        # new thread
         asyncio.set_event_loop(self.loop)
         self.task_group_ids_queue = asyncio.Queue()
         self.pending_tasks = {}
@@ -91,12 +92,13 @@ class WebSocketPollingTask:
             self.ws = await websockets.connect(
                 self.results_ws_uri, extra_headers=headers
             )
-        # initial Globus authentication happens during the HTTP portion of the handshake,
-        # so an invalid handshake means that the user was not authenticated
+        # initial Globus authentication happens during the HTTP portion of the
+        # handshake, so an invalid handshake means that the user was not authenticated
         except InvalidStatusCode as e:
             if e.status_code == 404:
                 raise Exception(
-                    "WebSocket service responsed with a 404. Please ensure you set the correct results_ws_uri"
+                    "WebSocket service responsed with a 404. "
+                    "Please ensure you set the correct results_ws_uri"
                 )
             else:
                 raise e
@@ -136,12 +138,14 @@ class WebSocketPollingTask:
                     if await self.set_result(task_id, data, pending_futures):
                         return
                 else:
-                    # This scenario occurs rarely using non-batching mode,
-                    # but quite often in batching mode.
-                    # When submitting tasks in batch with batch_run,
-                    # some task results may be received by websocket before the response of batch_run,
+                    # This scenario occurs rarely using non-batching mode, but quite
+                    # often in batching mode.
+                    #
+                    # When submitting tasks in batch with batch_run, some task results
+                    # may be received by websocket before the  response of batch_run,
                     # and pending_futures do not have the futures for the tasks yet.
-                    # We store these in unknown_results and process when their futures are ready.
+                    # We store these in unknown_results and process when their futures
+                    # are ready.
                     self.unknown_results[task_id] = data
 
             # Handle the results received but not processed before
@@ -188,8 +192,8 @@ class WebSocketPollingTask:
         except Exception:
             logger.exception("Caught unexpected exception while setting results")
 
-        # When the counter hits 0 we always exit. This guarantees that that
-        # if the counter increments to 1 on the executor, this handler needs to be restarted.
+        # When the counter hits 0 we always exit. This guarantees that that if the
+        # counter increments to 1 on the executor, this handler needs to be restarted.
         if self.atomic_controller is not None:
             count = self.atomic_controller.decrement()
             # Only close when count == 0 and unknown_results are empty
@@ -216,14 +220,19 @@ class WebSocketPollingTask:
 
     def get_auth_header(self):
         """
-        Gets an Authorization header to be sent during the WebSocket handshake. Based on
-        header setting in the Globus SDK: https://github.com/globus/globus-sdk-python/blob/main/globus_sdk/base.py
+        Gets an Authorization header to be sent during the WebSocket handshake.
 
         Returns
         -------
         Key-value tuple of the Authorization header
         (key, value)
         """
+        # TODO: under SDK v3 this will be
+        #
+        #   return (
+        #       "Authorization",
+        #       self.funcx_client.authorizer.get_authorization_header()`
+        #   )
         headers = dict()
         self.funcx_client.authorizer.set_authorization_header(headers)
         header_name = "Authorization"

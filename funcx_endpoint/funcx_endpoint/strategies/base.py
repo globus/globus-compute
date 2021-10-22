@@ -1,12 +1,11 @@
-import sys
-import threading
 import logging
+import threading
 import time
 
 logger = logging.getLogger("interchange.strategy.base")
 
 
-class BaseStrategy(object):
+class BaseStrategy:
     """Implements threshold-interval based flow control.
 
     The overall goal is to trap the flow of apps from the
@@ -61,7 +60,9 @@ class BaseStrategy(object):
         self._event_buffer = []
         self._wake_up_time = time.time() + 1
         self._kill_event = threading.Event()
-        self._thread = threading.Thread(target=self._wake_up_timer, args=(self._kill_event,))
+        self._thread = threading.Thread(
+            target=self._wake_up_timer, args=(self._kill_event,)
+        )
         self._thread.daemon = True
 
     def start(self, interchange):
@@ -72,21 +73,25 @@ class BaseStrategy(object):
             Interchange to bind the strategy to
         """
         self.interchange = interchange
-        if hasattr(interchange, 'provider'):
-            logger.debug("Strategy bounds-> init:{}, min:{}, max:{}".format(
-                interchange.provider.init_blocks,
-                interchange.provider.min_blocks,
-                interchange.provider.max_blocks))
+        if hasattr(interchange, "provider"):
+            logger.debug(
+                "Strategy bounds-> init:{}, min:{}, max:{}".format(
+                    interchange.provider.init_blocks,
+                    interchange.provider.min_blocks,
+                    interchange.provider.max_blocks,
+                )
+            )
         self._thread.start()
 
     def strategize(self, *args, **kwargs):
-        """ Strategize is called everytime the threshold or the interval is hit
-        """
-        logger.debug("Strategize called with {} {}".format(args, kwargs))
+        """Strategize is called everytime the threshold or the interval is hit"""
+        logger.debug(f"Strategize called with {args} {kwargs}")
 
     def _wake_up_timer(self, kill_event):
-        """Internal. This is the function that the thread will execute.
-        waits on an event so that the thread can make a quick exit when close() is called
+        """
+        Internal. This is the function that the thread will execute.
+        waits on an event so that the thread can make a quick exit when close() is
+        called
 
         Args:
             - kill_event (threading.Event) : Event to wait on
@@ -103,7 +108,7 @@ class BaseStrategy(object):
                 return
 
             if prev == self._wake_up_time:
-                self.make_callback(kind='timer')
+                self.make_callback(kind="timer")
             else:
                 print("Sleeping a bit more")
 
@@ -135,7 +140,7 @@ class BaseStrategy(object):
         self._thread.join()
 
 
-class Timer(object):
+class Timer:
     """This timer is a simplified version of the FlowControl timer.
     This timer does not employ notify events.
 
@@ -173,13 +178,16 @@ class Timer(object):
         self._wake_up_time = time.time() + 1
 
         self._kill_event = threading.Event()
-        self._thread = threading.Thread(target=self._wake_up_timer, args=(self._kill_event,))
+        self._thread = threading.Thread(
+            target=self._wake_up_timer, args=(self._kill_event,)
+        )
         self._thread.daemon = True
         self._thread.start()
 
     def _wake_up_timer(self, kill_event):
         """Internal. This is the function that the thread will execute.
-        waits on an event so that the thread can make a quick exit when close() is called
+        waits on an event so that the thread can make a quick exit when close() is
+        called
 
         Args:
             - kill_event (threading.Event) : Event to wait on
@@ -197,18 +205,16 @@ class Timer(object):
                 return
 
             if prev == self._wake_up_time:
-                self.make_callback(kind='timer')
+                self.make_callback(kind="timer")
             else:
                 print("Sleeping a bit more")
 
     def make_callback(self, kind=None):
-        """Makes the callback and resets the timer.
-        """
+        """Makes the callback and resets the timer."""
         self._wake_up_time = time.time() + self.interval
         self.callback(*self.cb_args)
 
     def close(self):
-        """Merge the threads and terminate.
-        """
+        """Merge the threads and terminate."""
         self._kill_event.set()
         self._thread.join()

@@ -25,7 +25,8 @@ def set_file_logger(
         - level (logging.LEVEL): Set the logging level.
         - format_string (string): Set the format string
         - maxBytes: The maximum bytes per logger file, default: 100MB
-        - backupCount: The number of backup (must be non-zero) per logger file, default: 1
+        - backupCount: The number of backup (must be non-zero) per logger file,
+                       default: 1
 
     Returns:
        -  None
