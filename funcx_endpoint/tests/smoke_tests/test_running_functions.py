@@ -5,7 +5,7 @@ def test_run_pre_registered_function(fxc, endpoint, tutorial_funcion_id):
     """This test confirms that we are connected to the default production DB"""
     fn_id = fxc.run(endpoint_id=endpoint, function_id=tutorial_funcion_id)
 
-    time.sleep(10)
+    time.sleep(30)
 
     result = fxc.get_result(fn_id)
     assert result == "Hello World!", f"Expected result: Hello World!, got {result}"
