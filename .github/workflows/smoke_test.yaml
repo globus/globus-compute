@@ -24,10 +24,10 @@ jobs:
     - name: Install dependencies for funcx-sdk and test requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
+        python -m pip install ./funcx_sdk
         python -m pip install -r funcx_sdk/test-requirements.txt
     - name: Test sdk by just importing
       run: |
-        python -m pip install funcx
         python -c "from funcx.sdk.client import FuncXClient"
     - name: Run smoke tests to check liveness of hosted services
       run: |
