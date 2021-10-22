@@ -11,4 +11,4 @@ def test_executor_basic(fx, endpoint):
     x = random.randint(0, 100)
     fut = fx.submit(double, x, endpoint_id=endpoint)
 
-    assert fut.result(timeout=10) == x * 2, "Got wrong answer"
+    assert fut.result(timeout=60) == x * 2, "Got wrong answer"
