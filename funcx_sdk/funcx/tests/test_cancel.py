@@ -48,6 +48,13 @@ def slow_double(x, sleep_dur=2):
     return x * 2
 
 
+def test_cancel_notimplemented(htex):
+    n = 2
+    future = htex.submit(slow_double, n)
+    with pytest.raises(NotImplementedError):
+        future.cancel()
+
+
 def test_non_cancel(htex):
     n = 2
     future = htex.submit(double, n)
@@ -69,7 +76,7 @@ def test_cancel_slow(htex, t=10):
     print("Sleeping")
     time.sleep(5)
     print("Cancelling")
-    future.cancel()
+    future.best_effort_cancel()
     print(f"Cancelled, now status done={future.done()}")
     try:
         future.result()
@@ -81,7 +88,7 @@ def test_cancel_task_pending_on_interchange(htex):
 
     future1 = htex.submit(slow_double, 1, sleep_dur=5)
     future2 = htex.submit(slow_double, 2, sleep_dur=0)
-    future2.cancel()
+    future2.best_effort_cancel()
     future1.result()
     try:
         future2.result()  # This should raise a CancelledError
@@ -95,7 +102,7 @@ def test_cancel_random_tasks(htex):
 
     futures = [htex.submit(slow_double, i, sleep_dur=2) for i in range(10)]
     random.shuffle(futures)
-    [fu.cancel() for fu in futures[0:5]]
+    [fu.best_effort_cancel() for fu in futures[0:5]]
     for fu in futures[0:5]:
         try:
             fu.result()
@@ -132,7 +139,7 @@ def test_cancel_random_file_creators(htex):
     to_cancel = keys[0:5]
 
     for future in to_cancel:
-        future.cancel()
+        future.best_effort_cancel()
         fmap[future]["cancelled"] = True
 
     print("Here")
@@ -152,14 +159,3 @@ def test_cancel_random_file_creators(htex):
             assert (
                 os.path.exists(fmap[future]["fname"]) is False
             ), "Expected file is missing"
-
-
-if __name__ == "__main__":
-
-    _htex = htex()
-    test_non_cancel(_htex)
-    test_non_cancel_slow(_htex, t=2)
-    test_cancel_task_pending_on_interchange(_htex)
-    test_cancel_random_tasks(_htex)
-    test_cancel_random_file_creators(_htex)
-    htex.shutdown()

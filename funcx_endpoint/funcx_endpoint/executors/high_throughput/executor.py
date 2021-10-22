@@ -805,11 +805,22 @@ class HTEXFuture(Future):
         self.executor = executor
 
     def cancel(self):
+        raise NotImplementedError(f"{self.__class__} does not implement cancel() try using best_effort_cancel()")
 
+    def best_effort_cancel(self):
+        """ Attempt to cancel the function. If the function has finished running, the task cannot be cancelled
+        and the method will return False. If the function is yet to start or is running, cancellation will be
+        attempted without guarantees, and the method will return True.
+
+        Please note that a return value of True does not guarantee that your function will not
+        execute at all, but it does guarantee that the future will be in a cancelled state.
+
+        Returns
+        -------
+        Bool
+        """
         self.executor._cancel(self)
-        super().cancel()
-
-        return True
+        return super().cancel()
 
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
