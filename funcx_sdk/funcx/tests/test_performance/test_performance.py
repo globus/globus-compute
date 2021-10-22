@@ -2,8 +2,6 @@ import time
 
 import pytest
 
-from funcx.sdk.client import FuncXClient
-
 
 def double(x):
     return x * 2
