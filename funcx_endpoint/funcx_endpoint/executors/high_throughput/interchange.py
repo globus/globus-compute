@@ -264,8 +264,7 @@ class Interchange(object):
         self.pending_task_queue = {}
         self.containers = {}
         self.total_pending_task_count = 0
-        self.funcx_service_address = funcx_service_address
-        if self.funcx_service_address:
+        if funcx_service_address:
             self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
         else:
             self.fxs = FuncXClient()
