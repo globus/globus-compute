@@ -127,6 +127,7 @@ class Interchange(object):
                  logging_level=logging.INFO,
                  endpoint_id=None,
                  suppress_failure=False,
+                 relax_manager_version_match=True,
                  log_max_bytes=256 * 1024 * 1024,
                  log_backup_count=1,
                  ):
@@ -331,6 +332,7 @@ class Interchange(object):
         self.tasks = set()
         self.task_status_deltas = {}
         self.container_switch_count = {}
+        self.relax_manager_version_match = relax_manager_version_match
 
     def load_config(self):
         """ Load the config
@@ -687,7 +689,9 @@ class Interchange(object):
                             msg['parsl_v'] != self.current_platform['parsl_v']):
                             logger.warn("[MAIN] Manager {} has incompatible version info with the interchange".format(manager))
 
-                            if self.suppress_failure is False:
+                            if self.relax_manager_version_match is True:
+                                logger.info("[MAIN] Ignoring version match requirements and continuing")
+                            elif self.suppress_failure is False:
                                 logger.debug("Setting kill event")
                                 self._kill_event.set()
                                 e = ManagerLost(manager)
