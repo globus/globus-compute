@@ -808,7 +808,7 @@ class Interchange(object):
                     for task in tasks:
                         task_id = task["task_id"]
                         if self.task_cancel_pending_trap and task_id in self.task_cancel_pending_trap:
-                            logger.warning(f"[MAIN] Task:{task_id} CANCELLED before launch")
+                            logger.info(f"[MAIN] Task:{task_id} CANCELLED before launch")
                             cancel_message = pickle.dumps(('TASK_CANCEL', task_id))
                             self.task_outgoing.send_multipart([manager, b'', cancel_message])
                             self.task_cancel_pending_trap.pop(task_id)
