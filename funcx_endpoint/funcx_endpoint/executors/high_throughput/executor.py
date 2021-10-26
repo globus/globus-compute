@@ -283,7 +283,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.task_status_queue = task_status_queue
 
         # FuncX specific options
-        self.funcx_service_address = None
+        self.funcx_service_address = funcx_service_address
         self.container_image = container_image
         self.worker_mode = worker_mode
         self.last_response_time = time.time()
