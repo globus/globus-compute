@@ -3,7 +3,7 @@
 There's a slow but sure deviation from Parsl's Executor interface here, that needs
 to be addressed.
 """
-
+import concurrent.futures
 from concurrent.futures import Future
 import os
 import time
@@ -573,10 +573,16 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
                         if 'result' in msg:
                             result = fx_serializer.deserialize(msg['result'])
-                            task_fut.set_result(result)
+                            try:
+                                task_fut.set_result(result)
+                            except concurrent.futures.InvalidStateError:
+                                logger.debug(f"Task:{tid} result couldn't be set. Already in terminal state")
                         elif 'exception' in msg:
                             exception = fx_serializer.deserialize(msg['exception'])
-                            task_fut.set_result(exception)
+                            try:
+                                task_fut.set_result(exception)
+                            except concurrent.futures.InvalidStateError:
+                                logger.debug(f"Task:{tid} result couldn't be set. Already in terminal state")
                         else:
                             raise BadMessage("[MTHREAD] Message received is neither result or exception")
 
@@ -786,10 +792,27 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         return True
 
     def _cancel(self, future):
+        """ Attempt cancelling a task tracked by the future by requesting
+        cancellation from the interchange. Task cancellation is attempted
+        only if the future is cancellable i.e not already in a terminal
+        state. This relies on the executor not setting the task to a running
+        state, and the task only tracking pending, and completed states.
+
+        Parameters
+        ----------
+        future
+
+        Returns
+        -------
+        Bool
+        """
+
+        ret_value = future._cancel()
         logger.debug("Sending cancel of task_id:{future.task_id} to interchange")
-        response = self.command_client.run(TaskCancel(future.task_id))
-        logger.debug("Sent TaskCancel to interchange")
-        return response
+        if ret_value is True:
+            self.command_client.run(TaskCancel(future.task_id))
+            logger.debug("Sent TaskCancel to interchange")
+        return ret_value
 
 
 CANCELLED = 'CANCELLED'
@@ -807,6 +830,14 @@ class HTEXFuture(Future):
     def cancel(self):
         raise NotImplementedError(f"{self.__class__} does not implement cancel() try using best_effort_cancel()")
 
+    def _cancel(self):
+        """ Should be invoked only by the executor
+        Returns
+        -------
+        Bool
+        """
+        return super().cancel()
+
     def best_effort_cancel(self):
         """ Attempt to cancel the function. If the function has finished running, the task cannot be cancelled
         and the method will return False. If the function is yet to start or is running, cancellation will be
@@ -819,8 +850,7 @@ class HTEXFuture(Future):
         -------
         Bool
         """
-        self.executor._cancel(self)
-        return super().cancel()
+        return self.executor._cancel(self)
 
 
 def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
