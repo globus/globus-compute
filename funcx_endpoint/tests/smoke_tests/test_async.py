@@ -10,7 +10,7 @@ async def simple_task(fxc, endpoint):
     squared_function = fxc.register_function(squared)
     x = random.randint(0, 100)
     task = fxc.run(x, endpoint_id=endpoint, function_id=squared_function)
-    result = await asyncio.wait_for(task, 20)
+    result = await asyncio.wait_for(task, 60)
     assert result == squared(x), "Got wrong answer"
 
 

@@ -190,6 +190,10 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         and SlurmProvider interfaces to request resources from the Slurm batch scheduler.
         Default: LocalProvider
 
+    funcx_service_address: str
+        Override funcx_service_address used by the FuncXClient. If no address is specified,
+        the FuncXClient's default funcx_service_address is used.
+        Default: None
     """
 
     def __init__(self,

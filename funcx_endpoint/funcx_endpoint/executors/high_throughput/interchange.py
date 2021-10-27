@@ -186,6 +186,11 @@ class Interchange(object):
 
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures. Default: False
+
+        funcx_service_address: str
+             Override funcx_service_address used by the FuncXClient. If no address is specified,
+             the FuncXClient's default funcx_service_address is used.
+             Default: None
         """
 
         self.logdir = logdir
