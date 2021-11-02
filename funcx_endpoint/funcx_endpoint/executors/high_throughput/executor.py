@@ -542,7 +542,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                         if tid == -1 and 'exception' in msg:
                             # TODO: This could be handled better we are essentially shutting down the
                             # client with little indication to the user.
-                            logger.warning("[MTHREAD] Executor shutting down due to version mismatch in interchange")
+                            logger.warning("[MTHREAD] Executor shutting down due to fatal exception from interchange")
                             self._executor_exception = fx_serializer.deserialize(msg['exception'])
                             logger.exception("[MTHREAD] Exception: {}".format(self._executor_exception))
                             # Set bad state to prevent new tasks from being submitted
