@@ -140,7 +140,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         Caps the number of workers launched by the manager. Default: infinity
 
     suppress_failure : Bool
-        If set, the interchange will suppress failures rather than terminate early. Default: False
+        If set, the interchange will suppress failures rather than terminate early. Default: True
 
     heartbeat_threshold : int
         Seconds since the last message from the counterpart in the communication pair:
@@ -229,7 +229,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                  heartbeat_period=30,
                  poll_period=10,
                  container_image=None,
-                 suppress_failure=False,
+                 suppress_failure=True,
                  run_dir=None,
                  endpoint_id=None,
                  managed=True,
@@ -551,7 +551,11 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             # We set all current tasks to this exception to make sure that
                             # this is raised in the main context.
                             for task in self.tasks:
-                                self.tasks[task].set_exception(self._executor_exception)
+                                try:
+                                    self.tasks[task].set_exception(self._executor_exception)
+                                except concurrent.futures.InvalidStateError:
+                                    # Task was already cancelled, the exception can be ignored
+                                    logger.debug(f"Task:{tid} result couldn't be set. Already in terminal state")
                             break
 
                         if self.passthrough is True:
