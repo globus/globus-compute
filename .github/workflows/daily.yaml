@@ -1,8 +1,8 @@
 name: daily
 on:
-  # build every weekday at 4:00 AM UTC
+  # build every day at 4:00 AM UTC
   schedule:
-    - cron: '0 4 * * 1-5'
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 jobs:
