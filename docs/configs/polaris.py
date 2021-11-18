@@ -24,7 +24,7 @@ config = Config(
         HighThroughputExecutor(
             max_workers_per_node=1,
             strategy=SimpleStrategy(max_idletime=300),
-            address='10.230.2.72', # edtb-02
+            address='10.230.2.72',  # edtb-02
             provider=PBSProProvider(
                 launcher=SingleNodeLauncher(),
                 queue='workq',
