@@ -24,9 +24,9 @@ _CONFIGS = {
             "funcx_service_address": "https://api.dev.funcx.org/v2",
             "results_ws_uri": "wss://api.dev.funcx.org/ws/v2/",
         },
-        # assert versions are as expected on prod
-        "forwarder_version": "0.3.5",
-        "api_version": "0.3.5",
+        # assert versions are as expected on dev
+        "forwarder_min_version": "0.3.5",
+        "api_min_version": "0.3.5",
         # This fn is public and searchable
         "public_hello_fn_uuid": "f84351f9-6f82-45d8-8eca-80d8f73645be",
         "endpoint_uuid": _LOCAL_ENDPOINT_ID,
@@ -36,8 +36,8 @@ _CONFIGS = {
         # any arguments to the client object (default will point at prod stack)
         "client_args": {},
         # assert versions are as expected on prod
-        "forwarder_version": "0.3.5",
-        "api_version": "0.3.5",
+        "forwarder_min_version": "0.3.5",
+        "api_min_version": "0.3.5",
         # This fn is public and searchable
         "public_hello_fn_uuid": "b0a5d1a0-2b22-4381-b899-ba73321e41e0",
         # For production tests, the target endpoint should be the tutorial_endpoint
