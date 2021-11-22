@@ -67,15 +67,15 @@ class ManagerLost(Exception):
 class BadRegistration(Exception):
     ''' A new Manager tried to join the executor with a BadRegistration message
     '''
-
     def __init__(self, worker_id, critical=False):
         self.worker_id = worker_id
         self.tstamp = time.time()
         self.handled = "critical" if critical else "suppressed"
 
     def __repr__(self):
-        return "Manager:{} caused a {} failure".format(self.worker_id,
-                                                       self.handled)
+        return "Manager {} attempted to register with a bad registration message. Caused a {} failure".format(
+            self.worker_id,
+            self.handled)
 
     def __str__(self):
         return self.__repr__()
