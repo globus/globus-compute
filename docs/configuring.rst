@@ -93,6 +93,18 @@ using the `CobaltProvider`. This configuration assumes that the script is being 
 .. literalinclude:: configs/cooley.py
 
 
+Polaris (ALCF)
+^^^^^^^^^^^^
+
+.. image:: images/ALCF_Polaris.jpeg
+
+The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
+**Polaris** cluster. This example uses the `HighThroughputExecutor` and connects to Polaris's PBS scheduler
+using the `PBSProProvider`. This configuration assumes that the script is being executed on the login node of Polaris (edtb-02).
+
+.. literalinclude:: configs/polaris.py
+
+
 Cori (NERSC)
 ^^^^^^^^^^^^
 
