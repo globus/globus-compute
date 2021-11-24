@@ -1,30 +1,31 @@
+import logging
 import os
+import uuid
+
 import zmq
 import zmq.auth
 from zmq.auth.thread import ThreadAuthenticator
-import uuid
-import logging
-import time
 
 logger = logging.getLogger(__name__)
 
 
-class TaskQueue(object):
-    """ Outgoing task queue from the executor to the Interchange
-    """
+class TaskQueue:
+    """Outgoing task queue from the executor to the Interchange"""
 
-    def __init__(self,
-                 address: str,
-                 port: int = 55001,
-                 identity: str = str(uuid.uuid4()),
-                 zmq_context=None,
-                 set_hwm=False,
-                 RCVTIMEO=None,
-                 SNDTIMEO=None,
-                 linger=None,
-                 ironhouse: bool = False,
-                 keys_dir: str = os.path.abspath('.curve'),
-                 mode: str = 'client'):
+    def __init__(
+        self,
+        address: str,
+        port: int = 55001,
+        identity: str = str(uuid.uuid4()),
+        zmq_context=None,
+        set_hwm=False,
+        RCVTIMEO=None,
+        SNDTIMEO=None,
+        linger=None,
+        ironhouse: bool = False,
+        keys_dir: str = os.path.abspath(".curve"),
+        mode: str = "client",
+    ):
         """
         Parameters
         ----------
@@ -37,7 +38,8 @@ class TaskQueue(object):
 
         identity : str
            Applies only to clients, where the identity must match the endpoint uuid.
-           This will be utf-8 encoded on the wire. A random uuid4 string is set by default.
+           This will be utf-8 encoded on the wire. A random uuid4 string is set by
+           default.
 
         mode: string
            Either 'client' or 'server'
@@ -59,21 +61,26 @@ class TaskQueue(object):
         self.ironhouse = ironhouse
         self.keys_dir = keys_dir
 
-        assert self.mode in ['client', 'server'], "Only two modes are supported: client, server"
+        assert self.mode in [
+            "client",
+            "server",
+        ], "Only two modes are supported: client, server"
 
-        if self.mode == 'server':
+        if self.mode == "server":
             print("Configuring server")
             self.zmq_socket = self.context.socket(zmq.ROUTER)
             self.zmq_socket.set(zmq.ROUTER_MANDATORY, 1)
             self.zmq_socket.set(zmq.ROUTER_HANDOVER, 1)
             print("Setting up auth-server")
             self.setup_server_auth()
-        elif self.mode == 'client':
+        elif self.mode == "client":
             self.zmq_socket = self.context.socket(zmq.DEALER)
             self.setup_client_auth()
-            self.zmq_socket.setsockopt(zmq.IDENTITY, identity.encode('utf-8'))
+            self.zmq_socket.setsockopt(zmq.IDENTITY, identity.encode("utf-8"))
         else:
-            raise ValueError("TaskQueue must be initialized with mode set to 'server' or 'client'")
+            raise ValueError(
+                "TaskQueue must be initialized with mode set to 'server' or 'client'"
+            )
 
         if set_hwm:
             self.zmq_socket.set_hwm(0)
@@ -85,10 +92,10 @@ class TaskQueue(object):
             self.zmq_socket.setsockopt(zmq.LINGER, linger)
 
         # all zmq setsockopt calls must be done before bind/connect is called
-        if self.mode == 'server':
-            self.zmq_socket.bind("tcp://*:{}".format(port))
-        elif self.mode == 'client':
-            self.zmq_socket.connect("tcp://{}:{}".format(address, port))
+        if self.mode == "server":
+            self.zmq_socket.bind(f"tcp://*:{port}")
+        elif self.mode == "client":
+            self.zmq_socket.connect(f"tcp://{address}:{port}")
 
         self.poller = zmq.Poller()
         self.poller.register(self.zmq_socket)
@@ -102,10 +109,10 @@ class TaskQueue(object):
         logger.info("Adding client key")
         if self.ironhouse:
             # Use the ironhouse ZMQ pattern: http://hintjens.com/blog:49#toc6
-            with open(os.path.join(self.keys_dir, f'{endpoint_id}.key'), 'w') as f:
+            with open(os.path.join(self.keys_dir, f"{endpoint_id}.key"), "w") as f:
                 f.write(client_key)
             try:
-                self.auth.configure_curve(domain='*', location=self.keys_dir)
+                self.auth.configure_curve(domain="*", location=self.keys_dir)
             except Exception:
                 logger.exception("Failed to load keys from {self.keys_dir}")
         return
@@ -114,12 +121,12 @@ class TaskQueue(object):
         # Start an authenticator for this context.
         self.auth = ThreadAuthenticator(self.context)
         self.auth.start()
-        self.auth.allow('127.0.0.1')
+        self.auth.allow("127.0.0.1")
         # Tell the authenticator how to handle CURVE requests
 
         if not self.ironhouse:
             # Use the stonehouse ZMQ pattern: http://hintjens.com/blog:49#toc5
-            self.auth.configure_curve(domain='*', location=zmq.auth.CURVE_ALLOW_ANY)
+            self.auth.configure_curve(domain="*", location=zmq.auth.CURVE_ALLOW_ANY)
 
         server_secret_file = os.path.join(self.keys_dir, "server.key_secret")
         server_public, server_secret = zmq.auth.load_certificate(server_secret_file)
@@ -166,7 +173,7 @@ class TaskQueue(object):
         return self.zmq_socket.send_multipart([message])
 
     def put(self, dest, message, max_timeout=1000):
-        """ This function needs to be fast at the same time aware of the possibility of
+        """This function needs to be fast at the same time aware of the possibility of
         ZMQ pipes overflowing.
 
         The timeout increases slowly if contention is detected on ZMQ pipes.
@@ -183,7 +190,8 @@ class TaskQueue(object):
              Python object to send
 
         max_timeout : int
-             Max timeout in milliseconds that we will wait for before raising an exception
+             Max timeout in milliseconds that we will wait for before raising an
+             exception
 
         Raises
         ------
@@ -192,7 +200,7 @@ class TaskQueue(object):
         zmq.error.ZMQError: Host unreachable (if client disconnects?)
 
         """
-        if self.mode == 'client':
+        if self.mode == "client":
             return self.zmq_socket.send_multipart([message])
         else:
             return self.zmq_socket.send_multipart([dest, message])

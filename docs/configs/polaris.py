@@ -1,4 +1,3 @@
-from parsl.addresses import address_by_hostname
 from parsl.launchers import SingleNodeLauncher
 from parsl.providers import PBSProProvider
 
