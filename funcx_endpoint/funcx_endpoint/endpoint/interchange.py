@@ -63,18 +63,6 @@ class ManagerLost(Exception):
         return f"Task failure due to loss of worker {self.worker_id}"
 
 
-class BadRegistration(Exception):
-    """A new Manager tried to join the executor with a BadRegistration message"""
-
-    def __init__(self, worker_id, critical=False):
-        self.worker_id = worker_id
-        self.tstamp = time.time()
-        self.handled = "critical" if critical else "suppressed"
-
-    def __repr__(self):
-        return f"Manager:{self.worker_id} caused a {self.handled} failure"
-
-
 class EndpointInterchange:
     """Interchange is a task orchestrator for distributed systems.
 
