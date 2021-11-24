@@ -177,7 +177,8 @@ def test_batch_delays(batch_fx, endpoint):
 
 
 # test locally: python3 test_executor.py -e <endpoint_id>
-# test on dev: python3 test_executor.py -s https://api2.dev.funcx.org/v2 -w wss://api2.dev.funcx.org/ws/v2/ -e <endpoint_id>
+# test on dev:
+#   python3 test_executor.py -s https://api2.dev.funcx.org/v2 -w wss://api2.dev.funcx.org/ws/v2/ -e <endpoint_id>    # noqa:E501
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(

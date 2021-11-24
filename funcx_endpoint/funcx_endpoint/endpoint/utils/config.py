@@ -1,6 +1,6 @@
-from funcx_endpoint.executors import HighThroughputExecutor
-from funcx_endpoint.strategies.simple import SimpleStrategy
 from parsl.utils import RepresentationMixin
+
+from funcx_endpoint.executors import HighThroughputExecutor
 
 _DEFAULT_EXECUTORS = [HighThroughputExecutor()]
 
@@ -12,8 +12,8 @@ class Config(RepresentationMixin):
     ----------
 
     executors : list of Executors
-        A list of executors which serve as the backend for function execution. As of 0.2.2,
-        this list should contain only one executor.
+        A list of executors which serve as the backend for function execution.
+        As of 0.2.2, this list should contain only one executor.
         Default: [HighThroughtputExecutor()]
 
     funcx_service_address: str
@@ -21,12 +21,13 @@ class Config(RepresentationMixin):
         Default: 'https://api2.funcx.org/v2'
 
     heartbeat_period: int (seconds)
-        The interval at which heartbeat messages are sent from the endpoint to the funcx-web-service
+        The interval at which heartbeat messages are sent from the endpoint to the
+        funcx-web-service
         Default: 30s
 
     heartbeat_threshold: int (seconds)
-        Seconds since the last hearbeat message from the funcx-web-service after which the connection
-        is assumed to be disconnected.
+        Seconds since the last hearbeat message from the funcx-web-service after which
+        the connection is assumed to be disconnected.
         Default: 120s
 
     stdout : str

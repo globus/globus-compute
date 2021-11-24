@@ -231,7 +231,10 @@ class FuncXExecutor(concurrent.futures.Executor):
                     self.poller_thread.atomic_controller.increment()
 
     def _get_tasks_in_batch(self):
-        """Get tasks from task_outgoing queue in batch, either by interval or by batch size"""
+        """
+        Get tasks from task_outgoing queue in batch,
+        either by interval or by batch size
+        """
         messages = []
         start = time.time()
         while True:
@@ -312,8 +315,8 @@ class ExecutorPollerThread:
         eventloop.run_until_complete(self.web_socket_poller())
 
     async def web_socket_poller(self):
-        # TODO: if WebSocket connection fails, we should either retry connecting and back off
-        # or we should set an exception to all of the outstanding futures
+        # TODO: if WebSocket connection fails, we should either retry connecting and
+        # backoff or we should set an exception to all of the outstanding futures
         await self.ws_handler.init_ws(start_message_handlers=False)
         await self.ws_handler.handle_incoming(
             self._function_future_map, auto_close=True

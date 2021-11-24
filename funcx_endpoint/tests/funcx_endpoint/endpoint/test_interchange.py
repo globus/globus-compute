@@ -1,26 +1,22 @@
+import logging
+import os
+import shutil
+from importlib.machinery import SourceFileLoader
+
+import pytest
+
 from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.register_endpoint import register_endpoint
-from importlib.machinery import SourceFileLoader
-import os
-import logging
-import sys
-import shutil
-import pytest
-import json
-from pytest import fixture
-from unittest.mock import ANY
 
-logger = logging.getLogger('mock_funcx')
+logger = logging.getLogger("mock_funcx")
 
 
 class TestStart:
-
     @pytest.fixture(autouse=True)
     def test_setup_teardown(self):
         # Code that will run before your test, for example:
 
-        funcx_dir = f'{os.getcwd()}'
+        funcx_dir = f"{os.getcwd()}"
         config_dir = os.path.join(funcx_dir, "mock_endpoint")
         assert not os.path.exists(config_dir)
         # A test function will be run at this point
@@ -34,62 +30,72 @@ class TestStart:
 
         manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-        keys_dir = os.path.join(config_dir, 'certificates')
+        keys_dir = os.path.join(config_dir, "certificates")
 
         optionals = {}
-        optionals['client_address'] = '127.0.0.1'
-        optionals['client_ports'] = (8080, 8081, 8082)
-        optionals['logdir'] = './mock_endpoint'
+        optionals["client_address"] = "127.0.0.1"
+        optionals["client_ports"] = (8080, 8081, 8082)
+        optionals["logdir"] = "./mock_endpoint"
 
         manager.configure_endpoint("mock_endpoint", None)
-        endpoint_config = SourceFileLoader('config',
-                                           os.path.join(config_dir, 'config.py')).load_module()
+        endpoint_config = SourceFileLoader(
+            "config", os.path.join(config_dir, "config.py")
+        ).load_module()
 
         for executor in endpoint_config.config.executors:
             executor.passthrough = False
 
-        ic = EndpointInterchange(endpoint_config.config,
-                                 endpoint_id='mock_endpoint_id',
-                                 keys_dir=keys_dir,
-                                 **optionals)
+        ic = EndpointInterchange(
+            endpoint_config.config,
+            endpoint_id="mock_endpoint_id",
+            keys_dir=keys_dir,
+            **optionals,
+        )
 
         for executor in ic.executors.values():
-            assert executor.endpoint_id == 'mock_endpoint_id'
+            assert executor.endpoint_id == "mock_endpoint_id"
 
     def test_register_endpoint(self, mocker):
         mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
         mock_client.return_value = None
 
-        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.interchange.register_endpoint')
-        mock_register_endpoint.return_value = {'endpoint_id': 'abcde12345',
-                                               'public_ip': '127.0.0.1',
-                                               'tasks_port': 8080,
-                                               'results_port': 8081,
-                                               'commands_port': 8082, }
+        mock_register_endpoint = mocker.patch(
+            "funcx_endpoint.endpoint.interchange.register_endpoint"
+        )
+        mock_register_endpoint.return_value = {
+            "endpoint_id": "abcde12345",
+            "public_ip": "127.0.0.1",
+            "tasks_port": 8080,
+            "results_port": 8081,
+            "commands_port": 8082,
+        }
 
         manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-        keys_dir = os.path.join(config_dir, 'certificates')
+        keys_dir = os.path.join(config_dir, "certificates")
 
         optionals = {}
-        optionals['client_address'] = '127.0.0.1'
-        optionals['client_ports'] = (8080, 8081, 8082)
-        optionals['logdir'] = './mock_endpoint'
+        optionals["client_address"] = "127.0.0.1"
+        optionals["client_ports"] = (8080, 8081, 8082)
+        optionals["logdir"] = "./mock_endpoint"
 
         manager.configure_endpoint("mock_endpoint", None)
-        endpoint_config = SourceFileLoader('config',
-                                           os.path.join(config_dir, 'config.py')).load_module()
+        endpoint_config = SourceFileLoader(
+            "config", os.path.join(config_dir, "config.py")
+        ).load_module()
 
         for executor in endpoint_config.config.executors:
             executor.passthrough = False
 
-        ic = EndpointInterchange(endpoint_config.config,
-                                 endpoint_id='mock_endpoint_id',
-                                 keys_dir=keys_dir,
-                                 **optionals)
+        ic = EndpointInterchange(
+            endpoint_config.config,
+            endpoint_id="mock_endpoint_id",
+            keys_dir=keys_dir,
+            **optionals,
+        )
 
         ic.register_endpoint()
-        assert ic.client_address == '127.0.0.1'
+        assert ic.client_address == "127.0.0.1"
         assert ic.client_ports == (8080, 8081, 8082)
 
     def test_start_no_reg_info(self, mocker):
@@ -100,38 +106,47 @@ class TestStart:
         mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
         mock_client.return_value = None
 
-        mock_register_endpoint = mocker.patch('funcx_endpoint.endpoint.interchange.register_endpoint')
-        mock_register_endpoint.return_value = {'endpoint_id': 'abcde12345',
-                                               'public_ip': '127.0.0.1',
-                                               'tasks_port': 8080,
-                                               'results_port': 8081,
-                                               'commands_port': 8082, }
+        mock_register_endpoint = mocker.patch(
+            "funcx_endpoint.endpoint.interchange.register_endpoint"
+        )
+        mock_register_endpoint.return_value = {
+            "endpoint_id": "abcde12345",
+            "public_ip": "127.0.0.1",
+            "tasks_port": 8080,
+            "results_port": 8081,
+            "commands_port": 8082,
+        }
 
         manager = EndpointManager(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-        keys_dir = os.path.join(config_dir, 'certificates')
+        keys_dir = os.path.join(config_dir, "certificates")
 
         optionals = {}
-        optionals['client_address'] = '127.0.0.1'
-        optionals['client_ports'] = (8080, 8081, 8082)
-        optionals['logdir'] = './mock_endpoint'
+        optionals["client_address"] = "127.0.0.1"
+        optionals["client_ports"] = (8080, 8081, 8082)
+        optionals["logdir"] = "./mock_endpoint"
 
         manager.configure_endpoint("mock_endpoint", None)
-        endpoint_config = SourceFileLoader('config',
-                                           os.path.join(config_dir, 'config.py')).load_module()
+        endpoint_config = SourceFileLoader(
+            "config", os.path.join(config_dir, "config.py")
+        ).load_module()
 
         for executor in endpoint_config.config.executors:
             executor.passthrough = False
 
-        mock_quiesce = mocker.patch.object(EndpointInterchange, 'quiesce',
-                                           return_value=None)
-        mock_main_loop = mocker.patch.object(EndpointInterchange, '_main_loop',
-                                             return_value=None)
+        mock_quiesce = mocker.patch.object(
+            EndpointInterchange, "quiesce", return_value=None
+        )
+        mock_main_loop = mocker.patch.object(
+            EndpointInterchange, "_main_loop", return_value=None
+        )
 
-        ic = EndpointInterchange(endpoint_config.config,
-                                 endpoint_id='mock_endpoint_id',
-                                 keys_dir=keys_dir,
-                                 **optionals)
+        ic = EndpointInterchange(
+            endpoint_config.config,
+            endpoint_id="mock_endpoint_id",
+            keys_dir=keys_dir,
+            **optionals,
+        )
 
         ic.results_outgoing = mocker.Mock()
 

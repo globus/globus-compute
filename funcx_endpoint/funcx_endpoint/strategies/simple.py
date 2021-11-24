@@ -1,6 +1,7 @@
-import math
 import logging
+import math
 import time
+
 from parsl.providers.provider_base import JobState
 
 from funcx_endpoint.strategies.base import BaseStrategy
@@ -9,13 +10,9 @@ logger = logging.getLogger("interchange.strategy.simple")
 
 
 class SimpleStrategy(BaseStrategy):
-    """ Implements the simple strategy
-    """
+    """Implements the simple strategy"""
 
-    def __init__(self, *args,
-                 threshold=20,
-                 interval=1,
-                 max_idletime=60):
+    def __init__(self, *args, threshold=20, interval=1, max_idletime=60):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
@@ -29,20 +26,21 @@ class SimpleStrategy(BaseStrategy):
           seconds after which timer expires
 
         max_idletime: (int)
-          maximum idle time(seconds) allowed for resources after which strategy will try to kill them.
+          maximum idle time(seconds) allowed for resources after which strategy will
+          try to kill them.
           default: 60s
 
         """
         logger.info("SimpleStrategy Initialized")
         super().__init__(*args, threshold=threshold, interval=interval)
         self.max_idletime = max_idletime
-        self.executors = {'idle_since': None}
+        self.executors = {"idle_since": None}
 
     def strategize(self, *args, **kwargs):
         try:
             self._strategize(*args, **kwargs)
         except Exception as e:
-            logger.exception("Caught error in strategize : {}".format(e))
+            logger.exception(f"Caught error in strategize : {e}")
             pass
 
     def _strategize(self, *args, **kwargs):
@@ -55,7 +53,7 @@ class SimpleStrategy(BaseStrategy):
         # Here we assume that each node has atleast 4 workers
 
         tasks_per_node = self.interchange.max_workers_per_node
-        if self.interchange.max_workers_per_node == float('inf'):
+        if self.interchange.max_workers_per_node == float("inf"):
             tasks_per_node = 1
 
         nodes_per_block = self.interchange.provider.nodes_per_block
@@ -70,12 +68,18 @@ class SimpleStrategy(BaseStrategy):
         active_blocks = running + pending
         active_slots = active_blocks * tasks_per_node * nodes_per_block
 
-        logger.debug('Endpoint has {} active tasks, {}/{} running/pending blocks, and {} connected workers'.format(
-            active_tasks, running, pending, self.interchange.get_total_live_workers()))
+        logger.debug(
+            "Endpoint has %s active tasks, %s/%s running/pending blocks, "
+            "and %s connected workers",
+            active_tasks,
+            running,
+            pending,
+            self.interchange.get_total_live_workers(),
+        )
 
         # reset kill timer if executor has active tasks
-        if active_tasks > 0 and self.executors['idle_since']:
-            self.executors['idle_since'] = None
+        if active_tasks > 0 and self.executors["idle_since"]:
+            self.executors["idle_since"] = None
 
         # Case 1
         # No tasks.
@@ -92,24 +96,30 @@ class SimpleStrategy(BaseStrategy):
             else:
                 # We want to make sure that max_idletime is reached
                 # before killing off resources
-                if not self.executors['idle_since']:
-                    logger.debug("Endpoint has 0 active tasks; starting kill timer (if idle time exceeds {}s, resources will be removed)".format(
-                        self.max_idletime)
+                if not self.executors["idle_since"]:
+                    logger.debug(
+                        "Endpoint has 0 active tasks; starting kill timer "
+                        "(if idle time exceeds %s seconds, resources will be removed)",
+                        self.max_idletime,
                     )
-                    self.executors['idle_since'] = time.time()
+                    self.executors["idle_since"] = time.time()
 
-                idle_since = self.executors['idle_since']
+                idle_since = self.executors["idle_since"]
                 if (time.time() - idle_since) > self.max_idletime:
                     # We have resources idle for the max duration,
                     # we have to scale_in now.
-                    logger.debug("Idle time has reached {}s; removing resources".format(
-                        self.max_idletime)
+                    logger.debug(
+                        "Idle time has reached {}s; removing resources".format(
+                            self.max_idletime
+                        )
                     )
                     self.interchange.scale_in(active_blocks - min_blocks)
 
                 else:
                     pass
-                    # logger.debug("Strategy: Case.1b. Waiting for timer : {0}".format(idle_since))
+                    # logger.debug(
+                    #     "Strategy: Case.1b. Waiting for timer : %s", idle_since
+                    # )
 
         # Case 2
         # More tasks than the available slots.
@@ -125,9 +135,11 @@ class SimpleStrategy(BaseStrategy):
             else:
                 # logger.debug("Strategy: Case.2b")
                 excess = math.ceil((active_tasks * parallelism) - active_slots)
-                excess_blocks = math.ceil(float(excess) / (tasks_per_node * nodes_per_block))
+                excess_blocks = math.ceil(
+                    float(excess) / (tasks_per_node * nodes_per_block)
+                )
                 excess_blocks = min(excess_blocks, max_blocks - active_blocks)
-                logger.debug("Requesting {} more blocks".format(excess_blocks))
+                logger.debug(f"Requesting {excess_blocks} more blocks")
                 self.interchange.scale_out(excess_blocks)
 
         elif active_slots == 0 and active_tasks > 0:
