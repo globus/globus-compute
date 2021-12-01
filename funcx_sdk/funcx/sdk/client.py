@@ -746,6 +746,10 @@ class FuncXClient(FuncXErrorHandlingClient):
         # Return the result
         return r.data["container_id"]
 
+    def build_container(self, container_spec):
+        r = self.post("containers/build", json_body=container_spec.to_json())
+        return r.data["container_id"]
+
     def add_to_whitelist(self, endpoint_id, function_ids):
         """Adds the function to the endpoint's whitelist
 

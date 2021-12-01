@@ -10,3 +10,4 @@ __version__ = VERSION
 
 from funcx.sdk.client import FuncXClient
 from funcx.utils.loggers import set_file_logger, set_stream_logger
+from funcx.sdk.container_spec import ContainerSpec
