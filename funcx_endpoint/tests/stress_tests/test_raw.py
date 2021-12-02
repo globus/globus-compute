@@ -1,25 +1,9 @@
 import time
 
 import pytest
-from shared import simple_function
+from shared import simple_function, wait_for_task
 
 from funcx.sdk.utils.throttling import MaxRequestsExceeded
-
-
-def wait_for_task(fxc, task_id, walltime: int = 2):
-    import time
-
-    start = time.time()
-    while True:
-        if time.time() > start + walltime:
-            raise Exception("Timeout")
-        try:
-            r = fxc.get_result(task_id)
-        except Exception:
-            print("Not available yet")
-            time.sleep(1)
-        else:
-            return r
 
 
 @pytest.mark.parametrize("task_count", [100])
