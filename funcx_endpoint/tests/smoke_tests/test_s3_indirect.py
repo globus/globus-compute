@@ -42,7 +42,7 @@ def test_allowed_arg_sizes(fx, endpoint, size):
     assert x == size, "Arg size does not match excepted size"
 
 
-@pytest.mark.xfail(reason="As of 0.3.4, an arg size limit is not being enforced")
+@pytest.mark.skip(reason="As of 0.3.4, an arg size limit is not being enforced")
 def test_arg_size_too_large(fx, endpoint, size=55000000):
     """funcX should raise an exception for objects larger than some limit,
     which we are yet to define. This does not work right now.
