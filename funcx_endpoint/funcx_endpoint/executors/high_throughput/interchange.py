@@ -94,43 +94,39 @@ class Interchange(object):
     TODO: We most likely need a PUB channel to send out global commands, like shutdown
     """
 
-    def __init__(self,
-                 #
-                 strategy=None,
-                 poll_period=None,
-                 heartbeat_period=None,
-                 heartbeat_threshold=None,
-                 working_dir=None,
-                 provider=None,
-                 max_workers_per_node=None,
-                 mem_per_worker=None,
-                 prefetch_capacity=None,
-
-                 scheduler_mode=None,
-                 container_type=None,
-                 container_cmd_options='',
-                 worker_mode=None,
-                 cold_routing_interval=10.0,
-
-                 funcx_service_address=None,
-                 scaling_enabled=True,
-                 #
-                 client_address="127.0.0.1",
-                 interchange_address="127.0.0.1",
-                 client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
-                 worker_ports=None,
-                 worker_port_range=(54000, 55000),
-                 cores_per_worker=1.0,
-                 worker_debug=False,
-                 launch_cmd=None,
-                 logdir=".",
-                 logging_level=logging.INFO,
-                 endpoint_id=None,
-                 suppress_failure=False,
-                 relax_manager_version_match=True,
-                 log_max_bytes=256 * 1024 * 1024,
-                 log_backup_count=1,
-                 ):
+    def __init__(
+        self,
+        strategy=None,
+        poll_period=None,
+        heartbeat_period=None,
+        heartbeat_threshold=None,
+        working_dir=None,
+        provider=None,
+        max_workers_per_node=None,
+        mem_per_worker=None,
+        prefetch_capacity=None,
+        scheduler_mode=None,
+        container_type=None,
+        container_cmd_options='',
+        worker_mode=None,
+        cold_routing_interval=10.0,
+        funcx_service_address=None,
+        scaling_enabled=True,
+        client_address="127.0.0.1",
+        interchange_address="127.0.0.1",
+        client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
+        worker_ports=None,
+        worker_port_range=(54000, 55000),
+        cores_per_worker=1.0,
+        worker_debug=False,
+        launch_cmd=None,
+        logdir=".",
+        logging_level=logging.INFO,
+        endpoint_id=None,
+        suppress_failure=False,
+        log_max_bytes=256 * 1024 * 1024,
+        log_backup_count=1,
+    ):
         """
         Parameters
         ----------
@@ -332,7 +328,6 @@ class Interchange(object):
         self.tasks = set()
         self.task_status_deltas = {}
         self.container_switch_count = {}
-        self.relax_manager_version_match = relax_manager_version_match
 
     def load_config(self):
         """ Load the config
@@ -687,21 +682,7 @@ class Interchange(object):
 
                         if (msg['python_v'].rsplit(".", 1)[0] != self.current_platform['python_v'].rsplit(".", 1)[0] or
                             msg['parsl_v'] != self.current_platform['parsl_v']):
-                            logger.warn("[MAIN] Manager {} has incompatible version info with the interchange".format(manager))
-
-                            if self.relax_manager_version_match is True:
-                                logger.info("[MAIN] Ignoring version match requirements and continuing")
-                            elif self.suppress_failure is False:
-                                logger.debug("Setting kill event")
-                                self._kill_event.set()
-                                e = ManagerLost(manager)
-                                result_package = {'task_id': -1,
-                                                  'exception': self.serializer.serialize(e)}
-                                pkl_package = pickle.dumps(result_package)
-                                self.results_outgoing.send(pickle.dumps([pkl_package]))
-                                logger.warning("[MAIN] Sent failure reports, unregistering manager")
-                            else:
-                                logger.debug("[MAIN] Suppressing shutdown due to version incompatibility")
+                            logger.info(f"[MAIN] Manager:{manager} version:{msg['python_v']} does not match the interchange")
 
                     else:
                         # Registration has failed.
