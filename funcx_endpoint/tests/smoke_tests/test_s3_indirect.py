@@ -11,16 +11,12 @@ def large_arg_consumer(data: str) -> int:
     return len(data)
 
 
-test_cases = [200, 2000, 20000, 200000]
-
-
-@pytest.mark.parametrize("size", test_cases)
+@pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
 def test_allowed_result_sizes(fx, endpoint, size):
     """funcX should allow all listed result sizes which are under 512KB limit"""
 
     future = fx.submit(large_result_producer, size, endpoint_id=endpoint)
-    x = future.result(timeout=60)
-    assert len(x) == size, "Result size does not match excepted size"
+    assert len(future.result(timeout=60)) == size
 
 
 def test_result_size_too_large(fx, endpoint, size=550000):
@@ -33,13 +29,12 @@ def test_result_size_too_large(fx, endpoint, size=550000):
         future.result(timeout=60)
 
 
-@pytest.mark.parametrize("size", test_cases)
+@pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
 def test_allowed_arg_sizes(fx, endpoint, size):
     """funcX should allow all listed result sizes which are under 512KB limit"""
 
     future = fx.submit(large_arg_consumer, bytearray(size), endpoint_id=endpoint)
-    x = future.result(timeout=60)
-    assert x == size, "Arg size does not match excepted size"
+    assert future.result(timeout=60) == size
 
 
 @pytest.mark.skip(reason="As of 0.3.4, an arg size limit is not being enforced")

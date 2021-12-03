@@ -25,6 +25,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install './funcx_sdk[test]'
+        # fixme: Remove this next install line once issue #640 is fixed.
         python -m pip install './funcx_endpoint'
     - name: Run smoke tests to check liveness of hosted services
       run: |
