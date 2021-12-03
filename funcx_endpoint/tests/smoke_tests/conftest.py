@@ -173,13 +173,6 @@ def fxc(funcx_test_config):
 
 
 @pytest.fixture(scope="session")
-def async_fxc(funcx_test_config):
-    client_args = funcx_test_config["client_args"]
-    fxc = FuncXClient(**client_args, asynchronous=True)
-    return fxc
-
-
-@pytest.fixture(scope="session")
 def fx(fxc):
     fx = FuncXExecutor(fxc)
     return fx
