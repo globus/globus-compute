@@ -1,7 +1,10 @@
+import os
+
+from parsl.providers import LocalProvider
+
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.executors import HighThroughputExecutor
-from parsl.providers import LocalProvider
-import os
+
 CONDA_ENV = os.environ["WORKER_CONDA_ENV"]
 print(f"Using conda env:{CONDA_ENV} for worker_init")
 
