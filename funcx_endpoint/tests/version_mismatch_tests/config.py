@@ -11,6 +11,7 @@ config = Config(
             init_blocks=1,
             min_blocks=0,
             max_blocks=1,
+            # FIX ME: Update conda.sh file to match your paths
             worker_init=("source ~/anaconda3/etc/profile.d/conda.sh; "
                          f"conda activate {CONDA_ENV}; "
                          "python3 --version"),
