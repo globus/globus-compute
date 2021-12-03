@@ -7,20 +7,18 @@ permissions to create the worker pod.
 
 ## How to Use
 First you need to install valid funcX credentials into the cluster's
-namespace. Launch a local version of the endpoint to get it to populate your
-`~/.funcx/credentials/funcx_sdk_tokens.json` with
-```
-funcx-endpoint start
-```
-
+namespace. If you've used the funcX client, these will already be available
+in your home directory's `.funcx/credentials` folder. If not, they can easily
+be created with:
+```shell
+pip install funcx
+python -c "from funcx.sdk.client import FuncXClient; FuncXClient()"
+````
 It will prompt you with an authentication URL to visit and ask you to paste the
-resulting token. After it completes you can stop your endpoint with
-```
-funcx-endpoint stop
-```
+resulting token.
 
-cd to your `~/.funcx/credentials` directory and install the keys file as a
-kubernetes secret.
+Now that you have a valid funcX token, cd to your `~/.funcx/credentials`
+directory and install the keys file as a kubernetes secret.
 
 ```shell script
 kubectl create secret generic funcx-sdk-tokens --from-file=funcx_sdk_tokens.json

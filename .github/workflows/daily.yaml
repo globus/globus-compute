@@ -1,36 +1,46 @@
-name: hourly
-
+name: daily
 on:
+  # build every day at 4:00 AM UTC
   schedule:
-    - cron: "0 * * * *"
+    - cron: '0 4 * * *'
   workflow_dispatch:
-    inputs:
-      tags:
-        required: false
-        description: "manual test"
 
 jobs:
-  smoke-test:
+  safety-check-sdk:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
       with:
         ref: main
     - uses: actions/setup-python@v1
-      with:
-        python-version: 3.7
-    - name: Install dependencies for funcx-sdk and test requirements
+    - name: install requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        python -m pip install './funcx_sdk[test]'
+        python -m pip install './funcx_sdk'
         python -m pip install safety
-    - name: Run smoke tests to check liveness of hosted services
+    - name: run safety check
+      run: safety check
+
+  safety-check-endpoint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: main
+    - uses: actions/setup-python@v1
+    - name: install requirements
       run: |
-        pytest -v funcx_endpoint/tests/smoke_tests --api-client-id ${{ secrets.API_CLIENT_ID }} --api-client-secret ${{ secrets.API_CLIENT_SECRET }}
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install './funcx_endpoint'
+        python -m pip install safety
+    - name: run safety check
+      run: safety check
 
   notify:
     runs-on: ubuntu-latest
-    needs: [smoke-test]
+    needs:
+      - safety-check-sdk
+      - safety-check-endpoint
     if: failure()
     steps:
       # FIXME: make this send to a listhost or Slack
@@ -41,7 +51,7 @@ jobs:
           server_port: 465
           username: ${{secrets.MAIL_USERNAME}}
           password: ${{secrets.MAIL_PASSWORD}}
-          subject: ${{ github.repository }} - Hourly smoke test failed
+          subject: ${{ github.repository }} - Daily Check ${{ job.status }}
           to: ryan.chard@gmail.com,rchard@anl.gov,chard@uchicago.edu,yadudoc1729@gmail.com,josh@globus.org,bengal1@illinois.edu,benc@hawaga.org.uk,sirosen@globus.org,uriel@globus.org
           from: funcX Tests # <user@example.com>
-          body: The hourly ${{ github.repository }} workflow failed!
+          body: The daily ${{ github.repository }} workflow failed!

@@ -2,8 +2,10 @@ from abc import ABC
 from enum import Enum
 
 
-# IMPORTANT: new error codes can be added, but existing error codes must not be changed once published.
-# changing existing error codes will cause problems with users that have older SDK versions
+# IMPORTANT: new error codes can be added, but existing error codes must not be changed
+# once published.
+# changing existing error codes will cause problems with users that have older SDK
+# versions
 class ResponseErrorCode(int, Enum):
     UNKNOWN_ERROR = 0
     USER_UNAUTHENTICATED = 1
@@ -86,8 +88,9 @@ class FuncxResponseError(Exception, ABC):
             ):
                 try:
                     # if the response error code is not recognized here because the
-                    # user is not using the latest SDK version, an exception will occur here
-                    # which we will pass in order to give the user a generic exception below
+                    # user is not using the latest SDK version, an exception will occur
+                    # here, which we will pass in order to give the user a generic
+                    # exception below
                     res_error_code = ResponseErrorCode(res_data["code"])
                     error_class = None
                     if res_error_code is ResponseErrorCode.USER_UNAUTHENTICATED:
@@ -179,9 +182,10 @@ class UserUnauthenticated(FuncxResponseError):
 
 
 class UserNotFound(FuncxResponseError):
-    """User not found exception. This error should only be used when the server must
-    look up a user in order to fulfill the user's request body. If the request only
-    fails because the user is unauthenticated, UserUnauthenticated should be used instead.
+    """
+    User not found exception. This error should only be used when the server must look
+    up a user in order to fulfill the user's request body. If the request only fails
+    because the user is unauthenticated, UserUnauthenticated should be used instead.
     """
 
     code = ResponseErrorCode.USER_NOT_FOUND
@@ -399,7 +403,10 @@ class EndpointOutdated(FuncxResponseError):
 
     def __init__(self, min_ep_version):
         self.error_args = [min_ep_version]
-        self.reason = f"Endpoint is out of date. Minimum supported endpoint version is {min_ep_version}"
+        self.reason = (
+            "Endpoint is out of date. "
+            f"Minimum supported endpoint version is {min_ep_version}"
+        )
 
 
 class TaskGroupNotFound(FuncxResponseError):
