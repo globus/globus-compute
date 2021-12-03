@@ -6,18 +6,21 @@ from funcx.sdk.executor import FuncXExecutor
 
 def get_version():
     import sys
+
     return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
 def test_worker_version(fx, ep_id, ep_version, version):
     import sys
+
     print(f"Running a version check against endpoint:{ep_id}")
     future = fx.submit(get_version, endpoint_id=ep_id)
     print(f"Future launched with future:{future}")
     try:
         print(f"Expected worker_version : {version}, actual: {future.result()}")
-        assert future.result(timeout=10) == version, \
-            f"Expected worker version:{version} Got:{future.result()}"
+        assert (
+            future.result(timeout=10) == version
+        ), f"Expected worker version:{version} Got:{future.result()}"
 
     except Exception:
         print(f"Expected worker_version : {version}, actual: {future.result()}")
