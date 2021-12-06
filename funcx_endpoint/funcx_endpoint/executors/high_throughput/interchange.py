@@ -32,6 +32,7 @@ from funcx_endpoint.executors.high_throughput.messages import (
     MessageType,
     TaskStatusCode,
 )
+from funcx_endpoint.data_transfer.globus import GlobusTransferClient
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
@@ -62,6 +63,21 @@ class ManagerLost(Exception):
 
     def __repr__(self):
         return f"Task failure due to loss of manager {self.worker_id}"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class GlobusTransferFailure(Exception):
+    """ Task failed due to Globus transfer failure.
+    """
+
+    def __init__(self, reason):
+        self.reason = reason
+        self.tstamp = time.time()
+
+    def __repr__(self):
+        return "Task failure due to {}".format(self.reason)
 
     def __str__(self):
         return self.__repr__()
@@ -284,6 +300,24 @@ class Interchange:
             self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
         else:
             self.fxs = FuncXClient()
+        # Globus transfer
+        self.data_staging = False
+        if self.config.globus_ep_id:
+            logger.info("Initiating Globus transfer client")
+            self.data_staging = True
+            self.globus_data_path = self.config.local_data_path
+            if self.globus_data_path is None:
+                self.globus_data_path = "{}/data/".format(self.logdir)
+            self.gtc = GlobusTransferClient(dst_ep=self.config.globus_ep_id,
+                                            local_path=self.globus_data_path,
+                                            funcx_ep_id=endpoint_id)
+
+        self.globus_polling_interval = self.config.globus_polling_interval
+        self.active_transfers = {}
+        self.completed_transfers = {}
+        self.pending_transfer_queue = queue.Queue(maxsize=10 ** 6)
+        self.pending_transfer_tasks = {}
+        self.failed_transfer_tasks = {}
 
         logger.info(f"Interchange address is {self.interchange_address}")
         self.worker_ports = worker_ports
@@ -549,8 +583,8 @@ class Interchange:
         outstanding = {}
         for task_type in self.pending_task_queue:
             outstanding[task_type] = (
-                outstanding.get(task_type, 0)
-                + self.pending_task_queue[task_type].qsize()
+                    outstanding.get(task_type, 0)
+                    + self.pending_task_queue[task_type].qsize()
             )
         for manager in self._ready_manager_queue:
             for task_type in self._ready_manager_queue[manager]["tasks"]:
@@ -603,8 +637,8 @@ class Interchange:
         """
         for manager in self._ready_manager_queue:
             if (
-                self._ready_manager_queue[manager]["active"]
-                and self._ready_manager_queue[manager]["block_id"] == block_id
+                    self._ready_manager_queue[manager]["active"]
+                    and self._ready_manager_queue[manager]["block_id"] == block_id
             ):
                 logger.debug(f"[HOLD_BLOCK]: Sending hold to manager: {manager}")
                 self.hold_manager(manager)
@@ -748,8 +782,8 @@ class Interchange:
 
             # Listen for requests for work
             if (
-                self.task_outgoing in self.socks
-                and self.socks[self.task_outgoing] == zmq.POLLIN
+                    self.task_outgoing in self.socks
+                    and self.socks[self.task_outgoing] == zmq.POLLIN
             ):
                 logger.debug("[MAIN] starting task_outgoing section")
                 message = self.task_outgoing.recv_multipart()
@@ -790,9 +824,9 @@ class Interchange:
                         )
 
                         if (
-                            msg["python_v"].rsplit(".", 1)[0]
-                            != self.current_platform["python_v"].rsplit(".", 1)[0]
-                            or msg["parsl_v"] != self.current_platform["parsl_v"]
+                                msg["python_v"].rsplit(".", 1)[0]
+                                != self.current_platform["python_v"].rsplit(".", 1)[0]
+                                or msg["parsl_v"] != self.current_platform["parsl_v"]
                         ):
                             logger.warn(
                                 "[MAIN] Manager %s has incompatible version info with "
@@ -910,8 +944,8 @@ class Interchange:
 
             # Receive any results and forward to client
             if (
-                self.results_incoming in self.socks
-                and self.socks[self.results_incoming] == zmq.POLLIN
+                    self.results_incoming in self.socks
+                    and self.socks[self.results_incoming] == zmq.POLLIN
             ):
                 logger.debug("[MAIN] entering results_incoming section")
                 manager, *b_messages = self.results_incoming.recv_multipart()
@@ -992,7 +1026,7 @@ class Interchange:
                 manager
                 for manager in self._ready_manager_queue
                 if time.time() - self._ready_manager_queue[manager]["last"]
-                > self.heartbeat_threshold
+                   > self.heartbeat_threshold
             ]
             bad_manager_msgs = []
             for manager in bad_managers:
@@ -1214,7 +1248,6 @@ def starter(comm_q, *args, **kwargs):
 
 
 def cli_run():
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--client_address", required=True, help="Client address")
     parser.add_argument(
@@ -1236,7 +1269,7 @@ def cli_run():
         "--worker_ports",
         default=None,
         help="OPTIONAL, pair of workers ports to listen on, "
-        "eg --worker_ports=50001,50005",
+             "eg --worker_ports=50001,50005",
     )
     parser.add_argument(
         "--suppress_failure",
