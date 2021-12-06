@@ -4,10 +4,10 @@ Setting up the envs
 Step.1: To run these tests first create 4 conda envs with the appropriate python3 versions
 
 ```bash
-funcx_version_mismatch_py3.6
-funcx_version_mismatch_py3.7
-funcx_version_mismatch_py3.8
-funcx_version_mismatch_py3.9
+conda create --name=funcx_version_mismatch_py3.6 'python=3.6'
+conda create --name=funcx_version_mismatch_py3.7 'python=3.7'
+conda create --name=funcx_version_mismatch_py3.8 'python=3.8'
+conda create --name=funcx_version_mismatch_py3.9 'python=3.9'
 ```
 
 Step.2: Next checkout the branch `relax_version_match_constraints` and run the `update_all.sh` script
