@@ -452,7 +452,7 @@ class Interchange(object):
             elif isinstance(msg, Heartbeat):
                 logger.debug("Got heartbeat")
             else:
-                logger.info("[TASK_PULL_THREAD] Received task:{}".format(msg.task_id))
+                logger.info("[TASK_PULL_THREAD] Received Task:{}".format(msg.task_id))
                 local_container = self.get_container(msg.container_id)
                 msg.set_local_container(local_container)
                 if local_container not in self.pending_task_queue:
@@ -465,10 +465,10 @@ class Interchange(object):
                                                               'raw_buffer': raw_msg})
                 self.total_pending_task_count += 1
                 self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
-                logger.debug(f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES")
+                logger.debug(f"[TASK_PULL_THREAD] Task:{msg.task_id} is now WAITING_FOR_NODES")
                 logger.debug("[TASK_PULL_THREAD] pending task count: {}".format(self.total_pending_task_count))
                 task_counter += 1
-                logger.debug("[TASK_PULL_THREAD] Fetched task:{}".format(task_counter))
+                logger.debug("[TASK_PULL_THREAD] Fetched Task:{}".format(task_counter))
 
     def get_container(self, container_uuid):
         """ Get the container image location if it is not known to the interchange"""
@@ -583,7 +583,7 @@ class Interchange(object):
                 command = Message.unpack(buffer)
 
                 if command.type is MessageType.TASK_CANCEL:
-                    logger.info(f"[COMMAND] Received TASK_CANCEL for task_id:{command.task_id}")
+                    logger.info(f"[COMMAND] Received TASK_CANCEL for Task:{command.task_id}")
                     self.enqueue_task_cancel(command.task_id)
                     reply = command
 
@@ -847,7 +847,8 @@ class Interchange(object):
                         logger.info("[MAIN] Got {} result items in batch".format(len(b_messages)))
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
-                        logger.debug("[MAIN] Received result for task {} from {}".format(r, manager))
+                        logger.debug("[MAIN] Received result for Task:{} from {}".format(r['task_id'],
+                                                                                         manager))
                         task_type = self.containers[r['container_id']]
                         logger.debug(f"[MAIN] Removing for manager:{manager} from {self._ready_manager_queue}")
                         if r['task_id'] in self.task_status_deltas:
