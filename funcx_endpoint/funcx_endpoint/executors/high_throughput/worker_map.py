@@ -51,14 +51,16 @@ class WorkerMap(object):
         if worker_type not in self.to_die_count:
             self.to_die_count[worker_type] = 0
 
+    def start_remove_worker(self, worker_type):
+        """ Increase the to_die_count in prep for a worker getting removed"""
+        self.to_die_count[worker_type] += 1
+
     def remove_worker(self, worker_id):
         """ Remove the worker from the WorkerMap
 
             Should already be KILLed by this point.
         """
-
         worker_type = self.worker_types[worker_id]
-
         self.active_workers -= 1
         self.total_worker_type_counts[worker_type] -= 1
         self.to_die_count[worker_type] -= 1
