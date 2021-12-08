@@ -9,9 +9,11 @@ from parsl.providers import LocalProvider
 
 import funcx
 from funcx_endpoint.executors import HighThroughputExecutor
+import logging
+logger = logging.getLogger(__name__)
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def htex():
     try:
         os.remove("interchange.log")
@@ -50,8 +52,10 @@ def slow_double(x, sleep_dur=2):
 def test_cancel_notimplemented(htex):
     n = 2
     future = htex.submit(slow_double, n)
+    logger.warning(f"Launched task:{future.task_id}")
     with pytest.raises(NotImplementedError):
         future.cancel()
+    logger.warning(f"Finished task:{future.task_id}")
 
 
 def test_non_cancel(htex):
@@ -61,26 +65,20 @@ def test_non_cancel(htex):
     assert future.result() == n * 2, "Got wrong answer"
 
 
-def test_non_cancel_slow(htex, t=2):
+def test_non_cancel_slow(htex, t=1):
     future = htex.submit(slow_double, 5, sleep_dur=t)
-    print(f"Future:{future}, status:{future.done()}")
-    print(f"Task_id:{future.task_id}")
-    print(f"Result:{future.result()}")
+    assert future.result() == 10
 
 
 def test_cancel_slow(htex, t=10):
     future = htex.submit(slow_double, 5, sleep_dur=t)
-    print(f"Future: {future}, status:{future.done()}")
-    print(f"Task_id: {future.task_id}")
-    print("Sleeping")
+    logger.warning(f"Launched task:{future.task_id}")
     time.sleep(5)
-    print("Cancelling")
+    logger.warning(f"Cancelling task:{future.task_id}")
     future.best_effort_cancel()
-    print(f"Cancelled, now status done={future.done()}")
-    try:
+    logger.warning(f"Cancelled, now task:{future.task_id} is done:{future.done()}")
+    with pytest.raises(CancelledError):
         future.result()
-    except CancelledError:
-        print("Got the right error")
 
 
 def test_cancel_task_pending_on_interchange(htex):
@@ -100,16 +98,21 @@ def test_cancel_task_pending_on_interchange(htex):
 def test_cancel_random_tasks(htex):
 
     futures = [htex.submit(slow_double, i, sleep_dur=2) for i in range(10)]
+    logger.warning(f"Launched 10 tasks {[f.task_id for f in futures]}")
     random.shuffle(futures)
-    [fu.best_effort_cancel() for fu in futures[0:5]]
+    for fu in futures[0:5]:
+        fu.best_effort_cancel()
+        logger.warning(f"Cancelled task:{fu.task_id}")
     for fu in futures[0:5]:
         try:
+            logger.warning(f"Waiting for cancelled task:{fu.task_id}")
             fu.result()
         except CancelledError:
             print("Got the right error")
         else:
             raise Exception("Failed")
     for fu in futures[5:]:
+        logger.warning(f"Waiting for non-cancelled task:{fu.task_id}")
         print(fu.result())
 
 
@@ -130,6 +133,7 @@ def test_cancel_random_file_creators(htex):
         if os.path.exists(fname):
             os.remove(fname)
         future = htex.submit(make_file_slow, fname, sleep_dur=2)
+        logger.warning(f"Launched task {future.task_id}")
         fmap[future] = {"fname": fname, "cancelled": False}
     print(fmap)
 
@@ -139,6 +143,7 @@ def test_cancel_random_file_creators(htex):
 
     for future in to_cancel:
         future.best_effort_cancel()
+        logger.warning(f"Cancelled task:{future.task_id}")
         fmap[future]["cancelled"] = True
 
     print("Here")
@@ -146,10 +151,12 @@ def test_cancel_random_file_creators(htex):
 
         print("Checking:", fmap[future])
         if fmap[future]["cancelled"] is False:
+            logger.warning(f"Waiting for non-cancelled task:{future.task_id}")
             assert fmap[future]["fname"] == future.result(), "Got wrong fname"
             assert os.path.exists(fmap[future]["fname"]), "Expected file is missing"
         else:
             try:
+                logger.warning(f"Waiting for cancelled task:{future.task_id}")
                 f = future.result()
             except CancelledError:
                 print("Got the right error")
