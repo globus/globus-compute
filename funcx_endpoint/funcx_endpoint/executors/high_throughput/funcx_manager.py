@@ -237,6 +237,7 @@ class Manager(object):
         self.task_worker_map = {}
 
         self.task_done_counter = 0
+        self.task_cancel_lock = threading.Lock()
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -324,6 +325,7 @@ class Manager(object):
                     break
 
                 elif type(message) == tuple and message[0] == 'TASK_CANCEL':
+                    self.task_cancel_lock.acquire()
                     task_id = message[1]
                     logger.info(f"Received TASK_CANCEL request for task: {task_id}")
                     if task_id not in self.task_worker_map:
@@ -337,6 +339,7 @@ class Manager(object):
                     logger.debug(f"Cancelling task running on worker:{self.task_worker_map[task_id]}")
                     try:
                         logger.info(f"Removing worker:{worker_id_raw} from map")
+                        self.worker_map.start_remove_worker(worker_type)
                         self.worker_map.remove_worker(worker_id_raw)
                         logger.info(f"Popping worker:{worker_to_kill} from worker_procs")
                         proc = self.worker_procs.pop(worker_to_kill)
@@ -372,6 +375,7 @@ class Manager(object):
                     self.worker_procs.update(worker_proc)
                     self.task_worker_map.pop(task_id)
                     self.remove_task(task_id)
+                    self.task_cancel_lock.release()
 
                 elif message == HEARTBEAT_CODE:
                     logger.debug("Got heartbeat from interchange")
@@ -482,14 +486,18 @@ class Manager(object):
                 self.worker_map.register_worker(w_id, reg_info['worker_type'])
 
             elif m_type == b'TASK_RET':
+                # We lock because the following steps are also shared by task_cancel
+                self.task_cancel_lock.acquire()
                 logger.debug("Result received from worker: {}".format(w_id))
-                logger.debug("[TASK_PULL_THREAD] Got result: {}".format(message))
-                self.pending_result_queue.put(message)
-                self.worker_map.put_worker(w_id)
-                self.task_done_counter += 1
                 task_id = pickle.loads(message)['task_id']
-                self.remove_task(task_id)
-                logger.debug("Got result: Outstanding task counts: {}".format(self.outstanding_task_count))
+                try:
+                    self.remove_task(task_id)
+                except KeyError:
+                    logger.exception(f"Task:{task_id} missing in task structure")
+                else:
+                    self.pending_result_queue.put(message)
+                    self.worker_map.put_worker(w_id)
+                self.task_cancel_lock.release()
 
             elif m_type == b'WRKR_DIE':
                 logger.debug("[WORKER_REMOVE] Removing worker {} from worker_map...".format(w_id))
@@ -508,14 +516,14 @@ class Manager(object):
             if test:
                 return pickle.loads(message)
 
-        except Exception as e:
-            logger.exception("[TASK_PULL_THREAD] FUNCX : caught {}".format(e))
+        except Exception:
+            logger.exception("Unhandled exception while processing worker messages")
 
     def remove_task(self, task_id: str):
         task_type = self.task_type_mapping.pop(task_id)
         self.task_status_deltas.pop(task_id, None)
-        logger.debug(f"Task type: {task_type}")
         self.outstanding_task_count[task_type] -= 1
+        self.task_done_counter += 1
 
     def send_task_to_worker(self, task_type):
         task = self.task_queues[task_type].get()
@@ -598,7 +606,7 @@ class Manager(object):
         """
 
         logger.debug("[WORKER_REMOVE] Appending KILL message to worker queue {}".format(worker_type))
-        self.worker_map.to_die_count[worker_type] += 1
+        self.worker_map.start_remove_worker(worker_type)
         task = Task(task_id='KILL',
                     container_id='RAW',
                     task_buffer='KILL')
