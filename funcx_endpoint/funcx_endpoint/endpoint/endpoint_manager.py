@@ -315,7 +315,7 @@ class EndpointManager:
         )
 
         with context:
-            setup_logging(logfile=logfile, debug=self.debug)
+            setup_logging(logfile=logfile, debug=self.debug, console_enabled=False)
             self.daemon_launch(
                 endpoint_uuid,
                 endpoint_dir,
@@ -340,11 +340,6 @@ class EndpointManager:
         optionals = {}
         if "endpoint_address" in self.funcx_config:
             optionals["interchange_address"] = self.funcx_config["endpoint_address"]
-
-        optionals["logdir"] = endpoint_dir
-
-        if self.debug:
-            optionals["logging_level"] = logging.DEBUG
 
         ic = EndpointInterchange(
             endpoint_config.config,

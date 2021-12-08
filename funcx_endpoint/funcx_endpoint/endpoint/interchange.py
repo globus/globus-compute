@@ -880,8 +880,6 @@ def cli_run():
     else:
         optionals["config"] = args.config
 
-    if args.debug:
-        optionals["logging_level"] = logging.DEBUG
     if args.worker_ports:
         optionals["worker_ports"] = [int(i) for i in args.worker_ports.split(",")]
     if args.worker_port_range:

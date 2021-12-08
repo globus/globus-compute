@@ -734,16 +734,6 @@ def cli_run():
         required=True,
         help="REQUIRED: ZMQ url for posting results",
     )
-    parser.add_argument(
-        "--log_max_bytes",
-        default=256 * 1024 * 1024,
-        help="The maximum bytes per logger file in bytes",
-    )
-    parser.add_argument(
-        "--log_backup_count",
-        default=1,
-        help="The number of backup (must be non-zero) per logger file",
-    )
 
     args = parser.parse_args()
 
@@ -769,8 +759,6 @@ def cli_run():
         log.info(f"container_cmd_options: {args.container_cmd_options}")
         log.info(f"scheduler_mode: {args.scheduler_mode}")
         log.info(f"worker_type: {args.worker_type}")
-        log.info(f"log_max_bytes: {args.log_max_bytes}")
-        log.info(f"log_backup_count: {args.log_backup_count}")
 
         manager = Manager(
             task_q_url=args.task_url,

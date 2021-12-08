@@ -446,8 +446,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 "mem_per_worker": self.mem_per_worker,
                 "cores_per_worker": self.cores_per_worker,
                 "prefetch_capacity": self.prefetch_capacity,
-                # "log_max_bytes": self.log_max_bytes,
-                # "log_backup_count": self.log_backup_count,
                 "scheduler_mode": self.scheduler_mode,
                 "worker_mode": self.worker_mode,
                 "container_type": self.container_type,
@@ -460,7 +458,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 "logdir": os.path.join(self.run_dir, self.label),
                 "suppress_failure": self.suppress_failure,
                 "endpoint_id": self.endpoint_id,
-                "logging_level": logging.DEBUG if self.worker_debug else logging.INFO,
             },
         )
         self.queue_proc.start()
@@ -883,7 +880,10 @@ def executor_starter(htex, logdir, endpoint_id):
     logdir = os.path.abspath(logdir)
     with daemon.DaemonContext(stdout=stdout, stderr=stderr):
         print("cwd: ", os.getcwd())
-        setup_logging(logfile=os.path.join(logdir, f"executor.{endpoint_id}.log"))
+        setup_logging(
+            logfile=os.path.join(logdir, f"executor.{endpoint_id}.log"),
+            console_enabled=False,
+        )
         htex.start()
 
     stdout.close()
