@@ -57,9 +57,8 @@ def setup_logging(
                 "level": "DEBUG" if debug else "INFO",
                 "handlers": ["console", "logfile"] if console_enabled else ["logfile"],
             },
-            # TODO: evaluate whether or not it's really appropriate to setup logging
-            # for asyncio
-            "asyncio": {
+            # configure for the funcx SDK as well
+            "funcx": {
                 "level": "DEBUG" if debug else "WARNING",
                 "handlers": ["logfile", "console"] if console_enabled else ["logfile"],
             },

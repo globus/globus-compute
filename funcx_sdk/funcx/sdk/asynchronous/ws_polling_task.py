@@ -13,7 +13,7 @@ from websockets.exceptions import (
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
-logger = logging.getLogger("asyncio")
+log = logging.getLogger(__name__)
 
 
 class WebSocketPollingTask:
@@ -127,9 +127,9 @@ class WebSocketPollingTask:
                 pass
             except ConnectionClosedOK:
                 if self.closed_by_main_thread:
-                    logger.debug("WebSocket connection closed by main thread")
+                    log.debug("WebSocket connection closed by main thread")
                 else:
-                    logger.error("WebSocket connection closed unexpectedly")
+                    log.error("WebSocket connection closed unexpectedly")
                 return
             else:
                 data = json.loads(raw_data)
@@ -190,7 +190,7 @@ class WebSocketPollingTask:
             else:
                 future.set_exception(Exception(data["reason"]))
         except Exception:
-            logger.exception("Caught unexpected exception while setting results")
+            log.exception("Caught unexpected exception while setting results")
 
         # When the counter hits 0 we always exit. This guarantees that that if the
         # counter increments to 1 on the executor, this handler needs to be restarted.
