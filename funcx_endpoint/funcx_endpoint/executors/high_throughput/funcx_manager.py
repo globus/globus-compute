@@ -20,7 +20,6 @@ import zmq
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.serialize import FuncXSerializer
-from funcx_endpoint.config import setup_logging
 from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from funcx_endpoint.executors.high_throughput.messages import (
@@ -30,6 +29,7 @@ from funcx_endpoint.executors.high_throughput.messages import (
     TaskStatusCode,
 )
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
+from funcx_endpoint.logging_config import setup_logging
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11

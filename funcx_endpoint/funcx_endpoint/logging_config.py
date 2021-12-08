@@ -67,3 +67,6 @@ def setup_logging(
     }
 
     logging.config.dictConfig(default_config)
+
+    if debug:
+        log.debug("debug logging enabled")

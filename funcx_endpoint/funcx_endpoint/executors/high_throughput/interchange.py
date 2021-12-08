@@ -20,7 +20,6 @@ from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
-from funcx_endpoint.config import setup_logging
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import (
     naive_interchange_task_dispatch,
 )
@@ -32,6 +31,7 @@ from funcx_endpoint.executors.high_throughput.messages import (
     MessageType,
     TaskStatusCode,
 )
+from funcx_endpoint.logging_config import setup_logging
 
 log = logging.getLogger(__name__)
 

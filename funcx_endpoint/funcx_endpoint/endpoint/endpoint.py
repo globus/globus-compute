@@ -97,7 +97,7 @@ def start_endpoint(
             "config", os.path.join(endpoint_dir, manager.funcx_config_file_name)
         ).load_module()
     except Exception:
-        manager.logger.exception(
+        log.exception(
             "funcX v0.2.0 made several non-backwards compatible changes to the config. "
             "Your config might be out of date. "
             "Refer to "

@@ -9,9 +9,11 @@ import sys
 import zmq
 from parsl.app.errors import RemoteExceptionWrapper
 
-from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message
+from funcx_endpoint.logging_config import setup_logging
+
+log = logging.getLogger(__name__)
 
 
 class MaxResultSizeExceeded(Exception):
@@ -44,12 +46,6 @@ class FuncXWorker:
     port : int
      Port at which the manager can be reached
 
-    logdir : str
-     Logging directory
-
-    debug : Bool
-     Enables debug logging
-
     result_size_limit : int
      Maximum result size allowed in Bytes
      Default = 10 MB == 10 * (2**20) Bytes
@@ -66,8 +62,6 @@ class FuncXWorker:
         worker_id,
         address,
         port,
-        logdir,
-        debug=False,
         worker_type="RAW",
         result_size_limit=512000,
     ):
@@ -75,26 +69,14 @@ class FuncXWorker:
         self.worker_id = worker_id
         self.address = address
         self.port = port
-        self.logdir = logdir
-        self.debug = debug
         self.worker_type = worker_type
         self.serializer = FuncXSerializer()
         self.serialize = self.serializer.serialize
         self.deserialize = self.serializer.deserialize
         self.result_size_limit = result_size_limit
 
-        global logger
-        logger = set_file_logger(
-            os.path.join(logdir, f"funcx_worker_{worker_id}.log"),
-            name="worker_log",
-            level=logging.DEBUG if debug else logging.INFO,
-        )
-
-        logger.info(f"Initializing worker {worker_id}")
-        logger.info(f"Worker is of type: {worker_type}")
-
-        if debug:
-            logger.debug("Debug logging enabled")
+        log.info(f"Initializing worker {worker_id}")
+        log.info(f"Worker is of type: {worker_type}")
 
         self.context = zmq.Context()
         self.poller = zmq.Poller()
@@ -103,7 +85,7 @@ class FuncXWorker:
         self.task_socket = self.context.socket(zmq.DEALER)
         self.task_socket.setsockopt(zmq.IDENTITY, self.identity)
 
-        logger.info(f"Trying to connect to : tcp://{self.address}:{self.port}")
+        log.info(f"Trying to connect to : tcp://{self.address}:{self.port}")
         self.task_socket.connect(f"tcp://{self.address}:{self.port}")
         self.poller.register(self.task_socket, zmq.POLLIN)
 
@@ -112,37 +94,37 @@ class FuncXWorker:
 
     def start(self):
 
-        logger.info("Starting worker")
+        log.info("Starting worker")
 
         result = self.registration_message()
         task_type = b"REGISTER"
-        logger.debug("Sending registration")
+        log.debug("Sending registration")
         self.task_socket.send_multipart(
             [task_type, pickle.dumps(result)]  # Byte encoded
         )
 
         while True:
 
-            logger.debug("Waiting for task")
+            log.debug("Waiting for task")
             p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
             task_id = pickle.loads(p_task_id)
             container_id = pickle.loads(p_container_id)
-            logger.debug(f"Received task_id:{task_id} with task:{msg}")
+            log.debug(f"Received task_id:{task_id} with task:{msg}")
 
             result = None
             task_type = None
             if task_id == "KILL":
                 task = Message.unpack(msg)
                 if task.task_buffer.decode("utf-8") == "KILL":
-                    logger.info("[KILL] -- Worker KILL message received! ")
+                    log.info("[KILL] -- Worker KILL message received! ")
                     task_type = b"WRKR_DIE"
                 else:
-                    logger.exception(
+                    log.exception(
                         "Caught an exception of non-KILL message for KILL task"
                     )
                     continue
             else:
-                logger.debug("Executing task...")
+                log.debug("Executing task...")
 
                 try:
                     result = self.execute_task(msg)
@@ -153,7 +135,7 @@ class FuncXWorker:
                             sys.getsizeof(serialized_result), self.result_size_limit
                         )
                 except Exception as e:
-                    logger.exception(f"Caught an exception {e}")
+                    log.exception(f"Caught an exception {e}")
                     result_package = {
                         "task_id": task_id,
                         "container_id": container_id,
@@ -162,7 +144,7 @@ class FuncXWorker:
                         ),
                     }
                 else:
-                    logger.debug("Execution completed without exception")
+                    log.debug("Execution completed without exception")
                     result_package = {
                         "task_id": task_id,
                         "container_id": container_id,
@@ -171,20 +153,20 @@ class FuncXWorker:
                 result = result_package
                 task_type = b"TASK_RET"
 
-            logger.debug("Sending result")
+            log.debug("Sending result")
 
             self.task_socket.send_multipart(
                 [task_type, pickle.dumps(result)]  # Byte encoded
             )
 
             if task_type == b"WRKR_DIE":
-                logger.info(f"*** WORKER {self.worker_id} ABOUT TO DIE ***")
+                log.info(f"*** WORKER {self.worker_id} ABOUT TO DIE ***")
                 # Kill the worker after accepting death in message to manager.
                 sys.exit()
                 # We need to return here to allow for sys.exit mocking in tests
                 return
 
-        logger.warning("Broke out of the loop... dying")
+        log.warning("Broke out of the loop... dying")
 
     def execute_task(self, message):
         """Deserialize the buffer and execute the task.
@@ -224,18 +206,21 @@ def cli_run():
         action="store_true",
         help="Directory path where worker log files written",
     )
-
     args = parser.parse_args()
+
+    os.makedirs(args.logdir, exist_ok=True)
+    setup_logging(
+        logfile=os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.log"),
+        debug=args.debug,
+    )
+
     worker = FuncXWorker(
         args.worker_id,
         args.address,
         int(args.port),
-        args.logdir,
         worker_type=args.type,
-        debug=args.debug,
     )
     worker.start()
-    return
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ import zmq
 import zmq.auth
 from zmq.auth.thread import ThreadAuthenticator
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 class TaskQueue:
@@ -100,13 +100,13 @@ class TaskQueue:
         self.poller = zmq.Poller()
         self.poller.register(self.zmq_socket)
         os.makedirs(self.keys_dir, exist_ok=True)
-        logger.debug(f"Initializing Taskqueue:{self.mode} on port:{self.port}")
+        log.debug(f"Initializing Taskqueue:{self.mode} on port:{self.port}")
 
     def zmq_context(self):
         return self.context
 
     def add_client_key(self, endpoint_id, client_key):
-        logger.info("Adding client key")
+        log.info("Adding client key")
         if self.ironhouse:
             # Use the ironhouse ZMQ pattern: http://hintjens.com/blog:49#toc6
             with open(os.path.join(self.keys_dir, f"{endpoint_id}.key"), "w") as f:
@@ -114,7 +114,7 @@ class TaskQueue:
             try:
                 self.auth.configure_curve(domain="*", location=self.keys_dir)
             except Exception:
-                logger.exception("Failed to load keys from {self.keys_dir}")
+                log.exception("Failed to load keys from {self.keys_dir}")
         return
 
     def setup_server_auth(self):
