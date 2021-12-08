@@ -1,11 +1,12 @@
+import collections
 import json
 import os
+import time
 
 import pytest
 from globus_sdk import AccessTokenAuthorizer, ConfidentialAppAuthClient
 
 from funcx import FuncXClient
-from funcx.sdk.executor import FuncXExecutor
 
 # the non-tutorial endpoint will be required, with the following priority order for
 # finding the ID:
@@ -169,13 +170,8 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
 def fxc(funcx_test_config):
     client_args = funcx_test_config["client_args"]
     fxc = FuncXClient(**client_args)
+    fxc.throttling_enabled = False
     return fxc
-
-
-@pytest.fixture(scope="session")
-def fx(fxc):
-    fx = FuncXExecutor(fxc)
-    return fx
 
 
 @pytest.fixture
@@ -189,3 +185,44 @@ def tutorial_funcion_id(funcx_test_config):
     if not funcid:
         pytest.skip("test requires a pre-defined public hello function")
     return funcid
+
+
+FuncResult = collections.namedtuple(
+    "FuncResult", ["func_id", "task_id", "result", "response"]
+)
+
+
+@pytest.fixture
+def submit_function_and_get_result(fxc):
+    def submit_fn(
+        endpoint_id, func=None, func_args=None, func_kwargs=None, initial_sleep=0
+    ):
+        if callable(func):
+            func_id = fxc.register_function(func)
+        else:
+            func_id = func
+
+        if func_args is None:
+            func_args = ()
+        if func_kwargs is None:
+            func_kwargs = {}
+
+        task_id = fxc.run(
+            *func_args, endpoint_id=endpoint_id, function_id=func_id, **func_kwargs
+        )
+
+        if initial_sleep:
+            time.sleep(initial_sleep)
+
+        result = None
+        response = None
+        for attempt in range(10):
+            response = fxc.get_task(task_id)
+            if response.get("pending") is False:
+                result = response.get("result")
+            else:
+                time.sleep(attempt)
+
+        return FuncResult(func_id, task_id, result, response)
+
+    return submit_fn

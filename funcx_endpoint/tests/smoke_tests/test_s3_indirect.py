@@ -12,37 +12,48 @@ def large_arg_consumer(data: str) -> int:
 
 
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
-def test_allowed_result_sizes(fx, endpoint, size):
+def test_allowed_result_sizes(submit_function_and_get_result, endpoint, size):
     """funcX should allow all listed result sizes which are under 512KB limit"""
 
-    future = fx.submit(large_result_producer, size, endpoint_id=endpoint)
-    assert len(future.result(timeout=60)) == size
+    r = submit_function_and_get_result(
+        endpoint, func=large_result_producer, func_args=(size,)
+    )
+    assert len(r.result) == size
 
 
-def test_result_size_too_large(fx, endpoint, size=550000):
+def test_result_size_too_large(submit_function_and_get_result, endpoint):
     """
     funcX should raise a MaxResultSizeExceeded exception when results exceeds 512KB
     limit
     """
-    future = fx.submit(large_result_producer, size, endpoint_id=endpoint)
+    r = submit_function_and_get_result(
+        endpoint, func=large_result_producer, func_args=(550000,)
+    )
+    assert r.result is None
+    assert "exception" in r.response
+    # the exception that comes back is a wrapper, so we must "reraise()" to get the
+    # true error out
     with pytest.raises(MaxResultSizeExceeded):
-        future.result(timeout=60)
+        r.response["exception"].reraise()
 
 
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
-def test_allowed_arg_sizes(fx, endpoint, size):
+def test_allowed_arg_sizes(submit_function_and_get_result, endpoint, size):
     """funcX should allow all listed result sizes which are under 512KB limit"""
-
-    future = fx.submit(large_arg_consumer, bytearray(size), endpoint_id=endpoint)
-    assert future.result(timeout=60) == size
+    r = submit_function_and_get_result(
+        endpoint, func=large_arg_consumer, func_args=(bytearray(size),)
+    )
+    assert r.result == size
 
 
 @pytest.mark.skip(reason="As of 0.3.4, an arg size limit is not being enforced")
-def test_arg_size_too_large(fx, endpoint, size=55000000):
+def test_arg_size_too_large(submit_function_and_get_result, endpoint, size=55000000):
     """funcX should raise an exception for objects larger than some limit,
     which we are yet to define. This does not work right now.
     """
 
-    future = fx.submit(large_arg_consumer, bytearray(size), endpoint_id=endpoint)
-    with pytest.raises(Exception):
-        future.result(timeout=60)
+    r = submit_function_and_get_result(
+        endpoint, func=large_result_producer, func_args=(bytearray(550000),)
+    )
+    assert r.result is None
+    assert "exception" in r.response
