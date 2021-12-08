@@ -10,7 +10,7 @@ image:
   pullPolicy: Always
 
 workerImage: python:3.7-buster
-workerInit: pip install funcx-endpoint>=0.3.0; pip install -U home_run; export PYTHONPATH=PYTHONPATH:/app:/home/ubuntu; mkdir -p /home/ubuntu/
+workerInit: pip install funcx-endpoint>=0.3.0; pip install -U home_run; export PYTHONPATH="$PYTHONPATH:/app:/home/ubuntu"; mkdir -p /home/ubuntu/
 workerNamespace: dlhub
 workingDir: /home/ubuntu
 workerImageSecret: ryan-kube-secret
