@@ -1,5 +1,3 @@
-import pytest
-
 from funcx.sdk.container_spec import ContainerSpec
 
 
@@ -11,6 +9,7 @@ def test_constructor():
 
 
 def test_to_json():
-    container = ContainerSpec(apt=["abc"], pip=["cde==2"], conda=['cccc'])
-    assert container.to_json() == \
-           '{"apt": ["abc"], "pip": ["cde==2"], "conda": ["cccc"]}'
+    container = ContainerSpec(apt=["abc"], pip=["cde==2"], conda=["cccc"])
+    assert (
+        container.to_json() == '{"apt": ["abc"], "pip": ["cde==2"], "conda": ["cccc"]}'
+    )
