@@ -17,7 +17,7 @@ def version_callback(value):
     if value:
         import funcx_endpoint
 
-        typer.echo(f"FuncX endpoint version: {funcx_endpoint.__version__} test")
+        typer.echo(f"FuncX endpoint version: {funcx_endpoint.__version__} file trans")
         raise typer.Exit()
 
 

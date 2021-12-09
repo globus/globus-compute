@@ -46,6 +46,15 @@ class Config(RepresentationMixin):
     log_dir : str
         Optional path string to the top-level directory where logs should be written to.
         Default: None
+
+    globus_ep_id : str
+        Globus endpoint ID. Default: None
+
+    globus_polling_interval : float
+        The interval (in seconds) to poll data transfer status. Default: 10, minimum 1
+
+    local_data_path : str
+        The local path to store the data. Default: None
     """
 
     def __init__(
@@ -62,6 +71,10 @@ class Config(RepresentationMixin):
         log_dir=None,
         stdout="./endpoint.log",
         stderr="./endpoint.log",
+        # Globus transfer info
+        globus_ep_id=None,
+        globus_polling_interval=10,
+        local_data_path=None,
     ):
 
         # Execution backends
@@ -79,3 +92,8 @@ class Config(RepresentationMixin):
         self.log_dir = log_dir
         self.stdout = stdout
         self.stderr = stderr
+
+        # Globus transfer info
+        self.globus_ep_id = globus_ep_id
+        self.globus_polling_interval = globus_polling_interval
+        self.local_data_path = local_data_path

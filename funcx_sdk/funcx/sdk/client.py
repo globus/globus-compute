@@ -55,6 +55,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         fx_authorizer=None,
         search_authorizer=None,
         openid_authorizer=None,
+        need_transfer=False,
         funcx_service_address="https://api2.funcx.org/v2",
         check_endpoint_version=False,
         asynchronous=False,
@@ -129,8 +130,10 @@ class FuncXClient(FuncXErrorHandlingClient):
 
         # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
         search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
+        transfer_scope = "urn:globus:auth:scope:transfer.api.globus.org:all"
         scopes = [self.FUNCX_SCOPE, search_scope, "openid"]
-
+        if need_transfer:
+            scopes.append(transfer_scope)
         if not fx_authorizer or not search_authorizer or not openid_authorizer:
             self.native_client.login(
                 requested_scopes=scopes,

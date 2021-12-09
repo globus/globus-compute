@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 from typing import Dict, Tuple
+from urllib.parse import urlparse
 
 import daemon
 import zmq
@@ -21,6 +22,7 @@ from parsl.version import VERSION as PARSL_VERSION
 from funcx import set_file_logger
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.data_transfer.globus import GlobusTransferClient
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import (
     naive_interchange_task_dispatch,
 )
@@ -32,7 +34,6 @@ from funcx_endpoint.executors.high_throughput.messages import (
     MessageType,
     TaskStatusCode,
 )
-from funcx_endpoint.data_transfer.globus import GlobusTransferClient
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
@@ -69,15 +70,14 @@ class ManagerLost(Exception):
 
 
 class GlobusTransferFailure(Exception):
-    """ Task failed due to Globus transfer failure.
-    """
+    """Task failed due to Globus transfer failure."""
 
     def __init__(self, reason):
         self.reason = reason
         self.tstamp = time.time()
 
     def __repr__(self):
-        return "Task failure due to {}".format(self.reason)
+        return f"Task failure due to {self.reason}"
 
     def __str__(self):
         return self.__repr__()
@@ -307,10 +307,12 @@ class Interchange:
             self.data_staging = True
             self.globus_data_path = self.config.local_data_path
             if self.globus_data_path is None:
-                self.globus_data_path = "{}/data/".format(self.logdir)
-            self.gtc = GlobusTransferClient(dst_ep=self.config.globus_ep_id,
-                                            local_path=self.globus_data_path,
-                                            funcx_ep_id=endpoint_id)
+                self.globus_data_path = f"{self.logdir}/data/"
+            self.gtc = GlobusTransferClient(
+                dst_ep=self.config.globus_ep_id,
+                local_path=self.globus_data_path,
+                funcx_ep_id=endpoint_id,
+            )
 
         self.globus_polling_interval = self.config.globus_polling_interval
         self.active_transfers = {}
@@ -484,6 +486,113 @@ class Interchange:
 
         return tasks
 
+    def _track_transfer_status(self, kill_event):
+        """Track the status of active data transfers
+
+        Parameters:
+        -----------
+        kill_event : threading.Event
+              Event to let the thread know when it is time to die.
+        """
+        logger.info("[TRANSFER_TRACKING_THREAD] Starting")
+        while not kill_event.is_set():
+            for task_id, info in list(self.active_transfers.items()):
+                transfer_task, src_ep, src_path, dst_ep, dst_path = info
+                logger.debug(
+                    "[TRANSFER_TRACKING_THREAD] Globus Transfer task: {}".format(
+                        transfer_task
+                    )
+                )
+                transfer_status = self.gtc.status(transfer_task)
+                logger.debug(
+                    "[TRANSFER_TRACKING_THREAD] Status for task: {}".format(
+                        transfer_status["status"]
+                    )
+                )
+
+                if transfer_status["status"] == "SUCCEEDED":
+                    logger.info(
+                        "[TRANSFER_TRACKING_THREAD] Globus transfer{}, "
+                        "from {}{} to {}{} succeeded".format(
+                            transfer_task["task_id"], src_ep, src_path, dst_ep, dst_path
+                        )
+                    )
+                    msg = self.pending_transfer_tasks.pop(task_id)
+                    del self.active_transfers[task_id]
+                    self.pending_task_queue[msg["container"]].put(msg)
+                elif (
+                    transfer_status["status"] == "FAILED"
+                    or transfer_status["status"] == "ACTIVE"
+                ):
+                    failed_reason = self.gtc.get_event(transfer_task)
+                    if failed_reason is not None:
+                        self.gtc.cancel(transfer_task)
+                        msg = self.pending_transfer_tasks.pop(task_id)
+                        del self.active_transfers[task_id]
+                        self.failed_transfer_tasks[
+                            msg["task_id"]
+                        ] = GlobusTransferFailure(failed_reason)
+                        logger.error(
+                            "[TRANSFER_TRACKING_THREAD] Globus transfer {}, "
+                            'from {}{} to {}{} failed due to error: "{}"'.format(
+                                transfer_task["task_id"],
+                                src_ep,
+                                src_path,
+                                dst_ep,
+                                dst_path,
+                                failed_reason,
+                            )
+                        )
+
+            time.sleep(self.globus_polling_interval)
+
+    def _submit_transfer(self, kill_event):
+        """Initiate data data transfers
+
+        Parameters:
+        -----------
+        kill_event : threading.Event
+              Event to let the thread know when it is time to die.
+        """
+        logger.info("[TRANSFER_SUBMIT_THREAD] Starting")
+        while not kill_event.is_set():
+            try:
+                msg = self.pending_transfer_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+            else:
+                data_url = msg["task_id"].split(";")[3]
+                recursive = True if msg["task_id"].split(";")[4] == "True" else False
+
+            try:
+                parsed_url = urlparse(data_url)
+                src_ep = parsed_url.netloc
+                src_path = parsed_url.path
+                basename = os.path.basename(src_path)
+            except Exception as e:
+                logger.exception(
+                    "[TRANSFER_SUBMIT_THREAD] Failed to parse data url {}".format(
+                        data_url
+                    )
+                )
+                self.failed_transfer_tasks[msg["task_id"]] = GlobusTransferFailure(e)
+            else:
+                try:
+                    info = self.gtc.transfer(
+                        src_ep, src_path, basename, recursive=recursive
+                    )
+                except Exception as e:
+                    logger.exception(
+                        "[TRANSFER_SUBMIT_THREAD] Failed "
+                        "to submit transfer for task {}".format(msg["task_id"])
+                    )
+                    self.failed_transfer_tasks[msg["task_id"]] = GlobusTransferFailure(
+                        e
+                    )
+                else:
+                    self.active_transfers[msg["task_id"]] = info
+                    self.pending_transfer_tasks[msg["task_id"]] = msg
+
     def migrate_tasks_to_internal(self, kill_event, status_request):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
@@ -535,16 +644,34 @@ class Interchange:
                     self.pending_task_queue[local_container] = queue.Queue(
                         maxsize=10 ** 6
                     )
-
+                # Check if data transfer is needed
+                data_url = msg["task_id"].split(";")[3]
+                if data_url != "None":
+                    if not self.data_staging:
+                        logger.exception(
+                            "[TASK_PULL_THREAD] Destination Globus "
+                            "Endpoint ID not specified. "
+                            "Please specify it in config"
+                        )
+                        e = GlobusTransferFailure(
+                            "Destination Globus Endpoint ID not specified. "
+                            "Please specify it in config"
+                        )
+                        self.failed_transfer_tasks[
+                            msg["task_id"]
+                        ] = GlobusTransferFailure(e)
+                    else:
+                        self.pending_transfer_queue.put(msg)
                 # We pass the raw message along
-                self.pending_task_queue[local_container].put(
-                    {
-                        "task_id": msg.task_id,
-                        "container_id": msg.container_id,
-                        "local_container": local_container,
-                        "raw_buffer": raw_msg,
-                    }
-                )
+                else:
+                    self.pending_task_queue[local_container].put(
+                        {
+                            "task_id": msg.task_id,
+                            "container_id": msg.container_id,
+                            "local_container": local_container,
+                            "raw_buffer": raw_msg,
+                        }
+                    )
                 self.total_pending_task_count += 1
                 self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
                 logger.debug(
@@ -583,8 +710,8 @@ class Interchange:
         outstanding = {}
         for task_type in self.pending_task_queue:
             outstanding[task_type] = (
-                    outstanding.get(task_type, 0)
-                    + self.pending_task_queue[task_type].qsize()
+                outstanding.get(task_type, 0)
+                + self.pending_task_queue[task_type].qsize()
             )
         for manager in self._ready_manager_queue:
             for task_type in self._ready_manager_queue[manager]["tasks"]:
@@ -637,8 +764,8 @@ class Interchange:
         """
         for manager in self._ready_manager_queue:
             if (
-                    self._ready_manager_queue[manager]["active"]
-                    and self._ready_manager_queue[manager]["block_id"] == block_id
+                self._ready_manager_queue[manager]["active"]
+                and self._ready_manager_queue[manager]["block_id"] == block_id
             ):
                 logger.debug(f"[HOLD_BLOCK]: Sending hold to manager: {manager}")
                 self.hold_manager(manager)
@@ -711,6 +838,9 @@ class Interchange:
 
         self._task_puller_thread.join()
         self._command_thread.join()
+        if self.data_staging:
+            self._transfer_submit_thread.join()
+            self._transfer_tracking_thread.join()
 
     def start(self, poll_period=None):
         """Start the Interchange
@@ -738,6 +868,17 @@ class Interchange:
             ),
         )
         self._task_puller_thread.start()
+
+        if self.data_staging:
+            self._transfer_submit_thread = threading.Thread(
+                target=self._submit_transfer, args=(self._kill_event,)
+            )
+            self._transfer_submit_thread.start()
+
+            self._transfer_tracking_thread = threading.Thread(
+                target=self._track_transfer_status, args=(self._kill_event,)
+            )
+            self._transfer_tracking_thread.start()
 
         self._command_thread = threading.Thread(
             target=self._command_server, args=(self._kill_event,)
@@ -782,8 +923,8 @@ class Interchange:
 
             # Listen for requests for work
             if (
-                    self.task_outgoing in self.socks
-                    and self.socks[self.task_outgoing] == zmq.POLLIN
+                self.task_outgoing in self.socks
+                and self.socks[self.task_outgoing] == zmq.POLLIN
             ):
                 logger.debug("[MAIN] starting task_outgoing section")
                 message = self.task_outgoing.recv_multipart()
@@ -824,9 +965,9 @@ class Interchange:
                         )
 
                         if (
-                                msg["python_v"].rsplit(".", 1)[0]
-                                != self.current_platform["python_v"].rsplit(".", 1)[0]
-                                or msg["parsl_v"] != self.current_platform["parsl_v"]
+                            msg["python_v"].rsplit(".", 1)[0]
+                            != self.current_platform["python_v"].rsplit(".", 1)[0]
+                            or msg["parsl_v"] != self.current_platform["parsl_v"]
                         ):
                             logger.warn(
                                 "[MAIN] Manager %s has incompatible version info with "
@@ -944,8 +1085,8 @@ class Interchange:
 
             # Receive any results and forward to client
             if (
-                    self.results_incoming in self.socks
-                    and self.socks[self.results_incoming] == zmq.POLLIN
+                self.results_incoming in self.socks
+                and self.socks[self.results_incoming] == zmq.POLLIN
             ):
                 logger.debug("[MAIN] entering results_incoming section")
                 manager, *b_messages = self.results_incoming.recv_multipart()
@@ -1021,12 +1162,37 @@ class Interchange:
             except queue.Empty:
                 pass
 
+            # Failed transfer task section
+            failed_transfer_msgs = []
+            for tid, reason in list(self.failed_transfer_tasks.items()):
+                try:
+                    raise reason
+                except Exception:
+                    result_package = {
+                        "task_id": tid,
+                        "exception": self.serializer.serialize(
+                            RemoteExceptionWrapper(*sys.exc_info())
+                        ),
+                    }
+                    pkl_package = pickle.dumps(result_package)
+                    failed_transfer_msgs.append(pkl_package)
+                    logger.info(
+                        "[MAIN] Sending result for "
+                        "failed transfer task: {}, result: {}".format(
+                            tid, result_package
+                        )
+                    )
+                    self.failed_transfer_tasks.pop(tid, "None")
+                    self.total_pending_task_count -= 1
+            if failed_transfer_msgs:
+                self.results_outgoing.send(pickle.dumps(failed_transfer_msgs))
+
             # logger.debug("[MAIN] entering bad_managers section")
             bad_managers = [
                 manager
                 for manager in self._ready_manager_queue
                 if time.time() - self._ready_manager_queue[manager]["last"]
-                   > self.heartbeat_threshold
+                > self.heartbeat_threshold
             ]
             bad_manager_msgs = []
             for manager in bad_managers:
@@ -1269,7 +1435,7 @@ def cli_run():
         "--worker_ports",
         default=None,
         help="OPTIONAL, pair of workers ports to listen on, "
-             "eg --worker_ports=50001,50005",
+        "eg --worker_ports=50001,50005",
     )
     parser.add_argument(
         "--suppress_failure",
