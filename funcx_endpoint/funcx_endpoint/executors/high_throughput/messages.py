@@ -87,27 +87,45 @@ class Task(Message):
     type = MessageType.TASK
 
     def __init__(
-        self, task_id: str, container_id: str, task_buffer: str, raw_buffer=None
+        self,
+        task_id: str,
+        container_id: str,
+        task_buffer: str,
+        raw_buffer=None,
+        data_url=None,
+        recursive=None,
     ):
         super().__init__()
         self.task_id = task_id
         self.container_id = container_id
         self.task_buffer = task_buffer
         self.raw_buffer = raw_buffer
+        self.data_url = data_url
+        self.recursive = recursive
 
     def pack(self) -> bytes:
 
         if self.raw_buffer is None:
-            add_ons = f"TID={self.task_id};CID={self.container_id};{self.task_buffer}"
+            add_ons = (
+                f"TID={self.task_id};CID={self.container_id};"
+                f"{self.task_buffer};DURL={self.data_url};RCUR={self.recursive}"
+            )
             self.raw_buffer = add_ons.encode("utf-8")
 
         return self.type.pack() + self.raw_buffer
 
     @classmethod
     def unpack(cls, raw_buffer: bytes):
-        b_tid, b_cid, task_buf = raw_buffer.decode("utf-8").split(";", 2)
+        b_tid, b_cid, task_buf, b_data_url, b_recursive = raw_buffer.decode(
+            "utf-8"
+        ).split(";", 4)
         return cls(
-            b_tid[4:], b_cid[4:], task_buf.encode("utf-8"), raw_buffer=raw_buffer
+            b_tid[4:],
+            b_cid[4:],
+            task_buf.encode("utf-8"),
+            raw_buffer=raw_buffer,
+            data_url=b_data_url[5:],
+            recursive=b_recursive[5:],
         )
 
     def set_local_container(self, container_id):

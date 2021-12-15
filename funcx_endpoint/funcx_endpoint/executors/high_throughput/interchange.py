@@ -148,6 +148,9 @@ class Interchange:
         suppress_failure=False,
         log_max_bytes=256 * 1024 * 1024,
         log_backup_count=1,
+        globus_ep_id=None,
+        local_data_path=None,
+        globus_polling_interval=10,
     ):
         """
         Parameters
@@ -302,19 +305,20 @@ class Interchange:
             self.fxs = FuncXClient()
         # Globus transfer
         self.data_staging = False
-        if self.config.globus_ep_id:
-            logger.info("Initiating Globus transfer client")
+        self.globus_ep_id = globus_ep_id
+        if self.globus_ep_id is not None:
+            print(f"Initiating Globus transfer client {self.globus_ep_id}")
             self.data_staging = True
-            self.globus_data_path = self.config.local_data_path
+            self.globus_data_path = local_data_path
             if self.globus_data_path is None:
                 self.globus_data_path = f"{self.logdir}/data/"
             self.gtc = GlobusTransferClient(
-                dst_ep=self.config.globus_ep_id,
+                dst_ep=self.globus_ep_id,
                 local_path=self.globus_data_path,
                 funcx_ep_id=endpoint_id,
             )
 
-        self.globus_polling_interval = self.config.globus_polling_interval
+        self.globus_polling_interval = globus_polling_interval
         self.active_transfers = {}
         self.completed_transfers = {}
         self.pending_transfer_queue = queue.Queue(maxsize=10 ** 6)

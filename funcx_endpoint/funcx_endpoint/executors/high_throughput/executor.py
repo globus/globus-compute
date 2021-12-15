@@ -256,8 +256,13 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         passthrough=True,
         funcx_service_address=None,
         task_status_queue=None,
+        globus_ep_id=None,
+        local_data_path=None,
+        globus_polling_interval=10,
     ):
-
+        self.globus_ep_id = globus_ep_id
+        self.local_data_path = local_data_path
+        self.globus_polling_interval = globus_polling_interval
         logger.debug("Initializing HighThroughputExecutor")
         StatusHandlingExecutor.__init__(self, provider)
 
@@ -466,6 +471,9 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 "suppress_failure": self.suppress_failure,
                 "endpoint_id": self.endpoint_id,
                 "logging_level": logging.DEBUG if self.worker_debug else logging.INFO,
+                "globus_ep_id": self.globus_ep_id,
+                "local_data_path": self.local_data_path,
+                "globus_polling_interval": self.globus_polling_interval,
             },
         )
         self.queue_proc.start()
