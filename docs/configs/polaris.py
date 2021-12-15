@@ -14,7 +14,7 @@ user_opts = {
         'worker_init': '',
         # PBS directives (header lines): for array jobs pass '-J' option
         # Set ncpus=32, otherwise it defaults to 1 on Polaris
-        'scheduler_options': '#PBS -l select=32:ncpus=32',
+        'scheduler_options': '',
     }
 }
 
@@ -23,7 +23,7 @@ config = Config(
         HighThroughputExecutor(
             max_workers_per_node=1,
             strategy=SimpleStrategy(max_idletime=300),
-            address='10.230.2.72',
+            address='10.230.2.72', # IP of Polaris testbed login node
             provider=PBSProProvider(
                 launcher=SingleNodeLauncher(),
                 queue='workq',
@@ -31,6 +31,7 @@ config = Config(
                 # Command to be run before starting a worker, such as:
                 # 'module load Anaconda; source activate parsl_env'.
                 worker_init=user_opts['polaris']['worker_init'],
+                cpus_per_node=32,
                 walltime='01:00:00',
                 nodes_per_block=1,
                 init_blocks=0,
