@@ -3,7 +3,7 @@ import asyncio
 
 class FuncXTask(asyncio.Future):
     """
-    Represents a submitted funcX task with an asychio wrapper
+    Represents a submitted funcX task with an asyncio wrapper
     """
 
     def __init__(self, task_id):

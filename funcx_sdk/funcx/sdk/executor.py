@@ -67,14 +67,23 @@ class FuncXExecutor(concurrent.futures.Executor):
         ==========
 
         funcx_client : client object
-            Instance of FuncXClient to be used by the executor
-
-        results_ws_uri : str
-            Web sockets URI for the results
+        Instance of FuncXClient to be used by the executor
 
         label : str
-            Optional string label to name the executor.
-            Default: 'FuncXExecutor'
+        Optional string label to name the executor.
+        Default: 'FuncXExecutor'
+
+        batch_enabled: bool
+        Use option to enable batch automatic batching of task submissions
+        Default: False
+
+        batch_interval: float
+        Interval (in seconds) between submission of batches when batch is enabled.
+        Default: 1.0
+
+        batch_size: int
+        Maximum number of tasks within a batch
+        Default: 100
         """
 
         self.funcx_client = funcx_client
