@@ -127,9 +127,9 @@ class WebSocketPollingTask:
                 pass
             except ConnectionClosedOK:
                 if self.closed_by_main_thread:
-                    log.debug("WebSocket connection closed by main thread")
+                    log.info("WebSocket connection closed by main thread")
                 else:
-                    log.error("WebSocket connection closed unexpectedly")
+                    log.exception("WebSocket connection closed unexpectedly")
                 return
             else:
                 data = json.loads(raw_data)

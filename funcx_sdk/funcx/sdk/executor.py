@@ -323,6 +323,7 @@ class ExecutorPollerThread:
         )
 
     def shutdown(self):
+        log.info("Shutting down")
         if self.ws_handler is None:
             return
 
