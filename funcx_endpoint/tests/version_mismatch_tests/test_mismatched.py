@@ -30,7 +30,7 @@ def test_worker_version(fx, ep_id, ep_version, version):
 
     except Exception:
         print(f"Expected worker_version : {version}, actual: {future.result()}")
-        sys.exit(-1)
+        sys.exit(1)
     else:
         print(f"Worker returned the expected version:{future.result()}")
 
@@ -47,10 +47,10 @@ def test_app_exception(fx, ep_id, ep_version, version):
         print("Worker returned the correct exception")
     except Exception as e:
         print(f"Expected ValueError, actual: {e}")
-        sys.exit(-1)
+        sys.exit(1)
     else:
         print("No exception, expected ValueError")
-        sys.exit(-1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
