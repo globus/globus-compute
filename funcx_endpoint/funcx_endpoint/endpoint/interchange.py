@@ -18,7 +18,6 @@ from parsl.version import VERSION as PARSL_VERSION
 from retry.api import retry_call
 
 from funcx import __version__ as funcx_sdk_version
-from funcx import set_file_logger
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint import __version__ as funcx_endpoint_version
@@ -34,6 +33,9 @@ from funcx_endpoint.executors.high_throughput.messages import (
     Task,
     TaskStatusCode,
 )
+from funcx_endpoint.logging_config import setup_logging
+
+log = logging.getLogger(__name__)
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2 ** 32) - 1
@@ -84,7 +86,6 @@ class EndpointInterchange:
         client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
         launch_cmd=None,
         logdir=".",
-        logging_level=logging.INFO,
         endpoint_id=None,
         keys_dir=".curve",
         suppress_failure=True,
@@ -117,9 +118,6 @@ class EndpointInterchange:
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'
 
-        logging_level : int
-             Logging level as defined in the logging module. Default: logging.INFO (20)
-
         keys_dir : str
              Directory from where keys used for communicating with the funcX
              service (forwarders) are stored
@@ -145,25 +143,13 @@ class EndpointInterchange:
              FuncXClient initialization options
         """
         self.logdir = logdir
-        try:
-            os.makedirs(self.logdir)
-        except FileExistsError:
-            pass
-
-        global logger
-
-        logger = set_file_logger(
-            os.path.join(self.logdir, "endpoint.log"),
-            name="funcx_endpoint",
-            level=logging_level,
-        )
-        logger.info(
+        log.info(
             "Initializing EndpointInterchange process with Endpoint ID: {}".format(
                 endpoint_id
             )
         )
         self.config = config
-        logger.info(f"Got config : {config}")
+        log.info(f"Got config: {config}")
 
         self.client_address = client_address
         self.interchange_address = interchange_address
@@ -198,7 +184,7 @@ class EndpointInterchange:
 
         self.results_ack_handler = results_ack_handler
 
-        logger.info(f"Interchange address is {self.interchange_address}")
+        log.info(f"Interchange address is {self.interchange_address}")
 
         self.endpoint_id = endpoint_id
 
@@ -217,11 +203,11 @@ class EndpointInterchange:
             "dir": os.getcwd(),
         }
 
-        logger.info(f"Platform info: {self.current_platform}")
+        log.info(f"Platform info: {self.current_platform}")
         try:
             self.load_config()
         except Exception:
-            logger.exception("Caught exception")
+            log.exception("Caught exception")
             raise
 
         self.tasks = set()
@@ -231,12 +217,12 @@ class EndpointInterchange:
 
     def load_config(self):
         """Load the config"""
-        logger.info("Loading endpoint local config")
+        log.info("Loading endpoint local config")
 
         self.results_passthrough = mpQueue()
         self.executors = {}
         for executor in self.config.executors:
-            logger.info(f"Initializing executor: {executor.label}")
+            log.info(f"Initializing executor: {executor.label}")
             executor.funcx_service_address = self.config.funcx_service_address
             if not executor.endpoint_id:
                 executor.endpoint_id = self.endpoint_id
@@ -248,7 +234,7 @@ class EndpointInterchange:
                 executor.run_dir = self.logdir
 
     def start_executors(self):
-        logger.info("Starting Executors")
+        log.info("Starting Executors")
         for executor in self.config.executors:
             if hasattr(executor, "passthrough") and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
@@ -277,16 +263,16 @@ class EndpointInterchange:
         quiesce_event : threading.Event
               Event to let the thread know when it is time to die.
         """
-        logger.info("[TASK_PULL_THREAD] Starting")
+        log.info("[TASK_PULL_THREAD] Starting")
 
         try:
             self._task_puller_loop(quiesce_event)
         except Exception:
-            logger.exception("[TASK_PULL_THREAD] Unhandled exception")
+            log.exception("[TASK_PULL_THREAD] Unhandled exception")
         finally:
             quiesce_event.set()
             self.task_incoming.close()
-            logger.info("[TASK_PULL_THREAD] Thread loop exiting")
+            log.info("[TASK_PULL_THREAD] Thread loop exiting")
 
     def _task_puller_loop(self, quiesce_event):
         task_counter = 0
@@ -304,9 +290,7 @@ class EndpointInterchange:
         )
 
         self.task_incoming.put("forwarder", pickle.dumps(self.current_platform))
-        logger.info(
-            f"Task incoming on tcp://{self.client_address}:{self.client_ports[0]}"
-        )
+        log.info(f"Task incoming on tcp://{self.client_address}:{self.client_ports[0]}")
 
         self.last_heartbeat = time.time()
 
@@ -314,7 +298,7 @@ class EndpointInterchange:
 
             try:
                 if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
-                    logger.critical(
+                    log.critical(
                         "[TASK_PULL_THREAD] Missed too many heartbeats. "
                         "Setting quiesce event."
                     )
@@ -327,14 +311,14 @@ class EndpointInterchange:
                     self.last_heartbeat = time.time()
                 except zmq.Again:
                     # We just timed out while attempting to receive
-                    logger.debug(
+                    log.debug(
                         "[TASK_PULL_THREAD] {} tasks in internal queue".format(
                             self.total_pending_task_count
                         )
                     )
                     continue
                 except Exception:
-                    logger.exception(
+                    log.exception(
                         "[TASK_PULL_THREAD] Unknown exception while waiting for tasks"
                     )
 
@@ -342,7 +326,7 @@ class EndpointInterchange:
                 try:
                     msg = Message.unpack(raw_msg)
                 except Exception:
-                    logger.exception(
+                    log.exception(
                         "[TASK_PULL_THREAD] Failed to unpack message from forwarder"
                     )
                     pass
@@ -353,17 +337,17 @@ class EndpointInterchange:
                     break
 
                 elif isinstance(msg, Heartbeat):
-                    logger.info("[TASK_PULL_THREAD] Got heartbeat from funcx-forwarder")
+                    log.info("[TASK_PULL_THREAD] Got heartbeat from funcx-forwarder")
 
                 elif isinstance(msg, Task):
-                    logger.info(f"[TASK_PULL_THREAD] Received task:{msg.task_id}")
+                    log.info(f"[TASK_PULL_THREAD] Received task:{msg.task_id}")
                     self.pending_task_queue.put(msg)
                     self.total_pending_task_count += 1
                     self.task_status_deltas[
                         msg.task_id
                     ] = TaskStatusCode.WAITING_FOR_NODES
                     task_counter += 1
-                    logger.debug(
+                    log.debug(
                         "[TASK_PULL_THREAD] Task counter:%s Pending Tasks: %s",
                         task_counter,
                         self.total_pending_task_count,
@@ -373,12 +357,12 @@ class EndpointInterchange:
                     self.results_ack_handler.ack(msg.task_id)
 
                 else:
-                    logger.warning(
+                    log.warning(
                         f"[TASK_PULL_THREAD] Unknown message type received: {msg}"
                     )
 
             except Exception:
-                logger.exception("[TASK_PULL_THREAD] Something really bad happened")
+                log.exception("[TASK_PULL_THREAD] Something really bad happened")
                 continue
 
     def get_container(self, container_uuid):
@@ -392,12 +376,12 @@ class EndpointInterchange:
                         container_uuid, self.config.container_type
                     )
                 except Exception:
-                    logger.exception(
+                    log.exception(
                         "[FETCH_CONTAINER] Unable to resolve container location"
                     )
                     self.containers[container_uuid] = "RAW"
                 else:
-                    logger.info(f"[FETCH_CONTAINER] Got container info: {container}")
+                    log.info(f"[FETCH_CONTAINER] Got container info: {container}")
                     self.containers[container_uuid] = container.get("location", "RAW")
         return self.containers[container_uuid]
 
@@ -411,16 +395,16 @@ class EndpointInterchange:
          - HoldWorker
          - Shutdown
         """
-        logger.debug("[COMMAND] Command Server Starting")
+        log.debug("[COMMAND] Command Server Starting")
 
         try:
             self._command_server_loop(quiesce_event)
         except Exception:
-            logger.exception("[COMMAND] Unhandled exception")
+            log.exception("[COMMAND] Unhandled exception")
         finally:
             quiesce_event.set()
             self.command_channel.close()
-            logger.info("[COMMAND] Thread loop exiting")
+            log.info("[COMMAND] Thread loop exiting")
 
     def _command_server_loop(self, quiesce_event):
         self.command_channel = TaskQueue(
@@ -443,51 +427,47 @@ class EndpointInterchange:
             try:
                 # Wait for 1000 ms
                 buffer = self.command_channel.get(timeout=1000)
-                logger.debug(f"[COMMAND] Received command request {buffer}")
+                log.debug(f"[COMMAND] Received command request {buffer}")
                 command = Message.unpack(buffer)
                 if command.type not in COMMAND_TYPES:
-                    logger.error("Received incorrect message type on command channel")
+                    log.error("Received incorrect message type on command channel")
                     self.command_channel.put(bytes())
                     continue
 
                 if command.type is MessageType.HEARTBEAT_REQ:
-                    logger.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
-                    logger.info(
-                        f"[COMMAND] Replying with Heartbeat({self.endpoint_id})"
-                    )
+                    log.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
+                    log.info(f"[COMMAND] Replying with Heartbeat({self.endpoint_id})")
                     reply = Heartbeat(self.endpoint_id)
 
-                logger.debug(f"[COMMAND] Reply: {reply}")
+                log.debug(f"[COMMAND] Reply: {reply}")
                 self.command_channel.put(reply.pack())
 
             except zmq.Again:
-                # logger.debug("[COMMAND] is alive")
+                # log.debug("[COMMAND] is alive")
                 continue
 
     def quiesce(self):
         """Temporarily stop everything on the interchange in order to reach a consistent
         state before attempting to start again. This must be called on the main thread
         """
-        logger.info(
-            "Interchange Quiesce in progress (stopping and joining all threads)"
-        )
+        log.info("Interchange Quiesce in progress (stopping and joining all threads)")
         self._quiesce_event.set()
         self._task_puller_thread.join()
         self._command_thread.join()
 
-        logger.info("Saving unacked results to disk")
+        log.info("Saving unacked results to disk")
         try:
             self.results_ack_handler.persist()
         except Exception:
-            logger.exception("Caught exception while saving unacked results")
-            logger.warning("Interchange will continue without saving unacked results")
+            log.exception("Caught exception while saving unacked results")
+            log.warning("Interchange will continue without saving unacked results")
 
         # this must be called last to ensure the next interchange run will occur
         self._quiesce_event.clear()
 
     def stop(self):
         """Prepare the interchange for shutdown"""
-        logger.info("Shutting down EndpointInterchange")
+        log.info("Shutting down EndpointInterchange")
 
         # TODO: shut down executors gracefully
 
@@ -497,18 +477,18 @@ class EndpointInterchange:
         self._quiesce_event.set()
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
-        logger.warning("Received SIGTERM, attempting to save unacked results to disk")
+        log.warning("Received SIGTERM, attempting to save unacked results to disk")
         try:
             self.results_ack_handler.persist()
         except Exception:
-            logger.exception("Caught exception while saving unacked results")
+            log.exception("Caught exception while saving unacked results")
         else:
-            logger.info("Unacked results successfully saved to disk")
+            log.info("Unacked results successfully saved to disk")
         sys.exit(1)
 
     def start(self):
         """Start the Interchange"""
-        logger.info("Starting EndpointInterchange")
+        log.info("Starting EndpointInterchange")
 
         signal.signal(signal.SIGTERM, self.handle_sigterm)
 
@@ -527,23 +507,23 @@ class EndpointInterchange:
             if self._test_start:
                 break
 
-        logger.info("EndpointInterchange shutdown complete.")
+        log.info("EndpointInterchange shutdown complete.")
 
     def _start_threads_and_main(self):
         # re-register on every loop start
         if not self.initial_registration_complete:
             # Register the endpoint
-            logger.info("Running endpoint registration retry loop")
+            log.info("Running endpoint registration retry loop")
             reg_info = retry_call(
                 self.register_endpoint, delay=10, max_delay=300, backoff=1.2
             )
-            logger.info(
+            log.info(
                 "Endpoint registered with UUID: {}".format(reg_info["endpoint_id"])
             )
 
         self.initial_registration_complete = False
 
-        logger.info(
+        log.info(
             "Attempting connection to client at {} on ports: {},{},{}".format(
                 self.client_address,
                 self.client_ports[0],
@@ -565,10 +545,10 @@ class EndpointInterchange:
         try:
             self._main_loop()
         except Exception:
-            logger.exception("[MAIN] Unhandled exception")
+            log.exception("[MAIN] Unhandled exception")
         finally:
             self.results_outgoing.close()
-            logger.info("[MAIN] Thread loop exiting")
+            log.info("[MAIN] Thread loop exiting")
 
     def _main_loop(self):
         self.results_outgoing = TaskQueue(
@@ -590,7 +570,7 @@ class EndpointInterchange:
         # ensure there are not unacked results left
         resend_results_messages = self.results_ack_handler.get_unacked_results_list()
         if len(resend_results_messages) > 0:
-            logger.info(
+            log.info(
                 "[MAIN] Resending %s previously unacked results",
                 len(resend_results_messages),
             )
@@ -604,14 +584,14 @@ class EndpointInterchange:
 
         while not self._quiesce_event.is_set():
             if last + self.heartbeat_threshold < time.time():
-                logger.debug("[MAIN] alive")
+                log.debug("[MAIN] alive")
                 last = time.time()
                 try:
                     # Adding results heartbeat to essentially force a TCP keepalive
                     # without meddling with OS TCP keepalive defaults
                     self.results_outgoing.put("forwarder", b"HEARTBEAT")
                 except Exception:
-                    logger.exception(
+                    log.exception(
                         "[MAIN] Sending heartbeat to the forwarder over the results "
                         "channel has failed"
                     )
@@ -625,10 +605,7 @@ class EndpointInterchange:
             except queue.Empty:
                 pass
             except Exception:
-                logger.exception(
-                    "[MAIN] Unhandled issue while waiting for pending tasks"
-                )
-                pass
+                log.exception("[MAIN] Unhandled issue while waiting for pending tasks")
 
             try:
                 results = self.results_passthrough.get(False, 0.01)
@@ -636,7 +613,7 @@ class EndpointInterchange:
                 task_id = results["task_id"]
                 if task_id:
                     self.results_ack_handler.put(task_id, results["message"])
-                    logger.info(f"Passing result to forwarder for task {task_id}")
+                    log.info(f"Passing result to forwarder for task {task_id}")
 
                 # results will be a pickled dict with task_id, container_id,
                 # and results/exception
@@ -646,7 +623,7 @@ class EndpointInterchange:
                 pass
 
             except Exception:
-                logger.exception(
+                log.exception(
                     "[MAIN] Something broke while forwarding results from executor "
                     "to forwarder queues"
                 )
@@ -731,7 +708,7 @@ class EndpointInterchange:
                     internal_block = self.config.provider.submit(
                         launch_cmd, 1, task_type
                     )
-                logger.debug(f"Launched block {external_block_id}->{internal_block}")
+                log.debug(f"Launched block {external_block_id}->{internal_block}")
                 if not internal_block:
                     raise (
                         ScalingFailed(
@@ -742,7 +719,7 @@ class EndpointInterchange:
                 self.blocks[external_block_id] = internal_block
                 self.block_id_map[internal_block] = external_block_id
             else:
-                logger.error("No execution provider available")
+                log.error("No execution provider available")
                 r = None
         return r
 
@@ -760,22 +737,22 @@ class EndpointInterchange:
         if block_ids is None:
             block_ids = []
         if task_type:
-            logger.info(
+            log.info(
                 "Scaling in blocks of specific task type %s. "
                 "Let the provider decide which to kill",
                 task_type,
             )
             if self.config.scaling_enabled and self.config.provider:
                 to_kill, r = self.config.provider.cancel(blocks, task_type)
-                logger.info(f"Get the killed blocks: {to_kill}, and status: {r}")
+                log.info(f"Get the killed blocks: {to_kill}, and status: {r}")
                 for job in to_kill:
-                    logger.info(
+                    log.info(
                         "[scale_in] Getting the block_id map {} for job {}".format(
                             self.block_id_map, job
                         )
                     )
                     block_id = self.block_id_map[job]
-                    logger.info(f"[scale_in] Holding block {block_id}")
+                    log.info(f"[scale_in] Holding block {block_id}")
                     self._hold_block(block_id)
                     self.blocks.pop(block_id)
                 return r
@@ -802,13 +779,13 @@ class EndpointInterchange:
         """Get status of all blocks from the provider"""
         status = []
         if self.config.provider:
-            logger.debug(
+            log.debug(
                 "[MAIN] Getting the status of {} blocks.".format(
                     list(self.blocks.values())
                 )
             )
             status = self.config.provider.status(list(self.blocks.values()))
-            logger.debug(f"[MAIN] The status is {status}")
+            log.debug(f"[MAIN] The status is {status}")
 
         return status
 
@@ -871,6 +848,10 @@ def cli_run():
     print("Starting HTEX Intechange")
     args = parser.parse_args()
 
+    logdir = os.path.abspath(args.logdir)
+    os.makedirs(logdir, exist_ok=True)
+    setup_logging(logfile=os.path.join(logdir, "endpoint.log"), debug=args.debug)
+
     optionals = {}
     optionals["suppress_failure"] = args.suppress_failure
     optionals["logdir"] = os.path.abspath(args.logdir)
@@ -899,8 +880,6 @@ def cli_run():
     else:
         optionals["config"] = args.config
 
-    if args.debug:
-        optionals["logging_level"] = logging.DEBUG
     if args.worker_ports:
         optionals["worker_ports"] = [int(i) for i in args.worker_ports.split(",")]
     if args.worker_port_range:

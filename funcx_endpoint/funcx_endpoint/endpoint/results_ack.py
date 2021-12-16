@@ -3,9 +3,7 @@ import os
 import pickle
 import time
 
-# The logger path needs to start with endpoint. while the current path
-# start with funcx_endpoint.endpoint.
-logger = logging.getLogger("endpoint.results_ack")
+log = logging.getLogger(__name__)
 
 
 class ResultsAckHandler:
@@ -50,7 +48,7 @@ class ResultsAckHandler:
         if acked_task:
             self.acked_count += 1
             unacked_count = len(self.unacked_results)
-            logger.debug(f"Acked task {task_id}, Unacked count: {unacked_count}")
+            log.debug(f"Acked task {task_id}, Unacked count: {unacked_count}")
 
     def check_ack_counts(self):
         """Log the number of currently Unacked tasks and the tasks Acked since
@@ -59,7 +57,7 @@ class ResultsAckHandler:
         now = time.time()
         if now - self.last_log_timestamp > self.log_period:
             unacked_count = len(self.unacked_results)
-            logger.info(
+            log.info(
                 "Unacked count: %s, Acked results since last check %s",
                 unacked_count,
                 self.acked_count,
@@ -89,7 +87,7 @@ class ResultsAckHandler:
                 with open(self.data_path, "rb") as fp:
                     self.unacked_results = pickle.load(fp)
         except pickle.UnpicklingError:
-            logger.warning(
+            log.warning(
                 "Cached results %s appear to be corrupt. "
                 "Proceeding without loading cached results",
                 self.data_path,
