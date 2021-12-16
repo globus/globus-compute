@@ -29,6 +29,7 @@ start_endpoint() {
         echo "TEST PASSED, EP_PY_V:$ep_v WORKER_PY_V:$worker_v"
     else
         echo "TEST FAILED, EP_PY_V:$ep_v WORKER_PY_V:$worker_v"
+        return 1
     fi
     echo "Stopping endpoint in 2s"
     sleep 2
@@ -54,6 +55,10 @@ do
         conda activate $ep_env_name
         which funcx-endpoint
         start_endpoint $worker_v $ep_v
+        if [ $? -ne 0 ] ; then
+          echo Aborting tests due to failure.
+          exit 1
+        fi
     done
 done
 
