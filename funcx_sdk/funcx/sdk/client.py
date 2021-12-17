@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import typing
 import uuid
 from distutils.version import LooseVersion
 from inspect import getsource
@@ -61,6 +62,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         loop=None,
         results_ws_uri="wss://api2.funcx.org/ws/v2/",
         use_offprocess_checker=True,
+        task_group_id: typing.Union[str, uuid.UUID] = uuid.uuid4(),
         **kwargs,
     ):
         """
@@ -109,13 +111,17 @@ class FuncXClient(FuncXErrorHandlingClient):
             used by the client.
             Default: True
 
+        task_group_id: str or UUID
+            Set the task_group_id to (re) connect to a  specific task_group.
+            Default: uuid.uuid4()
+
         Keyword arguments are the same as for BaseClient.
 
         """
         self.func_table = {}
         self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
-        self.session_task_group_id = str(uuid.uuid4())
+        self.session_task_group_id = str(task_group_id)
 
         if not os.path.exists(self.TOKEN_DIR):
             os.makedirs(self.TOKEN_DIR)
