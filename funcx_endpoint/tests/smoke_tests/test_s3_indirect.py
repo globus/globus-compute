@@ -23,11 +23,11 @@ def test_allowed_result_sizes(submit_function_and_get_result, endpoint, size):
 
 def test_result_size_too_large(submit_function_and_get_result, endpoint):
     """
-    funcX should raise a MaxResultSizeExceeded exception when results exceeds 512KB
+    funcX should raise a MaxResultSizeExceeded exception when results exceeds 10MB
     limit
     """
     r = submit_function_and_get_result(
-        endpoint, func=large_result_producer, func_args=(550000,)
+        endpoint, func=large_result_producer, func_args=(11 * 1024 * 1024,)
     )
     assert r.result is None
     assert "exception" in r.response
