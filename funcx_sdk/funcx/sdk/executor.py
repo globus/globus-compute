@@ -234,10 +234,24 @@ class FuncXExecutor(concurrent.futures.Executor):
                 raise
             else:
                 for i, msg in enumerate(messages):
-                    self._function_future_map[batch_tasks[i]] = self._tasks.pop(
-                        msg["task_id"]
-                    )
-                    self.poller_thread.atomic_controller.increment()
+                    future = self._tasks.pop(msg["task_id"])
+                    task_id = batch_tasks[i]
+                    self.add_task_to_poller(task_id, future)
+
+    def add_task_to_poller(self, task_id: str, future: concurrent.futures.Future):
+        """Add task to poller
+
+        Parameters
+        ----------
+        task_id: str
+        Task ID assigned by the funcX service, this is a uuid.uuid4 string.
+
+        future: A future object
+        Future object that will track the asynchronous execution of the task
+        """
+        future.task_id = task_id
+        self._function_future_map[task_id] = future
+        self.poller_thread.atomic_controller.increment()
 
     def _get_tasks_in_batch(self):
         """
