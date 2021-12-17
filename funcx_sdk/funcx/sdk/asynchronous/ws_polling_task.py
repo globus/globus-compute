@@ -119,7 +119,20 @@ class WebSocketPollingTask:
             task_group_id = await queue.get()
             await self.ws.send(task_group_id)
 
-    async def handle_incoming(self, pending_futures, auto_close=False):
+    async def handle_incoming(self, pending_futures, auto_close=False) -> bool:
+        """
+
+        Parameters
+        ----------
+        pending_futures
+        auto_close
+
+        Returns
+        -------
+        True -- If connection is closing from internal shutdown process
+        False -- External disconnect - to be handled by reconnect logic
+        """
+
         while True:
             try:
                 raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
@@ -128,15 +141,16 @@ class WebSocketPollingTask:
             except ConnectionClosedOK:
                 if self.closed_by_main_thread:
                     log.info("WebSocket connection closed by main thread")
+                    return True
                 else:
-                    log.exception("WebSocket connection closed unexpectedly")
-                return
+                    log.info("WebSocket connection closed unexpectedly")
+                    return False
             else:
                 data = json.loads(raw_data)
                 task_id = data["task_id"]
                 if task_id in pending_futures:
                     if await self.set_result(task_id, data, pending_futures):
-                        return
+                        return True
                 else:
                     # This scenario occurs rarely using non-batching mode, but quite
                     # often in batching mode.
@@ -153,7 +167,7 @@ class WebSocketPollingTask:
             for task_id in unprocessed_task_ids:
                 data = self.unknown_results.pop(task_id)
                 if await self.set_result(task_id, data, pending_futures):
-                    return
+                    return True
 
     async def set_result(self, task_id, data, pending_futures):
         """Sets the result of a future with given task_id in the pending_futures map,
@@ -198,10 +212,14 @@ class WebSocketPollingTask:
             count = self.atomic_controller.decrement()
             # Only close when count == 0 and unknown_results are empty
             if count == 0 and len(self.unknown_results) == 0:
-                await self.ws.close()
-                self.ws = None
+                await self.close()
                 return True
         return False
+
+    async def close(self):
+        """Close underlying web-sockets, does not stop listeners directly"""
+        await self.ws.close()
+        self.ws = None
 
     def put_task_group_id(self, task_group_id):
         # prevent the task_group_id from being sent to the WebSocket server
