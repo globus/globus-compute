@@ -315,12 +315,22 @@ class ExecutorPollerThread:
         eventloop.run_until_complete(self.web_socket_poller())
 
     async def web_socket_poller(self):
-        # TODO: if WebSocket connection fails, we should either retry connecting and
-        # backoff or we should set an exception to all of the outstanding futures
-        await self.ws_handler.init_ws(start_message_handlers=False)
-        await self.ws_handler.handle_incoming(
-            self._function_future_map, auto_close=True
-        )
+        """Start ws and listen for tasks.
+        If a remote disconnect breaks the ws, close the ws and reconnect"""
+        while True:
+            await self.ws_handler.init_ws(start_message_handlers=False)
+            status = await self.ws_handler.handle_incoming(
+                self._function_future_map, auto_close=True
+            )
+            if status is False:
+                # handle_incoming broke from a remote side disconnect
+                # we should close and re-connect
+                log.info("Attempting ws close")
+                await self.ws_handler.close()
+                log.info("Attempting ws re-connect")
+            else:
+                # clean exit
+                break
 
     def shutdown(self):
         if self.ws_handler is None:
