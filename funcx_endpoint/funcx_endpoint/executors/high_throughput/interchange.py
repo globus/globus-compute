@@ -765,7 +765,7 @@ class Interchange:
                             != self.current_platform["python_v"].rsplit(".", 1)[0]
                             or msg["parsl_v"] != self.current_platform["parsl_v"]
                         ):
-                            logger.info(
+                            log.info(
                                 f"[MAIN] Manager:{manager} version:{msg['python_v']} "
                                 "does not match the interchange"
                             )
