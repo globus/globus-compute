@@ -53,7 +53,7 @@ def test_app_exception(fx, ep_id, ep_version, version):
     except ValueError:
         print("Worker returned the correct exception")
     except Exception as e:
-        print(f"Wrong exception type...")
+        print("Wrong exception type...")
         print(f"Wrong exception type, {type(e)}")
         print(f"Expected ValueError, actual: {repr(e)}")
         print("Exiting because of wrong exception")
