@@ -102,7 +102,6 @@ class Interchange:
 
     def __init__(
         self,
-        #
         strategy=None,
         poll_period=None,
         heartbeat_period=None,
@@ -119,7 +118,6 @@ class Interchange:
         cold_routing_interval=10.0,
         funcx_service_address=None,
         scaling_enabled=True,
-        #
         client_address="127.0.0.1",
         interchange_address="127.0.0.1",
         client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
@@ -767,31 +765,10 @@ class Interchange:
                             != self.current_platform["python_v"].rsplit(".", 1)[0]
                             or msg["parsl_v"] != self.current_platform["parsl_v"]
                         ):
-                            log.warn(
-                                "[MAIN] Manager %s has incompatible version info with "
-                                "the interchange",
-                                manager,
+                            log.info(
+                                f"[MAIN] Manager:{manager} version:{msg['python_v']} "
+                                "does not match the interchange"
                             )
-
-                            if self.suppress_failure is False:
-                                log.debug("Setting kill event")
-                                self._kill_event.set()
-                                e = ManagerLost(manager)
-                                result_package = {
-                                    "task_id": -1,
-                                    "exception": self.serializer.serialize(e),
-                                }
-                                pkl_package = pickle.dumps(result_package)
-                                self.results_outgoing.send(pickle.dumps([pkl_package]))
-                                log.warning(
-                                    "[MAIN] Sent failure reports, unregistering manager"
-                                )
-                            else:
-                                log.debug(
-                                    "[MAIN] Suppressing shutdown due to version "
-                                    "incompatibility"
-                                )
-
                     else:
                         # Registration has failed.
                         if self.suppress_failure is False:
