@@ -23,23 +23,29 @@ config = Config(
 )"""
 
 
-class TestEndpoint:
-    @pytest.fixture(autouse=True)
-    def test_setup_teardown(self, mocker):
-        mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
-        yield
+@pytest.fixture(autouse=True)
+def patch_funcx_client(mocker):
+    mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
 
-    def test_non_configured_endpoint(self, mocker):
-        result = runner.invoke(app, ["start", "newendpoint"])
-        assert "newendpoint" in result.stdout
-        assert "not configured" in result.stdout
 
-    def test_using_outofdate_config(self, mocker):
-        mock_loader = mocker.patch("funcx_endpoint.endpoint.endpoint.os.path.join")
-        mock_loader.return_value = "./config.py"
-        config_file = open("./config.py", "w")
-        config_file.write(config_string)
-        config_file.close()
-        result = runner.invoke(app, ["start", "newendpoint"])
-        os.remove("./config.py")
-        assert isinstance(result.exception, TypeError)
+@pytest.fixture(autouse=True)
+def adjust_default_logfile(tmp_path, monkeypatch):
+    logfile = str(tmp_path / "endpoint.log")
+    monkeypatch.setattr("funcx_endpoint.logging_config._DEFAULT_LOGFILE", logfile)
+
+
+def test_non_configured_endpoint(mocker):
+    result = runner.invoke(app, ["start", "newendpoint"])
+    assert "newendpoint" in result.stdout
+    assert "not configured" in result.stdout
+
+
+def test_using_outofdate_config(mocker):
+    mock_loader = mocker.patch("funcx_endpoint.endpoint.endpoint.os.path.join")
+    mock_loader.return_value = "./config.py"
+    config_file = open("./config.py", "w")
+    config_file.write(config_string)
+    config_file.close()
+    result = runner.invoke(app, ["start", "newendpoint"])
+    os.remove("./config.py")
+    assert isinstance(result.exception, TypeError)

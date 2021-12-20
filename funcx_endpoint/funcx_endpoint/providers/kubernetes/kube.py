@@ -17,7 +17,7 @@ try:
 except (ImportError, NameError, FileNotFoundError):
     _kubernetes_enabled = False
 
-logger = logging.getLogger("interchange.kube_provider")
+log = logging.getLogger(__name__)
 
 
 class KubernetesProvider(ExecutionProvider, RepresentationMixin):
@@ -167,12 +167,12 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         else:
             pod_name = f"{self.pod_name}-{cur_timestamp}"
 
-        logger.debug(f"cmd_string is {cmd_string}")
+        log.debug(f"cmd_string is {cmd_string}")
         formatted_cmd = template_string.format(
             command=cmd_string, worker_init=self.worker_init
         )
 
-        logger.info(f"[KUBERNETES] Scaling out a pod with name :{pod_name}")
+        log.info(f"[KUBERNETES] Scaling out a pod with name :{pod_name}")
         self._create_pod(
             image=image,
             pod_name=pod_name,
@@ -203,7 +203,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
              - ExecutionProviderExceptions or its subclasses
         """
         # This is a hack
-        logger.debug("Getting Kubernetes provider status")
+        log.debug("Getting Kubernetes provider status")
         status = {}
         for jid in job_ids:
             if jid in self.resources_by_pod_name:
@@ -224,7 +224,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                     break
                 else:
                     num_pods -= 1
-        logger.info(f"[KUBERNETES] The to_kill pods are {to_kill}")
+        log.info(f"[KUBERNETES] The to_kill pods are {to_kill}")
         rets = self._cancel(to_kill)
         return to_kill, rets
 
@@ -236,13 +236,13 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         [True/False...] : If the cancel operation fails the entire list will be False.
         """
         for job in job_ids:
-            logger.debug(f"Terminating job/proc_id: {job}")
+            log.debug(f"Terminating job/proc_id: {job}")
             # Here we are assuming that for local, the job_ids are the process id's
             self._delete_pod(job)
 
             self.resources_by_pod_name[job]["status"] = "CANCELLED"
             del self.resources_by_pod_name[job]
-        logger.debug(
+        log.debug(
             "[KUBERNETES] The resources in kube provider is {}".format(
                 self.resources_by_pod_name
             )
@@ -342,7 +342,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         api_response = self.kube_client.create_namespaced_pod(
             namespace=self.namespace, body=pod
         )
-        logger.debug(f"Pod created. status='{str(api_response.status)}'")
+        log.debug(f"Pod created. status='{str(api_response.status)}'")
 
     def _delete_pod(self, pod_name):
         """Delete a pod"""
@@ -350,7 +350,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         api_response = self.kube_client.delete_namespaced_pod(
             name=pod_name, namespace=self.namespace, body=client.V1DeleteOptions()
         )
-        logger.debug(f"Pod deleted. status='{str(api_response.status)}'")
+        log.debug(f"Pod deleted. status='{str(api_response.status)}'")
 
     @property
     def label(self):

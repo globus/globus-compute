@@ -5,7 +5,7 @@ import subprocess
 import time
 from queue import Queue
 
-logger = logging.getLogger("funcx_manager.worker_map")
+log = logging.getLogger(__name__)
 
 
 class WorkerMap:
@@ -36,7 +36,7 @@ class WorkerMap:
 
     def register_worker(self, worker_id, worker_type):
         """Add a new worker"""
-        logger.debug(f"In register worker worker_id: {worker_id} type:{worker_type}")
+        log.debug(f"In register worker worker_id: {worker_id} type:{worker_type}")
         self.worker_types[worker_id] = worker_type
 
         if worker_type not in self.worker_queues:
@@ -109,22 +109,22 @@ class WorkerMap:
         """
         spin_ups = {}
 
-        logger.debug(f"[SPIN UP] Next Worker Qsize: {len(next_worker_q)}")
-        logger.debug(f"[SPIN UP] Active Workers: {self.active_workers}")
-        logger.debug(f"[SPIN UP] Pending Workers: {self.pending_workers}")
-        logger.debug(f"[SPIN UP] Max Worker Count: {self.max_worker_count}")
+        log.debug(f"[SPIN UP] Next Worker Qsize: {len(next_worker_q)}")
+        log.debug(f"[SPIN UP] Active Workers: {self.active_workers}")
+        log.debug(f"[SPIN UP] Pending Workers: {self.pending_workers}")
+        log.debug(f"[SPIN UP] Max Worker Count: {self.max_worker_count}")
 
         if (
             len(next_worker_q) > 0
             and self.active_workers + self.pending_workers < self.max_worker_count
         ):
-            logger.debug("[SPIN UP] Spinning up new workers!")
-            logger.debug(
+            log.debug("[SPIN UP] Spinning up new workers!")
+            log.debug(
                 "[SPIN up] Empty slots: %s",
                 self.max_worker_count - self.active_workers - self.pending_workers,
             )
-            logger.debug(f"[SPIN up] New workers: {len(next_worker_q)}")
-            logger.debug(
+            log.debug(f"[SPIN up] New workers: {len(next_worker_q)}")
+            log.debug(
                 f"[SPIN up] Unused slots: {self.total_worker_type_counts['unused']}"
             )
             num_slots = min(
@@ -147,7 +147,7 @@ class WorkerMap:
                         worker_port=worker_port,
                     )
                 except Exception:
-                    logger.exception("Error spinning up worker! Skipping...")
+                    log.exception("Error spinning up worker! Skipping...")
                     continue
                 else:
                     spin_ups.update(proc)
@@ -222,11 +222,11 @@ class WorkerMap:
                 and time.time() - self.worker_idle_since[worker_type]
                 < worker_max_idletime
             ):
-                logger.debug(f"[SPIN DOWN] Current time: {time.time()}")
-                logger.debug(
+                log.debug(f"[SPIN DOWN] Current time: {time.time()}")
+                log.debug(
                     f"[SPIN DOWN] Idle since: {self.worker_idle_since[worker_type]}"
                 )
-                logger.debug(
+                log.debug(
                     "[SPIN DOWN] Worker type %s has not exceeded maximum idle "
                     "time %s, continuing",
                     worker_type,
@@ -245,7 +245,7 @@ class WorkerMap:
                 num_remove = min(num_remove, max_remove)
 
             if num_remove > 0:
-                logger.debug(
+                log.debug(
                     "[SPIN DOWN] Removing {} workers of type {}".format(
                         num_remove, worker_type
                     )
@@ -306,23 +306,23 @@ class WorkerMap:
         if worker_type != "RAW":
             container_uri = worker_type
 
-        logger.info(f"Command string :\n {cmd}")
-        logger.info(f"Mode: {mode}")
-        logger.info(f"Container uri: {container_uri}")
-        logger.info(f"Container cmd options: {container_cmd_options}")
-        logger.info(f"Worker type: {worker_type}")
+        log.info(f"Command string :\n {cmd}")
+        log.info(f"Mode: {mode}")
+        log.info(f"Container uri: {container_uri}")
+        log.info(f"Container cmd options: {container_cmd_options}")
+        log.info(f"Worker type: {worker_type}")
 
         if mode == "no_container":
             modded_cmd = cmd
         elif mode == "singularity_reuse":
             if container_uri is None:
-                logger.warning(
+                log.warning(
                     "No container is specified for singularity mode. "
                     "Spawning a worker in a raw process instead."
                 )
                 modded_cmd = cmd
             elif not os.path.exists(container_uri):
-                logger.warning(
+                log.warning(
                     f"Container uri {container_uri} is not found. "
                     "Spawning a worker in a raw process instead."
                 )
@@ -331,7 +331,7 @@ class WorkerMap:
                 modded_cmd = (
                     f"singularity exec {container_cmd_options} {container_uri} {cmd}"
                 )
-            logger.info(f"Command string with singularity:\n {modded_cmd}")
+            log.info(f"Command string with singularity:\n {modded_cmd}")
         else:
             raise NameError("Invalid container launch mode.")
 
@@ -344,7 +344,7 @@ class WorkerMap:
             )
 
         except Exception:
-            logger.exception("Got an error in worker launch")
+            log.exception("Got an error in worker launch")
             raise
 
         self.total_worker_type_counts["unused"] -= 1
@@ -372,11 +372,11 @@ class WorkerMap:
 
         # next_worker_q = []
         new_worker_list = []
-        logger.debug(
+        log.debug(
             "[GET_NEXT_WORKER] total_worker_type_counts: %s",
             self.total_worker_type_counts,
         )
-        logger.debug(
+        log.debug(
             "[GET_NEXT_WORKER] pending_worker_type_counts: %s",
             self.pending_worker_type_counts,
         )
@@ -405,9 +405,7 @@ class WorkerMap:
 
     def update_worker_idle(self, worker_type):
         """Update the workers' last idle time by worker type"""
-        logger.debug(
-            f"[UPDATE_WORKER_IDLE] Worker idle since: {self.worker_idle_since}"
-        )
+        log.debug(f"[UPDATE_WORKER_IDLE] Worker idle since: {self.worker_idle_since}")
         self.worker_idle_since[worker_type] = time.time()
 
     def put_worker(self, worker):

@@ -8,7 +8,7 @@ import zmq
 
 from funcx_endpoint.executors.high_throughput.messages import Message
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 class CommandClient:
@@ -111,7 +111,7 @@ class TasksOutgoing:
                 return
             else:
                 timeout_ms += 1
-                logger.debug(
+                log.debug(
                     "Not sending due to full zmq pipe, timeout: {} ms".format(
                         timeout_ms
                     )
@@ -119,7 +119,7 @@ class TasksOutgoing:
             current_wait += timeout_ms
 
         # Send has failed.
-        logger.debug(f"Remote side has been unresponsive for {current_wait}")
+        log.debug(f"Remote side has been unresponsive for {current_wait}")
         raise zmq.error.Again
 
     def close(self):
@@ -158,7 +158,7 @@ class ResultsIncoming:
             try:
                 res = Message.unpack(block_messages)
             except Exception:
-                logger.exception(
+                log.exception(
                     "Message in results queue is not pickle/Message formatted: %s",
                     block_messages,
                 )

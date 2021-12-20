@@ -10,7 +10,7 @@ from concurrent.futures import Future
 
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 
-logger = logging.getLogger("asyncio")
+log = logging.getLogger(__name__)
 
 
 class AtomicController:
@@ -104,7 +104,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         atexit.register(self.shutdown)
 
         if self.batch_enabled:
-            logger.info("Batch submission enabled.")
+            log.info("Batch submission enabled.")
             self.start_batching_thread()
 
     def start_batching_thread(self):
@@ -117,7 +117,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         )
         self.task_submit_thread.daemon = True
         self.task_submit_thread.start()
-        logger.info("Started task submit thread")
+        log.info("Started task submit thread")
 
     def submit(self, function, *args, endpoint_id=None, container_uuid=None, **kwargs):
         """Initiate an invocation
@@ -145,7 +145,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         if function not in self._function_registry:
             # Please note that this is a partial implementation, not all function
             # registration options are fleshed out here.
-            logger.debug(f"Function:{function} is not registered. Registering")
+            log.debug(f"Function:{function} is not registered. Registering")
             try:
                 function_id = self.funcx_client.register_function(
                     function,
@@ -153,11 +153,11 @@ class FuncXExecutor(concurrent.futures.Executor):
                     container_uuid=container_uuid,
                 )
             except Exception:
-                logger.error(f"Error in registering {function.__name__}")
+                log.error(f"Error in registering {function.__name__}")
                 raise
             else:
                 self._function_registry[function] = function_id
-                logger.debug(f"Function registered with id:{function_id}")
+                log.debug(f"Function registered with id:{function_id}")
 
         task_id = self._task_counter
         self._task_counter += 1
@@ -190,13 +190,13 @@ class FuncXExecutor(concurrent.futures.Executor):
         while not kill_event.is_set():
             messages = self._get_tasks_in_batch()
             if messages:
-                logger.info(
+                log.info(
                     "[TASK_SUBMIT_THREAD] Submitting {} tasks to funcX".format(
                         len(messages)
                     )
                 )
             self._submit_tasks(messages)
-        logger.info("[TASK_SUBMIT_THREAD] Exiting")
+        log.info("[TASK_SUBMIT_THREAD] Exiting")
 
     def _submit_tasks(self, messages):
         """Submit a batch of tasks"""
@@ -212,12 +212,12 @@ class FuncXExecutor(concurrent.futures.Executor):
                 batch.add(
                     *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
                 )
-                logger.debug(f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch")
+                log.debug(f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch")
             try:
                 batch_tasks = self.funcx_client.batch_run(batch)
-                logger.debug(f"Batch submitted to task_group: {self.task_group_id}")
+                log.debug(f"Batch submitted to task_group: {self.task_group_id}")
             except Exception:
-                logger.error(
+                log.error(
                     "[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(
                         len(messages)
                     )
@@ -255,7 +255,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.poller_thread.shutdown()
         if self.batch_enabled:
             self._kill_event.set()
-        logger.debug(f"Executor:{self.label} shutting down")
+        log.debug(f"Executor:{self.label} shutting down")
 
 
 def noop():
@@ -308,19 +308,29 @@ class ExecutorPollerThread:
         self.thread = threading.Thread(target=self.event_loop_thread, args=(eventloop,))
         self.thread.daemon = True
         self.thread.start()
-        logger.debug("Started web_socket_poller thread")
+        log.debug("Started web_socket_poller thread")
 
     def event_loop_thread(self, eventloop):
         asyncio.set_event_loop(eventloop)
         eventloop.run_until_complete(self.web_socket_poller())
 
     async def web_socket_poller(self):
-        # TODO: if WebSocket connection fails, we should either retry connecting and
-        # backoff or we should set an exception to all of the outstanding futures
-        await self.ws_handler.init_ws(start_message_handlers=False)
-        await self.ws_handler.handle_incoming(
-            self._function_future_map, auto_close=True
-        )
+        """Start ws and listen for tasks.
+        If a remote disconnect breaks the ws, close the ws and reconnect"""
+        while True:
+            await self.ws_handler.init_ws(start_message_handlers=False)
+            status = await self.ws_handler.handle_incoming(
+                self._function_future_map, auto_close=True
+            )
+            if status is False:
+                # handle_incoming broke from a remote side disconnect
+                # we should close and re-connect
+                log.info("Attempting ws close")
+                await self.ws_handler.close()
+                log.info("Attempting ws re-connect")
+            else:
+                # clean exit
+                break
 
     def shutdown(self):
         if self.ws_handler is None:

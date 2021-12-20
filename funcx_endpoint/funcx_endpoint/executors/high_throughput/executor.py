@@ -23,7 +23,6 @@ from parsl.executors.status_handling import StatusHandlingExecutor
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
-from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 
 # from parsl.executors.high_throughput import interchange
@@ -35,6 +34,7 @@ from funcx_endpoint.executors.high_throughput.messages import (
     HeartbeatReq,
     Task,
 )
+from funcx_endpoint.logging_config import setup_logging
 from funcx_endpoint.strategies.simple import SimpleStrategy
 
 fx_serializer = FuncXSerializer()
@@ -43,9 +43,7 @@ fx_serializer = FuncXSerializer()
 # stderr
 # "logging" python3 self.stream.flush() OSError: [Errno 9] Bad file descriptor
 
-logger = logging.getLogger(__name__)
-# if not logger.hasHandlers():
-#    logger = set_file_logger("executor.log", name=__name__)
+log = logging.getLogger(__name__)
 
 
 BUFFER_THRESHOLD = 1024 * 1024
@@ -257,8 +255,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         funcx_service_address=None,
         task_status_queue=None,
     ):
-
-        logger.debug("Initializing HighThroughputExecutor")
+        log.debug("Initializing HighThroughputExecutor")
         StatusHandlingExecutor.__init__(self, provider)
 
         self.label = label
@@ -361,17 +358,15 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             container_image=self.container_image,
         )
         self.launch_cmd = l_cmd
-        logger.debug(f"Launch command: {self.launch_cmd}")
+        log.debug(f"Launch command: {self.launch_cmd}")
 
         self._scaling_enabled = self.provider.scaling_enabled
-        logger.debug(
-            "Starting HighThroughputExecutor with provider:\n%s", self.provider
-        )
+        log.debug("Starting HighThroughputExecutor with provider:\n%s", self.provider)
         if hasattr(self.provider, "init_blocks"):
             try:
                 self.scale_out(blocks=self.provider.init_blocks)
             except Exception as e:
-                logger.error(f"Scaling out failed: {e}")
+                log.error(f"Scaling out failed: {e}")
                 raise e
 
     def start(self, results_passthrough=None):
@@ -395,7 +390,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                     "a multiprocessing queue for results_passthrough"
                 )
             self.results_passthrough = results_passthrough
-            logger.debug(f"Executor:{self.label} starting in results_passthrough mode")
+            log.debug(f"Executor:{self.label} starting in results_passthrough mode")
 
         self._executor_bad_state = threading.Event()
         self._executor_exception = None
@@ -403,22 +398,22 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self._start_queue_management_thread()
 
         if self.interchange_local is True:
-            logger.info("Attempting local interchange start")
+            log.info("Attempting local interchange start")
             self._start_local_interchange_process()
-            logger.info(
+            log.info(
                 "Started local interchange with ports: %s. %s",
                 self.worker_task_port,
                 self.worker_result_port,
             )
 
-        logger.debug(f"Created management thread: {self._queue_management_thread}")
+        log.debug(f"Created management thread: {self._queue_management_thread}")
 
         if self.provider:
             # self.initialize_scaling()
             pass
         else:
             self._scaling_enabled = False
-            logger.debug("Starting HighThroughputExecutor with no provider")
+            log.debug("Starting HighThroughputExecutor with no provider")
 
         return (self.outgoing_q.port, self.incoming_q.port, self.command_client.port)
 
@@ -451,8 +446,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 "mem_per_worker": self.mem_per_worker,
                 "cores_per_worker": self.cores_per_worker,
                 "prefetch_capacity": self.prefetch_capacity,
-                # "log_max_bytes": self.log_max_bytes,
-                # "log_backup_count": self.log_backup_count,
                 "scheduler_mode": self.scheduler_mode,
                 "worker_mode": self.worker_mode,
                 "container_type": self.container_type,
@@ -465,7 +458,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 "logdir": os.path.join(self.run_dir, self.label),
                 "suppress_failure": self.suppress_failure,
                 "endpoint_id": self.endpoint_id,
-                "logging_level": logging.DEBUG if self.worker_debug else logging.INFO,
             },
         )
         self.queue_proc.start()
@@ -474,9 +466,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 block=True, timeout=120
             )
         except queue.Empty:
-            logger.error(
-                "Interchange has not completed initialization in 120s. Aborting"
-            )
+            log.error("Interchange has not completed initialization in 120s. Aborting")
             raise Exception("Interchange failed to start")
 
         self.worker_task_url = f"tcp://{self.address}:{self.worker_task_port}"
@@ -491,7 +481,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         uses the command channel to request worker urls that the interchange
         has selected.
         """
-        logger.debug(
+        log.debug(
             "Attempting Interchange deployment via channel: {}".format(
                 self.provider.channel
             )
@@ -499,7 +489,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
         debug_opts = "--debug" if self.worker_debug else ""
         suppress_failure = "--suppress_failure" if self.suppress_failure else ""
-        logger.debug(f"Before : \n{self.ix_launch_cmd}\n")
+        log.debug(f"Before : \n{self.ix_launch_cmd}\n")
         launch_command = self.ix_launch_cmd.format(
             debug=debug_opts,
             client_address=self.address,
@@ -521,7 +511,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         if self.provider.worker_init:
             launch_command = self.provider.worker_init + "\n" + launch_command
 
-        logger.debug(f"Launch command : \n{launch_command}\n")
+        log.debug(f"Launch command : \n{launch_command}\n")
         return
 
     def _queue_management_worker(self):
@@ -557,7 +547,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
         The `None` message is a die request.
         """
-        logger.debug("[MTHREAD] queue management worker starting")
+        log.debug("[MTHREAD] queue management worker starting")
 
         while not self._executor_bad_state.is_set():
             try:
@@ -565,12 +555,12 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 self.last_response_time = time.time()
 
             except queue.Empty:
-                logger.debug("[MTHREAD] queue empty")
+                log.debug("[MTHREAD] queue empty")
                 # Timed out.
                 pass
 
             except OSError as e:
-                logger.exception(
+                log.exception(
                     "[MTHREAD] Caught broken queue with exception code {}: {}".format(
                         e.errno, e
                     )
@@ -578,24 +568,24 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 return
 
             except Exception as e:
-                logger.exception(f"[MTHREAD] Caught unknown exception: {e}")
+                log.exception(f"[MTHREAD] Caught unknown exception: {e}")
                 return
 
             else:
 
                 if msgs is None:
-                    logger.debug("[MTHREAD] Got None, exiting")
+                    log.debug("[MTHREAD] Got None, exiting")
                     return
 
                 elif isinstance(msgs, EPStatusReport):
-                    logger.debug(f"[MTHREAD] Received EPStatusReport {msgs}")
+                    log.debug(f"[MTHREAD] Received EPStatusReport {msgs}")
                     if self.passthrough:
                         self.results_passthrough.put(
                             {"task_id": None, "message": pickle.dumps(msgs)}
                         )
 
                 else:
-                    logger.debug("[MTHREAD] Unpacking results")
+                    log.debug("[MTHREAD] Unpacking results")
                     for serialized_msg in msgs:
                         try:
                             msg = pickle.loads(serialized_msg)
@@ -609,7 +599,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             )
 
                         if tid == -2 and "info" in msg:
-                            logger.warning(
+                            log.warning(
                                 "[MTHREAD[ Received info response : {}".format(
                                     msg["info"]
                                 )
@@ -619,14 +609,14 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             # TODO: This could be handled better we are
                             # essentially shutting down the client with little
                             # indication to the user.
-                            logger.warning(
+                            log.warning(
                                 "[MTHREAD] Executor shutting down due to fatal "
                                 "exception from interchange"
                             )
                             self._executor_exception = fx_serializer.deserialize(
                                 msg["exception"]
                             )
-                            logger.exception(
+                            log.exception(
                                 "[MTHREAD] Exception: {}".format(
                                     self._executor_exception
                                 )
@@ -640,15 +630,15 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             break
 
                         if self.passthrough is True:
-                            logger.debug(f"[MTHREAD] Pushing results for task:{tid}")
+                            log.debug(f"[MTHREAD] Pushing results for task:{tid}")
                             # we are only interested in actual task ids here, not
                             # identifiers for other message types
                             sent_task_id = tid if isinstance(tid, str) else None
                             x = self.results_passthrough.put(
                                 {"task_id": sent_task_id, "message": serialized_msg}
                             )
-                            logger.debug(f"[MTHREAD] task:{tid} ret value: {x}")
-                            logger.debug(
+                            log.debug(f"[MTHREAD] task:{tid} ret value: {x}")
+                            log.debug(
                                 "[MTHREAD] task:%s items in queue: %s",
                                 tid,
                                 self.results_passthrough.qsize(),
@@ -671,7 +661,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
             if not self.is_alive:
                 break
-        logger.info("[MTHREAD] queue management worker finished")
+        log.info("[MTHREAD] queue management worker finished")
 
     # When the executor gets lost, the weakref callback will wake up
     # the queue management thread.
@@ -686,16 +676,16 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         Could be used later as a restart if the management thread dies.
         """
         if self._queue_management_thread is None:
-            logger.debug("Starting queue management thread")
+            log.debug("Starting queue management thread")
             self._queue_management_thread = threading.Thread(
                 target=self._queue_management_worker
             )
             self._queue_management_thread.daemon = True
             self._queue_management_thread.start()
-            logger.debug("Started queue management thread")
+            log.debug("Started queue management thread")
 
         else:
-            logger.debug("Management thread already exists, returning")
+            log.debug("Management thread already exists, returning")
 
     def hold_worker(self, worker_id):
         """Puts a worker on hold, preventing scheduling of additional tasks to it.
@@ -710,29 +700,29 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             Worker id to be put on hold
         """
         c = self.command_client.run(f"HOLD_WORKER;{worker_id}")
-        logger.debug(f"Sent hold request to worker: {worker_id}")
+        log.debug(f"Sent hold request to worker: {worker_id}")
         return c
 
     def send_heartbeat(self):
-        logger.warning("Sending heartbeat to interchange")
+        log.warning("Sending heartbeat to interchange")
         msg = Heartbeat(endpoint_id="")
         self.outgoing_q.put(msg.pack())
 
     def wait_for_endpoint(self):
         heartbeat = self.command_client.run(HeartbeatReq())
-        logger.debug("Attempting heartbeat to interchange")
+        log.debug("Attempting heartbeat to interchange")
         return heartbeat
 
     @property
     def outstanding(self):
         outstanding_c = self.command_client.run("OUTSTANDING_C")
-        logger.debug(f"Got outstanding count: {outstanding_c}")
+        log.debug(f"Got outstanding count: {outstanding_c}")
         return outstanding_c
 
     @property
     def connected_workers(self):
         workers = self.command_client.run("MANAGERS")
-        logger.debug(f"Got managers: {workers}")
+        log.debug(f"Got managers: {workers}")
         return workers
 
     def submit(
@@ -772,7 +762,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         Returns:
               Submit status
         """
-        logger.debug(f"Submitting raw task : {packed_task}")
+        log.debug(f"Submitting raw task : {packed_task}")
         if self._executor_bad_state.is_set():
             raise self._executor_exception
 
@@ -819,7 +809,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         for i in range(blocks):
             if self.provider:
                 block = self.provider.submit(self.launch_cmd, 1, 1)
-                logger.debug(f"Launched block {i}:{block}")
+                log.debug(f"Launched block {i}:{block}")
                 if not block:
                     raise (
                         ScalingFailed(
@@ -829,7 +819,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                     )
                 self.blocks.extend([block])
             else:
-                logger.error("No execution provider available")
+                log.error("No execution provider available")
                 r = None
         return r
 
@@ -874,27 +864,25 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
              NotImplementedError
         """
 
-        logger.info("Attempting HighThroughputExecutor shutdown")
+        log.info("Attempting HighThroughputExecutor shutdown")
         # self.outgoing_q.close()
         # self.incoming_q.close()
         if self.queue_proc:
             self.queue_proc.terminate()
-        logger.info("Finished HighThroughputExecutor shutdown attempt")
+        log.info("Finished HighThroughputExecutor shutdown attempt")
         return True
 
 
-def executor_starter(htex, logdir, endpoint_id, logging_level=logging.DEBUG):
-
+def executor_starter(htex, logdir, endpoint_id):
     stdout = open(os.path.join(logdir, f"executor.{endpoint_id}.stdout"), "w")
     stderr = open(os.path.join(logdir, f"executor.{endpoint_id}.stderr"), "w")
 
     logdir = os.path.abspath(logdir)
     with daemon.DaemonContext(stdout=stdout, stderr=stderr):
-        global logger
         print("cwd: ", os.getcwd())
-        logger = set_file_logger(
-            os.path.join(logdir, f"executor.{endpoint_id}.log"),
-            level=logging_level,
+        setup_logging(
+            logfile=os.path.join(logdir, f"executor.{endpoint_id}.log"),
+            console_enabled=False,
         )
         htex.start()
 

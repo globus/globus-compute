@@ -3,8 +3,8 @@ import logging
 import queue
 import random
 
-logger = logging.getLogger("interchange.task_dispatch")
-logger.info("Interchange task dispatch started")
+log = logging.getLogger(__name__)
+log.info("Interchange task dispatch started")
 
 
 def naive_interchange_task_dispatch(
@@ -79,14 +79,14 @@ def dispatch(
                         real_capacity,
                         loop=loop,
                     )
-                logger.debug(f"[MAIN] Get tasks {tasks} from queue")
+                log.debug(f"[MAIN] Get tasks {tasks} from queue")
                 if tasks:
                     for task_type in tids:
                         # This line is a set update, not dict update
                         ready_manager_queue[manager]["tasks"][task_type].update(
                             tids[task_type]
                         )
-                    logger.debug(
+                    log.debug(
                         "[MAIN] The tasks on manager {} is {}".format(
                             manager, ready_manager_queue[manager]["tasks"]
                         )
@@ -96,9 +96,9 @@ def dispatch(
                         task_dispatch[manager] = []
                     task_dispatch[manager] += tasks
                     dispatched_tasks += len(tasks)
-                    logger.debug(f"[MAIN] Assigned tasks {tids} to manager {manager}")
+                    log.debug(f"[MAIN] Assigned tasks {tids} to manager {manager}")
                 if ready_manager_queue[manager]["free_capacity"]["total_workers"] > 0:
-                    logger.debug(
+                    log.debug(
                         "[MAIN] Manager {} still has free_capacity {}".format(
                             manager,
                             ready_manager_queue[manager]["free_capacity"][
@@ -107,12 +107,12 @@ def dispatch(
                         )
                     )
                 else:
-                    logger.debug(f"[MAIN] Manager {manager} is now saturated")
+                    log.debug(f"[MAIN] Manager {manager} is now saturated")
                     interesting_managers.remove(manager)
             else:
                 interesting_managers.remove(manager)
 
-    logger.debug(
+    log.debug(
         "The task dispatch of {} loop is {}, in total {} tasks".format(
             loop, task_dispatch, dispatched_tasks
         )
@@ -125,13 +125,13 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
     tids = collections.defaultdict(set)
     task_type = manager_ads["worker_type"]
     if not task_type:
-        logger.warning(
+        log.warning(
             "Using hard scheduler mode but with manager worker type unset. "
             "Use soft scheduler mode. Set this in the config."
         )
         return tasks, tids
     if task_type not in pending_task_queue:
-        logger.debug(f"No task of type {task_type}. Exiting task fetching.")
+        log.debug(f"No task of type {task_type}. Exiting task fetching.")
         return tasks, tids
 
     # dispatch tasks of available types on manager
@@ -142,7 +142,7 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
             except queue.Empty:
                 break
             else:
-                logger.debug(f"Get task {x}")
+                log.debug(f"Get task {x}")
                 tasks.append(x)
                 tids[task_type].add(x["task_id"])
                 manager_ads["free_capacity"]["free"][task_type] -= 1
@@ -150,14 +150,14 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
                 real_capacity -= 1
 
     # dispatch tasks to unused slots based on the manager type
-    logger.debug("Second round of task fetching in hard mode")
+    log.debug("Second round of task fetching in hard mode")
     while manager_ads["free_capacity"]["free"]["unused"] > 0 and real_capacity > 0:
         try:
             x = pending_task_queue[task_type].get(block=False)
         except queue.Empty:
             break
         else:
-            logger.debug(f"Get task {x}")
+            log.debug(f"Get task {x}")
             tasks.append(x)
             tids[task_type].add(x["task_id"])
             manager_ads["free_capacity"]["free"]["unused"] -= 1
@@ -192,7 +192,7 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop="warm"):
                     except queue.Empty:
                         break
                     else:
-                        logger.debug(f"Get task {x}")
+                        log.debug(f"Get task {x}")
                         tasks.append(x)
                         tids[task_type].add(x["task_id"])
                         manager_ads["free_capacity"]["free"][task_type] -= 1
@@ -214,7 +214,7 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop="warm"):
                         except queue.Empty:
                             break
                         else:
-                            logger.debug(f"Get task {x}")
+                            log.debug(f"Get task {x}")
                             tasks.append(x)
                             tids[task_type].add(x["task_id"])
                             manager_ads["free_capacity"]["free"]["unused"] -= 1
@@ -228,7 +228,7 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop="warm"):
     # This is needed to avoid workers being idle for too long
     # Potential issues may be that it could kill containers of short tasks frequently
     # Tune cold_routing_interval in the config to balance such a tradeoff
-    logger.debug("Cold function routing!")
+    log.debug("Cold function routing!")
     task_types = list(pending_task_queue.keys())
     random.shuffle(task_types)
     for task_type in task_types:
@@ -238,7 +238,7 @@ def get_tasks_soft(pending_task_queue, manager_ads, real_capacity, loop="warm"):
             except queue.Empty:
                 break
             else:
-                logger.debug(f"Get task {x}")
+                log.debug(f"Get task {x}")
                 tasks.append(x)
                 tids[task_type].add(x["task_id"])
                 manager_ads["free_capacity"]["total_workers"] -= 1
