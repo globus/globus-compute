@@ -45,9 +45,9 @@ def test_allowed_result_sizes(fxc, endpoint, size):
     assert len(x) == size, "Result size does not match excepted size"
 
 
-def test_result_size_too_large(fxc, endpoint, size=550000):
+def test_result_size_too_large(fxc, endpoint, size=11 * 1024 * 1024):
     """
-    funcX should raise a MaxResultSizeExceeded exception when results exceeds 512KB
+    funcX should raise a MaxResultSizeExceeded exception when results exceeds 10MB
     limit
     """
     fn_uuid = fxc.register_function(

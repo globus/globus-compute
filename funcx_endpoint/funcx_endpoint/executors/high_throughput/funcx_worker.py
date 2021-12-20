@@ -15,11 +15,14 @@ from funcx_endpoint.logging_config import setup_logging
 
 log = logging.getLogger(__name__)
 
+DEFAULT_RESULT_SIZE_LIMIT_MB = 10
+DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
+
 
 class MaxResultSizeExceeded(Exception):
     """
     Result produced by the function exceeds the maximum supported result size
-    threshold of 512000B"""
+    threshold"""
 
     def __init__(self, result_size, result_size_limit):
         self.result_size = result_size
@@ -48,8 +51,7 @@ class FuncXWorker:
 
     result_size_limit : int
      Maximum result size allowed in Bytes
-     Default = 10 MB == 10 * (2**20) Bytes
-
+     Default = 10 MB
 
     Funcx worker will use the REP sockets to:
          task = recv ()
@@ -63,7 +65,7 @@ class FuncXWorker:
         address,
         port,
         worker_type="RAW",
-        result_size_limit=512000,
+        result_size_limit=DEFAULT_RESULT_SIZE_LIMIT_B,
     ):
 
         self.worker_id = worker_id
@@ -130,9 +132,9 @@ class FuncXWorker:
                     result = self.execute_task(msg)
                     serialized_result = self.serialize(result)
 
-                    if sys.getsizeof(serialized_result) > self.result_size_limit:
+                    if len(serialized_result) > self.result_size_limit:
                         raise MaxResultSizeExceeded(
-                            sys.getsizeof(serialized_result), self.result_size_limit
+                            len(serialized_result), self.result_size_limit
                         )
                 except Exception as e:
                     log.exception(f"Caught an exception {e}")
