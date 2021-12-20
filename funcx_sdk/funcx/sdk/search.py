@@ -1,5 +1,4 @@
-from globus_sdk import SearchAPIError
-from globus_sdk.search import SearchClient
+from globus_sdk import SearchAPIError, SearchClient
 from texttable import Texttable
 
 from funcx.serialize import FuncXSerializer
