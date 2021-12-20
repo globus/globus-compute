@@ -4,6 +4,7 @@ from funcx import FuncXClient
 from funcx.sdk.executor import FuncXExecutor
 from funcx_endpoint.executors.high_throughput.interchange import ManagerLost
 
+
 def get_version():
     import sys
 
@@ -20,7 +21,6 @@ def kill_managers():
     import os
 
     os.system("killall funcx-manager")
-
 
 
 def test_worker_version(fx, ep_id, ep_version, version):
@@ -71,7 +71,7 @@ def test_kill_manager(fx, ep_id, ep_version, version):
     future = fx.submit(kill_managers, endpoint_id=ep_id)
     print(f"Future launched with future:{future}")
     try:
-        future.result(timeout=600) # leave a longish time for this timeout...
+        future.result(timeout=600)  # leave a longish time for this timeout...
     except ManagerLost as me:
         print(f"Worker returned the correct exception: {repr(me)}")
     except Exception as e:
