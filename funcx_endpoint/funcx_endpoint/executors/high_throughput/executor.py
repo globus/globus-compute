@@ -550,12 +550,12 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             self._executor_bad_state.set()
                             # We set all current tasks to this exception to make sure that
                             # this is raised in the main context.
-                            for task in self.tasks:
+                            for task_id in self.tasks:
                                 try:
-                                    self.tasks[task].set_exception(self._executor_exception)
+                                    self.tasks[task_id].set_exception(self._executor_exception)
                                 except concurrent.futures.InvalidStateError:
                                     # Task was already cancelled, the exception can be ignored
-                                    logger.debug(f"Task:{tid} result couldn't be set. Already in terminal state")
+                                    logger.debug(f"Task:{task_id} result couldn't be set. Already in terminal state")
                             break
 
                         if self.passthrough is True:
@@ -576,7 +576,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                         except KeyError:
                             # This is triggered when the result of a cancelled task is returned
                             # We should log, and proceed.
-                            logger.warning(f"[MTHREAD] Task:{tid} duplicate result received. Ignoring.")
+                            logger.warning(f"[MTHREAD] Task:{tid} not found in tasks table\n"
+                                           "Task likely was cancelled and removed.")
                             continue
 
                         if 'result' in msg:
