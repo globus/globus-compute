@@ -1,7 +1,7 @@
 .. funcX documentation master file, created by
-   sphinx-quickstart on Mon Jul  1 11:43:54 2019.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+    sphinx-quickstart on Mon Jul  1 11:43:54 2019.
+    You can adapt this file completely to your liking, but it should at least
+    contain the root `toctree` directive.
 
 funcX - Federated Function as a Service
 #########################################
@@ -75,27 +75,25 @@ A funcX endpoint can be created by installing the funcX endpoint software
 and configuring it for the target resources. The following steps show
 how to download and configure an endpoint for local (multi-process) execution. ::
 
-  $ python3 -m pip install funcx_endpoint
+    $ python3 -m pip install funcx_endpoint
 
-  $ funcx-endpoint configure
+    $ funcx-endpoint configure
 
-  $ funcx-endpoint start <ENDPOINT_NAME>
+    $ funcx-endpoint start <ENDPOINT_NAME>
 
 
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+    :maxdepth: 2
+    :caption: Contents:
 
-   quickstart
-   sdk
-   endpoints
-   Tutorial.ipynb
-   actionprovider
-   reference
-   debugging
-   limits
-   changelog
+    foreword
+    getting-started
+    sdk
+    endpoint
+    integrations
+    help
+    info
 
 Indices and tables
 ==================

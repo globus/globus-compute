@@ -1,12 +1,8 @@
-Reference
-#########
-
-
-funcX SDK
-=========
+SDK Reference
+#############
 
 .. autosummary::
-    :toctree: stubs
+    :toctree: ../stubs
     :nosignatures:
 
     funcx
@@ -16,27 +12,11 @@ funcX SDK
     funcx.serialize.base
     funcx.serialize.concretes
 
-funcx-endpoint
-==============
-
-.. autosummary::
-    :toctree: stubs
-    :nosignatures:
-
-    funcx_endpoint.endpoint.endpoint
-    funcx_endpoint.endpoint.endpoint_manager.EndpointManager
-    funcx_endpoint.endpoint.interchange.EndpointInterchange
-    funcx_endpoint.endpoint.taskqueue.TaskQueue
-    funcx_endpoint.strategies.base.BaseStrategy
-    funcx_endpoint.strategies.simple.SimpleStrategy
-    funcx_endpoint.strategies.kube_simple.KubeSimpleStrategy
-
-
 Exceptions
 ==========
 
 .. autosummary::
-    :toctree: stubs
+    :toctree: ../stubs
     :nosignatures:
 
     funcx.utils.errors.TaskPending
@@ -51,4 +31,3 @@ Exceptions
     funcx.utils.errors.HTTPError
     funcx.sdk.utils.throttling.MaxRequestsExceeded
     funcx.sdk.utils.throttling.MaxRequestSizeExceeded
-    funcx_endpoint.executors.high_throughput.funcx_worker.MaxResultSizeExceeded
