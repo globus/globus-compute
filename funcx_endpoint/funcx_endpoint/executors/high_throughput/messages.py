@@ -3,7 +3,6 @@ import uuid
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from struct import Struct
-from typing import Tuple
 
 MESSAGE_TYPE_FORMATTER = Struct("b")
 
@@ -124,8 +123,10 @@ class Task(Message):
 
 class HeartbeatReq(Message):
     """
-    Synchronous request for a Heartbeat.  This is sent from the Forwarder to the endpoint on start to get
-    an initial connection and ensure liveness.
+    Synchronous request for a Heartbeat.
+
+    This is sent from the Forwarder to the endpoint on start to get an initial
+    connection and ensure liveness.
     """
 
     type = MessageType.HEARTBEAT_REQ
@@ -148,7 +149,8 @@ class HeartbeatReq(Message):
 
 class Heartbeat(Message):
     """
-    Generic Heartbeat message, sent in both directions between Forwarder and Interchange.
+    Generic Heartbeat message, sent in both directions between Forwarder and
+    Interchange.
     """
 
     type = MessageType.HEARTBEAT
@@ -167,8 +169,9 @@ class Heartbeat(Message):
 
 class EPStatusReport(Message):
     """
-    Status report for an endpoint, sent from Interchange to Forwarder.  Includes EP-wide info such as utilization,
-    as well as per-task status information.
+    Status report for an endpoint, sent from Interchange to Forwarder.
+
+    Includes EP-wide info such as utilization, as well as per-task status information.
     """
 
     type = MessageType.EP_STATUS_REPORT
@@ -196,8 +199,8 @@ class EPStatusReport(Message):
 
 class ManagerStatusReport(Message):
     """
-    Status report sent from the Manager to the Interchange, which mostly just amounts to saying which tasks are now
-    RUNNING.
+    Status report sent from the Manager to the Interchange, which mostly just amounts
+    to saying which tasks are now RUNNING.
     """
 
     type = MessageType.MANAGER_STATUS_REPORT
@@ -247,7 +250,9 @@ class ResultsAck(Message):
 
 class TaskCancel(Message):
     """
-    Synchronous request for to cancel a Task. This is sent from the Executor to the Interchange
+    Synchronous request for to cancel a Task.
+
+    This is sent from the Executor to the Interchange
     """
 
     type = MessageType.TASK_CANCEL
@@ -266,7 +271,8 @@ class TaskCancel(Message):
 
 class BadCommand(Message):
     """
-    Error message send to indicate that a command is either unknown, malformed or unsupported.
+    Error message send to indicate that a command is either
+    unknown, malformed or unsupported.
     """
 
     type = MessageType.BAD_COMMAND

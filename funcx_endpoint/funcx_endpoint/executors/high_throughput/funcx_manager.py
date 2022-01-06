@@ -20,28 +20,24 @@ import zmq
 from parsl.app.errors import RemoteExceptionWrapper
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx import set_file_logger
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from funcx_endpoint.executors.high_throughput.messages import (
-    COMMAND_TYPES,
-    EPStatusReport,
-    Heartbeat,
     ManagerStatusReport,
     Message,
-    MessageType,
     Task,
     TaskStatusCode,
 )
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
+from funcx_endpoint.logging_config import setup_logging
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2 ** 32) - 1
 
 
-logger = None
+log = logging.getLogger(__name__)
 
 
 class TaskCancelled(Exception):
@@ -53,7 +49,10 @@ class TaskCancelled(Exception):
         self.tstamp = time.time()
 
     def __str__(self):
-        return f"Task cancelled based on user request on manager:{self.manager_id}, worker:{self.worker_id}"
+        return (
+            "Task cancelled based on user request on manager: "
+            f"{self.manager_id}, worker: {self.worker_id}"
+        )
 
 
 class Manager:
@@ -114,23 +113,29 @@ class Manager:
 
         heartbeat_threshold : int
              Seconds since the last message from the interchange after which the
-             interchange is assumed to be un-available, and the manager initiates shutdown. Default:120s
+             interchange is assumed to be un-available, and the manager initiates
+             shutdown. Default:120s
 
-             Number of seconds since the last message from the interchange after which the worker
-             assumes that the interchange is lost and the manager shuts down. Default:120
+             Number of seconds since the last message from the interchange after which
+             the worker assumes that the interchange is lost and the manager shuts down.
+             Default:120
 
         heartbeat_period : int
-             Number of seconds after which a heartbeat message is sent to the interchange
+             Number of seconds after which a heartbeat message is sent to the
+             interchange
 
         internal_worker_port_range : tuple(int, int)
-             Port range from which the port(s) for the workers to connect to the manager is picked.
+             Port range from which the port(s) for the workers to connect to the manager
+             is picked.
              Default: (50000,60000)
 
         worker_mode : str
              Pick between 3 supported modes for the worker:
               1. no_container : Worker launched without containers
-              2. singularity_reuse : Worker launched inside a singularity container that will be reused
-              3. singularity_single_use : Each worker and task runs inside a new container instance.
+              2. singularity_reuse : Worker launched inside a singularity container that
+                                     will be reused
+              3. singularity_single_use : Each worker and task runs inside a new
+                                          container instance.
 
         container_cmd_options: str
               Container command strings to be added to associated container command.
@@ -147,17 +152,7 @@ class Manager:
         poll_period : int
              Timeout period used by the manager in milliseconds. Default: 10ms
         """
-
-        global logger
-        # This is expected to be used only in unit test
-        if logger is None:
-            logger = set_file_logger(
-                os.path.join(logdir, uid, "manager.log"),
-                name="funcx_manager",
-                level=logging.DEBUG,
-            )
-
-        logger.info("Manager started")
+        log.info("Manager started")
 
         self.context = zmq.Context()
         self.task_incoming = self.context.socket(zmq.DEALER)
@@ -175,7 +170,7 @@ class Manager:
         self.result_outgoing.setsockopt(zmq.LINGER, 0)
         self.result_outgoing.connect(result_q_url)
 
-        logger.info("Manager connected")
+        log.info("Manager connected")
 
         self.uid = uid
 
@@ -206,7 +201,7 @@ class Manager:
             max_port=self.internal_worker_port_range[1],
         )
 
-        logger.info(
+        log.info(
             "Manager listening on {} port for incoming worker connections".format(
                 self.worker_port
             )
@@ -287,11 +282,11 @@ class Manager:
         kill_event : threading.Event
               Event to let the thread know when it is time to die.
         """
-        logger.info("[TASK PULL THREAD] starting")
+        log.info("[TASK PULL THREAD] starting")
 
         # Send a registration message
         msg = self.create_reg_message()
-        logger.debug(f"Sending registration message: {msg}")
+        log.debug(f"Sending registration message: {msg}")
         self.task_incoming.send(msg)
         last_interchange_contact = time.time()
         task_recv_counter = 0
@@ -301,18 +296,18 @@ class Manager:
         new_worker_map = None
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
-            logger.debug("[TASK_PULL_THREAD] Loop start")
+            log.debug("[TASK_PULL_THREAD] Loop start")
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
-            logger.debug(
-                "[TASK_PULL_THREAD pending_task_count: {}, Ready_worker_count: {}".format(
-                    pending_task_count, ready_worker_count
-                )
+            log.debug(
+                "[TASK_PULL_THREAD pending_task_count: %s, Ready_worker_count: %s",
+                pending_task_count,
+                ready_worker_count,
             )
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
-                logger.debug(f"[TASK_PULL_THREAD] Requesting tasks: {ads}")
+                log.debug(f"[TASK_PULL_THREAD] Requesting tasks: {ads}")
                 msg = pickle.dumps(ads)
                 self.task_incoming.send(msg)
 
@@ -328,25 +323,31 @@ class Manager:
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
 
-                # If we want to wrap the task_incoming polling into a separate function, we need to
-                # self.poll_task_incoming(poll_timer, last_interchange_contact, kill_event, task_revc_counter)
+                # If we want to wrap the task_incoming polling into a separate function,
+                # we need to
+                #   self.poll_task_incoming(
+                #       poll_timer,
+                #       last_interchange_contact,
+                #       kill_event,
+                #       task_revc_counter
+                #   )
                 poll_timer = 0
                 _, pkl_msg = self.task_incoming.recv_multipart()
                 message = pickle.loads(pkl_msg)
                 last_interchange_contact = time.time()
 
                 if message == "STOP":
-                    logger.critical("[TASK_PULL_THREAD] Received stop request")
+                    log.critical("[TASK_PULL_THREAD] Received stop request")
                     kill_event.set()
                     break
 
                 elif type(message) == tuple and message[0] == "TASK_CANCEL":
                     self.task_cancel_lock.acquire()
                     task_id = message[1]
-                    logger.info(f"Received TASK_CANCEL request for task: {task_id}")
+                    log.info(f"Received TASK_CANCEL request for task: {task_id}")
                     if task_id not in self.task_worker_map:
-                        logger.warning(f"Task:{task_id} is not in task_worker_map.")
-                        logger.warning("Possible duplicate cancel or race-condition")
+                        log.warning(f"Task:{task_id} is not in task_worker_map.")
+                        log.warning("Possible duplicate cancel or race-condition")
                         continue
                     # Cancel task by killing the worker it is on
                     worker_id_raw = self.task_worker_map[task_id]["worker_id"]
@@ -354,33 +355,30 @@ class Manager:
                         "utf-8"
                     )
                     worker_type = self.task_worker_map[task_id]["task_type"]
-                    logger.debug(
-                        f"Cancelling task running on worker:{self.task_worker_map[task_id]}"
+                    log.debug(
+                        "Cancelling task running on worker: %s",
+                        self.task_worker_map[task_id],
                     )
                     try:
-                        logger.info(f"Removing worker:{worker_id_raw} from map")
+                        log.info(f"Removing worker:{worker_id_raw} from map")
                         self.worker_map.start_remove_worker(worker_type)
                         self.worker_map.remove_worker(worker_id_raw)
-                        logger.info(
-                            f"Popping worker:{worker_to_kill} from worker_procs"
-                        )
+                        log.info(f"Popping worker:{worker_to_kill} from worker_procs")
                         proc = self.worker_procs.pop(worker_to_kill)
-                        logger.warning(f"Sending process:{proc.pid} terminate signal")
+                        log.warning(f"Sending process:{proc.pid} terminate signal")
                         proc.terminate()
                         try:
                             proc.wait(1)  # Wait 1 second before attempting SIGKILL
                         except subprocess.TimeoutExpired:
-                            logger.exception("Process did not terminate in 1 second")
-                            logger.warning(f"Sending process:{proc.pid} kill signal")
+                            log.exception("Process did not terminate in 1 second")
+                            log.warning(f"Sending process:{proc.pid} kill signal")
                             proc.kill()
                         else:
-                            logger.debug(
-                                f"Worker process exited with : {proc.returncode}"
-                            )
+                            log.debug(f"Worker process exited with : {proc.returncode}")
 
                         raise TaskCancelled(worker_to_kill, self.uid)
                     except Exception as e:
-                        logger.exception(f"Raise exception, handling: {e}")
+                        log.exception(f"Raise exception, handling: {e}")
                         result_package = {
                             "task_id": task_id,
                             "container_id": worker_type,
@@ -406,7 +404,7 @@ class Manager:
                     self.task_cancel_lock.release()
 
                 elif message == HEARTBEAT_CODE:
-                    logger.debug("Got heartbeat from interchange")
+                    log.debug("Got heartbeat from interchange")
 
                 else:
                     tasks = [
@@ -415,14 +413,14 @@ class Manager:
                     ]
 
                     task_recv_counter += len(tasks)
-                    logger.debug(
+                    log.debug(
                         "[TASK_PULL_THREAD] Got tasks: {} of {}".format(
                             [t[1].task_id for t in tasks], task_recv_counter
                         )
                     )
 
                     for task_type, task in tasks:
-                        logger.debug(f"[TASK DEBUG] Task is of type: {task_type}")
+                        log.debug(f"[TASK DEBUG] Task is of type: {task_type}")
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
@@ -431,15 +429,15 @@ class Manager:
                         self.task_queues[task_type].put(task)
                         self.outstanding_task_count[task_type] += 1
                         self.task_type_mapping[task.task_id] = task_type
-                        logger.debug(
+                        log.debug(
                             "Got task: Outstanding task counts: {}".format(
                                 self.outstanding_task_count
                             )
                         )
-                        logger.debug(f"Task {task} pushed to a task queue {task_type}")
+                        log.debug(f"Task {task} pushed to a task queue {task_type}")
 
             else:
-                logger.debug("[TASK_PULL_THREAD] No incoming tasks")
+                log.debug("[TASK_PULL_THREAD] No incoming tasks")
                 # Limit poll duration to heartbeat_period
                 # heartbeat_period is in s vs poll_timer in ms
                 if not poll_timer:
@@ -448,18 +446,19 @@ class Manager:
 
                 # Only check if no messages were received.
                 if time.time() > last_interchange_contact + self.heartbeat_threshold:
-                    logger.critical(
-                        "[TASK_PULL_THREAD] Missing contact with interchange beyond heartbeat_threshold"
+                    log.critical(
+                        "[TASK_PULL_THREAD] Missing contact with interchange beyond "
+                        "heartbeat_threshold"
                     )
                     kill_event.set()
-                    logger.critical("Killing all workers")
+                    log.critical("Killing all workers")
                     for proc in self.worker_procs.values():
                         proc.kill()
-                    logger.critical("[TASK_PULL_THREAD] Exiting")
+                    log.critical("[TASK_PULL_THREAD] Exiting")
                     break
 
-            logger.debug(f"To-Die Counts: {self.worker_map.to_die_count}")
-            logger.debug(
+            log.debug(f"To-Die Counts: {self.worker_map.to_die_count}")
+            log.debug(
                 "Alive worker counts: {}".format(
                     self.worker_map.total_worker_type_counts
                 )
@@ -471,11 +470,11 @@ class Manager:
                 self.max_worker_count,
                 new_worker_map,
                 self.worker_map.to_die_count,
-                logger=logger,
             )
-            logger.debug(f"[SCHEDULER] New worker map: {new_worker_map}")
+            log.debug(f"[SCHEDULER] New worker map: {new_worker_map}")
 
-            # NOTE: Wipes the queue -- previous scheduling loops don't affect what's needed now.
+            # NOTE: Wipes the queue -- previous scheduling loops don't affect what's
+            # needed now.
             self.next_worker_q, need_more = self.worker_map.get_next_worker_q(
                 new_worker_map
             )
@@ -494,7 +493,7 @@ class Manager:
                     worker_port=self.worker_port,
                 )
             )
-            logger.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
+            log.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
 
             #  Count the workers of each type that need to be removed
             spin_downs, container_switch_count = self.worker_map.spin_down_workers(
@@ -504,7 +503,7 @@ class Manager:
                 scheduler_mode=self.scheduler_mode,
             )
             self.container_switch_count += container_switch_count
-            logger.debug(
+            log.debug(
                 "Container switch count: total {}, cur {}".format(
                     self.container_switch_count, container_switch_count
                 )
@@ -521,7 +520,7 @@ class Manager:
                 # *** Match tasks to workers *** #
                 else:
                     available_workers = current_worker_map[task_type]
-                    logger.debug(
+                    log.debug(
                         "Available workers of type {}: {}".format(
                             task_type, available_workers
                         )
@@ -535,12 +534,12 @@ class Manager:
                             == 0
                         ):
 
-                            logger.debug(
+                            log.debug(
                                 "Task type {} has task queue size {}".format(
                                     task_type, self.task_queues[task_type].qsize()
                                 )
                             )
-                            logger.debug(
+                            log.debug(
                                 "... and available workers: {}".format(
                                     self.worker_map.worker_queues[task_type].qsize()
                                 )
@@ -553,33 +552,31 @@ class Manager:
             w_id, m_type, message = self.funcx_task_socket.recv_multipart()
             if m_type == b"REGISTER":
                 reg_info = pickle.loads(message)
-                logger.debug(f"Registration received from worker:{w_id} {reg_info}")
+                log.debug(f"Registration received from worker:{w_id} {reg_info}")
                 self.worker_map.register_worker(w_id, reg_info["worker_type"])
 
             elif m_type == b"TASK_RET":
                 # We lock because the following steps are also shared by task_cancel
                 self.task_cancel_lock.acquire()
-                logger.debug(f"Result received from worker: {w_id}")
+                log.debug(f"Result received from worker: {w_id}")
                 task_id = pickle.loads(message)["task_id"]
                 try:
                     self.remove_task(task_id)
                 except KeyError:
-                    logger.exception(f"Task:{task_id} missing in task structure")
+                    log.exception(f"Task:{task_id} missing in task structure")
                 else:
                     self.pending_result_queue.put(message)
                     self.worker_map.put_worker(w_id)
                 self.task_cancel_lock.release()
 
             elif m_type == b"WRKR_DIE":
-                logger.debug(
-                    f"[WORKER_REMOVE] Removing worker {w_id} from worker_map..."
-                )
-                logger.debug(
+                log.debug(f"[WORKER_REMOVE] Removing worker {w_id} from worker_map...")
+                log.debug(
                     "Ready worker counts: {}".format(
                         self.worker_map.ready_worker_type_counts
                     )
                 )
-                logger.debug(
+                log.debug(
                     "Total worker counts: {}".format(
                         self.worker_map.total_worker_type_counts
                     )
@@ -590,17 +587,19 @@ class Manager:
                     try:
                         proc.wait(timeout=1)
                     except subprocess.TimeoutExpired:
-                        logger.warning(
-                            f"[WORKER_REMOVE] Timeout waiting for worker {w_id} process to terminate"
+                        log.warning(
+                            "[WORKER_REMOVE] Timeout waiting for worker %s process to "
+                            "terminate",
+                            w_id,
                         )
-                logger.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
-                logger.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
+                log.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
+                log.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
             if test:
                 return pickle.loads(message)
 
         except Exception:
-            logger.exception("Unhandled exception while processing worker messages")
+            log.exception("Unhandled exception while processing worker messages")
 
     def remove_task(self, task_id: str):
         task_type = self.task_type_mapping.pop(task_id)
@@ -612,7 +611,7 @@ class Manager:
         task = self.task_queues[task_type].get()
         worker_id = self.worker_map.get_worker(task_type)
 
-        logger.debug(f"Sending task {task.task_id} to {worker_id}")
+        log.debug(f"Sending task {task.task_id} to {worker_id}")
         # TODO: Some duplication of work could be avoided here
         to_send = [
             worker_id,
@@ -623,27 +622,27 @@ class Manager:
         self.funcx_task_socket.send_multipart(to_send)
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
-            logger.debug(f"Set task {task.task_id} to RUNNING")
+            log.debug(f"Set task {task.task_id} to RUNNING")
             self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,
                 "task_type": task_type,
             }
-        logger.debug("Sending complete!")
+        log.debug("Sending complete!")
 
     def _status_report_loop(self, kill_event):
-        logger.debug("[STATUS] Manager status reporting loop starting")
+        log.debug("[STATUS] Manager status reporting loop starting")
 
         while not kill_event.is_set():
             msg = ManagerStatusReport(
                 self.task_status_deltas,
                 self.container_switch_count,
             )
-            logger.info(
+            log.info(
                 f"[STATUS] Sending status report to interchange: {msg.task_statuses}"
             )
             self.pending_result_queue.put(msg)
-            logger.info("[STATUS] Clearing task deltas")
+            log.info("[STATUS] Clearing task deltas")
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
 
@@ -656,12 +655,12 @@ class Manager:
               Event to let the thread know when it is time to die.
         """
 
-        logger.debug("[RESULT_PUSH_THREAD] Starting thread")
+        log.debug("[RESULT_PUSH_THREAD] Starting thread")
 
         push_poll_period = (
             max(10, self.poll_period) / 1000
         )  # push_poll_period must be atleast 10 ms
-        logger.debug(f"[RESULT_PUSH_THREAD] push poll period: {push_poll_period}")
+        log.debug(f"[RESULT_PUSH_THREAD] push poll period: {push_poll_period}")
 
         last_beat = time.time()
         items = []
@@ -669,8 +668,10 @@ class Manager:
         while not kill_event.is_set():
             try:
                 r = self.pending_result_queue.get(block=True, timeout=push_poll_period)
-                # This avoids the interchange searching and attempting to unpack every message in case it's a
-                # status report.  (Would be better to use Task Messages eventually to make this more uniform)
+                # This avoids the interchange searching and attempting to unpack every
+                # message in case it's a status report.
+                # (It would be better to use Task Messages eventually to make this more
+                #  uniform)
                 # TODO: use task messages, and don't have to prepend
                 if isinstance(r, ManagerStatusReport):
                     items.insert(0, r.pack())
@@ -679,9 +680,10 @@ class Manager:
             except queue.Empty:
                 pass
             except Exception as e:
-                logger.exception(f"[RESULT_PUSH_THREAD] Got an exception: {e}")
+                log.exception(f"[RESULT_PUSH_THREAD] Got an exception: {e}")
 
-            # If we have reached poll_period duration or timer has expired, we send results
+            # If we have reached poll_period duration or timer has expired, we send
+            # results
             if (
                 len(items) >= self.max_queue_size
                 or time.time() > last_beat + push_poll_period
@@ -691,7 +693,7 @@ class Manager:
                     self.result_outgoing.send_multipart(items)
                     items = []
 
-        logger.critical("[RESULT_PUSH_THREAD] Exiting")
+        log.critical("[RESULT_PUSH_THREAD] Exiting")
 
     def remove_worker_init(self, worker_type):
         """
@@ -699,10 +701,11 @@ class Manager:
 
         Add a kill message to the task_type queue.
 
-        Assumption : All workers of the same type are uniform, and therefore don't discriminate when killing.
+        Assumption : All workers of the same type are uniform, and therefore don't
+                     discriminate when killing.
         """
 
-        logger.debug(
+        log.debug(
             "[WORKER_REMOVE] Appending KILL message to worker queue {}".format(
                 worker_type
             )
@@ -720,7 +723,7 @@ class Manager:
         """
 
         if self.worker_type and self.scheduler_mode == "hard":
-            logger.debug(
+            log.debug(
                 "[MANAGER] Start an initial worker with worker type {}".format(
                     self.worker_type
                 )
@@ -738,11 +741,11 @@ class Manager:
                 )
             )
 
-        logger.debug("Initial workers launched")
+        log.debug("Initial workers launched")
         self._result_pusher_thread.start()
         self._status_report_thread.start()
         self.pull_tasks(self._kill_event)
-        logger.info("Waiting")
+        log.info("Waiting")
 
 
 def cli_run():
@@ -818,55 +821,31 @@ def cli_run():
         required=True,
         help="REQUIRED: ZMQ url for posting results",
     )
-    parser.add_argument(
-        "--log_max_bytes",
-        default=256 * 1024 * 1024,
-        help="The maximum bytes per logger file in bytes",
-    )
-    parser.add_argument(
-        "--log_backup_count",
-        default=1,
-        help="The number of backup (must be non-zero) per logger file",
-    )
 
     args = parser.parse_args()
 
-    try:
-        os.makedirs(os.path.join(args.logdir, args.uid))
-    except FileExistsError:
-        pass
+    os.makedirs(os.path.join(args.logdir, args.uid), exist_ok=True)
+    setup_logging(
+        logfile=os.path.join(args.logdir, args.uid, "manager.log"), debug=args.debug
+    )
 
     try:
-        global logger
-        # TODO The config options for the rotatingfilehandler need to be implemented and checked so that it is user configurable
-        logger = set_file_logger(
-            os.path.join(args.logdir, args.uid, "manager.log"),
-            name="funcx_manager",
-            level=logging.DEBUG if args.debug is True else logging.INFO,
-            max_bytes=float(
-                args.log_max_bytes
-            ),  # TODO: Test if this still works on forwarder_rearch_1
-            backup_count=int(args.log_backup_count),
-        )  # TODO: Test if this still works on forwarder_rearch_1
-
-        logger.info(f"Python version: {sys.version}")
-        logger.info(f"Debug logging: {args.debug}")
-        logger.info(f"Log dir: {args.logdir}")
-        logger.info(f"Manager ID: {args.uid}")
-        logger.info(f"Block ID: {args.block_id}")
-        logger.info(f"cores_per_worker: {args.cores_per_worker}")
-        logger.info(f"task_url: {args.task_url}")
-        logger.info(f"result_url: {args.result_url}")
-        logger.info(f"hb_period: {args.hb_period}")
-        logger.info(f"hb_threshold: {args.hb_threshold}")
-        logger.info(f"max_workers: {args.max_workers}")
-        logger.info(f"poll_period: {args.poll}")
-        logger.info(f"worker_mode: {args.worker_mode}")
-        logger.info(f"container_cmd_options: {args.container_cmd_options}")
-        logger.info(f"scheduler_mode: {args.scheduler_mode}")
-        logger.info(f"worker_type: {args.worker_type}")
-        logger.info(f"log_max_bytes: {args.log_max_bytes}")
-        logger.info(f"log_backup_count: {args.log_backup_count}")
+        log.info(f"Python version: {sys.version}")
+        log.info(f"Debug logging: {args.debug}")
+        log.info(f"Log dir: {args.logdir}")
+        log.info(f"Manager ID: {args.uid}")
+        log.info(f"Block ID: {args.block_id}")
+        log.info(f"cores_per_worker: {args.cores_per_worker}")
+        log.info(f"task_url: {args.task_url}")
+        log.info(f"result_url: {args.result_url}")
+        log.info(f"hb_period: {args.hb_period}")
+        log.info(f"hb_threshold: {args.hb_threshold}")
+        log.info(f"max_workers: {args.max_workers}")
+        log.info(f"poll_period: {args.poll}")
+        log.info(f"worker_mode: {args.worker_mode}")
+        log.info(f"container_cmd_options: {args.container_cmd_options}")
+        log.info(f"scheduler_mode: {args.scheduler_mode}")
+        log.info(f"worker_type: {args.worker_type}")
 
         manager = Manager(
             task_q_url=args.task_url,
@@ -890,11 +869,11 @@ def cli_run():
         manager.start()
 
     except Exception as e:
-        logger.critical("process_worker_pool exiting from an exception")
-        logger.exception(f"Caught error: {e}")
+        log.critical("process_worker_pool exiting from an exception")
+        log.exception(f"Caught error: {e}")
         raise
     else:
-        logger.info("process_worker_pool main event loop exiting normally")
+        log.info("process_worker_pool main event loop exiting normally")
         print("PROCESS_WORKER_POOL main event loop exiting normally")
 
 

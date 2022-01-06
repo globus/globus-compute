@@ -8,7 +8,6 @@ from concurrent.futures import CancelledError
 import pytest
 from parsl.providers import LocalProvider
 
-import funcx
 from funcx_endpoint.executors import HighThroughputExecutor
 
 logger = logging.getLogger(__name__)
