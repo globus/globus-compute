@@ -28,6 +28,8 @@ from funcx.sdk import VERSION as SDK_VERSION
 
 logger = logging.getLogger(__name__)
 
+_FUNCX_HOME = os.path.join("~", ".funcx")
+
 
 class FuncXClient(FuncXErrorHandlingClient):
     """Main class for interacting with the funcX service
@@ -48,7 +50,7 @@ class FuncXClient(FuncXErrorHandlingClient):
     def __init__(
         self,
         http_timeout=None,
-        funcx_home=os.path.join("~", ".funcx"),
+        funcx_home=_FUNCX_HOME,
         force_login=False,
         fx_authorizer=None,
         search_authorizer=None,

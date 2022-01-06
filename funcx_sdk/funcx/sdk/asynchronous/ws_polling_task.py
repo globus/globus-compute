@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from asyncio import AbstractEventLoop, QueueEmpty
+from asyncio import AbstractEventLoop
 
 import dill
 import websockets
@@ -13,7 +13,7 @@ from websockets.exceptions import (
 
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
-logger = logging.getLogger("asyncio")
+log = logging.getLogger(__name__)
 
 
 class WebSocketPollingTask:
@@ -72,8 +72,9 @@ class WebSocketPollingTask:
         # the WebSocket server immediately
         self.running_task_group_ids.add(self.init_task_group_id)
 
-        # Set event loop explicitly since event loop can only be fetched automatically in main thread
-        # when batch submission is enabled, the task submission is in a new thread
+        # Set event loop explicitly since event loop can only be fetched automatically
+        # in main thread when batch submission is enabled, the task submission is in a
+        # new thread
         asyncio.set_event_loop(self.loop)
         self.task_group_ids_queue = asyncio.Queue()
         self.pending_tasks = {}
@@ -91,12 +92,13 @@ class WebSocketPollingTask:
             self.ws = await websockets.connect(
                 self.results_ws_uri, extra_headers=headers
             )
-        # initial Globus authentication happens during the HTTP portion of the handshake,
-        # so an invalid handshake means that the user was not authenticated
+        # initial Globus authentication happens during the HTTP portion of the
+        # handshake, so an invalid handshake means that the user was not authenticated
         except InvalidStatusCode as e:
             if e.status_code == 404:
                 raise Exception(
-                    "WebSocket service responsed with a 404. Please ensure you set the correct results_ws_uri"
+                    "WebSocket service responsed with a 404. "
+                    "Please ensure you set the correct results_ws_uri"
                 )
             else:
                 raise e
@@ -117,7 +119,19 @@ class WebSocketPollingTask:
             task_group_id = await queue.get()
             await self.ws.send(task_group_id)
 
-    async def handle_incoming(self, pending_futures, auto_close=False):
+    async def handle_incoming(self, pending_futures, auto_close=False) -> bool:
+        """
+
+        Parameters
+        ----------
+        pending_futures
+        auto_close
+
+        Returns
+        -------
+        True -- If connection is closing from internal shutdown process
+        False -- External disconnect - to be handled by reconnect logic
+        """
         while True:
             try:
                 raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
@@ -125,23 +139,26 @@ class WebSocketPollingTask:
                 pass
             except ConnectionClosedOK:
                 if self.closed_by_main_thread:
-                    logger.debug("WebSocket connection closed by main thread")
+                    log.info("WebSocket connection closed by main thread")
+                    return True
                 else:
-                    logger.error("WebSocket connection closed unexpectedly")
-                return
+                    log.info("WebSocket connection closed by remote-side")
+                    return False
             else:
                 data = json.loads(raw_data)
                 task_id = data["task_id"]
                 if task_id in pending_futures:
                     if await self.set_result(task_id, data, pending_futures):
-                        return
+                        return True
                 else:
-                    # This scenario occurs rarely using non-batching mode,
-                    # but quite often in batching mode.
-                    # When submitting tasks in batch with batch_run,
-                    # some task results may be received by websocket before the response of batch_run,
+                    # This scenario occurs rarely using non-batching mode, but quite
+                    # often in batching mode.
+                    #
+                    # When submitting tasks in batch with batch_run, some task results
+                    # may be received by websocket before the  response of batch_run,
                     # and pending_futures do not have the futures for the tasks yet.
-                    # We store these in unknown_results and process when their futures are ready.
+                    # We store these in unknown_results and process when their futures
+                    # are ready.
                     self.unknown_results[task_id] = data
 
             # Handle the results received but not processed before
@@ -149,7 +166,7 @@ class WebSocketPollingTask:
             for task_id in unprocessed_task_ids:
                 data = self.unknown_results.pop(task_id)
                 if await self.set_result(task_id, data, pending_futures):
-                    return
+                    return True
 
     async def set_result(self, task_id, data, pending_futures):
         """Sets the result of a future with given task_id in the pending_futures map,
@@ -186,10 +203,10 @@ class WebSocketPollingTask:
             else:
                 future.set_exception(Exception(data["reason"]))
         except Exception:
-            logger.exception("Caught unexpected exception while setting results")
+            log.exception("Caught unexpected exception while setting results")
 
-        # When the counter hits 0 we always exit. This guarantees that that
-        # if the counter increments to 1 on the executor, this handler needs to be restarted.
+        # When the counter hits 0 we always exit. This guarantees that that if the
+        # counter increments to 1 on the executor, this handler needs to be restarted.
         if self.atomic_controller is not None:
             count = self.atomic_controller.decrement()
             # Only close when count == 0 and unknown_results are empty
@@ -198,6 +215,11 @@ class WebSocketPollingTask:
                 self.ws = None
                 return True
         return False
+
+    async def close(self):
+        """Close underlying web-sockets, does not stop listeners directly"""
+        await self.ws.close()
+        self.ws = None
 
     def put_task_group_id(self, task_group_id):
         # prevent the task_group_id from being sent to the WebSocket server
@@ -216,14 +238,19 @@ class WebSocketPollingTask:
 
     def get_auth_header(self):
         """
-        Gets an Authorization header to be sent during the WebSocket handshake. Based on
-        header setting in the Globus SDK: https://github.com/globus/globus-sdk-python/blob/main/globus_sdk/base.py
+        Gets an Authorization header to be sent during the WebSocket handshake.
 
         Returns
         -------
         Key-value tuple of the Authorization header
         (key, value)
         """
+        # TODO: under SDK v3 this will be
+        #
+        #   return (
+        #       "Authorization",
+        #       self.funcx_client.authorizer.get_authorization_header()`
+        #   )
         headers = dict()
         self.funcx_client.authorizer.set_authorization_header(headers)
         header_name = "Authorization"

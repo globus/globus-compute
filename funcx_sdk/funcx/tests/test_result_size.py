@@ -1,6 +1,5 @@
 import pytest
 
-from funcx.sdk.client import FuncXClient
 from funcx.utils.errors import TaskPending
 from funcx_endpoint.executors.high_throughput.funcx_worker import MaxResultSizeExceeded
 
@@ -46,8 +45,11 @@ def test_allowed_result_sizes(fxc, endpoint, size):
     assert len(x) == size, "Result size does not match excepted size"
 
 
-def test_result_size_too_large(fxc, endpoint, size=550000):
-    """funcX should raise a MaxResultSizeExceeded exception when results exceeds 512KB limit"""
+def test_result_size_too_large(fxc, endpoint, size=11 * 1024 * 1024):
+    """
+    funcX should raise a MaxResultSizeExceeded exception when results exceeds 10MB
+    limit
+    """
     fn_uuid = fxc.register_function(
         large_result_producer, endpoint, description="LargeResultProducer"
     )

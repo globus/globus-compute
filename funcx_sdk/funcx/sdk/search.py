@@ -81,7 +81,8 @@ class SearchHelper:
         # print(res)
 
         # Restructure results to look like the data dict in FuncXClient
-        # see the JSON structure of res.data: https://docs.globus.org/api/search/search/#gsearchresult
+        # see the JSON structure of res.data:
+        #   https://docs.globus.org/api/search/search/#gsearchresult
         gmeta = response.data["gmeta"]
         results = []
         for item in gmeta:
@@ -130,7 +131,7 @@ class SearchHelper:
             }
         elif scope == "shared-with-me":
             # TODO: filter for public=False AND owner != self._owner_uuid
-            # but...need to build advanced query for that, because GFilters cannot do NOT
+            # need to build advanced query for that, because GFilters cannot do NOT
             # raise Exception('This scope has not been implemented')
             scope_filter = {
                 "type": "match_all",

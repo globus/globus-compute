@@ -10,7 +10,7 @@ from funcx_endpoint.executors import HighThroughputExecutor
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'bluewaters': {
-        'worker_init': 'module load bwpy;source anaconda3/etc/profile.d/conda.sh;conda activate funcx_testing_py3.7',
+        'worker_init': 'module load bwpy;source anaconda3/etc/profile.d/conda.sh;conda activate funcx_testing_py3.7',  # noqa: E501
         'scheduler_options': '',
     }
 }

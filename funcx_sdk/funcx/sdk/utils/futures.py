@@ -2,7 +2,6 @@
 
 Credit: Logan Ward
 """
-import json
 from concurrent.futures import Future
 from threading import Thread
 from time import sleep

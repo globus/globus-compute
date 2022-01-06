@@ -35,13 +35,13 @@ for func_id in func_ids:
 task_ids = fx.batch_run(batch)
 
 delta = time.time() - start
-print("Time to launch {} tasks: {:8.3f} s".format(task_count * len(func_ids), delta))
-print("Got {} tasks_ids ".format(len(task_ids)))
+print(f"Time to launch {task_count * len(func_ids)} tasks: {delta:8.3f} s")
+print(f"Got {len(task_ids)} tasks_ids ")
 
 for _i in range(10):
     x = fx.get_batch_result(task_ids)
     complete_count = sum([1 for t in task_ids if t in x and x[t].get("pending", False)])
-    print("Batch status : {}/{} complete".format(complete_count, len(task_ids)))
+    print(f"Batch status : {complete_count}/{len(task_ids)} complete")
     if complete_count == len(task_ids):
         print(x)
         break

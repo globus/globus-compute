@@ -63,7 +63,7 @@ targeting before you start the endpoint.
 funcX is configured using a :class:`~funcx_endpoint.endpoint.utils.config.Config` object.
 funcX uses `Parsl <https://parsl-project.org>`_ to manage resources. For more information,
 see the :class:`~funcx_endpoint.endpoint.utils.config.Config` class documentation and the
-`Parsl documentation <hhttps://parsl.readthedocs.io/en/stable/userguide/overview.html>`_ .
+`Parsl documentation <https://parsl.readthedocs.io/en/stable/userguide/overview.html>`_ .
 
 .. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is configured.
 

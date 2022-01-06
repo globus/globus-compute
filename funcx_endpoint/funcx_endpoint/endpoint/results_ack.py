@@ -1,23 +1,20 @@
 import logging
-import time
 import os
 import pickle
+import time
 
-# The logger path needs to start with endpoint. while the current path
-# start with funcx_endpoint.endpoint.
-logger = logging.getLogger("endpoint.results_ack")
+log = logging.getLogger(__name__)
 
 
-class ResultsAckHandler():
+class ResultsAckHandler:
     """
     Tracks task results by task ID, discarding results after they have been ack'ed
     """
 
     def __init__(self, endpoint_dir):
-        """ Initialize results storage and timing for log updates
-        """
+        """Initialize results storage and timing for log updates"""
         self.endpoint_dir = endpoint_dir
-        self.data_path = os.path.join(self.endpoint_dir, 'unacked_results.p')
+        self.data_path = os.path.join(self.endpoint_dir, "unacked_results.p")
 
         self.unacked_results = {}
         # how frequently to log info about acked and unacked results
@@ -26,7 +23,7 @@ class ResultsAckHandler():
         self.acked_count = 0
 
     def put(self, task_id, message):
-        """ Put sent task result into Unacked Dict
+        """Put sent task result into Unacked Dict
 
         Parameters
         ----------
@@ -39,7 +36,7 @@ class ResultsAckHandler():
         self.unacked_results[task_id] = message
 
     def ack(self, task_id):
-        """ Ack a task result that was sent. Nothing happens if the task ID is not
+        """Ack a task result that was sent. Nothing happens if the task ID is not
         present in the Unacked Dict
 
         Parameters
@@ -51,21 +48,25 @@ class ResultsAckHandler():
         if acked_task:
             self.acked_count += 1
             unacked_count = len(self.unacked_results)
-            logger.debug(f"Acked task {task_id}, Unacked count: {unacked_count}")
+            log.debug(f"Acked task {task_id}, Unacked count: {unacked_count}")
 
     def check_ack_counts(self):
-        """ Log the number of currently Unacked tasks and the tasks Acked since
+        """Log the number of currently Unacked tasks and the tasks Acked since
         the last check
         """
         now = time.time()
         if now - self.last_log_timestamp > self.log_period:
             unacked_count = len(self.unacked_results)
-            logger.info(f"Unacked count: {unacked_count}, Acked results since last check {self.acked_count}")
+            log.info(
+                "Unacked count: %s, Acked results since last check %s",
+                unacked_count,
+                self.acked_count,
+            )
             self.acked_count = 0
             self.last_log_timestamp = now
 
     def get_unacked_results_list(self):
-        """ Get a list of unacked results messages that can be used for resending
+        """Get a list of unacked results messages that can be used for resending
 
         Returns
         -------
@@ -75,17 +76,19 @@ class ResultsAckHandler():
         return list(self.unacked_results.values())
 
     def persist(self):
-        """ Save unacked results to disk
-        """
-        with open(self.data_path, 'wb') as fp:
+        """Save unacked results to disk"""
+        with open(self.data_path, "wb") as fp:
             pickle.dump(self.unacked_results, fp)
 
     def load(self):
-        """ Load unacked results from disk
-        """
+        """Load unacked results from disk"""
         try:
             if os.path.exists(self.data_path):
-                with open(self.data_path, 'rb') as fp:
+                with open(self.data_path, "rb") as fp:
                     self.unacked_results = pickle.load(fp)
         except pickle.UnpicklingError:
-            logger.warning(f"Cached results {self.data_path} appear to be corrupt. Proceeding without loading cached results")
+            log.warning(
+                "Cached results %s appear to be corrupt. "
+                "Proceeding without loading cached results",
+                self.data_path,
+            )

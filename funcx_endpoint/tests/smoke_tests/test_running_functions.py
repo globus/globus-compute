@@ -1,14 +1,12 @@
 import time
 
 
-def test_run_pre_registered_function(fxc, endpoint, tutorial_funcion_id):
+def test_run_pre_registered_function(
+    endpoint, tutorial_funcion_id, submit_function_and_get_result
+):
     """This test confirms that we are connected to the default production DB"""
-    fn_id = fxc.run(endpoint_id=endpoint, function_id=tutorial_funcion_id)
-
-    time.sleep(30)
-
-    result = fxc.get_result(fn_id)
-    assert result == "Hello World!", f"Expected result: Hello World!, got {result}"
+    r = submit_function_and_get_result(endpoint, func=tutorial_funcion_id)
+    assert r.result == "Hello World!"
 
 
 def double(x):
