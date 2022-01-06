@@ -5,7 +5,7 @@ from enum import Enum, auto
 from struct import Struct
 from typing import Tuple
 
-MESSAGE_TYPE_FORMATTER = Struct('b')
+MESSAGE_TYPE_FORMATTER = Struct("b")
 
 
 class MessageType(Enum):
@@ -23,8 +23,8 @@ class MessageType(Enum):
 
     @classmethod
     def unpack(cls, buffer):
-        mtype, = MESSAGE_TYPE_FORMATTER.unpack_from(buffer, offset=0)
-        return MessageType(mtype), buffer[MESSAGE_TYPE_FORMATTER.size:]
+        (mtype,) = MESSAGE_TYPE_FORMATTER.unpack_from(buffer, offset=0)
+        return MessageType(mtype), buffer[MESSAGE_TYPE_FORMATTER.size :]
 
 
 class TaskStatusCode(int, Enum):
@@ -36,10 +36,7 @@ class TaskStatusCode(int, Enum):
     CANCELLED = auto()
 
 
-COMMAND_TYPES = {
-    MessageType.HEARTBEAT_REQ,
-    MessageType.TASK_CANCEL
-}
+COMMAND_TYPES = {MessageType.HEARTBEAT_REQ, MessageType.TASK_CANCEL}
 
 
 class Message(ABC):
@@ -94,9 +91,12 @@ class Task(Message):
     """
     Task message from the forwarder->interchange
     """
+
     type = MessageType.TASK
 
-    def __init__(self, task_id: str, container_id: str, task_buffer: str, raw_buffer=None):
+    def __init__(
+        self, task_id: str, container_id: str, task_buffer: str, raw_buffer=None
+    ):
         super().__init__()
         self.task_id = task_id
         self.container_id = container_id
@@ -106,15 +106,17 @@ class Task(Message):
     def pack(self) -> bytes:
 
         if self.raw_buffer is None:
-            add_ons = f'TID={self.task_id};CID={self.container_id};{self.task_buffer}'
-            self.raw_buffer = add_ons.encode('utf-8')
+            add_ons = f"TID={self.task_id};CID={self.container_id};{self.task_buffer}"
+            self.raw_buffer = add_ons.encode("utf-8")
 
         return self.type.pack() + self.raw_buffer
 
     @classmethod
     def unpack(cls, raw_buffer: bytes):
-        b_tid, b_cid, task_buf = raw_buffer.decode('utf-8').split(';', 2)
-        return cls(b_tid[4:], b_cid[4:], task_buf.encode('utf-8'), raw_buffer=raw_buffer)
+        b_tid, b_cid, task_buf = raw_buffer.decode("utf-8").split(";", 2)
+        return cls(
+            b_tid[4:], b_cid[4:], task_buf.encode("utf-8"), raw_buffer=raw_buffer
+        )
 
     def set_local_container(self, container_id):
         self.local_container = container_id
@@ -125,6 +127,7 @@ class HeartbeatReq(Message):
     Synchronous request for a Heartbeat.  This is sent from the Forwarder to the endpoint on start to get
     an initial connection and ensure liveness.
     """
+
     type = MessageType.HEARTBEAT_REQ
 
     @property
@@ -147,6 +150,7 @@ class Heartbeat(Message):
     """
     Generic Heartbeat message, sent in both directions between Forwarder and Interchange.
     """
+
     type = MessageType.HEARTBEAT
 
     def __init__(self, endpoint_id):
@@ -166,6 +170,7 @@ class EPStatusReport(Message):
     Status report for an endpoint, sent from Interchange to Forwarder.  Includes EP-wide info such as utilization,
     as well as per-task status information.
     """
+
     type = MessageType.EP_STATUS_REPORT
 
     def __init__(self, endpoint_id, ep_status_report, task_statuses):
@@ -194,6 +199,7 @@ class ManagerStatusReport(Message):
     Status report sent from the Manager to the Interchange, which mostly just amounts to saying which tasks are now
     RUNNING.
     """
+
     type = MessageType.MANAGER_STATUS_REPORT
 
     def __init__(self, task_statuses, container_switch_count):
@@ -203,7 +209,7 @@ class ManagerStatusReport(Message):
 
     @classmethod
     def unpack(cls, msg):
-        container_switch_count = int.from_bytes(msg[:10], 'little')
+        container_switch_count = int.from_bytes(msg[:10], "little")
         msg = msg[10:]
         jsonified = msg.decode("ascii")
         task_statuses = json.loads(jsonified)
@@ -212,7 +218,11 @@ class ManagerStatusReport(Message):
     def pack(self):
         # TODO: do better than JSON?
         jsonified = json.dumps(self.task_statuses)
-        return self.type.pack() + self.container_switch_count.to_bytes(10, 'little') + jsonified.encode("ascii")
+        return (
+            self.type.pack()
+            + self.container_switch_count.to_bytes(10, "little")
+            + jsonified.encode("ascii")
+        )
 
 
 class ResultsAck(Message):
@@ -220,6 +230,7 @@ class ResultsAck(Message):
     Results acknowledgement to acknowledge a task result was received by
     the forwarder. Sent from forwarder->interchange
     """
+
     type = MessageType.RESULTS_ACK
 
     def __init__(self, task_id):
@@ -238,6 +249,7 @@ class TaskCancel(Message):
     """
     Synchronous request for to cancel a Task. This is sent from the Executor to the Interchange
     """
+
     type = MessageType.TASK_CANCEL
 
     def __init__(self, task_id):
@@ -256,6 +268,7 @@ class BadCommand(Message):
     """
     Error message send to indicate that a command is either unknown, malformed or unsupported.
     """
+
     type = MessageType.BAD_COMMAND
 
     def __init__(self, reason: str):

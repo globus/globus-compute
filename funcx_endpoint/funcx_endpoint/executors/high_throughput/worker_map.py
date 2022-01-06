@@ -60,7 +60,7 @@ class WorkerMap:
             self.to_die_count[worker_type] = 0
 
     def start_remove_worker(self, worker_type):
-        """ Increase the to_die_count in prep for a worker getting removed"""
+        """Increase the to_die_count in prep for a worker getting removed"""
         self.to_die_count[worker_type] += 1
 
     def remove_worker(self, worker_id):
