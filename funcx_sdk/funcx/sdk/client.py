@@ -17,7 +17,10 @@ from funcx.sdk.utils.batch import Batch
 from funcx.serialize import FuncXSerializer
 from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
-from funcx.utils.url_parsing import ws_uri_from_service_address
+from funcx.utils.url_parsing import (
+    validate_service_address,
+    ws_uri_from_service_address,
+)
 
 try:
     from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
@@ -166,6 +169,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             authorizer=search_authorizer, owner_uuid=user_info["sub"]
         )
         self.funcx_service_address = funcx_service_address
+        validate_service_address(self.funcx_service_address)
         self.check_endpoint_version = check_endpoint_version
 
         self.version_check()

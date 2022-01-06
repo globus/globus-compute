@@ -104,3 +104,13 @@ class TaskPending(FuncxError):
 
     def __repr__(self):
         return f"Task is pending due to {self.reason}"
+
+
+class InvalidServiceAddress(FuncxError):
+    """funcX Service Address is invalid"""
+
+    def __init__(self, reason):
+        self.reason = reason
+
+    def __repr__(self):
+        return f"Provided funcx_service_address is invalid: {self.reason}"
