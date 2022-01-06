@@ -17,6 +17,7 @@ from funcx.sdk.utils.batch import Batch
 from funcx.serialize import FuncXSerializer
 from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
+from funcx.utils.url_parsing import ws_uri_from_service_address
 
 try:
     from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
@@ -59,7 +60,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         check_endpoint_version=False,
         asynchronous=False,
         loop=None,
-        results_ws_uri="wss://api2.funcx.org/ws/v2/",
+        results_ws_uri=None,
         use_offprocess_checker=True,
         **kwargs,
     ):
@@ -170,6 +171,11 @@ class FuncXClient(FuncXErrorHandlingClient):
         self.version_check()
 
         self.results_ws_uri = results_ws_uri
+        if self.results_ws_uri is None:
+            self.results_ws_uri = ws_uri_from_service_address(
+                self.funcx_service_address
+            )
+
         self.asynchronous = asynchronous
         if asynchronous:
             self.loop = loop if loop else asyncio.get_event_loop()
