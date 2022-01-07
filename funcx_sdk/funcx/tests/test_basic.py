@@ -52,7 +52,17 @@ def test_non_blocking(fxc, endpoint):
             break
 
 
-def test_malformed_service_address(fxc, endpoint):
+def test_correct_ws_uri_prod():
+    fxc = FuncXClient(funcx_service_address="https://api2.funcx.org/v2")
+    assert fxc.results_ws_uri == "wss://api2.funcx.org/ws/v2/"
+
+
+def test_correct_ws_uri_testing():
+    fxc = FuncXClient(funcx_service_address="http://localhost:5000/v2")
+    assert fxc.results_ws_uri == "ws://localhost:6000/ws/v2/"
+
+
+def test_malformed_service_address():
     with pytest.raises(InvalidServiceAddress):
         FuncXClient(funcx_service_address="http:/k8s-dev.funcx.org/api/v1")
 

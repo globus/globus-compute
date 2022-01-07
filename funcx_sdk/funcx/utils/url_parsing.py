@@ -7,7 +7,12 @@ def validate_service_address(service_address):
     try:
         url_data = urlparse(service_address)
         # port must be accessed to raise port value issues
-        url_data.port
+        port = url_data.port
+        # the only other valid service address ports are None (not specified)
+        # 443 for HTTPS, and 5000 for development
+        if not (port is None or port == 443 or port == 5000):
+            raise InvalidServiceAddress("Port must be 443 or 5000")
+
         if url_data.scheme != "http" and url_data.scheme != "https":
             raise InvalidServiceAddress("Protocol must be HTTP/HTTPS")
 

@@ -7,6 +7,36 @@ from funcx.utils.url_parsing import (
 )
 
 
+def test_validate_service_address_testing():
+    url = "http://localhost:5000/v2"
+    # should not raise because this is valid
+    validate_service_address(url)
+
+
+def test_validate_service_address_dev():
+    url = "https://api.dev.funcx.org/v2"
+    # should not raise because this is valid
+    validate_service_address(url)
+
+
+def test_validate_service_address_prod():
+    url = "https://api2.funcx.org/v2"
+    # should not raise because this is valid
+    validate_service_address(url)
+
+
+def test_validate_service_address_explicit_port():
+    url = "https://api.dev.funcx.org:443/v2"
+    # should not raise because this is valid
+    validate_service_address(url)
+
+
+def test_validate_service_address_incorrect_port():
+    url = "http://localhost:9000/v2"
+    with pytest.raises(InvalidServiceAddress, match="Port must be 443 or 5000"):
+        validate_service_address(url)
+
+
 def test_validate_service_address_invalid_port():
     url = "https://api.dev.funcx.org:abc/v2"
     with pytest.raises(InvalidServiceAddress, match="Address is malformed"):
@@ -36,6 +66,12 @@ def test_ws_uri_from_service_address_dev():
     url = "https://api.dev.funcx.org/v2"
     res = ws_uri_from_service_address(url)
     assert res == "wss://api.dev.funcx.org/ws/v2/"
+
+
+def test_ws_uri_from_service_address_dev_explicit_port():
+    url = "https://api.dev.funcx.org:443/v2"
+    res = ws_uri_from_service_address(url)
+    assert res == "wss://api.dev.funcx.org:443/ws/v2/"
 
 
 def test_ws_uri_from_service_address_prod():
