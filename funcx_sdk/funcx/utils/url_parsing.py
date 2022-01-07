@@ -3,7 +3,15 @@ from urllib.parse import urlparse
 from funcx.utils.errors import InvalidServiceAddress
 
 
-def validate_service_address(service_address):
+def validate_service_address(service_address: str):
+    """Validate funcX service address, raising InvalidServiceAddress
+    if invalid
+
+    Parameters
+    ----------
+    service_address : str
+        funcX service address
+    """
     try:
         url_data = urlparse(service_address)
         # port must be accessed to raise port value issues
@@ -23,6 +31,18 @@ def validate_service_address(service_address):
 
 
 def ws_uri_from_service_address(service_address):
+    """Compute ws uri from funcX service address
+
+    Parameters
+    ----------
+    service_address : str
+        funcX service address
+
+    Returns
+    -------
+    str
+        WebSocket URI
+    """
     url_data = urlparse(service_address)
     scheme = "wss" if url_data.scheme == "https" else "ws"
     hostname = url_data.hostname
