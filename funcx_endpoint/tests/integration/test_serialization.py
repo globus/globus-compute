@@ -8,7 +8,7 @@ def foo(x, y=3):
 def test_1():
     jb = concretes.json_base64()
 
-    d = jb.serialize(([2], {'y': 10}))
+    d = jb.serialize(([2], {"y": 10}))
     args, kwargs = jb.deserialize(d)
     result = foo(*args, **kwargs)
     print(result)
@@ -22,7 +22,7 @@ def test_2():
 
     fn = jb.deserialize(f)
     print(fn)
-    assert fn(2) == 6, "Expected 6 got {}".format(fn(2))
+    assert fn(2) == 6, f"Expected 6 got {fn(2)}"
 
 
 def test_code_1():
@@ -79,6 +79,7 @@ def test_code_3():
 def test_overall():
 
     from funcx.serialize.facade import FuncXSerializer
+
     fxs = FuncXSerializer()
     print(fxs._list_methods())
 
@@ -87,7 +88,7 @@ def test_overall():
     print(fxs.deserialize(x))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # test_1()
     # test_2()

@@ -4,8 +4,7 @@ import time
 from funcx_endpoint.strategies import SimpleStrategy
 
 
-class MockInterchange(object):
-
+class MockInterchange:
     def __init__(self, max_blocks=1, tasks=10):
         self.tasks_pending = tasks
         self.max_blocks = max_blocks
@@ -22,7 +21,7 @@ class MockInterchange(object):
             this_round = self.tasks_pending
             self.tasks_pending = 0
 
-        current = [('interchange', this_round, this_round)]
+        current = [("interchange", this_round, this_round)]
         for i in range(self.managers):
             current.extend((f"manager_{i}", 1, 1))
         self.status.put(current)
@@ -35,11 +34,11 @@ class MockInterchange(object):
     def create_data(self):
         q = queue.Queue()
         items = [
-            [('interchange', 0, 0)],
-            [('interchange', 0, 0)],
-            [('interchange', 0, 0)],
-            [('interchange', self.tasks_pending, self.tasks_pending)],
-            [('interchange', self.tasks_pending, self.tasks_pending)]
+            [("interchange", 0, 0)],
+            [("interchange", 0, 0)],
+            [("interchange", 0, 0)],
+            [("interchange", self.tasks_pending, self.tasks_pending)],
+            [("interchange", self.tasks_pending, self.tasks_pending)],
         ]
         [q.put(i) for i in items]
 

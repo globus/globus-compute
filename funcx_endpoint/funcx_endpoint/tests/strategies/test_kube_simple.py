@@ -1,5 +1,6 @@
 import threading
 import time
+
 from pytest import fixture
 
 from funcx_endpoint.executors.high_throughput.interchange import Interchange
@@ -17,7 +18,6 @@ def no_op_worker():
 
 
 class TestKubeSimple:
-
     @fixture
     def mock_interchange(self, mocker):
         mock_interchange = mocker.MagicMock(Interchange)
@@ -29,8 +29,10 @@ class TestKubeSimple:
         mock_interchange.config.provider.max_blocks = 4
         mock_interchange.config.provider.nodes_per_block = 1
         mock_interchange.config.provider.parallelism = 1.0
-        mock_interchange.get_total_tasks_outstanding = mocker.Mock(return_value={'RAW': 0})
-        mock_interchange.provider_status = mocker.Mock(return_value={'RAW': 16})
+        mock_interchange.get_total_tasks_outstanding = mocker.Mock(
+            return_value={"RAW": 0}
+        )
+        mock_interchange.provider_status = mocker.Mock(return_value={"RAW": 16})
         mock_interchange.get_total_live_workers = mocker.Mock(return_value=0)
         mock_interchange.scale_in = mocker.Mock()
         mock_interchange.scale_out = mocker.Mock()
@@ -48,7 +50,8 @@ class TestKubeSimple:
 
     def test_no_tasks_no_pods(self, mock_interchange, kube_strategy):
         mock_interchange.get_outstanding_breakdown.return_value = [
-            ('interchange', 0, True)]
+            ("interchange", 0, True)
+        ]
         mock_interchange.get_total_tasks_outstanding.return_value = []
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
@@ -57,8 +60,8 @@ class TestKubeSimple:
 
     def test_scale_in_with_no_tasks(self, mock_interchange, kube_strategy):
         # First there is work to do and pods are scaled up
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 16}
-        mock_interchange.provider_status.return_value = {'RAW': 16}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 16}
+        mock_interchange.provider_status.return_value = {"RAW": 16}
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
@@ -66,7 +69,7 @@ class TestKubeSimple:
 
         # Now tasks are all done, but pods are still running. Idle time has not yet
         # been reached, so the pods will still be running.
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 0}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 0}
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
         mock_interchange.scale_out.assert_not_called()
@@ -81,8 +84,8 @@ class TestKubeSimple:
 
     def test_task_arrives_during_idle_time(self, mock_interchange, kube_strategy):
         # First there is work to do and pods are scaled up
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 16}
-        mock_interchange.provider_status.return_value = {'RAW': 16}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 16}
+        mock_interchange.provider_status.return_value = {"RAW": 16}
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
@@ -90,20 +93,20 @@ class TestKubeSimple:
 
         # Now tasks are all done, but pods are still running. Idle time has not yet
         # been reached, so the pods will still be running.
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 0}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 0}
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
         mock_interchange.scale_out.assert_not_called()
 
         # Now add a new task
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 1}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 1}
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
         mock_interchange.scale_out.assert_not_called()
 
         # Verify that idle time is reset
         time.sleep(5)
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 0}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 0}
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
         mock_interchange.scale_out.assert_not_called()
@@ -112,8 +115,8 @@ class TestKubeSimple:
         # Aggressive scaling so new tasks will create new pods
         mock_interchange.config.provider.parallelism = 1.0
         mock_interchange.config.provider.max_blocks = 16
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 16}
-        mock_interchange.provider_status.return_value = {'RAW': 1}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 16}
+        mock_interchange.provider_status.return_value = {"RAW": 1}
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
@@ -123,8 +126,8 @@ class TestKubeSimple:
         # Lazy scaling, so just a single new task won't spawn a new pod
         mock_interchange.config.provider.parallelism = 0.5
         mock_interchange.config.provider.max_blocks = 16
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 16}
-        mock_interchange.provider_status.return_value = {'RAW': 1}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 16}
+        mock_interchange.provider_status.return_value = {"RAW": 1}
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
@@ -133,8 +136,8 @@ class TestKubeSimple:
     def test_task_backlog_gated_by_max_blocks(self, mock_interchange, kube_strategy):
         mock_interchange.config.provider.parallelism = 1.0
         mock_interchange.config.provider.max_blocks = 8
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 16}
-        mock_interchange.provider_status.return_value = {'RAW': 1}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 16}
+        mock_interchange.provider_status.return_value = {"RAW": 1}
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
@@ -143,8 +146,8 @@ class TestKubeSimple:
     def test_task_backlog_already_max_blocks(self, mock_interchange, kube_strategy):
         mock_interchange.config.provider.parallelism = 1.0
         mock_interchange.config.provider.max_blocks = 8
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 16}
-        mock_interchange.provider_status.return_value = {'RAW': 16}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 16}
+        mock_interchange.provider_status.return_value = {"RAW": 16}
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()
@@ -152,8 +155,8 @@ class TestKubeSimple:
 
     def test_scale_when_no_pods(self, mock_interchange, kube_strategy):
         mock_interchange.config.provider.parallelism = 0.01  # Very lazy scaling
-        mock_interchange.provider_status.return_value = {'RAW': 0}
-        mock_interchange.get_total_tasks_outstanding.return_value = {'RAW': 1}
+        mock_interchange.provider_status.return_value = {"RAW": 0}
+        mock_interchange.get_total_tasks_outstanding.return_value = {"RAW": 1}
         kube_strategy.start(mock_interchange)
         kube_strategy.make_callback(kind="timer")
         mock_interchange.scale_in.assert_not_called()

@@ -1,6 +1,5 @@
 import pytest
 
-from funcx.sdk.client import FuncXClient
 from funcx.utils.response_errors import EndpointNotFound
 
 

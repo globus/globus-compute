@@ -1,6 +1,6 @@
 from parsl.addresses import address_by_hostname
 from parsl.launchers import SrunLauncher
-from parsl.providers import LocalProvider, SlurmProvider
+from parsl.providers import SlurmProvider
 
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.executors import HighThroughputExecutor
@@ -28,12 +28,17 @@ config = Config(
                 partition='general',
 
                 # Launch 4 managers per node, each bound to 1 GPU
-                # This is a hack. We use hostname ; to terminate the srun command, and start our own
+                # This is a hack. We use hostname ; to terminate the srun command, and
+                # start our own
+                #
                 # DO NOT MODIFY unless you know what you are doing.
-                launcher=SrunLauncher(overrides=(f'hostname; srun --ntasks={TOTAL_WORKERS} '
-                                                 f'--ntasks-per-node={WORKERS_PER_NODE} '
-                                                 f'--gpus-per-task=rtx2080ti:{GPUS_PER_WORKER} '
-                                                 f'--gpu-bind=map_gpu:{GPU_MAP}')
+                launcher=SrunLauncher(
+                    overrides=(
+                        f'hostname; srun --ntasks={TOTAL_WORKERS} '
+                        f'--ntasks-per-node={WORKERS_PER_NODE} '
+                        f'--gpus-per-task=rtx2080ti:{GPUS_PER_WORKER} '
+                        f'--gpu-bind=map_gpu:{GPU_MAP}'
+                    )
                 ),
 
                 # Scale between 0-1 blocks with 2 nodes per block

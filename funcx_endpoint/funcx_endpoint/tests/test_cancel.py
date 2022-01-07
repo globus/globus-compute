@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import time
@@ -7,13 +8,12 @@ from concurrent.futures import CancelledError
 import pytest
 from parsl.providers import LocalProvider
 
-import funcx
 from funcx_endpoint.executors import HighThroughputExecutor
-import logging
+
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def htex():
     try:
         os.remove("interchange.log")

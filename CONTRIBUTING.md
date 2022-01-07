@@ -30,3 +30,18 @@ After installing `pre-commit`, run
 in the repo to configure hooks.
 
 > NOTE: If necessary, you can always skip hooks with `git commit --no-verify`
+
+## Installing Testing Requirements
+
+Testing requirements for each of the two packages in this repository
+(funcx-sdk and funcx-endpoint) are specified as installable extras.
+
+To install the funcx-sdk test requirements
+
+    cd funcx_sdk
+    pip install '.[test]'
+
+To install the funcx-endpoint test requirements
+
+    cd funcx_endpoint
+    pip install '.[test]'

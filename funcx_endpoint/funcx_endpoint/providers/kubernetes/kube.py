@@ -1,17 +1,14 @@
 import logging
 import queue
 import time
-
-from funcx_endpoint.providers.kubernetes.template import template_string
-
-logger = logging.getLogger("interchange.kube_provider")
-
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import typeguard
 from parsl.errors import OptionalModuleMissing
 from parsl.providers.provider_base import ExecutionProvider
 from parsl.utils import RepresentationMixin
+
+from funcx_endpoint.providers.kubernetes.template import template_string
 
 try:
     from kubernetes import client, config
@@ -19,6 +16,8 @@ try:
     _kubernetes_enabled = True
 except (ImportError, NameError, FileNotFoundError):
     _kubernetes_enabled = False
+
+log = logging.getLogger(__name__)
 
 
 class KubernetesProvider(ExecutionProvider, RepresentationMixin):
@@ -54,9 +53,10 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         This is the memory "requests" option for resource specification on kubernetes.
         Check kubernetes docs for more details. Default is 250Mi.
     parallelism : float
-        Ratio of provisioned task slots to active tasks. A parallelism value of 1 represents aggressive
-        scaling where as many resources as possible are used; parallelism close to 0 represents
-        the opposite situation in which as few resources as possible (i.e., min_blocks) are used.
+        Ratio of provisioned task slots to active tasks. A parallelism value of 1
+        represents aggressive scaling where as many resources as possible are used;
+        parallelism close to 0 represents the opposite situation in which as few
+        resources as possible (i.e., min_blocks) are used.
     worker_init : str
         Command to be run first for the workers, such as `python start.py`.
     secret : str
@@ -156,23 +156,23 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         """
 
         cur_timestamp = str(time.time() * 1000).split(".")[0]
-        job_name = "{0}-{1}".format(job_name, cur_timestamp)
+        job_name = f"{job_name}-{cur_timestamp}"
 
         # Use default image
         image = self.image if task_type == "RAW" else task_type
 
         # Set the pod name
         if not self.pod_name:
-            pod_name = "{}".format(job_name)
+            pod_name = f"{job_name}"
         else:
-            pod_name = "{}-{}".format(self.pod_name, cur_timestamp)
+            pod_name = f"{self.pod_name}-{cur_timestamp}"
 
-        logger.debug("cmd_string is {}".format(cmd_string))
+        log.debug(f"cmd_string is {cmd_string}")
         formatted_cmd = template_string.format(
             command=cmd_string, worker_init=self.worker_init
         )
 
-        logger.info("[KUBERNETES] Scaling out a pod with name :{}".format(pod_name))
+        log.info(f"[KUBERNETES] Scaling out a pod with name :{pod_name}")
         self._create_pod(
             image=image,
             pod_name=pod_name,
@@ -203,7 +203,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
              - ExecutionProviderExceptions or its subclasses
         """
         # This is a hack
-        logger.debug("Getting Kubernetes provider status")
+        log.debug("Getting Kubernetes provider status")
         status = {}
         for jid in job_ids:
             if jid in self.resources_by_pod_name:
@@ -224,7 +224,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                     break
                 else:
                     num_pods -= 1
-        logger.info("[KUBERNETES] The to_kill pods are {}".format(to_kill))
+        log.info(f"[KUBERNETES] The to_kill pods are {to_kill}")
         rets = self._cancel(to_kill)
         return to_kill, rets
 
@@ -236,13 +236,13 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         [True/False...] : If the cancel operation fails the entire list will be False.
         """
         for job in job_ids:
-            logger.debug("Terminating job/proc_id: {0}".format(job))
+            log.debug(f"Terminating job/proc_id: {job}")
             # Here we are assuming that for local, the job_ids are the process id's
             self._delete_pod(job)
 
             self.resources_by_pod_name[job]["status"] = "CANCELLED"
             del self.resources_by_pod_name[job]
-        logger.debug(
+        log.debug(
             "[KUBERNETES] The resources in kube provider is {}".format(
                 self.resources_by_pod_name
             )
@@ -291,7 +291,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         # Create the enviornment variables and command to initiate IPP
         environment_vars = client.V1EnvVar(name="TEST", value="SOME DATA")
 
-        launch_args = ["-c", "{0}".format(cmd_string)]
+        launch_args = ["-c", f"{cmd_string}"]
 
         volume_mounts = []
         # Create mount paths for the volumes
@@ -342,7 +342,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         api_response = self.kube_client.create_namespaced_pod(
             namespace=self.namespace, body=pod
         )
-        logger.debug("Pod created. status='{0}'".format(str(api_response.status)))
+        log.debug(f"Pod created. status='{str(api_response.status)}'")
 
     def _delete_pod(self, pod_name):
         """Delete a pod"""
@@ -350,7 +350,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         api_response = self.kube_client.delete_namespaced_pod(
             name=pod_name, namespace=self.namespace, body=client.V1DeleteOptions()
         )
-        logger.debug("Pod deleted. status='{0}'".format(str(api_response.status)))
+        log.debug(f"Pod deleted. status='{str(api_response.status)}'")
 
     @property
     def label(self):

@@ -4,4 +4,4 @@ __version__ = "0.3.4"
 VERSION = __version__
 
 # app name to send as part of requests
-app_name = "funcX Endpoint v{}".format(__version__)
+app_name = f"funcX Endpoint v{__version__}"
