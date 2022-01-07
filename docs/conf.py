@@ -46,4 +46,8 @@ pygments_style = "friendly"
 pygments_dark_style = "monokai"  # this is a furo-specific option
 html_show_sourcelink = True
 html_theme = "furo"
-html_logo = "_static/logo.png"
+html_static_path = ["_static"]
+html_theme_options = {
+    "light_logo": "images/funcX-light-cropped.png",
+    "dark_logo": "images/funcX-dark-cropped.png",
+}
