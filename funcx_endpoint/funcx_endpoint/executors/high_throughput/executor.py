@@ -5,7 +5,6 @@ There's a slow but sure deviation from Parsl's Executor interface here, that nee
 to be addressed.
 """
 import concurrent.futures
-
 import logging
 import os
 import pickle
