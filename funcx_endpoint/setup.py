@@ -40,6 +40,7 @@ REQUIRES = [
     # of different features and functions
     # pin exact versions because it does not use semver
     "parsl==1.1.0",
+    "funcx-common",
 ]
 
 TEST_REQUIRES = [

@@ -17,6 +17,7 @@ REQUIRES = [
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
     # versioning and compatibility policy
     "dill==0.3.4",
+    "funcx-common",
 ]
 
 TEST_REQUIRES = [
