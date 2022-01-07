@@ -986,6 +986,7 @@ class Interchange:
                             manager,
                             self._ready_manager_queue,
                         )
+
                         if r["task_id"] in self.task_status_deltas:
                             del self.task_status_deltas[r["task_id"]]
                         self._ready_manager_queue[manager]["tasks"][task_type].remove(

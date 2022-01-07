@@ -5,6 +5,7 @@ There's a slow but sure deviation from Parsl's Executor interface here, that nee
 to be addressed.
 """
 import concurrent.futures
+
 import logging
 import os
 import pickle
@@ -34,6 +35,7 @@ from funcx_endpoint.logging_config import setup_logging
 from funcx_endpoint.strategies.simple import SimpleStrategy
 
 fx_serializer = FuncXSerializer()
+
 
 # TODO: YADU There's a bug here which causes some of the log messages to write out to
 # stderr
