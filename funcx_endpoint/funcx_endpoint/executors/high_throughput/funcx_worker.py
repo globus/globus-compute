@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import pickle
+import signal
 import sys
 
 import zmq
@@ -90,6 +91,11 @@ class FuncXWorker:
         log.info(f"Trying to connect to : tcp://{self.address}:{self.port}")
         self.task_socket.connect(f"tcp://{self.address}:{self.port}")
         self.poller.register(self.task_socket, zmq.POLLIN)
+        signal.signal(signal.SIGTERM, self.handler)
+
+    def handler(self, signum, frame):
+        log.error("Signal handler called with signal", signum)
+        sys.exit(1)
 
     def registration_message(self):
         return {"worker_id": self.worker_id, "worker_type": self.worker_type}

@@ -14,6 +14,8 @@ class MessageType(Enum):
     MANAGER_STATUS_REPORT = auto()
     TASK = auto()
     RESULTS_ACK = auto()
+    TASK_CANCEL = auto()
+    BAD_COMMAND = auto()
 
     def pack(self):
         return MESSAGE_TYPE_FORMATTER.pack(self.value)
@@ -30,9 +32,10 @@ class TaskStatusCode(int, Enum):
     RUNNING = auto()
     SUCCESS = auto()
     FAILED = auto()
+    CANCELLED = auto()
 
 
-COMMAND_TYPES = {MessageType.HEARTBEAT_REQ}
+COMMAND_TYPES = {MessageType.HEARTBEAT_REQ, MessageType.TASK_CANCEL}
 
 
 class Message(ABC):
@@ -71,6 +74,10 @@ class Message(ABC):
             return Task.unpack(remaining)
         elif message_type is MessageType.RESULTS_ACK:
             return ResultsAck.unpack(remaining)
+        elif message_type is MessageType.TASK_CANCEL:
+            return TaskCancel.unpack(remaining)
+        elif message_type is MessageType.BAD_COMMAND:
+            return BadCommand.unpack(remaining)
 
         raise Exception(f"Unknown Message Type Code: {message_type}")
 
@@ -239,3 +246,44 @@ class ResultsAck(Message):
 
     def pack(self):
         return self.type.pack() + self.task_id.encode("ascii")
+
+
+class TaskCancel(Message):
+    """
+    Synchronous request for to cancel a Task.
+
+    This is sent from the Executor to the Interchange
+    """
+
+    type = MessageType.TASK_CANCEL
+
+    def __init__(self, task_id):
+        super().__init__()
+        self.task_id = task_id
+
+    @classmethod
+    def unpack(cls, msg):
+        return cls(json.loads(msg.decode("ascii")))
+
+    def pack(self):
+        return self.type.pack() + json.dumps(self.task_id).encode("ascii")
+
+
+class BadCommand(Message):
+    """
+    Error message send to indicate that a command is either
+    unknown, malformed or unsupported.
+    """
+
+    type = MessageType.BAD_COMMAND
+
+    def __init__(self, reason: str):
+        super().__init__()
+        self.reason = reason
+
+    @classmethod
+    def unpack(cls, msg):
+        return cls(msg.decode("ascii"))
+
+    def pack(self):
+        return self.type.pack() + self.reason.encode("ascii")

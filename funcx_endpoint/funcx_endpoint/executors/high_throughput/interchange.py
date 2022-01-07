@@ -24,7 +24,7 @@ from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import (
     naive_interchange_task_dispatch,
 )
 from funcx_endpoint.executors.high_throughput.messages import (
-    COMMAND_TYPES,
+    BadCommand,
     EPStatusReport,
     Heartbeat,
     Message,
@@ -341,6 +341,8 @@ class Interchange:
             raise
 
         self.tasks = set()
+        self.task_cancel_running_queue = queue.Queue()
+        self.task_cancel_pending_trap = {}
         self.task_status_deltas = {}
         self.container_switch_count = {}
 
@@ -625,15 +627,25 @@ class Interchange:
                 buffer = self.command_channel.recv()
                 log.debug(f"[COMMAND] Received command request {buffer}")
                 command = Message.unpack(buffer)
-                if command.type not in COMMAND_TYPES:
-                    log.error("Received incorrect message type on command channel")
-                    self.command_channel.send(bytes())
-                    continue
 
-                if command.type is MessageType.HEARTBEAT_REQ:
+                if command.type is MessageType.TASK_CANCEL:
+                    log.info(
+                        f"[COMMAND] Received TASK_CANCEL for Task:{command.task_id}"
+                    )
+                    self.enqueue_task_cancel(command.task_id)
+                    reply = command
+
+                elif command.type is MessageType.HEARTBEAT_REQ:
                     log.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
                     log.info(f"[COMMAND] Replying with Heartbeat({self.endpoint_id})")
                     reply = Heartbeat(self.endpoint_id)
+
+                else:
+                    log.error(
+                        f"Received unsupported message type:{command.type} on "
+                        "command channel"
+                    )
+                    reply = BadCommand(f"Unknown command type: {command.type}")
 
                 log.debug(f"[COMMAND] Reply: {reply}")
                 self.command_channel.send(reply.pack())
@@ -641,6 +653,37 @@ class Interchange:
             except zmq.Again:
                 log.debug("[COMMAND] is alive")
                 continue
+
+    def enqueue_task_cancel(self, task_id):
+        """Cancel a task on the interchange
+        Here are the task states and responses we issue here
+        1. Task is pending in queues -> we add task to a trap to capture while in
+            dispatch and delegate cancel to the manager the task is assigned to
+        2. Task is in a transitionary state between pending in queue and dispatched ->
+               task is added pre-emptively to trap
+        3. Task is pending on a manager -> we delegate cancellation to manager
+        4. Task is already complete -> we leave in trap, since we can't know
+
+        We place the task in the trap so that even if the search misses, the task
+        will be caught from getting dispatched even if the search fails due to a
+        race-condition. Since the task can't be dispatched before scheduling is
+        complete, either must work.
+        """
+        log.debug(f"Received task_cancel request for Task:{task_id}")
+
+        self.task_cancel_pending_trap[task_id] = task_id
+        for manager in self._ready_manager_queue:
+            for task_type in self._ready_manager_queue[manager]["tasks"]:
+                for tid in self._ready_manager_queue[manager]["tasks"][task_type]:
+                    if tid == task_id:
+                        log.debug(
+                            f"Task:{task_id} is running, "
+                            "moving task_cancel message onto queue"
+                        )
+                        self.task_cancel_running_queue.put((manager, task_id))
+                        self.task_cancel_pending_trap.pop(task_id, None)
+                        break
+        return
 
     def stop(self):
         """Prepare the interchange for shutdown"""
@@ -838,6 +881,21 @@ class Interchange:
 
             self.total_pending_task_count -= dispatched_task
 
+            # Task cancel is high priority, so we'll process all requests
+            # in one go
+            while True:
+                try:
+                    manager, task_id = self.task_cancel_running_queue.get(block=False)
+                    log.debug(
+                        f"[MAIN] Task:{task_id} on manager:{manager} is "
+                        "now CANCELLED while running"
+                    )
+                    cancel_message = pickle.dumps(("TASK_CANCEL", task_id))
+                    self.task_outgoing.send_multipart([manager, b"", cancel_message])
+
+                except queue.Empty:
+                    break
+
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]
                 if tasks:
@@ -853,10 +911,23 @@ class Interchange:
 
                     for task in tasks:
                         task_id = task["task_id"]
-                        log.debug(f"[MAIN] Task {task_id} is now WAITING_FOR_LAUNCH")
-                        self.task_status_deltas[
-                            task_id
-                        ] = TaskStatusCode.WAITING_FOR_LAUNCH
+                        if (
+                            self.task_cancel_pending_trap
+                            and task_id in self.task_cancel_pending_trap
+                        ):
+                            log.info(f"[MAIN] Task:{task_id} CANCELLED before launch")
+                            cancel_message = pickle.dumps(("TASK_CANCEL", task_id))
+                            self.task_outgoing.send_multipart(
+                                [manager, b"", cancel_message]
+                            )
+                            self.task_cancel_pending_trap.pop(task_id)
+                        else:
+                            log.debug(
+                                f"[MAIN] Task:{task_id} is now WAITING_FOR_LAUNCH"
+                            )
+                            self.task_status_deltas[
+                                task_id
+                            ] = TaskStatusCode.WAITING_FOR_LAUNCH
 
             # Receive any results and forward to client
             if (
@@ -906,10 +977,16 @@ class Interchange:
                         r = pickle.loads(b_message)
                         log.debug(
                             "[MAIN] Received result for task {} from {}".format(
-                                r, manager
+                                r["task_id"], manager
                             )
                         )
                         task_type = self.containers[r["container_id"]]
+                        log.debug(
+                            "[MAIN] Removing for manager: %s from %s",
+                            manager,
+                            self._ready_manager_queue,
+                        )
+
                         if r["task_id"] in self.task_status_deltas:
                             del self.task_status_deltas[r["task_id"]]
                         self._ready_manager_queue[manager]["tasks"][task_type].remove(

@@ -4,28 +4,23 @@ task distribution
 There's a slow but sure deviation from Parsl's Executor interface here, that needs
 to be addressed.
 """
-
+import concurrent.futures
 import logging
 import os
 import pickle
 import queue
 import threading
 import time
-from concurrent.futures import Future
 from multiprocessing import Process
 
 import daemon
 from parsl.dataflow.error import ConfigurationError
 from parsl.executors.errors import BadMessage, ScalingFailed
-
-# from parsl.executors.base import ParslExecutor
 from parsl.executors.status_handling import StatusHandlingExecutor
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
 from funcx.serialize import FuncXSerializer
-
-# from parsl.executors.high_throughput import interchange
 from funcx_endpoint.executors.high_throughput import interchange, zmq_pipes
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from funcx_endpoint.executors.high_throughput.messages import (
@@ -33,11 +28,13 @@ from funcx_endpoint.executors.high_throughput.messages import (
     Heartbeat,
     HeartbeatReq,
     Task,
+    TaskCancel,
 )
 from funcx_endpoint.logging_config import setup_logging
 from funcx_endpoint.strategies.simple import SimpleStrategy
 
 fx_serializer = FuncXSerializer()
+
 
 # TODO: YADU There's a bug here which causes some of the log messages to write out to
 # stderr
@@ -246,7 +243,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         heartbeat_period=30,
         poll_period=10,
         container_image=None,
-        suppress_failure=False,
+        suppress_failure=True,
         run_dir=None,
         endpoint_id=None,
         managed=True,
@@ -625,8 +622,18 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             self._executor_bad_state.set()
                             # We set all current tasks to this exception to make sure
                             # that this is raised in the main context.
-                            for task in self.tasks:
-                                self.tasks[task].set_exception(self._executor_exception)
+                            for task_id in self.tasks:
+                                try:
+                                    self.tasks[task_id].set_exception(
+                                        self._executor_exception
+                                    )
+                                except concurrent.futures.InvalidStateError:
+                                    # Task was already cancelled, the exception can be
+                                    # ignored
+                                    log.debug(
+                                        f"Task:{task_id} result couldn't be set. "
+                                        "Already in terminal state"
+                                    )
                             break
 
                         if self.passthrough is True:
@@ -645,14 +652,36 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             )
                             continue
 
-                        task_fut = self.tasks.pop(tid)
+                        try:
+                            task_fut = self.tasks.pop(tid)
+                        except KeyError:
+                            # This is triggered when the result of a cancelled task is
+                            # returned
+                            # We should log, and proceed.
+                            log.warning(
+                                f"[MTHREAD] Task:{tid} not found in tasks table\n"
+                                "Task likely was cancelled and removed."
+                            )
+                            continue
 
                         if "result" in msg:
                             result = fx_serializer.deserialize(msg["result"])
-                            task_fut.set_result(result)
+                            try:
+                                task_fut.set_result(result)
+                            except concurrent.futures.InvalidStateError:
+                                log.debug(
+                                    f"Task:{tid} result couldn't be set. "
+                                    "Already in terminal state"
+                                )
                         elif "exception" in msg:
                             exception = fx_serializer.deserialize(msg["exception"])
-                            task_fut.set_result(exception)
+                            try:
+                                task_fut.set_result(exception)
+                            except concurrent.futures.InvalidStateError:
+                                log.debug(
+                                    f"Task:{tid} result couldn't be set. "
+                                    "Already in terminal state"
+                                )
                         else:
                             raise BadMessage(
                                 "[MTHREAD] Message received is neither result or "
@@ -742,7 +771,8 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         payload = Task(task_id, container_id, ser_code + ser_params)
 
         self.submit_raw(payload.pack())
-        self.tasks[task_id] = Future()
+        self.tasks[task_id] = HTEXFuture(self)
+        self.tasks[task_id].task_id = task_id
 
         return self.tasks[task_id]
 
@@ -871,6 +901,73 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             self.queue_proc.terminate()
         log.info("Finished HighThroughputExecutor shutdown attempt")
         return True
+
+    def _cancel(self, future):
+        """Attempt cancelling a task tracked by the future by requesting
+        cancellation from the interchange. Task cancellation is attempted
+        only if the future is cancellable i.e not already in a terminal
+        state. This relies on the executor not setting the task to a running
+        state, and the task only tracking pending, and completed states.
+
+        Parameters
+        ----------
+        future
+
+        Returns
+        -------
+        Bool
+        """
+
+        ret_value = future._cancel()
+        log.debug("Sending cancel of task_id:{future.task_id} to interchange")
+        if ret_value is True:
+            self.command_client.run(TaskCancel(future.task_id))
+            log.debug("Sent TaskCancel to interchange")
+        return ret_value
+
+
+CANCELLED = "CANCELLED"
+CANCELLED_AND_NOTIFIED = "CANCELLED_AND_NOTIFIED"
+FINISHED = "FINISHED"
+
+
+class HTEXFuture(concurrent.futures.Future):
+    def __init__(self, executor):
+
+        super().__init__()
+        self.executor = executor
+
+    def cancel(self):
+        raise NotImplementedError(
+            f"{self.__class__} does not implement cancel() "
+            "try using best_effort_cancel()"
+        )
+
+    def _cancel(self):
+        """Should be invoked only by the executor
+        Returns
+        -------
+        Bool
+        """
+        return super().cancel()
+
+    def best_effort_cancel(self):
+        """Attempt to cancel the function.
+
+        If the function has finished running, the task cannot be cancelled
+        and the method will return False.
+        If the function is yet to start or is running, cancellation will be
+        attempted without guarantees, and the method will return True.
+
+        Please note that a return value of True does not guarantee that your
+        function will not execute at all, but it does guarantee that the
+        future will be in a cancelled state.
+
+        Returns
+        -------
+        Bool
+        """
+        return self.executor._cancel(self)
 
 
 def executor_starter(htex, logdir, endpoint_id):
