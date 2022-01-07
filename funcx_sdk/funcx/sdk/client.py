@@ -9,6 +9,7 @@ from inspect import getsource
 from fair_research_login import JSONTokenStorage, NativeClient
 from globus_sdk import AuthClient
 
+from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
@@ -55,12 +56,13 @@ class FuncXClient(FuncXErrorHandlingClient):
         fx_authorizer=None,
         search_authorizer=None,
         openid_authorizer=None,
-        funcx_service_address="https://api2.funcx.org/v2",
+        funcx_service_address=None,
         check_endpoint_version=False,
         asynchronous=False,
         loop=None,
-        results_ws_uri="wss://api2.funcx.org/ws/v2/",
+        results_ws_uri=None,
         use_offprocess_checker=True,
+        environment=None,
         **kwargs,
     ):
         """
@@ -112,6 +114,12 @@ class FuncXClient(FuncXErrorHandlingClient):
         Keyword arguments are the same as for BaseClient.
 
         """
+        # resolve URLs if not set
+        if funcx_service_address is None:
+            funcx_service_address = get_web_service_url(environment)
+        if results_ws_uri is None:
+            results_ws_uri = get_web_socket_url(environment)
+
         self.func_table = {}
         self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
