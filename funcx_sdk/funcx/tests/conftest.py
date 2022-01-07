@@ -6,7 +6,10 @@ from funcx.sdk.executor import FuncXExecutor
 config = {
     "funcx_service_address": "https://api2.funcx.org/v2",
     "endpoint_uuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    "results_ws_uri": "wss://api2.funcx.org/ws/v2/",
+    # should default to the correct ws_uri based on service address
+    # unless an irregular testing setup is being used, in which case
+    # --ws-uri should be specified too
+    "results_ws_uri": None,
 }
 
 

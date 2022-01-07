@@ -11,9 +11,8 @@ def validate_service_address(service_address):
         if url_data.scheme != "http" and url_data.scheme != "https":
             raise InvalidServiceAddress("Protocol must be HTTP/HTTPS")
 
-        # note: this can occur with http://api.dev.funcx.org:5001/v2
         if url_data.netloc is None or url_data.hostname is None:
-            raise InvalidServiceAddress("hostname/port is malformed")
+            raise InvalidServiceAddress("Address is malformed")
     except Exception as e:
         raise InvalidServiceAddress(f"Address is malformed - {e}")
 

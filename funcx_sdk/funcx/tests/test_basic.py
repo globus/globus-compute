@@ -1,6 +1,9 @@
 import time
 
+import pytest
+
 from funcx.sdk.client import FuncXClient
+from funcx.utils.errors import InvalidServiceAddress
 
 
 def hello_world() -> str:
@@ -47,6 +50,11 @@ def test_non_blocking(fxc, endpoint):
             print(f"Result: {result}")
             assert result == hello_world(), "Result from remote function not correct"
             break
+
+
+def test_malformed_service_address(fxc, endpoint):
+    with pytest.raises(InvalidServiceAddress):
+        FuncXClient(funcx_service_address="http:/k8s-dev.funcx.org/api/v1")
 
 
 if __name__ == "__main__":

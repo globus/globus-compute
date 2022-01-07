@@ -9,19 +9,19 @@ from funcx.utils.url_parsing import (
 
 def test_validate_service_address_invalid_port():
     url = "https://api.dev.funcx.org:abc/v2"
-    with pytest.raises(InvalidServiceAddress):
+    with pytest.raises(InvalidServiceAddress, match="Address is malformed"):
         validate_service_address(url)
 
 
 def test_validate_service_address_invalid_protocol():
-    url = "ws://api.dev.funcx.org:abc/v2"
-    with pytest.raises(InvalidServiceAddress):
+    url = "ws://api.dev.funcx.org/v2"
+    with pytest.raises(InvalidServiceAddress, match="Protocol must be HTTP/HTTPS"):
         validate_service_address(url)
 
 
 def test_validate_service_address_address_malformed():
-    url = "http:/api.dev.funcx.org:abc/v2"
-    with pytest.raises(InvalidServiceAddress):
+    url = "http:/api.dev.funcx.org/v2"
+    with pytest.raises(InvalidServiceAddress, match="Address is malformed"):
         validate_service_address(url)
 
 
