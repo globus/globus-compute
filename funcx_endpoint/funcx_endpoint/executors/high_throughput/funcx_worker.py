@@ -8,6 +8,7 @@ import signal
 import sys
 
 import zmq
+from funcx_common.errors import MaxResultSizeExceeded
 from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx.serialize import FuncXSerializer
@@ -18,22 +19,6 @@ log = logging.getLogger(__name__)
 
 DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
-
-
-class MaxResultSizeExceeded(Exception):
-    """
-    Result produced by the function exceeds the maximum supported result size
-    threshold"""
-
-    def __init__(self, result_size, result_size_limit):
-        self.result_size = result_size
-        self.result_size_limit = result_size_limit
-
-    def __str__(self):
-        return (
-            f"Task result of {self.result_size}B exceeded current "
-            f"limit of {self.result_size_limit}B"
-        )
 
 
 class FuncXWorker:
