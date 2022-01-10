@@ -93,8 +93,13 @@ class FuncXClient(FuncXErrorHandlingClient):
             Default: ``None``, will be created.
 
         funcx_service_address: str
-            The address of the funcX web service to communicate with.
-            Default: https://api.funcx.org/v2
+            For internal use only. The address of the web service.
+
+        results_ws_uri: str
+            For internal use only. The address of the websocket service.
+
+        environment: str
+            For internal use only. The name of the environment to use.
 
         asynchronous: bool
         Should the API use asynchronous interactions with the web service? Currently
