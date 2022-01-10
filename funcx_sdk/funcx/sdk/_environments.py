@@ -20,5 +20,5 @@ def get_web_socket_url(envname: t.Optional[str]) -> str:
     prod = "wss://api2.funcx.org/ws/v2/"
     return {
         "production": prod,
-        "dev": "wss://api.dev.funcx.org/ws/v2",
+        "dev": "wss://api.dev.funcx.org/ws/v2/",
     }.get(env, prod)

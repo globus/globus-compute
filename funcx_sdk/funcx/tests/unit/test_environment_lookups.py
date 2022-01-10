@@ -21,6 +21,6 @@ def test_web_socket_url(monkeypatch):
     assert get_web_socket_url(None) == "wss://api2.funcx.org/ws/v2/"
     assert get_web_socket_url("production") == "wss://api2.funcx.org/ws/v2/"
     assert get_web_socket_url("no-such-env-name-known") == "wss://api2.funcx.org/ws/v2/"
-    assert get_web_socket_url("dev") == "wss://api.dev.funcx.org/ws/v2"
+    assert get_web_socket_url("dev") == "wss://api.dev.funcx.org/ws/v2/"
     monkeypatch.setenv("FUNCX_SDK_ENVIRONMENT", "dev")
-    assert get_web_socket_url(None) == "wss://api.dev.funcx.org/ws/v2"
+    assert get_web_socket_url(None) == "wss://api.dev.funcx.org/ws/v2/"
