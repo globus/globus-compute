@@ -3,14 +3,14 @@ name: smoke_test
 on:
   push:
     paths:
-      - 'funcx_endpoint/tests/smoke_tests/**'
+      - 'smoke_tests/**'
     branches:
       - "*"
     tags:
       - "*"
   pull_request:
     paths:
-      - 'funcx_endpoint/tests/smoke_tests/**'
+      - 'smoke_tests/**'
 
 jobs:
   test:
@@ -22,11 +22,11 @@ jobs:
       with:
         python-version: 3.7
     - name: install requirements
+      run: python -m pip install tox
+    - name: Run smoke tests (localdeps)
+      env:
+        FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+        FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        python -m pip install './funcx_sdk[test]'
-        # fixme: Remove this next install line once issue #640 is fixed.
-        python -m pip install './funcx_endpoint'
-    - name: Run smoke tests to check liveness of hosted services
-      run: |
-        pytest -v funcx_endpoint/tests/smoke_tests --api-client-id ${{ secrets.API_CLIENT_ID }} --api-client-secret ${{ secrets.API_CLIENT_SECRET }}
+        cd smoke_tests
+        tox -e localdeps

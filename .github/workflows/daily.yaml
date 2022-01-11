@@ -6,6 +6,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  smoke-test-dev:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: main
+    - uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: install tox
+      run: python -m pip install 'tox'
+    - name: run smoke tests (dev)
+      env:
+        FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+        FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
+      run: |
+        cd smoke_tests
+        make dev
+
   safety-check-sdk:
     runs-on: ubuntu-latest
     steps:

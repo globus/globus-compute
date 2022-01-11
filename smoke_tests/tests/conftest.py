@@ -30,7 +30,7 @@ _CONFIGS = {
         "api_min_version": "0.3.5",
         # This fn is public and searchable
         "public_hello_fn_uuid": "f84351f9-6f82-45d8-8eca-80d8f73645be",
-        "endpoint_uuid": _LOCAL_ENDPOINT_ID,
+        "endpoint_uuid": "2238617a-8756-4030-a8ab-44ffb1446092",
     },
     "prod": {
         # By default tests are against production, which means we do not need to pass
@@ -90,18 +90,6 @@ def pytest_addoption(parser):
     parser.addoption(
         "--ws-uri", metavar="ws-uri", help="WebSocket URI to get task results"
     )
-    parser.addoption(
-        "--api-client-id",
-        metavar="api-client-id",
-        default=None,
-        help="The API Client ID. Used for github actions testing",
-    )
-    parser.addoption(
-        "--api-client-secret",
-        metavar="api-client-secret",
-        default=None,
-        help="The API Client Secret. Used for github actions testing",
-    )
 
 
 @pytest.fixture(scope="session")
@@ -129,8 +117,10 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
     client_args = config["client_args"]
     ws_uri = pytestconfig.getoption("--ws-uri")
     api_uri = pytestconfig.getoption("--service-address")
-    api_client_id = pytestconfig.getoption("--api-client-id")
-    api_client_secret = pytestconfig.getoption("--api-client-secret")
+
+    # env vars to allow use of client creds in GitHub Actions
+    api_client_id = os.getenv("FUNCX_SMOKE_CLIENT_ID")
+    api_client_secret = os.getenv("FUNCX_SMOKE_CLIENT_SECRET")
     if ws_uri:
         client_args["results_ws_uri"] = ws_uri
     if api_uri:
