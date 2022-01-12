@@ -7,13 +7,76 @@ funcx & funcx-endpoint v0.3.5
 
 Released on January 12th, 2021
 
+funcx v0.3.4 is a minor release that includes contributions (code, tests, reviews, and reports) from:
+Ben Clifford <benc@hawaga.org.uk>, Ben Galewsky <bengal1@illinois.edu>,
+Daniel S. Katz <d.katz@ieee.org>, Kirill Nagaitsev <knagaitsev@uchicago.edu>
+Michael McQuade <michael@giraffesyo.io>, Ryan Chard <rchard@anl.gov>,
+Stephen Rosen <sirosen@globus.org>, Wes Brewer <whbrew@gmail.com>
+Yadu Nand Babuji <yadudoc1729@gmail.com>, Zhuozhao Li <zhuozhl@clemson.edu>
 
 Bug Fixes
 ^^^^^^^^^
 
+* ``MaxResultSizeExceeded`` is now defined in ``funcx.utils.errors``. Fixes `issue#640 <https://github.com/funcx-faas/funcX/issues/640>`_
+
+* Fixed Websocket disconnect after idling for 10 mins. See `issue#562 <https://github.com/funcx-faas/funcX/issues/562>`_
+  funcX SDK will not auto-reconnect on remote-side disconnects
+
+* Cleaner logging on the ``funcx-endpoint``. See `PR#643 <https://github.com/funcx-faas/funcX/pull/643>`_
+  Previously available ``set_stream_logger``, ``set_file_logger`` methods are now removed.
+  For debugging the SDK use standard logging setup, like:
+
+  .. code-block::
+    import logging
+    def set_stream_logger(name="funcx", level=logging.DEBUG, format_string="%(asctime)s %(name)s:%(lineno)d [%(levelname)s]  %(message)s"):
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.DEBUG)
+        handler = logging.StreamHandler()
+        handler.setLevel(level)
+        formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return logger
+    set_stream_logger()
+
+* Warn and continue on failure to load a results ack file. `PR#616 <https://github.com/funcx-faas/funcX/pull/616>`_
+
+
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
+* Result size raised to 10MB from 512KB. See `PR#647 <https://github.com/funcx-faas/funcX/pull/647>`_
+
+* Version match constraints between the ``funcx-endpoint`` and the ``funcx-worker`` are now relaxed.
+  This allows containers of any supported python3 version to be used for running tasks.
+  See `PR#637 <https://github.com/funcx-faas/funcX/pull/637>`_
+
+* New example config for Polaris at Argonne Leadership Computing Facility
+
+* Simplify instructions for installing endpoint secrets to cluster. `PR#623 <https://github.com/funcx-faas/funcX/pull/623>`_
+
+* Webservice and Websocket service URLs are resolved by the names "production" and
+  "dev". These values can be passed to FuncX client init as in ``environment="dev"``,
+  or by setting the ``FUNCX_SDK_ENVIRONMENT`` environment variable.
+
+* Support for cancelling tasks in ``funcx_endpoint.executors.HighThroughputExecutor``. To cancel a
+  task, use the ``best_effort_cancel`` method on the task's ``future``. This method differs from the
+  concurrent futures ``future.cancel()`` method in that a running task can be cancelled.
+  ``best_effort_cancel`` returns ``True`` only if the task is cancellable with no guarantees that the
+  task will not execute. If the task is already complete, it returns ``False``
+
+  .. note:: Please note that this feature is not yet supported on the SDK.
+
+  Example:
+
+     .. code-block:: python
+
+        from funcx_endpoint.executors import HighThroughputExecutor
+        htex = HighThroughputExecutor(passthrough=False)
+        htex.start()
+
+        future = htex.submit(slow_function)
+        future.best_effort_cancel()
 
 
 funcx & funcx-endpoint v0.3.4
