@@ -1,4 +1,4 @@
-﻿funcx\_endpoint.endpoint.interchange.EndpointInterchange
+funcx\_endpoint.endpoint.interchange.EndpointInterchange
 ========================================================
 
 .. currentmodule:: funcx_endpoint.endpoint.interchange
@@ -17,6 +17,7 @@
       ~EndpointInterchange.apply_reg_info
       ~EndpointInterchange.get_container
       ~EndpointInterchange.get_status_report
+      ~EndpointInterchange.handle_sigterm
       ~EndpointInterchange.load_config
       ~EndpointInterchange.migrate_tasks_to_internal
       ~EndpointInterchange.provider_status

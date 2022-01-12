@@ -1,4 +1,4 @@
-﻿funcx.serialize.concretes
+funcx.serialize.concretes
 =========================
 
 .. automodule:: funcx.serialize.concretes

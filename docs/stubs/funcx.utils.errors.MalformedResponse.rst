@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.MalformedResponse
+funcx.utils.errors.MalformedResponse
 ====================================
 
 .. currentmodule:: funcx.utils.errors

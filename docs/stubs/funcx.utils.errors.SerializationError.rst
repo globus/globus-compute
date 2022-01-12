@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.SerializationError
+funcx.utils.errors.SerializationError
 =====================================
 
 .. currentmodule:: funcx.utils.errors

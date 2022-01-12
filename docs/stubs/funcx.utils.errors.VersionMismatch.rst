@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.VersionMismatch
+funcx.utils.errors.VersionMismatch
 ==================================
 
 .. currentmodule:: funcx.utils.errors

@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.FuncXUnreachable
+funcx.utils.errors.FuncXUnreachable
 ===================================
 
 .. currentmodule:: funcx.utils.errors

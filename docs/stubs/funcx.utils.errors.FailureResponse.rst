@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.FailureResponse
+funcx.utils.errors.FailureResponse
 ==================================
 
 .. currentmodule:: funcx.utils.errors

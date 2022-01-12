@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.InvalidScopeException
+funcx.utils.errors.InvalidScopeException
 ========================================
 
 .. currentmodule:: funcx.utils.errors

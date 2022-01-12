@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.UserCancelledException
+funcx.utils.errors.UserCancelledException
 =========================================
 
 .. currentmodule:: funcx.utils.errors
