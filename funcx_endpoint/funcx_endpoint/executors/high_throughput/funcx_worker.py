@@ -8,10 +8,10 @@ import signal
 import sys
 
 import zmq
-from funcx_common.errors import MaxResultSizeExceeded
 from parsl.app.errors import RemoteExceptionWrapper
 
 from funcx.serialize import FuncXSerializer
+from funcx.utils.errors import MaxResultSizeExceeded
 from funcx_endpoint.executors.high_throughput.messages import Message
 from funcx_endpoint.logging_config import setup_logging
 

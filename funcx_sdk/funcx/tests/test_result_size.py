@@ -1,7 +1,6 @@
 import pytest
-from funcx_common.errors import MaxResultSizeExceeded
 
-from funcx.utils.errors import TaskPending
+from funcx.utils.errors import MaxResultSizeExceeded, TaskPending
 
 
 def large_result_producer(size) -> str:
