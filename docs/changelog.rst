@@ -7,7 +7,7 @@ funcx & funcx-endpoint v0.3.5
 
 Released on January 12th, 2021
 
-funcx v0.3.4 is a minor release that includes contributions (code, tests, reviews, and reports) from:
+funcx v0.3.5 is a minor release that includes contributions (code, tests, reviews, and reports) from:
 Ben Clifford <benc@hawaga.org.uk>, Ben Galewsky <bengal1@illinois.edu>,
 Daniel S. Katz <d.katz@ieee.org>, Kirill Nagaitsev <knagaitsev@uchicago.edu>
 Michael McQuade <michael@giraffesyo.io>, Ryan Chard <rchard@anl.gov>,
