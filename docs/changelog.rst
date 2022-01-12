@@ -1,6 +1,21 @@
 Changelog
 =========
 
+funcx & funcx-endpoint v0.3.5
+-----------------------------
+
+
+Released on January 12th, 2021
+
+
+Bug Fixes
+^^^^^^^^^
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+
+
 funcx & funcx-endpoint v0.3.4
 -----------------------------
 
