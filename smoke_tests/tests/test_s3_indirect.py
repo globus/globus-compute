@@ -1,6 +1,11 @@
 import pytest
 
-from funcx.utils.errors import MaxResultSizeExceeded
+try:
+    from funcx.utils.errors import MaxResultSizeExceeded
+except ImportError:
+    from funcx_endpoint.executors.high_throughput.funcx_worker import (
+        MaxResultSizeExceeded,
+    )
 
 
 def large_result_producer(size: int) -> str:
