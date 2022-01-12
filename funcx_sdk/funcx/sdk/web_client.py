@@ -12,14 +12,14 @@ import uuid
 
 import globus_sdk
 
-from funcx.serialize import FuncXSerializer
 from funcx.sdk._environments import get_web_service_url
+from funcx.serialize import FuncXSerializer
 
 ID_PARAM_T = t.Union[uuid.UUID, str]
 
 
 def _get_packed_code(
-    self, func: t.Callable, serializer: t.Optional[FuncXSerializer] = None
+    func: t.Callable, serializer: t.Optional[FuncXSerializer] = None
 ) -> str:
     serializer = serializer if serializer else FuncXSerializer()
     return serializer.pack_buffers([serializer.serialize(func)])
@@ -91,6 +91,12 @@ class FunctionRegistrationData:
 
 
 class FuncxWebClient(globus_sdk.BaseClient):
+    # the `service_name` is used in the Globus SDK to lookup the service URL from
+    # config. However, FuncX has its own logic for determining the base URL.
+    # set `service_name` to allow the check which ensures this is set to pass
+    # it does not have any other effects
+    service_name: str = "funcx"
+
     def __init__(
         self,
         *,
