@@ -21,6 +21,8 @@ TEST_REQUIRES = [
     "flake8==3.8.0",
     "numpy",
     "pytest",
+    # easy mocking of the `requests` library
+    "responses",
 ]
 DEV_REQUIRES = TEST_REQUIRES + [
     "pre-commit",
