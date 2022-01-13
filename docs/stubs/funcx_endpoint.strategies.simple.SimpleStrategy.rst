@@ -1,4 +1,4 @@
-﻿funcx\_endpoint.strategies.simple.SimpleStrategy
+funcx\_endpoint.strategies.simple.SimpleStrategy
 ================================================
 
 .. currentmodule:: funcx_endpoint.strategies.simple

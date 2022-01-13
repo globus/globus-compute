@@ -1,6 +1,6 @@
-funcx.utils.errors.InvalidScopeException
+funcx.utils.errors.MaxResultSizeExceeded
 ========================================
 
 .. currentmodule:: funcx.utils.errors
 
-.. autoexception:: InvalidScopeException
+.. autoexception:: MaxResultSizeExceeded

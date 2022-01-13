@@ -1,4 +1,4 @@
-﻿funcx\_endpoint.strategies.kube\_simple.KubeSimpleStrategy
+funcx\_endpoint.strategies.kube\_simple.KubeSimpleStrategy
 ==========================================================
 
 .. currentmodule:: funcx_endpoint.strategies.kube_simple

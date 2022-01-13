@@ -1,4 +1,4 @@
-﻿funcx.serialize.base
+funcx.serialize.base
 ====================
 
 .. automodule:: funcx.serialize.base

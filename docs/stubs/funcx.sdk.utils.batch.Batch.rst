@@ -1,4 +1,4 @@
-﻿funcx.sdk.utils.batch.Batch
+funcx.sdk.utils.batch.Batch
 ===========================
 
 .. currentmodule:: funcx.sdk.utils.batch

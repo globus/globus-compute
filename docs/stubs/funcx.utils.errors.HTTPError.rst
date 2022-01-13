@@ -1,4 +1,4 @@
-﻿funcx.utils.errors.HTTPError
+funcx.utils.errors.HTTPError
 ============================
 
 .. currentmodule:: funcx.utils.errors

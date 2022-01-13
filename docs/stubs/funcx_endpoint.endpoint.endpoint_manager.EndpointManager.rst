@@ -1,4 +1,4 @@
-﻿funcx\_endpoint.endpoint.endpoint\_manager.EndpointManager
+funcx\_endpoint.endpoint.endpoint\_manager.EndpointManager
 ==========================================================
 
 .. currentmodule:: funcx_endpoint.endpoint.endpoint_manager
