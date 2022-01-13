@@ -63,8 +63,8 @@ class SimpleStrategy(BaseStrategy):
         status = self.interchange.provider_status()
         log.debug(f"Provider status : {status}")
 
-        running = sum([1 for x in status if x.state == JobState.RUNNING])
-        pending = sum([1 for x in status if x.state == JobState.PENDING])
+        running = sum(1 for x in status if x.state == JobState.RUNNING)
+        pending = sum(1 for x in status if x.state == JobState.PENDING)
         active_blocks = running + pending
         active_slots = active_blocks * tasks_per_node * nodes_per_block
 

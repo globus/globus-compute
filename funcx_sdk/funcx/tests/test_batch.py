@@ -38,7 +38,7 @@ def test_batch(fxc, endpoint):
     for _i in range(10):
         x = fxc.get_batch_result(task_ids)
         complete_count = sum(
-            [1 for t in task_ids if t in x and not x[t].get("pending", False)]
+            1 for t in task_ids if t in x and not x[t].get("pending", False)
         )
         print(f"Batch status : {complete_count}/{len(task_ids)} complete")
         if complete_count == len(task_ids):
