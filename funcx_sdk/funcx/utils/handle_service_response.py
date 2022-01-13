@@ -1,4 +1,4 @@
-from funcx.utils.response_errors import FuncxResponseError
+from funcx_common.response_errors import FuncxResponseError
 
 
 def handle_response_errors(res_data):

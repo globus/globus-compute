@@ -15,10 +15,10 @@ import psutil
 import texttable
 import typer
 import zmq
+from funcx_common.response_errors import FuncxResponseError
 from globus_sdk import GlobusAPIError, NetworkError
 
 from funcx.sdk.client import FuncXClient
-from funcx.utils.response_errors import FuncxResponseError
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint

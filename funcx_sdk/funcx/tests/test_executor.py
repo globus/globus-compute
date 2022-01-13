@@ -5,10 +5,10 @@ import uuid
 
 import numpy as np
 import pytest
+from funcx_common.response_errors import EndpointNotFound
 
 from funcx import FuncXClient
 from funcx.sdk.executor import FuncXExecutor
-from funcx.utils.response_errors import EndpointNotFound
 
 
 def double(x):

@@ -40,6 +40,9 @@ REQUIRES = [
     # of different features and functions
     # pin exact versions because it does not use semver
     "parsl==1.1.0",
+    # used for raising descriptive FuncxResponseError exceptions that
+    # come from web service error responses
+    "funcx-common==0.0.11",
 ]
 
 TEST_REQUIRES = [

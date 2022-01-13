@@ -1,6 +1,5 @@
 import pytest
-
-from funcx.utils.response_errors import FunctionNotFound
+from funcx_common.response_errors import FunctionNotFound
 
 
 def test_invalid_function(fxc, endpoint):

@@ -1,6 +1,5 @@
 import pytest
-
-from funcx.utils.response_errors import EndpointNotFound
+from funcx_common.response_errors import EndpointNotFound
 
 
 def hello_world() -> str:
