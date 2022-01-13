@@ -11,6 +11,7 @@ FIXME: This doc is a stub.
 ### Recommended
 
 - [pre-commit](https://pre-commit.com/)
+- [scriv](https://scriv.readthedocs.io/en/latest/index.html)
 
 ## Linting
 
@@ -30,6 +31,19 @@ After installing `pre-commit`, run
 in the repo to configure hooks.
 
 > NOTE: If necessary, you can always skip hooks with `git commit --no-verify`
+
+## Adding Changelog Fragments
+
+Any change to the codebase must either include a changelog fragment (in some
+projects these are called "newsfiles") or be in a GitHub PR with the label
+`no-news-is-good-news`.
+
+To create a new changelog fragment, run
+
+    scriv create --edit
+
+and populate the fragment. It will include comments which instruct you on how
+to fill out the fragment.
 
 ## Installing Testing Requirements
 

@@ -1,6 +1,8 @@
 Changelog
 =========
 
+.. scriv-insert-here
+
 funcx & funcx-endpoint v0.3.5
 -----------------------------
 
