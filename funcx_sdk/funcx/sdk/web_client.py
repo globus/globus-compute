@@ -13,6 +13,7 @@ import uuid
 import globus_sdk
 
 from funcx.sdk._environments import get_web_service_url
+from funcx.sdk.errors import FuncxAPIError
 from funcx.serialize import FuncXSerializer
 
 ID_PARAM_T = t.Union[uuid.UUID, str]
@@ -96,6 +97,8 @@ class FuncxWebClient(globus_sdk.BaseClient):
     # set `service_name` to allow the check which ensures this is set to pass
     # it does not have any other effects
     service_name: str = "funcx"
+    # use the FuncX-specific error class
+    error_class = FuncxAPIError
 
     def __init__(
         self,

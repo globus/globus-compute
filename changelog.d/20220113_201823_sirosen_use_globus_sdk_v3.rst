@@ -12,7 +12,7 @@ Changed
   encountered
 
 - The exceptions raised by the ``FuncXClient`` when the web service sends back
-  an error response are now instances of ``globus_sdk.GlobusAPIError``. This
+  an error response are now instances of ``funcx.FuncxAPIError``. This
   means that the errors no longer inherit from ``FuncxResponseError``. Update
   error handling code as follows:
 
@@ -21,25 +21,27 @@ In prior versions of the `funcx` package:
 
 .. code-block:: python
 
-    from funcx.utils.response_errors import FuncxResponseError
+    import funcx
+    from funcx.utils.response_errors import (
+        FuncxResponseError, ResponseErrorCode
+    )
 
-    client = FuncXClient(...)
+    client = funcx.FuncXClient()
     try:
         client.some_method(...)
     except FuncxResponseError as err:
-        code = err.code  # this is an enum member
-        ...
-
+        if err.code == ResponseErrorCode.INVALID_UUID:  # this is an enum
+            ...
 
 In the new version:
 
 .. code-block:: python
 
-    import globus_sdk
+    import funcx
 
-    client = FuncXClient(...)
+    client = funcx.FuncXClient()
     try:
         client.some_method(...)
-    except globus_sdk.GlobusAPIError as err:
-        code = err["code"]  # this is an integer
-        ...
+    except funcx.FuncxAPIError as err:
+        if err.code_name == "invalid_uuid":  # this is a string
+            ...

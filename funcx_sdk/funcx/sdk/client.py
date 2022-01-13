@@ -528,7 +528,7 @@ class FuncXClient:
         """
         self.version_check()
 
-        r = self.webclient.register_endpoint(
+        r = self.web_client.register_endpoint(
             endpoint_name=name,
             endpoint_id=endpoint_uuid,
             metadata=metadata,
