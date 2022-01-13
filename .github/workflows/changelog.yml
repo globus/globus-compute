@@ -1,0 +1,22 @@
+name: changelog
+on:
+  - pull_request
+
+jobs:
+  check_has_news_in_changelog_dir:
+    if: ${{ ! contains(github.event.pull_request.labels.*.name, 'no-news-is-good-news') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:  # do a deep fetch to allow merge-base and diff
+          fetch-depth: 0
+      - name: check PR adds a news file
+        run: |
+          news_files="$(git diff --name-only "$(git merge-base origin/main "$GITHUB_SHA")" "$GITHUB_SHA" -- changelog.d/*.rst)"
+          if [ -n "$news_files" ]; then
+            echo "Saw new files. changelog.d:"
+            echo "$news_files"
+          else
+            echo "No news files seen"
+            exit 1
+          fi
