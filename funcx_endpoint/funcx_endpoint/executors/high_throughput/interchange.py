@@ -558,10 +558,8 @@ class Interchange:
             resp = (
                 manager.decode("utf-8"),
                 sum(
-                    [
-                        len(tids)
-                        for tids in self._ready_manager_queue[manager]["tasks"].values()
-                    ]
+                    len(tids)
+                    for tids in self._ready_manager_queue[manager]["tasks"].values()
                 ),
                 self._ready_manager_queue[manager]["active"],
             )
