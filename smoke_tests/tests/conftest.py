@@ -170,7 +170,7 @@ def endpoint(funcx_test_config):
 
 
 @pytest.fixture
-def tutorial_funcion_id(funcx_test_config):
+def tutorial_function_id(funcx_test_config):
     funcid = funcx_test_config.get("public_hello_fn_uuid")
     if not funcid:
         pytest.skip("test requires a pre-defined public hello function")

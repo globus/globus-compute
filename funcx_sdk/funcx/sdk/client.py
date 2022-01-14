@@ -317,7 +317,7 @@ class FuncXClient:
         ------
         Exception obj: Exception due to which the task failed
         """
-        task = self.web_client.get_task(task_id)
+        task = self.get_task(task_id)
         if task["pending"] is True:
             raise TaskPending(task["status"])
         else:
