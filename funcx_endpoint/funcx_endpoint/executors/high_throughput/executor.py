@@ -148,6 +148,14 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
     mem_per_worker : float
         Memory to be assigned to each worker. Default=None(no limits)
 
+    available_accelerators: int, list of str
+        Either a list of accelerators device IDs
+        or an integer defining the number of accelerators available.
+        If an integer, sequential device IDs will be created starting at 0.
+        The manager will ensure each worker is pinned to an accelerator and
+        will launch no more workers than the number of available accelerators.
+        Default: None
+
     max_workers_per_node : int
         Caps the number of workers launched by the manager. Default: infinity
 
@@ -222,6 +230,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         max_workers_per_node=float("inf"),
         mem_per_worker=None,
         launch_cmd=None,
+        available_accelerators=None,
         # Container specific
         worker_mode="no_container",
         scheduler_mode="hard",
@@ -298,6 +307,18 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.interchange_local = interchange_local
         self.passthrough = passthrough
         self.task_status_queue = task_status_queue
+
+        # Set the available accelerators
+        if available_accelerators is None:
+            self.available_accelerators = 0
+        else:
+            if isinstance(available_accelerators, int):
+                self.available_accelerators = \
+                    [str(i) for i in range(available_accelerators)]
+            else:
+                self.available_accelerators = list(available_accelerators)
+            log.debug('Workers will be assigned '
+                      f'to accelerators: {self.available_accelerators}')
 
         # FuncX specific options
         self.funcx_service_address = funcx_service_address
@@ -442,6 +463,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 "max_workers_per_node": self.max_workers_per_node,
                 "mem_per_worker": self.mem_per_worker,
                 "cores_per_worker": self.cores_per_worker,
+                "available_accelerators": self.available_accelerators,
                 "prefetch_capacity": self.prefetch_capacity,
                 "scheduler_mode": self.scheduler_mode,
                 "worker_mode": self.worker_mode,

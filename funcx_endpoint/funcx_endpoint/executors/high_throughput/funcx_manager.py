@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import uuid
+from typing import List
 
 import psutil
 import zmq
@@ -78,6 +79,7 @@ class Manager:
         result_q_url="tcp://127.0.0.1:50098",
         max_queue_size=10,
         cores_per_worker=1,
+        available_accelerators: List[str] = (),
         max_workers=float("inf"),
         uid=None,
         heartbeat_threshold=120,
@@ -106,6 +108,10 @@ class Manager:
         cores_per_worker : float
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
+
+        available_accelerators: list of strings
+            Accelerators available for workers to use.
+            default: empty list
 
         max_workers : int
              caps the maximum number of workers that can be launched.
@@ -188,7 +194,14 @@ class Manager:
         self.max_worker_count = min(
             max_workers, math.floor(self.cores_on_node / cores_per_worker)
         )
-        self.worker_map = WorkerMap(self.max_worker_count)
+
+        # Control pinning to accelerators
+        self.available_accelerators = available_accelerators
+        n_accelerators = len(available_accelerators)
+        if n_accelerators > 0:
+            self.max_worker_count = min(self.max_worker_count, n_accelerators)
+
+        self.worker_map = WorkerMap(self.max_worker_count, self.available_accelerators)
 
         self.internal_worker_port_range = internal_worker_port_range
 
@@ -778,6 +791,13 @@ def cli_run():
         help="Number of cores assigned to each worker process. Default=1.0",
     )
     parser.add_argument(
+        "-a",
+        "--available-accelerators",
+        default=(),
+        nargs="*",
+        help="List of available accelerators"
+    )
+    parser.add_argument(
         "-t", "--task_url", required=True, help="REQUIRED: ZMQ url for receiving tasks"
     )
     parser.add_argument(
@@ -838,6 +858,7 @@ def cli_run():
         log.info(f"Manager ID: {args.uid}")
         log.info(f"Block ID: {args.block_id}")
         log.info(f"cores_per_worker: {args.cores_per_worker}")
+        log.info(f"available_accelerators: {args.available_accelerators}")
         log.info(f"task_url: {args.task_url}")
         log.info(f"result_url: {args.result_url}")
         log.info(f"hb_period: {args.hb_period}")
@@ -855,6 +876,7 @@ def cli_run():
             uid=args.uid,
             block_id=args.block_id,
             cores_per_worker=float(args.cores_per_worker),
+            available_accelerators=args.available_accelerators,
             max_workers=args.max_workers
             if args.max_workers == float("inf")
             else int(args.max_workers),

@@ -3,7 +3,8 @@ import os
 import random
 import subprocess
 import time
-from queue import Queue
+from queue import Queue, Empty
+from typing import List, Dict
 
 log = logging.getLogger(__name__)
 
@@ -11,7 +12,20 @@ log = logging.getLogger(__name__)
 class WorkerMap:
     """WorkerMap keeps track of workers"""
 
-    def __init__(self, max_worker_count):
+    def __init__(
+            self,
+            max_worker_count: int,
+            available_accelerators: List[str],
+    ):
+        """
+
+        Parameters
+        ----------
+        max_worker_count:
+            Maximum number of workers allowed
+        available_accelerators:
+            List of accelerator devices workers can be pinned to
+        """
         self.max_worker_count = max_worker_count
         self.total_worker_type_counts = {"unused": self.max_worker_count}
         self.ready_worker_type_counts = {"unused": self.max_worker_count}
@@ -33,6 +47,15 @@ class WorkerMap:
 
         # Need to keep track of workers' last idle time by worker type
         self.worker_idle_since = {}
+
+        # Create a queue of available accelerators, if accelerators are defined
+        if len(available_accelerators) == 0:
+            self.available_accelerators = None
+        else:
+            self.available_accelerators = Queue()
+            for device in available_accelerators:
+                self.available_accelerators.put(device)
+        self.assigned_accelerators: Dict[str, str] = {}  # Map worker ID -> accelerator
 
     def register_worker(self, worker_id, worker_type):
         """Add a new worker"""
@@ -74,6 +97,11 @@ class WorkerMap:
         self.to_die_count[worker_type] -= 1
         self.total_worker_type_counts["unused"] += 1
         self.ready_worker_type_counts["unused"] += 1
+
+        # Mark the accelerator as available, if provided
+        if worker_id in self.assigned_accelerators:
+            device = self.assigned_accelerators.pop(worker_id)
+            self.available_accelerators.put(device)
 
     def spin_up_workers(
         self,
@@ -308,6 +336,25 @@ class WorkerMap:
         if worker_type != "RAW":
             container_uri = worker_type
 
+        # If accelerator list is provided, get the next one off the queue
+        #   and mark it as assigned
+        environment_variables = os.environ.copy()
+        if self.available_accelerators is not None:
+            try:
+                device = self.available_accelerators.get_nowait()
+            except Empty:
+                raise ValueError('No accelerators are available.'
+                                 ' New worker must be created only'
+                                 ' after another is removed')
+            self.assigned_accelerators[worker_id] = device
+            log.info(f"Assigned worker '{worker_id}' to accelerator '{device}'")
+
+            # Create the
+            #  TODO (wardlt): This code has only been tested for CUDA
+            environment_variables["CUDA_VISIBLE_DEVICES"] = device
+            environment_variables["ROCR_VISIBLE_DEVICES"] = device
+            environment_variables["SYCL_DEVICE_FILTER"] = f"*:*:{device}"
+
         log.info(f"Command string :\n {cmd}")
         log.info(f"Mode: {mode}")
         log.info(f"Container uri: {container_uri}")
@@ -343,6 +390,7 @@ class WorkerMap:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 shell=False,
+                env=environment_variables
             )
 
         except Exception:

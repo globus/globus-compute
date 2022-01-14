@@ -110,6 +110,7 @@ class Interchange:
         provider=None,
         max_workers_per_node=None,
         mem_per_worker=None,
+        available_accelerators=(),
         prefetch_capacity=None,
         scheduler_mode=None,
         container_type=None,
@@ -163,6 +164,10 @@ class Interchange:
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
 
+        available_accelerators: list of str
+            List of device IDs for accelerators available on each node
+            Default: Empty list
+
         container_cmd_options: str
             Container command strings to be added to associated container command.
             For example, singularity exec {container_cmd_options}
@@ -203,6 +208,7 @@ class Interchange:
         self.max_workers_per_node = max_workers_per_node
         self.mem_per_worker = mem_per_worker
         self.cores_per_worker = cores_per_worker
+        self.available_accelerators = available_accelerators
         self.prefetch_capacity = prefetch_capacity
 
         self.scheduler_mode = scheduler_mode
@@ -224,7 +230,7 @@ class Interchange:
         self.poll_period = poll_period
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
-        # initalize the last heartbeat time to start the loop
+        # initialize the last heartbeat time to start the loop
         self.last_heartbeat = time.time()
 
         self.serializer = FuncXSerializer()
@@ -320,6 +326,7 @@ class Interchange:
                 "--container_cmd_options='{container_cmd_options}' "
                 "--scheduler_mode={scheduler_mode} "
                 "--worker_type={{worker_type}} "
+                "--available-accelerators {accelerator_list}"
             )
 
         self.current_platform = {
@@ -380,6 +387,7 @@ class Interchange:
             debug=debug_opts,
             max_workers=max_workers,
             cores_per_worker=self.cores_per_worker,
+            accelerator_list=" ".join(self.available_accelerators),
             # mem_per_worker=self.mem_per_worker,
             prefetch_capacity=self.prefetch_capacity,
             task_url=worker_task_url,
