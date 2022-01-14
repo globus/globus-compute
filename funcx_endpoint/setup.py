@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 REQUIRES = [
     "requests>=2.20.0,<3",
-    "globus_sdk<3",
+    "globus-sdk",  # version will be bounded by `funcx`
     "funcx>=0.3.3,<0.4.0",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",

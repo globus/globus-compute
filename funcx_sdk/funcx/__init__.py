@@ -7,5 +7,6 @@ __author__ = "The funcX team"
 __version__ = VERSION
 
 from funcx.sdk.client import FuncXClient
+from funcx.sdk.errors import FuncxAPIError
 
-__all__ = ("FuncXClient",)
+__all__ = ("FuncXClient", "FuncxAPIError")

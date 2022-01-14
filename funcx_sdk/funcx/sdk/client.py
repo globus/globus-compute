@@ -4,17 +4,17 @@ import logging
 import os
 import uuid
 from distutils.version import LooseVersion
-from inspect import getsource
 
 from fair_research_login import JSONTokenStorage, NativeClient
 from globus_sdk import AuthClient
 
+from funcx.sdk import VERSION as SDK_VERSION
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
-from funcx.sdk.error_handling_client import FuncXErrorHandlingClient
 from funcx.sdk.search import SearchHelper
 from funcx.sdk.utils.batch import Batch
+from funcx.sdk.web_client import FunctionRegistrationData, FuncxWebClient
 from funcx.serialize import FuncXSerializer
 from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
@@ -25,14 +25,12 @@ try:
 except ModuleNotFoundError:
     ENDPOINT_VERSION = None
 
-from funcx.sdk import VERSION as SDK_VERSION
-
 logger = logging.getLogger(__name__)
 
 _FUNCX_HOME = os.path.join("~", ".funcx")
 
 
-class FuncXClient(FuncXErrorHandlingClient):
+class FuncXClient:
     """Main class for interacting with the funcX service
 
     Holds helper operations for performing common tasks with the funcX service.
@@ -160,13 +158,8 @@ class FuncXClient(FuncXErrorHandlingClient):
             search_authorizer = all_authorizers[search_scope]
             openid_authorizer = all_authorizers["openid"]
 
-        super().__init__(
-            "funcX",
-            environment="funcx",
-            authorizer=fx_authorizer,
-            http_timeout=http_timeout,
-            base_url=funcx_service_address,
-            **kwargs,
+        self.web_client = FuncxWebClient(
+            base_url=funcx_service_address, authorizer=fx_authorizer
         )
         self.fx_serializer = FuncXSerializer(
             use_offprocess_checker=self.use_offprocess_checker
@@ -199,7 +192,7 @@ class FuncXClient(FuncXErrorHandlingClient):
 
     def version_check(self):
         """Check this client version meets the service's minimum supported version."""
-        resp = self.get("version", params={"service": "all"})
+        resp = self.web_client.get_version()
         versions = resp.data
         if "min_ep_version" not in versions:
             raise VersionMismatch(
@@ -300,7 +293,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         if task_id in self.func_table:
             return self.func_table[task_id]
 
-        r = self.get(f"tasks/{task_id}")
+        r = self.web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
         try:
             rets = self.update_table(r.text, task_id)
@@ -345,8 +338,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         results = {}
 
         if pending_task_ids:
-            payload = {"task_ids": pending_task_ids}
-            r = self.post("/batch_status", json_body=payload)
+            r = self.web_client.get_batch_status(pending_task_ids)
             logger.debug(f"Response string : {r}")
 
         pending_task_ids = set(pending_task_ids)
@@ -435,14 +427,13 @@ class FuncXClient(FuncXErrorHandlingClient):
         -------
         task_ids : a list of UUID strings that identify the tasks
         """
-        servable_path = "submit"
         assert isinstance(batch, Batch), "Requires a Batch object as input"
         assert len(batch.tasks) > 0, "Requires a non-empty batch"
 
         data = batch.prepare()
 
         # Send the data to funcX
-        r = self.post(servable_path, json_body=data)
+        r = self.web_client.submit(data)
 
         task_uuids = []
         for result in r["results"]:
@@ -489,7 +480,6 @@ class FuncXClient(FuncXErrorHandlingClient):
         task_id : str
         UUID string that identifies the task
         """
-        servable_path = "submit_batch"
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
@@ -510,7 +500,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         }
 
         # Send the data to funcX
-        r = self.post(servable_path, json_body=data)
+        r = self.web_client.submit_batch(data)
         return r["task_uuids"]
 
     def register_endpoint(
@@ -538,17 +528,12 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         self.version_check()
 
-        data = {
-            "endpoint_name": name,
-            "endpoint_uuid": endpoint_uuid,
-            "version": endpoint_version,
-        }
-        if metadata:
-            data["meta"] = metadata
-
-        r = self.post("/endpoints", json_body=data)
-
-        # Return the result
+        r = self.web_client.register_endpoint(
+            endpoint_name=name,
+            endpoint_id=endpoint_uuid,
+            metadata=metadata,
+            endpoint_version=endpoint_version,
+        )
         return r.data
 
     def get_containers(self, name, description=None):
@@ -566,13 +551,9 @@ class FuncXClient(FuncXErrorHandlingClient):
         int
             The port to connect to and a list of containers
         """
-        registration_path = "get_containers"
-
         data = {"endpoint_name": name, "description": description}
 
-        r = self.post(registration_path, json_body=data)
-
-        # Return the result
+        r = self.web_client.post("get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
     def get_container(self, container_uuid, container_type):
@@ -592,11 +573,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         """
         self.version_check()
 
-        container_path = f"containers/{container_uuid}/{container_type}"
-
-        r = self.get(container_path)
-
-        # Return the result
+        r = self.web_client.get(f"containers/{container_uuid}/{container_type}")
         return r.data["container"]
 
     def get_endpoint_status(self, endpoint_uuid):
@@ -612,11 +589,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         dict
             The details of the endpoint's stats
         """
-        stats_path = f"endpoints/{endpoint_uuid}/status"
-
-        r = self.get(stats_path)
-
-        # Return the result
+        r = self.web_client.get_endpoint_status(endpoint_uuid)
         return r.data
 
     def register_function(
@@ -654,38 +627,20 @@ class FuncXClient(FuncXErrorHandlingClient):
         function uuid : str
             UUID identifier for the registered function
         """
-        source_code = ""
-        try:
-            source_code = getsource(function)
-        except OSError:
-            logger.error("Failed to find source code during function registration.")
-
-        serialized_fn = self.fx_serializer.serialize(function)
-        packed_code = self.fx_serializer.pack_buffers([serialized_fn])
-
-        data = {
-            "function_name": function.__name__,
-            "function_code": packed_code,
-            "function_source": source_code,
-            "container_uuid": container_uuid,
-            "entry_point": function_name if function_name else function.__name__,
-            "description": description,
-            "public": public,
-            "group": group,
-            "searchable": searchable,
-        }
-
+        data = FunctionRegistrationData(
+            function=function,
+            failover_source="",
+            container_uuid=container_uuid,
+            entry_point=function_name,
+            description=description,
+            public=public,
+            group=group,
+            searchable=searchable,
+            serializer=self.fx_serializer,
+        )
         logger.info(f"Registering function : {data}")
-
-        r = self.post("/functions", json_body=data)
-
-        func_uuid = r.data["function_uuid"]
-
-        # Return the result
-        return func_uuid
-
-    def update_function(self, func_uuid, function):
-        pass
+        r = self.web_client.register_function(data)
+        return r.data["function_uuid"]
 
     def search_function(self, q, offset=0, limit=10, advanced=False):
         """Search for function via the funcX service
@@ -747,8 +702,6 @@ class FuncXClient(FuncXErrorHandlingClient):
         str
             The id of the container
         """
-        container_path = "containers"
-
         payload = {
             "name": name,
             "location": location,
@@ -756,9 +709,7 @@ class FuncXClient(FuncXErrorHandlingClient):
             "type": container_type,
         }
 
-        r = self.post(container_path, json_body=payload)
-
-        # Return the result
+        r = self.web_client.post("containers", data=payload)
         return r.data["container_id"]
 
     def add_to_whitelist(self, endpoint_id, function_ids):
@@ -776,17 +727,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         json
             The response of the request
         """
-        req_path = f"endpoints/{endpoint_id}/whitelist"
-
-        if not isinstance(function_ids, list):
-            function_ids = [function_ids]
-
-        payload = {"func": function_ids}
-
-        r = self.post(req_path, json_body=payload)
-
-        # Return the result
-        return r
+        return self.web_client.whitelist_add(endpoint_id, function_ids)
 
     def get_whitelist(self, endpoint_id):
         """List the endpoint's whitelist
@@ -801,12 +742,7 @@ class FuncXClient(FuncXErrorHandlingClient):
         json
             The response of the request
         """
-        req_path = f"endpoints/{endpoint_id}/whitelist"
-
-        r = self.get(req_path)
-
-        # Return the result
-        return r
+        return self.web_client.get_whitelist(endpoint_id)
 
     def delete_from_whitelist(self, endpoint_id, function_ids):
         """List the endpoint's whitelist
@@ -827,10 +763,5 @@ class FuncXClient(FuncXErrorHandlingClient):
             function_ids = [function_ids]
         res = []
         for fid in function_ids:
-            req_path = f"endpoints/{endpoint_id}/whitelist/{fid}"
-
-            r = self.delete(req_path)
-            res.append(r)
-
-        # Return the result
+            res.append(self.web_client.whitelist_remove(endpoint_id, fid))
         return res

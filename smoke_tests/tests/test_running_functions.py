@@ -1,16 +1,25 @@
 import time
 
+from funcx.utils.errors import TaskPending
+
 
 def test_run_pre_registered_function(
-    endpoint, tutorial_funcion_id, submit_function_and_get_result
+    endpoint, tutorial_function_id, submit_function_and_get_result
 ):
     """This test confirms that we are connected to the default production DB"""
-    r = submit_function_and_get_result(endpoint, func=tutorial_funcion_id)
+    r = submit_function_and_get_result(endpoint, func=tutorial_function_id)
     assert r.result == "Hello World!"
 
 
 def double(x):
     return x * 2
+
+
+def ohai():
+    import time
+
+    time.sleep(5)
+    return "ohai"
 
 
 def test_batch(fxc, endpoint):
@@ -37,3 +46,20 @@ def test_batch(fxc, endpoint):
             pass
 
     assert total == 2 * (sum(inputs)), "Batch run results do not add up"
+
+
+def test_wait_on_new_hello_world_func(fxc, endpoint):
+
+    func_id = fxc.register_function(ohai)
+    task_id = fxc.run(endpoint_id=endpoint, function_id=func_id)
+
+    got_result = False
+    for _ in range(30):
+        try:
+            result = fxc.get_result(task_id)
+            got_result = True
+        except TaskPending:
+            time.sleep(1)
+
+    assert got_result
+    assert result == "ohai"
