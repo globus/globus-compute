@@ -4,7 +4,7 @@ import pytest
 from shared import simple_function
 
 
-@pytest.mark.parametrize("task_count", [100, 1000])
+@pytest.mark.parametrize("task_count", [5000])
 def test_bag_of_IO_tasks_executor(fx, endpoint, task_count):
     """Launches a parametrized bag of tasks using the executor interface."""
     data_sizes = [2000, 20000, 200000]
