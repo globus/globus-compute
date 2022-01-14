@@ -71,3 +71,23 @@ def test_code_name_unpacking(client, code_int, code_str, http_status):
     err = excinfo.value
     assert err.code_name == code_str
     assert err.http_status == http_status
+
+
+@pytest.mark.parametrize("http_status", [400, 500])
+def test_reason_parsed_as_part_of_error(client, http_status):
+    reason = "you are bad and you should feel bad"
+    responses.add(
+        responses.GET,
+        "https://api.funcx/foo",
+        json={"code": 100, "reason": reason},
+        match_querystring=None,
+        status=http_status,
+    )
+    with pytest.raises(funcx.FuncxAPIError) as excinfo:
+        client.get("foo")
+
+    err = excinfo.value
+    assert err.http_status == http_status
+    assert err.message == reason
+    # the message should be visible in the str form of the error
+    assert reason in str(err)

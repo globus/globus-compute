@@ -6,6 +6,8 @@ class FuncxAPIError(globus_sdk.GlobusAPIError):
     An error raised by the FuncXClient when the web API responds with an error.
     """
 
+    MESSAGE_FIELDS = ["reason", "message"]
+
     @property
     def code_name(self) -> str:
         """
