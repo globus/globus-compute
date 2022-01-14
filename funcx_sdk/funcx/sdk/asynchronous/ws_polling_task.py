@@ -245,13 +245,9 @@ class WebSocketPollingTask:
         Key-value tuple of the Authorization header
         (key, value)
         """
-        # TODO: under SDK v3 this will be
-        #
-        #   return (
-        #       "Authorization",
-        #       self.funcx_client.authorizer.get_authorization_header()`
-        #   )
-        headers = dict()
-        self.funcx_client.authorizer.set_authorization_header(headers)
+        # FIXME: this model, in which we inspect the client in order to get
+        # authorization information, is very bad. We should instead use an authorizer or
+        # other object here, if that is what's appropriate
+        authz_value = self.funcx_client.web_client.authorizer.get_authorization_header()
         header_name = "Authorization"
-        return (header_name, headers[header_name])
+        return (header_name, authz_value)
