@@ -471,46 +471,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             self.address, self.worker_result_port
         )
 
-    def _start_remote_interchange_process(self):
-        """Starts the interchange process locally
-
-        Starts the interchange process remotely via the provider.channel and
-        uses the command channel to request worker urls that the interchange
-        has selected.
-        """
-        log.debug(
-            "Attempting Interchange deployment via channel: {}".format(
-                self.provider.channel
-            )
-        )
-
-        debug_opts = "--debug" if self.worker_debug else ""
-        suppress_failure = "--suppress_failure" if self.suppress_failure else ""
-        log.debug(f"Before : \n{self.ix_launch_cmd}\n")
-        launch_command = self.ix_launch_cmd.format(
-            debug=debug_opts,
-            client_address=self.address,
-            client_ports="{},{},{}".format(
-                self.outgoing_q.port, self.incoming_q.port, self.command_client.port
-            ),
-            worker_port_range="{},{}".format(
-                self.worker_port_range[0], self.worker_port_range[1]
-            ),
-            logdir=os.path.join(
-                self.provider.channel.script_dir,
-                "runinfo",
-                os.path.basename(self.run_dir),
-                self.label,
-            ),
-            suppress_failure=suppress_failure,
-        )
-
-        if self.provider.worker_init:
-            launch_command = self.provider.worker_init + "\n" + launch_command
-
-        log.debug(f"Launch command : \n{launch_command}\n")
-        return
-
     def _queue_management_worker(self):
         """Listen to the queue for task status messages and handle them.
 
