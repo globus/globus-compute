@@ -310,7 +310,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
         # Set the available accelerators
         if available_accelerators is None:
-            self.available_accelerators = 0
+            self.available_accelerators = ()
         else:
             if isinstance(available_accelerators, int):
                 self.available_accelerators = \
