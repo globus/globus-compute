@@ -32,7 +32,6 @@ except ImportError:
                 f"limit of {self.result_size_limit}B"
             )
 
-
 log = logging.getLogger(__name__)
 
 DEFAULT_RESULT_SIZE_LIMIT_MB = 10
@@ -64,12 +63,12 @@ class FuncXWorker:
     """
 
     def __init__(
-        self,
-        worker_id,
-        address,
-        port,
-        worker_type="RAW",
-        result_size_limit=DEFAULT_RESULT_SIZE_LIMIT_B,
+            self,
+            worker_id,
+            address,
+            port,
+            worker_type="RAW",
+            result_size_limit=DEFAULT_RESULT_SIZE_LIMIT_B,
     ):
 
         self.worker_id = worker_id
@@ -225,13 +224,27 @@ def cli_run():
         debug=args.debug,
     )
 
-    worker = FuncXWorker(
-        args.worker_id,
-        args.address,
-        int(args.port),
-        worker_type=args.type,
-    )
-    worker.start()
+    # Redirect the stdout and stderr
+    stdout_path = os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.stdout")
+    stderr_path = os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.stderr")
+    with open(stdout_path, 'w') as fo, open(stderr_path, 'w') as fe:
+        # Redirect the stdout
+        old_stdout, old_stderr = sys.stdout, sys.stderr
+        sys.stdout = fo
+        sys.stderr = fe
+
+        try:
+            worker = FuncXWorker(
+                args.worker_id,
+                args.address,
+                int(args.port),
+                worker_type=args.type,
+            )
+            worker.start()
+        finally:
+            # Switch them back
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
 
 if __name__ == "__main__":
