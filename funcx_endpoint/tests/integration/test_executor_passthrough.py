@@ -5,24 +5,28 @@ from multiprocessing import Queue
 
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.executor import HighThroughputExecutor
-from funcx_endpoint.executors.high_throughput.messages import Task
+from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Task
 
 
 def double(x):
     return x * 2
 
 
-if __name__ == "__main__":
-
+def test_passthrough():
     results_queue = Queue()
-    #    set_file_logger('executor.log', name='funcx_endpoint', level=logging.DEBUG)
-    htex = HighThroughputExecutor(interchange_local=True, passthrough=True)
+    htex = HighThroughputExecutor(
+        interchange_local=True,
+        passthrough=True,
+        run_dir=".",
+        endpoint_id=str(uuid.uuid4()),
+    )
 
     htex.start(results_passthrough=results_queue)
-    htex._start_remote_interchange_process()
     fx_serializer = FuncXSerializer()
 
-    for i in range(10):
+    count = 10
+    task_ids = {}
+    for i in range(count):
         task_id = str(uuid.uuid4())
         args = (i,)
         kwargs = {}
@@ -34,14 +38,27 @@ if __name__ == "__main__":
         )
 
         payload = Task(task_id, "RAW", ser_code + ser_params)
-        f = htex.submit_raw(payload.pack())
+        htex.submit_raw(payload.pack())
         time.sleep(0.5)
+        task_ids[task_id] = None
 
-    for i in range(10):
-        result_package = results_queue.get()
-        # print("Result package : ", result_package)
-        r = pickle.loads(result_package)
-        result = fx_serializer.deserialize(r["result"])
-        print(f"Result:{i}: {result}")
+    while count:
+        result_package = results_queue.get(timeout=60)
+        print("Got :", result_package)
+        assert "message" in result_package
+        ret_obj = pickle.loads(result_package["message"])
+        print(ret_obj)
+
+        if result_package["task_id"] is None:
+            # we got a EPStatusReport
+            assert isinstance(ret_obj, EPStatusReport)
+        else:
+            assert result_package["task_id"] in task_ids
+            count -= 1
 
     print("All done")
+    htex.shutdown()
+
+
+if __name__ == "__main__":
+    test_passthrough()
