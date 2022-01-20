@@ -83,6 +83,11 @@ def pytest_addoption(parser):
         "--endpoint", metavar="endpoint", help="Specify an active endpoint UUID"
     )
     parser.addoption(
+        "--endpoints",
+        metavar="endpoints",
+        help="Specify a comma separated list of active endpoint UUIDs",
+    )
+    parser.addoption(
         "--service-address",
         metavar="service-address",
         help="Specify a funcX service address",
@@ -117,8 +122,12 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
     # if `--endpoint` was passed or `endpoint_uuid` is present in config,
     # handle those cases
     endpoint = pytestconfig.getoption("--endpoint")
+    endpoints = pytestconfig.getoption("--endpoints")
+
     if endpoint:
         config["endpoint_uuid"] = endpoint
+    elif endpoints:
+        config["endpoint_uuids"] = endpoints.split(",")
     elif config["endpoint_uuid"] is None:
         config["endpoint_uuid"] = _get_local_endpoint_id()
     if not config["endpoint_uuid"]:
@@ -189,6 +198,11 @@ def fx(fxc):
 @pytest.fixture
 def endpoint(funcx_test_config):
     return funcx_test_config["endpoint_uuid"]
+
+
+@pytest.fixture
+def endpoints(funcx_test_config):
+    return funcx_test_config["endpoint_uuids"]
 
 
 @pytest.fixture

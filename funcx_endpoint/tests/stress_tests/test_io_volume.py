@@ -6,9 +6,10 @@ from shared import simple_function
 logger = logging.getLogger("test")
 
 
-@pytest.mark.parametrize("task_count", [1000])
-def test_IO_through_s3_executor(fx, endpoint, task_count, result_size=350000):
-    """Launches N tasks that return ~500KB results per task."""
+# @pytest.mark.skip
+@pytest.mark.parametrize("task_count", [10000])
+def test_small_IO_through_s3_executor(fx, endpoint, task_count, result_size=100000):
+    """Launches N tasks that return ~1MB results per task."""
     futures = {}
     for _i in range(task_count):
         kwargs = {"input_data": bytearray(1), "output_size": result_size}
@@ -49,8 +50,10 @@ def test_IO_through_redis_executor(fx, endpoint, task_count, result_size=10000):
         assert x == expected_result, f"Result does not match, got: {x}"
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize("task_count", [1000])
-def test_IO_through_S3_executor(fx, endpoint, task_count, result_size=7000000):
+# def test_IO_through_S3_executor(fx, endpoint, task_count, result_size=7000000):
+def test_IO_through_S3_executor(fx, endpoint, task_count, result_size=700):
     """Launches N tasks that return ~7MB results per task that would use redis"""
     futures = {}
     count = 0
