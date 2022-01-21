@@ -96,7 +96,7 @@ class FuncXWorker:
         signal.signal(signal.SIGTERM, self.handler)
 
     def handler(self, signum, frame):
-        log.error("Signal handler called with signal", signum)
+        log.error(f"Signal handler called with signal {signum}")
         sys.exit(1)
 
     def registration_message(self):
