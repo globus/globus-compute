@@ -78,7 +78,7 @@ setup(
     keywords=["funcX", "FaaS", "Function Serving"],
     entry_points={
         "console_scripts": [
-            "funcx-endpoint=funcx_endpoint.endpoint.endpoint:cli_run",
+            "funcx-endpoint=funcx_endpoint.endpoint.cli:cli_run",
             "funcx-interchange"
             "=funcx_endpoint.executors.high_throughput.interchange:cli_run",
             "funcx-manager"
