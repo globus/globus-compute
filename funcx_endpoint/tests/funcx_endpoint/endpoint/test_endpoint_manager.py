@@ -9,7 +9,7 @@ import pytest
 from globus_sdk import GlobusAPIError, GlobusHTTPResponse
 from requests import Response
 
-from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
+from funcx_endpoint.endpoint.endpoint import Endpoint
 
 logger = logging.getLogger("mock_funcx")
 
@@ -28,13 +28,13 @@ class TestStart:
         shutil.rmtree(config_dir)
 
     def test_configure(self):
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         manager.configure_endpoint("mock_endpoint", None)
         assert os.path.exists(config_dir)
 
     def test_double_configure(self):
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -69,9 +69,7 @@ class TestStart:
 
         mock_context.return_value.pidfile.path = ""
 
-        mock_daemon = mocker.patch.object(
-            EndpointManager, "daemon_launch", return_value=None
-        )
+        mock_daemon = mocker.patch.object(Endpoint, "daemon_launch", return_value=None)
 
         mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4")
         mock_uuid.return_value = 123456
@@ -85,7 +83,7 @@ class TestStart:
             "funcx_endpoint.endpoint.endpoint_manager.ResultsAckHandler"
         )
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -162,7 +160,7 @@ class TestStart:
 
         mocker.patch("funcx_endpoint.endpoint.endpoint_manager.ResultsAckHandler")
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -220,9 +218,7 @@ class TestStart:
 
         mock_context.return_value.pidfile.path = ""
 
-        mock_daemon = mocker.patch.object(
-            EndpointManager, "daemon_launch", return_value=None
-        )
+        mock_daemon = mocker.patch.object(Endpoint, "daemon_launch", return_value=None)
 
         mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4")
         mock_uuid.return_value = 123456
@@ -236,7 +232,7 @@ class TestStart:
             "funcx_endpoint.endpoint.endpoint_manager.ResultsAckHandler"
         )
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -302,7 +298,7 @@ class TestStart:
 
             config = mock_executors()
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -320,7 +316,7 @@ class TestStart:
         mock_interchange.return_value.start.return_value = None
         mock_interchange.return_value.stop.return_value = None
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         manager.name = "test"
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
@@ -369,7 +365,7 @@ class TestStart:
         mock_funcx_config = {}
         mock_funcx_config["endpoint_address"] = "127.0.0.1"
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         manager.name = "test"
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         mock_optionals["logdir"] = config_dir
@@ -408,7 +404,7 @@ class TestStart:
         mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint_manager.uuid.uuid4")
         mock_uuid.return_value = 123456
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -417,7 +413,7 @@ class TestStart:
         )
 
     def test_check_endpoint_json_no_json_given_uuid(self, mocker):
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
@@ -426,7 +422,7 @@ class TestStart:
         )
 
     def test_check_endpoint_json_given_json(self, mocker):
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
