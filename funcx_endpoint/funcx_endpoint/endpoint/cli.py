@@ -22,7 +22,7 @@ def version_callback(value):
 
 
 def complete_endpoint_name():
-    # Manager context is not initialized at this point, so we assume the default
+    # Endpoint context is not initialized at this point, so we assume the default
     # the funcx_dir path of ~/.funcx
     funcx_dir = os.path.join(pathlib.Path.home(), ".funcx")
     config_files = glob.glob(os.path.join(funcx_dir, "*", "config.py"))
@@ -44,7 +44,7 @@ def configure_endpoint(
     Drops a config.py template into the funcx configs directory.
     The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
     """
-    manager.configure_endpoint(name, endpoint_config)
+    endpoint.configure_endpoint(name, endpoint_config)
 
 
 @app.command(name="start", help="Start an endpoint by name")
@@ -79,7 +79,7 @@ def start_endpoint(
     name : str
     endpoint_uuid : str
     """
-    endpoint_dir = os.path.join(manager.funcx_dir, name)
+    endpoint_dir = os.path.join(endpoint.funcx_dir, name)
 
     if not os.path.exists(endpoint_dir):
         msg = (
@@ -94,7 +94,7 @@ def start_endpoint(
 
     try:
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(endpoint_dir, manager.funcx_config_file_name)
+            "config", os.path.join(endpoint_dir, endpoint.funcx_config_file_name)
         ).load_module()
     except Exception:
         log.exception(
@@ -105,7 +105,7 @@ def start_endpoint(
         )
         raise
 
-    manager.start_endpoint(name, endpoint_uuid, endpoint_config)
+    endpoint.start_endpoint(name, endpoint_uuid, endpoint_config)
 
 
 @app.command(name="stop")
@@ -114,7 +114,7 @@ def stop_endpoint(
 ):
     """Stops an endpoint using the pidfile"""
 
-    manager.stop_endpoint(name)
+    endpoint.stop_endpoint(name)
 
 
 @app.command(name="restart")
@@ -129,7 +129,7 @@ def restart_endpoint(
 @app.command(name="list")
 def list_endpoints():
     """List all available endpoints"""
-    manager.list_endpoints()
+    endpoint.list_endpoints()
 
 
 @app.command(name="delete")
@@ -145,7 +145,7 @@ def delete_endpoint(
             f"Are you sure you want to delete the endpoint <{name}>?", abort=True
         )
 
-    manager.delete_endpoint(name)
+    endpoint.delete_endpoint(name)
 
 
 @app.callback()
@@ -174,23 +174,23 @@ def main(
     setup_logging(debug=debug)
     log.debug("Command: %s", ctx.invoked_subcommand)
 
-    global manager
-    manager = Endpoint(funcx_dir=config_dir, debug=debug)
+    global endpoint
+    endpoint = Endpoint(funcx_dir=config_dir, debug=debug)
 
     # Otherwise, we ensure that configs exist
-    if not os.path.exists(manager.funcx_config_file):
+    if not os.path.exists(endpoint.funcx_config_file):
         log.info(
             "No existing configuration found at %s. Initializing...",
-            manager.funcx_config_file,
+            endpoint.funcx_config_file,
         )
-        manager.init_endpoint()
+        endpoint.init_endpoint()
 
-    log.debug(f"Loading config files from {manager.funcx_dir}")
+    log.debug(f"Loading config files from {endpoint.funcx_dir}")
 
     funcx_config = SourceFileLoader(
-        "global_config", manager.funcx_config_file
+        "global_config", endpoint.funcx_config_file
     ).load_module()
-    manager.funcx_config = funcx_config.global_options
+    endpoint.funcx_config = funcx_config.global_options
 
 
 def cli_run():
