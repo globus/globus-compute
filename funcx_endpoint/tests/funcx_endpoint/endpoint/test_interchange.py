@@ -5,7 +5,7 @@ from importlib.machinery import SourceFileLoader
 
 import pytest
 
-from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
+from funcx_endpoint.endpoint.endpoint import Endpoint
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 
 logger = logging.getLogger("mock_funcx")
@@ -28,7 +28,7 @@ class TestStart:
         mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
         mock_client.return_value = None
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         keys_dir = os.path.join(config_dir, "certificates")
 
@@ -70,7 +70,7 @@ class TestStart:
             "commands_port": 8082,
         }
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         keys_dir = os.path.join(config_dir, "certificates")
 
@@ -117,7 +117,7 @@ class TestStart:
             "commands_port": 8082,
         }
 
-        manager = EndpointManager(funcx_dir=os.getcwd())
+        manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
         keys_dir = os.path.join(config_dir, "certificates")
 

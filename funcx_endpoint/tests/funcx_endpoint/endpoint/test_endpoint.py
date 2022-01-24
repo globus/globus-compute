@@ -3,7 +3,7 @@ import os
 import pytest
 from typer.testing import CliRunner
 
-from funcx_endpoint.endpoint.endpoint import app
+from funcx_endpoint.endpoint.cli import app
 
 runner = CliRunner()
 
