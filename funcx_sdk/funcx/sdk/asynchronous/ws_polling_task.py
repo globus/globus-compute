@@ -15,6 +15,10 @@ from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
 log = logging.getLogger(__name__)
 
+# Add extra allowance for result wrappers
+DEFAULT_RESULT_SIZE_LIMIT_MB = 10
+DEFAULT_RESULT_SIZE_LIMIT_B = (DEFAULT_RESULT_SIZE_LIMIT_MB + 1) * 1024 * 1024
+
 
 class WebSocketPollingTask:
     """The WebSocketPollingTask is used by the FuncXExecutor and the FuncXClient
@@ -90,7 +94,9 @@ class WebSocketPollingTask:
         headers = [self.get_auth_header()]
         try:
             self.ws = await websockets.connect(
-                self.results_ws_uri, extra_headers=headers
+                self.results_ws_uri,
+                extra_headers=headers,
+                max_size=DEFAULT_RESULT_SIZE_LIMIT_B,
             )
         # initial Globus authentication happens during the HTTP portion of the
         # handshake, so an invalid handshake means that the user was not authenticated
