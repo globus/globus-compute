@@ -1,5 +1,6 @@
-import uuid
 import os
+import uuid
+
 import pytest
 from parsl.providers import LocalProvider
 

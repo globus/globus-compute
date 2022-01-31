@@ -3,8 +3,8 @@ import os
 import random
 import subprocess
 import time
-from queue import Queue, Empty
-from typing import List, Dict
+from queue import Empty, Queue
+from typing import Dict, List
 
 log = logging.getLogger(__name__)
 
@@ -13,9 +13,9 @@ class WorkerMap:
     """WorkerMap keeps track of workers"""
 
     def __init__(
-            self,
-            max_worker_count: int,
-            available_accelerators: List[str],
+        self,
+        max_worker_count: int,
+        available_accelerators: List[str],
     ):
         """
 
@@ -343,9 +343,11 @@ class WorkerMap:
             try:
                 device = self.available_accelerators.get_nowait()
             except Empty:
-                raise ValueError('No accelerators are available.'
-                                 ' New worker must be created only'
-                                 ' after another is removed')
+                raise ValueError(
+                    "No accelerators are available."
+                    " New worker must be created only"
+                    " after another is removed"
+                )
             self.assigned_accelerators[worker_id] = device
             log.info(f"Assigned worker '{worker_id}' to accelerator '{device}'")
 
@@ -390,7 +392,7 @@ class WorkerMap:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 shell=False,
-                env=environment_variables
+                env=environment_variables,
             )
 
         except Exception:

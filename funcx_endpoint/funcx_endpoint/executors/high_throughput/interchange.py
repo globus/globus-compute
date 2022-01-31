@@ -906,7 +906,7 @@ class Interchange:
                 tasks = task_dispatch[manager]
                 if tasks:
                     log.info(
-                        "[MAIN] Sending task message \"{}...\" to manager {}".format(
+                        '[MAIN] Sending task message "{}..." to manager {}'.format(
                             str(tasks)[:50], manager
                         )
                     )
@@ -1133,7 +1133,7 @@ class Interchange:
         Raises:
              NotImplementedError
         """
-        log.info(f'Scaling out by {blocks} more blocks for task type {task_type}')
+        log.info(f"Scaling out by {blocks} more blocks for task type {task_type}")
         r = []
         for _i in range(blocks):
             if self.provider:

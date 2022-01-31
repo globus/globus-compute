@@ -39,4 +39,4 @@ class TestWorkerMap:
         )
 
         last_call = mock_popen.mock_calls[-1]
-        assert last_call[-1]['env']["CUDA_VISIBLE_DEVICES"] == "0"
+        assert last_call[-1]["env"]["CUDA_VISIBLE_DEVICES"] == "0"

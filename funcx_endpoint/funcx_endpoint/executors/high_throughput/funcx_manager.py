@@ -795,7 +795,7 @@ def cli_run():
         "--available-accelerators",
         default=(),
         nargs="*",
-        help="List of available accelerators"
+        help="List of available accelerators",
     )
     parser.add_argument(
         "-t", "--task_url", required=True, help="REQUIRED: ZMQ url for receiving tasks"

@@ -313,12 +313,15 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             self.available_accelerators = ()
         else:
             if isinstance(available_accelerators, int):
-                self.available_accelerators = \
-                    [str(i) for i in range(available_accelerators)]
+                self.available_accelerators = [
+                    str(i) for i in range(available_accelerators)
+                ]
             else:
                 self.available_accelerators = list(available_accelerators)
-            log.debug('Workers will be assigned '
-                      f'to accelerators: {self.available_accelerators}')
+            log.debug(
+                "Workers will be assigned "
+                f"to accelerators: {self.available_accelerators}"
+            )
 
         # FuncX specific options
         self.funcx_service_address = funcx_service_address
