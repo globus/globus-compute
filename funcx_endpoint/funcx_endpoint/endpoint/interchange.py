@@ -848,7 +848,9 @@ def cli_run():
     print("Starting HTEX Intechange")
     args = parser.parse_args()
 
-    setup_logging(logfile=os.path.join(args.logdir, "endpoint.log"), debug=args.debug)
+    setup_logging(
+        logfile=os.path.join(args.logdir, "endpoint.interchange.log"), debug=args.debug
+    )
 
     optionals = {}
     optionals["suppress_failure"] = args.suppress_failure

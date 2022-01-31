@@ -307,7 +307,7 @@ class EndpointManager:
         # It's important that this log is emitted before we enter the daemon context
         # because daemonization closes down everything, a log message inside the
         # context won't write the currently configured loggers
-        logfile = os.path.join(endpoint_dir, "endpoint.log")
+        logfile = os.path.join(endpoint_dir, "endpoint.manager.log")
         log.info(
             "Logging will be reconfigured for the daemon. logfile=%s , debug=%s",
             logfile,
