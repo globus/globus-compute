@@ -1290,7 +1290,6 @@ def cli_run():
     if args.worker_port_range:
         args.worker_port_range = [int(i) for i in args.worker_port_range.split(",")]
 
-    os.makedirs(args.logdir, exist_ok=True)
     setup_logging(
         logfile=os.path.join(args.logdir, "interchange.log"),
         debug=args.debug,
