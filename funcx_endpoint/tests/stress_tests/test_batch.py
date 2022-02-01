@@ -1,6 +1,7 @@
 import time
 
 import pytest
+
 from shared import simple_function
 
 

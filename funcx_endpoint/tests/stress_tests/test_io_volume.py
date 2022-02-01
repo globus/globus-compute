@@ -1,6 +1,8 @@
 import logging
 import time
+
 import pytest
+
 from shared import simple_function
 
 logger = logging.getLogger("test")

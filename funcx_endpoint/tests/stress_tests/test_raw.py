@@ -1,9 +1,9 @@
 import time
 
 import pytest
-from shared import simple_function, wait_for_task
 
 from funcx.sdk.utils.throttling import MaxRequestsExceeded
+from shared import simple_function, wait_for_task
 
 
 @pytest.mark.parametrize("task_count", [100])
