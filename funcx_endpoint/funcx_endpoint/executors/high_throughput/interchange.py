@@ -1210,7 +1210,9 @@ class Interchange:
         return r
 
     def provider_status(self):
-        """Get status of all blocks from the provider"""
+        """Get status of all blocks from the provider. The return type is
+        defined by the particular provider in use.
+        """
         status = []
         if self.provider:
             log.debug(
