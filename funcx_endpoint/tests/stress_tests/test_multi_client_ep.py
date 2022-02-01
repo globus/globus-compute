@@ -4,10 +4,10 @@ from functools import partial
 from multiprocessing import Pool
 
 import pytest
+from shared import simple_function
 
 from funcx import FuncXClient
 from funcx.sdk.executor import FuncXExecutor
-from shared import simple_function
 
 logger = logging.getLogger("test")
 
