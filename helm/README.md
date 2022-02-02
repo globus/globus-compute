@@ -89,4 +89,5 @@ The deployment is configured via values.yaml file.
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
 | detachEndpoint | Run the endpoint as a daemon inside the pod? | true |
 | endpointUUID   | Specify an existing UUID to this endpoint. Leave blank to generate a new one | |
-
+| maxIdleTime  | The maximum time to maintain an idle worker. After this time the SimpleStrategy will terminate the idle worker. | 3600 |
+| workerImageSecret | The K8s secret to use to deploy worker images. This can refer to an ECR secret. | |
