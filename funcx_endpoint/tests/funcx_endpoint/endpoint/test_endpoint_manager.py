@@ -6,12 +6,21 @@ from importlib.machinery import SourceFileLoader
 from unittest.mock import ANY
 
 import pytest
-from globus_sdk import GlobusAPIError, GlobusHTTPResponse
-from requests import Response
+import requests
+from globus_sdk import GlobusAPIError
 
 from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
 
 logger = logging.getLogger("mock_funcx")
+
+
+def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.Response:
+    req = requests.Request(method, "https://funcx.example.org/")
+    p_req = req.prepare()
+    res = requests.Response()
+    res.request = p_req
+    res.status_code = status
+    return res
 
 
 class TestStart:
@@ -132,17 +141,12 @@ class TestStart:
         """
         mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
 
-        base_r = Response()
-        base_r.headers = {"Content-Type": "json"}
-        base_r.status_code = 400
-        r = GlobusHTTPResponse(base_r)
-        r.status_code = base_r.status_code
-        r.headers = base_r.headers
-
         mock_register_endpoint = mocker.patch(
             "funcx_endpoint.endpoint.endpoint_manager.register_endpoint"
         )
-        mock_register_endpoint.side_effect = GlobusAPIError(r)
+        mock_register_endpoint.side_effect = GlobusAPIError(
+            _fake_http_response(status=400, method="POST")
+        )
 
         mock_zmq_create = mocker.patch(
             "zmq.auth.create_certificates", return_value=("public/key/file", None)
@@ -192,17 +196,12 @@ class TestStart:
         """
         mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
 
-        base_r = Response()
-        base_r.headers = {"Content-Type": "json"}
-        base_r.status_code = 500
-        r = GlobusHTTPResponse(base_r)
-        r.status_code = base_r.status_code
-        r.headers = base_r.headers
-
         mock_register_endpoint = mocker.patch(
             "funcx_endpoint.endpoint.endpoint_manager.register_endpoint"
         )
-        mock_register_endpoint.side_effect = GlobusAPIError(r)
+        mock_register_endpoint.side_effect = GlobusAPIError(
+            _fake_http_response(status=500, method="POST")
+        )
 
         mock_zmq_create = mocker.patch(
             "zmq.auth.create_certificates", return_value=("public/key/file", None)
