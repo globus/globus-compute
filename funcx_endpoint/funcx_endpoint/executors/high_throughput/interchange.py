@@ -1146,7 +1146,7 @@ class Interchange:
                 if not internal_block:
                     raise (
                         ScalingFailed(
-                            self.config.provider.label,
+                            self.provider.label,
                             "Attempts to provision nodes via provider has failed",
                         )
                     )
