@@ -34,8 +34,8 @@ data:
                     image="{{ .Values.workerImage }}",
                     worker_init='{{ .Values.workerInit }}',
                     namespace='{{ .Values.workerNamespace }}',
-                    {{- if .Values.workerImageSecret }}
-                    secret='{{ .Values.workerImageSecret }}',
+                    {{- if .Values.imagePullSecret }}
+                    secret='{{ .Values.imagePullSecret }}',
                     {{- end }}
                     incluster_config=True
                 ),
