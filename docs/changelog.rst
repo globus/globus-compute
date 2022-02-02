@@ -88,20 +88,21 @@ Bug Fixes
 
 * Cleaner logging on the ``funcx-endpoint``. See `PR#643 <https://github.com/funcx-faas/funcX/pull/643>`_
   Previously available ``set_stream_logger``, ``set_file_logger`` methods are now removed.
-  For debugging the SDK use standard logging setup, like:
+  For debugging the SDK use standard logging methods, as described in the
+  `Python Logging HOWTO <https://docs.python.org/3/howto/logging.html>`_, on
+  the logger named ``"funcx"``.
+
+  For example:
 
   .. code-block::
+
     import logging
-    def set_stream_logger(name="funcx", level=logging.DEBUG, format_string="%(asctime)s %(name)s:%(lineno)d [%(levelname)s]  %(message)s"):
-        logger = logging.getLogger(name)
-        logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler()
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        return logger
-    set_stream_logger()
+
+    logger = logging.getLogger("funcx")
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    funcx_logger.addHandler(ch)
 
 * Warn and continue on failure to load a results ack file. `PR#616 <https://github.com/funcx-faas/funcX/pull/616>`_
 
