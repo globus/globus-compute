@@ -20,7 +20,7 @@ data:
             HighThroughputExecutor(
                 max_workers_per_node={{ .Values.maxWorkersPerPod }},
                 address=address_by_route(),
-                strategy=KubeSimpleStrategy(max_idletime=3600),
+                strategy=KubeSimpleStrategy(max_idletime={{ .Values.maxIdleTime | default 3600 }}),
                 container_type='docker',
                 scheduler_mode='hard',
                 provider=KubernetesProvider(
@@ -35,7 +35,7 @@ data:
                     worker_init='{{ .Values.workerInit }}',
                     namespace='{{ .Values.workerNamespace }}',
                     {{- if .Values.workerImageSecret }}
-                    secret: '{{ .Values.workerImageSecret }}',
+                    secret='{{ .Values.workerImageSecret }}',
                     {{- end }}
                     incluster_config=True
                 ),
