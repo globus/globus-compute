@@ -82,7 +82,7 @@ The following configuration is an example to use singularity container on Theta.
 
 
 Cooley (ALCF)
-^^^^^^^^^^^^
+^^^^^^^^^^^^^
 
 .. image:: images/31174D02-Cooley800.jpg
 
@@ -94,7 +94,7 @@ using the `CobaltProvider`. This configuration assumes that the script is being 
 
 
 Polaris (ALCF)
-^^^^^^^^^^^^
+^^^^^^^^^^^^^
 
 .. image:: images/ALCF_Polaris.jpeg
 
