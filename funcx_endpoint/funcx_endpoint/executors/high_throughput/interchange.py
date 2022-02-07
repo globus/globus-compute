@@ -10,7 +10,7 @@ import queue
 import sys
 import threading
 import time
-from typing import Dict, Tuple
+from typing import Dict, Sequence, Tuple
 
 import daemon
 import zmq
@@ -110,7 +110,7 @@ class Interchange:
         provider=None,
         max_workers_per_node=None,
         mem_per_worker=None,
-        available_accelerators=(),
+        available_accelerators: Sequence[str] = (),
         prefetch_capacity=None,
         scheduler_mode=None,
         container_type=None,
@@ -164,7 +164,7 @@ class Interchange:
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
 
-        available_accelerators: list of str
+        available_accelerators: sequence of str
             List of device IDs for accelerators available on each node
             Default: Empty list
 

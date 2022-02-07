@@ -153,7 +153,12 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         or an integer defining the number of accelerators available.
         If an integer, sequential device IDs will be created starting at 0.
         The manager will ensure each worker is pinned to an accelerator and
-        will launch no more workers than the number of available accelerators.
+        will set the maximum number of workers per node to be no more
+        than the number of accelerators.
+
+        Workers are pinned to specific accelerators using environment variables,
+        such as by setting the ``CUDA_VISIBLE_DEVICES`` or
+        ``SYCL_DEVICE_FILTER`` to the selected accelerator.
         Default: None
 
     max_workers_per_node : int
