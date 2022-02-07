@@ -5,6 +5,7 @@
 New Functionality
 ^^^^^^^^^^^^^^^^^
 - Added option for pinning workers to different accelerators
+- Log standard error and output from workers to disk
 
 .. Bug Fixes
 .. ^^^^^^^^^
