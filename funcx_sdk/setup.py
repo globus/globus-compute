@@ -16,6 +16,9 @@ REQUIRES = [
     # versioning and compatibility policy
     "dill==0.3.4",
 ]
+DOCS_REQUIRES = [
+    "sphinx_rtd_theme",
+]
 
 TEST_REQUIRES = [
     "flake8==3.8.0",
@@ -42,6 +45,7 @@ setup(
     extras_require={
         "dev": DEV_REQUIRES,
         "test": TEST_REQUIRES,
+        "docs": DOCS_REQUIRES,
     },
     python_requires=">=3.6.0",
     classifiers=[

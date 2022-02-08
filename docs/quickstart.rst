@@ -3,8 +3,6 @@ Quickstart
 
 **funcX** client and endpoint software releases are available on `PyPI <https://pypi.org/project/funcx/>`_.
 
-The latest version available on PyPI is ``v0.3.0``.
-
 You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb>`_
 
 
