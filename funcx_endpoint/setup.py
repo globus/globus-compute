@@ -48,6 +48,7 @@ TEST_REQUIRES = [
     "codecov==2.1.8",
     "pytest-mock==3.2.0",
     "flake8>=3.8",
+    "safety>=1.10.3",
 ]
 
 

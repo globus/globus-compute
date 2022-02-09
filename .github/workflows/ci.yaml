@@ -50,9 +50,7 @@ jobs:
           python-version: 3.7
       - name: install requirements
         run: |
-          pip install safety
-      - name: run safety check
-        run: safety check
+          python -m pip install tox
       - name: run tests
         run: |
           cd funcx_endpoint
