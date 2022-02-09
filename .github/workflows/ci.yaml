@@ -50,14 +50,13 @@ jobs:
           python-version: 3.7
       - name: install requirements
         run: |
-          python -m pip install -U pip setuptools wheel
-          python -m pip install './funcx_endpoint[test]'
           pip install safety
       - name: run safety check
         run: safety check
-      - name: run pytest
+      - name: run tests
         run: |
-          PYTHONPATH=funcx_endpoint python -m coverage run -m pytest funcx_endpoint/tests/funcx_endpoint
+          cd funcx_endpoint
+          tox -e py
 
   publish:
     # only trigger on pushes to the main repo (not forks, and not PRs)
