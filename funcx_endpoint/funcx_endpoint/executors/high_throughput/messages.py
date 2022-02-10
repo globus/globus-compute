@@ -96,6 +96,8 @@ class Task(Message):
         recursive=None,
     ):
         super().__init__()
+        self.whole_buffer = None
+        self.local_container = None
         self.task_id = task_id
         self.container_id = container_id
         self.task_buffer = task_buffer
@@ -130,6 +132,9 @@ class Task(Message):
 
     def set_local_container(self, container_id):
         self.local_container = container_id
+
+    def set_whole_buffer(self, raw_buffer):
+        self.whole_buffer = raw_buffer
 
 
 class HeartbeatReq(Message):

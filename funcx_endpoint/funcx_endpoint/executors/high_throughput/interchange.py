@@ -523,7 +523,15 @@ class Interchange:
                     )
                     msg = self.pending_transfer_tasks.pop(task_id)
                     del self.active_transfers[task_id]
-                    self.pending_task_queue[msg["container"]].put(msg)
+                    local_container = msg.local_container
+                    self.pending_task_queue[local_container].put(
+                        {
+                            "task_id": msg.task_id,
+                            "container_id": msg.container_id,
+                            "local_container": local_container,
+                            "raw_buffer": msg.whole_buffer,
+                        }
+                    )
                 elif (
                     transfer_status["status"] == "FAILED"
                     or transfer_status["status"] == "ACTIVE"
@@ -533,9 +541,9 @@ class Interchange:
                         self.gtc.cancel(transfer_task)
                         msg = self.pending_transfer_tasks.pop(task_id)
                         del self.active_transfers[task_id]
-                        self.failed_transfer_tasks[
-                            msg["task_id"]
-                        ] = GlobusTransferFailure(failed_reason)
+                        self.failed_transfer_tasks[msg.task_id] = GlobusTransferFailure(
+                            failed_reason
+                        )
                         logger.error(
                             "[TRANSFER_TRACKING_THREAD] Globus transfer {}, "
                             'from {}{} to {}{} failed due to error: "{}"'.format(
@@ -565,8 +573,9 @@ class Interchange:
             except queue.Empty:
                 continue
             else:
-                data_url = msg["task_id"].split(";")[3]
-                recursive = True if msg["task_id"].split(";")[4] == "True" else False
+                # to be solved
+                data_url = msg.data_url
+                recursive = True if msg.recursive == "True" else False
 
             try:
                 parsed_url = urlparse(data_url)
@@ -579,7 +588,7 @@ class Interchange:
                         data_url
                     )
                 )
-                self.failed_transfer_tasks[msg["task_id"]] = GlobusTransferFailure(e)
+                self.failed_transfer_tasks[msg.task_id] = GlobusTransferFailure(e)
             else:
                 try:
                     info = self.gtc.transfer(
@@ -588,14 +597,12 @@ class Interchange:
                 except Exception as e:
                     logger.exception(
                         "[TRANSFER_SUBMIT_THREAD] Failed "
-                        "to submit transfer for task {}".format(msg["task_id"])
+                        "to submit transfer for task {}".format(msg.task_id)
                     )
-                    self.failed_transfer_tasks[msg["task_id"]] = GlobusTransferFailure(
-                        e
-                    )
+                    self.failed_transfer_tasks[msg.task_id] = GlobusTransferFailure(e)
                 else:
-                    self.active_transfers[msg["task_id"]] = info
-                    self.pending_transfer_tasks[msg["task_id"]] = msg
+                    self.active_transfers[msg.task_id] = info
+                    self.pending_transfer_tasks[msg.task_id] = msg
 
     def migrate_tasks_to_internal(self, kill_event, status_request):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
@@ -641,7 +648,7 @@ class Interchange:
             elif isinstance(msg, Heartbeat):
                 logger.debug("Got heartbeat")
             else:
-                logger.info(f"[TASK_PULL_THREAD] Received task:{msg}")
+                logger.info(f"[TASK_PULL_THREAD] Received task:{msg.__dict__}")
                 local_container = self.get_container(msg.container_id)
                 msg.set_local_container(local_container)
                 if local_container not in self.pending_task_queue:
@@ -649,8 +656,8 @@ class Interchange:
                         maxsize=10 ** 6
                     )
                 # Check if data transfer is needed
-                data_url = msg["task_id"].split(";")[3]
-                if data_url != "None":
+                data_url = msg.data_url
+                if data_url != "" and data_url != "None":
                     if not self.data_staging:
                         logger.exception(
                             "[TASK_PULL_THREAD] Destination Globus "
@@ -661,10 +668,11 @@ class Interchange:
                             "Destination Globus Endpoint ID not specified. "
                             "Please specify it in config"
                         )
-                        self.failed_transfer_tasks[
-                            msg["task_id"]
-                        ] = GlobusTransferFailure(e)
+                        self.failed_transfer_tasks[msg.task_id] = GlobusTransferFailure(
+                            e
+                        )
                     else:
+                        msg.set_whole_buffer(raw_msg)
                         self.pending_transfer_queue.put(msg)
                 # We pass the raw message along
                 else:
