@@ -3,7 +3,7 @@ import logging
 import os
 import pathlib
 from importlib.machinery import SourceFileLoader
-
+from funcx.sdk.client import FuncXClient
 import typer
 
 import funcx
@@ -79,6 +79,9 @@ def start_endpoint(
     name : str
     endpoint_uuid : str
     """
+
+    funcx_client = FuncXClient(need_transfer=True)
+
     endpoint_dir = os.path.join(manager.funcx_dir, name)
 
     if not os.path.exists(endpoint_dir):
