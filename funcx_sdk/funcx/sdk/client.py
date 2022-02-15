@@ -551,7 +551,7 @@ class FuncXClient:
         int
             The port to connect to and a list of containers
         """
-        data = {"endpoint_name": name, "description": description}
+        data = {"endpoint_id": name, "description": description}
 
         r = self.web_client.post("get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
