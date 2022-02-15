@@ -1,0 +1,36 @@
+.. A new scriv changelog fragment.
+..
+.. Uncomment the header that is right (remove the leading dots).
+..
+.. New Functionality
+.. ^^^^^^^^^^^^^^^^^
+..
+.. - A bullet item for the New Functionality category.
+..
+ Bug Fixes
+ ^^^^^^^^^
+
+- When a provider raised an exception, that exception was then mishandled
+  and presented as an AttributeError. This handling now no longer corrupts
+  the exception. https://github.com/funcx-faas/funcX/issues/679
+..
+.. Removed
+.. ^^^^^^^
+..
+.. - A bullet item for the Removed category.
+..
+.. Deprecated
+.. ^^^^^^^^^^
+..
+.. - A bullet item for the Deprecated category.
+..
+.. Changed
+.. ^^^^^^^
+..
+.. - A bullet item for the Changed category.
+..
+.. Security
+.. ^^^^^^^^
+..
+.. - A bullet item for the Security category.
+..
