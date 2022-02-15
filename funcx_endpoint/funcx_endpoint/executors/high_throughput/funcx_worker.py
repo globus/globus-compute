@@ -219,7 +219,6 @@ def cli_run():
     )
     args = parser.parse_args()
 
-    os.makedirs(args.logdir, exist_ok=True)
     setup_logging(
         logfile=os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.log"),
         debug=args.debug,

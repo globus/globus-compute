@@ -826,7 +826,6 @@ def cli_run():
 
     args = parser.parse_args()
 
-    os.makedirs(os.path.join(args.logdir, args.uid), exist_ok=True)
     setup_logging(
         logfile=os.path.join(args.logdir, args.uid, "manager.log"), debug=args.debug
     )

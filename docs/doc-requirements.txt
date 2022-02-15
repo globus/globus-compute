@@ -1,3 +1,0 @@
-../funcx_sdk
-nbsphinx
-sphinx_rtd_theme

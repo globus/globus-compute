@@ -5,6 +5,7 @@ This module contains logging configuration for the funcx-endpoint application.
 import logging
 import logging.config
 import logging.handlers
+import os
 import pathlib
 import typing as t
 
@@ -21,6 +22,10 @@ def setup_logging(
 ) -> None:
     if logfile is None:
         logfile = _DEFAULT_LOGFILE
+
+    # ensure that the logdir exists
+    logdir = os.path.dirname(logfile)
+    os.makedirs(logdir, exist_ok=True)
 
     default_config = {
         "version": 1,

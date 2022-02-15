@@ -11,7 +11,6 @@ funcX SDK
 
     funcx
     funcx.sdk.client.FuncXClient
-    funcx.sdk.error_handling_client.FuncXErrorHandlingClient
     funcx.sdk.utils.batch.Batch
     funcx.serialize.base
     funcx.serialize.concretes
@@ -50,5 +49,3 @@ Exceptions
     funcx.utils.errors.InvalidScopeException
     funcx.utils.errors.MaxResultSizeExceeded
     funcx.utils.errors.HTTPError
-    funcx.sdk.utils.throttling.MaxRequestsExceeded
-    funcx.sdk.utils.throttling.MaxRequestSizeExceeded
