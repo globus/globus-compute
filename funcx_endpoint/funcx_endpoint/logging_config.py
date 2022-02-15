@@ -6,33 +6,55 @@ import logging
 import logging.config
 import logging.handlers
 import os
-import pathlib
 import typing as t
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_LOGFILE = str(pathlib.Path.home() / ".funcx" / "endpoint.log")
+
+class FuncxConsoleFormatter(logging.Formatter):
+    """
+    For internal use only.
+    This formatter handles output to standard streams in the following way:
+
+    if 'debug' is False (default):
+        info messages and below are treated as "user output" and are minimally decorated
+        warning messages and up are given a full format, so are debug messages
+
+    if 'debug' is True:
+        all messages are given the full format
+    """
+
+    def __init__(
+        self,
+        debug: bool = False,
+        fmt: str = "%(asctime)s %(name)s:%(lineno)d [%(levelname)s] %(message)s",
+        datefmt: str = "%Y-%m-%d %H:%M:%S",
+    ) -> None:
+        super().__init__()
+
+        self._warning_formatter = logging.Formatter(fmt=fmt, datefmt=datefmt)
+        if debug:
+            self._info_formatter = self._warning_formatter
+        else:
+            self._info_formatter = logging.Formatter(fmt="> %(message)s")
+
+    def format(self, record):
+        if record.levelno > logging.INFO:
+            return self._warning_formatter.format(record)
+        return self._info_formatter.format(record)
 
 
-def setup_logging(
-    *,
-    logfile: t.Optional[str] = None,
-    console_enabled: bool = True,
-    debug: bool = False
-) -> None:
-    if logfile is None:
-        logfile = _DEFAULT_LOGFILE
-
+def _get_file_dict_config(logfile: str, console_enabled: bool, debug: bool) -> dict:
     # ensure that the logdir exists
     logdir = os.path.dirname(logfile)
     os.makedirs(logdir, exist_ok=True)
 
-    default_config = {
+    return {
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "format": "%(asctime)s %(name)s:%(lineno)d [%(levelname)s] %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
+                "()": "funcx_endpoint.logging_config.FuncxConsoleFormatter",
+                "debug": debug,
             },
             "filefmt": {
                 "format": (
@@ -70,7 +92,48 @@ def setup_logging(
         },
     }
 
-    logging.config.dictConfig(default_config)
 
+def _get_stream_dict_config(debug: bool) -> dict:
+    return {
+        "version": 1,
+        "formatters": {
+            "streamfmt": {
+                "()": "funcx_endpoint.logging_config.FuncxConsoleFormatter",
+                "debug": debug,
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": "DEBUG" if debug else "INFO",
+                "formatter": "streamfmt",
+            }
+        },
+        "loggers": {
+            "funcx_endpoint": {
+                "level": "DEBUG",
+                "handlers": ["console"],
+            },
+            # configure for the funcx SDK as well
+            "funcx": {
+                "level": "DEBUG" if debug else "WARNING",
+                "handlers": ["console"],
+            },
+        },
+    }
+
+
+def setup_logging(
+    *,
+    logfile: t.Optional[str] = None,
+    console_enabled: bool = True,
+    debug: bool = False
+) -> None:
+    if logfile is not None:
+        config = _get_file_dict_config(logfile, console_enabled, debug)
+    else:
+        config = _get_stream_dict_config(debug)
+
+    logging.config.dictConfig(config)
     if debug:
         log.debug("debug logging enabled")
