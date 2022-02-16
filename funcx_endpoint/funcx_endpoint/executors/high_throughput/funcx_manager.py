@@ -375,7 +375,7 @@ class Manager:
                         try:
                             log.info(f"Removing worker:{worker_id_raw} from map")
                             self.worker_map.start_remove_worker(worker_type)
-                            self.worker_map.remove_worker(worker_id_raw)
+
                             log.info(
                                 f"Popping worker:{worker_to_kill} from worker_procs"
                             )
@@ -393,6 +393,8 @@ class Manager:
                                     f"Worker process exited with : {proc.returncode}"
                                 )
 
+                            # Now that the worker is dead, remove it from worker map
+                            self.worker_map.remove_worker(worker_id_raw)
                             raise TaskCancelled(worker_to_kill, self.uid)
                         except Exception as e:
                             log.exception(f"Raise exception, handling: {e}")
