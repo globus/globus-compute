@@ -5,6 +5,7 @@ import logging
 import os
 import pickle
 import signal
+import time
 import sys
 
 import zmq
@@ -136,7 +137,7 @@ class FuncXWorker:
                     continue
             else:
                 log.debug("Executing task...")
-
+                exec_start = time.time()
                 try:
                     result = self.execute_task(msg)
                     serialized_result = self.serialize(result)
@@ -146,6 +147,7 @@ class FuncXWorker:
                             len(serialized_result), self.result_size_limit
                         )
                 except Exception as e:
+                    exec_end = time.time()
                     log.exception(f"Caught an exception {e}")
                     result_package = {
                         "task_id": task_id,
@@ -153,13 +155,18 @@ class FuncXWorker:
                         "exception": self.serialize(
                             RemoteExceptionWrapper(*sys.exc_info())
                         ),
+                        "times": {'execution_start': exec_start,
+                                  'execution_end': exec_end},
                     }
                 else:
+                    exec_end = time.time()
                     log.debug("Execution completed without exception")
                     result_package = {
                         "task_id": task_id,
                         "container_id": container_id,
                         "result": serialized_result,
+                        "times": {'execution_start': exec_start,
+                                  'execution_end': exec_end},
                     }
                 result = result_package
                 task_type = b"TASK_RET"
