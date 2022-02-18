@@ -172,6 +172,8 @@ class FuncXWorker:
                     }
                 result = result_package
                 task_type = b"TASK_RET"
+            
+                log.debug(f'Task {task_id} completed in {exec_end - exec_start} seconds')
 
             log.debug("Sending result")
 

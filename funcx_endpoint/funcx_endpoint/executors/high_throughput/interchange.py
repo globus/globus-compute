@@ -973,6 +973,10 @@ class Interchange:
                         )
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
+                        try:
+                            r['times'].update({'interchange_result': time.time()})
+                        except KeyError:
+                            r['times'] = {'interchange_result': time.time()}
                         log.debug(
                             "[MAIN] Received result for task {} from {}".format(
                                 r["task_id"], manager
