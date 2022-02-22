@@ -155,9 +155,11 @@ class FuncXWorker:
                         "exception": self.serialize(
                             RemoteExceptionWrapper(*sys.exc_info())
                         ),
-                        "times": {'execution_start': exec_start,
-                                  'execution_end': exec_end,
-                                  'execution_time': exec_end - exec_start},
+                        "times": {
+                            "execution_start": exec_start,
+                            "execution_end": exec_end,
+                            "execution_time": exec_end - exec_start,
+                        },
                     }
                 else:
                     exec_end = time.time()
@@ -166,14 +168,18 @@ class FuncXWorker:
                         "task_id": task_id,
                         "container_id": container_id,
                         "result": serialized_result,
-                        "times": {'execution_start': exec_start,
-                                  'execution_end': exec_end,
-                                  'execution_time': exec_end - exec_start},
+                        "times": {
+                            "execution_start": exec_start,
+                            "execution_end": exec_end,
+                            "execution_time": exec_end - exec_start,
+                        },
                     }
                 result = result_package
                 task_type = b"TASK_RET"
-            
-                log.debug(f'Task {task_id} completed in {exec_end - exec_start} seconds')
+
+                log.debug(
+                    f"Task {task_id} completed in {exec_end - exec_start} seconds"
+                )
 
             log.debug("Sending result")
 
