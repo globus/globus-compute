@@ -5,8 +5,8 @@ import logging
 import os
 import pickle
 import signal
-import time
 import sys
+import time
 
 import zmq
 from parsl.app.errors import RemoteExceptionWrapper
