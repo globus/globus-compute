@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import logging
+import multiprocessing
 import os
 import pickle
 import platform
@@ -9,9 +10,9 @@ import signal
 import sys
 import threading
 import time
-from queue import Queue
 from typing import Tuple
 
+import pika
 import zmq
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
@@ -21,6 +22,10 @@ from funcx import __version__ as funcx_sdk_version
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint import __version__ as funcx_endpoint_version
+from funcx_endpoint.endpoint.rabbit_mq.result_queue_publisher import (
+    ResultQueuePublisher,
+)
+from funcx_endpoint.endpoint.rabbit_mq.task_queue_subscriber import TaskQueueSubscriber
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.taskqueue import TaskQueue
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
@@ -75,12 +80,12 @@ class EndpointInterchange:
     5. Be aware of requests worker resource capacity,
        eg. schedule only jobs that fit into walltime.
 
-    TODO: We most likely need a PUB channel to send out global commandzs, like shutdown
     """
 
     def __init__(
         self,
         config,
+        reg_info: pika.connection.Parameters,
         client_address="127.0.0.1",
         interchange_address="127.0.0.1",
         client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
@@ -91,7 +96,6 @@ class EndpointInterchange:
         suppress_failure=True,
         endpoint_dir=".",
         endpoint_name="default",
-        reg_info=None,
         funcx_client_options=None,
         results_ack_handler=None,
     ):
@@ -100,6 +104,10 @@ class EndpointInterchange:
         ----------
         config : funcx.Config object
              Funcx config object that describes how compute should be provisioned
+
+        reg_info : pika.connection.Parameters
+             Connection parameters to connect to the service side RabbitMQ pipes
+             Required
 
         client_address : str
              The ip address at which the parsl client can be reached.
@@ -135,10 +143,6 @@ class EndpointInterchange:
         endpoint_name : str
              Name of endpoint
 
-        reg_info : Dict
-             Registration info from initial registration on endpoint start, if it
-             succeeded
-
         funcx_client_options : Dict
              FuncXClient initialization options
         """
@@ -164,9 +168,10 @@ class EndpointInterchange:
         self.funcx_client = FuncXClient(**funcx_client_options)
 
         self.initial_registration_complete = False
-        if reg_info:
-            self.initial_registration_complete = True
-            self.apply_reg_info(reg_info)
+
+        self.connection_params = reg_info
+        log.warning(f"YADU: Received reg_info : {reg_info}")
+        self.initial_registration_complete = True
 
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
@@ -175,7 +180,7 @@ class EndpointInterchange:
         self.keys_dir = keys_dir
         self.serializer = FuncXSerializer()
 
-        self.pending_task_queue = Queue()
+        self.pending_task_queue = multiprocessing.Queue()
         self.containers = {}
         self.total_pending_task_count = 0
 
@@ -239,42 +244,55 @@ class EndpointInterchange:
             if hasattr(executor, "passthrough") and executor.passthrough is True:
                 executor.start(results_passthrough=self.results_passthrough)
 
-    def apply_reg_info(self, reg_info):
-        self.client_address = reg_info["public_ip"]
-        self.client_ports = (
-            reg_info["tasks_port"],
-            reg_info["results_port"],
-            reg_info["commands_port"],
-        )
-
     def register_endpoint(self):
         reg_info = register_endpoint(
             self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name
         )
-        self.apply_reg_info(reg_info)
-        return reg_info
+        self.connection_params = reg_info
 
-    def migrate_tasks_to_internal(self, quiesce_event):
+    def migrate_tasks_to_internal(
+        self,
+        connection_params: pika.connection.Parameters,
+        endpoint_uuid: str,
+        pending_task_queue: multiprocessing.Queue,
+        quiesce_event: multiprocessing.Event,
+    ):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
         Parameters:
         -----------
+        connection_params: pika.connection.Parameters
+              Connection params to connect to the service side Tasks queue
+
+        endpoint_uuid: endpoint_uuid str
+
+        pending_task_queue: multiprocessing.Queue
+              Internal queue to which tasks should be migrated
+
         quiesce_event : threading.Event
               Event to let the thread know when it is time to die.
         """
         log.info("[TASK_PULL_THREAD] Starting")
 
         try:
-            self._task_puller_loop(quiesce_event)
+            log.info(
+                f"[TASK_PULL_PROC Starting the TaskQueueSubscriber"
+                f" as {endpoint_uuid}"
+            )
+            task_q = TaskQueueSubscriber(connection_params, endpoint_uuid)
+            task_q.connect()
+            task_q.run(queue=pending_task_queue, disconnect_event=quiesce_event)
         except Exception:
-            log.exception("[TASK_PULL_THREAD] Unhandled exception")
+            log.exception("[TASK_PULL_PROC] Unhandled exception")
         finally:
             quiesce_event.set()
-            self.task_incoming.close()
-            log.info("[TASK_PULL_THREAD] Thread loop exiting")
+            task_q.stop()
+            log.warning("[TASK_PULL_PROC] loop exiting")
 
     def _task_puller_loop(self, quiesce_event):
+        """Obsolete but some logic here needs to be migrated"""
+
         task_counter = 0
         # Create the incoming queue in the thread to keep
         # zmq.context in the same thread. zmq.context is not thread-safe
@@ -430,7 +448,7 @@ class EndpointInterchange:
                 log.debug(f"[COMMAND] Received command request {buffer}")
                 command = Message.unpack(buffer)
                 if command.type not in COMMAND_TYPES:
-                    log.error("Received incorrect message type on command channel")
+                    log.error("Received incorrect message type on command _channel")
                     self.command_channel.put(bytes())
                     continue
 
@@ -523,24 +541,16 @@ class EndpointInterchange:
 
         self.initial_registration_complete = False
 
-        log.info(
-            "Attempting connection to client at {} on ports: {},{},{}".format(
-                self.client_address,
-                self.client_ports[0],
-                self.client_ports[1],
-                self.client_ports[2],
-            )
+        self._task_puller_proc = multiprocessing.Process(
+            target=self.migrate_tasks_to_internal,
+            args=(
+                self.connection_params,
+                self.endpoint_id,
+                self.pending_task_queue,
+                self._quiesce_event,
+            ),
         )
-
-        self._task_puller_thread = threading.Thread(
-            target=self.migrate_tasks_to_internal, args=(self._quiesce_event,)
-        )
-        self._task_puller_thread.start()
-
-        self._command_thread = threading.Thread(
-            target=self._command_server, args=(self._quiesce_event,)
-        )
-        self._command_thread.start()
+        self._task_puller_proc.start()
 
         try:
             self._main_loop()
@@ -549,22 +559,17 @@ class EndpointInterchange:
         finally:
             self.results_outgoing.close()
             log.info("[MAIN] Thread loop exiting")
+        self._quiesce_event.set()
+        self._task_puller_proc.terminate()
 
     def _main_loop(self):
-        self.results_outgoing = TaskQueue(
-            self.client_address,
-            port=self.client_ports[1],
-            identity=self.endpoint_id,
-            mode="client",
-            keys_dir=self.keys_dir,
-            # Fail immediately if results cannot be sent back
-            SNDTIMEO=0,
-            set_hwm=True,
-            linger=0,
+
+        self.results_outgoing = ResultQueuePublisher(
+            endpoint_id=self.endpoint_id,
+            pika_conn_params=self.connection_params,
         )
-        self.results_outgoing.put(
-            "forwarder", pickle.dumps({"registration": self.endpoint_id})
-        )
+
+        self.results_outgoing.connect()
 
         # TODO: this resend must happen after any endpoint re-registration to
         # ensure there are not unacked results left
@@ -577,7 +582,9 @@ class EndpointInterchange:
 
         # TODO: this should be a multipart send rather than a loop
         for results in resend_results_messages:
-            self.results_outgoing.put("forwarder", results)
+            # TO-DO: Republishing backlogged/unacked messages is not supported
+            # until the types are sorted out
+            self.results_outgoing.publish(results)
 
         executor = list(self.executors.values())[0]
         last = time.time()
@@ -586,22 +593,13 @@ class EndpointInterchange:
             if last + self.heartbeat_threshold < time.time():
                 log.debug("[MAIN] alive")
                 last = time.time()
-                try:
-                    # Adding results heartbeat to essentially force a TCP keepalive
-                    # without meddling with OS TCP keepalive defaults
-                    self.results_outgoing.put("forwarder", b"HEARTBEAT")
-                except Exception:
-                    log.exception(
-                        "[MAIN] Sending heartbeat to the forwarder over the results "
-                        "channel has failed"
-                    )
-                    raise
 
             self.results_ack_handler.check_ack_counts()
 
             try:
                 task = self.pending_task_queue.get(block=True, timeout=0.01)
-                executor.submit_raw(task.pack())
+                log.warning(f"Submitting task : {task}")
+                executor.submit_raw(task)
             except queue.Empty:
                 pass
             except Exception:
@@ -617,7 +615,8 @@ class EndpointInterchange:
 
                 # results will be a pickled dict with task_id, container_id,
                 # and results/exception
-                self.results_outgoing.put("forwarder", results["message"])
+                log.warning(f"Publishing message {results['message']}")
+                self.results_outgoing.publish(results["message"])
 
             except queue.Empty:
                 pass

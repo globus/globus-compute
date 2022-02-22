@@ -248,7 +248,7 @@ class Interchange:
         self.command_channel = self.context.socket(zmq.DEALER)
         self.command_channel.RCVTIMEO = 1000  # in milliseconds
         # self.command_channel.set_hwm(0)
-        log.info(f"Command channel on tcp://{client_address}:{client_ports[2]}")
+        log.info(f"Command _channel on tcp://{client_address}:{client_ports[2]}")
         self.command_channel.connect(f"tcp://{client_address}:{client_ports[2]}")
         log.info("Connected to forwarder")
 
@@ -355,12 +355,12 @@ class Interchange:
         log.info(f"Setting working_dir: {working_dir}")
 
         self.provider.script_dir = working_dir
-        if hasattr(self.provider, "channel"):
-            self.provider.channel.script_dir = os.path.join(
+        if hasattr(self.provider, "_channel"):
+            self.provider._channel.script_dir = os.path.join(
                 working_dir, "submit_scripts"
             )
-            self.provider.channel.makedirs(
-                self.provider.channel.script_dir, exist_ok=True
+            self.provider._channel.makedirs(
+                self.provider._channel.script_dir, exist_ok=True
             )
             os.makedirs(self.provider.script_dir, exist_ok=True)
 
@@ -641,7 +641,7 @@ class Interchange:
                 else:
                     log.error(
                         f"Received unsupported message type:{command.type} on "
-                        "command channel"
+                        "command _channel"
                     )
                     reply = BadCommand(f"Unknown command type: {command.type}")
 
