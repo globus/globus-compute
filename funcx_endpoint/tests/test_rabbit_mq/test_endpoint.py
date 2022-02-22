@@ -32,7 +32,7 @@ def start_task_q_subscriber(
     )
 
     task_q = TaskQueueSubscriber(
-        endpoint_name=endpoint_id, pika_conn_params=service_params
+        endpoint_uuid=endpoint_id, pika_conn_params=service_params
     )
     task_q.connect()
     task_q.run(queue=out_queue, disconnect_event=disconnect_event)

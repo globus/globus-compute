@@ -6,7 +6,6 @@ import time
 import uuid
 
 import pika
-import pytest
 
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.rabbit_mq import TaskQueuePublisher, TaskQueueSubscriber
@@ -16,36 +15,12 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture()
-def offprocess_consumer():
-    print("Starting offprocess_consumer")
-    yield True
-    print("Closing offprocess_consumer")
-
-
-def listen_for_tasks():
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
-
-    endpoint_id = "231fab4e-630a-4d76-bbbb-cf0b4aedbdf9"
-
-    task_queue = TaskQueueSubscriber(service_params, endpoint_name=endpoint_id)
-    task_queue.run()
+CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/%2F")
+ENDPOINT_ID = "task-q-tests"
 
 
 def start_task_q_publisher():
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
-
-    endpoint_id = "231fab4e-630a-4d76-bbbb-cf0b4aedbdf9"
-
-    task_q = TaskQueuePublisher(
-        endpoint_name=endpoint_id, pika_conn_params=service_params
-    )
+    task_q = TaskQueuePublisher(endpoint_uuid=ENDPOINT_ID, pika_conn_params=CONN_PARAMS)
     task_q.connect()
     return task_q
 
@@ -53,28 +28,24 @@ def start_task_q_publisher():
 def start_task_q_subscriber(
     out_queue: multiprocessing.Queue, disconnect_event: multiprocessing.Event
 ):
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
-
-    endpoint_id = "231fab4e-630a-4d76-bbbb-cf0b4aedbdf9"
-
     task_q = TaskQueueSubscriber(
-        endpoint_name=endpoint_id, pika_conn_params=service_params
+        CONN_PARAMS,
+        external_queue=out_queue,
+        kill_event=disconnect_event,
+        endpoint_uuid=ENDPOINT_ID,
     )
-    task_q.connect()
-    task_q.run(queue=out_queue, disconnect_event=disconnect_event)
+    task_q.start()
     return task_q
 
 
-def test_synch():
+def test_synch(count=10):
     """Open publisher, and publish to task_q, then open subscriber a fetch"""
     fxs = FuncXSerializer()
+
     task_q_pub = start_task_q_publisher()
     task_q_pub.queue_purge()  # Make sure queue is empty
     messages = {}
-    for i in range(10):
+    for i in range(count):
         data = list(range(10))
         message = {
             "task_id": str(uuid.uuid4()),
@@ -85,23 +56,17 @@ def test_synch():
         messages[i] = b_message
 
     task_q_pub.close()
-
+    logger.warning(f"Published {count} messages, closing task_q_pub")
+    logger.warning("Starting task_q_subscriber")
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
 
-    proc = multiprocessing.Process(
-        target=start_task_q_subscriber,
-        args=(
-            tasks_out,
-            disconnect_event,
-        ),
-    )
-    proc.start()
-    for i in range(10):
+    proc = start_task_q_subscriber(tasks_out, disconnect_event)
+    for i in range(count):
         message = tasks_out.get()
-        logger.warning(f"Got message: {message}")
         assert messages[i] == message
 
+    proc.close()
     proc.terminate()
     return
 
@@ -140,14 +105,7 @@ def test_subscriber_recovery():
     disconnect_event = multiprocessing.Event()
 
     # Listen for 10 messages
-    proc = multiprocessing.Process(
-        target=start_task_q_subscriber,
-        args=(
-            tasks_out,
-            disconnect_event,
-        ),
-    )
-    proc.start()
+    proc = start_task_q_subscriber(tasks_out, disconnect_event)
     logger.warning("Proc started")
     for i in range(10):
         message = tasks_out.get()
@@ -156,6 +114,7 @@ def test_subscriber_recovery():
 
     # Terminate the connection
     proc.terminate()
+    logger.warning("Disconnected")
 
     # Launch 10 messages
     messages = {}
@@ -170,14 +129,7 @@ def test_subscriber_recovery():
         messages[i] = b_message
 
     # Listen for the messages on a new connection
-    proc = multiprocessing.Process(
-        target=start_task_q_subscriber,
-        args=(
-            tasks_out,
-            disconnect_event,
-        ),
-    )
-    proc.start()
+    proc = start_task_q_subscriber(tasks_out, disconnect_event)
     logger.warning("Proc started")
     for i in range(10):
         message = tasks_out.get()
@@ -185,7 +137,6 @@ def test_subscriber_recovery():
         assert messages[i] == message
 
     proc.terminate()
-
     task_q_pub.close()
     return
 
@@ -202,25 +153,9 @@ def test_exclusive_subscriber():
         multiprocessing.Event(),
         multiprocessing.Event(),
     )
-    proc1 = multiprocessing.Process(
-        target=start_task_q_subscriber,
-        args=(
-            tasks_out_1,
-            disconnect_event_1,
-        ),
-    )
-    proc2 = multiprocessing.Process(
-        target=start_task_q_subscriber,
-        args=(
-            tasks_out_2,
-            disconnect_event_2,
-        ),
-    )
-    proc1.start()
+    proc1 = start_task_q_subscriber(tasks_out_1, disconnect_event_1)
     time.sleep(1)
-    # TO-DO figure out from stephen the caplog mechanism to confirm that
-    # a warning/error is logged.
-    proc2.start()
+    proc2 = start_task_q_subscriber(tasks_out_2, disconnect_event_2)
 
     logger.warning("TEST: Launching messages")
     # Launch 10 messages
@@ -262,14 +197,7 @@ def test_combined_pub_sub_latency(count=10):
 
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
-    proc = multiprocessing.Process(
-        target=start_task_q_subscriber,
-        args=(
-            tasks_out,
-            disconnect_event,
-        ),
-    )
-    proc.start()
+    proc = start_task_q_subscriber(tasks_out, disconnect_event)
 
     latency = []
     for i in range(count):
@@ -298,14 +226,10 @@ def test_combined_throughput(count=1000):
 
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
-    proc = multiprocessing.Process(
-        target=start_task_q_subscriber,
-        args=(
-            tasks_out,
-            disconnect_event,
-        ),
+    proc = start_task_q_subscriber(
+        tasks_out,
+        disconnect_event,
     )
-    proc.start()
 
     tput_at_size = {}
     # Do 10 rounds of throughput measures
