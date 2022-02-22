@@ -2,9 +2,37 @@ import json
 import logging
 import os
 
+import pika
+
 import funcx_endpoint
 
 log = logging.getLogger(__name__)
+
+
+def mock_register_endpoint(
+    endpoint_name: str, endpoint_uuid: str, endpoint_version: str = None
+) -> pika.URLParameters:
+    """This is only a mock function that currently returns a URL to a
+    default local RabbitMQ service
+
+    Parameters
+    ----------
+    endpoint_name: str
+        User facing name of the endpoint
+    endpoint_uuid: str
+        Endpoint UUID
+    endpoint_version: str
+        funcx-endpoint version number. Optional
+
+    Returns
+    -------
+    pika.URLParameters to the RabbitMQ pipes
+    """
+    log.info(
+        f"Registering endpoint:{endpoint_name}:{endpoint_uuid}"
+        " of version:{endpoint_version}"
+    )
+    return pika.URLParameters("amqp://guest:guest@localhost:5672/%2F")
 
 
 def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
@@ -31,39 +59,24 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
     """
     log.debug("Attempting registration")
     log.debug(f"Trying with eid : {endpoint_uuid}")
-    reg_info = funcx_client.register_endpoint(
+
+    reg_info = mock_register_endpoint(
         endpoint_name, endpoint_uuid, endpoint_version=funcx_endpoint.__version__
     )
-
-    # this is a backup error handler in case an endpoint ID is not sent back
-    # from the service or a bad ID is sent back
-    if "endpoint_id" not in reg_info:
-        raise Exception(
-            "Endpoint ID was not included in the service's registration response."
-        )
-    elif not isinstance(reg_info["endpoint_id"], str):
-        raise Exception("Endpoint ID sent by the service was not a string.")
 
     # NOTE: While all registration info is saved to endpoint.json, only the
     # endpoint UUID is reused from this file. The latest forwarder URI is used
     # every time we fetch registration info and register
     with open(os.path.join(endpoint_dir, "endpoint.json"), "w+") as fp:
-        json.dump(reg_info, fp)
+        endpoint_info = {
+            "endpoint_name": endpoint_name,
+            "endpoint_uuid": endpoint_uuid,
+        }
+        json.dump(endpoint_info, fp)
         log.debug(
             "Registration info written to {}".format(
                 os.path.join(endpoint_dir, "endpoint.json")
             )
         )
-
-    certs_dir = os.path.join(endpoint_dir, "certificates")
-    os.makedirs(certs_dir, exist_ok=True)
-    server_keyfile = os.path.join(certs_dir, "server.key")
-    log.debug(f"Writing server key to {server_keyfile}")
-    try:
-        with open(server_keyfile, "w") as f:
-            f.write(reg_info["forwarder_pubkey"])
-            os.chmod(server_keyfile, 0o600)
-    except Exception:
-        log.exception("Failed to write server certificate")
 
     return reg_info
