@@ -14,7 +14,7 @@ class ResultQueuePublisher:
     def __init__(
         self,
         endpoint_id: str,
-        pika_conn_params: pika.ConnectionParameters,
+        pika_conn_params: pika.connection.Parameters,
         exchange="results",
     ):
         self.endpoint_id = endpoint_id

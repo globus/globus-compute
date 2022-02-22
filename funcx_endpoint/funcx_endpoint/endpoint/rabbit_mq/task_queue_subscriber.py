@@ -7,7 +7,7 @@ import pika
 logger = logging.getLogger(__name__)
 
 
-class TaskQueueSubscriber:
+class TaskQueueSubscriber(multiprocessing.Process):
     """The TaskQueueSubscriber is a direct rabbitMQ pipe subscriber that uses
     the SelectConnection adaptor to enable performance consumption of messages
     from the service
@@ -16,31 +16,68 @@ class TaskQueueSubscriber:
 
     def __init__(
         self,
-        pika_conn_params,
-        endpoint_name: str,
-        exchange="tasks",
+        pika_conn_params: pika.connection.Parameters,
+        external_queue: multiprocessing.Queue,
+        kill_event: multiprocessing.Event,
+        endpoint_uuid: str,
+        _on_message_test_hook: Callable = None,
+        exchange: str = "tasks",
     ):
+        """
 
-        self.endpoint_name = endpoint_name
-        self.queue_name = f"{self.endpoint_name}.tasks"
-        self.routing_key = f"{self.endpoint_name}.tasks"
+        Parameters
+        ----------
+        pika_conn_params: Connection Params
+
+        external_queue: multiprocessing.Queue
+             Each incoming message will be pushed to the queue.
+             Please note that upon pushing a message into this queue, it will be
+             marked as delivered.
+
+        kill_event: multiprocessing.Event
+             This event is used to communicate a failure on the subscriber
+
+        _on_message_test_hook: Callable
+            This is a test_hook used only for testing. This is invoked on
+            every message
+
+        endpoint_uuid: endpoint uuid string
+
+        exchange: str
+            Exchange name
+        """
+
+        super().__init__()
+        self.endpoint_uuid = endpoint_uuid
+        self.conn_params = pika_conn_params
+        self.external_queue = external_queue
+        self.kill_event: multiprocessing.Event = kill_event
+        self.cleanup_complete = multiprocessing.Event()
+        self.external_callback = _on_message_test_hook
+
+        self.queue_name = f"{self.endpoint_uuid}.tasks"
+        self.routing_key = f"{self.endpoint_uuid}.tasks"
         self.params = pika_conn_params
         self.exchange = exchange
         self.exchange_type = "direct"
-        self._is_connected = False
         self._closing = False
+        self._closed = False
+        self._connection = None
+        self._channel = None
+
+        self._watcher_poll_period = 0.1  # seconds
         logger.debug("Init done")
 
-    def connect(self):
+    def _connect(self) -> pika.SelectConnection:
         logger.info("Connecting to %s", self.params)
         return pika.SelectConnection(
-            pika.URLParameters("amqp://guest:guest@localhost:5672/%2F"),  # self.params,
+            self.conn_params,
             on_open_callback=self._on_connection_open,
             on_close_callback=self._on_connection_closed,
             on_open_error_callback=self._on_open_failed,
         )
 
-    def _on_connection_open(self, unused_connection):
+    def _on_connection_open(self, _unused_connection):
         logger.warning("Connection opened")
         self.open_channel()
 
@@ -59,10 +96,10 @@ class TaskQueueSubscriber:
         self._channel = None
         if self._closing:
             connection.ioloop.stop()
+            self._closed = True
         else:
             logger.warning(f"Connection closed, reopening in 5 seconds: {exception}")
             self._connection.ioloop.call_later(5, self.reconnect)
-            # self._connection.add_timeout(5, self.reconnect)
 
     def reconnect(self):
         """Will be invoked by the IOLoop timer if the connection is
@@ -253,22 +290,27 @@ class TaskQueueSubscriber:
         :param str|unicode body: The message body
 
         """
-        logger.info(
-            f"Received message # {basic_deliver.delivery_tag} "
-            "from {properties.app_id} {body}"
+        logger.debug(
+            "Received message from %s: %s, %s",
+            basic_deliver.delivery_tag,
+            properties.app_id,
+            body,
         )
-        if self.external_queue:
-            self.external_queue.put(body)
-            self.acknowledge_message(basic_deliver.delivery_tag)
-        elif self.external_callback:
-            try:
+
+        # Not sure if we need to do this in a locked context,
+        # rabbit's ACK system should make sure you don't lose tasks.
+        try:
+            if self.external_callback:
                 self.external_callback(body)
-            except Exception:
-                # We only ack the message
-                logger.exception("External callback failed")
-                self._channel.basic_nack(basic_deliver.delivery_tag, requeue=True)
-            else:
-                self.acknowledge_message(basic_deliver.delivery_tag)
+
+            if self.external_queue:
+                self.external_queue.put(body)
+        except Exception:
+            # We only ack the message if the hand-off to queue worked
+            logger.exception("External callback failed")
+            self._channel.basic_nack(basic_deliver.delivery_tag, requeue=True)
+        else:
+            self.acknowledge_message(basic_deliver.delivery_tag)
 
     def acknowledge_message(self, delivery_tag):
         """Acknowledge the message delivery from RabbitMQ by sending a
@@ -309,34 +351,39 @@ class TaskQueueSubscriber:
         logger.info("Closing the channel")
         self._channel.close()
 
-    def run(
-        self,
-        queue: multiprocessing.Queue,
-        disconnect_event: multiprocessing.Event,
-        test_hook: Callable = None,
-    ):
+    def event_watcher(self):
+        """Polls the kill_event periodically to trigger a shutdown"""
+        if self.kill_event.is_set():
+            logger.info("Kill event is set. Start subscriber shutdown")
+            try:
+                self.close_connection()
+                self._connection.ioloop.stop()
+                self.cleanup_complete.set()
+            except Exception:
+                logger.exception("Failed to close connection cleanly")
+            logger.info("Shutdown complete")
+            return
+        else:
+            self._connection.ioloop.call_later(
+                self._watcher_poll_period, self.event_watcher
+            )
+
+    def run(self):
         """Run the example consumer by connecting to RabbitMQ and then
         starting the IOLoop to block and allow the SelectConnection to
         operate.
 
         Note: Only one of these options should be used.
-        queue: multiprocessing.Queue
-             if this option is provided, each incoming message will be
-             pushed to the queue
-        disconnect_event: multiprocessing.Event
-             This event is used to communicate a failure on the subscriber
-        test_hook: Callable
-             This is a test_hook used only for testing. This is invoked on
-             every message
         """
         logger.warning("Run method")
-        self.external_queue = queue
-        self.disconnect_event = disconnect_event
-        self.test_hook = test_hook
-        self._connection = self.connect()
-        self._connection.ioloop.start()
+        try:
+            self._connection = self._connect()
+            self.event_watcher()
+            self._connection.ioloop.start()
+        except Exception:
+            logger.exception("Failed to start subscriber")
 
-    def stop(self):
+    def close(self) -> None:
         """Cleanly shutdown the connection to RabbitMQ by stopping the consumer
         with RabbitMQ. When RabbitMQ confirms the cancellation, on_cancelok
         will be invoked by pika, which will then closing the channel and
@@ -346,14 +393,22 @@ class TaskQueueSubscriber:
         communicate with RabbitMQ. All of the commands issued prior to starting
         the IOLoop will be buffered but not processed.
 
+        ^  This doc block is mostly all wrong, since the code has been rewritten
+        but some cases described here need to be tested more closely like handling
+        KeyboardInterrupts
+
+        This close method needs some rethinking since this whole thing is a separate
+        process with the ioloop callbacks not setting the vars properly
         """
         logger.info("Stopping")
+        self.kill_event.set()
         self._closing = True
-        self.stop_consuming()
-        self._connection.ioloop.start()
+        logger.warning("Waiting for cleanup_complete")
+        self.cleanup_complete.wait(2 * self._watcher_poll_period)
+        logger.warning("Cleanup done")
         logger.info("Stopped")
 
     def close_connection(self):
         """This method closes the connection to RabbitMQ."""
         logger.info("Closing connection")
-        self._connection.close()
+        return self._connection.close()

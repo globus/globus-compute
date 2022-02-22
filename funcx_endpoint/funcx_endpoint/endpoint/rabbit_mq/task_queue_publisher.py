@@ -14,13 +14,13 @@ class TaskQueuePublisher:
 
     def __init__(
         self,
-        endpoint_name: str,
-        pika_conn_params: pika.ConnectionParameters,
-        exchange="tasks",
+        endpoint_uuid: str,
+        pika_conn_params: pika.connection.Parameters,
+        exchange: str = "tasks",
     ):
-        self.endpoint_name = endpoint_name
-        self.queue_name = f"{self.endpoint_name}.tasks"
-        self.routing_key = f"{self.endpoint_name}.tasks"
+        self.endpoint_uuid = endpoint_uuid
+        self.queue_name = f"{self.endpoint_uuid}.tasks"
+        self.routing_key = f"{self.endpoint_uuid}.tasks"
         self.params = pika_conn_params
         self.params._heartbeat = 60
         self.params._blocked_connection_timeout = 120
