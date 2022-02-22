@@ -7,7 +7,7 @@ import pika
 logger = logging.getLogger(__name__)
 
 
-class ResultQueueSubscriber:
+class ResultQueueSubscriber(multiprocessing.Process):
     """The ResultQueueSubscriber is a direct rabbitMQ pipe subscriber that uses
     the SelectConnection adaptor to enable performance consumption of messages
     from the service
@@ -16,23 +16,51 @@ class ResultQueueSubscriber:
 
     def __init__(
         self,
-        pika_conn_params,
+        pika_conn_params: pika.connection.Parameters,
+        external_queue: multiprocessing.Queue,
+        kill_event: multiprocessing.Event,
         exchange="results",
         exchange_type="topic",
     ):
+        """
 
+        Parameters
+        ----------
+        pika_conn_params: Connection Params
+
+        external_queue: multiprocessing.Queue
+             Each incoming message will be pushed to the queue.
+             Please note that upon pushing a message into this queue, it will be
+             marked as delivered.
+
+        kill_event: multiprocessing.Event
+             This event is used to communicate a failure on the subscriber
+
+        endpoint_uuid: endpoint uuid string
+
+        exchange: str
+            Exchange name
+        """
+        super().__init__()
+        self.conn_params = pika_conn_params
+        self.external_queue = external_queue
+        self.kill_event = kill_event
         self.queue_name = "results"
         self.routing_key = "*.results"
-        self.params = pika_conn_params
+
         self.exchange = exchange
         self.exchange_type = exchange_type
         self._is_connected = False
+        self._connection = None
+        self._channel = None
+        self._closed = False
+        self._closing = False
         logger.debug("Init done")
 
-    def connect(self):
-        logger.info("Connecting to %s", self.params)
+    def _connect(self):
+        logger.info("Connecting to %s", self.conn_params)
         return pika.SelectConnection(
-            pika.URLParameters("amqp://guest:guest@localhost:5672/%2F"),  # self.params,
+            self.conn_params,
             on_open_callback=self._on_connection_open,
             on_close_callback=self._on_connection_closed,
             on_open_error_callback=self._on_open_failed,
@@ -60,8 +88,8 @@ class ResultQueueSubscriber:
         if self._closing:
             self._connection.ioloop.stop()
         else:
-            logger.warning("Connection closed, reopening in 5 seconds: (%s)", exception)
-            self._connection.add_timeout(5, self.reconnect)
+            logger.warning(f"Connection closed, reopening in 5 seconds: {exception}")
+            self._connection.ioloop.call_later(5, self.reconnect)
 
     def reconnect(self):
         """Will be invoked by the IOLoop timer if the connection is
@@ -284,13 +312,12 @@ class ResultQueueSubscriber:
         logger.info("Closing the channel")
         self._channel.close()
 
-    def run(self, queue: multiprocessing.Queue):
+    def run(self):
         """Run the example consumer by connecting to RabbitMQ and then
         starting the IOLoop to block and allow the SelectConnection to operate.
 
         """
-        self.external_queue = queue
-        self._connection = self.connect()
+        self._connection = self._connect()
         self._connection.ioloop.start()
 
     def stop(self):
