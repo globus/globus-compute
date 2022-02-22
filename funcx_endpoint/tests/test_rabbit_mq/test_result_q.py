@@ -20,28 +20,24 @@ logger = logging.getLogger(__name__)
 endpoint_id_1 = "a9aec9a1-ff86-4d6a-a5b8-5bb160746b5c"
 endpoint_id_2 = "9b2dbe0f-0420-4256-9f89-71cb8bfb26d2"
 
+CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/%2F")
+
 
 def start_result_q_publisher(endpoint_id):
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
 
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id, pika_conn_params=service_params
+        endpoint_id=endpoint_id, pika_conn_params=CONN_PARAMS
     )
     result_pub.connect()
     return result_pub
 
 
 def start_result_q_subscriber(queue: multiprocessing.Queue) -> ResultQueueSubscriber:
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
+    kill_event = multiprocessing.Event()
+    result_q = ResultQueueSubscriber(
+        pika_conn_params=CONN_PARAMS, external_queue=queue, kill_event=kill_event
     )
-
-    result_q = ResultQueueSubscriber(pika_conn_params=service_params)
-    result_q.run(queue=queue)
+    result_q.start()
     return result_q
 
 
@@ -61,7 +57,6 @@ def publish_messages(count: int, endpoint_id: str, size=10) -> ResultQueuePublis
     return result_pub
 
 
-# @pytest.mark.skip
 def test_result_queue_basic(count=10):
     """Test that any endpoint can publish
     TO DO: Add in auth to ensure that you can publish results from *any* EP
@@ -73,7 +68,6 @@ def test_result_queue_basic(count=10):
 
 
 @pytest.mark.parametrize("size", [10, 2 ** 10, 2 ** 20, (2 ** 20) * 10])
-# @pytest.mark.skip
 def test_message_integrity_across_sizes(size):
     """Publish count messages from endpoint_1 and endpoint_1
     Confirm that the subscriber gets all of them.
@@ -90,10 +84,7 @@ def test_message_integrity_across_sizes(size):
     result_pub.publish(b_message)
 
     results_q = multiprocessing.Queue()
-    sub_proc = multiprocessing.Process(
-        target=start_result_q_subscriber, args=(results_q,)
-    )
-    sub_proc.start()
+    sub_proc = start_result_q_subscriber(results_q)
 
     (routing_key, received_message) = results_q.get(timeout=2)
     assert endpoint_id_1 in routing_key
@@ -110,10 +101,7 @@ def test_publish_multiple_then_subscribe(count=10):
     publish_messages(count=count, endpoint_id=endpoint_id_2)
 
     results_q = multiprocessing.Queue()
-    sub_proc = multiprocessing.Process(
-        target=start_result_q_subscriber, args=(results_q,)
-    )
-    sub_proc.start()
+    sub_proc = start_result_q_subscriber(results_q)
 
     all_results = {}
     for _i in range(total_messages):
