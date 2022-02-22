@@ -39,12 +39,12 @@ def test_size_throttling_on_small_requests(mock_globus_sdk):
 def test_size_throttle_on_large_request(mock_globus_sdk):
     cli = ThrottledBaseClient()
     # Test with ~2mb sized POST
-    jb = {"is": "l" + "o" * 2 * 2 ** 20 + "ng"}
+    jb = {"is": "l" + "o" * 2 * 2**20 + "ng"}
     with pytest.raises(MaxRequestSizeExceeded):
         cli.throttle_request_size("POST", "/my_rest_endpoint", json_body=jb)
 
     # Test on text request
-    data = "B" + "i" * 2 * 2 ** 20 + "gly"
+    data = "B" + "i" * 2 * 2**20 + "gly"
     with pytest.raises(MaxRequestSizeExceeded):
         cli.throttle_request_size("POST", "/my_rest_endpoint", text_body=data)
 
