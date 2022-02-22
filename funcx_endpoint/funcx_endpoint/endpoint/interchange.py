@@ -38,7 +38,7 @@ from funcx_endpoint.logging_config import setup_logging
 log = logging.getLogger(__name__)
 
 LOOP_SLOWDOWN = 0.0  # in seconds
-HEARTBEAT_CODE = (2 ** 32) - 1
+HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
 
 
