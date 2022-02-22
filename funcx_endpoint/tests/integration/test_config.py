@@ -19,8 +19,10 @@ if __name__ == "__main__":
     print("Loading : ", config)
     # Set script dir
     config.provider.script_dir = working_dir
-    config.provider.channel.script_dir = os.path.join(working_dir, "submit_scripts")
-    config.provider.channel.makedirs(config.provider.channel.script_dir, exist_ok=True)
+    config.provider._channel.script_dir = os.path.join(working_dir, "submit_scripts")
+    config.provider._channel.makedirs(
+        config.provider._channel.script_dir, exist_ok=True
+    )
     os.makedirs(config.provider.script_dir, exist_ok=True)
 
     debug_opts = "--debug" if config.worker_debug else ""
