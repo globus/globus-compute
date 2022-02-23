@@ -5,7 +5,7 @@
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added Helm options to specify Kuberenetes imagePullSecret and maxIdleTime values.
+- Added Helm options to specify Kuberenetes workerDebug, imagePullSecret and maxIdleTime values.
 ..
 .. Bug Fixes
 .. ^^^^^^^^^

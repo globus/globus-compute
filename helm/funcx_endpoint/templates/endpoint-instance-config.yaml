@@ -23,6 +23,7 @@ data:
                 strategy=KubeSimpleStrategy(max_idletime={{ .Values.maxIdleTime | default 3600 }}),
                 container_type='docker',
                 scheduler_mode='hard',
+                worker_debug={{ .Values.workerDebug }},
                 provider=KubernetesProvider(
                     init_blocks={{ .Values.initBlocks }},
                     min_blocks={{ .Values.minBlocks }},

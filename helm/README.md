@@ -76,6 +76,7 @@ The deployment is configured via values.yaml file.
 | image.repository | Docker image repository |  funcx/kube-endpoint |
 | image.tag | Tag name for the endpoint image | endpoint_helm |
 | image.pullPolicy | Pod pull policy for the endpoint image |  Always |
+| workerDebug | Log additional information in the worker logs | False |
 | workerImage | Docker image to run in the worker pods |  python:3.6-buster |
 | workerInit | Command to execute on worker before strating uip | pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0 |
 | workerNamespace | Kubernetes namespace to launch worker pods into | default |
