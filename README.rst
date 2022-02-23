@@ -26,7 +26,7 @@ on existing infrastructure including clouds, clusters, and supercomputers.
    :alt: NSF award info
 
 
-.. image:: docs/img/funcx-logo.png
+.. image:: docs/_static/funcx-logo.png
   :target: https://www.funcx.org
   :width: 200
 
