@@ -102,7 +102,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         if not self._closing:
 
             # Create a new connection
-            self._connection = self.connect()
+            self._connection = self._connect()
 
             # There is now a new connection, needs a new ioloop to run
             self._connection.ioloop.start()
