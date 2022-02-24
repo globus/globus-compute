@@ -170,7 +170,6 @@ class EndpointInterchange:
         self.initial_registration_complete = False
 
         self.connection_params = reg_info
-        log.warning(f"YADU: Received reg_info : {reg_info}")
         self.initial_registration_complete = True
 
         self.heartbeat_period = self.config.heartbeat_period
@@ -256,7 +255,7 @@ class EndpointInterchange:
         endpoint_uuid: str,
         pending_task_queue: multiprocessing.Queue,
         quiesce_event: multiprocessing.Event,
-    ):
+    ) -> multiprocessing.Process:
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
@@ -280,15 +279,17 @@ class EndpointInterchange:
                 f"[TASK_PULL_PROC Starting the TaskQueueSubscriber"
                 f" as {endpoint_uuid}"
             )
-            task_q = TaskQueueSubscriber(connection_params, endpoint_uuid)
-            task_q.connect()
-            task_q.run(queue=pending_task_queue, disconnect_event=quiesce_event)
+            task_q_proc = TaskQueueSubscriber(
+                pika_conn_params=connection_params,
+                external_queue=pending_task_queue,
+                kill_event=quiesce_event,
+                endpoint_uuid=endpoint_uuid,
+            )
+            task_q_proc.start()
         except Exception:
-            log.exception("[TASK_PULL_PROC] Unhandled exception")
-        finally:
-            quiesce_event.set()
-            task_q.stop()
-            log.warning("[TASK_PULL_PROC] loop exiting")
+            log.exception("[TASK_PULL_PROC] Unhandled exception in TaskQueueSubscriber")
+
+        return task_q_proc
 
     def _task_puller_loop(self, quiesce_event):
         """Obsolete but some logic here needs to be migrated"""
@@ -497,7 +498,12 @@ class EndpointInterchange:
     def handle_sigterm(self, sig_num, curr_stack_frame):
         log.warning("Received SIGTERM, attempting to save unacked results to disk")
         try:
-            self.results_ack_handler.persist()
+            # TO-DO YADU: We need to make sure that results are persisted
+            # This handler definitely isn't cleaning up properly since
+            # the triggered context isn't right.
+            # self.results_ack_handler.persist()
+            # self._task_puller_proc.terminate()
+            self._quiesce_event.set()
         except Exception:
             log.exception("Caught exception while saving unacked results")
         else:
@@ -541,16 +547,12 @@ class EndpointInterchange:
 
         self.initial_registration_complete = False
 
-        self._task_puller_proc = multiprocessing.Process(
-            target=self.migrate_tasks_to_internal,
-            args=(
-                self.connection_params,
-                self.endpoint_id,
-                self.pending_task_queue,
-                self._quiesce_event,
-            ),
+        self._task_puller_proc = self.migrate_tasks_to_internal(
+            self.connection_params,
+            self.endpoint_id,
+            self.pending_task_queue,
+            self._quiesce_event,
         )
-        self._task_puller_proc.start()
 
         try:
             self._main_loop()
