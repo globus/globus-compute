@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 def mock_register_endpoint(
     endpoint_name: str, endpoint_uuid: str, endpoint_version: str = None
-) -> pika.URLParameters:
+) -> str:
     """This is only a mock function that currently returns a URL to a
     default local RabbitMQ service
 
@@ -32,7 +32,7 @@ def mock_register_endpoint(
         f"Registering endpoint:{endpoint_name}:{endpoint_uuid}"
         " of version:{endpoint_version}"
     )
-    return pika.URLParameters("amqp://guest:guest@localhost:5672/%2F")
+    return "amqp://guest:guest@localhost:5672/%2F"
 
 
 def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
@@ -60,7 +60,7 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
     log.debug("Attempting registration")
     log.debug(f"Trying with eid : {endpoint_uuid}")
 
-    reg_info = mock_register_endpoint(
+    pika_url = mock_register_endpoint(
         endpoint_name, endpoint_uuid, endpoint_version=funcx_endpoint.__version__
     )
 
@@ -70,7 +70,10 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
     with open(os.path.join(endpoint_dir, "endpoint.json"), "w+") as fp:
         endpoint_info = {
             "endpoint_name": endpoint_name,
-            "endpoint_uuid": endpoint_uuid,
+            # This is named endpoint_id for backward compatibility when
+            # funcx-endpoint list is called
+            "pika_conn_info": pika_url,
+            "endpoint_id": endpoint_uuid,
         }
         json.dump(endpoint_info, fp)
         log.debug(
@@ -79,4 +82,5 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
             )
         )
 
+    reg_info = pika.URLParameters(pika_url)
     return reg_info
