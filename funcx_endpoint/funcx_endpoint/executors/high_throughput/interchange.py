@@ -353,6 +353,7 @@ class Interchange:
         if self.working_dir is None:
             working_dir = os.path.join(self.logdir, "worker_logs")
         log.info(f"Setting working_dir: {working_dir}")
+        os.makedirs(working_dir, exist_ok=True)
 
         self.provider.script_dir = working_dir
         if hasattr(self.provider, "_channel"):

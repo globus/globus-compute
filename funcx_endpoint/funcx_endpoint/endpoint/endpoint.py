@@ -152,7 +152,7 @@ class Endpoint:
             with open(endpoint_json) as fp:
                 log.debug("Connection info loaded from prior registration record")
                 reg_info = json.load(fp)
-                endpoint_uuid = reg_info["endpoint_id"]
+                endpoint_uuid = reg_info["endpoint_uuid"]
         elif not endpoint_uuid:
             endpoint_uuid = str(uuid.uuid4())
         return endpoint_uuid
