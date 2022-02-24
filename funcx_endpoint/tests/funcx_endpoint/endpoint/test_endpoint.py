@@ -3,7 +3,7 @@ import os
 import pytest
 from typer.testing import CliRunner
 
-from funcx_endpoint.endpoint.endpoint import app
+from funcx_endpoint.endpoint.cli import app
 
 runner = CliRunner()
 
@@ -19,13 +19,13 @@ config = Config(
         min_blocks=1,
         max_blocks=1,
     ),
-    funcx_service_address='https://api.funcx.org/v1'
+    funcx_service_address='https://api.funcx.org/v2'
 )"""
 
 
 @pytest.fixture(autouse=True)
 def patch_funcx_client(mocker):
-    mocker.patch("funcx_endpoint.endpoint.endpoint_manager.FuncXClient")
+    mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
 
 
 @pytest.fixture(autouse=True)
