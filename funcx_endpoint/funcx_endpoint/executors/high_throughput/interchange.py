@@ -355,12 +355,15 @@ class Interchange:
         log.info(f"Setting working_dir: {working_dir}")
 
         self.provider.script_dir = working_dir
-        if hasattr(self.provider, "_channel"):
-            self.provider._channel.script_dir = os.path.join(
+        log.warning("*" * 50)
+        log.warning(f"PROVIDER channel  : {self.provider.channel}")
+        log.warning("*" * 50)
+        if hasattr(self.provider, "channel"):
+            self.provider.channel.script_dir = os.path.join(
                 working_dir, "submit_scripts"
             )
-            self.provider._channel.makedirs(
-                self.provider._channel.script_dir, exist_ok=True
+            self.provider.channel.makedirs(
+                self.provider.channel.script_dir, exist_ok=True
             )
             os.makedirs(self.provider.script_dir, exist_ok=True)
 
