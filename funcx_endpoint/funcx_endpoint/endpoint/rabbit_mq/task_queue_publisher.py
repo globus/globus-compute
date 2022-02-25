@@ -18,6 +18,16 @@ class TaskQueuePublisher:
         pika_conn_params: pika.connection.Parameters,
         exchange: str = "tasks",
     ):
+        """
+        Parameters
+        ----------
+        endpoint_uuid: str
+             Endpoint UUID string used to identify the endpoint
+        pika_conn_params: pika.connection.Parameters
+             Pika connection parameters to connect to RabbitMQ
+        exchange: str
+             Exchange name. Default: "tasks"
+        """
         self.endpoint_uuid = endpoint_uuid
         self.queue_name = f"{self.endpoint_uuid}.tasks"
         self.routing_key = f"{self.endpoint_uuid}.tasks"
@@ -27,7 +37,9 @@ class TaskQueuePublisher:
 
         self.exchange = exchange
         self.exchange_type = "direct"
-        self._is_connected = False
+
+        self._conn = None
+        self._channel = None
 
     def connect(self):
         logger.debug("Connecting as server")
@@ -38,20 +50,15 @@ class TaskQueuePublisher:
         )
         self._channel.queue_declare(queue=self.queue_name)
         self._channel.queue_bind(self.queue_name, self.exchange)
-        self._is_connected = True
 
     def publish(self, payload: bytes):
         """Publish a message to the endpoint from the service
 
         Parameters
         ----------
-        payload: Payload string to be published
-
-        Returns
-        -------
-
+        payload: bytes:
+            Payload as byte buffer to be published
         """
-        assert self._is_connected, "Cannot publish, not connected"
         return self._channel.basic_publish(
             self.exchange,
             routing_key=self.routing_key,
@@ -62,9 +69,9 @@ class TaskQueuePublisher:
     def queue_purge(self):
         """Purge all messages in the queue. Either service/endpoint can
         call this method"""
-        assert self._is_connected, "Not connected, cannot purge"
         self._channel.queue_purge(self.queue_name)
 
     def close(self):
+        """Close channel"""
         self._channel.close()
         self._conn.close()

@@ -384,20 +384,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
             logger.exception("Failed to start subscriber")
 
     def close(self) -> None:
-        """Cleanly shutdown the connection to RabbitMQ by stopping the consumer
-        with RabbitMQ. When RabbitMQ confirms the cancellation, on_cancelok
-        will be invoked by pika, which will then closing the channel and
-        connection. The IOLoop is started again because this method is invoked
-        when CTRL-C is pressed raising a KeyboardInterrupt exception. This
-        exception stops the IOLoop which needs to be running for pika to
-        communicate with RabbitMQ. All of the commands issued prior to starting
-        the IOLoop will be buffered but not processed.
-
-        ^  This doc block is mostly all wrong, since the code has been rewritten
-        but some cases described here need to be tested more closely like handling
-        KeyboardInterrupts
-
-        This close method needs some rethinking since this whole thing is a separate
+        """This close method needs some rethinking since this whole thing is a separate
         process with the ioloop callbacks not setting the vars properly
         """
         logger.info("Stopping")

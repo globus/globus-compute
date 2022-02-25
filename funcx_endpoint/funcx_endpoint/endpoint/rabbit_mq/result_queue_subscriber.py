@@ -50,10 +50,9 @@ class ResultQueueSubscriber(multiprocessing.Process):
 
         self.exchange = exchange
         self.exchange_type = exchange_type
-        self._is_connected = False
         self._connection = None
         self._channel = None
-        self._closed = False
+
         self._closing = False
         logger.debug("Init done")
 
@@ -235,7 +234,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         """
         self.add_on_cancel_callback()
         logger.debug("Waiting for basic_consume")
-        self._consumer_tag = self._channel.basic_consume(
+        self._channel.basic_consume(
             self.queue_name, on_message_callback=self.on_message, exclusive=True
         )
 

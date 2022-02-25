@@ -16,6 +16,16 @@ class ResultQueuePublisher:
         pika_conn_params: pika.connection.Parameters,
         exchange="results",
     ):
+        """
+        Parameters
+        ----------
+        endpoint_uuid: str
+            Endpoint UUID string used to identify the endpoint
+        pika_conn_params: pika.connection.Parameters
+            Pika connection parameters to connect to RabbitMQ
+        exchange: str
+            Exchange name. Default: "result"
+        """
         self.endpoint_id = endpoint_id
         self.routing_key = f"{self.endpoint_id}.results"
         self.params = pika_conn_params
@@ -23,10 +33,8 @@ class ResultQueuePublisher:
         self.params.blocked_connection_timeout = 60
         self.exchange = exchange
         self.exchange_type = "topic"
-        self._is_connected = False
-        self._deliveries = None
         self._channel = None
-        self._stopping = False
+        self._connection = None
 
     def connect(self) -> pika.BlockingConnection:
         """Connect
@@ -34,8 +42,8 @@ class ResultQueuePublisher:
         :rtype: pika.BlockingConnection
         """
         logger.info(f"Connecting to {self.params}")
-        self._conn = pika.BlockingConnection(self.params)
-        self._channel = self._conn.channel()
+        self._connection = pika.BlockingConnection(self.params)
+        self._channel = self._connection.channel()
         self._channel.confirm_delivery()
         self._channel.exchange_declare(
             exchange=self.exchange, exchange_type=self.exchange_type
@@ -45,9 +53,8 @@ class ResultQueuePublisher:
         self._channel.queue_bind(
             queue="results", exchange=self.exchange, routing_key="*.results"
         )
-        self._is_connected = True
 
-        return self._conn
+        return self._connection
 
     def publish(self, message: bytes) -> None:
         """Publish message to RabbitMQ with the routing key to identify the message source
@@ -67,8 +74,7 @@ class ResultQueuePublisher:
 
     def close(self):
         self._channel.close()
-        self._conn.close()
-        self._is_connected = False
+        self._connection.close()
 
     def _queue_purge(self):
         """This method is *ONLY* for testing. This should not work in production"""
