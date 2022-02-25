@@ -1,5 +1,4 @@
 import logging
-import time
 
 import pika
 
@@ -49,37 +48,6 @@ class ResultQueuePublisher:
         self._is_connected = True
 
         return self._conn
-
-    def publish_message_retryable(self, message: bytes, retry_count=0, max_retries=3):
-        """Publish message to RabbitMQ with the routing key to identify the message source
-        The channel specifies confirm_delivery and with `mandatory=True` this call
-        will *block* until a delivery confirmation is received.
-
-        """
-        try:
-            self._channel.basic_publish(
-                self.exchange, self.routing_key, message, mandatory=True
-            )
-        except pika.exceptions.UnroutableError:
-            logger.exception("Message could not be delivered.")
-            raise
-        except (
-            pika.exceptions.ConnectionClosedByBroker,
-            pika.exceptions.ConnectionClosed,
-            pika.exceptions.ConnectionBlockedTimeout,
-        ):
-            logger.exception("Disconnected from the broker, attempting reconnect")
-            if retry_count < max_retries:
-                time.sleep(3 ** retry_count)  # Hacky exponential back-off
-                try:
-                    self.connect()
-                except Exception:
-                    logger.warning(
-                        f"Failed to reconnect, attempt {retry_count}/{max_retries}"
-                    )
-                    return self.publish(message, retry_count=retry_count + 1)
-            else:
-                raise
 
     def publish(self, message: bytes) -> None:
         """Publish message to RabbitMQ with the routing key to identify the message source
