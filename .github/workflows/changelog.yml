@@ -4,7 +4,11 @@ on:
 
 jobs:
   check_has_news_in_changelog_dir:
-    if: ${{ ! contains(github.event.pull_request.labels.*.name, 'no-news-is-good-news') }}
+    if: |
+      ! (
+        contains(github.event.pull_request.labels.*.name, 'no-news-is-good-news') ||
+        github.event.pull_request.title == '[pre-commit.ci] pre-commit autoupdate'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
