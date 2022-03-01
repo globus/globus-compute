@@ -33,9 +33,10 @@ def start_result_q_publisher(endpoint_id):
 
 
 def start_result_q_subscriber(queue: multiprocessing.Queue) -> ResultQueueSubscriber:
-    kill_event = multiprocessing.Event()
+
     result_q = ResultQueueSubscriber(
-        pika_conn_params=CONN_PARAMS, external_queue=queue, kill_event=kill_event
+        pika_conn_params=CONN_PARAMS,
+        external_queue=queue,
     )
     result_q.start()
     return result_q
@@ -63,7 +64,7 @@ def test_result_queue_basic(count=10):
     Testing purging queue
     """
     result_pub = publish_messages(count=count, endpoint_id=str(uuid.uuid4()))
-    result_pub._queue_purge()
+    result_pub._channel.queue_purge("results")
     result_pub.close()
 
 

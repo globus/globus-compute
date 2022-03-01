@@ -148,7 +148,7 @@ def test_simple_roundtrip():
     task_pub = start_task_q_publisher(endpoint_id=ENDPOINT_ID)
     task_pub.queue_purge()
     result_pub = start_result_q_publisher(endpoint_id=ENDPOINT_ID)
-    result_pub._queue_purge()  # Only tests should be able to do this
+    result_pub._channel.queue_purge("results")
     task_q, result_q = multiprocessing.Queue(), multiprocessing.Queue()
     task_fail_event = multiprocessing.Event()
 

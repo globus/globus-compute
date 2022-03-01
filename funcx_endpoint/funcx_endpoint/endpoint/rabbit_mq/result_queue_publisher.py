@@ -6,15 +6,14 @@ logger = logging.getLogger(__name__)
 
 
 class ResultQueuePublisher:
-    """ResultPublisher publishes results to a topic exchange, with the {endpoint_id}.results
-    as a routing key.
+    """ResultPublisher publishes results to a topic exchange_name, with
+    the {endpoint_id}.results as a routing key.
     """
 
     def __init__(
         self,
         endpoint_id: str,
         pika_conn_params: pika.connection.Parameters,
-        exchange="results",
     ):
         """
         Parameters
@@ -23,18 +22,17 @@ class ResultQueuePublisher:
             Endpoint UUID string used to identify the endpoint
         pika_conn_params: pika.connection.Parameters
             Pika connection parameters to connect to RabbitMQ
-        exchange: str
-            Exchange name. Default: "result"
         """
         self.endpoint_id = endpoint_id
-        self.routing_key = f"{self.endpoint_id}.results"
         self.params = pika_conn_params
-        self.params.heartbeat = 30
-        self.params.blocked_connection_timeout = 60
-        self.exchange = exchange
-        self.exchange_type = "topic"
         self._channel = None
         self._connection = None
+
+        self.exchange_name = "results"
+        self.exchange_type = "topic"
+        self.queue_name = "results"
+        self.routing_key = f"{self.endpoint_id}.results"
+        self.global_routing_key = "*.results"
 
     def connect(self) -> pika.BlockingConnection:
         """Connect
@@ -46,12 +44,14 @@ class ResultQueuePublisher:
         self._channel = self._connection.channel()
         self._channel.confirm_delivery()
         self._channel.exchange_declare(
-            exchange=self.exchange, exchange_type=self.exchange_type
+            exchange=self.exchange_name, exchange_type=self.exchange_type
         )
-        # TO-DO: This shouldn't be done on the endpoint side
-        self._channel.queue_declare(queue="results")
+
+        self._channel.queue_declare(queue=self.queue_name, passive=True)
         self._channel.queue_bind(
-            queue="results", exchange=self.exchange, routing_key="*.results"
+            queue=self.queue_name,
+            exchange=self.exchange_name,
+            routing_key=self.global_routing_key,
         )
 
         return self._connection
@@ -66,10 +66,10 @@ class ResultQueuePublisher:
         """
         try:
             self._channel.basic_publish(
-                self.exchange, self.routing_key, message, mandatory=True
+                self.exchange_name, self.routing_key, message, mandatory=True
             )
-        except Exception:
-            logger.exception("Message could not be delivered")
+        except pika.exceptions.AMQPError:
+            logger.error("Message could not be delivered")
             raise
 
     def close(self):
@@ -78,5 +78,5 @@ class ResultQueuePublisher:
 
     def _queue_purge(self):
         """This method is *ONLY* for testing. This should not work in production"""
-        self._channel.queue_declare(queue="results")
+        self._channel.queue_declare(queue=self.queue_name)
         self._channel.queue_purge("results")

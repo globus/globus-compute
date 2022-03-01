@@ -130,7 +130,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         """This method is invoked by pika when the channel has been opened.
         The channel object is passed in so we can make use of it.
 
-        Since the channel is now open, we'll declare the exchange to use.
+        Since the channel is now open, we'll declare the exchange_name to use.
 
         :param pika.channel.Channel channel: The channel object
 
@@ -151,7 +151,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
     def _on_channel_closed(self, channel, exception):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
         Channels are usually closed if you attempt to do something that
-        violates the protocol, such as re-declare an exchange or queue with
+        violates the protocol, such as re-declare an exchange_name or queue with
         different parameters. In this case, we'll close the connection
         to shutdown the object.
 
@@ -178,13 +178,13 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self._connection.close()
 
     def setup_exchange(self, exchange_name):
-        """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
+        """Setup the exchange_name on RabbitMQ by invoking the Exchange.Declare RPC
         command. When it is complete, the on_exchange_declareok method will
         be invoked by pika.
 
-        :param str|unicode exchange_name: The name of the exchange to declare
+        :param str|unicode exchange_name: The name of the exchange_name to declare
         """
-        logger.info(f"Declaring exchange {exchange_name}")
+        logger.info(f"Declaring exchange_name {exchange_name}")
         self._channel.exchange_declare(
             exchange=exchange_name,
             exchange_type=self.exchange_type,
@@ -215,16 +215,16 @@ class TaskQueueSubscriber(multiprocessing.Process):
     def _on_queue_declareok(self, method_frame):
         """Method invoked by pika when the Queue.Declare RPC call made in
         setup_queue has completed. In this method we will bind the queue
-        and exchange together with the routing key by issuing the Queue.Bind
+        and exchange_name together with the routing key by issuing the Queue.Bind
         RPC command. When this command is complete, the on_bindok method will
         be invoked by pika.
 
         :param pika.frame.Method method_frame: The Queue.DeclareOk frame
 
         """
-        logger.info(f"Binding exchange:{self.exchange} to {self.queue_name}")
+        logger.info(f"Binding exchange_name:{self.exchange} to {self.queue_name}")
 
-        # No routing key since we are doing a direct exchange
+        # No routing key since we are doing a direct exchange_name
         self._channel.queue_bind(
             self.queue_name, self.exchange, callback=self._on_bindok
         )
@@ -279,7 +279,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
     def on_message(self, unused_channel, basic_deliver, properties, body):
         """Invoked by pika when a message is delivered from RabbitMQ. The
         channel is passed for your convenience. The basic_deliver object that
-        is passed in carries the exchange, routing key, delivery tag and
+        is passed in carries the exchange_name, routing key, delivery tag and
         a redelivered flag for the message. The properties passed in is an
         instance of BasicProperties with the message properties and the body
         is the message that was sent.

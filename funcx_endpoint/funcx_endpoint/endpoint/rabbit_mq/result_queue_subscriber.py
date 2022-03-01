@@ -18,9 +18,6 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self,
         pika_conn_params: pika.connection.Parameters,
         external_queue: multiprocessing.Queue,
-        kill_event: multiprocessing.Event,
-        exchange="results",
-        exchange_type="topic",
     ):
         """
 
@@ -33,23 +30,15 @@ class ResultQueueSubscriber(multiprocessing.Process):
              Please note that upon pushing a message into this queue, it will be
              marked as delivered.
 
-        kill_event: multiprocessing.Event
-             This event is used to communicate a failure on the subscriber
-
-        endpoint_uuid: endpoint uuid string
-
-        exchange: str
-            Exchange name
         """
         super().__init__()
         self.conn_params = pika_conn_params
         self.external_queue = external_queue
-        self.kill_event = kill_event
         self.queue_name = "results"
         self.routing_key = "*.results"
+        self.exchange_name = "results"
+        self.exchange_type = "topic"
 
-        self.exchange = exchange
-        self.exchange_type = exchange_type
         self._connection = None
         self._channel = None
 
@@ -66,8 +55,8 @@ class ResultQueueSubscriber(multiprocessing.Process):
         )
 
     def _on_connection_open(self, unused_connection):
-        logger.debug("Connection opened")
-        self.open_channel()
+        logger.debug("Connection opened. Creating a new channel")
+        self._connection.channel(on_open_callback=self._on_channel_open)
 
     def _on_open_failed(self, *args):
         logger.warning(f"Connection failed to open : {args}")
@@ -106,41 +95,29 @@ class ResultQueueSubscriber(multiprocessing.Process):
             # There is now a new connection, needs a new ioloop to run
             self._connection.ioloop.start()
 
-    def open_channel(self):
-        """Open a new channel with RabbitMQ by issuing the Channel.Open RPC
-        command. When RabbitMQ responds that the channel is open, the
-        on_channel_open callback will be invoked by pika.
-
-        """
-        logger.debug("Creating a new channel")
-        self._connection.channel(on_open_callback=self._on_channel_open)
-
     def _on_channel_open(self, channel):
         """This method is invoked by pika when the channel has been opened.
         The channel object is passed in so we can make use of it.
 
-        Since the channel is now open, we'll declare the exchange to use.
+        Since the channel is now open, we'll declare the exchange_name to use.
 
         :param pika.channel.Channel channel: The channel object
 
         """
         logger.debug(f"Channel opened: {channel}")
         self._channel = channel
-        self.add_on_channel_close_callback()
-        self.setup_exchange(self.exchange)
-
-    def add_on_channel_close_callback(self):
-        """This method tells pika to call the on_channel_closed method if
-        RabbitMQ unexpectedly closes the channel.
-
-        """
-        logger.info("Adding channel close callback")
         self._channel.add_on_close_callback(self._on_channel_closed)
+        logger.info(f"Declaring exchange_name {self.exchange_name}")
+        self._channel.exchange_declare(
+            exchange=self.exchange_name,
+            exchange_type=self.exchange_type,
+            callback=self._on_exchange_declareok,
+        )
 
     def _on_channel_closed(self, channel, exception):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
         Channels are usually closed if you attempt to do something that
-        violates the protocol, such as re-declare an exchange or queue with
+        violates the protocol, such as re-declare an exchange_name or queue with
         different parameters. In this case, we'll close the connection
         to shutdown the object.
 
@@ -155,21 +132,6 @@ class ResultQueueSubscriber(multiprocessing.Process):
         )
         self._connection.close()
 
-    def setup_exchange(self, exchange_name):
-        """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
-        command. When it is complete, the on_exchange_declareok method will
-        be invoked by pika.
-
-        :param str|unicode exchange_name: The name of the exchange to declare
-
-        """
-        logger.info(f"Declaring exchange {exchange_name}")
-        self._channel.exchange_declare(
-            exchange=exchange_name,
-            exchange_type=self.exchange_type,
-            callback=self._on_exchange_declareok,
-        )
-
     def _on_exchange_declareok(self, unused_frame):
         """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
         command.
@@ -177,36 +139,25 @@ class ResultQueueSubscriber(multiprocessing.Process):
         :param pika.Frame.Method unused_frame: Exchange.DeclareOk response frame
 
         """
-        logger.info("Exchange declared")
-        self.setup_queue(self.queue_name)
-
-    def setup_queue(self, queue_name):
-        """Setup the queue on RabbitMQ by invoking the Queue.Declare RPC
-        command. When it is complete, the on_queue_declareok method will
-        be invoked by pika.
-
-        :param str|unicode queue_name: The name of the queue to declare.
-
-        """
-        logger.info("Declaring queue %s", queue_name)
-        self._channel.queue_declare(queue_name, callback=self._on_queue_declareok)
+        logger.info("Exchange declared. Declaring queue %s", self.queue_name)
+        self._channel.queue_declare(self.queue_name, callback=self._on_queue_declareok)
 
     def _on_queue_declareok(self, method_frame):
         """Method invoked by pika when the Queue.Declare RPC call made in
         setup_queue has completed. In this method we will bind the queue
-        and exchange together with the routing key by issuing the Queue.Bind
+        and exchange_name together with the routing key by issuing the Queue.Bind
         RPC command. When this command is complete, the on_bindok method will
         be invoked by pika.
 
         :param pika.frame.Method method_frame: The Queue.DeclareOk frame
 
         """
-        logger.info(f"Binding exchange:{self.exchange} to {self.queue_name}")
+        logger.info(f"Binding exchange_name:{self.exchange_name} to {self.queue_name}")
 
-        # No routing key since we are doing a direct exchange
+        # No routing key since we are doing a direct exchange_name
         self._channel.queue_bind(
             queue=self.queue_name,
-            exchange=self.exchange,
+            exchange=self.exchange_name,
             routing_key=self.routing_key,
             callback=self._on_bindok,
         )
@@ -232,20 +183,12 @@ class ResultQueueSubscriber(multiprocessing.Process):
         will invoke when a message is fully received.
 
         """
-        self.add_on_cancel_callback()
+        logger.info("Adding consumer cancellation callback")
+        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
         logger.debug("Waiting for basic_consume")
         self._channel.basic_consume(
             self.queue_name, on_message_callback=self.on_message, exclusive=True
         )
-
-    def add_on_cancel_callback(self):
-        """Add a callback that will be invoked if RabbitMQ cancels the consumer
-        for some reason. If RabbitMQ does cancel the consumer,
-        on_consumer_cancelled will be invoked by pika.
-
-        """
-        logger.info("Adding consumer cancellation callback")
-        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
 
     def on_consumer_cancelled(self, method_frame):
         """Invoked by pika when RabbitMQ sends a Basic.Cancel for a consumer
@@ -301,14 +244,6 @@ class ResultQueueSubscriber(multiprocessing.Process):
 
         """
         logger.info("RabbitMQ acknowledged the cancellation of the consumer")
-        self.close_channel()
-
-    def close_channel(self):
-        """Call to close the channel with RabbitMQ cleanly by issuing the
-        Channel.Close RPC command.
-
-        """
-        logger.info("Closing the channel")
         self._channel.close()
 
     def run(self):
