@@ -14,6 +14,9 @@ class FuncxAPIError(globus_sdk.GlobusAPIError):
         A friendly string name for the error code which was recieved, or
         ``"UNKNOWN"`` if the code is not recognized.
         """
+        if self.raw_json is None:
+            raise ValueError("could not JSON decode response")
+
         try:
             code_int = self.raw_json["code"]
         except KeyError as e:
