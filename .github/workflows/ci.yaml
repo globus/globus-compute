@@ -11,14 +11,6 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    services:
-      rabbitmq:
-        image: rabbitmq
-        env:
-          RABBITMQ_DEFAULT_USER: guest
-          RABBITMQ_DEFAULT_PASS: guest
-        ports:
-          - 5672:5672
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v1
@@ -51,6 +43,13 @@ jobs:
 
   test-endpoint:
     runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq
+        ports:
+          - 5672:5672
+        # needed because the rabbitmq container does not provide a healthcheck
+        options: --health-cmd "rabbitmqctl node_health_check" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v1

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 endpoint_id_1 = "a9aec9a1-ff86-4d6a-a5b8-5bb160746b5c"
 endpoint_id_2 = "9b2dbe0f-0420-4256-9f89-71cb8bfb26d2"
 
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/%2F")
+CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 
 
 def start_result_q_publisher(endpoint_id):

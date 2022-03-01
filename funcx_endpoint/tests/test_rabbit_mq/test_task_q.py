@@ -14,8 +14,7 @@ LOG_FORMAT = "%(levelname) -10s %(asctime)s %(name) -20s %(lineno) -5d: %(messag
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
-
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/%2F")
+CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 ENDPOINT_ID = "task-q-tests"
 
 

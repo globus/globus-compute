@@ -11,23 +11,19 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 endpoint_id_1 = "a9aec9a1-ff86-4d6a-a5b8-5bb160746b5c"
+RABBIT_MQ_URL = "amqp://guest:guest@localhost:5672/"
 
 
 def test_heartbeat_ok():
     """Confirm that result_q_publisher does not disconnect when delay
     between messages exceed heartbeat period
     """
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost",
-        heartbeat=1,
-        blocked_connection_timeout=2,
-        port=5672,
-        credentials=cred,
-    )
+    conn_params = pika.URLParameters(RABBIT_MQ_URL)
+    conn_params._heartbeat = 1
+    conn_params._blocked_connection_timeout = 2
 
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id_1, pika_conn_params=service_params
+        endpoint_id=endpoint_id_1, pika_conn_params=conn_params
     )
     result_pub.connect()
 
@@ -40,17 +36,12 @@ def test_heartbeat_ok():
 
 def test_fail_after_manual_close():
     """Confirm that result_q_publisher raises an error following a manual conn close"""
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost",
-        heartbeat=1,
-        blocked_connection_timeout=2,
-        port=5672,
-        credentials=cred,
-    )
+    conn_params = pika.URLParameters(RABBIT_MQ_URL)
+    conn_params._heartbeat = 1
+    conn_params._blocked_connection_timeout = 2
 
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id_1, pika_conn_params=service_params
+        endpoint_id=endpoint_id_1, pika_conn_params=conn_params
     )
     result_pub.connect()
 
@@ -64,17 +55,12 @@ def test_reconnect_after_disconnect():
     """Confirm that result_q_publisher does not disconnect when delay
     between messages exceed heartbeat period
     """
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost",
-        heartbeat=1,
-        blocked_connection_timeout=2,
-        port=5672,
-        credentials=cred,
-    )
+    conn_params = pika.URLParameters(RABBIT_MQ_URL)
+    conn_params._heartbeat = 1
+    conn_params._blocked_connection_timeout = 2
 
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id_1, pika_conn_params=service_params
+        endpoint_id=endpoint_id_1, pika_conn_params=conn_params
     )
     result_pub.connect()
 
