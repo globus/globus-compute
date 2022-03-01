@@ -147,7 +147,6 @@ class FuncXWorker:
                             len(serialized_result), self.result_size_limit
                         )
                 except Exception as e:
-                    exec_end = time.time()
                     log.exception(f"Caught an exception {e}")
                     result_package = {
                         "task_id": task_id,
@@ -155,31 +154,29 @@ class FuncXWorker:
                         "exception": self.serialize(
                             RemoteExceptionWrapper(*sys.exc_info())
                         ),
-                        "times": {
-                            "execution_start": exec_start,
-                            "execution_end": exec_end,
-                            "execution_time": exec_end - exec_start,
-                        },
                     }
                 else:
-                    exec_end = time.time()
                     log.debug("Execution completed without exception")
                     result_package = {
                         "task_id": task_id,
                         "container_id": container_id,
                         "result": serialized_result,
-                        "times": {
-                            "execution_start": exec_start,
-                            "execution_end": exec_end,
-                            "execution_time": exec_end - exec_start,
-                        },
                     }
+                finally:
+                    exec_end = time.time()
+
+                exec_duration = exec_end - exec_start
+
                 result = result_package
+                result["times"] = {
+                    "execution_start": exec_start,
+                    "execution_end": exec_end,
+                    "execution_time": exec_duration,
+                }
+
                 task_type = b"TASK_RET"
 
-                log.debug(
-                    f"Task {task_id} completed in {exec_end - exec_start} seconds"
-                )
+                log.debug(f"Task {task_id} completed in {exec_duration} seconds")
 
             log.debug("Sending result")
 
