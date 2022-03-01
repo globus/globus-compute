@@ -19,44 +19,60 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 ENDPOINT_ID = "231fab4e-630a-4d76-bbbb-cf0b4aedbdf9"
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/%2F")
 
 
 def start_task_q_subscriber(
-    out_queue: multiprocessing.Queue, disconnect_event: multiprocessing.Event
+    endpoint_id: str,
+    out_queue: multiprocessing.Queue,
+    disconnect_event: multiprocessing.Event,
 ):
-    task_q = TaskQueueSubscriber(
-        CONN_PARAMS,
-        external_queue=out_queue,
-        kill_event=disconnect_event,
-        endpoint_uuid=ENDPOINT_ID,
+    cred = pika.PlainCredentials("guest", "guest")
+    service_params = pika.ConnectionParameters(
+        host="localhost", heartbeat=60, port=5672, credentials=cred
     )
-    task_q.start()
+
+    task_q = TaskQueueSubscriber(
+        endpoint_uuid=endpoint_id, pika_conn_params=service_params
+    )
+    task_q.connect()
+    task_q.run(queue=out_queue, disconnect_event=disconnect_event)
     return task_q
 
 
 def start_result_q_publisher(endpoint_id) -> ResultQueuePublisher:
+    cred = pika.PlainCredentials("guest", "guest")
+    service_params = pika.ConnectionParameters(
+        host="localhost", heartbeat=60, port=5672, credentials=cred
+    )
+
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id, pika_conn_params=CONN_PARAMS
+        endpoint_id=endpoint_id, pika_conn_params=service_params
     )
     result_pub.connect()
     return result_pub
 
 
 def start_task_q_publisher(endpoint_id: str) -> TaskQueuePublisher:
+    cred = pika.PlainCredentials("guest", "guest")
+    service_params = pika.ConnectionParameters(
+        host="localhost", heartbeat=60, port=5672, credentials=cred
+    )
+
     task_q_pub = TaskQueuePublisher(
-        endpoint_uuid=endpoint_id, pika_conn_params=CONN_PARAMS
+        endpoint_name=endpoint_id, pika_conn_params=service_params
     )
     task_q_pub.connect()
     return task_q_pub
 
 
 def start_result_q_subscriber(queue: multiprocessing.Queue) -> ResultQueueSubscriber:
-    kill_event = multiprocessing.Event()
-    result_q = ResultQueueSubscriber(
-        pika_conn_params=CONN_PARAMS, external_queue=queue, kill_event=kill_event
+    cred = pika.PlainCredentials("guest", "guest")
+    service_params = pika.ConnectionParameters(
+        host="localhost", heartbeat=60, port=5672, credentials=cred
     )
-    result_q.start()
+
+    result_q = ResultQueueSubscriber(pika_conn_params=service_params)
+    result_q.run(queue=queue)
     return result_q
 
 
@@ -65,8 +81,10 @@ def run_async_service():
     task_q_pub = start_task_q_publisher(endpoint_id=ENDPOINT_ID)
     task_q_pub.queue_purge()
     result_q = multiprocessing.Queue()
-    result_q_proc = start_result_q_subscriber(result_q)
-
+    result_q_proc = multiprocessing.Process(
+        target=start_result_q_subscriber, args=(result_q,)
+    )
+    result_q_proc.start()
     logger.warning("SERVICE: Here")
     for _i in range(10):
         try:
@@ -78,23 +96,19 @@ def run_async_service():
             logger.warning("SERVICE: Trying to publish message")
             task_q_pub.publish(b_message)
             logger.warning(f"SERVICE: Published message: {message}")
-            from_ep, reply_message = result_q.get(timeout=2)
+            from_ep, reply_message = result_q.get(timeout=5)
             logger.warning(f"SERVICE: Received result message: {reply_message}")
 
             assert from_ep == ENDPOINT_ID
             assert reply_message == b_message
-        except (AssertionError, TimeoutError):
-            raise
         except Exception:
-            # Catching and logging so that errors from this process are logged
-            # rather than silently ignored upon process fail/exit
             logger.exception("Caught error")
-        finally:
-            result_q_proc.terminate()
-            task_q_pub.close()
+
+    result_q_proc.terminate()
+    task_q_pub.close()
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 def test_mock_endpoint():
 
     service = multiprocessing.Process(target=run_async_service, args=())
@@ -104,15 +118,22 @@ def test_mock_endpoint():
     disconnect_event = multiprocessing.Event()
 
     # Listen for 10 messages
-    proc = start_task_q_subscriber(tasks_out, disconnect_event)
+    proc = multiprocessing.Process(
+        target=start_task_q_subscriber,
+        args=(
+            ENDPOINT_ID,
+            tasks_out,
+            disconnect_event,
+        ),
+    )
+    proc.start()
     result_q_pub = start_result_q_publisher(ENDPOINT_ID)
-    result_q_pub._queue_purge()
 
     logger.warning("ENDPOINT: Here")
 
     for _i in range(10):
         logger.warning("ENDPOINT: Waiting for task: ")
-        b_message = tasks_out.get(timeout=2)
+        b_message = tasks_out.get(timeout=5)
         logger.warning(f"ENDPOINT: Received message: {b_message}")
         logger.warning("ENDPOINT: Publishing message to results_q")
         result_q_pub.publish(b_message)
@@ -121,6 +142,7 @@ def test_mock_endpoint():
     proc.terminate()
 
 
+@pytest.mark.skip
 def test_simple_roundtrip():
 
     task_pub = start_task_q_publisher(endpoint_id=ENDPOINT_ID)
@@ -130,10 +152,21 @@ def test_simple_roundtrip():
     task_q, result_q = multiprocessing.Queue(), multiprocessing.Queue()
     task_fail_event = multiprocessing.Event()
 
-    task_q_proc = start_task_q_subscriber(
-        out_queue=task_q, disconnect_event=task_fail_event
+    task_q_proc = multiprocessing.Process(
+        target=start_task_q_subscriber,
+        args=(
+            ENDPOINT_ID,
+            task_q,
+            task_fail_event,
+        ),
     )
-    result_q_proc = start_result_q_subscriber(result_q)
+    task_q_proc.start()
+
+    result_q_proc = multiprocessing.Process(
+        target=start_result_q_subscriber, args=(result_q,)
+    )
+
+    result_q_proc.start()
 
     message = f"Hello {random.randint(0,2**10)}".encode()
     logger.warning(f"Sending message: {message}")
@@ -145,7 +178,7 @@ def test_simple_roundtrip():
     result_message = result_q.get(timeout=2)
 
     assert result_message == (ENDPOINT_ID, message)
-    logger.warning("Roundtrip complete")
+
     task_pub.close()
     result_pub.close()
     task_q_proc.terminate()
