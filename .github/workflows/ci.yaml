@@ -11,6 +11,14 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - 5672:5672
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v1
@@ -58,7 +66,7 @@ jobs:
       - name: run pytest
         run: |
           PYTHONPATH=funcx_endpoint python -m coverage run -m pytest funcx_endpoint/tests/funcx_endpoint
-
+          PYTHONPATH=funcx_endpoint python -m coverage run -m pytest funcx_endpoint/tests/test_rabbit_mq
   publish:
     # only trigger on pushes to the main repo (not forks, and not PRs)
     if: ${{ github.repository == 'funcx-faas/funcX' && github.event_name == 'push' }}
