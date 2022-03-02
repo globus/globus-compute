@@ -32,8 +32,6 @@ class TaskQueuePublisher:
         self.queue_name = f"{self.endpoint_uuid}.tasks"
         self.routing_key = f"{self.endpoint_uuid}.tasks"
         self.params = pika_conn_params
-        self.params._heartbeat = 60
-        self.params._blocked_connection_timeout = 120
 
         self.exchange = exchange
         self.exchange_type = "direct"
