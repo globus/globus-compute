@@ -6,6 +6,7 @@ import logging
 import queue
 import threading
 import time
+import typing as t
 from concurrent.futures import Future
 
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
@@ -87,10 +88,10 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_interval = batch_interval
         self.batch_size = batch_size
 
-        self._tasks = {}
+        self._tasks: t.Dict[str, Future] = {}
         self._task_counter = 0
-        self._function_registry = {}
-        self._function_future_map = {}
+        self._function_registry: t.Dict[t.Any, str] = {}
+        self._function_future_map: t.Dict[str, Future] = {}
         self.task_group_id = (
             self.funcx_client.session_task_group_id
         )  # we need to associate all batch launches with this id
