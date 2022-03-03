@@ -15,30 +15,32 @@ from funcx_endpoint.endpoint.rabbit_mq import (
 endpoint_id_1 = "a9aec9a1-ff86-4d6a-a5b8-5bb160746b5c"
 endpoint_id_2 = "9b2dbe0f-0420-4256-9f89-71cb8bfb26d2"
 
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 
-
-def start_result_q_publisher(endpoint_id):
+def start_result_q_publisher(endpoint_id, conn_params):
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id, pika_conn_params=CONN_PARAMS
+        endpoint_id=endpoint_id, pika_conn_params=conn_params
     )
     result_pub.connect()
     return result_pub
 
 
-def start_result_q_subscriber(queue: multiprocessing.Queue) -> ResultQueueSubscriber:
+def start_result_q_subscriber(
+    queue: multiprocessing.Queue, conn_params
+) -> ResultQueueSubscriber:
 
     result_q = ResultQueueSubscriber(
-        pika_conn_params=CONN_PARAMS,
+        pika_conn_params=conn_params,
         external_queue=queue,
     )
     result_q.start()
     return result_q
 
 
-def publish_messages(count: int, endpoint_id: str, size=10) -> ResultQueuePublisher:
+def publish_messages(
+    conn_params, count: int, endpoint_id: str, size=10
+) -> ResultQueuePublisher:
     fxs = FuncXSerializer()
-    result_pub = start_result_q_publisher(endpoint_id)
+    result_pub = start_result_q_publisher(endpoint_id, conn_params)
     for _i in range(count):
         data = bytes(size)
         message = {
@@ -52,24 +54,26 @@ def publish_messages(count: int, endpoint_id: str, size=10) -> ResultQueuePublis
     return result_pub
 
 
-def test_result_queue_basic(count=10):
+def test_result_queue_basic(conn_params, count=10):
     """Test that any endpoint can publish
     TO DO: Add in auth to ensure that you can publish results from *any* EP
     Testing purging queue
     """
-    result_pub = publish_messages(count=count, endpoint_id=str(uuid.uuid4()))
+    result_pub = publish_messages(
+        conn_params, count=count, endpoint_id=str(uuid.uuid4())
+    )
     result_pub._channel.queue_purge("results")
     result_pub.close()
 
 
 @pytest.mark.parametrize("size", [10, 2 ** 10, 2 ** 20, (2 ** 20) * 10])
-def test_message_integrity_across_sizes(size):
+def test_message_integrity_across_sizes(size, conn_params):
     """Publish count messages from endpoint_1 and endpoint_1
     Confirm that the subscriber gets all of them.
     """
 
     fxs = FuncXSerializer()
-    result_pub = start_result_q_publisher(endpoint_id_1)
+    result_pub = start_result_q_publisher(endpoint_id_1, conn_params)
     data = bytes(size)
     message = {
         "task_id": str(uuid.uuid4()),
@@ -79,7 +83,7 @@ def test_message_integrity_across_sizes(size):
     result_pub.publish(b_message)
 
     results_q = multiprocessing.Queue()
-    sub_proc = start_result_q_subscriber(results_q)
+    sub_proc = start_result_q_subscriber(results_q, conn_params)
 
     (routing_key, received_message) = results_q.get(timeout=2)
     assert endpoint_id_1 in routing_key
@@ -87,16 +91,16 @@ def test_message_integrity_across_sizes(size):
     sub_proc.terminate()
 
 
-def test_publish_multiple_then_subscribe(count=10):
+def test_publish_multiple_then_subscribe(conn_params, count=10):
     """Publish count messages from endpoint_1 and endpoint_1
     Confirm that the subscriber gets all of them.
     """
     total_messages = 20
-    publish_messages(count=count, endpoint_id=endpoint_id_1)
-    publish_messages(count=count, endpoint_id=endpoint_id_2)
+    publish_messages(conn_params, count=count, endpoint_id=endpoint_id_1)
+    publish_messages(conn_params, count=count, endpoint_id=endpoint_id_2)
 
     results_q = multiprocessing.Queue()
-    sub_proc = start_result_q_subscriber(results_q)
+    sub_proc = start_result_q_subscriber(results_q, conn_params)
 
     all_results = {}
     for _i in range(total_messages):
@@ -125,18 +129,14 @@ def test_broken_connection():
         result_pub.connect()
 
 
-def test_disconnect_from_client_side():
+def test_disconnect_from_client_side(conn_params):
     """Confirm that an exception is raised when the connection is closed
     Ideally we use rabbitmqadmin to close the connection, but that is less reliable here
     since the test env may not be have the util, and
     """
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
 
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id_1, pika_conn_params=service_params
+        endpoint_id=endpoint_id_1, pika_conn_params=conn_params
     )
     result_pub.connect()
     res = result_pub.publish(b"Hello")

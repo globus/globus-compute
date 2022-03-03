@@ -1,12 +1,17 @@
 import pika
 import pytest
 
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
+G_CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
+
+
+@pytest.fixture()
+def conn_params():
+    return G_CONN_PARAMS
 
 
 @pytest.fixture(autouse=True, scope="session")
 def ensure_result_queue():
-    connection = pika.BlockingConnection(CONN_PARAMS)
+    connection = pika.BlockingConnection(G_CONN_PARAMS)
     channel = connection.channel()
     channel.exchange_declare(
         exchange="results",

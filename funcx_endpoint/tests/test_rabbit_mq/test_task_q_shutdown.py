@@ -2,22 +2,20 @@ import logging
 import multiprocessing
 import time
 
-import pika
 import pytest
 
 from funcx_endpoint.endpoint.rabbit_mq import TaskQueueSubscriber
 
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 ENDPOINT_ID = "95abffc0-11cc-43cf-8b9b-c1acadf6f877"
 
 
-def test_terminate():
+def test_terminate(conn_params):
 
     out_queue = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
 
     task_q = TaskQueueSubscriber(
-        CONN_PARAMS,
+        conn_params,
         external_queue=out_queue,
         kill_event=disconnect_event,
         endpoint_uuid=ENDPOINT_ID,

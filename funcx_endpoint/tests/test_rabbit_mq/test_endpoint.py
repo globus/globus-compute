@@ -14,17 +14,17 @@ from funcx_endpoint.endpoint.rabbit_mq import (
 )
 
 ENDPOINT_ID = "231fab4e-630a-4d76-bbbb-cf0b4aedbdf9"
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 
 
 def start_task_q_subscriber(
     endpoint_id: str,
     out_queue: multiprocessing.Queue,
     disconnect_event: multiprocessing.Event,
+    conn_params: pika.connection.Parameters,
 ):
 
     task_q = TaskQueueSubscriber(
-        CONN_PARAMS,
+        conn_params,
         external_queue=out_queue,
         kill_event=disconnect_event,
         endpoint_uuid=endpoint_id,
@@ -33,24 +33,30 @@ def start_task_q_subscriber(
     return task_q
 
 
-def start_result_q_publisher(endpoint_id) -> ResultQueuePublisher:
+def start_result_q_publisher(
+    endpoint_id, conn_params: pika.connection.Parameters
+) -> ResultQueuePublisher:
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id, pika_conn_params=CONN_PARAMS
+        endpoint_id=endpoint_id, pika_conn_params=conn_params
     )
     result_pub.connect()
     return result_pub
 
 
-def start_task_q_publisher(endpoint_id: str) -> TaskQueuePublisher:
+def start_task_q_publisher(
+    endpoint_id: str, conn_params: pika.connection.Parameters
+) -> TaskQueuePublisher:
     task_q_pub = TaskQueuePublisher(
-        endpoint_uuid=endpoint_id, pika_conn_params=CONN_PARAMS
+        endpoint_uuid=endpoint_id, pika_conn_params=conn_params
     )
     task_q_pub.connect()
     return task_q_pub
 
 
-def start_result_q_subscriber(queue: multiprocessing.Queue) -> ResultQueueSubscriber:
-    result_q = ResultQueueSubscriber(pika_conn_params=CONN_PARAMS, external_queue=queue)
+def start_result_q_subscriber(
+    queue: multiprocessing.Queue, conn_params: pika.connection.Parameters
+) -> ResultQueueSubscriber:
+    result_q = ResultQueueSubscriber(pika_conn_params=conn_params, external_queue=queue)
     result_q.start()
     return result_q
 
@@ -87,21 +93,25 @@ def run_async_service():
     task_q_pub.close()
 
 
-# @pytest.mark.skip
-def test_simple_roundtrip():
+def test_simple_roundtrip(conn_params: pika.connection.Parameters):
 
-    task_pub = start_task_q_publisher(endpoint_id=ENDPOINT_ID)
+    task_pub = start_task_q_publisher(endpoint_id=ENDPOINT_ID, conn_params=conn_params)
     task_pub.queue_purge()
-    result_pub = start_result_q_publisher(endpoint_id=ENDPOINT_ID)
+    result_pub = start_result_q_publisher(
+        endpoint_id=ENDPOINT_ID, conn_params=conn_params
+    )
     result_pub._channel.queue_purge("results")
     task_q, result_q = multiprocessing.Queue(), multiprocessing.Queue()
     task_fail_event = multiprocessing.Event()
 
     task_q_proc = start_task_q_subscriber(
-        ENDPOINT_ID, out_queue=task_q, disconnect_event=task_fail_event
+        ENDPOINT_ID,
+        out_queue=task_q,
+        disconnect_event=task_fail_event,
+        conn_params=conn_params,
     )
 
-    result_q_proc = start_result_q_subscriber(result_q)
+    result_q_proc = start_result_q_subscriber(result_q, conn_params=conn_params)
 
     message = f"Hello {random.randint(0,2**10)}".encode()
     logging.warning(f"Sending message: {message}")

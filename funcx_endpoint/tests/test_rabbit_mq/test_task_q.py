@@ -5,26 +5,25 @@ import random
 import time
 import uuid
 
-import pika
-
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.rabbit_mq import TaskQueuePublisher, TaskQueueSubscriber
 
-CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 ENDPOINT_ID = "task-q-tests"
 
 
-def start_task_q_publisher():
-    task_q = TaskQueuePublisher(endpoint_uuid=ENDPOINT_ID, pika_conn_params=CONN_PARAMS)
+def start_task_q_publisher(conn_params):
+    task_q = TaskQueuePublisher(endpoint_uuid=ENDPOINT_ID, pika_conn_params=conn_params)
     task_q.connect()
     return task_q
 
 
 def start_task_q_subscriber(
-    out_queue: multiprocessing.Queue, disconnect_event: multiprocessing.Event
+    out_queue: multiprocessing.Queue,
+    disconnect_event: multiprocessing.Event,
+    conn_params,
 ):
     task_q = TaskQueueSubscriber(
-        CONN_PARAMS,
+        conn_params,
         external_queue=out_queue,
         kill_event=disconnect_event,
         endpoint_uuid=ENDPOINT_ID,
@@ -33,11 +32,12 @@ def start_task_q_subscriber(
     return task_q
 
 
-def test_synch(count=10):
+def test_synch(conn_params, count=10):
+
     """Open publisher, and publish to task_q, then open subscriber a fetch"""
     fxs = FuncXSerializer()
 
-    task_q_pub = start_task_q_publisher()
+    task_q_pub = start_task_q_publisher(conn_params)
     task_q_pub.queue_purge()  # Make sure queue is empty
     messages = {}
     for i in range(count):
@@ -56,7 +56,7 @@ def test_synch(count=10):
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
 
-    proc = start_task_q_subscriber(tasks_out, disconnect_event)
+    proc = start_task_q_subscriber(tasks_out, disconnect_event, conn_params)
     for i in range(count):
         message = tasks_out.get()
         assert messages[i] == message
@@ -77,10 +77,10 @@ def fallible_callback(queue: multiprocessing.Queue, message: bytes):
     return
 
 
-def test_subscriber_recovery():
+def test_subscriber_recovery(conn_params):
     """Subscriber terminates after 10 messages, and reconnects."""
     fxs = FuncXSerializer()
-    task_q_pub = start_task_q_publisher()
+    task_q_pub = start_task_q_publisher(conn_params)
     task_q_pub.queue_purge()  # Make sure queue is empty
 
     # Launch 10 messages
@@ -99,7 +99,7 @@ def test_subscriber_recovery():
     disconnect_event = multiprocessing.Event()
 
     # Listen for 10 messages
-    proc = start_task_q_subscriber(tasks_out, disconnect_event)
+    proc = start_task_q_subscriber(tasks_out, disconnect_event, conn_params)
     logging.warning("Proc started")
     for i in range(10):
         message = tasks_out.get()
@@ -123,7 +123,7 @@ def test_subscriber_recovery():
         messages[i] = b_message
 
     # Listen for the messages on a new connection
-    proc = start_task_q_subscriber(tasks_out, disconnect_event)
+    proc = start_task_q_subscriber(tasks_out, disconnect_event, conn_params)
     logging.warning("Proc started")
     for i in range(10):
         message = tasks_out.get()
@@ -135,10 +135,10 @@ def test_subscriber_recovery():
     return
 
 
-def test_exclusive_subscriber():
+def test_exclusive_subscriber(conn_params):
     """2 subscribers connect, only last one should get any messages"""
     fxs = FuncXSerializer()
-    task_q_pub = start_task_q_publisher()
+    task_q_pub = start_task_q_publisher(conn_params)
     task_q_pub.queue_purge()  # Make sure queue is empty
 
     # Start two subscribers to the same queue
@@ -147,9 +147,9 @@ def test_exclusive_subscriber():
         multiprocessing.Event(),
         multiprocessing.Event(),
     )
-    proc1 = start_task_q_subscriber(tasks_out_1, disconnect_event_1)
+    proc1 = start_task_q_subscriber(tasks_out_1, disconnect_event_1, conn_params)
     time.sleep(1)
-    proc2 = start_task_q_subscriber(tasks_out_2, disconnect_event_2)
+    proc2 = start_task_q_subscriber(tasks_out_2, disconnect_event_2, conn_params)
 
     logging.warning("TEST: Launching messages")
     # Launch 10 messages
@@ -184,14 +184,14 @@ def test_exclusive_subscriber():
     return
 
 
-def test_combined_pub_sub_latency(count=10):
+def test_combined_pub_sub_latency(conn_params, count=10):
     """Confirm that messages published are received."""
-    task_q_pub = start_task_q_publisher()
+    task_q_pub = start_task_q_publisher(conn_params)
     task_q_pub.queue_purge()  # Make sure queue is empty
 
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
-    proc = start_task_q_subscriber(tasks_out, disconnect_event)
+    proc = start_task_q_subscriber(tasks_out, disconnect_event, conn_params)
 
     latency = []
     for i in range(count):
@@ -213,17 +213,14 @@ def test_combined_pub_sub_latency(count=10):
     proc.terminate()
 
 
-def test_combined_throughput(count=1000):
+def test_combined_throughput(conn_params, count=1000):
     """Confirm that messages published are received."""
-    task_q_pub = start_task_q_publisher()
+    task_q_pub = start_task_q_publisher(conn_params)
     task_q_pub.queue_purge()  # Make sure queue is empty
 
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
-    proc = start_task_q_subscriber(
-        tasks_out,
-        disconnect_event,
-    )
+    proc = start_task_q_subscriber(tasks_out, disconnect_event, conn_params)
 
     tput_at_size = {}
     # Do 10 rounds of throughput measures
