@@ -3,6 +3,7 @@ import multiprocessing
 import time
 
 import pika
+import pytest
 
 from funcx_endpoint.endpoint.rabbit_mq import TaskQueueSubscriber
 
@@ -29,5 +30,10 @@ def test_terminate():
     task_q.start()
     time.sleep(3)
     logger.warning("Calling terminate")
-    task_q.terminate()
+    task_q.close()
+    with pytest.raises(ValueError):
+        # Expected to raise ValueError since the process should
+        # be terminated at this point from the close() call
+        task_q.terminate()
+
     return task_q

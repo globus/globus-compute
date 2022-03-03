@@ -72,11 +72,12 @@ class ResultQueueSubscriber(multiprocessing.Process):
         :param str reply_text: The server provided reply_text if given
 
         """
-        logger.warning("Closing... something broke")
-        self._channel = None
-        if self._closing:
-            self._connection.ioloop.stop()
-        else:
+        logger.info("Handling connection closed")
+        if self._closing is True or isinstance(
+            exception, pika.exceptions.ConnectionClosedByClient
+        ):
+            logger.info("Closing connection from client")
+        elif isinstance(exception, pika.exceptions.ConnectionClosedByBroker):
             logger.warning(f"Connection closed, reopening in 5 seconds: {exception}")
             self._connection.ioloop.call_later(5, self.reconnect)
 
@@ -260,6 +261,8 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self._closing = True
         self.stop_consuming()
         self._connection.close()
+        self.join()
+        super().close()
         logger.info("Connection closed")
 
     def close_connection(self):

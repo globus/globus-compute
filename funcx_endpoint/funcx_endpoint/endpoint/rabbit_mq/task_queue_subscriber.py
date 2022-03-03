@@ -112,7 +112,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         if not self._closing:
 
             # Create a new connection
-            self._connection = self.connect()
+            self._connection = self._connect()
 
             # There is now a new connection, needs a new ioloop to run
             self._connection.ioloop.start()
@@ -159,10 +159,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         :param Exception: exception from pika
         """
         logger.warning(f"Channel:{channel} was closed: ({exception}")
-        try:
-            logger.warning("Raising exception:")
-            raise exception
-        except pika.exceptions.ChannelClosedByBroker:
+        if isinstance(exception, pika.exceptions.ChannelClosedByBroker):
             if "exclusive use" in exception.reply_text:
                 logger.exception(
                     "Channel closed by RabbitMQ broker due to exclusive "
@@ -170,12 +167,14 @@ class TaskQueueSubscriber(multiprocessing.Process):
                 )
                 logger.warning("Channel will close without connection retry")
                 self._closing = True
-        except Exception as e:
+                self.kill_event.set()
+        elif isinstance(exception, pika.exceptions.ChannelClosedByClient):
+            logger.debug("Detected channel closed by client")
+        else:
             logger.exception(
-                f"Channel closed with code:{e.reply_code}, error:{e.reply_text}"
+                f"Channel closed with code:{exception.reply_code}, "
+                f"error:{exception.reply_text}"
             )
-
-        self._connection.close()
 
     def setup_exchange(self, exchange_name):
         """Setup the EXCHANGE_NAME on RabbitMQ by invoking the Exchange.Declare RPC
@@ -392,6 +391,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self._closing = True
         logger.warning("Waiting for cleanup_complete")
         self.cleanup_complete.wait(2 * self._watcher_poll_period)
+        # join shouldn't block if the above did not raise a timeout
+        self.join()
+        super().close()
         logger.warning("Cleanup done")
 
     def close_connection(self):

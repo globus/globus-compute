@@ -65,7 +65,6 @@ def test_synch(count=10):
         message = tasks_out.get()
         assert messages[i] == message
 
-    proc.close()
     proc.terminate()
     return
 
