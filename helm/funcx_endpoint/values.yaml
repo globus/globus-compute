@@ -9,7 +9,7 @@ image:
   tag: main
   pullPolicy: Always
 
-workerDebug: False
+workerDebug: false
 workerImage: python:3.6-buster
 workerInit: pip install funcx-endpoint>=0.2.0
 workerNamespace: default
