@@ -29,6 +29,5 @@ def test_terminate():
     task_q.start()
     time.sleep(3)
     logger.warning("Calling terminate")
-    task_q.close()
-    # task_q.terminate()
+    task_q.terminate()
     return task_q

@@ -16,7 +16,6 @@ class TaskQueuePublisher:
         self,
         endpoint_uuid: str,
         pika_conn_params: pika.connection.Parameters,
-        exchange: str = "tasks",
     ):
         """
         Parameters
@@ -25,15 +24,13 @@ class TaskQueuePublisher:
              Endpoint UUID string used to identify the endpoint
         pika_conn_params: pika.connection.Parameters
              Pika connection parameters to connect to RabbitMQ
-        exchange: str
-             Exchange name. Default: "tasks"
         """
         self.endpoint_uuid = endpoint_uuid
         self.queue_name = f"{self.endpoint_uuid}.tasks"
         self.routing_key = f"{self.endpoint_uuid}.tasks"
         self.params = pika_conn_params
 
-        self.exchange = exchange
+        self.exchange = "tasks"
         self.exchange_type = "direct"
 
         self._conn = None
@@ -70,6 +67,5 @@ class TaskQueuePublisher:
         self._channel.queue_purge(self.queue_name)
 
     def close(self):
-        """Close channel"""
-        self._channel.close()
+        """Close the connection and channels"""
         self._conn.close()

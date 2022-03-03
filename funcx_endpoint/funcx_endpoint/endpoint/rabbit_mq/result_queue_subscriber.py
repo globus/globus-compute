@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import queue
 from typing import Tuple
 
 import pika
@@ -90,7 +91,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         if not self._closing:
 
             # Create a new connection
-            self._connection = self.connect()
+            self._connection = self._connect()
 
             # There is now a new connection, needs a new ioloop to run
             self._connection.ioloop.start()
@@ -99,7 +100,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         """This method is invoked by pika when the channel has been opened.
         The channel object is passed in so we can make use of it.
 
-        Since the channel is now open, we'll declare the exchange_name to use.
+        Since the channel is now open, we'll declare the EXCHANGE_NAME to use.
 
         :param pika.channel.Channel channel: The channel object
 
@@ -107,7 +108,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         logger.debug(f"Channel opened: {channel}")
         self._channel = channel
         self._channel.add_on_close_callback(self._on_channel_closed)
-        logger.info(f"Declaring exchange_name {self.exchange_name}")
+        logger.info(f"Declaring EXCHANGE_NAME {self.exchange_name}")
         self._channel.exchange_declare(
             exchange=self.exchange_name,
             exchange_type=self.exchange_type,
@@ -117,7 +118,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
     def _on_channel_closed(self, channel, exception):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
         Channels are usually closed if you attempt to do something that
-        violates the protocol, such as re-declare an exchange_name or queue with
+        violates the protocol, such as re-declare an EXCHANGE_NAME or queue with
         different parameters. In this case, we'll close the connection
         to shutdown the object.
 
@@ -145,16 +146,15 @@ class ResultQueueSubscriber(multiprocessing.Process):
     def _on_queue_declareok(self, method_frame):
         """Method invoked by pika when the Queue.Declare RPC call made in
         setup_queue has completed. In this method we will bind the queue
-        and exchange_name together with the routing key by issuing the Queue.Bind
+        and EXCHANGE_NAME together with the routing key by issuing the Queue.Bind
         RPC command. When this command is complete, the on_bindok method will
         be invoked by pika.
 
         :param pika.frame.Method method_frame: The Queue.DeclareOk frame
 
         """
-        logger.info(f"Binding exchange_name:{self.exchange_name} to {self.queue_name}")
+        logger.info(f"Binding EXCHANGE_NAME:{self.exchange_name} to {self.queue_name}")
 
-        # No routing key since we are doing a direct exchange_name
         self._channel.queue_bind(
             queue=self.queue_name,
             exchange=self.exchange_name,
@@ -217,9 +217,9 @@ class ResultQueueSubscriber(multiprocessing.Process):
 
         if self.external_queue:
             try:
-                response: Tuple[str, bytes] = (routing_key.split(".")[0], body)
+                response: Tuple[str, bytes] = (routing_key.rsplit(".", 1)[0], body)
                 self.external_queue.put(response)
-            except Exception:
+            except queue.Full:
                 logger.exception("Failed to forward message to external_queue")
                 self._channel.basic_nack(basic_deliver.delivery_tag, requeue=True)
             else:
@@ -254,22 +254,13 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self._connection = self._connect()
         self._connection.ioloop.start()
 
-    def stop(self):
-        """Cleanly shutdown the connection to RabbitMQ by stopping the consumer
-        with RabbitMQ. When RabbitMQ confirms the cancellation, on_cancelok
-        will be invoked by pika, which will then closing the channel and
-        connection. The IOLoop is started again because this method is invoked
-        when CTRL-C is pressed raising a KeyboardInterrupt exception. This
-        exception stops the IOLoop which needs to be running for pika to
-        communicate with RabbitMQ. All of the commands issued prior to starting
-        the IOLoop will be buffered but not processed.
-
-        """
-        logger.info("Stopping")
+    def close(self) -> None:
+        """Close the connection"""
+        logger.info("Attempting connection close")
         self._closing = True
         self.stop_consuming()
-        self._connection.ioloop.start()
-        logger.info("Stopped")
+        self._connection.close()
+        logger.info("Connection closed")
 
     def close_connection(self):
         """This method closes the connection to RabbitMQ."""

@@ -6,9 +6,14 @@ logger = logging.getLogger(__name__)
 
 
 class ResultQueuePublisher:
-    """ResultPublisher publishes results to a topic exchange_name, with
+    """ResultPublisher publishes results to a topic EXCHANGE_NAME, with
     the {endpoint_id}.results as a routing key.
     """
+
+    EXCHANGE_NAME = "results"
+    EXCHANGE_TYPE = "topic"
+    QUEUE_NAME = "results"
+    GLOBAL_ROUTING_KEY = "*.results"
 
     def __init__(
         self,
@@ -31,11 +36,7 @@ class ResultQueuePublisher:
         self._channel = None
         self._connection = None
 
-        self.exchange_name = "results"
-        self.exchange_type = "topic"
-        self.queue_name = "results"
         self.routing_key = f"{self.endpoint_id}.results"
-        self.global_routing_key = "*.results"
 
     def connect(self) -> pika.BlockingConnection:
         """Connect
@@ -47,14 +48,14 @@ class ResultQueuePublisher:
         self._channel = self._connection.channel()
         self._channel.confirm_delivery()
         self._channel.exchange_declare(
-            exchange=self.exchange_name, exchange_type=self.exchange_type
+            exchange=self.EXCHANGE_NAME, exchange_type=self.EXCHANGE_TYPE
         )
 
-        self._channel.queue_declare(queue=self.queue_name)
+        self._channel.queue_declare(queue=self.QUEUE_NAME)
         self._channel.queue_bind(
-            queue=self.queue_name,
-            exchange=self.exchange_name,
-            routing_key=self.global_routing_key,
+            queue=self.QUEUE_NAME,
+            exchange=self.EXCHANGE_NAME,
+            routing_key=self.GLOBAL_ROUTING_KEY,
         )
 
         return self._connection
@@ -69,7 +70,7 @@ class ResultQueuePublisher:
         """
         try:
             self._channel.basic_publish(
-                self.exchange_name, self.routing_key, message, mandatory=True
+                self.EXCHANGE_NAME, self.routing_key, message, mandatory=True
             )
         except pika.exceptions.AMQPError:
             logger.error("Message could not be delivered")
@@ -81,5 +82,5 @@ class ResultQueuePublisher:
 
     def _queue_purge(self):
         """This method is *ONLY* for testing. This should not work in production"""
-        self._channel.queue_declare(queue=self.queue_name)
+        self._channel.queue_declare(queue=self.QUEUE_NAME)
         self._channel.queue_purge("results")
