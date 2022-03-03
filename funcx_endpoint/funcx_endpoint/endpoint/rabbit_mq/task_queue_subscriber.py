@@ -374,7 +374,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
         Note: Only one of these options should be used.
         """
-        logger.warning("Run method")
         try:
             self._connection = self._connect()
             self.event_watcher()
