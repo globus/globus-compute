@@ -27,6 +27,7 @@ initBlocks: 0
 minBlocks: 1
 maxBlocks: 100
 maxWorkersPerPod: 1
+maxIdleTime: 3600
 
 detachEndpoint: true
 
