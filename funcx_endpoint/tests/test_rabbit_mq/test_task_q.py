@@ -10,10 +10,6 @@ import pika
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.endpoint.rabbit_mq import TaskQueuePublisher, TaskQueueSubscriber
 
-LOG_FORMAT = "%(levelname) -10s %(asctime)s %(name) -20s %(lineno) -5d: %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-logger = logging.getLogger(__name__)
-
 CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 ENDPOINT_ID = "task-q-tests"
 
@@ -55,8 +51,8 @@ def test_synch(count=10):
         messages[i] = b_message
 
     task_q_pub.close()
-    logger.warning(f"Published {count} messages, closing task_q_pub")
-    logger.warning("Starting task_q_subscriber")
+    logging.warning(f"Published {count} messages, closing task_q_pub")
+    logging.warning("Starting task_q_subscriber")
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
 
@@ -70,13 +66,13 @@ def test_synch(count=10):
 
 
 def fallible_callback(queue: multiprocessing.Queue, message: bytes):
-    logger.warning("In callback")
+    logging.warning("In callback")
     x = random.randint(1, 10)
-    logger.warning(f"{x} > 7")
+    logging.warning(f"{x} > 7")
     if x >= 7:
         raise ValueError
     else:
-        logger.warning(f"Got message: {message}")
+        logging.warning(f"Got message: {message}")
         queue.put(message)
     return
 
@@ -104,15 +100,15 @@ def test_subscriber_recovery():
 
     # Listen for 10 messages
     proc = start_task_q_subscriber(tasks_out, disconnect_event)
-    logger.warning("Proc started")
+    logging.warning("Proc started")
     for i in range(10):
         message = tasks_out.get()
-        logger.warning(f"Got message: {message}")
+        logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
     # Terminate the connection
     proc.terminate()
-    logger.warning("Disconnected")
+    logging.warning("Disconnected")
 
     # Launch 10 messages
     messages = {}
@@ -128,10 +124,10 @@ def test_subscriber_recovery():
 
     # Listen for the messages on a new connection
     proc = start_task_q_subscriber(tasks_out, disconnect_event)
-    logger.warning("Proc started")
+    logging.warning("Proc started")
     for i in range(10):
         message = tasks_out.get()
-        logger.warning(f"Got message: {message}")
+        logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
     proc.terminate()
@@ -155,7 +151,7 @@ def test_exclusive_subscriber():
     time.sleep(1)
     proc2 = start_task_q_subscriber(tasks_out_2, disconnect_event_2)
 
-    logger.warning("TEST: Launching messages")
+    logging.warning("TEST: Launching messages")
     # Launch 10 messages
     messages = {}
     for i in range(10):
@@ -167,7 +163,7 @@ def test_exclusive_subscriber():
         b_message = json.dumps(message, ensure_ascii=True).encode("utf-8")
         task_q_pub.publish(b_message)
         messages[i] = b_message
-    logger.warning("TEST: Launching messages")
+    logging.warning("TEST: Launching messages")
 
     # Give some delay
     time.sleep(1)
@@ -178,7 +174,7 @@ def test_exclusive_subscriber():
     # Confirm that the first subscriber received all the messages
     for i in range(10):
         message = tasks_out_1.get(timeout=5)
-        logger.warning(f"Got message: {message}")
+        logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
     proc1.terminate()
@@ -208,7 +204,7 @@ def test_combined_pub_sub_latency(count=10):
         assert b_message == x
 
     avg_latency = sum(latency) / len(latency)
-    logger.warning(
+    logging.warning(
         f"Message latencies in milliseconds, min:{1000*min(latency):.2f}, "
         f"max:{1000*max(latency):.2f}, avg:{1000*avg_latency:.2f}"
     )
@@ -244,7 +240,7 @@ def test_combined_throughput(count=1000):
         delta = time.time() - start_t
         tput_at_size[data_size] = {"send": send_t, "ttc": delta}
     for size in tput_at_size:
-        logger.warning(
+        logging.warning(
             f"TTC throughput for {count} messages at {size}B = "
             f"{count/tput_at_size[size]['ttc']:.2f}messages/s"
         )

@@ -1,14 +1,9 @@
-import logging
 import time
 
 import pika
 import pytest
 
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher
-
-LOG_FORMAT = "%(levelname) -10s %(asctime)s %(name) -20s %(lineno) -5d: %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-logger = logging.getLogger(__name__)
 
 endpoint_id_1 = "a9aec9a1-ff86-4d6a-a5b8-5bb160746b5c"
 RABBIT_MQ_URL = "amqp://guest:guest@localhost:5672/"

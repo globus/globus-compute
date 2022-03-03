@@ -13,10 +13,6 @@ from funcx_endpoint.endpoint.rabbit_mq import (
     TaskQueueSubscriber,
 )
 
-LOG_FORMAT = "%(levelname) -10s %(asctime)s %(name) -20s %(lineno) -5d: %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-logger = logging.getLogger(__name__)
-
 ENDPOINT_ID = "231fab4e-630a-4d76-bbbb-cf0b4aedbdf9"
 CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 
@@ -68,7 +64,7 @@ def run_async_service():
         target=start_result_q_subscriber, args=(result_q,)
     )
     result_q_proc.start()
-    logger.warning("SERVICE: Here")
+    logging.warning("SERVICE: Here")
     for _i in range(10):
         try:
             message = {
@@ -76,16 +72,16 @@ def run_async_service():
                 "task_buf": "TASKBUF TASKBUF",
             }
             b_message = json.dumps(message).encode()
-            logger.warning("SERVICE: Trying to publish message")
+            logging.warning("SERVICE: Trying to publish message")
             task_q_pub.publish(b_message)
-            logger.warning(f"SERVICE: Published message: {message}")
+            logging.warning(f"SERVICE: Published message: {message}")
             from_ep, reply_message = result_q.get(timeout=5)
-            logger.warning(f"SERVICE: Received result message: {reply_message}")
+            logging.warning(f"SERVICE: Received result message: {reply_message}")
 
             assert from_ep == ENDPOINT_ID
             assert reply_message == b_message
         except Exception:
-            logger.exception("Caught error")
+            logging.exception("Caught error")
 
     result_q_proc.terminate()
     task_q_pub.close()
@@ -108,7 +104,7 @@ def test_simple_roundtrip():
     result_q_proc = start_result_q_subscriber(result_q)
 
     message = f"Hello {random.randint(0,2**10)}".encode()
-    logger.warning(f"Sending message: {message}")
+    logging.warning(f"Sending message: {message}")
     task_pub.publish(message)
     task_message = task_q.get(timeout=2)
     assert message == task_message

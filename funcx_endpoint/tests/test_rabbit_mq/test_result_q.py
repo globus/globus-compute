@@ -12,11 +12,6 @@ from funcx_endpoint.endpoint.rabbit_mq import (
     ResultQueueSubscriber,
 )
 
-LOG_FORMAT = "%(levelname) -10s %(asctime)s %(name) -20s %(lineno) -5d: %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-logger = logging.getLogger(__name__)
-
-
 endpoint_id_1 = "a9aec9a1-ff86-4d6a-a5b8-5bb160746b5c"
 endpoint_id_2 = "9b2dbe0f-0420-4256-9f89-71cb8bfb26d2"
 
@@ -53,7 +48,7 @@ def publish_messages(count: int, endpoint_id: str, size=10) -> ResultQueuePublis
         b_message = json.dumps(message, ensure_ascii=True).encode("utf-8")
         result_pub.publish(b_message)
 
-    logger.warning(f"Published {count} messages")
+    logging.warning(f"Published {count} messages")
     return result_pub
 
 
