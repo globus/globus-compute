@@ -33,13 +33,13 @@ class TaskQueuePublisher:
         self.exchange = "tasks"
         self.exchange_type = "direct"
 
-        self._conn = None
+        self._connection = None
         self._channel = None
 
     def connect(self):
         logger.debug("Connecting as server")
-        self._conn = pika.BlockingConnection(self.params)
-        self._channel = self._conn.channel()
+        self._connection = pika.BlockingConnection(self.params)
+        self._channel = self._connection.channel()
         self._channel.exchange_declare(
             exchange=self.exchange, exchange_type=self.exchange_type
         )
@@ -68,4 +68,4 @@ class TaskQueuePublisher:
 
     def close(self):
         """Close the connection and channels"""
-        self._conn.close()
+        self._connection.close()
