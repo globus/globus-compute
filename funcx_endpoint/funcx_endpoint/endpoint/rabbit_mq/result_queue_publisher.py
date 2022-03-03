@@ -79,8 +79,3 @@ class ResultQueuePublisher:
     def close(self):
         self._channel.close()
         self._connection.close()
-
-    def _queue_purge(self):
-        """This method is *ONLY* for testing. This should not work in production"""
-        self._channel.queue_declare(queue=self.QUEUE_NAME)
-        self._channel.queue_purge("results")
