@@ -24,17 +24,10 @@ CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 
 
 def start_result_q_publisher(endpoint_id):
-
     result_pub = ResultQueuePublisher(
         endpoint_id=endpoint_id, pika_conn_params=CONN_PARAMS
     )
     result_pub.connect()
-    result_pub._channel.queue_declare(queue="results", passive=True)
-    result_pub._channel.queue_bind(
-        queue="results",
-        exchange="results",
-        routing_key="*results",
-    )
     return result_pub
 
 

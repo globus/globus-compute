@@ -18,7 +18,6 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 ENDPOINT_ID = "231fab4e-630a-4d76-bbbb-cf0b4aedbdf9"
-
 CONN_PARAMS = pika.URLParameters("amqp://guest:guest@localhost:5672/")
 
 
@@ -39,46 +38,23 @@ def start_task_q_subscriber(
 
 
 def start_result_q_publisher(endpoint_id) -> ResultQueuePublisher:
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
-
     result_pub = ResultQueuePublisher(
-        endpoint_id=endpoint_id, pika_conn_params=service_params
+        endpoint_id=endpoint_id, pika_conn_params=CONN_PARAMS
     )
     result_pub.connect()
-    result_pub._channel.queue_declare(queue="results", passive=True)
-    result_pub._channel.queue_bind(
-        queue="results",
-        exchange="results",
-        routing_key="*results",
-    )
     return result_pub
 
 
 def start_task_q_publisher(endpoint_id: str) -> TaskQueuePublisher:
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
-
     task_q_pub = TaskQueuePublisher(
-        endpoint_uuid=endpoint_id, pika_conn_params=service_params
+        endpoint_uuid=endpoint_id, pika_conn_params=CONN_PARAMS
     )
     task_q_pub.connect()
     return task_q_pub
 
 
 def start_result_q_subscriber(queue: multiprocessing.Queue) -> ResultQueueSubscriber:
-    cred = pika.PlainCredentials("guest", "guest")
-    service_params = pika.ConnectionParameters(
-        host="localhost", heartbeat=60, port=5672, credentials=cred
-    )
-
-    result_q = ResultQueueSubscriber(
-        pika_conn_params=service_params, external_queue=queue
-    )
+    result_q = ResultQueueSubscriber(pika_conn_params=CONN_PARAMS, external_queue=queue)
     result_q.start()
     return result_q
 

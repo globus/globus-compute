@@ -51,7 +51,7 @@ class ResultQueuePublisher:
             exchange=self.EXCHANGE_NAME, exchange_type=self.EXCHANGE_TYPE
         )
 
-        self._channel.queue_declare(queue=self.QUEUE_NAME)
+        self._channel.queue_declare(queue=self.QUEUE_NAME, passive=True)
         self._channel.queue_bind(
             queue=self.QUEUE_NAME,
             exchange=self.EXCHANGE_NAME,
