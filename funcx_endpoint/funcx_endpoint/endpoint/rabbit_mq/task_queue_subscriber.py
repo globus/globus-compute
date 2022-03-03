@@ -14,6 +14,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
     """
 
+    EXCHANGE_NAME = "tasks"
+    EXCHANGE_TYPE = "direct"
+
     def __init__(
         self,
         pika_conn_params: pika.connection.Parameters,
@@ -42,9 +45,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
             every message
 
         endpoint_uuid: endpoint uuid string
-
-        exchange: str
-            Exchange name
         """
 
         super().__init__()
@@ -58,10 +58,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self.queue_name = f"{self.endpoint_uuid}.tasks"
         self.routing_key = f"{self.endpoint_uuid}.tasks"
         self.params = pika_conn_params
-        self.exchange = exchange
-        self.exchange_type = "direct"
         self._closing = False
-        self._closed = False
+
         self._connection = None
         self._channel = None
 
@@ -96,7 +94,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self._channel = None
         if self._closing:
             connection.ioloop.stop()
-            self._closed = True
         else:
             logger.warning(f"Connection closed, reopening in 5 seconds: {exception}")
             self._connection.ioloop.call_later(5, self.reconnect)
@@ -138,7 +135,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.info(f"Channel opened: {channel}")
         self._channel = channel
         self.add_on_channel_close_callback()
-        self.setup_exchange(self.exchange)
+        self.setup_exchange(self.EXCHANGE_NAME)
 
     def add_on_channel_close_callback(self):
         """This method tells pika to call the on_channel_closed method if
@@ -186,7 +183,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.info(f"Declaring EXCHANGE_NAME {exchange_name}")
         self._channel.exchange_declare(
             exchange=exchange_name,
-            exchange_type=self.exchange_type,
+            exchange_type=self.EXCHANGE_TYPE,
             callback=self._on_exchange_declareok,
         )
 
@@ -221,11 +218,11 @@ class TaskQueueSubscriber(multiprocessing.Process):
         :param pika.frame.Method method_frame: The Queue.DeclareOk frame
 
         """
-        logger.info(f"Binding EXCHANGE_NAME:{self.exchange} to {self.queue_name}")
+        logger.info(f"Binding EXCHANGE_NAME:{self.EXCHANGE_NAME} to {self.queue_name}")
 
         # No routing key since we are doing a direct EXCHANGE_NAME
         self._channel.queue_bind(
-            self.queue_name, self.exchange, callback=self._on_bindok
+            self.queue_name, self.EXCHANGE_NAME, callback=self._on_bindok
         )
 
     def _on_bindok(self, unused_frame):
