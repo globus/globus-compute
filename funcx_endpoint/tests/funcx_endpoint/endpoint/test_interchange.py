@@ -49,6 +49,7 @@ class TestStart:
             endpoint_config.config,
             endpoint_id="mock_endpoint_id",
             keys_dir=keys_dir,
+            reg_info="amqp://guest:guest@localhost:5672/%2F",
             **optionals,
         )
 
@@ -91,6 +92,7 @@ class TestStart:
             endpoint_config.config,
             endpoint_id="mock_endpoint_id",
             keys_dir=keys_dir,
+            reg_info="amqp://guest:guest@localhost:5672/%2F",
             **optionals,
         )
 
@@ -145,6 +147,7 @@ class TestStart:
             endpoint_config.config,
             endpoint_id="mock_endpoint_id",
             keys_dir=keys_dir,
+            reg_info="amqp://guest:guest@localhost:5672/%2F",
             **optionals,
         )
 

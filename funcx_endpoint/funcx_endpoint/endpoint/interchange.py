@@ -170,7 +170,6 @@ class EndpointInterchange:
         self.initial_registration_complete = False
 
         self.connection_params = reg_info
-        self.initial_registration_complete = True
 
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
