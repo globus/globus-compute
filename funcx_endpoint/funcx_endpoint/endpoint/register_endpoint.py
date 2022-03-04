@@ -32,7 +32,7 @@ def mock_register_endpoint(
         f"Registering endpoint:{endpoint_name}:{endpoint_uuid}"
         " of version:{endpoint_version}"
     )
-    return "amqp://guest:guest@localhost:5672/%2F"
+    return "amqp://guest:guest@localhost:5672/"
 
 
 def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
@@ -54,8 +54,6 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
     endpoint_name : str
         The name of the endpoint
 
-    logger : Logger
-        Logger to use
     """
     log.debug("Attempting registration")
     log.debug(f"Trying with eid : {endpoint_uuid}")
