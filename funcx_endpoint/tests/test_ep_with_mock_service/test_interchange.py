@@ -29,12 +29,6 @@ config = Config(
     funcx_service_address="https://api2.funcx.org/v2",
 )
 
-ENDPOINT_UUID = "9d8f5fcc-8d70-4d8e-a027-510ed6084b2e"
-
-LOG_FORMAT = "%(levelname) -10s %(asctime)s %(name) -20s %(lineno) -5d: %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-logger = logging.getLogger(__name__)
-
 
 def make_mock_task():
     task_buf = (
@@ -51,31 +45,32 @@ def make_mock_task():
     return task
 
 
-def run_ix_process(reg_info):
+def run_ix_process(reg_info, endpoint_uuid):
     results_ack_handler = ResultsAckHandler(endpoint_dir=".")
     ix = EndpointInterchange(
         config=config,
-        endpoint_id=ENDPOINT_UUID,
+        endpoint_id=endpoint_uuid,
         results_ack_handler=results_ack_handler,
         reg_info=reg_info,
     )
 
-    logger.warning("IX created, starting")
+    logging.warning("IX created, starting")
     ix.start()
-    logger.warning("Done")
+    logging.warning("Done")
 
 
-def test_endpoint_interchange_against_rabbitmq():
+def test_endpoint_interchange_against_rabbitmq(endpoint_uuid):
     """This test registers the endpoint against local RabbitMQ, and
     uses mock tasks
     """
+    logging.warning(f"Current proc pid: {os.getpid()}")
 
     # Use register_endpoint to get connection params
     endpoint_name = "endpoint_foo"
-    fxc = funcx.FuncXClient()
+    fxc = funcx.FuncXClient(use_offprocess_checker=False)
     reg_info = register_endpoint(
         fxc,
-        endpoint_uuid=ENDPOINT_UUID,
+        endpoint_uuid=endpoint_uuid,
         endpoint_dir=os.getcwd(),
         endpoint_name=endpoint_name,
     )
@@ -84,50 +79,53 @@ def test_endpoint_interchange_against_rabbitmq():
     # Start the service side components:
     # Connect the TaskQueuePublisher and submit some mock tasks
     task_q_out = TaskQueuePublisher(
-        endpoint_uuid=ENDPOINT_UUID, pika_conn_params=reg_info
+        endpoint_uuid=endpoint_uuid, pika_conn_params=reg_info
     )
     task_q_out.connect()
-    logger.warning(f"Publishing task to {ENDPOINT_UUID}")
+    logging.warning(f"Publishing task to {endpoint_uuid}")
 
     result_q_in = multiprocessing.Queue()
-    kill_event = multiprocessing.Event()
-    result_pub_proc = ResultQueueSubscriber(
-        pika_conn_params=reg_info, external_queue=result_q_in, kill_event=kill_event
+    result_sub_proc = ResultQueueSubscriber(
+        pika_conn_params=reg_info,
+        external_queue=result_q_in,
     )
-    result_pub_proc.start()
+    result_sub_proc.start()
 
     # Make a Task and publish it
     task = make_mock_task()
     task_q_out.publish(task.pack())
 
     # Create the endpoint
-    ix_proc = multiprocessing.Process(target=run_ix_process, args=(reg_info,))
+    ix_proc = multiprocessing.Process(
+        target=run_ix_process,
+        args=(
+            reg_info,
+            endpoint_uuid,
+        ),
+    )
     ix_proc.start()
-
     time.sleep(2)
+
     for _i in range(10):
         from_ep, b_message = result_q_in.get()
-        # logger.warning(f"Got message: {message} from {from_ep}")
+        # logging.warning(f"Got message: {message} from {from_ep}")
 
-        assert from_ep == ENDPOINT_UUID
+        assert from_ep == endpoint_uuid
         try:
             message = pickle.loads(b_message)
         except Exception:
-            logger.warning(f"Unknown message: {b_message} from {from_ep}")
+            logging.warning(f"Unknown message: {b_message} from {from_ep}")
             continue
 
         if isinstance(message, EPStatusReport):
-            logger.warning(f"Got EPStatusMessage: {message}")
             continue
 
         if "result" in message or "exception" in message:
-            logger.warning(f"Received result/exception for {message['task_id']}")
+            logging.warning(f"Received result/exception for {message['task_id']}")
             assert message["task_id"] == task.task_id
-            logger.warning(f"Message : {message}")
             break
 
-    logger.warning("Exiting...")
-    result_pub_proc.terminate()
+    logging.warning("Exiting...")
+    result_sub_proc.terminate()
     task_q_out.close()
     ix_proc.terminate()
-    ix_proc.join()
