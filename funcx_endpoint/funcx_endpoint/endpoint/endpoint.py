@@ -249,9 +249,9 @@ class Endpoint:
 
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
-        reg_info = None
+        rabbitmq_uri = None
         try:
-            reg_info = register_endpoint(
+            rabbitmq_uri = register_endpoint(
                 funcx_client, endpoint_uuid, endpoint_dir, self.name
             )
         # if the service sends back an error response, it will be a FuncxResponseError
@@ -298,7 +298,7 @@ class Endpoint:
         except Exception:
             raise
 
-        if reg_info:
+        if rabbitmq_uri:
             log.info("Launching endpoint daemon process")
         else:
             log.critical("Launching endpoint daemon process with errors noted above")
@@ -321,7 +321,7 @@ class Endpoint:
                 endpoint_dir,
                 keys_dir,
                 endpoint_config,
-                reg_info,
+                rabbitmq_uri,
                 funcx_client_options,
                 results_ack_handler,
             )

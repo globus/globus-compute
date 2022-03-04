@@ -60,10 +60,11 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
     log.debug("Attempting registration")
     log.debug(f"Trying with eid : {endpoint_uuid}")
 
-    pika_url = mock_register_endpoint(
+    reg_info = funcx_client.register_endpoint(
         endpoint_name, endpoint_uuid, endpoint_version=funcx_endpoint.__version__
     )
 
+    log.debug("RabbitMQ URI From WebService:", reg_info)
     # NOTE: While all registration info is saved to endpoint.json, only the
     # endpoint UUID is reused from this file. The latest forwarder URI is used
     # every time we fetch registration info and register
@@ -72,7 +73,7 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
             "endpoint_name": endpoint_name,
             # This is named endpoint_id for backward compatibility when
             # funcx-endpoint list is called
-            "pika_conn_info": pika_url,
+            "pika_conn_info": reg_info["rabbitMQ_URI"],
             "endpoint_id": endpoint_uuid,
         }
         json.dump(endpoint_info, fp)
@@ -82,5 +83,4 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
             )
         )
 
-    reg_info = pika.URLParameters(pika_url)
-    return reg_info
+    return pika.URLParameters(reg_info["rabbitMQ_URI"])
