@@ -537,12 +537,8 @@ class EndpointInterchange:
         if not self.initial_registration_complete:
             # Register the endpoint
             log.info("Running endpoint registration retry loop")
-            reg_info = retry_call(
-                self.register_endpoint, delay=10, max_delay=300, backoff=1.2
-            )
-            log.info(
-                "Endpoint registered with UUID: {}".format(reg_info["endpoint_id"])
-            )
+            retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
+            log.info(f"Endpoint registered with UUID: {self.endpoint_id}")
 
         self.initial_registration_complete = False
 
