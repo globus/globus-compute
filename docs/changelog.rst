@@ -3,6 +3,36 @@ Changelog
 
 .. scriv-insert-here
 
+funcx & funcx-endpoint v0.3.7
+-----------------------------
+
+ Bug Fixes
+ ^^^^^^^^^
+
+- When a provider raised an exception, that exception was then mishandled
+  and presented as an AttributeError. This handling now no longer corrupts
+  the exception. https://github.com/funcx-faas/funcX/issues/679
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Capture, log, and report execution time information. The time a function takes to execute is now logged in worker debug logs and reported to the funcX service.
+
+- Added Helm options to specify Kuberenetes workerDebug, imagePullSecret and maxIdleTime values.
+
+Changed
+^^^^^^^
+
+- Kubernetes worker pods will now be named funcx-worker-*
+  instead of funcx-* to clarify what these pods are to
+  observers of 'kubectl get pods'
+
+- Logging for funcx-endpoint no longer writes to `~/.funcx/endpoint.log` at any point.
+  This file is considered deprecated. Use `funcx-endpoint --debug <command>` to
+  get debug output written to stderr.
+- The output formatting of `funcx-endpoint` logging has changed slightly when
+  writing to stderr.
+
 funcx & funcx-endpoint v0.3.6
 -----------------------------
 
