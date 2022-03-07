@@ -30,8 +30,9 @@ class ResultQueuePublisher:
         """
         self.endpoint_id = endpoint_id
         self.params = pika_conn_params
-        if self.params._heartbeat is None:
-            self.params._heartbeat = 0
+        if self.params.heartbeat is None:
+            # result_q is blocking, and shouldn't use heartbeats
+            self.params.heartbeat = 0
 
         self._channel = None
         self._connection = None

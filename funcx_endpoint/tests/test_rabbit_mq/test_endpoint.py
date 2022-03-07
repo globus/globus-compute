@@ -64,7 +64,7 @@ def start_result_q_subscriber(
 def run_async_service():
     """Run a task_q_publisher and result_q_subscriber mocking a simple service"""
     task_q_pub = start_task_q_publisher(endpoint_id=ENDPOINT_ID)
-    task_q_pub.queue_purge()
+    task_q_pub._channel.queue_purge(task_q_pub.queue_name)
     result_q = multiprocessing.Queue()
     result_q_proc = multiprocessing.Process(
         target=start_result_q_subscriber, args=(result_q,)
@@ -94,9 +94,8 @@ def run_async_service():
 
 
 def test_simple_roundtrip(conn_params: pika.connection.Parameters):
-
     task_pub = start_task_q_publisher(endpoint_id=ENDPOINT_ID, conn_params=conn_params)
-    task_pub.queue_purge()
+    task_pub._channel.queue_purge(task_pub.queue_name)
     result_pub = start_result_q_publisher(
         endpoint_id=ENDPOINT_ID, conn_params=conn_params
     )

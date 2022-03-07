@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import logging
 import multiprocessing
 import queue
-from typing import Tuple
 
 import pika
 
@@ -212,13 +213,15 @@ class ResultQueueSubscriber(multiprocessing.Process):
         :param pika.Spec.BasicProperties: properties
         :param str|unicode body: The message body
 
+        Pops items into the external_queue of the form:
+        tuple(str: Endpoint_UUID, bytes: message)
         """
 
         routing_key = basic_deliver.routing_key
 
         if self.external_queue:
             try:
-                response: Tuple[str, bytes] = (routing_key.rsplit(".", 1)[0], body)
+                response: tuple[str, bytes] = (routing_key.rsplit(".", 1)[0], body)
                 self.external_queue.put(response)
             except queue.Full:
                 logger.exception("Failed to forward message to external_queue")
@@ -264,8 +267,3 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self.join()
         super().close()
         logger.info("Connection closed")
-
-    def close_connection(self):
-        """This method closes the connection to RabbitMQ."""
-        logger.info("Closing connection")
-        self._connection.close()

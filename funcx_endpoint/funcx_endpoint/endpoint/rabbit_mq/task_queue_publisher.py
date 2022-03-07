@@ -61,11 +61,6 @@ class TaskQueuePublisher:
             mandatory=True,  # Raise error if message cannot be routed
         )
 
-    def queue_purge(self):
-        """Purge all messages in the queue. Either service/endpoint can
-        call this method"""
-        self._channel.queue_purge(self.queue_name)
-
     def close(self):
         """Close the connection and channels"""
         self._connection.close()

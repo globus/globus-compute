@@ -38,7 +38,7 @@ def test_synch(conn_params, count=10):
     fxs = FuncXSerializer()
 
     task_q_pub = start_task_q_publisher(conn_params)
-    task_q_pub.queue_purge()  # Make sure queue is empty
+    task_q_pub._channel.queue_purge(task_q_pub.queue_name)  # Make sure queue is empty
     messages = {}
     for i in range(count):
         data = list(range(10))
@@ -81,7 +81,7 @@ def test_subscriber_recovery(conn_params):
     """Subscriber terminates after 10 messages, and reconnects."""
     fxs = FuncXSerializer()
     task_q_pub = start_task_q_publisher(conn_params)
-    task_q_pub.queue_purge()  # Make sure queue is empty
+    task_q_pub._channel.queue_purge(task_q_pub.queue_name)  # Make sure queue is empty
 
     # Launch 10 messages
     messages = {}
@@ -139,7 +139,7 @@ def test_exclusive_subscriber(conn_params):
     """2 subscribers connect, only last one should get any messages"""
     fxs = FuncXSerializer()
     task_q_pub = start_task_q_publisher(conn_params)
-    task_q_pub.queue_purge()  # Make sure queue is empty
+    task_q_pub._channel.queue_purge(task_q_pub.queue_name)  # Make sure queue is empty
 
     # Start two subscribers to the same queue
     tasks_out_1, tasks_out_2 = multiprocessing.Queue(), multiprocessing.Queue()
@@ -187,7 +187,7 @@ def test_exclusive_subscriber(conn_params):
 def test_combined_pub_sub_latency(conn_params, count=10):
     """Confirm that messages published are received."""
     task_q_pub = start_task_q_publisher(conn_params)
-    task_q_pub.queue_purge()  # Make sure queue is empty
+    task_q_pub._channel.queue_purge(task_q_pub.queue_name)  # Make sure queue is empty
 
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
@@ -216,7 +216,7 @@ def test_combined_pub_sub_latency(conn_params, count=10):
 def test_combined_throughput(conn_params, count=1000):
     """Confirm that messages published are received."""
     task_q_pub = start_task_q_publisher(conn_params)
-    task_q_pub.queue_purge()  # Make sure queue is empty
+    task_q_pub._channel.queue_purge(task_q_pub.queue_name)  # Make sure queue is empty
 
     tasks_out = multiprocessing.Queue()
     disconnect_event = multiprocessing.Event()
