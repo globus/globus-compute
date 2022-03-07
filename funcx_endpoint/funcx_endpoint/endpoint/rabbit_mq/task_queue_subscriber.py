@@ -356,6 +356,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
                 self.cleanup_complete.set()
             except Exception:
                 logger.exception("Failed to close connection cleanly")
+                raise
             logger.info("Shutdown complete")
             return
         else:
