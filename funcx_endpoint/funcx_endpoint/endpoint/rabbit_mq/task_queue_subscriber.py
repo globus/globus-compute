@@ -24,7 +24,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
         kill_event: multiprocessing.Event,
         endpoint_uuid: str,
         _on_message_test_hook: Callable = None,
-        exchange: str = "tasks",
     ):
         """
 
