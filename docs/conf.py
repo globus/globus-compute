@@ -23,14 +23,9 @@ release = funcx.__version__
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
-    # 'sphinx.ext.linkcode',
     "sphinx.ext.napoleon",
-    "sphinx.ext.autosectionlabel",
 ]
-
-autosummary_generate = True
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),

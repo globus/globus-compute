@@ -19,7 +19,6 @@ REQUIRES = [
 DOCS_REQUIRES = [
     "sphinx<5",
     "furo==2021.09.08",
-    "nbsphinx==0.8.7",
 ]
 
 TEST_REQUIRES = [
