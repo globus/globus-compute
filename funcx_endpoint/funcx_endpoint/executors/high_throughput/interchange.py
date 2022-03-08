@@ -40,19 +40,6 @@ HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
 
 
-class ShutdownRequest(Exception):
-    """Exception raised when any async component receives a ShutdownRequest"""
-
-    def __init__(self):
-        self.tstamp = time.time()
-
-    def __repr__(self):
-        return f"Shutdown request received at {self.tstamp}"
-
-    def __str__(self):
-        return self.__repr__()
-
-
 class ManagerLost(Exception):
     """Task lost due to worker loss. Worker is considered lost when multiple heartbeats
     have been missed.
