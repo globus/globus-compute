@@ -3,6 +3,98 @@ Changelog
 
 .. scriv-insert-here
 
+funcx & funcx-endpoint v0.3.7
+-----------------------------
+
+ Bug Fixes
+ ^^^^^^^^^
+
+- When a provider raised an exception, that exception was then mishandled
+  and presented as an AttributeError. This handling now no longer corrupts
+  the exception. https://github.com/funcx-faas/funcX/issues/679
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Capture, log, and report execution time information. The time a function takes to execute is now logged in worker debug logs and reported to the funcX service.
+
+- Added Helm options to specify Kuberenetes workerDebug, imagePullSecret and maxIdleTime values.
+
+Changed
+^^^^^^^
+
+- Kubernetes worker pods will now be named funcx-worker-*
+  instead of funcx-* to clarify what these pods are to
+  observers of 'kubectl get pods'
+
+- Logging for funcx-endpoint no longer writes to `~/.funcx/endpoint.log` at any point.
+  This file is considered deprecated. Use `funcx-endpoint --debug <command>` to
+  get debug output written to stderr.
+- The output formatting of `funcx-endpoint` logging has changed slightly when
+  writing to stderr.
+
+funcx & funcx-endpoint v0.3.6
+-----------------------------
+
+Released on February 1, 2022.
+
+
+Bug Fixes
+^^^^^^^^^
+
+- Updates the data size limit for WebSockets from 1MB to 11MB to
+  address issue:https://github.com/funcx-faas/funcX/issues/677
+
+- Fixed an issue in which funcx-endpoint commands expected the ``~/.funcx/``
+  directory to exist, preventing the endpoint from starting on new installs
+
+Changed
+^^^^^^^
+
+- The version of ``globus-sdk`` used by ``funcx`` has been updated to v3.x .
+
+- ``FuncXClient`` is no longer a subclass of ``globus_sdk.BaseClient``, but
+  instead contains a web client object which can be used to prepare and send
+  requests to the web service
+
+- ``FuncXClient`` will no longer raise throttling-related errors when too many
+  requests are sent, and it may sleep and retry requests if errors are
+  encountered
+
+- The exceptions raised by the ``FuncXClient`` when the web service sends back
+  an error response are now instances of ``funcx.FuncxAPIError``. This
+  means that the errors no longer inherit from ``FuncxResponseError``. Update
+  error handling code as follows:
+
+In prior versions of the `funcx` package:
+
+.. code-block:: python
+
+    import funcx
+    from funcx.utils.response_errors import (
+        FuncxResponseError, ResponseErrorCode
+    )
+
+    client = funcx.FuncXClient()
+    try:
+        client.some_method(...)
+    except FuncxResponseError as err:
+        if err.code == ResponseErrorCode.INVALID_UUID:  # this is an enum
+            ...
+
+In the new version:
+
+.. code-block:: python
+
+    import funcx
+
+    client = funcx.FuncXClient()
+    try:
+        client.some_method(...)
+    except funcx.FuncxAPIError as err:
+        if err.code_name == "invalid_uuid":  # this is a string
+            ...
+
 funcx & funcx-endpoint v0.3.5
 -----------------------------
 
@@ -26,20 +118,21 @@ Bug Fixes
 
 * Cleaner logging on the ``funcx-endpoint``. See `PR#643 <https://github.com/funcx-faas/funcX/pull/643>`_
   Previously available ``set_stream_logger``, ``set_file_logger`` methods are now removed.
-  For debugging the SDK use standard logging setup, like:
+  For debugging the SDK use standard logging methods, as described in the
+  `Python Logging HOWTO <https://docs.python.org/3/howto/logging.html>`_, on
+  the logger named ``"funcx"``.
+
+  For example:
 
   .. code-block::
+
     import logging
-    def set_stream_logger(name="funcx", level=logging.DEBUG, format_string="%(asctime)s %(name)s:%(lineno)d [%(levelname)s]  %(message)s"):
-        logger = logging.getLogger(name)
-        logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler()
-        handler.setLevel(level)
-        formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        return logger
-    set_stream_logger()
+
+    logger = logging.getLogger("funcx")
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    funcx_logger.addHandler(ch)
 
 * Warn and continue on failure to load a results ack file. `PR#616 <https://github.com/funcx-faas/funcX/pull/616>`_
 

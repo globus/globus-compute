@@ -34,7 +34,7 @@ from funcx_endpoint.logging_config import setup_logging
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
-HEARTBEAT_CODE = (2 ** 32) - 1
+HEARTBEAT_CODE = (2**32) - 1
 
 
 log = logging.getLogger(__name__)
@@ -183,7 +183,7 @@ class Manager:
         self.max_workers = max_workers
         self.cores_per_workers = cores_per_worker
         self.available_mem_on_node = round(
-            psutil.virtual_memory().available / (2 ** 30), 1
+            psutil.virtual_memory().available / (2**30), 1
         )
         self.max_worker_count = min(
             max_workers, math.floor(self.cores_on_node / cores_per_worker)
@@ -826,7 +826,6 @@ def cli_run():
 
     args = parser.parse_args()
 
-    os.makedirs(os.path.join(args.logdir, args.uid), exist_ok=True)
     setup_logging(
         logfile=os.path.join(args.logdir, args.uid, "manager.log"), debug=args.debug
     )

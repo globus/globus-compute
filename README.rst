@@ -26,7 +26,7 @@ on existing infrastructure including clouds, clusters, and supercomputers.
    :alt: NSF award info
 
 
-.. image:: docs/img/funcx-logo.png
+.. image:: docs/_static/logo.png
   :target: https://www.funcx.org
   :width: 200
 
@@ -37,7 +37,7 @@ Documentation: https://funcx.readthedocs.io/en/latest/
 Quickstart
 ==========
 
-funcX is in a beta state with version `0.3.5` currently available on PyPI.
+funcX is in a beta state with version `0.3.7` currently available on PyPI.
 
 To install funcX, please ensure you have python3.6+.::
 

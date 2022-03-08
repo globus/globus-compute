@@ -6,6 +6,7 @@ import os
 import pickle
 import signal
 import sys
+import time
 
 import zmq
 from parsl.app.errors import RemoteExceptionWrapper
@@ -136,7 +137,7 @@ class FuncXWorker:
                     continue
             else:
                 log.debug("Executing task...")
-
+                exec_start = time.time()
                 try:
                     result = self.execute_task(msg)
                     serialized_result = self.serialize(result)
@@ -161,8 +162,21 @@ class FuncXWorker:
                         "container_id": container_id,
                         "result": serialized_result,
                     }
+                finally:
+                    exec_end = time.time()
+
+                exec_duration = exec_end - exec_start
+
                 result = result_package
+                result["times"] = {
+                    "execution_start": exec_start,
+                    "execution_end": exec_end,
+                    "execution_time": exec_duration,
+                }
+
                 task_type = b"TASK_RET"
+
+                log.debug(f"Task {task_id} completed in {exec_duration} seconds")
 
             log.debug("Sending result")
 
@@ -219,7 +233,6 @@ def cli_run():
     )
     args = parser.parse_args()
 
-    os.makedirs(args.logdir, exist_ok=True)
     setup_logging(
         logfile=os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.log"),
         debug=args.debug,

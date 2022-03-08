@@ -36,7 +36,7 @@ from funcx_endpoint.logging_config import setup_logging
 log = logging.getLogger(__name__)
 
 LOOP_SLOWDOWN = 0.0  # in seconds
-HEARTBEAT_CODE = (2 ** 32) - 1
+HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
 
 
@@ -474,7 +474,7 @@ class Interchange:
                 msg.set_local_container(local_container)
                 if local_container not in self.pending_task_queue:
                     self.pending_task_queue[local_container] = queue.Queue(
-                        maxsize=10 ** 6
+                        maxsize=10**6
                     )
 
                 # We pass the raw message along
@@ -973,6 +973,9 @@ class Interchange:
                         )
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
+                        if "times" not in r:
+                            r["times"] = {}
+                        r["times"]["interchange_result"] = time.time()
                         log.debug(
                             "[MAIN] Received result for task {} from {}".format(
                                 r["task_id"], manager
@@ -1146,7 +1149,7 @@ class Interchange:
                 if not internal_block:
                     raise (
                         ScalingFailed(
-                            self.config.provider.label,
+                            self.provider.label,
                             "Attempts to provision nodes via provider has failed",
                         )
                     )
@@ -1210,7 +1213,9 @@ class Interchange:
         return r
 
     def provider_status(self):
-        """Get status of all blocks from the provider"""
+        """Get status of all blocks from the provider. The return type is
+        defined by the particular provider in use.
+        """
         status = []
         if self.provider:
             log.debug(
@@ -1290,7 +1295,6 @@ def cli_run():
     if args.worker_port_range:
         args.worker_port_range = [int(i) for i in args.worker_port_range.split(",")]
 
-    os.makedirs(args.logdir, exist_ok=True)
     setup_logging(
         logfile=os.path.join(args.logdir, "interchange.log"),
         debug=args.debug,

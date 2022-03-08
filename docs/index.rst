@@ -40,7 +40,7 @@ results. funcX securely communicates with remote endpoints, waits for resources
 to become available, and can even retry execution upon failure. funcX stores results (or
 errors) in the cloud-hosted service until they are retrieved by the user.
 
-.. image:: img/funcX-model.png
+.. image:: _static/images/funcX-model.png
 
 
 Using funcX
@@ -90,7 +90,7 @@ how to download and configure an endpoint for local (multi-process) execution. :
    quickstart
    sdk
    endpoints
-   Tutorial.ipynb
+   Tutorial
    actionprovider
    reference
    debugging

@@ -76,6 +76,7 @@ The deployment is configured via values.yaml file.
 | image.repository | Docker image repository |  funcx/kube-endpoint |
 | image.tag | Tag name for the endpoint image | endpoint_helm |
 | image.pullPolicy | Pod pull policy for the endpoint image |  Always |
+| workerDebug | Log additional information in the worker logs | False |
 | workerImage | Docker image to run in the worker pods |  python:3.6-buster |
 | workerInit | Command to execute on worker before strating uip | pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0 |
 | workerNamespace | Kubernetes namespace to launch worker pods into | default |
@@ -89,4 +90,5 @@ The deployment is configured via values.yaml file.
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
 | detachEndpoint | Run the endpoint as a daemon inside the pod? | true |
 | endpointUUID   | Specify an existing UUID to this endpoint. Leave blank to generate a new one | |
-
+| maxIdleTime  | The maximum time to maintain an idle worker. After this time the SimpleStrategy will terminate the idle worker. | 3600 |
+| imagePullSecret | The K8s secret to use to deploy worker images. This can refer to an ECR secret. | |

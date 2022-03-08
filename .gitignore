@@ -13,6 +13,7 @@ venv/*
 web/*
 api/*
 .idea/*
+.venv-*/
 
 #Parsl
 runinfo/

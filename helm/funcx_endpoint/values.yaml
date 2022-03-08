@@ -9,6 +9,7 @@ image:
   tag: main
   pullPolicy: Always
 
+workerDebug: false
 workerImage: python:3.6-buster
 workerInit: pip install funcx-endpoint>=0.2.0
 workerNamespace: default
@@ -26,6 +27,7 @@ initBlocks: 0
 minBlocks: 1
 maxBlocks: 100
 maxWorkersPerPod: 1
+maxIdleTime: 3600
 
 detachEndpoint: true
 

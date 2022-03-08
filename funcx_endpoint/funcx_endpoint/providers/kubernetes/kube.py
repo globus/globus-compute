@@ -142,7 +142,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         # Dictionary that keeps track of jobs, keyed on task_type
         self.resources_by_task_type = {}
 
-    def submit(self, cmd_string, tasks_per_node, task_type, job_name="funcx"):
+    def submit(self, cmd_string, tasks_per_node, task_type, job_name="funcx-worker"):
         """Submit a job
         Args:
              - cmd_string  :(String) - Name of the container to initiate
@@ -192,15 +192,14 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         return pod_name
 
     def status(self, job_ids):
-        """Get the status of a list of jobs identified by the job identifiers
+        """Get the status of a list of pods identified by the job identifiers
         returned from the submit request.
         Args:
              - job_ids (list) : A list of job identifiers
         Returns:
-             - A list of status from ['PENDING', 'RUNNING', 'CANCELLED', 'COMPLETED',
-               'FAILED', 'TIMEOUT'] corresponding to each job_id in the job_ids list.
-        Raises:
-             - ExecutionProviderExceptions or its subclasses
+             - A dictionary keyed by task_types, containing the count of
+               known pods known with that task type.
+               For example: {"RAW": 16}
         """
         # This is a hack
         log.debug("Getting Kubernetes provider status")

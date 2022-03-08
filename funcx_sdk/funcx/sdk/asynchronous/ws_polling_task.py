@@ -1,10 +1,14 @@
 import asyncio
 import json
 import logging
+import typing as t
 from asyncio import AbstractEventLoop
 
 import dill
-import websockets
+
+# import from `websockets.client`, see:
+#   https://github.com/aaugustin/websockets/issues/940
+import websockets.client
 from websockets.exceptions import (
     ConnectionClosedOK,
     InvalidHandshake,
@@ -14,6 +18,10 @@ from websockets.exceptions import (
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
 log = logging.getLogger(__name__)
+
+# Add extra allowance for result wrappers
+DEFAULT_RESULT_SIZE_LIMIT_MB = 10
+DEFAULT_RESULT_SIZE_LIMIT_B = (DEFAULT_RESULT_SIZE_LIMIT_MB + 1) * 1024 * 1024
 
 
 class WebSocketPollingTask:
@@ -76,21 +84,29 @@ class WebSocketPollingTask:
         # in main thread when batch submission is enabled, the task submission is in a
         # new thread
         asyncio.set_event_loop(self.loop)
-        self.task_group_ids_queue = asyncio.Queue()
-        self.pending_tasks = {}
-        self.unknown_results = {}
+        self.task_group_ids_queue: asyncio.Queue[str] = asyncio.Queue()
+        self.pending_tasks: t.Dict[str, FuncXTask] = {}
+        self.unknown_results: t.Dict[str, t.Any] = {}
 
         self.closed_by_main_thread = False
-        self.ws = None
+        self._ws: t.Optional[websockets.client.WebSocketClientProtocol] = None
 
         if auto_start:
             self.loop.create_task(self.init_ws())
 
+    @property
+    def ws(self) -> websockets.client.WebSocketClientProtocol:
+        if self._ws is None:
+            raise ValueError("cannot use websocket client without init")
+        return self._ws
+
     async def init_ws(self, start_message_handlers=True):
         headers = [self.get_auth_header()]
         try:
-            self.ws = await websockets.connect(
-                self.results_ws_uri, extra_headers=headers
+            self._ws = await websockets.client.connect(
+                self.results_ws_uri,
+                extra_headers=headers,
+                max_size=DEFAULT_RESULT_SIZE_LIMIT_B,
             )
         # initial Globus authentication happens during the HTTP portion of the
         # handshake, so an invalid handshake means that the user was not authenticated
