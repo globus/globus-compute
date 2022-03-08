@@ -146,7 +146,7 @@ class FuncxWebClient(globus_sdk.BaseClient):
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
         data = {
-            "endpoint_id": endpoint_name,
+            "endpoint_name": endpoint_name,
             "endpoint_uuid": str(endpoint_id),
             "version": endpoint_version,
         }
