@@ -60,9 +60,7 @@ def test_synch(conn_params, count=10):
     for i in range(count):
         message = tasks_out.get()
         assert messages[i] == message
-
-    proc.terminate()
-    return
+    proc.stop()
 
 
 def fallible_callback(queue: multiprocessing.Queue, message: bytes):
@@ -107,7 +105,7 @@ def test_subscriber_recovery(conn_params):
         assert messages[i] == message
 
     # Terminate the connection
-    proc.terminate()
+    proc.stop()
     logging.warning("Disconnected")
 
     # Launch 10 messages
@@ -123,16 +121,18 @@ def test_subscriber_recovery(conn_params):
         messages[i] = b_message
 
     # Listen for the messages on a new connection
+    disconnect_event.clear()
     proc = start_task_q_subscriber(tasks_out, disconnect_event, conn_params)
-    logging.warning("Proc started")
+
+    logging.warning("Replacement proc started")
     for i in range(10):
+        logging.warning("getting message")
         message = tasks_out.get()
         logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
-    proc.terminate()
+    proc.stop()
     task_q_pub.close()
-    return
 
 
 def test_exclusive_subscriber(conn_params):
@@ -177,11 +177,9 @@ def test_exclusive_subscriber(conn_params):
         logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
-    proc1.terminate()
-    proc2.terminate()
-
+    proc1.stop()
+    proc2.stop()
     task_q_pub.close()
-    return
 
 
 def test_combined_pub_sub_latency(conn_params, count=10):
@@ -210,7 +208,7 @@ def test_combined_pub_sub_latency(conn_params, count=10):
     )
 
     task_q_pub.close()
-    proc.terminate()
+    proc.stop()
 
 
 def test_combined_throughput(conn_params, count=1000):
@@ -243,4 +241,4 @@ def test_combined_throughput(conn_params, count=1000):
         )
 
     task_q_pub.close()
-    proc.terminate()
+    proc.stop()

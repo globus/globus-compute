@@ -24,7 +24,7 @@ def test_terminate(conn_params):
     task_q.start()
     time.sleep(3)
     logging.warning("Calling terminate")
-    task_q.close()
+    task_q.stop()
     with pytest.raises(ValueError):
         # Expected to raise ValueError since the process should
         # be terminated at this point from the close() call
