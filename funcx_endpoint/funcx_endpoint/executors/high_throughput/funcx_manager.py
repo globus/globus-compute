@@ -650,18 +650,16 @@ class Manager:
         log.debug("Sending complete!")
 
     def _status_report_loop(self, kill_event):
-        log.debug("[STATUS] Manager status reporting loop starting")
+        log.debug("Manager status reporting loop starting")
 
         while not kill_event.is_set():
             msg = ManagerStatusReport(
                 self.task_status_deltas,
                 self.container_switch_count,
             )
-            log.info(
-                f"[STATUS] Sending status report to interchange: {msg.task_statuses}"
-            )
+            log.info(f"Sending status report to interchange: {msg.task_statuses}")
             self.pending_result_queue.put(msg)
-            log.info("[STATUS] Clearing task deltas")
+            log.info("Clearing task deltas")
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
 

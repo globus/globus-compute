@@ -112,7 +112,11 @@ def dispatch(
             else:
                 interesting_managers.remove(manager)
 
-    log.debug(
+    # if we're doing task dispatch, then we should log the individual
+    # tasks that were dispatched, as individual entities
+    # - so more log lines on task dispatch, but fewer on the high
+    # speed poll loop.
+    log.trace(
         "The task dispatch of {} loop is {}, in total {} tasks".format(
             loop, task_dispatch, dispatched_tasks
         )

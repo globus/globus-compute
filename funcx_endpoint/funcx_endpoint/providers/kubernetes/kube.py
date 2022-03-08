@@ -1,7 +1,7 @@
 import logging
 import queue
 import time
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import typeguard
 from parsl.errors import OptionalModuleMissing
@@ -137,9 +137,14 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
 
         self.kube_client = client.CoreV1Api()
 
-        # Dictionary that keeps track of jobs, keyed on job_id
-        self.resources_by_pod_name = {}
-        # Dictionary that keeps track of jobs, keyed on task_type
+        # Dictionary that keeps track of jobs, keyed on job_id. Values are a
+        # dictionary of attribute/values.
+        # The valid attributes are "status" and "type".
+        self.resources_by_pod_name = {}  # type: Dict[str, Dict[str, str]]
+
+        # Dictionary that keeps track of jobs, keyed on task_type. Values are
+        # a Queue of task IDs to be used by cancel code to find pods to delete
+        # of a particular type.
         self.resources_by_task_type = {}
 
     def submit(self, cmd_string, tasks_per_node, task_type, job_name="funcx-worker"):
@@ -172,7 +177,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             command=cmd_string, worker_init=self.worker_init
         )
 
-        log.info(f"[KUBERNETES] Scaling out a pod with name :{pod_name}")
+        log.info(f"Creating pod {pod_name} of type {task_type}")
         self._create_pod(
             image=image,
             pod_name=pod_name,
@@ -202,13 +207,55 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                For example: {"RAW": 16}
         """
         # This is a hack
-        log.debug("Getting Kubernetes provider status")
+
+        log.trace(f"Getting Kubernetes provider status: job_ids list {job_ids}")
         status = {}
         for jid in job_ids:
+            log.trace(f"Processing job id {jid} for kube provider status")
             if jid in self.resources_by_pod_name:
-                task_type = self.resources_by_pod_name[jid]["task_type"]
-                status[task_type] = status.get(task_type, 0) + 1
+                log.trace(f"Job {jid} is in resources_by_pod_name - getting status")
 
+                log.trace("BEGIN BENC NEW VALIDATION PATH")  # XXX TODO
+
+                valid = False
+
+                try:
+                    # this returns a status, but we don't test anything
+                    # against it
+                    self.kube_client.read_namespaced_pod_status(
+                        name=jid, namespace=self.namespace
+                    )
+                    valid = True  # TODO: is there anything deeper we can ask
+                    # about the pod to discover if it exists but
+                    # shouldn't be counted? Maybe not for this
+                    # particular quick validation. We're just
+                    # getting the pod status and using the
+                    # exception or not-exceptionness as the signal.
+                except Exception:
+                    log.exception(f"Exception polling pod {jid}")
+                    # if self.resources[jid]['status'] is JobStatus(JobState.RUNNING):
+                    #     phase = 'Unknown'
+                # else:
+                #    phase = pod_status.status.phase
+                log.trace("END BENC NEW VALIDATION PATH")  # XXX TODO
+
+                task_type = self.resources_by_pod_name[jid]["task_type"]
+
+                if valid:
+                    log.trace(
+                        f"Incremented status count for task type {task_type} "
+                        "without validating resources_by_pod_name"
+                    )
+                    status[task_type] = status.get(task_type, 0) + 1
+                else:
+                    log.debug(
+                        "Pod was not validated - "
+                        f"not counting for task type {task_type}"
+                    )
+            else:
+                log.debug(f"Job {jid} is not in resources_by_pod_name - skipping")
+
+        log.trace(f"Kubernetes provider status result to return: {status}")
         return status
 
     def cancel(self, num_pods, task_type=None):
@@ -235,10 +282,11 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         [True/False...] : If the cancel operation fails the entire list will be False.
         """
         for job in job_ids:
-            log.debug(f"Terminating job/proc_id: {job}")
-            # Here we are assuming that for local, the job_ids are the process id's
+            log.debug(f"Terminating job/pod {job}: {job}")
             self._delete_pod(job)
 
+            # ? why do this status change if immediate delete?
+            # The structure isn't referred to anywhere else, I think?
             self.resources_by_pod_name[job]["status"] = "CANCELLED"
             del self.resources_by_pod_name[job]
         log.debug(
@@ -334,7 +382,10 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
 
         metadata = client.V1ObjectMeta(name=pod_name, labels={"app": job_name})
         spec = client.V1PodSpec(
-            containers=[container], image_pull_secrets=[secret], volumes=volume_defs
+            containers=[container],
+            image_pull_secrets=[secret],
+            volumes=volume_defs,
+            restart_policy="Never",
         )
 
         pod = client.V1Pod(spec=spec, metadata=metadata)

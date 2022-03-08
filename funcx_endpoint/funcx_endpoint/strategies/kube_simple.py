@@ -38,7 +38,7 @@ class KubeSimpleStrategy(BaseStrategy):
         try:
             self._strategize(*args, **kwargs)
         except Exception as e:
-            log.exception(f"Caught error in strategize : {e}")
+            log.exception(f"Caught error in strategize: {e}")
 
     def _strategize(self, *args, **kwargs):
         max_pods = self.interchange.provider.max_blocks
@@ -54,17 +54,18 @@ class KubeSimpleStrategy(BaseStrategy):
         parallelism = self.interchange.provider.parallelism
 
         active_tasks = self.interchange.get_total_tasks_outstanding()
-        log.debug(f"Pending tasks : {active_tasks}")
+
+        log.trace(f"Pending tasks: {active_tasks}")
 
         status = self.interchange.provider_status()
-        log.debug(f"Provider status : {status}")
+        log.trace(f"Provider status: {status}")
 
         for task_type in active_tasks.keys():
             active_pods = status.get(task_type, 0)
             active_slots = active_pods * workers_per_pod * managers_per_pod
             active_tasks_per_type = active_tasks[task_type]
 
-            log.debug(
+            log.trace(
                 "Endpoint has %s active tasks of %s, %s active blocks, "
                 "%s connected workers for %s",
                 active_tasks_per_type,
@@ -123,5 +124,5 @@ class KubeSimpleStrategy(BaseStrategy):
                     self.interchange.scale_out(excess_blocks, task_type=task_type)
             # Immediatly scale if we are stuck with zero pods and work to do
             elif active_slots == 0 and active_tasks_per_type > 0:
-                log.info("Requesting single pod")
+                log.info("Requesting single block")
                 self.interchange.scale_out(1, task_type=task_type)

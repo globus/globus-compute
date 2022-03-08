@@ -61,7 +61,7 @@ class SimpleStrategy(BaseStrategy):
 
         active_tasks = sum(self.interchange.get_total_tasks_outstanding().values())
         status = self.interchange.provider_status()
-        log.debug(f"Provider status : {status}")
+        log.debug(f"Provider status: {status}")
 
         running = sum(1 for x in status if x.state == JobState.RUNNING)
         pending = sum(1 for x in status if x.state == JobState.PENDING)

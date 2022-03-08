@@ -59,6 +59,7 @@ def _get_file_dict_config(logfile: str, console_enabled: bool, debug: bool) -> d
         "version": 1,
         "formatters": {
             "streamfmt": {
+                "format": DEFAULT_FORMAT,
                 "()": "funcx_endpoint.logging_config.FuncxConsoleFormatter",
                 "debug": debug,
             },
@@ -74,12 +75,10 @@ def _get_file_dict_config(logfile: str, console_enabled: bool, debug: bool) -> d
                 "formatter": "streamfmt",
             },
             "logfile": {
-                "class": "logging.handlers.RotatingFileHandler",
+                "class": "logging.FileHandler",
                 "level": "DEBUG",
                 "filename": logfile,
                 "formatter": "filefmt",
-                "maxBytes": 100 * 1024 * 1024,
-                "backupCount": 1,
             },
         },
         "loggers": {
