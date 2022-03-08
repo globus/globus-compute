@@ -43,6 +43,13 @@ jobs:
 
   test-endpoint:
     runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq
+        ports:
+          - 5672:5672
+        # needed because the rabbitmq container does not provide a healthcheck
+        options: --health-cmd "rabbitmqctl node_health_check" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v1
@@ -58,7 +65,7 @@ jobs:
       - name: run pytest
         run: |
           PYTHONPATH=funcx_endpoint python -m coverage run -m pytest funcx_endpoint/tests/funcx_endpoint
-
+          PYTHONPATH=funcx_endpoint python -m coverage run -m pytest funcx_endpoint/tests/test_rabbit_mq
   publish:
     # only trigger on pushes to the main repo (not forks, and not PRs)
     if: ${{ github.repository == 'funcx-faas/funcX' && github.event_name == 'push' }}

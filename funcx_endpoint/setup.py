@@ -40,6 +40,7 @@ REQUIRES = [
     # of different features and functions
     # pin exact versions because it does not use semver
     "parsl==1.1.0",
+    "pika>=1.2.0",
 ]
 
 TEST_REQUIRES = [
