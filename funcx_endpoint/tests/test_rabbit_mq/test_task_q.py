@@ -177,13 +177,9 @@ def test_exclusive_subscriber(conn_params):
         logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
-    proc1.stop(block=False)
-    proc2.stop(block=False)
-    proc1.wait_until_stopped()
-    proc2.wait_until_stopped()
-
+    proc1.stop()
+    proc2.stop()
     task_q_pub.close()
-    return
 
 
 def test_combined_pub_sub_latency(conn_params, count=10):

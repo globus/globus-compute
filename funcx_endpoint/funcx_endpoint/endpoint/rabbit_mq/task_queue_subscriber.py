@@ -60,7 +60,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self.conn_params = pika_conn_params
         self.external_queue = external_queue
         self.kill_event: multiprocessing.Event = kill_event
-        self.cleanup_complete = multiprocessing.Event()
+        self._channel_closed = multiprocessing.Event()
+        self._cleanup_complete = multiprocessing.Event()
 
         self.queue_name = f"{self.endpoint_uuid}.tasks"
         self.routing_key = f"{self.endpoint_uuid}.tasks"
@@ -140,16 +141,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
         """
         logger.info(f"Channel opened: {channel}")
         self._channel = channel
-        self.add_on_channel_close_callback()
-        self.setup_exchange(self.EXCHANGE_NAME)
-
-    def add_on_channel_close_callback(self):
-        """This method tells pika to call the on_channel_closed method if
-        RabbitMQ unexpectedly closes the channel.
-
-        """
         logger.info("Adding channel close callback")
         self._channel.add_on_close_callback(self._on_channel_closed)
+        self.setup_exchange(self.EXCHANGE_NAME)
 
     def _on_channel_closed(self, channel, exception):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
@@ -157,6 +151,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
         violates the protocol, such as re-declare an EXCHANGE_NAME or queue with
         different parameters. In this case, we'll close the connection
         to shutdown the object.
+
+        This is also invoked at the end of a successful client-initiated close, as when
+        `connection.close()` is called and closes any open channels.
 
         :param pika.channel.Channel: The closed channel
         :param Exception: exception from pika
@@ -178,6 +175,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
                 f"Channel closed with code:{exception.reply_code}, "
                 f"error:{exception.reply_text}"
             )
+        logger.debug("marking channel as closed")
+        self._channel_closed.set()
 
     def setup_exchange(self, exchange_name):
         """Setup the EXCHANGE_NAME on RabbitMQ by invoking the Exchange.Declare RPC
@@ -356,12 +355,15 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self._connection.close()
         logger.debug("stopping ioloop")
         self._connection.ioloop.stop()
+        logger.debug("waiting until channel is closed (timeout=1 second)")
+        if not self._channel_closed.wait(1.0):
+            logger.warning("reached timeout while waiting for channel closed")
         logger.debug("closing connection to mp queue")
         self.external_queue.close()
         logger.debug("joining mp queue background thread")
         self.external_queue.join_thread()
         logger.info("shutdown done, setting cleanup event")
-        self.cleanup_complete.set()
+        self._cleanup_complete.set()
 
     def event_watcher(self):
         """Polls the kill_event periodically to trigger a shutdown"""
@@ -393,16 +395,13 @@ class TaskQueueSubscriber(multiprocessing.Process):
         except Exception:
             logger.exception("Failed to start subscriber")
 
-    def stop(self, *, block: bool = True) -> None:
+    def stop(self) -> None:
         """stop() is called by the parent to shutdown the subscriber"""
         logger.info("Stopping")
         self.kill_event.set()
-        if block:
-            self.wait_until_stopped()
-
-    def wait_until_stopped(self) -> None:
         logger.info("Waiting for cleanup_complete")
-        self.cleanup_complete.wait(2 * self._watcher_poll_period)
+        if not self._cleanup_complete.wait(2 * self._watcher_poll_period):
+            logger.warning("Reached timeout while waiting for cleanup complete")
         # join shouldn't block if the above did not raise a timeout
         self.join()
         self.close()
