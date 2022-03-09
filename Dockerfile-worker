@@ -1,0 +1,12 @@
+ARG PYTHON_VERSION="3.8"
+FROM python:${PYTHON_VERSION}
+# RUN pip install funcx-endpoint>=0.2.0
+
+COPY funcx_sdk /opt/funcx/funcx_sdk/
+WORKDIR /opt/funcx/funcx_sdk
+RUN pip install .
+
+COPY funcx_endpoint /opt/funcx/funcx_endpoint
+WORKDIR /opt/funcx/funcx_endpoint
+RUN pip install .
+
