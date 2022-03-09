@@ -79,15 +79,15 @@ def dispatch(
                         real_capacity,
                         loop=loop,
                     )
-                log.debug(f"[MAIN] Get tasks {tasks} from queue")
                 if tasks:
+                    log.debug(f"Got {len(tasks)} tasks from queue")
                     for task_type in tids:
                         # This line is a set update, not dict update
                         ready_manager_queue[manager]["tasks"][task_type].update(
                             tids[task_type]
                         )
                     log.debug(
-                        "[MAIN] The tasks on manager {} is {}".format(
+                        "The tasks on manager {} is {}".format(
                             manager, ready_manager_queue[manager]["tasks"]
                         )
                     )
@@ -96,18 +96,18 @@ def dispatch(
                         task_dispatch[manager] = []
                     task_dispatch[manager] += tasks
                     dispatched_tasks += len(tasks)
-                    log.debug(f"[MAIN] Assigned tasks {tids} to manager {manager}")
+                    log.debug(f"Assigned tasks {tids} to manager {manager}")
                 if ready_manager_queue[manager]["free_capacity"]["total_workers"] > 0:
-                    log.debug(
-                        "[MAIN] Manager {} still has free_capacity {}".format(
+                    log.trace(
+                        "Manager {} still has free_capacity {}".format(
                             manager,
                             ready_manager_queue[manager]["free_capacity"][
                                 "total_workers"
-                            ],
-                        )
-                    )
+                          ],
+                       )
+                     )
                 else:
-                    log.debug(f"[MAIN] Manager {manager} is now saturated")
+                    log.debug(f"Manager {manager} is now saturated")
                     interesting_managers.remove(manager)
             else:
                 interesting_managers.remove(manager)
@@ -150,7 +150,7 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
                 real_capacity -= 1
 
     # dispatch tasks to unused slots based on the manager type
-    log.debug("Second round of task fetching in hard mode")
+    log.trace("Second round of task fetching in hard mode")
     while manager_ads["free_capacity"]["free"]["unused"] > 0 and real_capacity > 0:
         try:
             x = pending_task_queue[task_type].get(block=False)
