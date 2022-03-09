@@ -72,7 +72,7 @@ class EndpointInterchange:
     def __init__(
         self,
         config: funcx_endpoint.endpoint.utils.config.Config,
-        reg_info: pika.connection.Parameters,
+        reg_info: pika.connection.Parameters = None,
         logdir=".",
         endpoint_id=None,
         endpoint_dir=".",
@@ -88,7 +88,8 @@ class EndpointInterchange:
 
         reg_info : pika.connection.Parameters
              Connection parameters to connect to the service side RabbitMQ pipes
-             Required
+             Optional: If not supplied, the endpoint will use a retry loop to
+             attempt registration periodically.
 
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'
@@ -124,9 +125,10 @@ class EndpointInterchange:
         self.funcx_client = FuncXClient(**funcx_client_options)
 
         self.initial_registration_complete = False
-
-        self.connection_params = reg_info
-        self.initial_registration_complete = True
+        self.connection_params = None
+        if reg_info:
+            self.connection_params = reg_info
+            self.initial_registration_complete = True
 
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold

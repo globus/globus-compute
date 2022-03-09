@@ -14,7 +14,6 @@ import daemon.pidfile
 import psutil
 import texttable
 import typer
-import zmq
 from globus_sdk import GlobusAPIError, NetworkError
 
 from funcx.sdk.client import FuncXClient
@@ -163,15 +162,6 @@ class Endpoint:
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
         endpoint_json = os.path.join(endpoint_dir, "endpoint.json")
 
-        # These certs need to be recreated for every registration
-        keys_dir = os.path.join(endpoint_dir, "certificates")
-        os.makedirs(keys_dir, exist_ok=True)
-        client_public_file, client_secret_file = zmq.auth.create_certificates(
-            keys_dir, "endpoint"
-        )
-        client_public_key, _ = zmq.auth.load_certificate(client_public_file)
-        client_public_key = client_public_key.decode("utf-8")
-
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.config.executors:
             raise Exception(
@@ -182,6 +172,7 @@ class Endpoint:
         funcx_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
             "check_endpoint_version": True,
+            "use_offprocess_checker": False,
         }
         funcx_client = FuncXClient(**funcx_client_options)
 
@@ -319,7 +310,6 @@ class Endpoint:
             self.daemon_launch(
                 endpoint_uuid,
                 endpoint_dir,
-                keys_dir,
                 endpoint_config,
                 reg_info,
                 funcx_client_options,
@@ -330,31 +320,23 @@ class Endpoint:
         self,
         endpoint_uuid,
         endpoint_dir,
-        keys_dir,
         endpoint_config,
         reg_info,
         funcx_client_options,
         results_ack_handler,
     ):
-        # Configure the parameters for the interchange
-        optionals = {}
-        if "endpoint_address" in self.funcx_config:
-            optionals["interchange_address"] = self.funcx_config["endpoint_address"]
-
-        ic = EndpointInterchange(
-            endpoint_config.config,
+        interchange = EndpointInterchange(
+            config=endpoint_config.config,
+            reg_info=reg_info,
             endpoint_id=endpoint_uuid,
-            keys_dir=keys_dir,
             endpoint_dir=endpoint_dir,
             endpoint_name=self.name,
-            reg_info=reg_info,
             funcx_client_options=funcx_client_options,
             results_ack_handler=results_ack_handler,
             logdir=endpoint_dir,
-            **optionals,
         )
 
-        ic.start()
+        interchange.start()
 
         log.critical("Interchange terminated.")
 
