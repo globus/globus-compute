@@ -6,8 +6,8 @@ Changelog
 funcx & funcx-endpoint v0.3.7
 -----------------------------
 
- Bug Fixes
- ^^^^^^^^^
+Bug Fixes
+^^^^^^^^^
 
 - When a provider raised an exception, that exception was then mishandled
   and presented as an AttributeError. This handling now no longer corrupts
@@ -483,7 +483,8 @@ New Functionality
   * funcx-endpoint connects to a forwarder service over an encrypted (Curve25519 elliptic curve) ZMQ channel using the server certificates.
   * If the connection is terminated this whole process repeats.
 
-* Significant changes to the `Config object`. All options related to executors have been moved from the top level Config object to the executor object. Refer to the `configuration <configuration> section for more details. Here's an example of the config change:
+* Significant changes to the `Config object`. All options related to executors have been moved from the top level Config object to the executor object.
+  Refer to the `configuration <configuration>`_ section for more details. Here's an example of the config change:
 
     This is the old style config:
 
@@ -542,8 +543,8 @@ New Functionality
     .. code-block:: json
 
         {
-          'status': 'Success',
-          'task_uuids': ['task_id_1', 'task_id_2', ...]
+          "status": "Success",
+          "task_uuids": ["task_id_1", "task_id_2", "..."]
         }
 
     This is the new response format, where some task submissions have failed:
@@ -551,21 +552,21 @@ New Functionality
     .. code-block:: json
 
         {
-          'response': 'batch',
-          'results': [
+          "response": "batch",
+          "results": [
             {
-              'status': 'Success',
-              'task_uuid': 'task_id_1',
-              'http_status_code': 200
+              "status": "Success",
+              "task_uuid": "task_id_1",
+              "http_status_code": 200
             },
             {
-              'status': 'Failed',
-              'code': 1,
-              'task_uuid': 'task_id_2',
-              'http_status_code': 4XX/5XX,
-              'error_args': [...]
+              "status": "Failed",
+              "code": 1,
+              "task_uuid": "task_id_2",
+              "http_status_code": 400,
+              "error_args": ["..."]
             },
-            ...
+            "..."
           ]
         }
 
