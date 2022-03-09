@@ -103,7 +103,8 @@ class FuncXWorker:
             p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
             task_id = pickle.loads(p_task_id)
             container_id = pickle.loads(p_container_id)
-            log.debug(f"Received task_id:{task_id} with task:{msg}")
+            log.debug(f"Received task_id: {task_id}")
+            # log.debug(f"Received task_id: {task_id} with task:{msg}")
 
             result = None
             task_type = None
