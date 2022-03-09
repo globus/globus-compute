@@ -46,7 +46,9 @@ def make_mock_task():
 
 
 def run_ix_process(reg_info, endpoint_uuid):
-    results_ack_handler = ResultsAckHandler(endpoint_dir=".")
+    results_ack_handler = ResultsAckHandler(
+        endpoint_dir="../../test_ep_with_mock_service"
+    )
     ix = EndpointInterchange(
         config=config,
         endpoint_id=endpoint_uuid,
@@ -82,6 +84,7 @@ def test_endpoint_interchange_against_rabbitmq(endpoint_uuid):
         endpoint_uuid=endpoint_uuid, pika_conn_params=reg_info
     )
     task_q_out.connect()
+    task_q_out._channel.queue_purge(task_q_out.queue_name)
     logging.warning(f"Publishing task to {endpoint_uuid}")
 
     result_q_in = multiprocessing.Queue()
