@@ -6,6 +6,8 @@ import queue
 
 import pika
 
+from .base import SubscriberProcessStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,38 +18,48 @@ class ResultQueueSubscriber(multiprocessing.Process):
 
     """
 
+    QUEUE_NAME = "results"
+    ROUTING_KEY = "*.results"
+    EXCHANGE_NAME = "results"
+    EXCHANGE_TYPE = "topic"
+
     def __init__(
         self,
-        pika_conn_params: pika.connection.Parameters,
+        *,
+        conn_params: pika.connection.Parameters,
         external_queue: multiprocessing.Queue,
+        kill_event: multiprocessing.Event,
     ):
         """
 
         Parameters
         ----------
-        pika_conn_params: Connection Params
+        conn_params: Connection Params
 
         external_queue: multiprocessing.Queue
              Each incoming message will be pushed to the queue.
              Please note that upon pushing a message into this queue, it will be
              marked as delivered.
 
+        kill_event: multiprocessing.Event
+             An event object used to signal shutdown to the subscriber process.
         """
         super().__init__()
-        self.conn_params = pika_conn_params
+        self.status = SubscriberProcessStatus.parent
+
+        self.conn_params = conn_params
         self.external_queue = external_queue
-        self.queue_name = "results"
-        self.routing_key = "*.results"
-        self.exchange_name = "results"
-        self.exchange_type = "topic"
+        self.kill_event = kill_event
+        self._channel_closed = multiprocessing.Event()
+        self._cleanup_complete = multiprocessing.Event()
+        self._watcher_poll_period_s = 0.1  # seconds
 
         self._connection = None
         self._channel = None
 
-        self._closing = False
         logger.debug("Init done")
 
-    def _connect(self):
+    def _connect(self) -> pika.SelectConnection:
         logger.info("Connecting to %s", self.conn_params)
         return pika.SelectConnection(
             self.conn_params,
@@ -74,7 +86,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
 
         """
         logger.info("Handling connection closed")
-        if self._closing is True or isinstance(
+        if self.status is SubscriberProcessStatus.closing or isinstance(
             exception, pika.exceptions.ConnectionClosedByClient
         ):
             logger.info("Closing connection from client")
@@ -90,8 +102,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         # This is the old connection IOLoop instance, stop its ioloop
         self._connection.ioloop.stop()
 
-        if not self._closing:
-
+        if self.status is not SubscriberProcessStatus.closing:
             # Create a new connection
             self._connection = self._connect()
 
@@ -110,10 +121,10 @@ class ResultQueueSubscriber(multiprocessing.Process):
         logger.debug(f"Channel opened: {channel}")
         self._channel = channel
         self._channel.add_on_close_callback(self._on_channel_closed)
-        logger.info(f"Declaring EXCHANGE_NAME {self.exchange_name}")
+        logger.info(f"Declaring EXCHANGE_NAME {self.EXCHANGE_NAME}")
         self._channel.exchange_declare(
-            exchange=self.exchange_name,
-            exchange_type=self.exchange_type,
+            exchange=self.EXCHANGE_NAME,
+            exchange_type=self.EXCHANGE_TYPE,
             callback=self._on_exchange_declareok,
         )
 
@@ -129,11 +140,20 @@ class ResultQueueSubscriber(multiprocessing.Process):
         :param str reply_text: The text reason the channel was closed
 
         """
-        logger.warning(
-            f"Channel:{channel} was closed: {exception.reply_code}:"
-            " {exception.reply_text}"
-        )
-        self._connection.close()
+        logger.warning(f"Channel: {channel} was closed: {exception}")
+        if isinstance(exception, pika.exceptions.ChannelClosedByBroker):
+            logger.warning("Channel closed by RabbitMQ broker")
+            self.status = SubscriberProcessStatus.closing
+            self.kill_event.set()
+        elif isinstance(exception, pika.exceptions.ChannelClosedByClient):
+            logger.debug("Detected channel closed by client")
+        else:
+            logger.exception(
+                f"Channel closed with code:{exception.reply_code}, "
+                f"error:{exception.reply_text}"
+            )
+        logger.debug("marking channel as closed")
+        self._channel_closed.set()
 
     def _on_exchange_declareok(self, unused_frame):
         """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
@@ -142,8 +162,8 @@ class ResultQueueSubscriber(multiprocessing.Process):
         :param pika.Frame.Method unused_frame: Exchange.DeclareOk response frame
 
         """
-        logger.info("Exchange declared. Declaring queue %s", self.queue_name)
-        self._channel.queue_declare(self.queue_name, callback=self._on_queue_declareok)
+        logger.info("Exchange declared. Declaring queue %s", self.QUEUE_NAME)
+        self._channel.queue_declare(self.QUEUE_NAME, callback=self._on_queue_declareok)
 
     def _on_queue_declareok(self, method_frame):
         """Method invoked by pika when the Queue.Declare RPC call made in
@@ -155,12 +175,12 @@ class ResultQueueSubscriber(multiprocessing.Process):
         :param pika.frame.Method method_frame: The Queue.DeclareOk frame
 
         """
-        logger.info(f"Binding EXCHANGE_NAME:{self.exchange_name} to {self.queue_name}")
+        logger.info(f"Binding EXCHANGE_NAME: {self.EXCHANGE_NAME} to {self.QUEUE_NAME}")
 
         self._channel.queue_bind(
-            queue=self.queue_name,
-            exchange=self.exchange_name,
-            routing_key=self.routing_key,
+            queue=self.QUEUE_NAME,
+            exchange=self.EXCHANGE_NAME,
+            routing_key=self.ROUTING_KEY,
             callback=self._on_bindok,
         )
 
@@ -189,7 +209,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
         logger.debug("Waiting for basic_consume")
         self._channel.basic_consume(
-            self.queue_name, on_message_callback=self.on_message, exclusive=True
+            self.QUEUE_NAME, on_message_callback=self.on_message, exclusive=True
         )
 
     def on_consumer_cancelled(self, method_frame):
@@ -250,20 +270,59 @@ class ResultQueueSubscriber(multiprocessing.Process):
         logger.info("RabbitMQ acknowledged the cancellation of the consumer")
         self._channel.close()
 
+    def _shutdown(self):
+        logger.debug("set status to 'closing'")
+        self.status = SubscriberProcessStatus.closing
+        logger.debug("closing connection")
+        self._connection.close()
+        logger.debug("stopping ioloop")
+        self._connection.ioloop.stop()
+        logger.debug("waiting until channel is closed (timeout=1 second)")
+        if not self._channel_closed.wait(1.0):
+            logger.warning("reached timeout while waiting for channel closed")
+        logger.debug("closing connection to mp queue")
+        self.external_queue.close()
+        logger.debug("joining mp queue background thread")
+        self.external_queue.join_thread()
+        logger.info("shutdown done, setting cleanup event")
+        self._cleanup_complete.set()
+
+    def event_watcher(self):
+        """Polls the kill_event periodically to trigger a shutdown"""
+        if self.kill_event.is_set():
+            logger.info("Kill event is set. Start subscriber shutdown")
+            try:
+                self._shutdown()
+            except Exception:
+                logger.exception("error while shutting down")
+                raise
+            logger.info("Shutdown complete")
+        else:
+            self._connection.ioloop.call_later(
+                self._watcher_poll_period_s, self.event_watcher
+            )
+
     def run(self):
         """Run the example consumer by connecting to RabbitMQ and then
         starting the IOLoop to block and allow the SelectConnection to operate.
 
         """
-        self._connection = self._connect()
-        self._connection.ioloop.start()
+        self.status = SubscriberProcessStatus.running
+        try:
+            self._connection = self._connect()
+            self.event_watcher()
+            self._connection.ioloop.start()
+        except Exception:
+            logger.exception("Failed to start subscriber")
 
-    def close(self) -> None:
-        """Close the connection"""
-        logger.info("Attempting connection close")
-        self._closing = True
-        self.stop_consuming()
-        self._connection.close()
+    def stop(self) -> None:
+        """stop() is called by the parent to shutdown the subscriber"""
+        logger.info("Stopping")
+        self.kill_event.set()
+        logger.info("Waiting for cleanup_complete")
+        if not self._cleanup_complete.wait(2 * self._watcher_poll_period_s):
+            logger.warning("Reached timeout while waiting for cleanup complete")
+        # join shouldn't block if the above did not raise a timeout
         self.join()
-        super().close()
-        logger.info("Connection closed")
+        self.close()
+        logger.info("Cleanup done")

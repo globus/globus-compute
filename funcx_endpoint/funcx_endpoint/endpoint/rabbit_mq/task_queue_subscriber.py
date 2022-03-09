@@ -1,22 +1,11 @@
-import enum
 import logging
 import multiprocessing
 
 import pika
 
+from .base import SubscriberProcessStatus
+
 logger = logging.getLogger(__name__)
-
-
-# a status enum to describe the different states of the TaskQueueSubscriber
-class SubscriberProcessStatus(enum.Enum):
-    # the object is in the parent process, it has no notion of the process state other
-    # than that it is none of the other values
-    parent = enum.auto()
-    # the process is in the child proc and should try to start or continue to run
-    running = enum.auto()
-    # the process is in the child proc and is closing down, it should not try to
-    # reconnect or otherwise handle failures
-    closing = enum.auto()
 
 
 class TaskQueueSubscriber(multiprocessing.Process):
@@ -31,10 +20,11 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
     def __init__(
         self,
-        pika_conn_params: pika.connection.Parameters,
+        *,
+        endpoint_id: str,
+        conn_params: pika.connection.Parameters,
         external_queue: multiprocessing.Queue,
         kill_event: multiprocessing.Event,
-        endpoint_uuid: str,
     ):
         """
 
@@ -50,22 +40,21 @@ class TaskQueueSubscriber(multiprocessing.Process):
         kill_event: multiprocessing.Event
              This event is used to communicate a failure on the subscriber
 
-        endpoint_uuid: endpoint uuid string
+        endpoint_id: endpoint uuid string
         """
 
         super().__init__()
         self.status = SubscriberProcessStatus.parent
 
-        self.endpoint_uuid = endpoint_uuid
-        self.conn_params = pika_conn_params
+        self.endpoint_id = endpoint_id
+        self.conn_params = conn_params
         self.external_queue = external_queue
-        self.kill_event: multiprocessing.Event = kill_event
+        self.kill_event = kill_event
         self._channel_closed = multiprocessing.Event()
         self._cleanup_complete = multiprocessing.Event()
 
-        self.queue_name = f"{self.endpoint_uuid}.tasks"
-        self.routing_key = f"{self.endpoint_uuid}.tasks"
-        self.params = pika_conn_params
+        self.queue_name = f"{self.endpoint_id}.tasks"
+        self.routing_key = f"{self.endpoint_id}.tasks"
 
         self._connection = None
         self._channel = None
@@ -74,7 +63,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.debug("Init done")
 
     def _connect(self) -> pika.SelectConnection:
-        logger.info("Connecting to %s", self.params)
+        logger.info("Connecting to %s", self.conn_params)
         return pika.SelectConnection(
             self.conn_params,
             on_open_callback=self._on_connection_open,
@@ -160,6 +149,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         """
         logger.warning(f"Channel:{channel} was closed: ({exception}")
         if isinstance(exception, pika.exceptions.ChannelClosedByBroker):
+            logger.warning("Channel closed by RabbitMQ broker")
             if "exclusive use" in exception.reply_text:
                 logger.exception(
                     "Channel closed by RabbitMQ broker due to exclusive "

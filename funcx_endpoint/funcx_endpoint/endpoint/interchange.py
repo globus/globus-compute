@@ -210,14 +210,15 @@ class EndpointInterchange:
                 f" as {endpoint_uuid}"
             )
             task_q_proc = TaskQueueSubscriber(
-                pika_conn_params=connection_params,
+                conn_params=connection_params,
                 external_queue=pending_task_queue,
                 kill_event=quiesce_event,
-                endpoint_uuid=endpoint_uuid,
+                endpoint_id=endpoint_uuid,
             )
             task_q_proc.start()
         except Exception:
             log.exception("Unhandled exception in TaskQueueSubscriber")
+            raise
 
         return task_q_proc
 
@@ -341,7 +342,7 @@ class EndpointInterchange:
 
         self.results_outgoing = ResultQueuePublisher(
             endpoint_id=self.endpoint_id,
-            pika_conn_params=self.result_q_connection_params["pika_conn_params"],
+            conn_params=self.result_q_connection_params["pika_conn_params"],
         )
 
         self.results_outgoing.connect()
