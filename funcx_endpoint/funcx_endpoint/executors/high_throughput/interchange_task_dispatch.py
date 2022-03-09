@@ -79,8 +79,10 @@ def dispatch(
                         real_capacity,
                         loop=loop,
                     )
-                log.debug(f"[MAIN] Get tasks {tasks} from queue")
+                # TODO: trace? or move into `if tasks`
+                # log.debug(f"[MAIN] Get tasks {tasks} from queue")
                 if tasks:
+                    log.debug(f"Got {len(tasks)} tasks from queue")
                     for task_type in tids:
                         # This line is a set update, not dict update
                         ready_manager_queue[manager]["tasks"][task_type].update(
@@ -98,14 +100,16 @@ def dispatch(
                     dispatched_tasks += len(tasks)
                     log.debug(f"[MAIN] Assigned tasks {tids} to manager {manager}")
                 if ready_manager_queue[manager]["free_capacity"]["total_workers"] > 0:
-                    log.debug(
-                        "[MAIN] Manager {} still has free_capacity {}".format(
-                            manager,
-                            ready_manager_queue[manager]["free_capacity"][
-                                "total_workers"
-                            ],
-                        )
-                    )
+                    pass
+                    # TODO: TRACE level
+                    #log.debug(
+                    #    "[MAIN] Manager {} still has free_capacity {}".format(
+                    #        manager,
+                    #        ready_manager_queue[manager]["free_capacity"][
+                    #            "total_workers"
+                    #      ],
+                    #   )
+                    # )
                 else:
                     log.debug(f"[MAIN] Manager {manager} is now saturated")
                     interesting_managers.remove(manager)
@@ -154,7 +158,8 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
                 real_capacity -= 1
 
     # dispatch tasks to unused slots based on the manager type
-    log.debug("Second round of task fetching in hard mode")
+    # TODO: trace level
+    # log.debug("Second round of task fetching in hard mode")
     while manager_ads["free_capacity"]["free"]["unused"] > 0 and real_capacity > 0:
         try:
             x = pending_task_queue[task_type].get(block=False)
