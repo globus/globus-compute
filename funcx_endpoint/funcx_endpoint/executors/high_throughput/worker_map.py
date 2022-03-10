@@ -139,10 +139,10 @@ class WorkerMap:
         """
         spin_ups = {}
 
-        log.debug(f"[SPIN UP] Next Worker Qsize: {len(next_worker_q)}")
-        log.debug(f"[SPIN UP] Active Workers: {self.active_workers}")
-        log.debug(f"[SPIN UP] Pending Workers: {self.pending_workers}")
-        log.debug(f"[SPIN UP] Max Worker Count: {self.max_worker_count}")
+        # log.debug(f"[SPIN UP] Next Worker Qsize: {len(next_worker_q)}")
+        # log.debug(f"[SPIN UP] Active Workers: {self.active_workers}")
+        # log.debug(f"[SPIN UP] Pending Workers: {self.pending_workers}")
+        # log.debug(f"[SPIN UP] Max Worker Count: {self.max_worker_count}")
 
         if (
             len(next_worker_q) > 0
@@ -252,16 +252,16 @@ class WorkerMap:
                 and time.time() - self.worker_idle_since[worker_type]
                 < worker_max_idletime
             ):
-                log.debug(f"[SPIN DOWN] Current time: {time.time()}")
-                log.debug(
-                    f"[SPIN DOWN] Idle since: {self.worker_idle_since[worker_type]}"
-                )
-                log.debug(
-                    "[SPIN DOWN] Worker type %s has not exceeded maximum idle "
-                    "time %s, continuing",
-                    worker_type,
-                    worker_max_idletime,
-                )
+                # log.debug(f"[SPIN DOWN] Current time: {time.time()}")
+                # log.debug(
+                #    f"[SPIN DOWN] Idle since: {self.worker_idle_since[worker_type]}"
+                # )
+                # log.debug(
+                #    "[SPIN DOWN] Worker type %s has not exceeded maximum idle "
+                #    "time %s, continuing",
+                #    worker_type,
+                #    worker_max_idletime,
+                #)
                 continue
             num_remove = max(
                 0,
@@ -424,14 +424,14 @@ class WorkerMap:
 
         # next_worker_q = []
         new_worker_list = []
-        log.debug(
-            "[GET_NEXT_WORKER] total_worker_type_counts: %s",
-            self.total_worker_type_counts,
-        )
-        log.debug(
-            "[GET_NEXT_WORKER] pending_worker_type_counts: %s",
-            self.pending_worker_type_counts,
-        )
+        # log.debug(
+        #    "[GET_NEXT_WORKER] total_worker_type_counts: %s",
+        #    self.total_worker_type_counts,
+        # )
+        # log.debug(
+        #    "[GET_NEXT_WORKER] pending_worker_type_counts: %s",
+        #    self.pending_worker_type_counts,
+        # )
         for worker_type in new_worker_map:
             cur_workers = self.total_worker_type_counts.get(
                 worker_type, 0

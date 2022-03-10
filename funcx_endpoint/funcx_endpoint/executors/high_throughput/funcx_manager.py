@@ -311,18 +311,18 @@ class Manager:
         new_worker_map = None
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
-            log.debug("Loop start")
+            # log.debug("Loop start")
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
-            log.debug(
-                "pending_task_count: %s, Ready_worker_count: %s",
-                pending_task_count,
-                ready_worker_count,
-            )
+            # log.debug(
+            #   "pending_task_count: %s, Ready_worker_count: %s",
+            #   pending_task_count,
+            #   ready_worker_count,
+            # )
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
-                log.debug(f"Requesting tasks: {ads}")
+                # log.debug(f"Requesting tasks: {ads}")
                 msg = pickle.dumps(ads)
                 self.task_incoming.send(msg)
 
@@ -457,7 +457,7 @@ class Manager:
                         log.debug(f"Task {task} pushed to a task queue {task_type}")
 
             else:
-                log.debug("No incoming tasks")
+                # log.debug("No incoming tasks")
                 # Limit poll duration to heartbeat_period
                 # heartbeat_period is in s vs poll_timer in ms
                 if not poll_timer:
@@ -477,12 +477,12 @@ class Manager:
                     log.critical("Exiting")
                     break
 
-            log.debug(f"To-Die Counts: {self.worker_map.to_die_count}")
-            log.debug(
-                "Alive worker counts: {}".format(
-                    self.worker_map.total_worker_type_counts
-                )
-            )
+            # log.debug(f"To-Die Counts: {self.worker_map.to_die_count}")
+            # log.debug(
+            #    "Alive worker counts: {}".format(
+            #        self.worker_map.total_worker_type_counts
+            #    )
+            # )
 
             new_worker_map = naive_scheduler(
                 self.task_queues,
@@ -491,7 +491,7 @@ class Manager:
                 new_worker_map,
                 self.worker_map.to_die_count,
             )
-            log.debug(f"[SCHEDULER] New worker map: {new_worker_map}")
+            # log.debug(f"[SCHEDULER] New worker map: {new_worker_map}")
 
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's
             # needed now.
@@ -513,7 +513,7 @@ class Manager:
                     worker_port=self.worker_port,
                 )
             )
-            log.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
+            # log.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
 
             #  Count the workers of each type that need to be removed
             spin_downs, container_switch_count = self.worker_map.spin_down_workers(
@@ -523,11 +523,11 @@ class Manager:
                 scheduler_mode=self.scheduler_mode,
             )
             self.container_switch_count += container_switch_count
-            log.debug(
-                "Container switch count: total {}, cur {}".format(
-                    self.container_switch_count, container_switch_count
-                )
-            )
+            # log.debug(
+            #    "Container switch count: total {}, cur {}".format(
+            #        self.container_switch_count, container_switch_count
+            #    )
+            # )
 
             for w_type in spin_downs:
                 self.remove_worker_init(w_type)
@@ -540,11 +540,11 @@ class Manager:
                 # *** Match tasks to workers *** #
                 else:
                     available_workers = current_worker_map[task_type]
-                    log.debug(
-                        "Available workers of type {}: {}".format(
-                            task_type, available_workers
-                        )
-                    )
+                    # log.debug(
+                    #     "Available workers of type {}: {}".format(
+                    #        task_type, available_workers
+                    #    )
+                    # )
 
                     for _i in range(available_workers):
                         if (
