@@ -16,8 +16,8 @@ def naive_scheduler(
     In this scheduler model, there is minimum 1 instance of each nonempty task queue.
     """
 
-    log.debug("Entering scheduler...")
-    log.debug(f"old_worker_map: {old_worker_map}")
+    log.trace("Entering scheduler...")
+    log.trace(f"old_worker_map: {old_worker_map}")
     q_sizes = {}
     q_types = []
     new_worker_map = {}
