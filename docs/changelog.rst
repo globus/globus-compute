@@ -3,6 +3,21 @@ Changelog
 
 .. scriv-insert-here
 
+funcx & funcx-endpoint v0.3.8
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added option for pinning workers to different accelerators
+- Log standard error and output from workers to disk
+
+Changed
+^^^^^^^
+
+- ``FuncXExecutor`` is now importable from the top-level namespace, as in
+  ``from funcx import FuncXExecutor``
+
 funcx & funcx-endpoint v0.3.7
 -----------------------------
 
