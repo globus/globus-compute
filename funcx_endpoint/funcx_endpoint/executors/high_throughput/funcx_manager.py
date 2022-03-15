@@ -453,7 +453,8 @@ class Manager:
                             )
                         )
                         log.debug(
-                            f"Task {task.task_id} pushed to task queue for type: {task_type}"
+                            f"Task {task.task_id} pushed to task queue "
+                            f"for type: {task_type}"
                         )
 
             else:
