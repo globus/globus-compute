@@ -10,6 +10,12 @@ import typing as t
 
 log = logging.getLogger(__name__)
 
+DEFAULT_FORMAT = (
+    "%(created)f %(asctime)s %(levelname)s %(processName)s-%(process)d "
+    "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
+    "%(message)s"
+)
+
 
 class FuncxConsoleFormatter(logging.Formatter):
     """
@@ -27,7 +33,7 @@ class FuncxConsoleFormatter(logging.Formatter):
     def __init__(
         self,
         debug: bool = False,
-        fmt: str = "%(asctime)s %(name)s:%(lineno)d [%(levelname)s] %(message)s",
+        fmt: str = DEFAULT_FORMAT,
         datefmt: str = "%Y-%m-%d %H:%M:%S",
     ) -> None:
         super().__init__()
@@ -57,10 +63,7 @@ def _get_file_dict_config(logfile: str, console_enabled: bool, debug: bool) -> d
                 "debug": debug,
             },
             "filefmt": {
-                "format": (
-                    "%(asctime)s.%(msecs)03d "
-                    "%(name)s:%(lineno)d [%(levelname)s] %(message)s"
-                ),
+                "format": DEFAULT_FORMAT,
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         },
