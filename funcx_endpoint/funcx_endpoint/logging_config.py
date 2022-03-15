@@ -10,7 +10,8 @@ import typing as t
 
 log = logging.getLogger(__name__)
 
-DEFAULT_FORMAT="%(created)f %(asctime)s %(levelname)s %(processName)s-%(process)d %(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s %(message)s"
+DEFAULT_FORMAT = "%(created)f %(asctime)s %(levelname)s %(processName)s-%(process)d %(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s %(message)s"
+
 
 class FuncxConsoleFormatter(logging.Formatter):
     """
