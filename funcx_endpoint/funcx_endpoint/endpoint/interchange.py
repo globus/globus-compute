@@ -312,7 +312,7 @@ class EndpointInterchange:
                     # We just timed out while attempting to receive
 
                     log.trace(
-                        "{} tasks in internal queue".format(
+                        "{} [LIES!] tasks in internal queue".format(
                             self.total_pending_task_count
                         )
                     )
@@ -344,7 +344,7 @@ class EndpointInterchange:
                     ] = TaskStatusCode.WAITING_FOR_NODES
                     task_counter += 1
                     log.debug(
-                        "Task counter:%s Pending Tasks: %s",
+                        "Task counter:%s Pending Tasks [LIES!]: %s",
                         task_counter,
                         self.total_pending_task_count,
                     )
