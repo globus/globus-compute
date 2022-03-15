@@ -126,12 +126,34 @@ def _get_stream_dict_config(debug: bool) -> dict:
     }
 
 
+def add_trace_level() -> None:
+    """This adds a trace level to the logging system.
+
+    See https://stackoverflow.com/questions/2183233
+    """
+
+    def logForLevel(self, message, *args, **kwargs):
+        if self.isEnabledFor(5):
+            self._log(5, message, args, **kwargs)
+
+    def logToRoot(message, *args, **kwargs):
+        logging.log(5, message, *args, **kwargs)
+
+    logging.addLevelName(5, "TRACE")
+    logging.TRACE = 5
+    logging.getLoggerClass().trace = logForLevel
+    logging.trace = logToRoot
+
+
 def setup_logging(
     *,
     logfile: t.Optional[str] = None,
     console_enabled: bool = True,
     debug: bool = False
 ) -> None:
+
+    add_trace_level()
+
     if logfile is not None:
         config = _get_file_dict_config(logfile, console_enabled, debug)
     else:
