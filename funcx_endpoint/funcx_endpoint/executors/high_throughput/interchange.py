@@ -446,6 +446,14 @@ class Interchange:
         task_counter = 0
         poller = zmq.Poller()
         poller.register(self.task_incoming, zmq.POLLIN)
+        # This poller ^ isn't even used as far as I can tell?
+        # It could be, with large/infinite timeout, to reduce the
+        # load of this thread? This thread only does stuff driven
+        # by one message source so there isn't much need for a poll
+        # to end, aside from the kill event checking - so whatever
+        # the desired kill latency is (which could be on the order
+        # of a second) that should be the poll timeout.
+
 
         while not kill_event.is_set():
             # We are no longer doing heartbeats on the task side.
