@@ -2,40 +2,11 @@ import logging
 import os
 import random
 import time
-import uuid
 from concurrent.futures import CancelledError
 
 import pytest
-from parsl.providers import LocalProvider
-
-from funcx_endpoint.executors import HighThroughputExecutor
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture(scope="module")
-def htex():
-    try:
-        os.remove("interchange.log")
-    except Exception:
-        pass
-
-    htex = HighThroughputExecutor(
-        worker_debug=True,
-        max_workers_per_node=1,
-        passthrough=False,
-        endpoint_id=str(uuid.uuid4()),
-        provider=LocalProvider(
-            init_blocks=1,
-            min_blocks=1,
-            max_blocks=1,
-        ),
-        run_dir=".",
-    )
-
-    htex.start()
-    yield htex
-    htex.shutdown()
 
 
 def double(x):

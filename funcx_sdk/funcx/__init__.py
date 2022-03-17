@@ -8,5 +8,6 @@ __version__ = VERSION
 
 from funcx.sdk.client import FuncXClient
 from funcx.sdk.errors import FuncxAPIError
+from funcx.sdk.executor import FuncXExecutor
 
-__all__ = ("FuncXClient", "FuncxAPIError")
+__all__ = ("FuncXExecutor", "FuncXClient", "FuncxAPIError")

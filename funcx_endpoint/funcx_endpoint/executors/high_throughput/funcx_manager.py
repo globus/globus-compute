@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import uuid
+from typing import List
 
 import psutil
 import zmq
@@ -78,6 +79,7 @@ class Manager:
         result_q_url="tcp://127.0.0.1:50098",
         max_queue_size=10,
         cores_per_worker=1,
+        available_accelerators: List[str] = (),
         max_workers=float("inf"),
         uid=None,
         heartbeat_threshold=120,
@@ -106,6 +108,10 @@ class Manager:
         cores_per_worker : float
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
+
+        available_accelerators: list of strings
+            Accelerators available for workers to use.
+            default: empty list
 
         max_workers : int
              caps the maximum number of workers that can be launched.
@@ -188,7 +194,14 @@ class Manager:
         self.max_worker_count = min(
             max_workers, math.floor(self.cores_on_node / cores_per_worker)
         )
-        self.worker_map = WorkerMap(self.max_worker_count)
+
+        # Control pinning to accelerators
+        self.available_accelerators = available_accelerators
+        n_accelerators = len(available_accelerators)
+        if n_accelerators > 0:
+            self.max_worker_count = min(self.max_worker_count, n_accelerators)
+
+        self.worker_map = WorkerMap(self.max_worker_count, self.available_accelerators)
 
         self.internal_worker_port_range = internal_worker_port_range
 
@@ -229,10 +242,12 @@ class Manager:
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
-            target=self.push_results, args=(self._kill_event,)
+            target=self.push_results, args=(self._kill_event,), name="Result-Pusher"
         )
         self._status_report_thread = threading.Thread(
-            target=self._status_report_loop, args=(self._kill_event,)
+            target=self._status_report_loop,
+            args=(self._kill_event,),
+            name="Status-Report",
         )
         self.container_switch_count = 0
 
@@ -362,7 +377,7 @@ class Manager:
                         try:
                             log.info(f"Removing worker:{worker_id_raw} from map")
                             self.worker_map.start_remove_worker(worker_type)
-                            self.worker_map.remove_worker(worker_id_raw)
+
                             log.info(
                                 f"Popping worker:{worker_to_kill} from worker_procs"
                             )
@@ -380,6 +395,8 @@ class Manager:
                                     f"Worker process exited with : {proc.returncode}"
                                 )
 
+                            # Now that the worker is dead, remove it from worker map
+                            self.worker_map.remove_worker(worker_id_raw)
                             raise TaskCancelled(worker_to_kill, self.uid)
                         except Exception as e:
                             log.exception(f"Raise exception, handling: {e}")
@@ -437,7 +454,10 @@ class Manager:
                                 self.outstanding_task_count
                             )
                         )
-                        log.debug(f"Task {task} pushed to a task queue {task_type}")
+                        log.debug(
+                            f"Task {task.task_id} pushed to task queue "
+                            f"for type: {task_type}"
+                        )
 
             else:
                 log.debug("[TASK_PULL_THREAD] No incoming tasks")
@@ -778,6 +798,13 @@ def cli_run():
         help="Number of cores assigned to each worker process. Default=1.0",
     )
     parser.add_argument(
+        "-a",
+        "--available-accelerators",
+        default=(),
+        nargs="*",
+        help="List of available accelerators",
+    )
+    parser.add_argument(
         "-t", "--task_url", required=True, help="REQUIRED: ZMQ url for receiving tasks"
     )
     parser.add_argument(
@@ -837,6 +864,7 @@ def cli_run():
         log.info(f"Manager ID: {args.uid}")
         log.info(f"Block ID: {args.block_id}")
         log.info(f"cores_per_worker: {args.cores_per_worker}")
+        log.info(f"available_accelerators: {args.available_accelerators}")
         log.info(f"task_url: {args.task_url}")
         log.info(f"result_url: {args.result_url}")
         log.info(f"hb_period: {args.hb_period}")
@@ -854,6 +882,7 @@ def cli_run():
             uid=args.uid,
             block_id=args.block_id,
             cores_per_worker=float(args.cores_per_worker),
+            available_accelerators=args.available_accelerators,
             max_workers=args.max_workers
             if args.max_workers == float("inf")
             else int(args.max_workers),

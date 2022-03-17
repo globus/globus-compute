@@ -13,8 +13,7 @@ Initializing the executor
 
 .. code-block:: python
 
-   from funcx import FuncXClient
-   from funcx.sdk.executor import FuncXExecutor
+   from funcx import FuncXClient, FuncXExecutor
 
    fx = FuncXExecutor(FuncXClient())
 

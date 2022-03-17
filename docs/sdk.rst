@@ -1,5 +1,5 @@
-SDK
-============
+FuncX SDK User Guide
+====================
 
 The **funcX SDK** provides a programmatic interface to funcX from Python.
 The SDK provides a convenient Pythonic interface to:
@@ -59,6 +59,7 @@ is defined in the same way as any Python function before being registered with f
 
 Running Functions
 -----------------
+
 You can invoke a function using the UUID returned when registering the function. The `run()` function
 requires that you specify the function (`function_id`) and endpoint (`endpoint_id`) on which to execute
 the function. funcX will return a UUID for the executing function (called a task) via which you can
@@ -95,10 +96,12 @@ task is still pending.
 
 Arguments and data
 ------------------
+
 funcX functions operate the same as any other Python function. You can pass arguments \*args and \**kwargs
 and return values from functions. The only constraint is that data passed to/from a funcX function must be
-serializable (e.g., via Pickle) and fall within :ref:`Limits` .  Input arguments can be passed to the function
-using the `run()` function. The following example shows how strings can be passed to and from a function.
+serializable (e.g., via Pickle) and fall within service limits.
+Input arguments can be passed to the function using the `run()` function.
+The following example shows how strings can be passed to and from a function.
 
 .. code-block:: python
 
@@ -195,11 +198,3 @@ and a result if it is available.
    'e453a993-73e6-4149-8078-86e7b8370c35': {'pending': True,
                                             'status': 'waiting-for-ep'}
   }
-
-
-
-FuncXClient Reference:
-----------------------
-
-.. autoclass:: funcx.FuncXClient
-   :members:

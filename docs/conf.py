@@ -23,14 +23,9 @@ release = funcx.__version__
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
-    # 'sphinx.ext.linkcode',
     "sphinx.ext.napoleon",
-    "sphinx.ext.autosectionlabel",
 ]
-
-autosummary_generate = True
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -42,8 +37,12 @@ intersphinx_mapping = {
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # theming, styles, and color options
-pygments_style = "sphinx"
-html_theme = "sphinx_rtd_theme"
+pygments_style = "friendly"
+pygments_dark_style = "monokai"  # this is a furo-specific option
+html_show_sourcelink = True
+html_theme = "furo"
 html_static_path = ["_static"]
-# disabled logo for now -- it looks bad on the RTD theme
-# html_logo = "_static/logo.png"
+html_theme_options = {
+    "light_logo": "images/funcX-light-cropped.png",
+    "dark_logo": "images/funcX-dark-cropped.png",
+}
