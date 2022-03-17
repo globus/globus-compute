@@ -20,10 +20,10 @@ from funcx import __version__ as funcx_sdk_version
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint import __version__ as funcx_endpoint_version
-from funcx_endpoint.endpoint.rabbit_mq.result_queue_publisher import (
+from funcx_endpoint.endpoint.rabbit_mq import (
     ResultQueuePublisher,
+    TaskQueueSubscriber,
 )
-from funcx_endpoint.endpoint.rabbit_mq.task_queue_subscriber import TaskQueueSubscriber
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
