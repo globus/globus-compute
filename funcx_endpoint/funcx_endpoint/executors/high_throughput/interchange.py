@@ -248,7 +248,7 @@ class Interchange:
         self.command_channel = self.context.socket(zmq.DEALER)
         self.command_channel.RCVTIMEO = 1000  # in milliseconds
         # self.command_channel.set_hwm(0)
-        log.info(f"Command _channel on tcp://{client_address}:{client_ports[2]}")
+        log.info(f"Command channel on tcp://{client_address}:{client_ports[2]}")
         self.command_channel.connect(f"tcp://{client_address}:{client_ports[2]}")
         log.info("Connected to forwarder")
 
