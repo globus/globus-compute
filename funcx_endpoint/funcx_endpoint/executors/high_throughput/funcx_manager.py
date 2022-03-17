@@ -452,7 +452,10 @@ class Manager:
                                 self.outstanding_task_count
                             )
                         )
-                        log.debug(f"Task {task} pushed to a task queue {task_type}")
+                        log.debug(
+                            f"Task {task.task_id} pushed to task queue "
+                            f"for type: {task_type}"
+                        )
 
             else:
                 log.debug("[TASK_PULL_THREAD] No incoming tasks")
