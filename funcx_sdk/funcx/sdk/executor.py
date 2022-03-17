@@ -229,6 +229,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                     self._function_future_map[batch_tasks[i]] = self._tasks.pop(
                         msg["task_id"]
                     )
+                    self._function_future_map[batch_tasks[i]].task_id = batch_tasks[i]
                     self.poller_thread.atomic_controller.increment()
 
     def _get_tasks_in_batch(self):
