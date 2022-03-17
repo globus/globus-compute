@@ -642,7 +642,7 @@ class Interchange:
                 else:
                     log.error(
                         f"Received unsupported message type:{command.type} on "
-                        "command _channel"
+                        "command channel"
                     )
                     reply = BadCommand(f"Unknown command type: {command.type}")
 
