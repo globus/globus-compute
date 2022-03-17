@@ -141,7 +141,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         Returns
         -------
-        Future : concurrent.futures.Future
+        Future : funcx.sdk.executor.FuncXFuture
             A future object
         """
 
@@ -175,7 +175,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             "kwargs": kwargs,
         }
 
-        fut = Future()
+        fut = FuncXFuture()
         self._counter_future_map[future_id] = fut
 
         if self.batch_enabled:
@@ -223,6 +223,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                     self._function_future_map[
                         batch_tasks[i]
                     ] = self._counter_future_map.pop(msg["future_id"])
+                    self._function_future_map[batch_tasks[i]].task_id = batch_tasks[i]
                 self.poller_thread.atomic_controller.increment(val=len(messages))
 
     def _get_tasks_in_batch(self) -> t.List[t.Dict[str, t.Any]]:
@@ -345,3 +346,16 @@ class ExecutorPollerThread:
                 ws.close(), self.eventloop
             )
             ws_close_future.result()
+
+
+class FuncXFuture(Future):
+    """Extends concurrent.futures.Future to include an optional task UUID."""
+
+    task_id: t.Optional[str]
+    """The UUID for the task behind this Future. In batch mode, this will
+    not be populated immediately, but will appear later when the task is
+    submitted to the FuncX services."""
+
+    def __init__(self):
+        super().__init__()
+        self.task_id = None
