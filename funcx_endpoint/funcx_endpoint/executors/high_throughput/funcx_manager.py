@@ -242,10 +242,12 @@ class Manager:
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
-            target=self.push_results, args=(self._kill_event,)
+            target=self.push_results, args=(self._kill_event,), name="Result-Pusher"
         )
         self._status_report_thread = threading.Thread(
-            target=self._status_report_loop, args=(self._kill_event,)
+            target=self._status_report_loop,
+            args=(self._kill_event,),
+            name="Status-Report",
         )
         self.container_switch_count = 0
 

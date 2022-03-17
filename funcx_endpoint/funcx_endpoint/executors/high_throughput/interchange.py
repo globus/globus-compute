@@ -722,11 +722,12 @@ class Interchange:
                 self._kill_event,
                 self._status_request,
             ),
+            name="TASK_PULL_THREAD",
         )
         self._task_puller_thread.start()
 
         self._command_thread = threading.Thread(
-            target=self._command_server, args=(self._kill_event,)
+            target=self._command_server, args=(self._kill_event,), name="COMMAND_THREAD"
         )
         self._command_thread.start()
 
@@ -734,6 +735,7 @@ class Interchange:
         self._status_report_thread = threading.Thread(
             target=self._status_report_loop,
             args=(self._kill_event, status_report_queue),
+            name="STATUS_THREAD",
         )
         self._status_report_thread.start()
 

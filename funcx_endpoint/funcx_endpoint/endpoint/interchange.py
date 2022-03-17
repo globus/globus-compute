@@ -533,12 +533,16 @@ class EndpointInterchange:
         )
 
         self._task_puller_thread = threading.Thread(
-            target=self.migrate_tasks_to_internal, args=(self._quiesce_event,)
+            target=self.migrate_tasks_to_internal,
+            args=(self._quiesce_event,),
+            name="TASK_PULL_THREAD",
         )
         self._task_puller_thread.start()
 
         self._command_thread = threading.Thread(
-            target=self._command_server, args=(self._quiesce_event,)
+            target=self._command_server,
+            args=(self._quiesce_event,),
+            name="COMMAND_THREAD",
         )
         self._command_thread.start()
 
