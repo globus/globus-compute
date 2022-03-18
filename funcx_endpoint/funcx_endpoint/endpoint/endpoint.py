@@ -21,9 +21,6 @@ from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
-from funcx_endpoint.executors.high_throughput import (
-    global_config as funcx_default_config,
-)
 from funcx_endpoint.logging_config import setup_logging
 
 # temporary: try both import paths; update to the new path in the next release
@@ -35,15 +32,16 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
+_DEFAULT_FUNCX_DIR = str(pathlib.Path.home() / ".funcx")
+
+
 class Endpoint:
     """
     Endpoint is primarily responsible for configuring, launching and stopping
     the Endpoint.
     """
 
-    def __init__(
-        self, funcx_dir=os.path.join(pathlib.Path.home(), ".funcx"), debug=False
-    ):
+    def __init__(self, funcx_dir=None, debug=False):
         """Initialize the Endpoint
 
         Parameters
@@ -55,15 +53,17 @@ class Endpoint:
         debug: Bool
             Enable debug logging. Default: False
         """
-        self.funcx_config_file_name = "config.py"
         self.debug = debug
-        self.funcx_dir = funcx_dir
-        self.funcx_config_file = os.path.join(
-            self.funcx_dir, self.funcx_config_file_name
-        )
-        self.funcx_default_config_template = funcx_default_config.__file__
-        self.funcx_config = {}
+        self.funcx_dir = funcx_dir if funcx_dir is not None else _DEFAULT_FUNCX_DIR
         self.name = "default"
+
+    @property
+    def _endpoint_dir(self):
+        return os.path.join(self.funcx_dir, self.name)
+
+    @property
+    def _config_file_path(self):
+        return os.path.join(self._endpoint_dir, "config.py")
 
     def init_endpoint_dir(self, endpoint_config=None):
         """Initialize a clean endpoint dir
@@ -75,16 +75,13 @@ class Endpoint:
             Path to a config file to be used instead of the funcX default config file
         """
 
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
-        log.debug(f"Creating endpoint dir {endpoint_dir}")
-        os.makedirs(endpoint_dir, exist_ok=True)
+        log.debug(f"Creating endpoint dir {self._endpoint_dir}")
+        os.makedirs(self._endpoint_dir, exist_ok=True)
 
-        endpoint_config_target_file = os.path.join(
-            endpoint_dir, self.funcx_config_file_name
-        )
+        endpoint_config_target_file = self._config_file_path
         if endpoint_config:
             shutil.copyfile(endpoint_config, endpoint_config_target_file)
-            return endpoint_dir
+            return self._endpoint_dir
 
         endpoint_config = endpoint_default_config.__file__
         with open(endpoint_config) as r:
@@ -94,18 +91,16 @@ class Endpoint:
         with open(endpoint_config_target_file, "w") as w:
             w.write(endpoint_config_template)
 
-        return endpoint_dir
+        return self._endpoint_dir
 
     def configure_endpoint(self, name, endpoint_config):
         self.name = name
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
-        new_config_file = os.path.join(endpoint_dir, self.funcx_config_file_name)
 
-        if not os.path.exists(endpoint_dir):
+        if not os.path.exists(self._endpoint_dir):
             self.init_endpoint_dir(endpoint_config=endpoint_config)
             print(
                 f"A default profile has been create for <{self.name}> "
-                f"at {new_config_file}"
+                f"at {self._config_file_path}"
             )
             print("Configure this file and try restarting with:")
             print(f"    $ funcx-endpoint start {self.name}")
@@ -127,7 +122,7 @@ class Endpoint:
         # FIXME: `funcx` should provide a cleaner way of doing login
         FuncXClient(do_version_check=False, use_offprocess_checker=False)
 
-        if os.path.exists(self.funcx_config_file):
+        if os.path.exists(self.funcx_dir):
             click.confirm(
                 "Are you sure you want to initialize this directory? "
                 f"This will erase everything in {self.funcx_dir}",
@@ -142,16 +137,10 @@ class Endpoint:
                 pass
             os.renames(self.funcx_dir, backup_dir)
 
-        if os.path.exists(self.funcx_config_file):
-            log.debug(f"Config file exists at {self.funcx_config_file}")
-            return
-
         try:
             os.makedirs(self.funcx_dir, exist_ok=True)
         except Exception as e:
             print(f"[FuncX] Caught exception during registration {e}")
-
-        shutil.copyfile(self.funcx_default_config_template, self.funcx_config_file)
 
     def check_endpoint_json(self, endpoint_json, endpoint_uuid):
         if os.path.exists(endpoint_json):
