@@ -8,19 +8,17 @@ import typing as t
 import uuid
 import warnings
 
-from fair_research_login import JSONTokenStorage, NativeClient
-from globus_sdk import SearchClient
-
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from funcx.sdk.search import SearchHelper
 from funcx.sdk.utils.batch import Batch
-from funcx.sdk.web_client import FunctionRegistrationData, FuncxWebClient
+from funcx.sdk.web_client import FunctionRegistrationData
 from funcx.serialize import FuncXSerializer
 from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
 
+from .login_manager import LoginManager
 from .version import PARSED_VERSION, parse_version
 
 logger = logging.getLogger(__name__)
@@ -34,8 +32,6 @@ class FuncXClient:
     Holds helper operations for performing common tasks with the funcX service.
     """
 
-    TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
-    TOKEN_FILENAME = "funcx_sdk_tokens.json"
     FUNCX_SDK_CLIENT_ID = os.environ.get(
         "FUNCX_SDK_CLIENT_ID", "4cf29807-cf21-49ec-9443-ff9a3fb9f81c"
     )
@@ -48,10 +44,6 @@ class FuncXClient:
         self,
         http_timeout=None,
         funcx_home=_FUNCX_HOME,
-        force_login=False,
-        fx_authorizer=None,
-        search_authorizer=None,
-        openid_authorizer=None,
         funcx_service_address=None,
         asynchronous=False,
         loop=None,
@@ -60,6 +52,11 @@ class FuncXClient:
         environment=None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         do_version_check: bool = True,
+        openid_authorizer: t.Any = None,
+        search_authorizer: t.Any = None,
+        fx_authorizer: t.Any = None,
+        *,
+        login_manager: LoginManager | None = None,
         **kwargs,
     ):
         """
@@ -70,19 +67,6 @@ class FuncXClient:
         http_timeout: int
             Timeout for any call to service in seconds.
             Default is no timeout
-
-        force_login: bool
-            Whether to force a login to get new credentials.
-
-        fx_authorizer:class:`GlobusAuthorizer \
-            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-            A custom authorizer instance to communicate with funcX.
-            Default: ``None``, will be created.
-
-        search_authorizer:class:`GlobusAuthorizer \
-            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-            A custom authorizer instance to communicate with Globus Search.
-            Default: ``None``, will be created.
 
         funcx_service_address: str
             For internal use only. The address of the web service.
@@ -134,48 +118,34 @@ class FuncXClient:
             task_group_id and str(task_group_id) or str(uuid.uuid4())
         )
 
-        if not os.path.exists(self.TOKEN_DIR):
-            os.makedirs(self.TOKEN_DIR)
+        for (arg, name) in [
+            (openid_authorizer, "openid_authorizer"),
+            (fx_authorizer, "fx_authorizer"),
+            (search_authorizer, "search_authorizer"),
+        ]:
+            if arg is not None:
+                warnings.warn(
+                    f"The '{name}' argument is deprecated. "
+                    "It will be removed in a future release.",
+                    DeprecationWarning,
+                )
 
-        tokens_filename = os.path.join(self.TOKEN_DIR, self.TOKEN_FILENAME)
-        self.native_client = NativeClient(
-            client_id=self.FUNCX_SDK_CLIENT_ID,
-            app_name="FuncX SDK",
-            token_storage=JSONTokenStorage(tokens_filename),
-        )
+        # if a login manager was passed, no login flow is triggered
+        if login_manager is not None:
+            self.login_manager = login_manager
+        # but if login handling is implicit (as when no login manager is passed)
+        # then ensure that the user is logged in
+        else:
+            self.login_manager = LoginManager()
+            self.login_manager.ensure_logged_in()
 
-        # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
-        scopes = [self.FUNCX_SCOPE, SearchClient.scopes.all, "openid"]
-
-        if openid_authorizer is not None:
-            warnings.warn(
-                "The 'openid_authorizer' argument is deprecated. "
-                "It will be removed in a future release.",
-                DeprecationWarning,
-            )
-
-        if not fx_authorizer or not search_authorizer:
-            self.native_client.login(
-                requested_scopes=scopes,
-                no_local_server=kwargs.get("no_local_server", True),
-                no_browser=kwargs.get("no_browser", True),
-                refresh_tokens=kwargs.get("refresh_tokens", True),
-                force=force_login,
-            )
-
-            all_authorizers = self.native_client.get_authorizers_by_scope(
-                requested_scopes=scopes
-            )
-            fx_authorizer = all_authorizers[self.FUNCX_SCOPE]
-
-        self.web_client = FuncxWebClient(
-            base_url=funcx_service_address, authorizer=fx_authorizer
+        self.web_client = self.login_manager.get_funcx_web_client(
+            base_url=funcx_service_address
         )
         self.fx_serializer = FuncXSerializer(
             use_offprocess_checker=self.use_offprocess_checker
         )
 
-        self._searcher = None
         self.funcx_service_address = funcx_service_address
 
         if do_version_check:
@@ -196,14 +166,14 @@ class FuncXClient:
         else:
             self.loop = None
 
+        # TODO: remove this
+        self._searcher = None
+
     @property
     def searcher(self):
         # TODO: remove this
         if self._searcher is None:
-            search_authorizer = self.native_client.get_authorizers(
-                requested_scopes=[SearchClient.scopes.all]
-            )[SearchClient.resource_server]
-            self._searcher = SearchHelper(authorizer=search_authorizer)
+            self._searcher = SearchHelper(self.login_manager.get_search_client())
         return self._searcher
 
     def version_check(self, endpoint_version: str | None = None) -> None:
@@ -232,7 +202,7 @@ class FuncXClient:
 
     def logout(self):
         """Remove credentials from your local system"""
-        self.native_client.logout()
+        self.login_manager.logout()
 
     def _update_task_table(self, return_msg: str | t.Dict, task_id: str):
         """

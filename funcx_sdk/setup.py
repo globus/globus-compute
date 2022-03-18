@@ -5,8 +5,7 @@ from setuptools import find_namespace_packages, setup
 REQUIRES = [
     # request sending and authorization tools
     "requests>=2.20.0",
-    "globus-sdk>=3,<4",
-    "fair_research_login==0.2.6",
+    "globus-sdk>=3.6.0,<4",
     # 'websockets' is used for the client-side websocket listener
     "websockets==9.1",
     # table printing used in search result rendering
