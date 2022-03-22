@@ -520,10 +520,10 @@ class EndpointInterchange:
         try:
             self._main_loop()
         except Exception:
-            log.exception("[MAIN] Unhandled exception")
+            log.exception("Unhandled exception")
         finally:
             self.results_outgoing.close()
-            log.info("[MAIN] Thread loop exiting")
+            log.info("Thread loop exiting")
 
     def _main_loop(self):
         self.results_outgoing = TaskQueue(
@@ -546,7 +546,7 @@ class EndpointInterchange:
         resend_results_messages = self.results_ack_handler.get_unacked_results_list()
         if len(resend_results_messages) > 0:
             log.info(
-                "[MAIN] Resending %s previously unacked results",
+                "Resending %s previously unacked results",
                 len(resend_results_messages),
             )
 
@@ -559,7 +559,7 @@ class EndpointInterchange:
 
         while not self._quiesce_event.is_set():
             if last + self.heartbeat_threshold < time.time():
-                log.debug("[MAIN] alive")
+                log.debug("alive")
                 last = time.time()
                 try:
                     # Adding results heartbeat to essentially force a TCP keepalive
@@ -567,7 +567,7 @@ class EndpointInterchange:
                     self.results_outgoing.put("forwarder", b"HEARTBEAT")
                 except Exception:
                     log.exception(
-                        "[MAIN] Sending heartbeat to the forwarder over the results "
+                        "Sending heartbeat to the forwarder over the results "
                         "channel has failed"
                     )
                     raise
@@ -580,7 +580,7 @@ class EndpointInterchange:
             except queue.Empty:
                 pass
             except Exception:
-                log.exception("[MAIN] Unhandled issue while waiting for pending tasks")
+                log.exception("Unhandled issue while waiting for pending tasks")
 
             try:
                 results = self.results_passthrough.get(False, 0.01)
@@ -599,7 +599,7 @@ class EndpointInterchange:
 
             except Exception:
                 log.exception(
-                    "[MAIN] Something broke while forwarding results from executor "
+                    "Something broke while forwarding results from executor "
                     "to forwarder queues"
                 )
                 continue
@@ -755,12 +755,12 @@ class EndpointInterchange:
         status = []
         if self.config.provider:
             log.debug(
-                "[MAIN] Getting the status of {} blocks.".format(
+                "Getting the status of {} blocks.".format(
                     list(self.blocks.values())
                 )
             )
             status = self.config.provider.status(list(self.blocks.values()))
-            log.debug(f"[MAIN] The status is {status}")
+            log.debug(f"The status is {status}")
 
         return status
 
