@@ -650,7 +650,7 @@ class Manager:
                 "worker_id": worker_id,
                 "task_type": task_type,
             }
-        log.debug("Sending complete!")
+        log.debug("Sending complete")
 
     def _status_report_loop(self, kill_event):
         log.debug("[STATUS] Manager status reporting loop starting")
