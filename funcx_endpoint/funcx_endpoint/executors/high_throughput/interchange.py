@@ -1009,6 +1009,8 @@ class Interchange:
                     # previously used this; switched to mono-message,
                     # self.results_outgoing.send_multipart(b_messages)
                     self.results_outgoing.send(pickle.dumps(b_messages))
+                    interesting_managers.add(manager)
+
                     log.debug(
                         "[MAIN] Current tasks: {}".format(
                             self._ready_manager_queue[manager]["tasks"]
