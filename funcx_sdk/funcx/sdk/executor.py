@@ -9,6 +9,7 @@ import typing as t
 from concurrent.futures import Future
 
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
+from funcx.sdk.client import FuncXClient
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
     def __init__(
         self,
-        funcx_client,
+        funcx_client: FuncXClient,
         label: str = "FuncXExecutor",
         batch_enabled: bool = False,
         batch_interval: float = 1.0,
@@ -77,9 +78,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             Default: 'FuncXExecutor'
         """
 
-        self.funcx_client = funcx_client
-        # Disable throttling
-        self.funcx_client.throttling_enabled = False
+        self.funcx_client: FuncXClient = funcx_client
 
         self.results_ws_uri = self.funcx_client.results_ws_uri
         self.label = label
@@ -94,6 +93,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.task_group_id = (
             self.funcx_client.session_task_group_id
         )  # we need to associate all batch launches with this id
+        self.task_outgoing: t.Optional[queue.Queue] = None
+        self._kill_event: t.Optional[threading.Event] = None
 
         self.poller_thread = ExecutorPollerThread(
             self.funcx_client,
@@ -196,7 +197,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             self._submit_tasks(messages)
         log.info("Exiting")
 
-    def _submit_tasks(self, messages):
+    def _submit_tasks(self, messages: t.List[t.Dict[str, t.Any]]):
         """Submit a batch of tasks"""
         if messages:
             batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
@@ -224,12 +225,12 @@ class FuncXExecutor(concurrent.futures.Executor):
                     ] = self._counter_future_map.pop(msg["future_id"])
                 self.poller_thread.atomic_controller.increment(val=len(messages))
 
-    def _get_tasks_in_batch(self):
+    def _get_tasks_in_batch(self) -> t.List[t.Dict[str, t.Any]]:
         """
         Get tasks from task_outgoing queue in batch,
         either by interval or by batch size
         """
-        messages = []
+        messages: t.List[t.Dict[str, t.Any]] = []
         start = time.time()
         while True:
             if (
@@ -238,7 +239,8 @@ class FuncXExecutor(concurrent.futures.Executor):
             ):
                 break
             try:
-                x = self.task_outgoing.get(timeout=0.1)
+                assert self.task_outgoing is not None
+                x: t.Dict[str, t.Any] = self.task_outgoing.get(timeout=0.1)
             except queue.Empty:
                 break
             else:
@@ -263,7 +265,11 @@ class ExecutorPollerThread:
     """
 
     def __init__(
-        self, funcx_client, _function_future_map, results_ws_uri, task_group_id
+        self,
+        funcx_client: FuncXClient,
+        _function_future_map: t.Dict[str, Future],
+        results_ws_uri: str,
+        task_group_id: str,
     ):
         """
         Parameters
@@ -276,9 +282,9 @@ class ExecutorPollerThread:
             Web sockets URI for the results
         """
 
-        self.funcx_client = funcx_client
+        self.funcx_client: FuncXClient = funcx_client
         self.results_ws_uri = results_ws_uri
-        self._function_future_map = _function_future_map
+        self._function_future_map: t.Dict[str, Future] = _function_future_map
         self.task_group_id = task_group_id
         self.eventloop = None
         self.atomic_controller = AtomicController(self.start, noop)
