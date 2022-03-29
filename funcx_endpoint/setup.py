@@ -25,6 +25,7 @@ REQUIRES = [
     #    backwards-incompatible changes are introduced, making our application
     #    safer to distribute
     "typer==0.4.0",
+    "click==8.0.4",  # pin `click` because typer uses `click` internals
     # disallow use of 22.3.0; the whl package on some platforms causes ZMQ issues
     #
     # NOTE: 22.3.0 introduced a patched version of libzmq.so to the wheel packaging
