@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import atexit
 import concurrent
@@ -344,50 +343,3 @@ class ExecutorPollerThread:
                 ws.close(), self.eventloop
             )
             ws_close_future.result()
-
-
-def double(x):
-    return x * 2
-
-
-if __name__ == "__main__":
-    from funcx import FuncXClient
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-s",
-        "--service_url",
-        default="http://localhost:5000/v2",
-        help="URL at which the funcx-web-service is hosted",
-    )
-    parser.add_argument(
-        "-e",
-        "--endpoint_id",
-        required=True,
-        help="Target endpoint to send functions to",
-    )
-    parser.add_argument(
-        "-d", "--debug", action="store_true", help="Count of apps to launch"
-    )
-    args = parser.parse_args()
-
-    endpoint_id = args.endpoint_id
-
-    # set_stream_logger()
-    fx = FuncXExecutor(FuncXClient(funcx_service_address=args.service_url))
-
-    print("In main")
-    endpoint_id = args.endpoint_id
-    future = fx.submit(double, 5, endpoint_id=endpoint_id)
-    print("Got future back : ", future)
-
-    for _i in range(5):
-        time.sleep(0.2)
-        # Non-blocking check whether future is done
-        print("Is the future done? :", future.done())
-
-    print("Blocking for result")
-    x = future.result()  # <--- This is a blocking call
-    print("Result : ", x)
-
-    # fx.shutdown()
