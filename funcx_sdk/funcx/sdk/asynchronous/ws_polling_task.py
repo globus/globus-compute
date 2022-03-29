@@ -228,14 +228,14 @@ class WebSocketPollingTask:
             # Only close when count == 0 and unknown_results are empty
             if count == 0 and len(self.unknown_results) == 0:
                 await self.ws.close()
-                self.ws = None
+                self._ws = None
                 return True
         return False
 
     async def close(self):
         """Close underlying web-sockets, does not stop listeners directly"""
         await self.ws.close()
-        self.ws = None
+        self._ws = None
 
     def put_task_group_id(self, task_group_id):
         # prevent the task_group_id from being sent to the WebSocket server
