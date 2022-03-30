@@ -101,7 +101,6 @@ class FuncXSerializer:
             if status == "PONG":
                 return status
             else:
-                logger.exception("Got exception while attempting deserialization")
                 raise Exception(info)
 
     def serialize(self, data):
