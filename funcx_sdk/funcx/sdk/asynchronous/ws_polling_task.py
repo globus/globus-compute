@@ -252,7 +252,7 @@ class WebSocketPollingTask:
         """
         self.pending_tasks[task.task_id] = task
 
-    def get_auth_header(self):
+    def get_auth_header(self) -> t.Tuple[str, t.Optional[str]]:
         """
         Gets an Authorization header to be sent during the WebSocket handshake.
 
@@ -266,4 +266,4 @@ class WebSocketPollingTask:
         # other object here, if that is what's appropriate
         authz_value = self.funcx_client.web_client.authorizer.get_authorization_header()
         header_name = "Authorization"
-        return (header_name, authz_value)
+        return header_name, authz_value
