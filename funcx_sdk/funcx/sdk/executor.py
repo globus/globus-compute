@@ -87,8 +87,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_interval = batch_interval
         self.batch_size = batch_size
 
-        self._tasks: t.Dict[str, Future] = {}
-        self._task_counter = 0
+        self._counter_future_map: t.Dict[int, Future] = {}
+        self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
         self._function_future_map: t.Dict[str, Future] = {}
         self.task_group_id = (
@@ -161,13 +161,13 @@ class FuncXExecutor(concurrent.futures.Executor):
                 self._function_registry[function] = function_id
                 log.debug(f"Function registered with id:{function_id}")
 
-        task_id = self._task_counter
-        self._task_counter += 1
+        future_id = self._future_counter
+        self._future_counter += 1
 
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
         msg = {
-            "task_id": task_id,
+            "future_id": future_id,
             "function_id": self._function_registry[function],
             "endpoint_id": endpoint_id,
             "args": args,
@@ -175,7 +175,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         }
 
         fut = Future()
-        self._tasks[task_id] = fut
+        self._counter_future_map[future_id] = fut
 
         if self.batch_enabled:
             # Put task to the the outgoing queue
@@ -219,9 +219,9 @@ class FuncXExecutor(concurrent.futures.Executor):
                 raise
             else:
                 for i, msg in enumerate(messages):
-                    self._function_future_map[batch_tasks[i]] = self._tasks.pop(
-                        msg["task_id"]
-                    )
+                    self._function_future_map[
+                        batch_tasks[i]
+                    ] = self._counter_future_map.pop(msg["future_id"])
                     self.poller_thread.atomic_controller.increment()
 
     def _get_tasks_in_batch(self):
