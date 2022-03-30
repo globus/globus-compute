@@ -453,6 +453,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         print(f"Starting local interchange with endpoint id: {self.endpoint_id}")
         self.queue_proc = Process(
             target=interchange.starter,
+            name="Executor-Interchange",
             args=(comm_q,),
             kwargs={
                 "client_address": self.address,
@@ -697,7 +698,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         if self._queue_management_thread is None:
             log.debug("Starting queue management thread")
             self._queue_management_thread = threading.Thread(
-                target=self._queue_management_worker
+                target=self._queue_management_worker, name="Queue-Management"
             )
             self._queue_management_thread.daemon = True
             self._queue_management_thread.start()

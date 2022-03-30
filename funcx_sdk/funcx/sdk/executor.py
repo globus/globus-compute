@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import atexit
 import concurrent
@@ -26,11 +25,11 @@ class AtomicController:
         self.start_callback = start_callback
         self.stop_callback = stop_callback
 
-    def increment(self):
+    def increment(self, val=1):
         with self.lock:
             if self._value == 0:
                 self.start_callback()
-            self._value += 1
+            self._value += val
 
     def decrement(self):
         with self.lock:
@@ -88,8 +87,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_interval = batch_interval
         self.batch_size = batch_size
 
-        self._tasks: t.Dict[str, Future] = {}
-        self._task_counter = 0
+        self._counter_future_map: t.Dict[int, Future] = {}
+        self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
         self._function_future_map: t.Dict[str, Future] = {}
         self.task_group_id = (
@@ -114,7 +113,9 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._kill_event = threading.Event()
         # Start the task submission thread
         self.task_submit_thread = threading.Thread(
-            target=self.task_submit_thread, args=(self._kill_event,)
+            target=self.task_submit_thread,
+            args=(self._kill_event,),
+            name="FuncX-Submit-Thread",
         )
         self.task_submit_thread.daemon = True
         self.task_submit_thread.start()
@@ -160,13 +161,13 @@ class FuncXExecutor(concurrent.futures.Executor):
                 self._function_registry[function] = function_id
                 log.debug(f"Function registered with id:{function_id}")
 
-        task_id = self._task_counter
-        self._task_counter += 1
+        future_id = self._future_counter
+        self._future_counter += 1
 
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
         msg = {
-            "task_id": task_id,
+            "future_id": future_id,
             "function_id": self._function_registry[function],
             "endpoint_id": endpoint_id,
             "args": args,
@@ -174,7 +175,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         }
 
         fut = Future()
-        self._tasks[task_id] = fut
+        self._counter_future_map[future_id] = fut
 
         if self.batch_enabled:
             # Put task to the the outgoing queue
@@ -191,13 +192,9 @@ class FuncXExecutor(concurrent.futures.Executor):
         while not kill_event.is_set():
             messages = self._get_tasks_in_batch()
             if messages:
-                log.info(
-                    "[TASK_SUBMIT_THREAD] Submitting {} tasks to funcX".format(
-                        len(messages)
-                    )
-                )
+                log.info(f"Submitting {len(messages)} tasks to funcX")
             self._submit_tasks(messages)
-        log.info("[TASK_SUBMIT_THREAD] Exiting")
+        log.info("Exiting")
 
     def _submit_tasks(self, messages):
         """Submit a batch of tasks"""
@@ -213,23 +210,19 @@ class FuncXExecutor(concurrent.futures.Executor):
                 batch.add(
                     *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
                 )
-                log.debug(f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch")
+                log.debug(f"Adding msg {msg} to funcX batch")
             try:
                 batch_tasks = self.funcx_client.batch_run(batch)
                 log.debug(f"Batch submitted to task_group: {self.task_group_id}")
             except Exception:
-                log.error(
-                    "[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(
-                        len(messages)
-                    )
-                )
+                log.error(f"Error submitting {len(messages)} tasks to funcX")
                 raise
             else:
                 for i, msg in enumerate(messages):
-                    self._function_future_map[batch_tasks[i]] = self._tasks.pop(
-                        msg["task_id"]
-                    )
-                    self.poller_thread.atomic_controller.increment()
+                    self._function_future_map[
+                        batch_tasks[i]
+                    ] = self._counter_future_map.pop(msg["future_id"])
+                self.poller_thread.atomic_controller.increment(val=len(messages))
 
     def _get_tasks_in_batch(self):
         """
@@ -306,7 +299,9 @@ class ExecutorPollerThread:
             results_ws_uri=self.results_ws_uri,
             auto_start=False,
         )
-        self.thread = threading.Thread(target=self.event_loop_thread, args=(eventloop,))
+        self.thread = threading.Thread(
+            target=self.event_loop_thread, args=(eventloop,), name="FuncX-Poller-Thread"
+        )
         self.thread.daemon = True
         self.thread.start()
         log.debug("Started web_socket_poller thread")
@@ -338,56 +333,9 @@ class ExecutorPollerThread:
             return
 
         self.ws_handler.closed_by_main_thread = True
-        ws = self.ws_handler.ws
+        ws = self.ws_handler._ws
         if ws:
             ws_close_future = asyncio.run_coroutine_threadsafe(
                 ws.close(), self.eventloop
             )
             ws_close_future.result()
-
-
-def double(x):
-    return x * 2
-
-
-if __name__ == "__main__":
-    from funcx import FuncXClient
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-s",
-        "--service_url",
-        default="http://localhost:5000/v2",
-        help="URL at which the funcx-web-service is hosted",
-    )
-    parser.add_argument(
-        "-e",
-        "--endpoint_id",
-        required=True,
-        help="Target endpoint to send functions to",
-    )
-    parser.add_argument(
-        "-d", "--debug", action="store_true", help="Count of apps to launch"
-    )
-    args = parser.parse_args()
-
-    endpoint_id = args.endpoint_id
-
-    # set_stream_logger()
-    fx = FuncXExecutor(FuncXClient(funcx_service_address=args.service_url))
-
-    print("In main")
-    endpoint_id = args.endpoint_id
-    future = fx.submit(double, 5, endpoint_id=endpoint_id)
-    print("Got future back : ", future)
-
-    for _i in range(5):
-        time.sleep(0.2)
-        # Non-blocking check whether future is done
-        print("Is the future done? :", future.done())
-
-    print("Blocking for result")
-    x = future.result()  # <--- This is a blocking call
-    print("Result : ", x)
-
-    # fx.shutdown()
