@@ -337,7 +337,7 @@ class ExecutorPollerThread:
             return
 
         self.ws_handler.closed_by_main_thread = True
-        ws = self.ws_handler.ws
+        ws = self.ws_handler._ws
         if ws:
             ws_close_future = asyncio.run_coroutine_threadsafe(
                 ws.close(), self.eventloop
