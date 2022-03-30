@@ -25,11 +25,11 @@ class AtomicController:
         self.start_callback = start_callback
         self.stop_callback = stop_callback
 
-    def increment(self):
+    def increment(self, val=1):
         with self.lock:
             if self._value == 0:
                 self.start_callback()
-            self._value += 1
+            self._value += val
 
     def decrement(self):
         with self.lock:
@@ -222,7 +222,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                     self._function_future_map[
                         batch_tasks[i]
                     ] = self._counter_future_map.pop(msg["future_id"])
-                    self.poller_thread.atomic_controller.increment()
+                self.poller_thread.atomic_controller.increment(val=len(messages))
 
     def _get_tasks_in_batch(self):
         """
