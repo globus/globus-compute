@@ -215,13 +215,11 @@ class FuncXExecutor(concurrent.futures.Executor):
             messages = self._get_tasks_in_batch()
             if messages:
                 log.info(f"Submitting {len(messages)} tasks to funcX")
-            self._submit_tasks(messages)
+                self._submit_tasks(messages)
         log.info("Exiting")
 
     def _submit_tasks(self, messages: t.List[TaskSubmissionInfo]):
         """Submit a batch of tasks"""
-        if not messages:
-            return
         batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
         for msg in messages:
             batch.add(
@@ -250,22 +248,20 @@ class FuncXExecutor(concurrent.futures.Executor):
         Get tasks from task_outgoing queue in batch,
         either by interval or by batch size
         """
-        messages: t.List[TaskSubmissionInfo] = []
+        submit_batch: t.List[TaskSubmissionInfo] = []
         start = time.time()
-        while True:
-            if (
-                time.time() - start >= self.batch_interval
-                or len(messages) >= self.batch_size
-            ):
-                break
+        while (
+            time.time() - start < self.batch_interval
+            and len(submit_batch) < self.batch_size
+        ):
             try:
                 assert self.task_outgoing is not None
                 x = self.task_outgoing.get(timeout=0.1)
             except queue.Empty:
                 break
             else:
-                messages.append(x)
-        return messages
+                submit_batch.append(x)
+        return submit_batch
 
     def shutdown(self):
         self.poller_thread.shutdown()
