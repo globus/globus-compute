@@ -113,7 +113,9 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._kill_event = threading.Event()
         # Start the task submission thread
         self.task_submit_thread = threading.Thread(
-            target=self.task_submit_thread, args=(self._kill_event,)
+            target=self.task_submit_thread,
+            args=(self._kill_event,),
+            name="FuncX-Submit-Thread",
         )
         self.task_submit_thread.daemon = True
         self.task_submit_thread.start()
@@ -190,13 +192,9 @@ class FuncXExecutor(concurrent.futures.Executor):
         while not kill_event.is_set():
             messages = self._get_tasks_in_batch()
             if messages:
-                log.info(
-                    "[TASK_SUBMIT_THREAD] Submitting {} tasks to funcX".format(
-                        len(messages)
-                    )
-                )
+                log.info(f"Submitting {len(messages)} tasks to funcX")
             self._submit_tasks(messages)
-        log.info("[TASK_SUBMIT_THREAD] Exiting")
+        log.info("Exiting")
 
     def _submit_tasks(self, messages):
         """Submit a batch of tasks"""
@@ -212,16 +210,12 @@ class FuncXExecutor(concurrent.futures.Executor):
                 batch.add(
                     *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
                 )
-                log.debug(f"[TASK_SUBMIT_THREAD] Adding msg {msg} to funcX batch")
+                log.debug(f"Adding msg {msg} to funcX batch")
             try:
                 batch_tasks = self.funcx_client.batch_run(batch)
                 log.debug(f"Batch submitted to task_group: {self.task_group_id}")
             except Exception:
-                log.error(
-                    "[TASK_SUBMIT_THREAD] Error submitting {} tasks to funcX".format(
-                        len(messages)
-                    )
-                )
+                log.error(f"Error submitting {len(messages)} tasks to funcX")
                 raise
             else:
                 for i, msg in enumerate(messages):
@@ -305,7 +299,9 @@ class ExecutorPollerThread:
             results_ws_uri=self.results_ws_uri,
             auto_start=False,
         )
-        self.thread = threading.Thread(target=self.event_loop_thread, args=(eventloop,))
+        self.thread = threading.Thread(
+            target=self.event_loop_thread, args=(eventloop,), name="FuncX-Poller-Thread"
+        )
         self.thread.daemon = True
         self.thread.start()
         log.debug("Started web_socket_poller thread")
