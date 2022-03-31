@@ -116,8 +116,7 @@ class WebSocketPollingTask:
                     "WebSocket service responsed with a 404. "
                     "Please ensure you set the correct results_ws_uri"
                 )
-            else:
-                raise e
+            raise
         except InvalidHandshake:
             raise Exception(
                 "Failed to authenticate user. Please ensure that you are logged in."
