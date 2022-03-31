@@ -14,6 +14,32 @@ from funcx.sdk.client import FuncXClient
 log = logging.getLogger(__name__)
 
 
+class TaskSubmissionInfo:
+    def __init__(
+        self,
+        *,
+        future_id: int,
+        function_id: str,
+        endpoint_id: str,
+        args: t.Tuple[t.Any],
+        kwargs: t.Dict[str, t.Any],
+    ):
+        self.future_id = future_id
+        self.function_id = function_id
+        self.endpoint_id = endpoint_id
+        self.args = args
+        self.kwargs = kwargs
+
+    def __repr__(self):
+        return (
+            "TaskSubmissionInfo("
+            f"future_id={self.future_id}, "
+            f"function_id='{self.function_id}', "
+            f"endpoint_id='{self.endpoint_id}', "
+            "args=..., kwargs=...)"
+        )
+
+
 class AtomicController:
     """This is used to synchronize between the FuncXExecutor which starts
     WebSocketPollingTasks and the WebSocketPollingTask which closes itself when there
@@ -97,12 +123,12 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_enabled = batch_enabled
         self.batch_interval = batch_interval
         self.batch_size = batch_size
+        self.task_outgoing: "queue.Queue[TaskSubmissionInfo]" = queue.Queue()
 
         self._counter_future_map: t.Dict[int, FuncXFuture] = {}
         self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
         self._function_future_map: t.Dict[str, FuncXFuture] = {}
-        self.task_outgoing: t.Optional[queue.Queue] = None
         self._kill_event: t.Optional[threading.Event] = None
 
         self.poller_thread = ExecutorPollerThread(
@@ -126,8 +152,6 @@ class FuncXExecutor(concurrent.futures.Executor):
         return self.funcx_client.session_task_group_id
 
     def start_batching_thread(self):
-        self.task_outgoing = queue.Queue()
-
         self._kill_event = threading.Event()
         # Start the task submission thread
         self.task_submit_thread = threading.Thread(
@@ -184,13 +208,13 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
-        msg = {
-            "future_id": future_id,
-            "function_id": self._function_registry[function],
-            "endpoint_id": endpoint_id,
-            "args": args,
-            "kwargs": kwargs,
-        }
+        msg = TaskSubmissionInfo(
+            future_id=future_id,
+            function_id=self._function_registry[function],
+            endpoint_id=endpoint_id,
+            args=args,
+            kwargs=kwargs,
+        )
 
         fut = FuncXFuture()
         self._counter_future_map[future_id] = fut
@@ -211,59 +235,53 @@ class FuncXExecutor(concurrent.futures.Executor):
             messages = self._get_tasks_in_batch()
             if messages:
                 log.info(f"Submitting {len(messages)} tasks to funcX")
-            self._submit_tasks(messages)
+                self._submit_tasks(messages)
         log.info("Exiting")
 
-    def _submit_tasks(self, messages: t.List[t.Dict[str, t.Any]]):
+    def _submit_tasks(self, messages: t.List[TaskSubmissionInfo]):
         """Submit a batch of tasks"""
-        if messages:
-            batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
-            for msg in messages:
-                function_id, endpoint_id, args, kwargs = (
-                    msg["function_id"],
-                    msg["endpoint_id"],
-                    msg["args"],
-                    msg["kwargs"],
-                )
-                batch.add(
-                    *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
-                )
-                log.debug(f"Adding msg {msg} to funcX batch")
-            try:
-                batch_tasks = self.funcx_client.batch_run(batch)
-                log.debug(f"Batch submitted to task_group: {self.task_group_id}")
-            except Exception:
-                log.error(f"Error submitting {len(messages)} tasks to funcX")
-                raise
-            else:
-                for i, msg in enumerate(messages):
-                    self._function_future_map[
-                        batch_tasks[i]
-                    ] = self._counter_future_map.pop(msg["future_id"])
-                    self._function_future_map[batch_tasks[i]].task_id = batch_tasks[i]
-                self.poller_thread.atomic_controller.increment(val=len(messages))
+        batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
+        for msg in messages:
+            batch.add(
+                *msg.args,
+                **msg.kwargs,
+                endpoint_id=msg.endpoint_id,
+                function_id=msg.function_id,
+            )
+            log.debug(f"Adding msg {msg} to funcX batch")
+        try:
+            batch_tasks = self.funcx_client.batch_run(batch)
+            log.debug(f"Batch submitted to task_group: {self.task_group_id}")
+        except Exception:
+            log.error(f"Error submitting {len(messages)} tasks to funcX")
+            raise
+        else:
+            for i, msg in enumerate(messages):
+                self._function_future_map[
+                    batch_tasks[i]
+                ] = self._counter_future_map.pop(msg.future_id)
+                self._function_future_map[batch_tasks[i]].task_id = batch_tasks[i]
+            self.poller_thread.atomic_controller.increment(val=len(messages))
 
-    def _get_tasks_in_batch(self) -> t.List[t.Dict[str, t.Any]]:
+    def _get_tasks_in_batch(self) -> t.List[TaskSubmissionInfo]:
         """
         Get tasks from task_outgoing queue in batch,
         either by interval or by batch size
         """
-        messages: t.List[t.Dict[str, t.Any]] = []
+        submit_batch: t.List[TaskSubmissionInfo] = []
         start = time.time()
-        while True:
-            if (
-                time.time() - start >= self.batch_interval
-                or len(messages) >= self.batch_size
-            ):
-                break
+        while (
+            time.time() - start < self.batch_interval
+            and len(submit_batch) < self.batch_size
+        ):
             try:
                 assert self.task_outgoing is not None
-                x: t.Dict[str, t.Any] = self.task_outgoing.get(timeout=0.1)
+                x = self.task_outgoing.get(timeout=0.1)
             except queue.Empty:
                 break
             else:
-                messages.append(x)
-        return messages
+                submit_batch.append(x)
+        return submit_batch
 
     def shutdown(self):
         self.poller_thread.shutdown()
