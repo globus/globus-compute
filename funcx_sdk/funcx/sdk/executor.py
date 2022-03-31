@@ -257,10 +257,10 @@ class FuncXExecutor(concurrent.futures.Executor):
             raise
         else:
             for i, msg in enumerate(messages):
-                self._function_future_map[
-                    batch_tasks[i]
-                ] = self._counter_future_map.pop(msg.future_id)
-                self._function_future_map[batch_tasks[i]].task_id = batch_tasks[i]
+                task_uuid: str = batch_tasks[i]
+                fut = self._counter_future_map.pop(msg.future_id)
+                fut.task_id = task_uuid
+                self._function_future_map[task_uuid] = fut
             self.poller_thread.atomic_controller.increment(val=len(messages))
 
     def _get_tasks_in_batch(self) -> t.List[TaskSubmissionInfo]:
