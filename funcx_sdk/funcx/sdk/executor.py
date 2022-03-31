@@ -47,6 +47,19 @@ class AtomicController:
         return f"AtomicController value:{self._value}"
 
 
+class FuncXFuture(Future):
+    """Extends concurrent.futures.Future to include an optional task UUID."""
+
+    task_id: t.Optional[str]
+    """The UUID for the task behind this Future. In batch mode, this will
+    not be populated immediately, but will appear later when the task is
+    submitted to the FuncX services."""
+
+    def __init__(self):
+        super().__init__()
+        self.task_id = None
+
+
 class FuncXExecutor(concurrent.futures.Executor):
     """Extends the concurrent.futures.Executor class to layer this interface
     over funcX. The executor returns future objects that are asynchronously
@@ -86,10 +99,10 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_interval = batch_interval
         self.batch_size = batch_size
 
-        self._counter_future_map: t.Dict[int, Future] = {}
+        self._counter_future_map: t.Dict[int, FuncXFuture] = {}
         self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
-        self._function_future_map: t.Dict[str, Future] = {}
+        self._function_future_map: t.Dict[str, FuncXFuture] = {}
         self.task_group_id = (
             self.funcx_client.session_task_group_id
         )  # we need to associate all batch launches with this id
@@ -141,7 +154,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         Returns
         -------
-        Future : concurrent.futures.Future
+        Future : funcx.sdk.executor.FuncXFuture
             A future object
         """
 
@@ -175,7 +188,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             "kwargs": kwargs,
         }
 
-        fut = Future()
+        fut = FuncXFuture()
         self._counter_future_map[future_id] = fut
 
         if self.batch_enabled:
@@ -223,6 +236,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                     self._function_future_map[
                         batch_tasks[i]
                     ] = self._counter_future_map.pop(msg["future_id"])
+                    self._function_future_map[batch_tasks[i]].task_id = batch_tasks[i]
                 self.poller_thread.atomic_controller.increment(val=len(messages))
 
     def _get_tasks_in_batch(self) -> t.List[t.Dict[str, t.Any]]:
@@ -267,7 +281,7 @@ class ExecutorPollerThread:
     def __init__(
         self,
         funcx_client: FuncXClient,
-        _function_future_map: t.Dict[str, Future],
+        _function_future_map: t.Dict[str, FuncXFuture],
         results_ws_uri: str,
         task_group_id: str,
     ):
@@ -284,7 +298,7 @@ class ExecutorPollerThread:
 
         self.funcx_client: FuncXClient = funcx_client
         self.results_ws_uri = results_ws_uri
-        self._function_future_map: t.Dict[str, Future] = _function_future_map
+        self._function_future_map: t.Dict[str, FuncXFuture] = _function_future_map
         self.task_group_id = task_group_id
         self.eventloop = None
         self.atomic_controller = AtomicController(self.start, noop)
