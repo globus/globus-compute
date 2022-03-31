@@ -49,7 +49,7 @@ setup(
         "test": TEST_REQUIRES,
         "docs": DOCS_REQUIRES,
     },
-    python_requires=">=3.6.0",
+    python_requires=">=3.7",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
