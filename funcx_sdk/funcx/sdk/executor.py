@@ -6,7 +6,6 @@ import queue
 import threading
 import time
 import typing as t
-from collections import namedtuple
 from concurrent.futures import Future
 
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
@@ -15,9 +14,30 @@ from funcx.sdk.client import FuncXClient
 log = logging.getLogger(__name__)
 
 
-TaskSubmissionInfo = namedtuple(
-    "TaskSubmissionInfo", "future_id, function_id, endpoint_id, args, kwargs"
-)
+class TaskSubmissionInfo:
+    def __init__(
+        self,
+        *,
+        future_id: int,
+        function_id: str,
+        endpoint_id: str,
+        args: t.Tuple[t.Any],
+        kwargs: t.Dict[str, t.Any],
+    ):
+        self.future_id = future_id
+        self.function_id = function_id
+        self.endpoint_id = endpoint_id
+        self.args = args
+        self.kwargs = kwargs
+
+    def __repr__(self):
+        return (
+            "TaskSubmissionInfo("
+            f"future_id={self.future_id}, "
+            f"function_id='{self.function_id}', "
+            f"endpoint_id='{self.endpoint_id}', "
+            "args=..., kwargs=...)"
+        )
 
 
 class AtomicController:
