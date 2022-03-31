@@ -80,7 +80,6 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         self.funcx_client: FuncXClient = funcx_client
 
-        self.results_ws_uri = self.funcx_client.results_ws_uri
         self.label = label
         self.batch_enabled = batch_enabled
         self.batch_interval = batch_interval
@@ -90,9 +89,6 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
         self._function_future_map: t.Dict[str, Future] = {}
-        self.task_group_id = (
-            self.funcx_client.session_task_group_id
-        )  # we need to associate all batch launches with this id
         self.task_outgoing: t.Optional[queue.Queue] = None
         self._kill_event: t.Optional[threading.Event] = None
 
@@ -107,6 +103,14 @@ class FuncXExecutor(concurrent.futures.Executor):
         if self.batch_enabled:
             log.info("Batch submission enabled.")
             self.start_batching_thread()
+
+    @property
+    def results_ws_uri(self) -> str:
+        return self.funcx_client.results_ws_uri
+
+    @property
+    def task_group_id(self) -> str:
+        return self.funcx_client.session_task_group_id
 
     def start_batching_thread(self):
         self.task_outgoing = queue.Queue()
@@ -283,12 +287,18 @@ class ExecutorPollerThread:
         """
 
         self.funcx_client: FuncXClient = funcx_client
-        self.results_ws_uri = results_ws_uri
         self._function_future_map: t.Dict[str, Future] = _function_future_map
-        self.task_group_id = task_group_id
         self.eventloop = None
         self.atomic_controller = AtomicController(self.start, noop)
         self.ws_handler = None
+
+    @property
+    def results_ws_uri(self) -> str:
+        return self.funcx_client.results_ws_uri
+
+    @property
+    def task_group_id(self) -> str:
+        return self.funcx_client.session_task_group_id
 
     def start(self):
         """Start the result polling thread"""
