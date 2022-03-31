@@ -240,16 +240,16 @@ class EndpointInterchange:
         quiesce_event : threading.Event
               Event to let the thread know when it is time to die.
         """
-        log.info("[TASK_PULL_THREAD] Starting")
+        log.info("Starting")
 
         try:
             self._task_puller_loop(quiesce_event)
         except Exception:
-            log.exception("[TASK_PULL_THREAD] Unhandled exception")
+            log.exception("Unhandled exception")
         finally:
             quiesce_event.set()
             self.task_incoming.close()
-            log.info("[TASK_PULL_THREAD] Thread loop exiting")
+            log.info("Thread loop exiting")
 
     def _task_puller_loop(self, quiesce_event):
         task_counter = 0
@@ -276,8 +276,7 @@ class EndpointInterchange:
             try:
                 if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
                     log.critical(
-                        "[TASK_PULL_THREAD] Missed too many heartbeats. "
-                        "Setting quiesce event."
+                        "Missed too many heartbeats. " "Setting quiesce event."
                     )
                     quiesce_event.set()
                     break
@@ -288,24 +287,21 @@ class EndpointInterchange:
                     self.last_heartbeat = time.time()
                 except zmq.Again:
                     # We just timed out while attempting to receive
-                    log.debug(
-                        "[TASK_PULL_THREAD] {} tasks in internal queue".format(
+
+                    log.trace(
+                        "{} tasks in internal queue".format(
                             self.total_pending_task_count
                         )
                     )
                     continue
                 except Exception:
-                    log.exception(
-                        "[TASK_PULL_THREAD] Unknown exception while waiting for tasks"
-                    )
+                    log.exception("Unknown exception while waiting for tasks")
 
                 # YADU: TODO We need to do the routing here
                 try:
                     msg = Message.unpack(raw_msg)
                 except Exception:
-                    log.exception(
-                        "[TASK_PULL_THREAD] Failed to unpack message from forwarder"
-                    )
+                    log.exception("Failed to unpack message from forwarder")
                     pass
 
                 if msg == "STOP":
@@ -314,10 +310,10 @@ class EndpointInterchange:
                     break
 
                 elif isinstance(msg, Heartbeat):
-                    log.info("[TASK_PULL_THREAD] Got heartbeat from funcx-forwarder")
+                    log.info("Got heartbeat from funcx-forwarder")
 
                 elif isinstance(msg, Task):
-                    log.info(f"[TASK_PULL_THREAD] Received task:{msg.task_id}")
+                    log.info(f"Received task:{msg.task_id}")
                     self.pending_task_queue.put(msg)
                     self.total_pending_task_count += 1
                     self.task_status_deltas[
@@ -325,7 +321,7 @@ class EndpointInterchange:
                     ] = TaskStatusCode.WAITING_FOR_NODES
                     task_counter += 1
                     log.debug(
-                        "[TASK_PULL_THREAD] Task counter:%s Pending Tasks: %s",
+                        "Task counter:%s Pending Tasks: %s",
                         task_counter,
                         self.total_pending_task_count,
                     )
@@ -334,12 +330,10 @@ class EndpointInterchange:
                     self.results_ack_handler.ack(msg.task_id)
 
                 else:
-                    log.warning(
-                        f"[TASK_PULL_THREAD] Unknown message type received: {msg}"
-                    )
+                    log.warning(f"Unknown message type received: {msg}")
 
             except Exception:
-                log.exception("[TASK_PULL_THREAD] Something really bad happened")
+                log.exception("Something really bad happened")
                 continue
 
     def get_container(self, container_uuid):

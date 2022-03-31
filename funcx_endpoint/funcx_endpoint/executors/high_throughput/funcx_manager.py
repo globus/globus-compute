@@ -440,7 +440,7 @@ class Manager:
                     )
 
                     for task_type, task in tasks:
-                        log.debug(f"[TASK DEBUG] Task is of type: {task_type}")
+                        log.debug(f"Task is of type: {task_type}")
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
@@ -653,18 +653,16 @@ class Manager:
         log.debug("Sending complete")
 
     def _status_report_loop(self, kill_event):
-        log.debug("[STATUS] Manager status reporting loop starting")
+        log.debug("Manager status reporting loop starting")
 
         while not kill_event.is_set():
             msg = ManagerStatusReport(
                 self.task_status_deltas,
                 self.container_switch_count,
             )
-            log.info(
-                f"[STATUS] Sending status report to interchange: {msg.task_statuses}"
-            )
+            log.info(f"Sending status report to interchange: {msg.task_statuses}")
             self.pending_result_queue.put(msg)
-            log.info("[STATUS] Clearing task deltas")
+            log.info("Clearing task deltas")
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
 
@@ -677,12 +675,12 @@ class Manager:
               Event to let the thread know when it is time to die.
         """
 
-        log.debug("[RESULT_PUSH_THREAD] Starting thread")
+        log.debug("Starting thread")
 
         push_poll_period = (
             max(10, self.poll_period) / 1000
         )  # push_poll_period must be atleast 10 ms
-        log.debug(f"[RESULT_PUSH_THREAD] push poll period: {push_poll_period}")
+        log.debug(f"push poll period: {push_poll_period}")
 
         last_beat = time.time()
         items = []
@@ -702,7 +700,7 @@ class Manager:
             except queue.Empty:
                 pass
             except Exception as e:
-                log.exception(f"[RESULT_PUSH_THREAD] Got an exception: {e}")
+                log.exception(f"Got an exception: {e}")
 
             # If we have reached poll_period duration or timer has expired, we send
             # results
@@ -715,7 +713,7 @@ class Manager:
                     self.result_outgoing.send_multipart(items)
                     items = []
 
-        log.critical("[RESULT_PUSH_THREAD] Exiting")
+        log.critical("Exiting")
 
     def remove_worker_init(self, worker_type):
         """
