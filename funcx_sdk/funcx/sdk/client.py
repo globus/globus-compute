@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import typing as t
 import uuid
 from distutils.version import LooseVersion
 
@@ -360,7 +361,7 @@ class FuncXClient:
 
         return results
 
-    def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
+    def run(self, *args, endpoint_id=None, function_id=None, **kwargs) -> str:
         """Initiate an invocation
 
         Parameters
@@ -392,7 +393,7 @@ class FuncXClient:
 
         return r[0]
 
-    def create_batch(self, task_group_id=None):
+    def create_batch(self, task_group_id=None) -> Batch:
         """
         Create a Batch instance to handle batch submission in funcX
 
@@ -413,10 +414,9 @@ class FuncXClient:
         if not task_group_id:
             task_group_id = self.session_task_group_id
 
-        batch = Batch(task_group_id=task_group_id)
-        return batch
+        return Batch(task_group_id=task_group_id)
 
-    def batch_run(self, batch):
+    def batch_run(self, batch) -> t.List[str]:
         """Initiate a batch of tasks to funcX
 
         Parameters
@@ -435,7 +435,7 @@ class FuncXClient:
         # Send the data to funcX
         r = self.web_client.submit(data)
 
-        task_uuids = []
+        task_uuids: t.List[str] = []
         for result in r["results"]:
             task_id = result["task_uuid"]
             task_uuids.append(task_id)
