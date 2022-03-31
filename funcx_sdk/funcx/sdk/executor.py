@@ -86,10 +86,10 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_interval = batch_interval
         self.batch_size = batch_size
 
-        self._counter_future_map: t.Dict[int, Future] = {}
+        self._counter_future_map: t.Dict[int, FuncXFuture] = {}
         self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
-        self._function_future_map: t.Dict[str, Future] = {}
+        self._function_future_map: t.Dict[str, FuncXFuture] = {}
         self.task_group_id = (
             self.funcx_client.session_task_group_id
         )  # we need to associate all batch launches with this id
@@ -268,7 +268,7 @@ class ExecutorPollerThread:
     def __init__(
         self,
         funcx_client: FuncXClient,
-        _function_future_map: t.Dict[str, Future],
+        _function_future_map: t.Dict[str, FuncXFuture],
         results_ws_uri: str,
         task_group_id: str,
     ):
@@ -285,7 +285,7 @@ class ExecutorPollerThread:
 
         self.funcx_client: FuncXClient = funcx_client
         self.results_ws_uri = results_ws_uri
-        self._function_future_map: t.Dict[str, Future] = _function_future_map
+        self._function_future_map: t.Dict[str, FuncXFuture] = _function_future_map
         self.task_group_id = task_group_id
         self.eventloop = None
         self.atomic_controller = AtomicController(self.start, noop)
