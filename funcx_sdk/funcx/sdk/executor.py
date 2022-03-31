@@ -163,6 +163,23 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.task_submit_thread.start()
         log.info("Started task submit thread")
 
+    def register_function(self, func: t.Callable, container_uuid=None):
+        # Please note that this is a partial implementation, not all function
+        # registration options are fleshed out here.
+        log.debug(f"Function:{func} is not registered. Registering")
+        try:
+            function_id = self.funcx_client.register_function(
+                func,
+                function_name=func.__name__,
+                container_uuid=container_uuid,
+            )
+        except Exception:
+            log.error(f"Error in registering {func.__name__}")
+            raise
+        else:
+            self._function_registry[func] = function_id
+            log.debug(f"Function registered with id:{function_id}")
+
     def submit(self, function, *args, endpoint_id=None, container_uuid=None, **kwargs):
         """Initiate an invocation
 
@@ -187,22 +204,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
 
         if function not in self._function_registry:
-            # Please note that this is a partial implementation, not all function
-            # registration options are fleshed out here.
-            log.debug(f"Function:{function} is not registered. Registering")
-            try:
-                function_id = self.funcx_client.register_function(
-                    function,
-                    function_name=function.__name__,
-                    container_uuid=container_uuid,
-                )
-            except Exception:
-                log.error(f"Error in registering {function.__name__}")
-                raise
-            else:
-                self._function_registry[function] = function_id
-                log.debug(f"Function registered with id:{function_id}")
-
+            self.register_function(function)
         future_id = self._future_counter
         self._future_counter += 1
 
