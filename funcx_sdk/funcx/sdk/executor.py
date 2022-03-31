@@ -47,6 +47,19 @@ class AtomicController:
         return f"AtomicController value:{self._value}"
 
 
+class FuncXFuture(Future):
+    """Extends concurrent.futures.Future to include an optional task UUID."""
+
+    task_id: t.Optional[str]
+    """The UUID for the task behind this Future. In batch mode, this will
+    not be populated immediately, but will appear later when the task is
+    submitted to the FuncX services."""
+
+    def __init__(self):
+        super().__init__()
+        self.task_id = None
+
+
 class FuncXExecutor(concurrent.futures.Executor):
     """Extends the concurrent.futures.Executor class to layer this interface
     over funcX. The executor returns future objects that are asynchronously
@@ -346,16 +359,3 @@ class ExecutorPollerThread:
                 ws.close(), self.eventloop
             )
             ws_close_future.result()
-
-
-class FuncXFuture(Future):
-    """Extends concurrent.futures.Future to include an optional task UUID."""
-
-    task_id: t.Optional[str]
-    """The UUID for the task behind this Future. In batch mode, this will
-    not be populated immediately, but will appear later when the task is
-    submitted to the FuncX services."""
-
-    def __init__(self):
-        super().__init__()
-        self.task_id = None
