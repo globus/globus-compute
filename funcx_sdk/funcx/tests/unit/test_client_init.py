@@ -1,3 +1,4 @@
+import uuid
 from unittest import mock
 
 import globus_sdk
@@ -83,3 +84,14 @@ def test_client_init_sets_addresses_by_env(
     # finally, confirm that the addresses were set correctly
     assert client.funcx_service_address == web_uri
     assert client.results_ws_uri == ws_uri
+
+
+def test_client_init_accepts_specified_taskgroup(mocker):
+    mocker.patch("funcx.sdk.client.NativeClient")
+    mocker.patch("funcx.sdk.client.JSONTokenStorage")
+    mocker.patch("funcx.sdk.client.FuncxWebClient")
+    mocker.patch("funcx.sdk.client.FuncXSerializer")
+    mocker.patch("funcx.sdk.client.AuthClient")
+    tg_uuid = uuid.uuid4()
+    fxc = funcx.FuncXClient(task_group_id=tg_uuid)
+    assert fxc.session_task_group_id == str(tg_uuid)

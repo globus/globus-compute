@@ -62,6 +62,7 @@ class FuncXClient:
         results_ws_uri=None,
         use_offprocess_checker=True,
         environment=None,
+        task_group_id: t.Union[None, uuid.UUID, str] = None,
         **kwargs,
     ):
         """
@@ -115,6 +116,11 @@ class FuncXClient:
             used by the client.
             Default: True
 
+        task_group_id: str|uuid.UUID
+            Set the TaskGroup ID (a UUID) for this FuncXClient instance.  Typically,
+            one uses this to submit new tasks to an existing session.
+            Default: None (will be auto generated)
+
         Keyword arguments are the same as for BaseClient.
 
         """
@@ -124,10 +130,12 @@ class FuncXClient:
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
 
-        self.func_table = {}
+        self.func_table: t.Dict[str, t.Dict] = {}
         self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
-        self.session_task_group_id = str(uuid.uuid4())
+        self.session_task_group_id = (
+            task_group_id and str(task_group_id) or str(uuid.uuid4())
+        )
 
         if not os.path.exists(self.TOKEN_DIR):
             os.makedirs(self.TOKEN_DIR)
