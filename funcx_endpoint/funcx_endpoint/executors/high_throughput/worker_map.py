@@ -154,9 +154,7 @@ class WorkerMap:
                 self.max_worker_count - self.active_workers - self.pending_workers,
             )
             log.debug(f"New workers: {len(next_worker_q)}")
-            log.debug(
-                f"Unused slots: {self.total_worker_type_counts['unused']}"
-            )
+            log.debug(f"Unused slots: {self.total_worker_type_counts['unused']}")
             num_slots = min(
                 self.max_worker_count - self.active_workers - self.pending_workers,
                 len(next_worker_q),
@@ -253,9 +251,7 @@ class WorkerMap:
                 < worker_max_idletime
             ):
                 log.debug(f"Current time: {time.time()}")
-                log.debug(
-                    f"Idle since: {self.worker_idle_since[worker_type]}"
-                )
+                log.debug(f"Idle since: {self.worker_idle_since[worker_type]}")
                 log.debug(
                     "Worker type %s has not exceeded maximum idle "
                     "time %s, continuing",
@@ -276,9 +272,7 @@ class WorkerMap:
 
             if num_remove > 0:
                 log.debug(
-                    "Removing {} workers of type {}".format(
-                        num_remove, worker_type
-                    )
+                    f"Removing {num_remove} workers of type {worker_type}"
                 )
             for _i in range(num_remove):
                 spin_downs.append(worker_type)
