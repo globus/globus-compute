@@ -271,9 +271,7 @@ class WorkerMap:
                 num_remove = min(num_remove, max_remove)
 
             if num_remove > 0:
-                log.debug(
-                    f"Removing {num_remove} workers of type {worker_type}"
-                )
+                log.debug(f"Removing {num_remove} workers of type {worker_type}")
             for _i in range(num_remove):
                 spin_downs.append(worker_type)
             # A container switching is defined as a warm container must be
