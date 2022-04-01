@@ -121,7 +121,8 @@ class EndpointManager:
 
         [1] https://docs.python.org/3/library/fcntl.html
         """
-        _ = FuncXClient()
+        client = FuncXClient(do_version_check=False, use_offprocess_checker=False)
+        client.version_check(endpoint_version=__version__)
 
         if os.path.exists(self.funcx_config_file):
             typer.confirm(
