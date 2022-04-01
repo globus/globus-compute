@@ -12,7 +12,7 @@ VersionType = t.Union[t.Tuple[int, int, int], t.Tuple[int, int, int, str]]
 
 # parse to a tuple
 def parse_version(s: str) -> VersionType:
-    pre: tuple[str, ...] = ()
+    pre: tuple[()] | tuple[str, int] = ()
     if s.endswith("-dev"):
         pre = ("dev", 0)
         s = s.rsplit("-", 1)[0]
