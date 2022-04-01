@@ -1,6 +1,7 @@
 import pytest
 
 from funcx import FuncXExecutor
+from funcx.sdk.executor import TaskSubmissionInfo
 
 
 def test_executor_shutdown(mocker):
@@ -23,3 +24,19 @@ def test_executor_shutdown(mocker):
         ws_handler.ws
 
     fexe.shutdown()
+
+
+def test_task_submission_info_stringification():
+    fut_id = 10
+    func_id = "foo_func"
+    ep_id = "bar_ep"
+
+    info = TaskSubmissionInfo(
+        future_id=fut_id, function_id=func_id, endpoint_id=ep_id, args=(), kwargs={}
+    )
+    as_str = str(info)
+    assert as_str.startswith("TaskSubmissionInfo(")
+    assert as_str.endswith("args=..., kwargs=...)")
+    assert "future_id=10" in as_str
+    assert "function_id='foo_func'" in as_str
+    assert "endpoint_id='bar_ep'" in as_str

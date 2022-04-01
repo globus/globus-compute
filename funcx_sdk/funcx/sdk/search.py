@@ -2,7 +2,6 @@ from globus_sdk import SearchAPIError, SearchClient
 from texttable import Texttable
 
 from funcx.serialize import FuncXSerializer
-from funcx.utils.errors import InvalidScopeException
 
 SEARCH_SCOPE = "urn:globus:auth:scope:search.api.globus.org:all"
 
@@ -21,7 +20,7 @@ class SearchHelper:
     ENDPOINT_SEARCH_INDEX_NAME = "funcx_endpoints"
     ENDPOINT_SEARCH_INDEX_ID = "85bcc497-3ee9-4d73-afbb-2abf292e398b"
 
-    def __init__(self, authorizer, owner_uuid):
+    def __init__(self, authorizer):
         """Initialize the Search Helper
 
         Parameters
@@ -30,7 +29,6 @@ class SearchHelper:
 
         """
         self._authorizer = authorizer
-        self._owner_uuid = owner_uuid
         self._sc = SearchClient(authorizer=self._authorizer)
 
     def _exists(self, func_uuid):
@@ -100,72 +98,6 @@ class SearchHelper:
                 "has_next_page": response.data["has_next_page"],
             }
         )
-
-    def search_endpoint(self, q, scope="all", owner_id=None):
-        """
-
-        Parameters
-        ----------
-        q
-        scope
-        owner_id
-
-        Returns
-        -------
-
-        """
-        query = {"q": q, "filters": []}
-
-        if owner_id:
-            query["filters"].append(
-                {"type": "match_all", "field_name": "owner", "values": [owner_id]}
-            )
-
-        scope_filter = None
-        if scope == "my-endpoints":
-            scope_filter = {
-                "type": "match_all",
-                "field_name": "owner",
-                "values": [f"urn:globus:auth:identity:{self._owner_uuid}"],
-            }
-        elif scope == "shared-with-me":
-            # TODO: filter for public=False AND owner != self._owner_uuid
-            # need to build advanced query for that, because GFilters cannot do NOT
-            # raise Exception('This scope has not been implemented')
-            scope_filter = {
-                "type": "match_all",
-                "field_name": "public",
-                "values": ["False"],
-            }
-        elif scope == "shared-by-me":
-            # TODO: filter for owner=self._owner_uuid AND len(shared_with) > 0
-            # but...how to filter for length of list...
-            raise InvalidScopeException("This scope has not been implemented")
-        elif scope != "all":
-            raise InvalidScopeException("This scope is invalid")
-
-        if scope_filter:
-            query["filters"].append(scope_filter)
-
-        print(query)
-        resp = self._sc.post_search(self.ENDPOINT_SEARCH_INDEX_ID, query)
-        gmeta = resp.data["gmeta"]
-        results = []
-        for res in gmeta:
-            if (
-                scope == "shared-with-me"
-                and res["entries"][0]["content"]["owner"]
-                == f"urn:globus:auth:identity:{self._owner_uuid}"
-            ):
-                continue
-            data = res["entries"][0]
-            data["endpoint_uuid"] = res["subject"]
-            data = {**data, **data["content"]}
-            del data["entry_id"]
-            del data["content"]
-            results.append(data)
-
-        return results
 
 
 class FunctionSearchResults(list):

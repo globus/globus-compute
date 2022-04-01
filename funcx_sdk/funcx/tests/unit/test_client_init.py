@@ -1,3 +1,4 @@
+import uuid
 from unittest import mock
 
 import globus_sdk
@@ -26,15 +27,6 @@ def _mock_login(monkeypatch):
         "openid": globus_sdk.NullAuthorizer(),
     }
 
-    mock_auth_client = mock.Mock()
-    monkeypatch.setattr(
-        "funcx.sdk.client.AuthClient", mock.Mock(return_value=mock_auth_client)
-    )
-    mock_auth_client.oauth2_userinfo.return_value = {"sub": "foo"}
-
-    monkeypatch.setattr("funcx.sdk.client.SearchHelper", mock.Mock())
-    monkeypatch.setattr("funcx.sdk.client.FuncXClient.version_check", mock.Mock())
-
 
 @pytest.mark.parametrize("env", [None, "dev", "production"])
 @pytest.mark.parametrize("usage_method", ["env_var", "param"])
@@ -51,8 +43,10 @@ def test_client_init_sets_addresses_by_env(
     else:
         raise NotImplementedError
 
+    # default kwargs: turn off external interactions
+    kwargs = {"do_version_check": False, "use_offprocess_checker": False}
+
     # either pass the env as a param or set it in the environment
-    kwargs = {}
     if usage_method == "param":
         kwargs["environment"] = env
     elif usage_method == "env_var":
@@ -83,3 +77,11 @@ def test_client_init_sets_addresses_by_env(
     # finally, confirm that the addresses were set correctly
     assert client.funcx_service_address == web_uri
     assert client.results_ws_uri == ws_uri
+
+
+def test_client_init_accepts_specified_taskgroup(_mock_login):
+    tg_uuid = uuid.uuid4()
+    fxc = funcx.FuncXClient(
+        task_group_id=tg_uuid, do_version_check=False, use_offprocess_checker=False
+    )
+    assert fxc.session_task_group_id == str(tg_uuid)

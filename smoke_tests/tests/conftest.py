@@ -160,7 +160,6 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
 def fxc(funcx_test_config):
     client_args = funcx_test_config["client_args"]
     fxc = FuncXClient(**client_args)
-    fxc.throttling_enabled = False
     return fxc
 
 

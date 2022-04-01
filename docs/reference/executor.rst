@@ -5,3 +5,6 @@ The FuncX Executor
     :members:
     :member-order: bysource
 
+.. autoclass:: funcx.sdk.executor.FuncXFuture
+    :members:
+    :member-order: bysource

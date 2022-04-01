@@ -14,6 +14,32 @@ from funcx.sdk.client import FuncXClient
 log = logging.getLogger(__name__)
 
 
+class TaskSubmissionInfo:
+    def __init__(
+        self,
+        *,
+        future_id: int,
+        function_id: str,
+        endpoint_id: str,
+        args: t.Tuple[t.Any],
+        kwargs: t.Dict[str, t.Any],
+    ):
+        self.future_id = future_id
+        self.function_id = function_id
+        self.endpoint_id = endpoint_id
+        self.args = args
+        self.kwargs = kwargs
+
+    def __repr__(self):
+        return (
+            "TaskSubmissionInfo("
+            f"future_id={self.future_id}, "
+            f"function_id='{self.function_id}', "
+            f"endpoint_id='{self.endpoint_id}', "
+            "args=..., kwargs=...)"
+        )
+
+
 class AtomicController:
     """This is used to synchronize between the FuncXExecutor which starts
     WebSocketPollingTasks and the WebSocketPollingTask which closes itself when there
@@ -45,6 +71,19 @@ class AtomicController:
 
     def __repr__(self):
         return f"AtomicController value:{self._value}"
+
+
+class FuncXFuture(Future):
+    """Extends concurrent.futures.Future to include an optional task UUID."""
+
+    task_id: t.Optional[str]
+    """The UUID for the task behind this Future. In batch mode, this will
+    not be populated immediately, but will appear later when the task is
+    submitted to the FuncX services."""
+
+    def __init__(self):
+        super().__init__()
+        self.task_id = None
 
 
 class FuncXExecutor(concurrent.futures.Executor):
@@ -80,20 +119,16 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         self.funcx_client: FuncXClient = funcx_client
 
-        self.results_ws_uri = self.funcx_client.results_ws_uri
         self.label = label
         self.batch_enabled = batch_enabled
         self.batch_interval = batch_interval
         self.batch_size = batch_size
+        self.task_outgoing: "queue.Queue[TaskSubmissionInfo]" = queue.Queue()
 
-        self._counter_future_map: t.Dict[int, Future] = {}
+        self._counter_future_map: t.Dict[int, FuncXFuture] = {}
         self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
-        self._function_future_map: t.Dict[str, Future] = {}
-        self.task_group_id = (
-            self.funcx_client.session_task_group_id
-        )  # we need to associate all batch launches with this id
-        self.task_outgoing: t.Optional[queue.Queue] = None
+        self._function_future_map: t.Dict[str, FuncXFuture] = {}
         self._kill_event: t.Optional[threading.Event] = None
 
         self.poller_thread = ExecutorPollerThread(
@@ -108,9 +143,15 @@ class FuncXExecutor(concurrent.futures.Executor):
             log.info("Batch submission enabled.")
             self.start_batching_thread()
 
-    def start_batching_thread(self):
-        self.task_outgoing = queue.Queue()
+    @property
+    def results_ws_uri(self) -> str:
+        return self.funcx_client.results_ws_uri
 
+    @property
+    def task_group_id(self) -> str:
+        return self.funcx_client.session_task_group_id
+
+    def start_batching_thread(self):
         self._kill_event = threading.Event()
         # Start the task submission thread
         self.task_submit_thread = threading.Thread(
@@ -121,6 +162,23 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.task_submit_thread.daemon = True
         self.task_submit_thread.start()
         log.info("Started task submit thread")
+
+    def register_function(self, func: t.Callable, container_uuid=None):
+        # Please note that this is a partial implementation, not all function
+        # registration options are fleshed out here.
+        log.debug(f"Function:{func} is not registered. Registering")
+        try:
+            function_id = self.funcx_client.register_function(
+                func,
+                function_name=func.__name__,
+                container_uuid=container_uuid,
+            )
+        except Exception:
+            log.error(f"Error in registering {func.__name__}")
+            raise
+        else:
+            self._function_registry[func] = function_id
+            log.debug(f"Function registered with id:{function_id}")
 
     def submit(self, function, *args, endpoint_id=None, container_uuid=None, **kwargs):
         """Initiate an invocation
@@ -141,41 +199,26 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         Returns
         -------
-        Future : concurrent.futures.Future
+        Future : funcx.sdk.executor.FuncXFuture
             A future object
         """
 
         if function not in self._function_registry:
-            # Please note that this is a partial implementation, not all function
-            # registration options are fleshed out here.
-            log.debug(f"Function:{function} is not registered. Registering")
-            try:
-                function_id = self.funcx_client.register_function(
-                    function,
-                    function_name=function.__name__,
-                    container_uuid=container_uuid,
-                )
-            except Exception:
-                log.error(f"Error in registering {function.__name__}")
-                raise
-            else:
-                self._function_registry[function] = function_id
-                log.debug(f"Function registered with id:{function_id}")
-
+            self.register_function(function)
         future_id = self._future_counter
         self._future_counter += 1
 
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
-        msg = {
-            "future_id": future_id,
-            "function_id": self._function_registry[function],
-            "endpoint_id": endpoint_id,
-            "args": args,
-            "kwargs": kwargs,
-        }
+        msg = TaskSubmissionInfo(
+            future_id=future_id,
+            function_id=self._function_registry[function],
+            endpoint_id=endpoint_id,
+            args=args,
+            kwargs=kwargs,
+        )
 
-        fut = Future()
+        fut = FuncXFuture()
         self._counter_future_map[future_id] = fut
 
         if self.batch_enabled:
@@ -194,58 +237,53 @@ class FuncXExecutor(concurrent.futures.Executor):
             messages = self._get_tasks_in_batch()
             if messages:
                 log.info(f"Submitting {len(messages)} tasks to funcX")
-            self._submit_tasks(messages)
+                self._submit_tasks(messages)
         log.info("Exiting")
 
-    def _submit_tasks(self, messages: t.List[t.Dict[str, t.Any]]):
+    def _submit_tasks(self, messages: t.List[TaskSubmissionInfo]):
         """Submit a batch of tasks"""
-        if messages:
-            batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
-            for msg in messages:
-                function_id, endpoint_id, args, kwargs = (
-                    msg["function_id"],
-                    msg["endpoint_id"],
-                    msg["args"],
-                    msg["kwargs"],
-                )
-                batch.add(
-                    *args, **kwargs, endpoint_id=endpoint_id, function_id=function_id
-                )
-                log.debug(f"Adding msg {msg} to funcX batch")
-            try:
-                batch_tasks = self.funcx_client.batch_run(batch)
-                log.debug(f"Batch submitted to task_group: {self.task_group_id}")
-            except Exception:
-                log.error(f"Error submitting {len(messages)} tasks to funcX")
-                raise
-            else:
-                for i, msg in enumerate(messages):
-                    self._function_future_map[
-                        batch_tasks[i]
-                    ] = self._counter_future_map.pop(msg["future_id"])
-                self.poller_thread.atomic_controller.increment(val=len(messages))
+        batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
+        for msg in messages:
+            batch.add(
+                *msg.args,
+                **msg.kwargs,
+                endpoint_id=msg.endpoint_id,
+                function_id=msg.function_id,
+            )
+            log.debug(f"Adding msg {msg} to funcX batch")
+        try:
+            batch_tasks = self.funcx_client.batch_run(batch)
+            log.debug(f"Batch submitted to task_group: {self.task_group_id}")
+        except Exception:
+            log.error(f"Error submitting {len(messages)} tasks to funcX")
+            raise
+        else:
+            for i, msg in enumerate(messages):
+                task_uuid: str = batch_tasks[i]
+                fut = self._counter_future_map.pop(msg.future_id)
+                fut.task_id = task_uuid
+                self._function_future_map[task_uuid] = fut
+            self.poller_thread.atomic_controller.increment(val=len(messages))
 
-    def _get_tasks_in_batch(self) -> t.List[t.Dict[str, t.Any]]:
+    def _get_tasks_in_batch(self) -> t.List[TaskSubmissionInfo]:
         """
         Get tasks from task_outgoing queue in batch,
         either by interval or by batch size
         """
-        messages: t.List[t.Dict[str, t.Any]] = []
+        submit_batch: t.List[TaskSubmissionInfo] = []
         start = time.time()
-        while True:
-            if (
-                time.time() - start >= self.batch_interval
-                or len(messages) >= self.batch_size
-            ):
-                break
+        while (
+            time.time() - start < self.batch_interval
+            and len(submit_batch) < self.batch_size
+        ):
             try:
                 assert self.task_outgoing is not None
-                x: t.Dict[str, t.Any] = self.task_outgoing.get(timeout=0.1)
+                x = self.task_outgoing.get(timeout=0.1)
             except queue.Empty:
                 break
             else:
-                messages.append(x)
-        return messages
+                submit_batch.append(x)
+        return submit_batch
 
     def shutdown(self):
         self.poller_thread.shutdown()
@@ -267,7 +305,7 @@ class ExecutorPollerThread:
     def __init__(
         self,
         funcx_client: FuncXClient,
-        _function_future_map: t.Dict[str, Future],
+        _function_future_map: t.Dict[str, FuncXFuture],
         results_ws_uri: str,
         task_group_id: str,
     ):
@@ -283,12 +321,18 @@ class ExecutorPollerThread:
         """
 
         self.funcx_client: FuncXClient = funcx_client
-        self.results_ws_uri = results_ws_uri
-        self._function_future_map: t.Dict[str, Future] = _function_future_map
-        self.task_group_id = task_group_id
+        self._function_future_map: t.Dict[str, FuncXFuture] = _function_future_map
         self.eventloop = None
         self.atomic_controller = AtomicController(self.start, noop)
         self.ws_handler = None
+
+    @property
+    def results_ws_uri(self) -> str:
+        return self.funcx_client.results_ws_uri
+
+    @property
+    def task_group_id(self) -> str:
+        return self.funcx_client.session_task_group_id
 
     def start(self):
         """Start the result polling thread"""

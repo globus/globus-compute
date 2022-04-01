@@ -66,7 +66,7 @@ setup(
     extras_require={
         "test": TEST_REQUIRES,
     },
-    python_requires=">=3.6.0",
+    python_requires=">=3.7",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",

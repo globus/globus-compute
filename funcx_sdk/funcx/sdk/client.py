@@ -4,10 +4,11 @@ import logging
 import os
 import typing as t
 import uuid
+import warnings
 from distutils.version import LooseVersion
 
 from fair_research_login import JSONTokenStorage, NativeClient
-from globus_sdk import AuthClient
+from globus_sdk import SearchClient
 
 from funcx.sdk import VERSION as SDK_VERSION
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
@@ -62,6 +63,8 @@ class FuncXClient:
         results_ws_uri=None,
         use_offprocess_checker=True,
         environment=None,
+        task_group_id: t.Union[None, uuid.UUID, str] = None,
+        do_version_check: bool = True,
         **kwargs,
     ):
         """
@@ -86,11 +89,6 @@ class FuncXClient:
             A custom authorizer instance to communicate with Globus Search.
             Default: ``None``, will be created.
 
-        openid_authorizer:class:`GlobusAuthorizer \
-            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-            A custom authorizer instance to communicate with OpenID.
-            Default: ``None``, will be created.
-
         funcx_service_address: str
             For internal use only. The address of the web service.
 
@@ -99,6 +97,11 @@ class FuncXClient:
 
         environment: str
             For internal use only. The name of the environment to use.
+
+        do_version_check: bool
+            Set to ``False`` to skip the version compatibility check on client
+            initialization
+            Default: True
 
         asynchronous: bool
         Should the API use asynchronous interactions with the web service? Currently
@@ -115,6 +118,11 @@ class FuncXClient:
             used by the client.
             Default: True
 
+        task_group_id: str|uuid.UUID
+            Set the TaskGroup ID (a UUID) for this FuncXClient instance.  Typically,
+            one uses this to submit new tasks to an existing session.
+            Default: None (will be auto generated)
+
         Keyword arguments are the same as for BaseClient.
 
         """
@@ -124,10 +132,12 @@ class FuncXClient:
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
 
-        self.func_table = {}
+        self.func_table: t.Dict[str, t.Dict] = {}
         self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
-        self.session_task_group_id = str(uuid.uuid4())
+        self.session_task_group_id = (
+            task_group_id and str(task_group_id) or str(uuid.uuid4())
+        )
 
         if not os.path.exists(self.TOKEN_DIR):
             os.makedirs(self.TOKEN_DIR)
@@ -140,10 +150,16 @@ class FuncXClient:
         )
 
         # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
-        search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
-        scopes = [self.FUNCX_SCOPE, search_scope, "openid"]
+        scopes = [self.FUNCX_SCOPE, SearchClient.scopes.all, "openid"]
 
-        if not fx_authorizer or not search_authorizer or not openid_authorizer:
+        if openid_authorizer is not None:
+            warnings.warn(
+                "The 'openid_authorizer' argument is deprecated. "
+                "It will be removed in a future release.",
+                DeprecationWarning,
+            )
+
+        if not fx_authorizer or not search_authorizer:
             self.native_client.login(
                 requested_scopes=scopes,
                 no_local_server=kwargs.get("no_local_server", True),
@@ -156,8 +172,6 @@ class FuncXClient:
                 requested_scopes=scopes
             )
             fx_authorizer = all_authorizers[self.FUNCX_SCOPE]
-            search_authorizer = all_authorizers[search_scope]
-            openid_authorizer = all_authorizers["openid"]
 
         self.web_client = FuncxWebClient(
             base_url=funcx_service_address, authorizer=fx_authorizer
@@ -166,15 +180,12 @@ class FuncXClient:
             use_offprocess_checker=self.use_offprocess_checker
         )
 
-        authclient = AuthClient(authorizer=openid_authorizer)
-        user_info = authclient.oauth2_userinfo()
-        self.searcher = SearchHelper(
-            authorizer=search_authorizer, owner_uuid=user_info["sub"]
-        )
+        self._searcher = None
         self.funcx_service_address = funcx_service_address
         self.check_endpoint_version = check_endpoint_version
 
-        self.version_check()
+        if do_version_check:
+            self.version_check()
 
         self.results_ws_uri = results_ws_uri
         self.asynchronous = asynchronous
@@ -190,6 +201,16 @@ class FuncXClient:
             )
         else:
             self.loop = None
+
+    @property
+    def searcher(self):
+        # TODO: remove this
+        if self._searcher is None:
+            search_authorizer = self.native_client.get_authorizers(
+                requested_scopes=[SearchClient.scopes.all]
+            )[SearchClient.resource_server]
+            self._searcher = SearchHelper(authorizer=search_authorizer)
+        return self._searcher
 
     def version_check(self):
         """Check this client version meets the service's minimum supported version."""
