@@ -14,7 +14,7 @@ VersionType = t.Union[t.Tuple[int, int, int], t.Tuple[int, int, int, str]]
 def parse_version(s: str) -> VersionType:
     pre: tuple[str, ...] = ()
     if s.endswith("-dev"):
-        pre = ("dev",)
+        pre = ("dev", 0)
         s = s.rsplit("-", 1)[0]
     vals = s.split(".")
     if len(vals) != 3:
