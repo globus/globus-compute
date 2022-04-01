@@ -110,7 +110,6 @@ class TestStart:
 
         funcx_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "check_endpoint_version": True,
         }
 
         mock_daemon.assert_called_with(
@@ -252,7 +251,6 @@ class TestStart:
 
         funcx_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "check_endpoint_version": True,
         }
 
         # We should expect reg_info in this test to be None when passed into

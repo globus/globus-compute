@@ -28,6 +28,8 @@ from funcx_endpoint.executors.high_throughput import (
 )
 from funcx_endpoint.logging_config import setup_logging
 
+from ..version import __version__
+
 log = logging.getLogger(__name__)
 
 
@@ -181,9 +183,10 @@ class EndpointManager:
 
         funcx_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "check_endpoint_version": True,
+            "do_version_check": False,
         }
         funcx_client = FuncXClient(**funcx_client_options)
+        funcx_client.version_check(endpoint_version=__version__)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 

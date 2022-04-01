@@ -55,7 +55,7 @@ TEST_REQUIRES = [
 version_ns = {}
 with open(os.path.join("funcx_endpoint", "version.py")) as f:
     exec(f.read(), version_ns)
-version = version_ns["VERSION"]
+version = version_ns["__version__"]
 
 setup(
     name="funcx-endpoint",
