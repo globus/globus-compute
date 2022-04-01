@@ -28,8 +28,6 @@ from funcx_endpoint.executors.high_throughput import (
 )
 from funcx_endpoint.logging_config import setup_logging
 
-from ..version import __version__
-
 log = logging.getLogger(__name__)
 
 
@@ -121,8 +119,9 @@ class EndpointManager:
 
         [1] https://docs.python.org/3/library/fcntl.html
         """
-        client = FuncXClient(do_version_check=False, use_offprocess_checker=False)
-        client.version_check(endpoint_version=__version__)
+        # construct client to force login flow
+        # FIXME: `funcx` should provide a cleaner way of doing login
+        FuncXClient(do_version_check=False, use_offprocess_checker=False)
 
         if os.path.exists(self.funcx_config_file):
             typer.confirm(
@@ -184,10 +183,9 @@ class EndpointManager:
 
         funcx_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "do_version_check": False,
+            "check_endpoint_version": True,
         }
         funcx_client = FuncXClient(**funcx_client_options)
-        funcx_client.version_check(endpoint_version=__version__)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
