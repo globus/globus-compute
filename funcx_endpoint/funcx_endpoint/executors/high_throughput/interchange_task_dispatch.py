@@ -103,9 +103,9 @@ def dispatch(
                             manager,
                             ready_manager_queue[manager]["free_capacity"][
                                 "total_workers"
-                          ],
-                       )
-                     )
+                            ],
+                        )
+                    )
                 else:
                     log.debug(f"Manager {manager} is now saturated")
                     interesting_managers.remove(manager)

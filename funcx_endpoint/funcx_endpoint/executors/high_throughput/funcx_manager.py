@@ -470,8 +470,7 @@ class Manager:
                 # Only check if no messages were received.
                 if time.time() > last_interchange_contact + self.heartbeat_threshold:
                     log.critical(
-                        "Missing contact with interchange beyond "
-                        "heartbeat_threshold"
+                        "Missing contact with interchange beyond " "heartbeat_threshold"
                     )
                     kill_event.set()
                     log.critical("Killing all workers")
