@@ -752,9 +752,7 @@ class EndpointInterchange:
         """Get status of all blocks from the provider"""
         status = []
         if self.config.provider:
-            log.debug(
-                f"Getting the status of {list(self.blocks.values())} blocks."
-            )
+            log.debug(f"Getting the status of {list(self.blocks.values())} blocks.")
             status = self.config.provider.status(list(self.blocks.values()))
             log.debug(f"The status is {status}")
 
