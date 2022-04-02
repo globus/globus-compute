@@ -315,9 +315,9 @@ class Manager:
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
             log.trace(
-               "pending_task_count: %s, Ready_worker_count: %s",
-               pending_task_count,
-               ready_worker_count,
+                "pending_task_count: %s, Ready_worker_count: %s",
+                pending_task_count,
+                ready_worker_count,
             )
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
@@ -543,7 +543,7 @@ class Manager:
                 else:
                     available_workers = current_worker_map[task_type]
                     log.trace(
-                         "Available workers of type {}: {}".format(
+                        "Available workers of type {}: {}".format(
                             task_type, available_workers
                         )
                     )

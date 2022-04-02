@@ -275,9 +275,7 @@ class EndpointInterchange:
 
             try:
                 if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
-                    log.critical(
-                        "Missed too many heartbeats. Setting quiesce event."
-                    )
+                    log.critical("Missed too many heartbeats. Setting quiesce event.")
                     quiesce_event.set()
                     break
 
@@ -755,9 +753,7 @@ class EndpointInterchange:
         status = []
         if self.config.provider:
             log.debug(
-                "Getting the status of {} blocks.".format(
-                    list(self.blocks.values())
-                )
+                f"Getting the status of {list(self.blocks.values())} blocks."
             )
             status = self.config.provider.status(list(self.blocks.values()))
             log.debug(f"The status is {status}")

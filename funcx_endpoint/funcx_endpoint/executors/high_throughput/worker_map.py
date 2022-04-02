@@ -251,14 +251,12 @@ class WorkerMap:
                 < worker_max_idletime
             ):
                 log.trace(f"Current time: {time.time()}")
+                log.trace(f"Idle since: {self.worker_idle_since[worker_type]}")
                 log.trace(
-                    f"Idle since: {self.worker_idle_since[worker_type]}"
-                )
-                log.trace(
-                   "Worker type %s has not exceeded maximum idle "
-                   "time %s, continuing",
-                   worker_type,
-                   worker_max_idletime,
+                    "Worker type %s has not exceeded maximum idle "
+                    "time %s, continuing",
+                    worker_type,
+                    worker_max_idletime,
                 )
                 continue
             num_remove = max(
