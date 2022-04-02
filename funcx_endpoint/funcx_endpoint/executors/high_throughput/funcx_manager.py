@@ -297,7 +297,7 @@ class Manager:
         kill_event : threading.Event
               Event to let the thread know when it is time to die.
         """
-        log.info("[TASK PULL THREAD] starting")
+        log.info("starting")
 
         # Send a registration message
         msg = self.create_reg_message()
@@ -311,18 +311,18 @@ class Manager:
         new_worker_map = None
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
-            log.debug("[TASK_PULL_THREAD] Loop start")
+            log.debug("Loop start")
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
             log.debug(
-                "[TASK_PULL_THREAD pending_task_count: %s, Ready_worker_count: %s",
+                "pending_task_count: %s, Ready_worker_count: %s",
                 pending_task_count,
                 ready_worker_count,
             )
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
-                log.debug(f"[TASK_PULL_THREAD] Requesting tasks: {ads}")
+                log.debug(f"Requesting tasks: {ads}")
                 msg = pickle.dumps(ads)
                 self.task_incoming.send(msg)
 
@@ -352,7 +352,7 @@ class Manager:
                 last_interchange_contact = time.time()
 
                 if message == "STOP":
-                    log.critical("[TASK_PULL_THREAD] Received stop request")
+                    log.critical("Received stop request")
                     kill_event.set()
                     break
 
@@ -434,13 +434,13 @@ class Manager:
 
                     task_recv_counter += len(tasks)
                     log.debug(
-                        "[TASK_PULL_THREAD] Got tasks: {} of {}".format(
+                        "Got tasks: {} of {}".format(
                             [t[1].task_id for t in tasks], task_recv_counter
                         )
                     )
 
                     for task_type, task in tasks:
-                        log.debug(f"[TASK DEBUG] Task is of type: {task_type}")
+                        log.debug(f"Task is of type: {task_type}")
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
@@ -460,7 +460,7 @@ class Manager:
                         )
 
             else:
-                log.debug("[TASK_PULL_THREAD] No incoming tasks")
+                log.debug("No incoming tasks")
                 # Limit poll duration to heartbeat_period
                 # heartbeat_period is in s vs poll_timer in ms
                 if not poll_timer:
@@ -470,14 +470,13 @@ class Manager:
                 # Only check if no messages were received.
                 if time.time() > last_interchange_contact + self.heartbeat_threshold:
                     log.critical(
-                        "[TASK_PULL_THREAD] Missing contact with interchange beyond "
-                        "heartbeat_threshold"
+                        "Missing contact with interchange beyond " "heartbeat_threshold"
                     )
                     kill_event.set()
                     log.critical("Killing all workers")
                     for proc in self.worker_procs.values():
                         proc.kill()
-                    log.critical("[TASK_PULL_THREAD] Exiting")
+                    log.critical("Exiting")
                     break
 
             log.debug(f"To-Die Counts: {self.worker_map.to_die_count}")
@@ -653,18 +652,16 @@ class Manager:
         log.debug("Sending complete")
 
     def _status_report_loop(self, kill_event):
-        log.debug("[STATUS] Manager status reporting loop starting")
+        log.debug("Manager status reporting loop starting")
 
         while not kill_event.is_set():
             msg = ManagerStatusReport(
                 self.task_status_deltas,
                 self.container_switch_count,
             )
-            log.info(
-                f"[STATUS] Sending status report to interchange: {msg.task_statuses}"
-            )
+            log.info(f"Sending status report to interchange: {msg.task_statuses}")
             self.pending_result_queue.put(msg)
-            log.info("[STATUS] Clearing task deltas")
+            log.info("Clearing task deltas")
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
 
@@ -677,12 +674,12 @@ class Manager:
               Event to let the thread know when it is time to die.
         """
 
-        log.debug("[RESULT_PUSH_THREAD] Starting thread")
+        log.debug("Starting thread")
 
         push_poll_period = (
             max(10, self.poll_period) / 1000
         )  # push_poll_period must be atleast 10 ms
-        log.debug(f"[RESULT_PUSH_THREAD] push poll period: {push_poll_period}")
+        log.debug(f"push poll period: {push_poll_period}")
 
         last_beat = time.time()
         items = []
@@ -702,7 +699,7 @@ class Manager:
             except queue.Empty:
                 pass
             except Exception as e:
-                log.exception(f"[RESULT_PUSH_THREAD] Got an exception: {e}")
+                log.exception(f"Got an exception: {e}")
 
             # If we have reached poll_period duration or timer has expired, we send
             # results
@@ -715,7 +712,7 @@ class Manager:
                     self.result_outgoing.send_multipart(items)
                     items = []
 
-        log.critical("[RESULT_PUSH_THREAD] Exiting")
+        log.critical("Exiting")
 
     def remove_worker_init(self, worker_type):
         """
