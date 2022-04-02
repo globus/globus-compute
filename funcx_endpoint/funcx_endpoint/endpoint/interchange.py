@@ -276,7 +276,7 @@ class EndpointInterchange:
             try:
                 if int(time.time() - self.last_heartbeat) > self.heartbeat_threshold:
                     log.critical(
-                        "Missed too many heartbeats. " "Setting quiesce event."
+                        "Missed too many heartbeats. Setting quiesce event."
                     )
                     quiesce_event.set()
                     break
