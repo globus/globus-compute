@@ -183,7 +183,6 @@ class EndpointManager:
 
         funcx_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "check_endpoint_version": True,
         }
         funcx_client = FuncXClient(**funcx_client_options)
 
