@@ -691,11 +691,11 @@ class FuncXClient:
         return r.data["container_id"]
 
     def build_container(self, container_spec):
-        r = self.post("containers/build", json_body=container_spec.to_json())
+        r = self.web_client.post("containers/build", data=container_spec.to_json())
         return r.data["container_id"]
 
     def get_container_build_status(self, container_id):
-        r = self.get(f"containers/build/{container_id}")
+        r = self.web_client.get(f"containers/build/{container_id}")
         if r.http_status == 200:
             return r["status"]
         else:
