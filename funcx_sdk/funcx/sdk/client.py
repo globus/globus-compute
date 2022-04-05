@@ -242,7 +242,7 @@ class FuncXClient:
         Parameters
         ----------
 
-        return_msg : str
+        return_msg : str | t.Dict
            Return message received from the funcx service
         task_id : str
            task id string
@@ -252,37 +252,40 @@ class FuncXClient:
         else:
             r_dict = return_msg
 
-        r_status = r_dict.get("status", "unknown")
-        status = {"pending": True, "status": r_status}
+        r_status = r_dict.get("status", "unknown").lower()
+        pending = r_status not in ("success", "failed")
+        status = {"pending": pending, "status": r_status}
 
-        if "result" in r_dict:
-            try:
-                r_obj = self.fx_serializer.deserialize(r_dict["result"])
-                completion_t = r_dict["completion_t"]
-            except Exception:
-                raise SerializationError("Result Object Deserialization")
-            else:
-                status.update(
-                    {"pending": False, "result": r_obj, "completion_t": completion_t}
-                )
-                self._task_status_table[task_id] = status
+        if not pending:
+            if "result" in r_dict:
+                try:
+                    r_obj = self.fx_serializer.deserialize(r_dict["result"])
+                    completion_t = r_dict["completion_t"]
+                except Exception:
+                    raise SerializationError("Result Object Deserialization")
+                else:
+                    status.update({"result": r_obj, "completion_t": completion_t})
 
-        elif "exception" in r_dict:
-            try:
-                r_exception = self.fx_serializer.deserialize(r_dict["exception"])
-                completion_t = r_dict["completion_t"]
-                logger.info(f"Exception : {r_exception}")
-            except Exception:
-                raise SerializationError("Task's exception object deserialization")
+            elif "exception" in r_dict:
+                try:
+                    r_exception = self.fx_serializer.deserialize(r_dict["exception"])
+                    completion_t = r_dict["completion_t"]
+                    logger.info(f"Exception : {r_exception}")
+                except Exception:
+                    raise SerializationError("Task's exception object deserialization")
+                else:
+                    status.update(
+                        {
+                            "exception": r_exception,
+                            "completion_t": completion_t,
+                        }
+                    )
+
             else:
-                status.update(
-                    {
-                        "pending": False,
-                        "exception": r_exception,
-                        "completion_t": completion_t,
-                    }
-                )
-                self._task_status_table[task_id] = status
+                reason = r_dict.get("reason", str(r_dict))
+                status["exception"] = Exception(reason)
+
+        self._task_status_table[task_id] = status
         return status
 
     def get_task(self, task_id):
