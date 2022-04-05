@@ -127,7 +127,7 @@ class FuncXClient:
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
 
-        self.func_table: t.Dict[str, t.Dict] = {}
+        self._task_status_table: t.Dict[str, t.Dict] = {}
         self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
         self.session_task_group_id = (
@@ -234,8 +234,10 @@ class FuncXClient:
         """Remove credentials from your local system"""
         self.native_client.logout()
 
-    def update_table(self, return_msg, task_id):
-        """Parses the return message from the service and updates the internal func_table
+    def _update_task_table(self, return_msg: str | t.Dict, task_id: str):
+        """
+        Parses the return message from the service and updates the
+        internal _task_status_table
 
         Parameters
         ----------
@@ -263,7 +265,7 @@ class FuncXClient:
                 status.update(
                     {"pending": False, "result": r_obj, "completion_t": completion_t}
                 )
-                self.func_table[task_id] = status
+                self._task_status_table[task_id] = status
 
         elif "exception" in r_dict:
             try:
@@ -280,7 +282,7 @@ class FuncXClient:
                         "completion_t": completion_t,
                     }
                 )
-                self.func_table[task_id] = status
+                self._task_status_table[task_id] = status
         return status
 
     def get_task(self, task_id):
@@ -296,13 +298,13 @@ class FuncXClient:
         dict
             Task block containing "status" key.
         """
-        if task_id in self.func_table:
-            return self.func_table[task_id]
+        if task_id in self._task_status_table:
+            return self._task_status_table[task_id]
 
         r = self.web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
         try:
-            rets = self.update_table(r.text, task_id)
+            rets = self._update_task_table(r.text, task_id)
         except Exception as e:
             raise e
         return rets
@@ -339,7 +341,7 @@ class FuncXClient:
             task_id_list, list
         ), "get_batch_result expects a list of task ids"
 
-        pending_task_ids = [t for t in task_id_list if t not in self.func_table]
+        pending_task_ids = [t for t in task_id_list if t not in self._task_status_table]
 
         results = {}
 
@@ -353,7 +355,7 @@ class FuncXClient:
             if task_id in pending_task_ids:
                 try:
                     data = r["results"][task_id]
-                    rets = self.update_table(data, task_id)
+                    rets = self._update_task_table(data, task_id)
                     results[task_id] = rets
                 except KeyError:
                     logger.debug("Task {} info was not available in the batch status")
@@ -362,7 +364,7 @@ class FuncXClient:
                         "Failure while unpacking results fom get_batch_result"
                     )
             else:
-                results[task_id] = self.func_table[task_id]
+                results[task_id] = self._task_status_table[task_id]
 
         return results
 
