@@ -1,4 +1,4 @@
-from funcx_endpoint.version import VERSION
+from funcx_endpoint.version import __version__ as _version
 
 __author__ = "The funcX team"
-__version__ = VERSION
+__version__ = _version

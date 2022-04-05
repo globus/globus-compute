@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
@@ -5,12 +7,10 @@ import os
 import typing as t
 import uuid
 import warnings
-from distutils.version import LooseVersion
 
 from fair_research_login import JSONTokenStorage, NativeClient
 from globus_sdk import SearchClient
 
-from funcx.sdk import VERSION as SDK_VERSION
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
@@ -21,11 +21,7 @@ from funcx.serialize import FuncXSerializer
 from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
 
-try:
-    from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
-
-except ModuleNotFoundError:
-    ENDPOINT_VERSION = None
+from .version import PARSED_VERSION, parse_version
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +53,6 @@ class FuncXClient:
         search_authorizer=None,
         openid_authorizer=None,
         funcx_service_address=None,
-        check_endpoint_version=False,
         asynchronous=False,
         loop=None,
         results_ws_uri=None,
@@ -182,7 +177,6 @@ class FuncXClient:
 
         self._searcher = None
         self.funcx_service_address = funcx_service_address
-        self.check_endpoint_version = check_endpoint_version
 
         if do_version_check:
             self.version_check()
@@ -212,35 +206,25 @@ class FuncXClient:
             self._searcher = SearchHelper(authorizer=search_authorizer)
         return self._searcher
 
-    def version_check(self):
+    def version_check(self, endpoint_version: str | None = None) -> None:
         """Check this client version meets the service's minimum supported version."""
-        resp = self.web_client.get_version()
-        versions = resp.data
-        if "min_ep_version" not in versions:
-            raise VersionMismatch(
-                "Failed to retrieve version information from funcX service."
-            )
+        data = self.web_client.get_version()
 
-        min_ep_version = versions["min_ep_version"]
-        min_sdk_version = versions["min_sdk_version"]
+        min_ep_version = data["min_ep_version"]
+        min_sdk_version = data["min_sdk_version"]
 
-        if self.check_endpoint_version:
-            if ENDPOINT_VERSION is None:
+        if endpoint_version is not None:
+            if parse_version(endpoint_version) < parse_version(min_ep_version):
                 raise VersionMismatch(
-                    "You do not have the funcx endpoint installed.  "
-                    "You can use 'pip install funcx-endpoint'."
-                )
-            if LooseVersion(ENDPOINT_VERSION) < LooseVersion(min_ep_version):
-                raise VersionMismatch(
-                    f"Your version={ENDPOINT_VERSION} is lower than the "
+                    f"Your version={endpoint_version} is lower than the "
                     f"minimum version for an endpoint: {min_ep_version}.  "
                     "Please update. "
                     f"pip install funcx-endpoint>={min_ep_version}"
                 )
         else:
-            if LooseVersion(SDK_VERSION) < LooseVersion(min_sdk_version):
+            if PARSED_VERSION < parse_version(min_sdk_version):
                 raise VersionMismatch(
-                    f"Your version={SDK_VERSION} is lower than the "
+                    f"Your version={PARSED_VERSION} is lower than the "
                     f"minimum version for funcx SDK: {min_sdk_version}.  "
                     "Please update. "
                     f"pip install funcx>={min_sdk_version}"
