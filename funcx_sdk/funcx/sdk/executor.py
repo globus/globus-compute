@@ -46,27 +46,27 @@ class AtomicController:
     are 0 tasks.
     """
 
-    def __init__(self, start_callback, stop_callback, init_value=0):
+    def __init__(self, start_callback, stop_callback):
         self._value = 0
-        self.lock = threading.Lock()
+        self._lock = threading.Lock()
         self.start_callback = start_callback
         self.stop_callback = stop_callback
 
-    def increment(self, val=1):
-        with self.lock:
+    def increment(self, val: int = 1):
+        with self._lock:
             if self._value == 0:
                 self.start_callback()
             self._value += val
 
     def decrement(self):
-        with self.lock:
+        with self._lock:
             self._value -= 1
             if self._value == 0:
                 self.stop_callback()
             return self._value
 
     def value(self):
-        with self.lock:
+        with self._lock:
             return self._value
 
     def __repr__(self):
