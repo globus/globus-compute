@@ -14,6 +14,8 @@ REQUIRES = [
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
     # versioning and compatibility policy
     "dill==0.3.4",
+    # typing_extensions, so we can use Protocol and other typing features on python3.7
+    'typing_extensions>=4.0;python_version<"3.8"',
 ]
 DOCS_REQUIRES = [
     "sphinx<5",

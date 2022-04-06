@@ -91,7 +91,7 @@ def test_client_init_accepts_specified_taskgroup():
         {"status": "asdf", "sentinel": 1},
     ],
 )
-def test_update_task_table_is_robust(_mock_login, api_data):
+def test_update_task_table_is_robust(api_data):
     payload = randomstring()
     exc = KeyError("asdf")
     task_id = "some_task_id"
