@@ -27,6 +27,7 @@ TEST_REQUIRES = [
     "numpy",
     "pytest",
     "pytest-mock",
+    "coverage",
     # easy mocking of the `requests` library
     "responses",
 ]
