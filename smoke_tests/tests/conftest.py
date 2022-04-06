@@ -1,12 +1,20 @@
+from __future__ import annotations
+
 import collections
 import json
 import os
 import time
 
 import pytest
-from globus_sdk import AccessTokenAuthorizer, ConfidentialAppAuthClient
+from globus_sdk import (
+    AccessTokenAuthorizer,
+    AuthClient,
+    ConfidentialAppAuthClient,
+    SearchClient,
+)
 
 from funcx import FuncXClient
+from funcx.sdk.web_client import FuncxWebClient
 
 # the non-tutorial endpoint will be required, with the following priority order for
 # finding the ID:
@@ -97,6 +105,57 @@ def funcx_test_config_name(pytestconfig):
     return pytestconfig.getoption("--funcx-config")
 
 
+def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_args):
+    auth_client = ConfidentialAppAuthClient(api_client_id, api_client_secret)
+    scopes = [
+        "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
+        SearchClient.scopes.all,
+        AuthClient.scopes.openid,
+    ]
+    tokens = auth_client.oauth2_client_credentials_tokens(
+        requested_scopes=scopes
+    ).by_resource_server
+
+    funcx_token = tokens["funcx_service"]["access_token"]
+    search_token = tokens[SearchClient.resource_server]["access_token"]
+    auth_token = tokens[AuthClient.resource_server]["access_token"]
+
+    funcx_authorizer = AccessTokenAuthorizer(funcx_token)
+    search_authorizer = AccessTokenAuthorizer(search_token)
+    auth_authorizer = AccessTokenAuthorizer(auth_token)
+
+    try:
+        from funcx.sdk.login_manager import LoginManagerProtocol
+
+        class TestsuiteLoginManager:
+            def ensure_logged_in(self) -> None:
+                pass
+
+            def logout(self) -> None:
+                pass
+
+            def get_auth_client(self) -> AuthClient:
+                return AuthClient(authorizer=auth_authorizer)
+
+            def get_search_client(self) -> SearchClient:
+                return SearchClient(authorizer=search_authorizer)
+
+            def get_funcx_web_client(
+                self, *, base_url: str | None = None
+            ) -> FuncxWebClient:
+                return FuncxWebClient(base_url=base_url, authorizer=funcx_authorizer)
+
+        login_manager = TestsuiteLoginManager()
+        assert isinstance(login_manager, LoginManagerProtocol)
+
+        client_args["login_manager"] = login_manager
+
+    except ImportError:
+        client_args["fx_authorizer"] = funcx_authorizer
+        client_args["search_authorizer"] = search_authorizer
+        client_args["openid_authorizer"] = auth_authorizer
+
+
 @pytest.fixture(scope="session")
 def funcx_test_config(pytestconfig, funcx_test_config_name):
     # start with basic config load
@@ -127,31 +186,7 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
         client_args["funcx_service_address"] = api_uri
 
     if api_client_id and api_client_secret:
-        client = ConfidentialAppAuthClient(api_client_id, api_client_secret)
-        scopes = [
-            "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
-            "urn:globus:auth:scope:search.api.globus.org:all",
-            "openid",
-        ]
-
-        token_response = client.oauth2_client_credentials_tokens(
-            requested_scopes=scopes
-        )
-        fx_token = token_response.by_resource_server["funcx_service"]["access_token"]
-        search_token = token_response.by_resource_server["search.api.globus.org"][
-            "access_token"
-        ]
-        openid_token = token_response.by_resource_server["auth.globus.org"][
-            "access_token"
-        ]
-
-        fx_auth = AccessTokenAuthorizer(fx_token)
-        search_auth = AccessTokenAuthorizer(search_token)
-        openid_auth = AccessTokenAuthorizer(openid_token)
-
-        client_args["fx_authorizer"] = fx_auth
-        client_args["search_authorizer"] = search_auth
-        client_args["openid_authorizer"] = openid_auth
+        _add_args_for_client_creds_login(api_client_id, api_client_secret, client_args)
 
     return config
 

@@ -7,6 +7,7 @@ import globus_sdk
 from ..web_client import FuncxWebClient
 
 
+@t.runtime_checkable
 class LoginManagerProtocol(t.Protocol):
     def ensure_logged_in(self) -> None:
         ...
