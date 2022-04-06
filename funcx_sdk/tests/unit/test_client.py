@@ -103,7 +103,9 @@ def test_update_task_table_is_robust(api_data):
         data["exception"] = serde.serialize(exc)
 
     # test kernel
-    fxc = funcx.FuncXClient(do_version_check=False, use_offprocess_checker=False)
+    fxc = funcx.FuncXClient(
+        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
+    )
     st = fxc._update_task_table(data, task_id)
 
     # verify results
