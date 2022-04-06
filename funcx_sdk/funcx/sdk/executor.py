@@ -52,6 +52,11 @@ class AtomicController:
         self.start_callback = start_callback
         self.stop_callback = stop_callback
 
+    def reset(self):
+        """Reset the counter to 0; this method does not call callbacks"""
+        with self._lock:
+            self._value = 0
+
     def increment(self, val: int = 1):
         with self._lock:
             if self._value == 0:
