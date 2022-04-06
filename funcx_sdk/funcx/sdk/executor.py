@@ -139,8 +139,6 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.poller_thread = ExecutorPollerThread(
             self.funcx_client,
             self._function_future_map,
-            self.results_ws_uri,
-            self.task_group_id,
         )
         atexit.register(self.shutdown)
 
@@ -307,9 +305,7 @@ class ExecutorPollerThread:
     def __init__(
         self,
         funcx_client: FuncXClient,
-        _function_future_map: t.Dict[str, FuncXFuture],
-        results_ws_uri: str,
-        task_group_id: str,
+        function_future_map: t.Dict[str, FuncXFuture],
     ):
         """
         Parameters
@@ -318,14 +314,15 @@ class ExecutorPollerThread:
         funcx_client : client object
             Instance of FuncXClient to be used by the executor
 
-        results_ws_uri : str
-            Web sockets URI for the results
+        function_future_map
+            A mapping of task_uuid to associated FuncXFutures; used for updating
+            when the upstream websocket service sends updates
         """
 
         self.funcx_client: FuncXClient = funcx_client
-        self._function_future_map: t.Dict[str, FuncXFuture] = _function_future_map
+        self._function_future_map: t.Dict[str, FuncXFuture] = function_future_map
         self.eventloop = None
-        self.atomic_controller = AtomicController(self.start, noop)
+        self.atomic_controller = AtomicController(self._start, noop)
         self.ws_handler = None
 
     @property
@@ -336,7 +333,7 @@ class ExecutorPollerThread:
     def task_group_id(self) -> str:
         return self.funcx_client.session_task_group_id
 
-    def start(self):
+    def _start(self):
         """Start the result polling thread"""
         # Currently we need to put the batch id's we launch into this queue
         # to tell the web_socket_poller to listen on them. Later we'll associate
