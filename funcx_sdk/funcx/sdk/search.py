@@ -1,4 +1,4 @@
-from globus_sdk import SearchAPIError, SearchClient
+from globus_sdk import SearchAPIError
 from texttable import Texttable
 
 from funcx.serialize import FuncXSerializer
@@ -20,7 +20,7 @@ class SearchHelper:
     ENDPOINT_SEARCH_INDEX_NAME = "funcx_endpoints"
     ENDPOINT_SEARCH_INDEX_ID = "85bcc497-3ee9-4d73-afbb-2abf292e398b"
 
-    def __init__(self, authorizer):
+    def __init__(self, client):
         """Initialize the Search Helper
 
         Parameters
@@ -28,8 +28,7 @@ class SearchHelper:
         authorizer : class:
 
         """
-        self._authorizer = authorizer
-        self._sc = SearchClient(authorizer=self._authorizer)
+        self._sc = client
 
     def _exists(self, func_uuid):
         """

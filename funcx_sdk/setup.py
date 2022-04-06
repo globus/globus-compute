@@ -5,8 +5,7 @@ from setuptools import find_namespace_packages, setup
 REQUIRES = [
     # request sending and authorization tools
     "requests>=2.20.0",
-    "globus-sdk>=3,<4",
-    "fair_research_login==0.2.6",
+    "globus-sdk>=3.6.0,<4",
     # 'websockets' is used for the client-side websocket listener
     "websockets==9.1",
     # table printing used in search result rendering
@@ -15,6 +14,8 @@ REQUIRES = [
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
     # versioning and compatibility policy
     "dill==0.3.4",
+    # typing_extensions, so we can use Protocol and other typing features on python3.7
+    'typing_extensions>=4.0;python_version<"3.8"',
 ]
 DOCS_REQUIRES = [
     "sphinx<5",
