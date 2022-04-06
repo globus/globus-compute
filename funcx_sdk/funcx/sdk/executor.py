@@ -231,13 +231,30 @@ class FuncXExecutor(concurrent.futures.Executor):
         return fut
 
     def _submit_task_kernel(self, kill_event: threading.Event):
-        """Task submission thread that fetch tasks from task_outgoing queue,
-        batch function requests, and submit functions to funcX"""
+        """
+        Fetch enqueued tasks task_outgoing queue and submit them to funcX in batches
+        of up to self.batch_size.
+
+        Parameters
+        ==========
+        kill_event : threading.Event
+            Sentinel event; used to stop the thread and exit.
+        """
         while not kill_event.is_set():
-            messages = self._get_tasks_in_batch()
-            if messages:
-                log.info(f"Submitting {len(messages)} tasks to funcX")
-                self._submit_tasks(messages)
+            tasks: t.List[TaskSubmissionInfo] = []
+            start = time.time()
+            try:
+                while (
+                    time.time() - start < self.batch_interval
+                    and len(tasks) < self.batch_size
+                ):
+                    tasks.append(self.task_outgoing.get(timeout=0.1))
+            except queue.Empty:
+                pass
+            if tasks:
+                log.info(f"Submitting {len(tasks)} tasks to funcX")
+                self._submit_tasks(tasks)
+
         log.info("Exiting")
 
     def _submit_tasks(self, messages: t.List[TaskSubmissionInfo]):
@@ -264,26 +281,6 @@ class FuncXExecutor(concurrent.futures.Executor):
                 fut.task_id = task_uuid
                 self._function_future_map[task_uuid] = fut
             self.poller_thread.atomic_controller.increment(val=len(messages))
-
-    def _get_tasks_in_batch(self) -> t.List[TaskSubmissionInfo]:
-        """
-        Get tasks from task_outgoing queue in batch,
-        either by interval or by batch size
-        """
-        submit_batch: t.List[TaskSubmissionInfo] = []
-        start = time.time()
-        while (
-            time.time() - start < self.batch_interval
-            and len(submit_batch) < self.batch_size
-        ):
-            try:
-                assert self.task_outgoing is not None
-                x = self.task_outgoing.get(timeout=0.1)
-            except queue.Empty:
-                break
-            else:
-                submit_batch.append(x)
-        return submit_batch
 
     def shutdown(self):
         self.poller_thread.shutdown()
