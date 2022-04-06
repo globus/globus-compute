@@ -18,7 +18,7 @@ from funcx.serialize import FuncXSerializer
 from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
 
-from .login_manager import LoginManager
+from .login_manager import LoginManager, LoginManagerProtocol
 from .version import PARSED_VERSION, parse_version
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ class FuncXClient:
         search_authorizer: t.Any = None,
         fx_authorizer: t.Any = None,
         *,
-        login_manager: LoginManager | None = None,
+        login_manager: LoginManagerProtocol | None = None,
         **kwargs,
     ):
         """
@@ -132,7 +132,7 @@ class FuncXClient:
 
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
-            self.login_manager = login_manager
+            self.login_manager: LoginManagerProtocol = login_manager
         # but if login handling is implicit (as when no login manager is passed)
         # then ensure that the user is logged in
         else:

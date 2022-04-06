@@ -1,18 +1,28 @@
 Added
 ^^^^^
 
-- The ``FuncXClient`` now accepts a new boolean argument ``do_version_check``,
-  which can be used to suppress a call to the FuncX API on initialization. Use
-  as in ``FuncXClient(do_version_check=False)``. This may lead to faster
-  instantiation of clients in some cases.
+- The ``FuncXClient`` now accepts a new argument ``login_manager``, which is
+  expected to implement a protocol for providing authenticated http client
+  objects, login, and logout capabilities.
+
+- The login manager and its protocol are now defined and may be imported as in
+  ``from funcx.sdk.login_manager import LoginManager, LoginManagerProtocol``.
+  They are internal components but may be used to force a login or to implement
+  an alternative ``LoginManagerProtocol`` to customize authentication
+
+Deprecated
+^^^^^^^^^^
+
+- The following arguments to ``FuncXClient`` are deprecated and will emit
+  warnings if used: ``fx_authorizer``, ``search_authorizer``,
+  ``openid_authorizer``. The use-cases for these arguments are now satisfied by
+  the ability to pass a custom ``LoginManager`` to the client class, if desired.
 
 Removed
 ^^^^^^^
 
 - The following arguments to ``FuncXClient`` are no longer supported:
-  ``force_login``, ``fx_authorizer``, ``search_authorizer``,
-  ``openid_authorizer``. The use-cases for these arguments are now satisfied by
-  the ability to pass a custom ``LoginManager`` to the client class, if desired.
+  ``force_login``
 
 Changed
 ^^^^^^^
