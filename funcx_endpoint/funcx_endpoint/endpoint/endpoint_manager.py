@@ -172,7 +172,6 @@ class EndpointManager:
             keys_dir, "endpoint"
         )
         client_public_key, _ = zmq.auth.load_certificate(client_public_file)
-        client_public_key = client_public_key.decode("utf-8")
 
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.config.executors:
