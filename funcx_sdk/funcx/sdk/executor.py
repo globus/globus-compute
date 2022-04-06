@@ -321,9 +321,17 @@ class ExecutorPollerThread:
 
         self.funcx_client: FuncXClient = funcx_client
         self._function_future_map: t.Dict[str, FuncXFuture] = function_future_map
-        self.eventloop = None
+        self.eventloop = asyncio.new_event_loop()
         self.atomic_controller = AtomicController(self._start, noop)
-        self.ws_handler = None
+        self.ws_handler = WebSocketPollingTask(
+            self.funcx_client,
+            self.eventloop,
+            atomic_controller=self.atomic_controller,
+            init_task_group_id=self.task_group_id,
+            results_ws_uri=self.results_ws_uri,
+            auto_start=False,
+        )
+        self._thread: t.Optional[threading.Thread] = None
 
     @property
     def results_ws_uri(self) -> str:
@@ -333,31 +341,25 @@ class ExecutorPollerThread:
     def task_group_id(self) -> str:
         return self.funcx_client.session_task_group_id
 
+    @property
+    def is_running(self) -> bool:
+        return self.eventloop.is_running()
+
     def _start(self):
         """Start the result polling thread"""
         # Currently we need to put the batch id's we launch into this queue
         # to tell the web_socket_poller to listen on them. Later we'll associate
 
-        eventloop = asyncio.new_event_loop()
-        self.eventloop = eventloop
-        self.ws_handler = WebSocketPollingTask(
-            self.funcx_client,
-            eventloop,
-            atomic_controller=self.atomic_controller,
-            init_task_group_id=self.task_group_id,
-            results_ws_uri=self.results_ws_uri,
-            auto_start=False,
+        self.ws_handler.closed_by_main_thread = False
+        self._thread = threading.Thread(
+            target=self.event_loop_thread, daemon=True, name="FuncX-Poller-Thread"
         )
-        self.thread = threading.Thread(
-            target=self.event_loop_thread, args=(eventloop,), name="FuncX-Poller-Thread"
-        )
-        self.thread.daemon = True
-        self.thread.start()
+        self._thread.start()
         log.debug("Started web_socket_poller thread")
 
-    def event_loop_thread(self, eventloop):
-        asyncio.set_event_loop(eventloop)
-        eventloop.run_until_complete(self.web_socket_poller())
+    def event_loop_thread(self):
+        asyncio.set_event_loop(self.eventloop)
+        self.eventloop.run_until_complete(self.web_socket_poller())
 
     async def web_socket_poller(self):
         """Start ws and listen for tasks.
@@ -376,13 +378,9 @@ class ExecutorPollerThread:
                 log.info("Attempting ws re-connect")
 
     def shutdown(self):
-        if self.ws_handler is None:
-            return
-
-        self.ws_handler.closed_by_main_thread = True
-        ws = self.ws_handler._ws
-        if ws:
-            ws_close_future = asyncio.run_coroutine_threadsafe(
-                ws.close(), self.eventloop
-            )
-            ws_close_future.result()
+        if self.is_running:
+            self.ws_handler.closed_by_main_thread = True
+            asyncio.run_coroutine_threadsafe(
+                self.ws_handler.close(), self.eventloop
+            ).result()
+            self.eventloop.stop()
