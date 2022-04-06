@@ -154,13 +154,13 @@ class FuncXExecutor(concurrent.futures.Executor):
     def start_batching_thread(self):
         self._kill_event = threading.Event()
         # Start the task submission thread
-        self.task_submit_thread = threading.Thread(
-            target=self.task_submit_thread,
+        self._task_submit_thread = threading.Thread(
+            target=self._submit_task_kernel,
             args=(self._kill_event,),
             name="FuncX-Submit-Thread",
         )
-        self.task_submit_thread.daemon = True
-        self.task_submit_thread.start()
+        self._task_submit_thread.daemon = True
+        self._task_submit_thread.start()
         log.info("Started task submit thread")
 
     def register_function(self, func: t.Callable, container_uuid=None):
@@ -230,7 +230,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         return fut
 
-    def task_submit_thread(self, kill_event):
+    def _submit_task_kernel(self, kill_event: threading.Event):
         """Task submission thread that fetch tasks from task_outgoing queue,
         batch function requests, and submit functions to funcX"""
         while not kill_event.is_set():
@@ -363,20 +363,18 @@ class ExecutorPollerThread:
     async def web_socket_poller(self):
         """Start ws and listen for tasks.
         If a remote disconnect breaks the ws, close the ws and reconnect"""
-        while True:
+        time_to_disconnect = False
+        while not time_to_disconnect:
             await self.ws_handler.init_ws(start_message_handlers=False)
-            status = await self.ws_handler.handle_incoming(
+            time_to_disconnect = await self.ws_handler.handle_incoming(
                 self._function_future_map, auto_close=True
             )
-            if status is False:
+            if not time_to_disconnect:
                 # handle_incoming broke from a remote side disconnect
                 # we should close and re-connect
                 log.info("Attempting ws close")
                 await self.ws_handler.close()
                 log.info("Attempting ws re-connect")
-            else:
-                # clean exit
-                break
 
     def shutdown(self):
         if self.ws_handler is None:
