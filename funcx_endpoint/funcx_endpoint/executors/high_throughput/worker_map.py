@@ -139,10 +139,10 @@ class WorkerMap:
         """
         spin_ups = {}
 
-        log.debug(f"Next Worker Qsize: {len(next_worker_q)}")
-        log.debug(f"Active Workers: {self.active_workers}")
-        log.debug(f"Pending Workers: {self.pending_workers}")
-        log.debug(f"Max Worker Count: {self.max_worker_count}")
+        log.trace(f"Next Worker Qsize: {len(next_worker_q)}")
+        log.trace(f"Active Workers: {self.active_workers}")
+        log.trace(f"Pending Workers: {self.pending_workers}")
+        log.trace(f"Max Worker Count: {self.max_worker_count}")
 
         if (
             len(next_worker_q) > 0
@@ -250,9 +250,9 @@ class WorkerMap:
                 and time.time() - self.worker_idle_since[worker_type]
                 < worker_max_idletime
             ):
-                log.debug(f"Current time: {time.time()}")
-                log.debug(f"Idle since: {self.worker_idle_since[worker_type]}")
-                log.debug(
+                log.trace(f"Current time: {time.time()}")
+                log.trace(f"Idle since: {self.worker_idle_since[worker_type]}")
+                log.trace(
                     "Worker type %s has not exceeded maximum idle "
                     "time %s, continuing",
                     worker_type,

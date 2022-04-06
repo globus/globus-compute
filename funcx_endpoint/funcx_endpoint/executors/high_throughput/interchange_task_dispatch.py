@@ -112,7 +112,7 @@ def dispatch(
             else:
                 interesting_managers.remove(manager)
 
-    log.debug(
+    log.trace(
         "The task dispatch of {} loop is {}, in total {} tasks".format(
             loop, task_dispatch, dispatched_tasks
         )

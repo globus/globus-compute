@@ -311,10 +311,10 @@ class Manager:
         new_worker_map = None
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
-            log.debug("Loop start")
+            log.trace("Loop start")
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
-            log.debug(
+            log.trace(
                 "pending_task_count: %s, Ready_worker_count: %s",
                 pending_task_count,
                 ready_worker_count,
@@ -322,7 +322,7 @@ class Manager:
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
-                log.debug(f"Requesting tasks: {ads}")
+                log.trace(f"Requesting tasks: {ads}")
                 msg = pickle.dumps(ads)
                 self.task_incoming.send(msg)
 
@@ -460,7 +460,7 @@ class Manager:
                         )
 
             else:
-                log.debug("No incoming tasks")
+                log.trace("No incoming tasks")
                 # Limit poll duration to heartbeat_period
                 # heartbeat_period is in s vs poll_timer in ms
                 if not poll_timer:
@@ -470,7 +470,7 @@ class Manager:
                 # Only check if no messages were received.
                 if time.time() > last_interchange_contact + self.heartbeat_threshold:
                     log.critical(
-                        "Missing contact with interchange beyond " "heartbeat_threshold"
+                        "Missing contact with interchange beyond heartbeat_threshold"
                     )
                     kill_event.set()
                     log.critical("Killing all workers")
@@ -479,8 +479,8 @@ class Manager:
                     log.critical("Exiting")
                     break
 
-            log.debug(f"To-Die Counts: {self.worker_map.to_die_count}")
-            log.debug(
+            log.trace(f"To-Die Counts: {self.worker_map.to_die_count}")
+            log.trace(
                 "Alive worker counts: {}".format(
                     self.worker_map.total_worker_type_counts
                 )
@@ -493,7 +493,7 @@ class Manager:
                 new_worker_map,
                 self.worker_map.to_die_count,
             )
-            log.debug(f"[SCHEDULER] New worker map: {new_worker_map}")
+            log.trace(f"New worker map: {new_worker_map}")
 
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's
             # needed now.
@@ -515,7 +515,7 @@ class Manager:
                     worker_port=self.worker_port,
                 )
             )
-            log.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
+            log.trace(f"Worker processes: {self.worker_procs}")
 
             #  Count the workers of each type that need to be removed
             spin_downs, container_switch_count = self.worker_map.spin_down_workers(
@@ -525,7 +525,7 @@ class Manager:
                 scheduler_mode=self.scheduler_mode,
             )
             self.container_switch_count += container_switch_count
-            log.debug(
+            log.trace(
                 "Container switch count: total {}, cur {}".format(
                     self.container_switch_count, container_switch_count
                 )
@@ -542,7 +542,7 @@ class Manager:
                 # *** Match tasks to workers *** #
                 else:
                     available_workers = current_worker_map[task_type]
-                    log.debug(
+                    log.trace(
                         "Available workers of type {}: {}".format(
                             task_type, available_workers
                         )
@@ -839,7 +839,7 @@ def cli_run():
     parser.add_argument(
         "--scheduler_mode",
         default="soft",
-        help=("Choose the mode of scheduler " "(hard, soft"),
+        help=("Choose the mode of scheduler (hard, soft"),
     )
     parser.add_argument(
         "-r",

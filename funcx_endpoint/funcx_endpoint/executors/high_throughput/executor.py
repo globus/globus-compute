@@ -667,7 +667,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                 )
                         else:
                             raise BadMessage(
-                                "Message received is neither result or " "exception"
+                                "Message received is neither result or exception"
                             )
 
             if not self.is_alive:

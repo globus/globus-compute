@@ -16,8 +16,8 @@ def naive_scheduler(
     In this scheduler model, there is minimum 1 instance of each nonempty task queue.
     """
 
-    log.debug("Entering scheduler...")
-    log.debug(f"old_worker_map: {old_worker_map}")
+    log.trace("Entering scheduler...")
+    log.trace(f"old_worker_map: {old_worker_map}")
     q_sizes = {}
     q_types = []
     new_worker_map = {}
@@ -31,7 +31,7 @@ def naive_scheduler(
         q_sizes[q_type] = q_size
 
     if sum_q_size > 0:
-        log.info(f"[SCHEDULER] Total number of tasks is {sum_q_size}")
+        log.info(f"Total number of tasks is {sum_q_size}")
 
         # Set proportions of workers equal to the proportion of queue size.
         for q_type in q_sizes:
@@ -48,8 +48,8 @@ def naive_scheduler(
         difference = 0
         if sum_q_size > tmp_sum_q_size:
             difference = min(max_workers - tmp_sum_q_size, sum_q_size - tmp_sum_q_size)
-        log.debug(f"[SCHEDULER] Offset difference: {difference}")
-        log.debug(f"[SCHEDULER] Queue Types: {q_types}")
+        log.debug(f"Offset difference: {difference}")
+        log.debug(f"Queue Types: {q_types}")
 
         if len(q_types) > 0:
             while difference > 0:
