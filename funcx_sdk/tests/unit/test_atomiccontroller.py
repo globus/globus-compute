@@ -73,3 +73,18 @@ def test_atomic_increment_by_n():
     assert ac.value() == 0
     assert not x.started
     assert x.stopped
+
+
+def test_atomic_reset():
+    x = DummyTarget()
+    ac = AtomicController(x.start, x.stop)
+
+    some_value = random.randint(1, 20)
+    ac.increment(some_value)
+    x.started = False
+
+    assert ac.value() == some_value
+    ac.reset()
+    assert not x.started
+    assert not x.stopped
+    assert ac.value() == 0
