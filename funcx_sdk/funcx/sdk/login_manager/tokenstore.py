@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import pathlib
@@ -46,7 +48,7 @@ def _get_storage_filename():
     return os.path.join(datadir, "storage.db")
 
 
-def _resolve_namespace() -> str:
+def _resolve_namespace(environment: str | None) -> str:
     """
     For now, the following namespace will always be used:
       user/<envname>
@@ -55,14 +57,15 @@ def _resolve_namespace() -> str:
 
       user/production
     """
-    return f"user/{_get_envname()}"
+    env = environment if environment is not None else _get_envname()
+    return f"user/{env}"
 
 
-def get_token_storage_adapter() -> SQLiteAdapter:
+def get_token_storage_adapter(*, environment: str | None = None) -> SQLiteAdapter:
     # when initializing the token storage adapter, check if the storage file exists
     # if it does not, then use this as a flag to clean the old config
     fname = _get_storage_filename()
     if not os.path.exists(fname):
         invalidate_old_config()
     # namespace is equal to the current environment
-    return SQLiteAdapter(fname, namespace=_resolve_namespace())
+    return SQLiteAdapter(fname, namespace=_resolve_namespace(environment))

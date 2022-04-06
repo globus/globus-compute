@@ -59,8 +59,8 @@ class LoginManager:
         SearchScopes.resource_server: [SearchScopes.all],
     }
 
-    def __init__(self) -> None:
-        self._token_storage = get_token_storage_adapter()
+    def __init__(self, *, environment: str | None = None) -> None:
+        self._token_storage = get_token_storage_adapter(environment=environment)
 
     @property
     def login_requirements(self) -> t.Iterator[tuple[str, list[str]]]:

@@ -49,7 +49,7 @@ class FuncXClient:
         loop=None,
         results_ws_uri=None,
         use_offprocess_checker=True,
-        environment=None,
+        environment: str | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         do_version_check: bool = True,
         openid_authorizer: t.Any = None,
@@ -136,7 +136,7 @@ class FuncXClient:
         # but if login handling is implicit (as when no login manager is passed)
         # then ensure that the user is logged in
         else:
-            self.login_manager = LoginManager()
+            self.login_manager = LoginManager(environment=environment)
             self.login_manager.ensure_logged_in()
 
         self.web_client = self.login_manager.get_funcx_web_client(

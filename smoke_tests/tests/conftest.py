@@ -30,10 +30,7 @@ _LOCAL_ENDPOINT_ID = os.getenv("FUNCX_LOCAL_ENDPOINT_ID")
 
 _CONFIGS = {
     "dev": {
-        "client_args": {
-            "funcx_service_address": "https://api.dev.funcx.org/v2",
-            "results_ws_uri": "wss://api.dev.funcx.org/ws/v2/",
-        },
+        "client_args": {"environment": "dev"},
         # assert versions are as expected on dev
         "forwarder_min_version": "0.3.5",
         "api_min_version": "0.3.5",
@@ -127,6 +124,11 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
 
     try:
         from funcx.sdk.login_manager import LoginManagerProtocol
+    except ImportError:
+        client_args["fx_authorizer"] = funcx_authorizer
+        client_args["search_authorizer"] = search_authorizer
+        client_args["openid_authorizer"] = auth_authorizer
+    else:
 
         class TestsuiteLoginManager:
             def ensure_logged_in(self) -> None:
@@ -153,11 +155,6 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
             assert isinstance(login_manager, LoginManagerProtocol)
 
         client_args["login_manager"] = login_manager
-
-    except ImportError:
-        client_args["fx_authorizer"] = funcx_authorizer
-        client_args["search_authorizer"] = search_authorizer
-        client_args["openid_authorizer"] = auth_authorizer
 
 
 @pytest.fixture(scope="session")
