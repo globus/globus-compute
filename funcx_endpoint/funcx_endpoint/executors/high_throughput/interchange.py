@@ -261,10 +261,11 @@ class Interchange:
         self.pending_task_queue = {}
         self.containers = {}
         self.total_pending_task_count = 0
+        # off_process_checker is unnecessary on endpoint-side
+        client_args = {"use_offprocess_checker": False}
         if funcx_service_address:
-            self.fxs = FuncXClient(funcx_service_address=funcx_service_address)
-        else:
-            self.fxs = FuncXClient()
+            client_args["funcx_service_address"] = funcx_service_address
+        self.fxs = FuncXClient(**client_args)
 
         log.info(f"Interchange address is {self.interchange_address}")
         self.worker_ports = worker_ports

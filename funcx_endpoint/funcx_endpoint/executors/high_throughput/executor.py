@@ -889,7 +889,12 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         # self.outgoing_q.close()
         # self.incoming_q.close()
         if self.queue_proc:
-            self.queue_proc.terminate()
+            try:
+                self.queue_proc.terminate()
+            except AttributeError:
+                log.info("Executor interchange terminate skipped due to wrong context")
+            except Exception:
+                log.exception("Terminating the interchange failed")
         log.info("Finished HighThroughputExecutor shutdown attempt")
         return True
 
