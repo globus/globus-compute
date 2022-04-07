@@ -86,9 +86,9 @@ class FuncXFuture(Future):
     not be populated immediately, but will appear later when the task is
     submitted to the FuncX services."""
 
-    def __init__(self):
+    def __init__(self, task_id: t.Optional[str] = None):
         super().__init__()
-        self.task_id = None
+        self.task_id = task_id
 
 
 class FuncXExecutor(concurrent.futures.Executor):
