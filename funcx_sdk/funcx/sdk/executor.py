@@ -102,7 +102,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self,
         funcx_client: FuncXClient,
         label: str = "FuncXExecutor",
-        batch_enabled: bool = False,
+        batch_enabled: bool = True,
         batch_interval: float = 1.0,
         batch_size: int = 100,
     ):
