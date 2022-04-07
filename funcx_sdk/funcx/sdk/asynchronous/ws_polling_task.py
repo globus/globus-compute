@@ -134,25 +134,31 @@ class WebSocketPollingTask:
             task_group_id = await queue.get()
             await self.ws.send(task_group_id)
 
-    async def handle_incoming(self, pending_futures, auto_close=False) -> bool:
+    async def handle_incoming(self, pending_futures: t.Dict[str, FuncXTask]) -> bool:
         """
-
         Parameters
         ----------
         pending_futures
-        auto_close
 
         Returns
         -------
         True -- If connection is closing from internal shutdown process
         False -- External disconnect - to be handled by reconnect logic
         """
+        # Handle previously-unknown received results (from the .batch_run() case)
+        unprocessed_task_ids = self.unknown_results.keys() & pending_futures.keys()
+        for task_id in unprocessed_task_ids:
+            data = self.unknown_results.pop(task_id)
+            if await self.set_result(task_id, data, pending_futures):
+                return True
+
         while not self.closed_by_main_thread:
             try:
                 raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
             except asyncio.TimeoutError:
                 pass
-            except ConnectionClosedOK:
+            except ConnectionClosedOK as exc:
+                log.debug("Websocket connection closed (%s): %s", exc.code, exc.reason)
                 if not self.closed_by_main_thread:
                     log.info("WebSocket connection closed by remote-side")
                     return False
@@ -167,18 +173,11 @@ class WebSocketPollingTask:
                     # often in batching mode.
                     #
                     # When submitting tasks in batch with batch_run, some task results
-                    # may be received by websocket before the  response of batch_run,
+                    # may be received by websocket before the response of batch_run,
                     # and pending_futures do not have the futures for the tasks yet.
                     # We store these in unknown_results and process when their futures
                     # are ready.
                     self.unknown_results[task_id] = data
-
-            # Handle the results received but not processed before
-            unprocessed_task_ids = self.unknown_results.keys() & pending_futures.keys()
-            for task_id in unprocessed_task_ids:
-                data = self.unknown_results.pop(task_id)
-                if await self.set_result(task_id, data, pending_futures):
-                    return True
 
         log.info("WebSocket connection closed by main thread")
         return True
@@ -217,8 +216,14 @@ class WebSocketPollingTask:
                 future.set_exception(dill.loads(r_exception.e_value))
             else:
                 future.set_exception(Exception(data["reason"]))
-        except Exception:
-            log.exception("Caught unexpected exception while setting results")
+        except Exception as exc:
+            log.exception("Ignoring unexpected exception while setting results")
+            st, reason = "Unknown", "Malformed or unexpected data structure"
+            msg = (
+                f"Task (ID: {task_id}) status: {st}."
+                f"  Reason: {reason}  Exception: {exc}"
+            )
+            future.set_exception(Exception(msg))
 
         # When the counter hits 0 we always exit. This guarantees that that if the
         # counter increments to 1 on the executor, this handler needs to be restarted.
