@@ -13,4 +13,4 @@ Choose which options apply, and delete the ones which do not apply.
 - New feature (non-breaking change that adds functionality)
 - Breaking change (fix or feature that would cause existing functionality to not work as expected)
 - Documentation update
-- Code maintentance/cleanup
+- Code maintenance/cleanup
