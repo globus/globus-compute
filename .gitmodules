@@ -1,4 +1,0 @@
-[submodule "docs/examples"]
-	path = docs/examples
-	url = https://github.com/funcx-faas/examples
-	branch = main

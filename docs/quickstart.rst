@@ -56,7 +56,7 @@ To update a previously installed funcX to a newer version, use: ``python3 -m pip
 
 
 Running a function
-------------------------
+------------------
 
 After installing the funcX SDK, you can register functions and execute
 them on available endpoints.  To use the SDK, you should first instantiate

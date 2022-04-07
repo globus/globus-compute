@@ -61,7 +61,7 @@ class BaseStrategy:
         self._wake_up_time = time.time() + 1
         self._kill_event = threading.Event()
         self._thread = threading.Thread(
-            target=self._wake_up_timer, args=(self._kill_event,)
+            target=self._wake_up_timer, args=(self._kill_event,), name="Base-Strategy"
         )
         self._thread.daemon = True
 
@@ -179,7 +179,7 @@ class Timer:
 
         self._kill_event = threading.Event()
         self._thread = threading.Thread(
-            target=self._wake_up_timer, args=(self._kill_event,)
+            target=self._wake_up_timer, args=(self._kill_event,), name="Timer"
         )
         self._thread.daemon = True
         self._thread.start()

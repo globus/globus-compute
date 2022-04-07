@@ -66,7 +66,7 @@ def test_result_queue_basic(conn_params, count=10):
     result_pub.close()
 
 
-@pytest.mark.parametrize("size", [10, 2 ** 10, 2 ** 20, (2 ** 20) * 10])
+@pytest.mark.parametrize("size", [10, 2**10, 2**20, (2**20) * 10])
 def test_message_integrity_across_sizes(size, conn_params):
     """Publish count messages from endpoint_1 and endpoint_1
     Confirm that the subscriber gets all of them.

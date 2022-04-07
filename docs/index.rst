@@ -88,11 +88,12 @@ how to download and configure an endpoint for local (multi-process) execution. :
    :caption: Contents:
 
    quickstart
+   executor
    sdk
    endpoints
    Tutorial
    actionprovider
-   reference
+   reference/index
    debugging
    limits
    changelog

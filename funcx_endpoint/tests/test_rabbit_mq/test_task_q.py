@@ -223,7 +223,7 @@ def test_combined_throughput(conn_params, count=1000):
     tput_at_size = {}
     # Do 10 rounds of throughput measures
     for i in range(10):
-        data_size = 2 ** i
+        data_size = 2**i
         b_message = bytes(data_size)
         start_t = time.time()
         for _i in range(count):
