@@ -460,8 +460,8 @@ class Interchange:
                     "[TASK_PULL_THREAD] received Message/Heartbeat? on task queue"
                 )
             except Exception:
-                log.exception("Failed to unpack message")
-                pass
+                log.exception(f"Failed to unpack message, RAW:{raw_msg}")
+                continue
 
             if msg == "STOP":
                 # TODO: Yadu. This should be replaced by a proper MessageType
