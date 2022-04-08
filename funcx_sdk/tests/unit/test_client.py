@@ -131,3 +131,39 @@ def test_update_task_table_is_robust(api_data):
         assert Exception is st["exception"].__class__
         for key in data:
             assert str(key) in str(st["exception"].args)
+
+
+def test_pending_tasks_always_fetched():
+    should_fetch_01 = str(uuid.uuid4())
+    should_fetch_02 = str(uuid.uuid4())
+    no_fetch = str(uuid.uuid4())
+
+    fxc = funcx.FuncXClient(
+        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
+    )
+    fxc.web_client = mock.MagicMock()
+    fxc._task_status_table.update(
+        {should_fetch_01: {"pending": True}, no_fetch: {"pending": False}}
+    )
+    task_id_list = [no_fetch, should_fetch_01, should_fetch_02]
+
+    # bulk avenue
+    fxc.get_batch_result(task_id_list)
+
+    args, _ = fxc.web_client.get_batch_status.call_args
+    assert should_fetch_01 in args[0]
+    assert should_fetch_02 in args[0]
+    assert no_fetch not in args[0]
+
+    # individual avenue
+    for should_fetch, sf in (
+        (True, should_fetch_01),
+        (True, should_fetch_02),
+        (False, no_fetch),
+    ):
+        fxc.web_client.get_task.reset_mock()
+        fxc.get_task(sf)
+        assert should_fetch is fxc.web_client.get_task.called
+        if should_fetch:
+            args, _ = fxc.web_client.get_task.call_args
+            assert sf == args[0]
