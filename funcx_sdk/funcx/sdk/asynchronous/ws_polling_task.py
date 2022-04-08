@@ -147,16 +147,13 @@ class WebSocketPollingTask:
         True -- If connection is closing from internal shutdown process
         False -- External disconnect - to be handled by reconnect logic
         """
-        while True:
+        while not self.closed_by_main_thread:
             try:
                 raw_data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
             except asyncio.TimeoutError:
                 pass
             except ConnectionClosedOK:
-                if self.closed_by_main_thread:
-                    log.info("WebSocket connection closed by main thread")
-                    return True
-                else:
+                if not self.closed_by_main_thread:
                     log.info("WebSocket connection closed by remote-side")
                     return False
             else:
@@ -182,6 +179,9 @@ class WebSocketPollingTask:
                 data = self.unknown_results.pop(task_id)
                 if await self.set_result(task_id, data, pending_futures):
                     return True
+
+        log.info("WebSocket connection closed by main thread")
+        return True
 
     async def set_result(self, task_id, data, pending_futures):
         """Sets the result of a future with given task_id in the pending_futures map,
