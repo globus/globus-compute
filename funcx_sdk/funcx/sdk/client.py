@@ -504,7 +504,7 @@ class FuncXClient:
         return r["task_uuids"]
 
     def register_endpoint(
-        self, name, endpoint_uuid, metadata=None, endpoint_version=None
+        self, name, endpoint_id, metadata=None, endpoint_version=None
     ):
         """Register an endpoint with the funcX service.
 
@@ -512,7 +512,7 @@ class FuncXClient:
         ----------
         name : str
             Name of the endpoint
-        endpoint_uuid : str
+        endpoint_id : str
                 The uuid of the endpoint
         metadata : dict
             endpoint metadata, see default_config example
@@ -530,7 +530,7 @@ class FuncXClient:
 
         r = self.web_client.register_endpoint(
             endpoint_name=name,
-            endpoint_id=endpoint_uuid,
+            endpoint_id=endpoint_id,
             metadata=metadata,
             endpoint_version=endpoint_version,
         )
