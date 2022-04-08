@@ -271,8 +271,9 @@ class FuncXClient:
         dict
             Task block containing "status" key.
         """
-        if task_id in self._task_status_table:
-            return self._task_status_table[task_id]
+        task = self._task_status_table.get(task_id, {})
+        if task.get("pending", True) is False:
+            return task
 
         r = self.web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
@@ -314,7 +315,11 @@ class FuncXClient:
             task_id_list, list
         ), "get_batch_result expects a list of task ids"
 
-        pending_task_ids = [t for t in task_id_list if t not in self._task_status_table]
+        pending_task_ids = [
+            task_id
+            for task_id in task_id_list
+            if self._task_status_table.get(task_id, {}).get("pending", True) is True
+        ]
 
         results = {}
 
