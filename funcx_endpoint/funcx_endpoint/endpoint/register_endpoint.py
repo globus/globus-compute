@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import typing as t
 
 import pika
 
@@ -9,33 +10,9 @@ import funcx_endpoint
 log = logging.getLogger(__name__)
 
 
-def mock_register_endpoint(
-    endpoint_name: str, endpoint_uuid: str, endpoint_version: str = None
-) -> str:
-    """This is only a mock function that currently returns a URL to a
-    default local RabbitMQ service
-
-    Parameters
-    ----------
-    endpoint_name: str
-        User facing name of the endpoint
-    endpoint_uuid: str
-        Endpoint UUID
-    endpoint_version: str
-        funcx-endpoint version number. Optional
-
-    Returns
-    -------
-    pika.URLParameters to the RabbitMQ pipes
-    """
-    log.info(
-        f"Registering endpoint:{endpoint_name}:{endpoint_uuid}"
-        " of version:{endpoint_version}"
-    )
-    return "amqp://guest:guest@localhost:5672/"
-
-
-def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
+def register_endpoint(
+    funcx_client, endpoint_uuid, endpoint_dir, endpoint_name
+) -> t.Tuple[t.Dict, t.Dict]:
     """Register the endpoint and return the registration info. This function needs
     to be isolated so that the function can both be called from the endpoint start
     process as well as the daemon process that it spawns.
@@ -54,23 +31,39 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
     endpoint_name : str
         The name of the endpoint
 
+    Returns: tuple[dict, dict]
+        Eg return value:
+        ({'pika_conn_params': <PIKA_URLParameters>,
+          'exchange_name': 'tasks',
+          'exchange_type': 'direct',
+          'task_url': 'amqp://funcx:rabbitmq@192.168.49.2:5672/'},
+         {'pika_conn_params': <PIKA_URLParameters>,
+          'exchange_name': 'results',
+          'exchange_type': 'topic',
+          'task_url': 'amqp://funcx:rabbitmq@192.168.49.2:5672/'}
+         )
     """
     log.debug("Attempting registration")
     log.debug(f"Trying with eid : {endpoint_uuid}")
 
-    pika_url = mock_register_endpoint(
-        endpoint_name, endpoint_uuid, endpoint_version=funcx_endpoint.__version__
+    reg_info = funcx_client.register_endpoint(
+        endpoint_name,
+        endpoint_uuid,
+        endpoint_version=funcx_endpoint.__version__,
     )
+    log.debug(f"Registration returned: {reg_info}")
+
+    task_queue_info = reg_info["task_queue_info"]
+    result_queue_info = reg_info["result_queue_info"]
 
     # NOTE: While all registration info is saved to endpoint.json, only the
-    # endpoint UUID is reused from this file. The latest forwarder URI is used
-    # every time we fetch registration info and register
+    # endpoint UUID is reused from this file.
     with open(os.path.join(endpoint_dir, "endpoint.json"), "w+") as fp:
         endpoint_info = {
             "endpoint_name": endpoint_name,
             # This is named endpoint_id for backward compatibility when
             # funcx-endpoint list is called
-            "pika_conn_info": pika_url,
+            "connection_info": reg_info,
             "endpoint_id": endpoint_uuid,
         }
         json.dump(endpoint_info, fp)
@@ -80,5 +73,13 @@ def register_endpoint(funcx_client, endpoint_uuid, endpoint_dir, endpoint_name):
             )
         )
 
-    reg_info = pika.URLParameters(pika_url)
-    return reg_info
+        # Pika conn params are not json serializable, so they are added
+        # after we dump the info to endpoint.json
+        task_queue_info["pika_conn_params"] = pika.URLParameters(
+            task_queue_info["task_url"]
+        )
+        result_queue_info["pika_conn_params"] = pika.URLParameters(
+            result_queue_info["result_url"]
+        )
+
+    return task_queue_info, result_queue_info
