@@ -15,6 +15,7 @@ from websockets.exceptions import (
     InvalidStatusCode,
 )
 
+from funcx.sdk.asynchronous.funcx_future import FuncXFuture
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
 log = logging.getLogger(__name__)
@@ -158,45 +159,58 @@ class WebSocketPollingTask:
                     return False
             else:
                 data = json.loads(raw_data)
-                task_id = data["task_id"]
-                if task_id in pending_futures:
-                    if await self.set_result(task_id, data, pending_futures):
+                task_id = data.get("task_id")
+                if task_id:
+                    task_fut = pending_futures.pop(task_id, None)
+                    if task_fut is not None and await self.set_result(task_fut, data):
                         return True
+                    else:
+                        # This scenario occurs rarely using non-batching mode, but quite
+                        # often in batching mode.
+                        #
+                        # When submitting tasks in batch with batch_run, some task
+                        # results may be received by websocket before the response of
+                        # batch_run, and pending_futures do not have the futures for the
+                        # tasks yet.  We store these in unknown_results and process when
+                        # their futures are ready.
+                        self.unknown_results[task_id] = data
                 else:
-                    # This scenario occurs rarely using non-batching mode, but quite
-                    # often in batching mode.
-                    #
-                    # When submitting tasks in batch with batch_run, some task results
-                    # may be received by websocket before the  response of batch_run,
-                    # and pending_futures do not have the futures for the tasks yet.
-                    # We store these in unknown_results and process when their futures
-                    # are ready.
-                    self.unknown_results[task_id] = data
+                    # This is not an expected case.  If upstream does not return a
+                    # task_id, then we have a larger error in play.  Time to shut down
+                    # (annoy the user!) and field the requisite bug reports.
+                    errmsg = (
+                        f"Upstream error: {data.get('exception', '(no reason given!)')}"
+                        f"\nShutting down connection."
+                    )
+                    log.error(errmsg)
+                    for fut in pending_futures.values():
+                        if not fut.done():
+                            fut.cancel()
+                    return True
 
             # Handle the results received but not processed before
             unprocessed_task_ids = self.unknown_results.keys() & pending_futures.keys()
             for task_id in unprocessed_task_ids:
+                task_fut = pending_futures.pop(task_id)
                 data = self.unknown_results.pop(task_id)
-                if await self.set_result(task_id, data, pending_futures):
+                if await self.set_result(task_fut, data):
                     return True
 
         log.info("WebSocket connection closed by main thread")
         return True
 
-    async def set_result(self, task_id, data, pending_futures):
+    async def set_result(self, task_fut: FuncXFuture, task_data: t.Dict):
         """Sets the result of a future with given task_id in the pending_futures map,
         then decrement the atomic counter and close the WebSocket connection if needed
 
         Parameters
         ----------
-        task_id : str
-            Task ID of the future to set the result for
+        task_fut : FuncXFuture
+            Task future for which to parse and set task_data
 
-        data : dict
+
+        task_data : dict
             Dict containing result/exception that should be set to future
-
-        pending_futures : dict
-            Dict of task_id keys that map to their futures
 
         Returns
         -------
@@ -204,24 +218,29 @@ class WebSocketPollingTask:
             True if the WebSocket connection has closed and the thread can
             exit, False otherwise
         """
-        future = pending_futures.pop(task_id)
         try:
-            if data["result"]:
-                future.set_result(
-                    self.funcx_client.fx_serializer.deserialize(data["result"])
+            if "result" in task_data:
+                task_fut.set_result(
+                    self.funcx_client.fx_serializer.deserialize(task_data["result"])
                 )
-            elif data["exception"]:
+            elif "exception" in task_data:
                 r_exception = self.funcx_client.fx_serializer.deserialize(
-                    data["exception"]
+                    task_data["exception"]
                 )
-                future.set_exception(dill.loads(r_exception.e_value))
+                task_fut.set_exception(dill.loads(r_exception.e_value))
             else:
-                future.set_exception(Exception(data["reason"]))
-        except Exception:
-            log.exception("Caught unexpected exception while setting results")
+                msg = f"Data contained neither result nor exception: {task_data}"
+                task_fut.set_exception(Exception(msg))
+        except Exception as exc:
+            log.exception("Handling unexpected exception while setting results")
+            task_exc = Exception(
+                f"Malformed or unexpected data structure.  Task data: {task_data}",
+            )
+            task_exc.__cause__ = exc
+            task_fut.set_exception(task_exc)
 
-        # When the counter hits 0 we always exit. This guarantees that that if the
-        # counter increments to 1 on the executor, this handler needs to be restarted.
+        # When the counter hits 0 we always exit. This guarantees that if the counter
+        # increments to 1 on the executor, this handler needs to be restarted.
         if self.atomic_controller is not None:
             count = self.atomic_controller.decrement()
             # Only close when count == 0 and unknown_results are empty
