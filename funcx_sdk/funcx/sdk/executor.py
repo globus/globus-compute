@@ -93,16 +93,12 @@ class FuncXExecutor(concurrent.futures.Executor):
         batch_interval: float = 1.0,
         batch_size: int = 100,
     ):
-
         """
         Parameters
         ==========
 
         funcx_client : client object
             Instance of FuncXClient to be used by the executor
-
-        results_ws_uri : str
-            Web sockets URI for the results
 
         label : str
             Optional string label to name the executor.
@@ -122,16 +118,32 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._function_registry: t.Dict[t.Any, str] = {}
         self._function_future_map: t.Dict[str, FuncXFuture] = {}
         self._kill_event: t.Optional[threading.Event] = None
+        self._task_submit_thread: t.Optional[threading.Thread] = None
 
         self.poller_thread = ExecutorPollerThread(
             self.funcx_client,
             self._function_future_map,
         )
-        atexit.register(self.shutdown)
+
+        self._reset_poller()
 
         if self.batch_enabled:
             log.info("Batch submission enabled.")
             self.start_batching_thread()
+
+        atexit.register(self.shutdown)
+
+    def _reset_poller(self):
+        if self.poller_thread.is_running:
+            self.poller_thread.shutdown()
+        self.poller_thread.atomic_controller.reset()
+
+        self._future_counter = 0
+        for fut_map in (self._counter_future_map, self._function_future_map):
+            while fut_map:
+                _, fut = fut_map.popitem()
+                if not fut.done():
+                    fut.cancel()
 
     @property
     def results_ws_uri(self) -> str:
@@ -212,7 +224,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._counter_future_map[future_id] = fut
 
         if self.batch_enabled:
-            # Put task to the the outgoing queue
+            # Put task to the outgoing queue
             self.task_outgoing.put(msg)
         else:
             # self._submit_task takes a list of messages
@@ -272,10 +284,123 @@ class FuncXExecutor(concurrent.futures.Executor):
                 self._function_future_map[task_uuid] = fut
             self.poller_thread.atomic_controller.increment(val=len(messages))
 
+    def reload_tasks(self) -> t.Iterable[FuncXFuture]:
+        """
+        Load the set of tasks associated with this Executor's Task Group (FuncXClient)
+        from the server and return a set of futures, one for each task.  This is
+        nominally intended to "reattach" to a previously initiated session, based on
+        the Task Group ID.  An example use might be:
+
+            import sys
+            import typing as T
+            from funcx import FuncXClient, FuncXExecutor
+            from funcx.sdk.executor import FuncXFuture
+
+            fxc_kwargs = {}
+            if len(sys.argv) > 1:
+                fxc_kwargs["task_group_id"] = sys.argv[1]
+
+            def example_funcx_kernel(num):
+                result = f"your funcx logic result, from task: {num}"
+                return result
+
+            fxclient = FuncXClient(**fxc_kwargs)
+            fxexec = FuncXExecutor(fxclient)
+
+            # Save the task_group_id somewhere.  Perhaps in a file, or less
+            # robustly "as mere text" on your console:
+            print("If this script dies, rehydrate futures with this "
+                 f"Task Group ID: {fxexec.task_group_id}")
+
+            futures: T.Iterable[FuncXFuture] = []
+            results, exceptions = [], []
+            if "task_group_id" in fxc_kwargs:
+                print(f"Reloading tasks from Task Group ID: {fxexec.task_group_id}")
+                futures = fxexec.reload_tasks()
+
+                # Ask server once up-front if there are any known results before
+                # waiting for each result in turn (below):
+                task_ids = [f.task_id for f in futures]
+                finished_tasks = set()
+                for task_id, state in fxclient.get_batch_result(task_ids).items():
+                    if not state["pending"]:
+                        finished_tasks.add(task_id)
+                        if state["status"] == "success":
+                            results.append(state["result"])
+                        else:
+                            exceptions.append(state["exception"])
+                futures = [f for f in futures if f.task_id not in finished_tasks]
+
+            else:
+                print("New session; creating FuncX tasks ...")
+                ep_id = "<YOUR_ENDPOINT_UUID>"
+                for i in range(1, 5):
+                    futures.append(
+                        fxexec.submit(example_funcx_kernel, endpoint_id=ep_id)
+                    )
+
+                # ... Right here, your script dies for [SILLY REASON;
+                #           DID YOU LOSE POWER?] ...
+
+            # Get results:
+            for f in futures:
+                try:
+                    results.append(f.result(timeout=10))
+                except Exception as exc:
+                    exceptions.append(exc)
+
+        Returns
+        -------
+        An iterable of futures.
+
+        Known throws
+        ------
+        - The usual (unhandled) request errors (e.g., no connection; invalid
+          authorization)
+        - ValueError if the server response is incorrect
+        - KeyError if the server did not return an expected response
+
+        Notes
+        -----
+        Any previous futures received from this executor will be cancelled.
+        """
+
+        # step 1: cleanup!  Turn off poller_thread, clear _function_future_map
+        self._reset_poller()
+
+        # step 2: from server, acquire list of related task ids and make futures
+        r = self.funcx_client.web_client.get_taskgroup_tasks(self.task_group_id)
+        if r["taskgroup_id"] != self.task_group_id:
+            msg = (
+                "Server did not respond with requested TaskGroup Tasks.  "
+                f"(Requested tasks for {self.task_group_id} but received "
+                f"tasks for {r['taskgroup_id']}"
+            )
+            raise ValueError(msg)
+
+        # step 3: create the associated set of futures
+        futures: t.List[FuncXFuture] = []
+        for task in r.get("tasks", []):
+            task_uuid: str = task["id"]
+            fut = FuncXFuture(task_uuid)
+            self._function_future_map[task_uuid] = fut
+            futures.append(fut)
+
+        if not futures:
+            log.warning(f"Received no tasks for Task Group ID: {self.task_group_id}")
+
+        # step 4: start up polling!
+        self.poller_thread.atomic_controller.increment(val=len(futures))
+
+        # step 5: the goods for the consumer
+        return futures
+
     def shutdown(self):
-        self.poller_thread.shutdown()
-        if self.batch_enabled:
-            self._kill_event.set()
+        if self.batch_enabled and self._kill_event:
+            self._kill_event.set()  # Reminder: stops the batch submission thread
+
+        self._reset_poller()
+
         log.debug(f"Executor:{self.label} shutting down")
 
 

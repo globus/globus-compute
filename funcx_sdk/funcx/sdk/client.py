@@ -99,7 +99,8 @@ class FuncXClient:
 
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this FuncXClient instance.  Typically,
-            one uses this to submit new tasks to an existing session.
+            one uses this to submit new tasks to an existing session or to reestablish
+            FuncXExecutor futures.
             Default: None (will be auto generated)
 
         Keyword arguments are the same as for BaseClient.
@@ -522,7 +523,9 @@ class FuncXClient:
         return r.data
 
     def get_containers(self, name, description=None):
-        """Register a DLHub endpoint with the funcX service and get the containers to launch.
+        """
+        Register a DLHub endpoint with the funcX service and get the containers to
+        launch.
 
         Parameters
         ----------

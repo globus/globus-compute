@@ -219,7 +219,8 @@ class WebSocketPollingTask:
             exit, False otherwise
         """
         try:
-            if "result" in task_data:
+            status = str(task_data.get("status")).lower()
+            if status == "success" and "result" in task_data:
                 task_fut.set_result(
                     self.funcx_client.fx_serializer.deserialize(task_data["result"])
                 )
