@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 def register_endpoint(
-    funcx_client, endpoint_uuid, endpoint_dir, endpoint_name
+    funcx_client, endpoint_uuid: str, endpoint_dir: str, endpoint_name: str
 ) -> t.Tuple[t.Dict, t.Dict]:
     """Register the endpoint and return the registration info. This function needs
     to be isolated so that the function can both be called from the endpoint start

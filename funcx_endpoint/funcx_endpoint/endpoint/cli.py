@@ -50,7 +50,7 @@ def configure_endpoint(
 @app.command(name="start", help="Start an endpoint by name")
 def start_endpoint(
     name: str = typer.Argument("default", autocompletion=complete_endpoint_name),
-    endpoint_uuid: str = typer.Option(
+    endpoint_uuid: str = typer.Argument(
         None, help="The UUID for the endpoint to register with"
     ),
 ):
@@ -104,7 +104,6 @@ def start_endpoint(
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
         )
         raise
-
     endpoint.start_endpoint(name, endpoint_uuid, endpoint_config)
 
 
