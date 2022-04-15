@@ -25,9 +25,8 @@
 Changed
 ^^^^^^^
 
-- Endpoint threads and processes now have human readable names, for logging metadata
+- The endpoint has a new log level, TRACE, which is more verbose than DEBUG
 
-..
 .. - A bullet item for the Changed category.
 ..
 .. Security

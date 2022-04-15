@@ -4,7 +4,7 @@ mkdir ~/.funcx/$1
 mkdir ~/.funcx/credentials
 cp /funcx/config/config.py ~/.funcx
 cp /funcx/$1/* ~/.funcx/$1
-cp /funcx/credentials/* ~/.funcx/credentials
+cp /funcx/credentials/storage.db ~/.funcx/
 if [ -z "$2" ]; then
   funcx-endpoint start $1
 else

@@ -139,24 +139,22 @@ class WorkerMap:
         """
         spin_ups = {}
 
-        log.debug(f"[SPIN UP] Next Worker Qsize: {len(next_worker_q)}")
-        log.debug(f"[SPIN UP] Active Workers: {self.active_workers}")
-        log.debug(f"[SPIN UP] Pending Workers: {self.pending_workers}")
-        log.debug(f"[SPIN UP] Max Worker Count: {self.max_worker_count}")
+        log.trace(f"Next Worker Qsize: {len(next_worker_q)}")
+        log.trace(f"Active Workers: {self.active_workers}")
+        log.trace(f"Pending Workers: {self.pending_workers}")
+        log.trace(f"Max Worker Count: {self.max_worker_count}")
 
         if (
             len(next_worker_q) > 0
             and self.active_workers + self.pending_workers < self.max_worker_count
         ):
-            log.debug("[SPIN UP] Spinning up new workers!")
+            log.debug("Spinning up new workers")
             log.debug(
-                "[SPIN up] Empty slots: %s",
+                "Empty slots: %s",
                 self.max_worker_count - self.active_workers - self.pending_workers,
             )
-            log.debug(f"[SPIN up] New workers: {len(next_worker_q)}")
-            log.debug(
-                f"[SPIN up] Unused slots: {self.total_worker_type_counts['unused']}"
-            )
+            log.debug(f"New workers: {len(next_worker_q)}")
+            log.debug(f"Unused slots: {self.total_worker_type_counts['unused']}")
             num_slots = min(
                 self.max_worker_count - self.active_workers - self.pending_workers,
                 len(next_worker_q),
@@ -252,12 +250,10 @@ class WorkerMap:
                 and time.time() - self.worker_idle_since[worker_type]
                 < worker_max_idletime
             ):
-                log.debug(f"[SPIN DOWN] Current time: {time.time()}")
-                log.debug(
-                    f"[SPIN DOWN] Idle since: {self.worker_idle_since[worker_type]}"
-                )
-                log.debug(
-                    "[SPIN DOWN] Worker type %s has not exceeded maximum idle "
+                log.trace(f"Current time: {time.time()}")
+                log.trace(f"Idle since: {self.worker_idle_since[worker_type]}")
+                log.trace(
+                    "Worker type %s has not exceeded maximum idle "
                     "time %s, continuing",
                     worker_type,
                     worker_max_idletime,
@@ -275,11 +271,7 @@ class WorkerMap:
                 num_remove = min(num_remove, max_remove)
 
             if num_remove > 0:
-                log.debug(
-                    "[SPIN DOWN] Removing {} workers of type {}".format(
-                        num_remove, worker_type
-                    )
-                )
+                log.debug(f"Removing {num_remove} workers of type {worker_type}")
             for _i in range(num_remove):
                 spin_downs.append(worker_type)
             # A container switching is defined as a warm container must be
@@ -425,11 +417,11 @@ class WorkerMap:
         # next_worker_q = []
         new_worker_list = []
         log.debug(
-            "[GET_NEXT_WORKER] total_worker_type_counts: %s",
+            "total_worker_type_counts: %s",
             self.total_worker_type_counts,
         )
         log.debug(
-            "[GET_NEXT_WORKER] pending_worker_type_counts: %s",
+            "pending_worker_type_counts: %s",
             self.pending_worker_type_counts,
         )
         for worker_type in new_worker_map:
@@ -457,7 +449,7 @@ class WorkerMap:
 
     def update_worker_idle(self, worker_type):
         """Update the workers' last idle time by worker type"""
-        log.debug(f"[UPDATE_WORKER_IDLE] Worker idle since: {self.worker_idle_since}")
+        log.debug(f"Worker idle since: {self.worker_idle_since}")
         self.worker_idle_since[worker_type] = time.time()
 
     def put_worker(self, worker):

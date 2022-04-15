@@ -3,6 +3,35 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-0.3.9:
+
+funcx & funcx-endpoint v0.3.9
+-----------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Improve performance in endpoint interchange->manager dispatch,
+  by fixing a race condition in worker status processing.
+  In an example kubernetes setup, this can double throughput of
+  5 second tasks on 6 workers.
+
+- Pin the version of `click` used by `funcx-endpoint`. This resolves issues
+  stemming from `typer` being incompatible with the latest `click` release.
+
+Removed
+^^^^^^^
+
+- FuncXFuture was removed. This functionality has been superseded by
+  code in FuncXExecutor which uses plain Futures.
+
+Changed
+^^^^^^^
+
+- Endpoint logs now have richer metadata on each log line
+
+- Endpoint threads and processes now have human readable names, for logging metadata
+
 funcx & funcx-endpoint v0.3.8
 -----------------------------
 

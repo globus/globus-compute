@@ -6,7 +6,7 @@ FIXME: This doc is a stub.
 
 ## Requirements
 
-- python3.6+, pip, virtualenv
+- python3.7+, pip, virtualenv
 
 ### Recommended
 

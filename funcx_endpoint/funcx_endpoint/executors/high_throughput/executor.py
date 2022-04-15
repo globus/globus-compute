@@ -535,7 +535,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
         The `None` message is a die request.
         """
-        log.debug("[MTHREAD] queue management worker starting")
+        log.debug("queue management worker starting")
 
         while not self._executor_bad_state.is_set():
             try:
@@ -543,37 +543,33 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 self.last_response_time = time.time()
 
             except queue.Empty:
-                log.debug("[MTHREAD] queue empty")
+                log.debug("queue empty")
                 # Timed out.
                 pass
 
             except OSError as e:
-                log.exception(
-                    "[MTHREAD] Caught broken queue with exception code {}: {}".format(
-                        e.errno, e
-                    )
-                )
+                log.exception(f"Caught broken queue with exception code {e.errno}: {e}")
                 return
 
             except Exception as e:
-                log.exception(f"[MTHREAD] Caught unknown exception: {e}")
+                log.exception(f"Caught unknown exception: {e}")
                 return
 
             else:
 
                 if msgs is None:
-                    log.debug("[MTHREAD] Got None, exiting")
+                    log.debug("Got None, exiting")
                     return
 
                 elif isinstance(msgs, EPStatusReport):
-                    log.debug(f"[MTHREAD] Received EPStatusReport {msgs}")
+                    log.debug(f"Received EPStatusReport {msgs}")
                     if self.passthrough:
                         self.results_passthrough.put(
                             {"task_id": None, "message": pickle.dumps(msgs)}
                         )
 
                 else:
-                    log.debug("[MTHREAD] Unpacking results")
+                    log.debug("Unpacking results")
                     for serialized_msg in msgs:
                         try:
                             msg = pickle.loads(serialized_msg)
@@ -598,17 +594,13 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             # essentially shutting down the client with little
                             # indication to the user.
                             log.warning(
-                                "[MTHREAD] Executor shutting down due to fatal "
+                                "Executor shutting down due to fatal "
                                 "exception from interchange"
                             )
                             self._executor_exception = fx_serializer.deserialize(
                                 msg["exception"]
                             )
-                            log.exception(
-                                "[MTHREAD] Exception: {}".format(
-                                    self._executor_exception
-                                )
-                            )
+                            log.exception(f"Exception: {self._executor_exception}")
                             # Set bad state to prevent new tasks from being submitted
                             self._executor_bad_state.set()
                             # We set all current tasks to this exception to make sure
@@ -628,16 +620,16 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             break
 
                         if self.passthrough is True:
-                            log.debug(f"[MTHREAD] Pushing results for task:{tid}")
+                            log.debug(f"Pushing results for task:{tid}")
                             # we are only interested in actual task ids here, not
                             # identifiers for other message types
                             sent_task_id = tid if isinstance(tid, str) else None
                             x = self.results_passthrough.put(
                                 {"task_id": sent_task_id, "message": serialized_msg}
                             )
-                            log.debug(f"[MTHREAD] task:{tid} ret value: {x}")
+                            log.debug(f"task:{tid} ret value: {x}")
                             log.debug(
-                                "[MTHREAD] task:%s items in queue: %s",
+                                "task:%s items in queue: %s",
                                 tid,
                                 self.results_passthrough.qsize(),
                             )
@@ -650,7 +642,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                             # returned
                             # We should log, and proceed.
                             log.warning(
-                                f"[MTHREAD] Task:{tid} not found in tasks table\n"
+                                f"Task:{tid} not found in tasks table\n"
                                 "Task likely was cancelled and removed."
                             )
                             continue
@@ -675,13 +667,12 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                 )
                         else:
                             raise BadMessage(
-                                "[MTHREAD] Message received is neither result or "
-                                "exception"
+                                "Message received is neither result or exception"
                             )
 
             if not self.is_alive:
                 break
-        log.info("[MTHREAD] queue management worker finished")
+        log.info("queue management worker finished")
 
     # When the executor gets lost, the weakref callback will wake up
     # the queue management thread.

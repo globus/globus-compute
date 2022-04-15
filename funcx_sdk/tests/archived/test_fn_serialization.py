@@ -1,7 +1,8 @@
 import time
 
-from funcx.tests.fn_module import imported_fn
 from funcx.utils.errors import TaskPending
+
+from .fn_module import imported_fn
 
 
 def local_fn():
