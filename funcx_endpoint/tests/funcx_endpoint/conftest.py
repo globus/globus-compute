@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import uuid
-
 import globus_sdk
 import pytest
 import responses
@@ -58,13 +56,13 @@ class FakeLoginManager:
 
 
 @pytest.fixture
-def setup_register_endpoint_response():
+def setup_register_endpoint_response(endpoint_uuid):
     responses.add(
         method=responses.POST,
         url="https://api2.funcx.org/v2/endpoints",
         headers={"Content-Type": "application/json"},
         json={
-            "endpoint_id": str(uuid.UUID(int=0)),
+            "endpoint_id": endpoint_uuid,
             "result_queue_info": {
                 "exchange_name": "results",
                 "exchange_type": "topic",
