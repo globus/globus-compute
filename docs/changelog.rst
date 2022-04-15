@@ -3,6 +3,94 @@ Changelog
 
 .. scriv-insert-here
 
+funcx & funcx-endpoint v0.4.0a1
+-------------------------------
+
+Added
+^^^^^
+
+* `TaskQueueSubscriber` class added that allows receiving tasks over RabbitMQ
+* `ResultQueuePublisher` class added that allows publishing results and status over RabbitMQ
+* `TaskQueuePublisher` class added for testing
+* `ResultQueueSubscriber` class added for testing
+* A bunch of tests are added that test the above classes described above
+
+- Implement Task Group reloading on the FuncXExecutor.  Look for `.reload_tasks()`
+
+- FuncXExecutor.submit returns futures with a .task_id attribute
+  that will contain the task ID of the corresponding FuncX task.
+  If that task has not been submitted yet, then that attribute
+  will contain None.
+
+- The ``FuncXClient`` may now be passed ``do_version_check=False`` on init,
+  which will lead to faster startup times
+
+- The ``FuncXClient`` now accepts a new argument ``login_manager``, which is
+  expected to implement a protocol for providing authenticated http client
+  objects, login, and logout capabilities.
+
+- The login manager and its protocol are now defined and may be imported as in
+  ``from funcx.sdk.login_manager import LoginManager, LoginManagerProtocol``.
+  They are internal components but may be used to force a login or to implement
+  an alternative ``LoginManagerProtocol`` to customize authentication
+
+Removed
+^^^^^^^
+
+- The following arguments to ``FuncXClient`` are no longer supported:
+  ``force_login``
+
+- The ``SearchHelper`` object no longer exposes a method for searching for
+  endpoints, as this functionality was never fully implemented.
+
+- The custom response type provided by the SearchHelper object has been
+  removed. Instead, callers to function search will get the Globus Search
+  response object directly
+
+Deprecated
+^^^^^^^^^^
+
+- The following arguments to ``FuncXClient`` are deprecated and will emit
+  warnings if used: ``fx_authorizer``, ``search_authorizer``,
+  ``openid_authorizer``. The use-cases for these arguments are now satisfied by
+  the ability to pass a custom ``LoginManager`` to the client class, if desired.
+
+- The ``openid_authorizer`` argument to FuncXClient is now deprecated. It can
+  still be passed, but is ignored and will emit a ``DeprecationWarning`` if
+  used
+
+Changed
+^^^^^^^
+
+- The endpoint has a new log level, TRACE, which is more verbose than DEBUG
+
+- The ``FuncXClient`` constructor has been refactored. It can no longer be
+  passed authorizers for various sub-services. Instead, a new component, the
+  ``LoginManager``, has been introduced which makes it possible to pass
+  arbitrary globus-sdk client objects for services (by passing a customized
+  login manager). The default behavior remains the same, checking login and
+  doing a new login on init.
+
+- Tokens are now stored in a new location, in a sqlite database, using
+  ``globus_sdk.tokenstorage``. Users will need to login again after upgrading
+  from past versions of ``funcx``.
+
+- Remove support for python3.6
+
+- Endpoint logs have been reduced in verbosity. A number of noisy log lines have been
+  lowered to TRACE level. [PREFIXES] have been removed from many messages as they
+  contain information more reliably availale in log metadata.
+
+- `FuncXExecutor <https://funcx.readthedocs.io/en/latest/executor.html>`_
+  now uses batched submission by default.  This typically significantly
+  improves the task submission rate when using the executor interface (for
+  example, 3 seconds to submit 500 tasks vs 2 minutes, in an informal test).
+  However, individual task submission latency may be increased.
+
+  To use non-batched submission mode, set `batch_mode=False` when instantiating
+  the `FuncXExecutor <https://funcx.readthedocs.io/en/latest/executor.html>`_
+  object.
+
 .. _changelog-0.3.9:
 
 funcx & funcx-endpoint v0.3.9

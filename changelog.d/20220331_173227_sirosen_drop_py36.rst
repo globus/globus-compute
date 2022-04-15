@@ -1,4 +1,0 @@
-Changed
-^^^^^^^
-
-- Remove support for python3.6

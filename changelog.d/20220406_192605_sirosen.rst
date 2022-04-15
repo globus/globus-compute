@@ -1,6 +1,0 @@
-Removed
-^^^^^^^
-
-- The custom response type provided by the SearchHelper object has been
-  removed. Instead, callers to function search will get the Globus Search
-  response object directly
