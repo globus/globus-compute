@@ -45,6 +45,7 @@ REQUIRES = [
 ]
 
 TEST_REQUIRES = [
+    "responses",
     "pytest>=5.2",
     "coverage>=5.2",
     "codecov==2.1.8",

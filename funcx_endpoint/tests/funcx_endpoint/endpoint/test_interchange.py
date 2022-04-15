@@ -3,6 +3,7 @@ import os
 import shutil
 from importlib.machinery import SourceFileLoader
 
+import pika
 import pytest
 
 from funcx_endpoint.endpoint.endpoint import Endpoint
@@ -51,7 +52,10 @@ class TestStart:
     def test_start_no_reg_info(self, mocker):
         mocker.patch("funcx_endpoint.endpoint.interchange.threading.Thread")
 
-        mock_retry_call = mocker.patch("funcx_endpoint.endpoint.interchange.retry_call")
+        def _fake_retry(func, *args, **kwargs):
+            return func()
+
+        mocker.patch("funcx_endpoint.endpoint.interchange.retry_call", _fake_retry)
 
         mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
         mock_client.return_value = None
@@ -59,13 +63,22 @@ class TestStart:
         mock_register_endpoint = mocker.patch(
             "funcx_endpoint.endpoint.interchange.register_endpoint"
         )
-        mock_register_endpoint.return_value = {
-            "endpoint_id": "abcde12345",
-            "public_ip": "127.0.0.1",
-            "tasks_port": 8080,
-            "results_port": 8081,
-            "commands_port": 8082,
-        }
+        result_url = "amqp://localhost:5672"
+        task_url = "amqp://localhost:5672"
+        mock_register_endpoint.return_value = (
+            {
+                "exchange_name": "results",
+                "exchange_type": "topic",
+                "result_url": result_url,
+                "pika_conn_params": pika.URLParameters(result_url),
+            },
+            {
+                "exchange_name": "tasks",
+                "exchange_type": "direct",
+                "task_url": task_url,
+                "pika_conn_params": pika.URLParameters(task_url),
+            },
+        )
 
         manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
@@ -99,6 +112,6 @@ class TestStart:
 
         # we need to ensure that retry_call is called during interchange
         # start if reg_info has not been passed into the interchange
-        mock_retry_call.assert_called()
         mock_quiesce.assert_called()
         mock_main_loop.assert_called()
+        mock_register_endpoint.assert_called()

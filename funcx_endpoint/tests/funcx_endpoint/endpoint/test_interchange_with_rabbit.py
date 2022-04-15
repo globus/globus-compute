@@ -3,12 +3,10 @@ import multiprocessing
 import os
 import pickle
 import time
-from unittest import mock
 
 import pika
 from parsl.providers import LocalProvider
 
-import funcx
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueueSubscriber, TaskQueuePublisher
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
@@ -62,7 +60,9 @@ def run_ix_process(reg_info, endpoint_uuid):
     logging.warning("Done")
 
 
-def test_endpoint_interchange_against_rabbitmq(endpoint_uuid):
+def test_endpoint_interchange_against_rabbitmq(
+    endpoint_uuid, get_standard_funcx_client, setup_register_endpoint_response
+):
     """This test registers the endpoint against local RabbitMQ, and
     uses mock tasks
     """
@@ -70,19 +70,27 @@ def test_endpoint_interchange_against_rabbitmq(endpoint_uuid):
 
     # Use register_endpoint to get connection params
     endpoint_name = "endpoint_foo"
-    fxc = funcx.FuncXClient(use_offprocess_checker=False, login_manager=mock.Mock())
+    fxc = get_standard_funcx_client()
     reg_info = register_endpoint(
         fxc,
         endpoint_uuid=endpoint_uuid,
         endpoint_dir=os.getcwd(),
         endpoint_name=endpoint_name,
     )
-    assert isinstance(reg_info, pika.URLParameters)
+    assert isinstance(reg_info, tuple)
+    assert len(reg_info) == 2
+    for param in reg_info:
+        assert isinstance(param, dict)
+        assert "pika_conn_params" in param
+        assert isinstance(param["pika_conn_params"], pika.URLParameters)
+
+    task_queue_info, result_queue_info = reg_info
 
     # Start the service side components:
     # Connect the TaskQueuePublisher and submit some mock tasks
     task_q_out = TaskQueuePublisher(
-        endpoint_uuid=endpoint_uuid, pika_conn_params=reg_info
+        endpoint_uuid=endpoint_uuid,
+        pika_conn_params=task_queue_info["pika_conn_params"],
     )
     task_q_out.connect()
     task_q_out._channel.queue_purge(task_q_out.queue_name)
@@ -90,7 +98,7 @@ def test_endpoint_interchange_against_rabbitmq(endpoint_uuid):
 
     result_q_in = multiprocessing.Queue()
     result_sub_proc = ResultQueueSubscriber(
-        pika_conn_params=reg_info,
+        pika_conn_params=result_queue_info["pika_conn_params"],
         external_queue=result_q_in,
     )
     result_sub_proc.start()
