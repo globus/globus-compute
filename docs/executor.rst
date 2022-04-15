@@ -13,8 +13,7 @@ Initializing the executor
 
 .. code-block:: python
 
-   from funcx import FuncXClient
-   from funcx.sdk.executor import FuncXExecutor
+   from funcx import FuncXClient, FuncXExecutor
 
    fx = FuncXExecutor(FuncXClient())
 
@@ -50,7 +49,7 @@ More complex cases
 .. code-block:: python
 
    ...
-   fx = FuncXExecutor(FuncXClient())
+   fx = FuncXExecutor(FuncXClient(batch_enabled=True))
 
 
    def double(x):
@@ -59,7 +58,7 @@ More complex cases
    # Here's how you'd launch several functions:
    futures = []
    for i in range(10):
-       futures.append(double(i))
+       futures.append(fx.submit(double, i, endpoint_id=endpoint_id)
 
    # Now wait and print each result:
    for f in futures:

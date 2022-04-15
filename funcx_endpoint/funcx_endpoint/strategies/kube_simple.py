@@ -54,10 +54,10 @@ class KubeSimpleStrategy(BaseStrategy):
         parallelism = self.interchange.provider.parallelism
 
         active_tasks = self.interchange.get_total_tasks_outstanding()
-        log.debug(f"Pending tasks : {active_tasks}")
+        log.trace(f"Pending tasks : {active_tasks}")
 
         status = self.interchange.provider_status()
-        log.debug(f"Provider status : {status}")
+        log.trace(f"Provider status : {status}")
 
         for task_type in active_tasks.keys():
             active_pods = status.get(task_type, 0)

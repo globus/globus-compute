@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import uuid
+from typing import List
 
 import psutil
 import zmq
@@ -78,6 +79,7 @@ class Manager:
         result_q_url="tcp://127.0.0.1:50098",
         max_queue_size=10,
         cores_per_worker=1,
+        available_accelerators: List[str] = (),
         max_workers=float("inf"),
         uid=None,
         heartbeat_threshold=120,
@@ -106,6 +108,10 @@ class Manager:
         cores_per_worker : float
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
+
+        available_accelerators: list of strings
+            Accelerators available for workers to use.
+            default: empty list
 
         max_workers : int
              caps the maximum number of workers that can be launched.
@@ -188,7 +194,14 @@ class Manager:
         self.max_worker_count = min(
             max_workers, math.floor(self.cores_on_node / cores_per_worker)
         )
-        self.worker_map = WorkerMap(self.max_worker_count)
+
+        # Control pinning to accelerators
+        self.available_accelerators = available_accelerators
+        n_accelerators = len(available_accelerators)
+        if n_accelerators > 0:
+            self.max_worker_count = min(self.max_worker_count, n_accelerators)
+
+        self.worker_map = WorkerMap(self.max_worker_count, self.available_accelerators)
 
         self.internal_worker_port_range = internal_worker_port_range
 
@@ -229,10 +242,12 @@ class Manager:
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
-            target=self.push_results, args=(self._kill_event,)
+            target=self.push_results, args=(self._kill_event,), name="Result-Pusher"
         )
         self._status_report_thread = threading.Thread(
-            target=self._status_report_loop, args=(self._kill_event,)
+            target=self._status_report_loop,
+            args=(self._kill_event,),
+            name="Status-Report",
         )
         self.container_switch_count = 0
 
@@ -282,7 +297,7 @@ class Manager:
         kill_event : threading.Event
               Event to let the thread know when it is time to die.
         """
-        log.info("[TASK PULL THREAD] starting")
+        log.info("starting")
 
         # Send a registration message
         msg = self.create_reg_message()
@@ -296,18 +311,18 @@ class Manager:
         new_worker_map = None
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
-            log.debug("[TASK_PULL_THREAD] Loop start")
+            log.trace("Loop start")
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
-            log.debug(
-                "[TASK_PULL_THREAD pending_task_count: %s, Ready_worker_count: %s",
+            log.trace(
+                "pending_task_count: %s, Ready_worker_count: %s",
                 pending_task_count,
                 ready_worker_count,
             )
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
-                log.debug(f"[TASK_PULL_THREAD] Requesting tasks: {ads}")
+                log.trace(f"Requesting tasks: {ads}")
                 msg = pickle.dumps(ads)
                 self.task_incoming.send(msg)
 
@@ -337,7 +352,7 @@ class Manager:
                 last_interchange_contact = time.time()
 
                 if message == "STOP":
-                    log.critical("[TASK_PULL_THREAD] Received stop request")
+                    log.critical("Received stop request")
                     kill_event.set()
                     break
 
@@ -362,7 +377,7 @@ class Manager:
                         try:
                             log.info(f"Removing worker:{worker_id_raw} from map")
                             self.worker_map.start_remove_worker(worker_type)
-                            self.worker_map.remove_worker(worker_id_raw)
+
                             log.info(
                                 f"Popping worker:{worker_to_kill} from worker_procs"
                             )
@@ -380,6 +395,8 @@ class Manager:
                                     f"Worker process exited with : {proc.returncode}"
                                 )
 
+                            # Now that the worker is dead, remove it from worker map
+                            self.worker_map.remove_worker(worker_id_raw)
                             raise TaskCancelled(worker_to_kill, self.uid)
                         except Exception as e:
                             log.exception(f"Raise exception, handling: {e}")
@@ -417,13 +434,13 @@ class Manager:
 
                     task_recv_counter += len(tasks)
                     log.debug(
-                        "[TASK_PULL_THREAD] Got tasks: {} of {}".format(
+                        "Got tasks: {} of {}".format(
                             [t[1].task_id for t in tasks], task_recv_counter
                         )
                     )
 
                     for task_type, task in tasks:
-                        log.debug(f"[TASK DEBUG] Task is of type: {task_type}")
+                        log.debug(f"Task is of type: {task_type}")
 
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
@@ -437,10 +454,13 @@ class Manager:
                                 self.outstanding_task_count
                             )
                         )
-                        log.debug(f"Task {task} pushed to a task queue {task_type}")
+                        log.debug(
+                            f"Task {task.task_id} pushed to task queue "
+                            f"for type: {task_type}"
+                        )
 
             else:
-                log.debug("[TASK_PULL_THREAD] No incoming tasks")
+                log.trace("No incoming tasks")
                 # Limit poll duration to heartbeat_period
                 # heartbeat_period is in s vs poll_timer in ms
                 if not poll_timer:
@@ -450,18 +470,17 @@ class Manager:
                 # Only check if no messages were received.
                 if time.time() > last_interchange_contact + self.heartbeat_threshold:
                     log.critical(
-                        "[TASK_PULL_THREAD] Missing contact with interchange beyond "
-                        "heartbeat_threshold"
+                        "Missing contact with interchange beyond heartbeat_threshold"
                     )
                     kill_event.set()
                     log.critical("Killing all workers")
                     for proc in self.worker_procs.values():
                         proc.kill()
-                    log.critical("[TASK_PULL_THREAD] Exiting")
+                    log.critical("Exiting")
                     break
 
-            log.debug(f"To-Die Counts: {self.worker_map.to_die_count}")
-            log.debug(
+            log.trace(f"To-Die Counts: {self.worker_map.to_die_count}")
+            log.trace(
                 "Alive worker counts: {}".format(
                     self.worker_map.total_worker_type_counts
                 )
@@ -474,7 +493,7 @@ class Manager:
                 new_worker_map,
                 self.worker_map.to_die_count,
             )
-            log.debug(f"[SCHEDULER] New worker map: {new_worker_map}")
+            log.trace(f"New worker map: {new_worker_map}")
 
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's
             # needed now.
@@ -496,7 +515,7 @@ class Manager:
                     worker_port=self.worker_port,
                 )
             )
-            log.debug(f"[SPIN UP] Worker processes: {self.worker_procs}")
+            log.trace(f"Worker processes: {self.worker_procs}")
 
             #  Count the workers of each type that need to be removed
             spin_downs, container_switch_count = self.worker_map.spin_down_workers(
@@ -506,7 +525,7 @@ class Manager:
                 scheduler_mode=self.scheduler_mode,
             )
             self.container_switch_count += container_switch_count
-            log.debug(
+            log.trace(
                 "Container switch count: total {}, cur {}".format(
                     self.container_switch_count, container_switch_count
                 )
@@ -523,7 +542,7 @@ class Manager:
                 # *** Match tasks to workers *** #
                 else:
                     available_workers = current_worker_map[task_type]
-                    log.debug(
+                    log.trace(
                         "Available workers of type {}: {}".format(
                             task_type, available_workers
                         )
@@ -630,21 +649,19 @@ class Manager:
                 "worker_id": worker_id,
                 "task_type": task_type,
             }
-        log.debug("Sending complete!")
+        log.debug("Sending complete")
 
     def _status_report_loop(self, kill_event):
-        log.debug("[STATUS] Manager status reporting loop starting")
+        log.debug("Manager status reporting loop starting")
 
         while not kill_event.is_set():
             msg = ManagerStatusReport(
                 self.task_status_deltas,
                 self.container_switch_count,
             )
-            log.info(
-                f"[STATUS] Sending status report to interchange: {msg.task_statuses}"
-            )
+            log.info(f"Sending status report to interchange: {msg.task_statuses}")
             self.pending_result_queue.put(msg)
-            log.info("[STATUS] Clearing task deltas")
+            log.info("Clearing task deltas")
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
 
@@ -657,12 +674,12 @@ class Manager:
               Event to let the thread know when it is time to die.
         """
 
-        log.debug("[RESULT_PUSH_THREAD] Starting thread")
+        log.debug("Starting thread")
 
         push_poll_period = (
             max(10, self.poll_period) / 1000
         )  # push_poll_period must be atleast 10 ms
-        log.debug(f"[RESULT_PUSH_THREAD] push poll period: {push_poll_period}")
+        log.debug(f"push poll period: {push_poll_period}")
 
         last_beat = time.time()
         items = []
@@ -682,7 +699,7 @@ class Manager:
             except queue.Empty:
                 pass
             except Exception as e:
-                log.exception(f"[RESULT_PUSH_THREAD] Got an exception: {e}")
+                log.exception(f"Got an exception: {e}")
 
             # If we have reached poll_period duration or timer has expired, we send
             # results
@@ -695,7 +712,7 @@ class Manager:
                     self.result_outgoing.send_multipart(items)
                     items = []
 
-        log.critical("[RESULT_PUSH_THREAD] Exiting")
+        log.critical("Exiting")
 
     def remove_worker_init(self, worker_type):
         """
@@ -778,6 +795,13 @@ def cli_run():
         help="Number of cores assigned to each worker process. Default=1.0",
     )
     parser.add_argument(
+        "-a",
+        "--available-accelerators",
+        default=(),
+        nargs="*",
+        help="List of available accelerators",
+    )
+    parser.add_argument(
         "-t", "--task_url", required=True, help="REQUIRED: ZMQ url for receiving tasks"
     )
     parser.add_argument(
@@ -815,7 +839,7 @@ def cli_run():
     parser.add_argument(
         "--scheduler_mode",
         default="soft",
-        help=("Choose the mode of scheduler " "(hard, soft"),
+        help=("Choose the mode of scheduler (hard, soft"),
     )
     parser.add_argument(
         "-r",
@@ -837,6 +861,7 @@ def cli_run():
         log.info(f"Manager ID: {args.uid}")
         log.info(f"Block ID: {args.block_id}")
         log.info(f"cores_per_worker: {args.cores_per_worker}")
+        log.info(f"available_accelerators: {args.available_accelerators}")
         log.info(f"task_url: {args.task_url}")
         log.info(f"result_url: {args.result_url}")
         log.info(f"hb_period: {args.hb_period}")
@@ -854,6 +879,7 @@ def cli_run():
             uid=args.uid,
             block_id=args.block_id,
             cores_per_worker=float(args.cores_per_worker),
+            available_accelerators=args.available_accelerators,
             max_workers=args.max_workers
             if args.max_workers == float("inf")
             else int(args.max_workers),

@@ -94,7 +94,7 @@ using the `CobaltProvider`. This configuration assumes that the script is being 
 
 
 Polaris (ALCF)
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
 .. image:: images/ALCF_Polaris.jpeg
 

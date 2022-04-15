@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import pickle
 import time
+from unittest import mock
 
 import pika
 from parsl.providers import LocalProvider
@@ -69,7 +70,7 @@ def test_endpoint_interchange_against_rabbitmq(endpoint_uuid):
 
     # Use register_endpoint to get connection params
     endpoint_name = "endpoint_foo"
-    fxc = funcx.FuncXClient(use_offprocess_checker=False)
+    fxc = funcx.FuncXClient(use_offprocess_checker=False, login_manager=mock.Mock())
     reg_info = register_endpoint(
         fxc,
         endpoint_uuid=endpoint_uuid,

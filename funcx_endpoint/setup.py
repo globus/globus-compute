@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 REQUIRES = [
     "requests>=2.20.0,<3",
     "globus-sdk",  # version will be bounded by `funcx`
-    "funcx>=0.4.0-dev",
+    "funcx==0.4.0a1",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer
@@ -25,6 +25,7 @@ REQUIRES = [
     #    backwards-incompatible changes are introduced, making our application
     #    safer to distribute
     "typer==0.4.0",
+    "click==8.0.4",  # pin `click` because typer uses `click` internals
     # disallow use of 22.3.0; the whl package on some platforms causes ZMQ issues
     #
     # NOTE: 22.3.0 introduced a patched version of libzmq.so to the wheel packaging
@@ -55,7 +56,7 @@ TEST_REQUIRES = [
 version_ns = {}
 with open(os.path.join("funcx_endpoint", "version.py")) as f:
     exec(f.read(), version_ns)
-version = version_ns["VERSION"]
+version = version_ns["__version__"]
 
 setup(
     name="funcx-endpoint",
@@ -66,7 +67,7 @@ setup(
     extras_require={
         "test": TEST_REQUIRES,
     },
-    python_requires=">=3.6.0",
+    python_requires=">=3.7",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",

@@ -4,19 +4,18 @@ repos:
     - id: check-hooks-apply
     - id: check-useless-excludes
 - repo: https://github.com/pre-commit/pre-commit-hooks.git
-  rev: v4.1.0
+  rev: v4.2.0
   hooks:
     - id: check-merge-conflict
     - id: trailing-whitespace
 - repo: https://github.com/sirosen/check-jsonschema
-  rev: 0.14.0
+  rev: 0.14.2
   hooks:
     - id: check-github-workflows
 - repo: https://github.com/psf/black
-  rev: 22.1.0
+  rev: 22.3.0
   hooks:
     - id: black
-      additional_dependencies: ['click==8.0.4']
 - repo: https://github.com/PyCQA/isort
   rev: 5.10.1
   hooks:
@@ -25,7 +24,7 @@ repos:
       # which settings to use based on a file's directory
       args: ["--settings-path", ".isort.cfg"]
 - repo: https://github.com/asottile/pyupgrade
-  rev: v2.31.0
+  rev: v2.32.0
   hooks:
     - id: pyupgrade
       args: ["--py36-plus"]

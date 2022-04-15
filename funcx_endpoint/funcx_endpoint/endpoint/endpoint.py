@@ -118,7 +118,9 @@ class Endpoint:
 
         [1] https://docs.python.org/3/library/fcntl.html
         """
-        _ = FuncXClient()
+        # construct client to force login flow
+        # FIXME: `funcx` should provide a cleaner way of doing login
+        FuncXClient(do_version_check=False, use_offprocess_checker=False)
 
         if os.path.exists(self.funcx_config_file):
             typer.confirm(
@@ -171,7 +173,6 @@ class Endpoint:
 
         funcx_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "check_endpoint_version": True,
             "use_offprocess_checker": False,
         }
         funcx_client = FuncXClient(**funcx_client_options)

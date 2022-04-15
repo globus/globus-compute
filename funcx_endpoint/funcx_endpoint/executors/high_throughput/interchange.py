@@ -10,7 +10,7 @@ import queue
 import sys
 import threading
 import time
-from typing import Dict, Tuple
+from typing import Dict, Sequence, Tuple
 
 import daemon
 import zmq
@@ -38,19 +38,6 @@ log = logging.getLogger(__name__)
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
-
-
-class ShutdownRequest(Exception):
-    """Exception raised when any async component receives a ShutdownRequest"""
-
-    def __init__(self):
-        self.tstamp = time.time()
-
-    def __repr__(self):
-        return f"Shutdown request received at {self.tstamp}"
-
-    def __str__(self):
-        return self.__repr__()
 
 
 class ManagerLost(Exception):
@@ -110,6 +97,7 @@ class Interchange:
         provider=None,
         max_workers_per_node=None,
         mem_per_worker=None,
+        available_accelerators: Sequence[str] = (),
         prefetch_capacity=None,
         scheduler_mode=None,
         container_type=None,
@@ -163,6 +151,10 @@ class Interchange:
              cores to be assigned to each worker. Oversubscription is possible
              by setting cores_per_worker < 1.0. Default=1
 
+        available_accelerators: sequence of str
+            List of device IDs for accelerators available on each node
+            Default: Empty list
+
         container_cmd_options: str
             Container command strings to be added to associated container command.
             For example, singularity exec {container_cmd_options}
@@ -203,6 +195,7 @@ class Interchange:
         self.max_workers_per_node = max_workers_per_node
         self.mem_per_worker = mem_per_worker
         self.cores_per_worker = cores_per_worker
+        self.available_accelerators = available_accelerators
         self.prefetch_capacity = prefetch_capacity
 
         self.scheduler_mode = scheduler_mode
@@ -224,7 +217,7 @@ class Interchange:
         self.poll_period = poll_period
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
-        # initalize the last heartbeat time to start the loop
+        # initialize the last heartbeat time to start the loop
         self.last_heartbeat = time.time()
 
         self.serializer = FuncXSerializer()
@@ -321,6 +314,7 @@ class Interchange:
                 "--container_cmd_options='{container_cmd_options}' "
                 "--scheduler_mode={scheduler_mode} "
                 "--worker_type={{worker_type}} "
+                "--available-accelerators {accelerator_list}"
             )
 
         self.current_platform = {
@@ -381,6 +375,7 @@ class Interchange:
             debug=debug_opts,
             max_workers=max_workers,
             cores_per_worker=self.cores_per_worker,
+            accelerator_list=" ".join(self.available_accelerators),
             # mem_per_worker=self.mem_per_worker,
             prefetch_capacity=self.prefetch_capacity,
             task_url=worker_task_url,
@@ -435,7 +430,7 @@ class Interchange:
         kill_event : threading.Event
               Event to let the thread know when it is time to die.
         """
-        log.info("[TASK_PULL_THREAD] Starting")
+        log.info("Starting")
         task_counter = 0
         poller = zmq.Poller()
         poller.register(self.task_incoming, zmq.POLLIN)
@@ -446,9 +441,8 @@ class Interchange:
                 raw_msg = self.task_incoming.recv()
                 self.last_heartbeat = time.time()
             except zmq.Again:
-                # We just timed out while attempting to receive
-                log.debug(
-                    "[TASK_PULL_THREAD] {} tasks in internal queue".format(
+                log.trace(
+                    "No new incoming task - {} tasks in internal queue".format(
                         self.total_pending_task_count
                     )
                 )
@@ -456,9 +450,7 @@ class Interchange:
 
             try:
                 msg = Message.unpack(raw_msg)
-                log.debug(
-                    "[TASK_PULL_THREAD] received Message/Heartbeat? on task queue"
-                )
+                log.debug("received Message/Heartbeat? on task queue")
             except Exception:
                 log.exception(f"Failed to unpack message, RAW:{raw_msg}")
                 continue
@@ -470,7 +462,7 @@ class Interchange:
             elif isinstance(msg, Heartbeat):
                 log.debug("Got heartbeat")
             else:
-                log.info(f"[TASK_PULL_THREAD] Received task:{msg}")
+                log.info(f"Received task:{msg}")
                 local_container = self.get_container(msg.container_id)
                 msg.set_local_container(local_container)
                 if local_container not in self.pending_task_queue:
@@ -595,16 +587,15 @@ class Interchange:
             self._ready_manager_queue[manager]["active"] = False
 
     def _status_report_loop(self, kill_event, status_report_queue: queue.Queue):
-        log.debug("[STATUS] Status reporting loop starting")
+        log.debug("Status reporting loop starting")
+        log.info(f"Endpoint id: {self.endpoint_id}")
 
         while not kill_event.is_set():
-            log.debug(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
+            log.trace(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
             msg = EPStatusReport(
                 self.endpoint_id, self.get_status_report(), self.task_status_deltas
             )
-            log.debug(
-                "[STATUS] Sending status report to executor, and clearing task deltas."
-            )
+            log.debug("Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
             time.sleep(self.heartbeat_period)
@@ -619,24 +610,22 @@ class Interchange:
          - HoldWorker
          - Shutdown
         """
-        log.debug("[COMMAND] Command Server Starting")
+        log.debug("Command Server Starting")
 
         while not kill_event.is_set():
             try:
                 buffer = self.command_channel.recv()
-                log.debug(f"[COMMAND] Received command request {buffer}")
+                log.debug(f"Received command request {buffer}")
                 command = Message.unpack(buffer)
 
                 if command.type is MessageType.TASK_CANCEL:
-                    log.info(
-                        f"[COMMAND] Received TASK_CANCEL for Task:{command.task_id}"
-                    )
+                    log.info(f"Received TASK_CANCEL for Task:{command.task_id}")
                     self.enqueue_task_cancel(command.task_id)
                     reply = command
 
                 elif command.type is MessageType.HEARTBEAT_REQ:
-                    log.info("[COMMAND] Received synchonous HEARTBEAT_REQ from hub")
-                    log.info(f"[COMMAND] Replying with Heartbeat({self.endpoint_id})")
+                    log.info("Received synchonous HEARTBEAT_REQ from hub")
+                    log.info(f"Replying with Heartbeat({self.endpoint_id})")
                     reply = Heartbeat(self.endpoint_id)
 
                 else:
@@ -646,11 +635,11 @@ class Interchange:
                     )
                     reply = BadCommand(f"Unknown command type: {command.type}")
 
-                log.debug(f"[COMMAND] Reply: {reply}")
+                log.debug(f"Reply: {reply}")
                 self.command_channel.send(reply.pack())
 
             except zmq.Again:
-                log.debug("[COMMAND] is alive")
+                log.trace("Command server is alive")
                 continue
 
     def enqueue_task_cancel(self, task_id):
@@ -715,11 +704,12 @@ class Interchange:
                 self._kill_event,
                 self._status_request,
             ),
+            name="TASK_PULL_THREAD",
         )
         self._task_puller_thread.start()
 
         self._command_thread = threading.Thread(
-            target=self._command_server, args=(self._kill_event,)
+            target=self._command_server, args=(self._kill_event,), name="COMMAND_THREAD"
         )
         self._command_thread.start()
 
@@ -727,6 +717,7 @@ class Interchange:
         self._status_report_thread = threading.Thread(
             target=self._status_report_loop,
             args=(self._kill_event, status_report_queue),
+            name="STATUS_THREAD",
         )
         self._status_report_thread.start()
 
@@ -764,7 +755,7 @@ class Interchange:
                 self.task_outgoing in self.socks
                 and self.socks[self.task_outgoing] == zmq.POLLIN
             ):
-                log.debug("[MAIN] starting task_outgoing section")
+                log.trace("starting task_outgoing section")
                 message = self.task_outgoing.recv_multipart()
                 manager = message[0]
 
@@ -776,11 +767,10 @@ class Interchange:
                         reg_flag = True
                     except Exception:
                         log.warning(
-                            "[MAIN] Got a non-json registration message from "
-                            "manager:%s",
+                            "Got a non-json registration message from " "manager:%s",
                             manager,
                         )
-                        log.debug(f"[MAIN] Message :\n{message}\n")
+                        log.debug(f"Message :\n{message}\n")
 
                     # By default we set up to ignore bad nodes/registration messages.
                     self._ready_manager_queue[manager] = {
@@ -794,13 +784,9 @@ class Interchange:
                     }
                     if reg_flag is True:
                         interesting_managers.add(manager)
-                        log.info(f"[MAIN] Adding manager: {manager} to ready queue")
+                        log.info(f"Adding manager: {manager} to ready queue")
                         self._ready_manager_queue[manager].update(msg)
-                        log.info(
-                            "[MAIN] Registration info for manager {}: {}".format(
-                                manager, msg
-                            )
-                        )
+                        log.info(f"Registration info for manager {manager}: {msg}")
 
                         if (
                             msg["python_v"].rsplit(".", 1)[0]
@@ -808,7 +794,7 @@ class Interchange:
                             or msg["parsl_v"] != self.current_platform["parsl_v"]
                         ):
                             log.info(
-                                f"[MAIN] Manager:{manager} version:{msg['python_v']} "
+                                f"Manager:{manager} version:{msg['python_v']} "
                                 "does not match the interchange"
                             )
                     else:
@@ -825,24 +811,20 @@ class Interchange:
                             self.results_outgoing.send(pickle.dumps([pkl_package]))
                         else:
                             log.debug(
-                                "[MAIN] Suppressing bad registration from manager: %s",
+                                "Suppressing bad registration from manager: %s",
                                 manager,
                             )
 
                 else:
                     self._ready_manager_queue[manager]["last"] = time.time()
                     if message[1] == b"HEARTBEAT":
-                        log.debug(f"[MAIN] Manager {manager} sends heartbeat")
+                        log.debug(f"Manager {manager} sends heartbeat")
                         self.task_outgoing.send_multipart(
                             [manager, b"", PKL_HEARTBEAT_CODE]
                         )
                     else:
                         manager_adv = pickle.loads(message[1])
-                        log.debug(
-                            "[MAIN] Manager {} requested {}".format(
-                                manager, manager_adv
-                            )
-                        )
+                        log.debug(f"Manager {manager} requested {manager_adv}")
                         self._ready_manager_queue[manager]["free_capacity"].update(
                             manager_adv
                         )
@@ -886,7 +868,7 @@ class Interchange:
                 try:
                     manager, task_id = self.task_cancel_running_queue.get(block=False)
                     log.debug(
-                        f"[MAIN] Task:{task_id} on manager:{manager} is "
+                        f"Task:{task_id} on manager:{manager} is "
                         "now CANCELLED while running"
                     )
                     cancel_message = pickle.dumps(("TASK_CANCEL", task_id))
@@ -899,8 +881,8 @@ class Interchange:
                 tasks = task_dispatch[manager]
                 if tasks:
                     log.info(
-                        "[MAIN] Sending task message {} to manager {}".format(
-                            tasks, manager
+                        'Sending task message "{}..." to manager {}'.format(
+                            str(tasks)[:50], manager
                         )
                     )
                     serializd_raw_tasks_buffer = pickle.dumps(tasks)
@@ -914,16 +896,14 @@ class Interchange:
                             self.task_cancel_pending_trap
                             and task_id in self.task_cancel_pending_trap
                         ):
-                            log.info(f"[MAIN] Task:{task_id} CANCELLED before launch")
+                            log.info(f"Task:{task_id} CANCELLED before launch")
                             cancel_message = pickle.dumps(("TASK_CANCEL", task_id))
                             self.task_outgoing.send_multipart(
                                 [manager, b"", cancel_message]
                             )
                             self.task_cancel_pending_trap.pop(task_id)
                         else:
-                            log.debug(
-                                f"[MAIN] Task:{task_id} is now WAITING_FOR_LAUNCH"
-                            )
+                            log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
                             self.task_status_deltas[
                                 task_id
                             ] = TaskStatusCode.WAITING_FOR_LAUNCH
@@ -933,22 +913,22 @@ class Interchange:
                 self.results_incoming in self.socks
                 and self.socks[self.results_incoming] == zmq.POLLIN
             ):
-                log.debug("[MAIN] entering results_incoming section")
+                log.debug("entering results_incoming section")
                 manager, *b_messages = self.results_incoming.recv_multipart()
                 if manager not in self._ready_manager_queue:
                     log.warning(
-                        "[MAIN] Received a result from a un-registered manager: %s",
+                        "Received a result from a un-registered manager: %s",
                         manager,
                     )
                 else:
                     # We expect the batch of messages to be (optionally) a task status
                     # update message followed by 0 or more task results
                     try:
-                        log.debug("[MAIN] Trying to unpack ")
+                        log.debug("Trying to unpack ")
                         manager_report = Message.unpack(b_messages[0])
                         if manager_report.task_statuses:
                             log.info(
-                                "[MAIN] Got manager status report: %s",
+                                "Got manager status report: %s",
                                 manager_report.task_statuses,
                             )
                         self.task_status_deltas.update(manager_report.task_statuses)
@@ -961,30 +941,26 @@ class Interchange:
                             manager
                         ] = manager_report.container_switch_count
                         log.info(
-                            "[MAIN] Got container switch count: %s",
+                            "Got container switch count: %s",
                             self.container_switch_count,
                         )
                     except Exception:
                         pass
                     if len(b_messages):
-                        log.info(
-                            "[MAIN] Got {} result items in batch".format(
-                                len(b_messages)
-                            )
-                        )
+                        log.info(f"Got {len(b_messages)} result items in batch")
                     for b_message in b_messages:
                         r = pickle.loads(b_message)
                         if "times" not in r:
                             r["times"] = {}
                         r["times"]["interchange_result"] = time.time()
                         log.debug(
-                            "[MAIN] Received result for task {} from {}".format(
+                            "Received result for task {} from {}".format(
                                 r["task_id"], manager
                             )
                         )
                         task_type = self.containers[r["container_id"]]
                         log.debug(
-                            "[MAIN] Removing for manager: %s from %s",
+                            "Removing for manager: %s from %s",
                             manager,
                             self._ready_manager_queue,
                         )
@@ -1000,23 +976,25 @@ class Interchange:
                     # previously used this; switched to mono-message,
                     # self.results_outgoing.send_multipart(b_messages)
                     self.results_outgoing.send(pickle.dumps(b_messages))
+                    interesting_managers.add(manager)
+
                     log.debug(
-                        "[MAIN] Current tasks: {}".format(
+                        "Current tasks: {}".format(
                             self._ready_manager_queue[manager]["tasks"]
                         )
                     )
-                log.debug("[MAIN] leaving results_incoming section")
+                log.debug("leaving results_incoming section")
 
             # Send status reports from this main thread to avoid thread-safety on zmq
             # sockets
             try:
                 packed_status_report = status_report_queue.get(block=False)
-                log.debug(f"[MAIN] forwarding status report: {packed_status_report}")
+                log.trace(f"forwarding status report: {packed_status_report}")
                 self.results_outgoing.send(packed_status_report)
             except queue.Empty:
                 pass
 
-            # log.debug("[MAIN] entering bad_managers section")
+            log.trace("entering bad_managers section")
             bad_managers = [
                 manager
                 for manager in self._ready_manager_queue
@@ -1026,11 +1004,11 @@ class Interchange:
             bad_manager_msgs = []
             for manager in bad_managers:
                 log.debug(
-                    "[MAIN] Last: {} Current: {}".format(
+                    "Last: {} Current: {}".format(
                         self._ready_manager_queue[manager]["last"], time.time()
                     )
                 )
-                log.warning(f"[MAIN] Too many heartbeats missed for manager {manager}")
+                log.warning(f"Too many heartbeats missed for manager {manager}")
                 e = ManagerLost(manager)
                 for task_type in self._ready_manager_queue[manager]["tasks"]:
                     for tid in self._ready_manager_queue[manager]["tasks"][task_type]:
@@ -1045,24 +1023,20 @@ class Interchange:
                             }
                             pkl_package = pickle.dumps(result_package)
                             bad_manager_msgs.append(pkl_package)
-                log.warning(
-                    "[MAIN] Sent failure reports, unregistering manager {}".format(
-                        manager
-                    )
-                )
+                log.warning(f"Sent failure reports, unregistering manager {manager}")
                 self._ready_manager_queue.pop(manager, "None")
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
             if bad_manager_msgs:
                 self.results_outgoing.send(pickle.dumps(bad_manager_msgs))
-            log.debug("[MAIN] ending one main loop iteration")
+            log.trace("ending one main loop iteration")
 
             if self._status_request.is_set():
                 log.info("status request response")
                 result_package = self.get_status_report()
                 pkl_package = pickle.dumps(result_package)
                 self.results_outgoing.send(pkl_package)
-                log.info("[MAIN] Sent info response")
+                log.info("Sent info response")
                 self._status_request.clear()
 
         delta = time.time() - start
@@ -1129,6 +1103,7 @@ class Interchange:
         Raises:
              NotImplementedError
         """
+        log.info(f"Scaling out by {blocks} more blocks for task type {task_type}")
         r = []
         for _i in range(blocks):
             if self.provider:
@@ -1219,13 +1194,9 @@ class Interchange:
         """
         status = []
         if self.provider:
-            log.debug(
-                "[MAIN] Getting the status of {} blocks.".format(
-                    list(self.blocks.values())
-                )
-            )
+            log.trace(f"Getting the status of {list(self.blocks.values())} blocks.")
             status = self.provider.status(list(self.blocks.values()))
-            log.debug(f"[MAIN] The status is {status}")
+            log.trace(f"The status is {status}")
 
         return status
 

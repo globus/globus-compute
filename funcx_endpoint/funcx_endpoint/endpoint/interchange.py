@@ -21,10 +21,7 @@ from funcx import __version__ as funcx_sdk_version
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint import __version__ as funcx_endpoint_version
-from funcx_endpoint.endpoint.rabbit_mq.result_queue_publisher import (
-    ResultQueuePublisher,
-)
-from funcx_endpoint.endpoint.rabbit_mq.task_queue_subscriber import TaskQueueSubscriber
+from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
@@ -33,29 +30,6 @@ log = logging.getLogger(__name__)
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
-
-
-class ShutdownRequest(Exception):
-    """Exception raised when any async component receives a ShutdownRequest"""
-
-    def __init__(self):
-        self.tstamp = time.time()
-
-    def __repr__(self):
-        return f"Shutdown request received at {self.tstamp}"
-
-
-class ManagerLost(Exception):
-    """Task lost due to worker loss. Worker is considered lost when multiple heartbeats
-    have been missed.
-    """
-
-    def __init__(self, worker_id):
-        self.worker_id = worker_id
-        self.tstamp = time.time()
-
-    def __repr__(self):
-        return f"Task failure due to loss of worker {self.worker_id}"
 
 
 class EndpointInterchange:
@@ -228,7 +202,7 @@ class EndpointInterchange:
         quiesce_event : threading.Event
               Event to let the thread know when it is time to die.
         """
-        log.info("[TASK_PULL_THREAD] Starting")
+        log.info("Starting")
 
         try:
             log.info(
@@ -243,7 +217,7 @@ class EndpointInterchange:
             )
             task_q_proc.start()
         except Exception:
-            log.exception("[TASK_PULL_PROC] Unhandled exception in TaskQueueSubscriber")
+            log.exception("Unhandled exception in TaskQueueSubscriber")
 
         return task_q_proc
 
@@ -359,11 +333,11 @@ class EndpointInterchange:
         try:
             self._main_loop()
         except Exception:
-            log.exception("[MAIN] Unhandled exception")
+            log.exception("Unhandled exception")
         finally:
             self.results_outgoing.close()
             self._task_puller_proc.terminate()
-            log.info("[MAIN] Thread loop exiting")
+            log.info("Thread loop exiting")
         self._quiesce_event.set()
         self._task_puller_proc.terminate()
 
@@ -381,7 +355,7 @@ class EndpointInterchange:
         resend_results_messages = self.results_ack_handler.get_unacked_results_list()
         if len(resend_results_messages) > 0:
             log.info(
-                "[MAIN] Resending %s previously unacked results",
+                "Resending %s previously unacked results",
                 len(resend_results_messages),
             )
 
@@ -394,8 +368,9 @@ class EndpointInterchange:
         last = time.time()
 
         while not self._quiesce_event.is_set():
+            log.warning("Boop")
             if last + self.heartbeat_threshold < time.time():
-                log.debug("[MAIN] alive")
+                log.debug("alive")
                 last = time.time()
 
             self.results_ack_handler.check_ack_counts()
@@ -407,7 +382,7 @@ class EndpointInterchange:
             except queue.Empty:
                 pass
             except Exception:
-                log.exception("[MAIN] Unhandled issue while waiting for pending tasks")
+                log.exception("Unhandled issue while waiting for pending tasks")
 
             try:
                 results = self.results_passthrough.get(False, 0.01)
@@ -427,7 +402,7 @@ class EndpointInterchange:
 
             except Exception:
                 log.exception(
-                    "[MAIN] Something broke while forwarding results from executor "
+                    "Something broke while forwarding results from executor "
                     "to forwarder queues"
                 )
                 continue

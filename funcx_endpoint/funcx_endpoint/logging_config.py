@@ -10,6 +10,12 @@ import typing as t
 
 log = logging.getLogger(__name__)
 
+DEFAULT_FORMAT = (
+    "%(created)f %(asctime)s %(levelname)s %(processName)s-%(process)d "
+    "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
+    "%(message)s"
+)
+
 
 class FuncxConsoleFormatter(logging.Formatter):
     """
@@ -27,7 +33,7 @@ class FuncxConsoleFormatter(logging.Formatter):
     def __init__(
         self,
         debug: bool = False,
-        fmt: str = "%(asctime)s %(name)s:%(lineno)d [%(levelname)s] %(message)s",
+        fmt: str = DEFAULT_FORMAT,
         datefmt: str = "%Y-%m-%d %H:%M:%S",
     ) -> None:
         super().__init__()
@@ -57,10 +63,7 @@ def _get_file_dict_config(logfile: str, console_enabled: bool, debug: bool) -> d
                 "debug": debug,
             },
             "filefmt": {
-                "format": (
-                    "%(asctime)s.%(msecs)03d "
-                    "%(name)s:%(lineno)d [%(levelname)s] %(message)s"
-                ),
+                "format": DEFAULT_FORMAT,
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         },
@@ -123,12 +126,35 @@ def _get_stream_dict_config(debug: bool) -> dict:
     }
 
 
+def add_trace_level() -> None:
+    """This adds a trace level to the logging system.
+
+    See https://stackoverflow.com/questions/2183233
+    """
+
+    logging.TRACE = 5
+
+    def logForLevel(self, message, *args, **kwargs):
+        if self.isEnabledFor(logging.TRACE):
+            self._log(logging.TRACE, message, args, **kwargs)
+
+    def logToRoot(message, *args, **kwargs):
+        logging.log(logging.TRACE, message, *args, **kwargs)
+
+    logging.addLevelName(logging.TRACE, "TRACE")
+    logging.getLoggerClass().trace = logForLevel
+    logging.trace = logToRoot
+
+
 def setup_logging(
     *,
     logfile: t.Optional[str] = None,
     console_enabled: bool = True,
     debug: bool = False
 ) -> None:
+
+    add_trace_level()
+
     if logfile is not None:
         config = _get_file_dict_config(logfile, console_enabled, debug)
     else:

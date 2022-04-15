@@ -1,29 +1,25 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
+import typing as t
 import uuid
-from distutils.version import LooseVersion
+import warnings
 
-from fair_research_login import JSONTokenStorage, NativeClient
-from globus_sdk import AuthClient
-
-from funcx.sdk import VERSION as SDK_VERSION
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from funcx.sdk.search import SearchHelper
 from funcx.sdk.utils.batch import Batch
-from funcx.sdk.web_client import FunctionRegistrationData, FuncxWebClient
+from funcx.sdk.web_client import FunctionRegistrationData
 from funcx.serialize import FuncXSerializer
 from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
 
-try:
-    from funcx_endpoint.version import VERSION as ENDPOINT_VERSION
-
-except ModuleNotFoundError:
-    ENDPOINT_VERSION = None
+from .login_manager import LoginManager, LoginManagerProtocol
+from .version import PARSED_VERSION, parse_version
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +32,6 @@ class FuncXClient:
     Holds helper operations for performing common tasks with the funcX service.
     """
 
-    TOKEN_DIR = os.path.expanduser("~/.funcx/credentials")
-    TOKEN_FILENAME = "funcx_sdk_tokens.json"
     FUNCX_SDK_CLIENT_ID = os.environ.get(
         "FUNCX_SDK_CLIENT_ID", "4cf29807-cf21-49ec-9443-ff9a3fb9f81c"
     )
@@ -50,17 +44,19 @@ class FuncXClient:
         self,
         http_timeout=None,
         funcx_home=_FUNCX_HOME,
-        force_login=False,
-        fx_authorizer=None,
-        search_authorizer=None,
-        openid_authorizer=None,
         funcx_service_address=None,
-        check_endpoint_version=False,
         asynchronous=False,
         loop=None,
         results_ws_uri=None,
         use_offprocess_checker=True,
-        environment=None,
+        environment: str | None = None,
+        task_group_id: t.Union[None, uuid.UUID, str] = None,
+        do_version_check: bool = True,
+        openid_authorizer: t.Any = None,
+        search_authorizer: t.Any = None,
+        fx_authorizer: t.Any = None,
+        *,
+        login_manager: LoginManagerProtocol | None = None,
         **kwargs,
     ):
         """
@@ -72,24 +68,6 @@ class FuncXClient:
             Timeout for any call to service in seconds.
             Default is no timeout
 
-        force_login: bool
-            Whether to force a login to get new credentials.
-
-        fx_authorizer:class:`GlobusAuthorizer \
-            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-            A custom authorizer instance to communicate with funcX.
-            Default: ``None``, will be created.
-
-        search_authorizer:class:`GlobusAuthorizer \
-            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-            A custom authorizer instance to communicate with Globus Search.
-            Default: ``None``, will be created.
-
-        openid_authorizer:class:`GlobusAuthorizer \
-            <globus_sdk.authorizers.base.GlobusAuthorizer>`:
-            A custom authorizer instance to communicate with OpenID.
-            Default: ``None``, will be created.
-
         funcx_service_address: str
             For internal use only. The address of the web service.
 
@@ -98,6 +76,11 @@ class FuncXClient:
 
         environment: str
             For internal use only. The name of the environment to use.
+
+        do_version_check: bool
+            Set to ``False`` to skip the version compatibility check on client
+            initialization
+            Default: True
 
         asynchronous: bool
         Should the API use asynchronous interactions with the web service? Currently
@@ -114,6 +97,12 @@ class FuncXClient:
             used by the client.
             Default: True
 
+        task_group_id: str|uuid.UUID
+            Set the TaskGroup ID (a UUID) for this FuncXClient instance.  Typically,
+            one uses this to submit new tasks to an existing session or to reestablish
+            FuncXExecutor futures.
+            Default: None (will be auto generated)
+
         Keyword arguments are the same as for BaseClient.
 
         """
@@ -123,57 +112,45 @@ class FuncXClient:
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
 
-        self.func_table = {}
+        self._task_status_table: t.Dict[str, t.Dict] = {}
         self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
-        self.session_task_group_id = str(uuid.uuid4())
-
-        if not os.path.exists(self.TOKEN_DIR):
-            os.makedirs(self.TOKEN_DIR)
-
-        tokens_filename = os.path.join(self.TOKEN_DIR, self.TOKEN_FILENAME)
-        self.native_client = NativeClient(
-            client_id=self.FUNCX_SDK_CLIENT_ID,
-            app_name="FuncX SDK",
-            token_storage=JSONTokenStorage(tokens_filename),
+        self.session_task_group_id = (
+            task_group_id and str(task_group_id) or str(uuid.uuid4())
         )
 
-        # TODO: if fx_authorizer is given, we still need to get an authorizer for Search
-        search_scope = "urn:globus:auth:scope:search.api.globus.org:all"
-        scopes = [self.FUNCX_SCOPE, search_scope, "openid"]
+        for (arg, name) in [
+            (openid_authorizer, "openid_authorizer"),
+            (fx_authorizer, "fx_authorizer"),
+            (search_authorizer, "search_authorizer"),
+        ]:
+            if arg is not None:
+                warnings.warn(
+                    f"The '{name}' argument is deprecated. "
+                    "It will be removed in a future release.",
+                    DeprecationWarning,
+                )
 
-        if not fx_authorizer or not search_authorizer or not openid_authorizer:
-            self.native_client.login(
-                requested_scopes=scopes,
-                no_local_server=kwargs.get("no_local_server", True),
-                no_browser=kwargs.get("no_browser", True),
-                refresh_tokens=kwargs.get("refresh_tokens", True),
-                force=force_login,
-            )
+        # if a login manager was passed, no login flow is triggered
+        if login_manager is not None:
+            self.login_manager: LoginManagerProtocol = login_manager
+        # but if login handling is implicit (as when no login manager is passed)
+        # then ensure that the user is logged in
+        else:
+            self.login_manager = LoginManager(environment=environment)
+            self.login_manager.ensure_logged_in()
 
-            all_authorizers = self.native_client.get_authorizers_by_scope(
-                requested_scopes=scopes
-            )
-            fx_authorizer = all_authorizers[self.FUNCX_SCOPE]
-            search_authorizer = all_authorizers[search_scope]
-            openid_authorizer = all_authorizers["openid"]
-
-        self.web_client = FuncxWebClient(
-            base_url=funcx_service_address, authorizer=fx_authorizer
+        self.web_client = self.login_manager.get_funcx_web_client(
+            base_url=funcx_service_address
         )
         self.fx_serializer = FuncXSerializer(
             use_offprocess_checker=self.use_offprocess_checker
         )
 
-        authclient = AuthClient(authorizer=openid_authorizer)
-        user_info = authclient.oauth2_userinfo()
-        self.searcher = SearchHelper(
-            authorizer=search_authorizer, owner_uuid=user_info["sub"]
-        )
         self.funcx_service_address = funcx_service_address
-        self.check_endpoint_version = check_endpoint_version
 
-        self.version_check()
+        if do_version_check:
+            self.version_check()
 
         self.results_ws_uri = results_ws_uri
         self.asynchronous = asynchronous
@@ -190,35 +167,35 @@ class FuncXClient:
         else:
             self.loop = None
 
-    def version_check(self):
+        # TODO: remove this
+        self._searcher = None
+
+    @property
+    def searcher(self):
+        # TODO: remove this
+        if self._searcher is None:
+            self._searcher = SearchHelper(self.login_manager.get_search_client())
+        return self._searcher
+
+    def version_check(self, endpoint_version: str | None = None) -> None:
         """Check this client version meets the service's minimum supported version."""
-        resp = self.web_client.get_version()
-        versions = resp.data
-        if "min_ep_version" not in versions:
-            raise VersionMismatch(
-                "Failed to retrieve version information from funcX service."
-            )
+        data = self.web_client.get_version()
 
-        min_ep_version = versions["min_ep_version"]
-        min_sdk_version = versions["min_sdk_version"]
+        min_ep_version = data["min_ep_version"]
+        min_sdk_version = data["min_sdk_version"]
 
-        if self.check_endpoint_version:
-            if ENDPOINT_VERSION is None:
+        if endpoint_version is not None:
+            if parse_version(endpoint_version) < parse_version(min_ep_version):
                 raise VersionMismatch(
-                    "You do not have the funcx endpoint installed.  "
-                    "You can use 'pip install funcx-endpoint'."
-                )
-            if LooseVersion(ENDPOINT_VERSION) < LooseVersion(min_ep_version):
-                raise VersionMismatch(
-                    f"Your version={ENDPOINT_VERSION} is lower than the "
+                    f"Your version={endpoint_version} is lower than the "
                     f"minimum version for an endpoint: {min_ep_version}.  "
                     "Please update. "
                     f"pip install funcx-endpoint>={min_ep_version}"
                 )
         else:
-            if LooseVersion(SDK_VERSION) < LooseVersion(min_sdk_version):
+            if PARSED_VERSION < parse_version(min_sdk_version):
                 raise VersionMismatch(
-                    f"Your version={SDK_VERSION} is lower than the "
+                    f"Your version={PARSED_VERSION} is lower than the "
                     f"minimum version for funcx SDK: {min_sdk_version}.  "
                     "Please update. "
                     f"pip install funcx>={min_sdk_version}"
@@ -226,15 +203,17 @@ class FuncXClient:
 
     def logout(self):
         """Remove credentials from your local system"""
-        self.native_client.logout()
+        self.login_manager.logout()
 
-    def update_table(self, return_msg, task_id):
-        """Parses the return message from the service and updates the internal func_table
+    def _update_task_table(self, return_msg: str | t.Dict, task_id: str):
+        """
+        Parses the return message from the service and updates the
+        internal _task_status_table
 
         Parameters
         ----------
 
-        return_msg : str
+        return_msg : str | t.Dict
            Return message received from the funcx service
         task_id : str
            task id string
@@ -244,37 +223,40 @@ class FuncXClient:
         else:
             r_dict = return_msg
 
-        r_status = r_dict.get("status", "unknown")
-        status = {"pending": True, "status": r_status}
+        r_status = r_dict.get("status", "unknown").lower()
+        pending = r_status not in ("success", "failed")
+        status = {"pending": pending, "status": r_status}
 
-        if "result" in r_dict:
-            try:
-                r_obj = self.fx_serializer.deserialize(r_dict["result"])
-                completion_t = r_dict["completion_t"]
-            except Exception:
-                raise SerializationError("Result Object Deserialization")
-            else:
-                status.update(
-                    {"pending": False, "result": r_obj, "completion_t": completion_t}
-                )
-                self.func_table[task_id] = status
+        if not pending:
+            if "result" in r_dict:
+                try:
+                    r_obj = self.fx_serializer.deserialize(r_dict["result"])
+                    completion_t = r_dict["completion_t"]
+                except Exception:
+                    raise SerializationError("Result Object Deserialization")
+                else:
+                    status.update({"result": r_obj, "completion_t": completion_t})
 
-        elif "exception" in r_dict:
-            try:
-                r_exception = self.fx_serializer.deserialize(r_dict["exception"])
-                completion_t = r_dict["completion_t"]
-                logger.info(f"Exception : {r_exception}")
-            except Exception:
-                raise SerializationError("Task's exception object deserialization")
+            elif "exception" in r_dict:
+                try:
+                    r_exception = self.fx_serializer.deserialize(r_dict["exception"])
+                    completion_t = r_dict["completion_t"]
+                    logger.info(f"Exception : {r_exception}")
+                except Exception:
+                    raise SerializationError("Task's exception object deserialization")
+                else:
+                    status.update(
+                        {
+                            "exception": r_exception,
+                            "completion_t": completion_t,
+                        }
+                    )
+
             else:
-                status.update(
-                    {
-                        "pending": False,
-                        "exception": r_exception,
-                        "completion_t": completion_t,
-                    }
-                )
-                self.func_table[task_id] = status
+                reason = r_dict.get("reason", str(r_dict))
+                status["exception"] = Exception(reason)
+
+        self._task_status_table[task_id] = status
         return status
 
     def get_task(self, task_id):
@@ -290,13 +272,14 @@ class FuncXClient:
         dict
             Task block containing "status" key.
         """
-        if task_id in self.func_table:
-            return self.func_table[task_id]
+        task = self._task_status_table.get(task_id, {})
+        if task.get("pending", True) is False:
+            return task
 
         r = self.web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
         try:
-            rets = self.update_table(r.text, task_id)
+            rets = self._update_task_table(r.text, task_id)
         except Exception as e:
             raise e
         return rets
@@ -333,7 +316,11 @@ class FuncXClient:
             task_id_list, list
         ), "get_batch_result expects a list of task ids"
 
-        pending_task_ids = [t for t in task_id_list if t not in self.func_table]
+        pending_task_ids = [
+            task_id
+            for task_id in task_id_list
+            if self._task_status_table.get(task_id, {}).get("pending", True) is True
+        ]
 
         results = {}
 
@@ -347,7 +334,7 @@ class FuncXClient:
             if task_id in pending_task_ids:
                 try:
                     data = r["results"][task_id]
-                    rets = self.update_table(data, task_id)
+                    rets = self._update_task_table(data, task_id)
                     results[task_id] = rets
                 except KeyError:
                     logger.debug("Task {} info was not available in the batch status")
@@ -356,11 +343,11 @@ class FuncXClient:
                         "Failure while unpacking results fom get_batch_result"
                     )
             else:
-                results[task_id] = self.func_table[task_id]
+                results[task_id] = self._task_status_table[task_id]
 
         return results
 
-    def run(self, *args, endpoint_id=None, function_id=None, **kwargs):
+    def run(self, *args, endpoint_id=None, function_id=None, **kwargs) -> str:
         """Initiate an invocation
 
         Parameters
@@ -392,7 +379,7 @@ class FuncXClient:
 
         return r[0]
 
-    def create_batch(self, task_group_id=None):
+    def create_batch(self, task_group_id=None) -> Batch:
         """
         Create a Batch instance to handle batch submission in funcX
 
@@ -413,10 +400,9 @@ class FuncXClient:
         if not task_group_id:
             task_group_id = self.session_task_group_id
 
-        batch = Batch(task_group_id=task_group_id)
-        return batch
+        return Batch(task_group_id=task_group_id)
 
-    def batch_run(self, batch):
+    def batch_run(self, batch) -> t.List[str]:
         """Initiate a batch of tasks to funcX
 
         Parameters
@@ -435,7 +421,7 @@ class FuncXClient:
         # Send the data to funcX
         r = self.web_client.submit(data)
 
-        task_uuids = []
+        task_uuids: t.List[str] = []
         for result in r["results"]:
             task_id = result["task_uuid"]
             task_uuids.append(task_id)
@@ -537,7 +523,9 @@ class FuncXClient:
         return r.data
 
     def get_containers(self, name, description=None):
-        """Register a DLHub endpoint with the funcX service and get the containers to launch.
+        """
+        Register a DLHub endpoint with the funcX service and get the containers to
+        launch.
 
         Parameters
         ----------

@@ -13,14 +13,14 @@ Installation
 
 The pre-requisites for the `funcX endpoint` and the `funcX client` are
 
-  1. Python3.6+
+  1. Python3.7+
   2. The machine must have outbound network access
 
 To check if you have the right Python version, run the following commands::
 
   >>> python3 --version
 
-This should return the Python version, for example: ``Python 3.6.7``.
+This should return the Python version, for example: ``Python 3.8.10``.
 
 To check if your endpoint/client have network access and can connect to the funcX service, run ::
 
@@ -56,7 +56,7 @@ To update a previously installed funcX to a newer version, use: ``python3 -m pip
 
 
 Running a function
-------------------------
+------------------
 
 After installing the funcX SDK, you can register functions and execute
 them on available endpoints.  To use the SDK, you should first instantiate

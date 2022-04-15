@@ -114,6 +114,11 @@ class FuncxWebClient(globus_sdk.BaseClient):
     def get_version(self, *, service: str = "all") -> globus_sdk.GlobusHTTPResponse:
         return self.get("version", query_params={"service": service})
 
+    def get_taskgroup_tasks(
+        self, task_group_id: ID_PARAM_T
+    ) -> globus_sdk.GlobusHTTPResponse:
+        return self.get(f"/taskgroup/{task_group_id}")
+
     def get_task(self, task_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"tasks/{task_id}")
 

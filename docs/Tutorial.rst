@@ -80,7 +80,10 @@ Functions with Arguments
 
 funcX supports registration and invocation of functions with arbitrary arguments and returned parameters.
 funcX will serialize any ``*args`` and ``**kwargs`` when invoking a function and it will serialize any return parameters or exceptions.
- Note: funcX uses standard Python serilaization libraries (e.g., Pickle, Dill) it also limits the size of input arguments and returned parameters to 5MB.
+
+.. note::
+
+    funcX uses standard Python serilaization libraries (e.g., Pickle, Dill) it also limits the size of input arguments and returned parameters to 5MB.
 
 The following example shows a function that computes the sum of a list of input arguments.
 First we register the function as above.

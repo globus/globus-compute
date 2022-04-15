@@ -3,7 +3,8 @@ import os
 import random
 import subprocess
 import time
-from queue import Queue
+from queue import Empty, Queue
+from typing import Dict, List
 
 log = logging.getLogger(__name__)
 
@@ -11,7 +12,20 @@ log = logging.getLogger(__name__)
 class WorkerMap:
     """WorkerMap keeps track of workers"""
 
-    def __init__(self, max_worker_count):
+    def __init__(
+        self,
+        max_worker_count: int,
+        available_accelerators: List[str],
+    ):
+        """
+
+        Parameters
+        ----------
+        max_worker_count:
+            Maximum number of workers allowed
+        available_accelerators:
+            List of accelerator devices workers can be pinned to
+        """
         self.max_worker_count = max_worker_count
         self.total_worker_type_counts = {"unused": self.max_worker_count}
         self.ready_worker_type_counts = {"unused": self.max_worker_count}
@@ -33,6 +47,15 @@ class WorkerMap:
 
         # Need to keep track of workers' last idle time by worker type
         self.worker_idle_since = {}
+
+        # Create a queue of available accelerators, if accelerators are defined
+        if len(available_accelerators) == 0:
+            self.available_accelerators = None
+        else:
+            self.available_accelerators = Queue()
+            for device in available_accelerators:
+                self.available_accelerators.put(device)
+        self.assigned_accelerators: Dict[str, str] = {}  # Map worker ID -> accelerator
 
     def register_worker(self, worker_id, worker_type):
         """Add a new worker"""
@@ -75,6 +98,11 @@ class WorkerMap:
         self.total_worker_type_counts["unused"] += 1
         self.ready_worker_type_counts["unused"] += 1
 
+        # Mark the accelerator as available, if provided
+        if worker_id in self.assigned_accelerators:
+            device = self.assigned_accelerators.pop(worker_id)
+            self.available_accelerators.put(device)
+
     def spin_up_workers(
         self,
         next_worker_q,
@@ -111,24 +139,22 @@ class WorkerMap:
         """
         spin_ups = {}
 
-        log.debug(f"[SPIN UP] Next Worker Qsize: {len(next_worker_q)}")
-        log.debug(f"[SPIN UP] Active Workers: {self.active_workers}")
-        log.debug(f"[SPIN UP] Pending Workers: {self.pending_workers}")
-        log.debug(f"[SPIN UP] Max Worker Count: {self.max_worker_count}")
+        log.trace(f"Next Worker Qsize: {len(next_worker_q)}")
+        log.trace(f"Active Workers: {self.active_workers}")
+        log.trace(f"Pending Workers: {self.pending_workers}")
+        log.trace(f"Max Worker Count: {self.max_worker_count}")
 
         if (
             len(next_worker_q) > 0
             and self.active_workers + self.pending_workers < self.max_worker_count
         ):
-            log.debug("[SPIN UP] Spinning up new workers!")
+            log.debug("Spinning up new workers")
             log.debug(
-                "[SPIN up] Empty slots: %s",
+                "Empty slots: %s",
                 self.max_worker_count - self.active_workers - self.pending_workers,
             )
-            log.debug(f"[SPIN up] New workers: {len(next_worker_q)}")
-            log.debug(
-                f"[SPIN up] Unused slots: {self.total_worker_type_counts['unused']}"
-            )
+            log.debug(f"New workers: {len(next_worker_q)}")
+            log.debug(f"Unused slots: {self.total_worker_type_counts['unused']}")
             num_slots = min(
                 self.max_worker_count - self.active_workers - self.pending_workers,
                 len(next_worker_q),
@@ -224,12 +250,10 @@ class WorkerMap:
                 and time.time() - self.worker_idle_since[worker_type]
                 < worker_max_idletime
             ):
-                log.debug(f"[SPIN DOWN] Current time: {time.time()}")
-                log.debug(
-                    f"[SPIN DOWN] Idle since: {self.worker_idle_since[worker_type]}"
-                )
-                log.debug(
-                    "[SPIN DOWN] Worker type %s has not exceeded maximum idle "
+                log.trace(f"Current time: {time.time()}")
+                log.trace(f"Idle since: {self.worker_idle_since[worker_type]}")
+                log.trace(
+                    "Worker type %s has not exceeded maximum idle "
                     "time %s, continuing",
                     worker_type,
                     worker_max_idletime,
@@ -247,11 +271,7 @@ class WorkerMap:
                 num_remove = min(num_remove, max_remove)
 
             if num_remove > 0:
-                log.debug(
-                    "[SPIN DOWN] Removing {} workers of type {}".format(
-                        num_remove, worker_type
-                    )
-                )
+                log.debug(f"Removing {num_remove} workers of type {worker_type}")
             for _i in range(num_remove):
                 spin_downs.append(worker_type)
             # A container switching is defined as a warm container must be
@@ -308,6 +328,27 @@ class WorkerMap:
         if worker_type != "RAW":
             container_uri = worker_type
 
+        # If accelerator list is provided, get the next one off the queue
+        #   and mark it as assigned
+        environment_variables = os.environ.copy()
+        if self.available_accelerators is not None:
+            try:
+                device = self.available_accelerators.get_nowait()
+            except Empty:
+                raise ValueError(
+                    "No accelerators are available."
+                    " New worker must be created only"
+                    " after another is removed"
+                )
+            self.assigned_accelerators[worker_id] = device
+            log.info(f"Assigned worker '{worker_id}' to accelerator '{device}'")
+
+            # Create the
+            #  TODO (wardlt): This code has only been tested for CUDA
+            environment_variables["CUDA_VISIBLE_DEVICES"] = device
+            environment_variables["ROCR_VISIBLE_DEVICES"] = device
+            environment_variables["SYCL_DEVICE_FILTER"] = f"*:*:{device}"
+
         log.info(f"Command string :\n {cmd}")
         log.info(f"Mode: {mode}")
         log.info(f"Container uri: {container_uri}")
@@ -343,6 +384,7 @@ class WorkerMap:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 shell=False,
+                env=environment_variables,
             )
 
         except Exception:
@@ -375,11 +417,11 @@ class WorkerMap:
         # next_worker_q = []
         new_worker_list = []
         log.debug(
-            "[GET_NEXT_WORKER] total_worker_type_counts: %s",
+            "total_worker_type_counts: %s",
             self.total_worker_type_counts,
         )
         log.debug(
-            "[GET_NEXT_WORKER] pending_worker_type_counts: %s",
+            "pending_worker_type_counts: %s",
             self.pending_worker_type_counts,
         )
         for worker_type in new_worker_map:
@@ -407,7 +449,7 @@ class WorkerMap:
 
     def update_worker_idle(self, worker_type):
         """Update the workers' last idle time by worker type"""
-        log.debug(f"[UPDATE_WORKER_IDLE] Worker idle since: {self.worker_idle_since}")
+        log.debug(f"Worker idle since: {self.worker_idle_since}")
         self.worker_idle_since[worker_type] = time.time()
 
     def put_worker(self, worker):
