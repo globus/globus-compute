@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from typer.testing import CliRunner
 
@@ -34,12 +32,10 @@ def test_non_configured_endpoint(mocker):
     assert "not configured" in result.stdout
 
 
-def test_using_outofdate_config(mocker):
+def test_using_outofdate_config(mocker, tmp_path):
+    config_file = tmp_path / "config.py"
+    config_file.write_text(config_string)
     mock_loader = mocker.patch("funcx_endpoint.endpoint.endpoint.os.path.join")
-    mock_loader.return_value = "./config.py"
-    config_file = open("./config.py", "w")
-    config_file.write(config_string)
-    config_file.close()
+    mock_loader.return_value = str(config_file)
     result = runner.invoke(app, ["start", "newendpoint"])
-    os.remove("./config.py")
     assert isinstance(result.exception, TypeError)
