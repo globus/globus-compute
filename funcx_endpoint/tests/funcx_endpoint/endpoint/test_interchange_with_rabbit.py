@@ -5,6 +5,7 @@ import pickle
 import time
 
 import pika
+import pytest
 from parsl.providers import LocalProvider
 
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
@@ -66,6 +67,7 @@ def run_ix_process(reg_info, endpoint_uuid):
     logging.warning("Interchange exiting")
 
 
+@pytest.mark.skip()
 def test_endpoint_interchange_against_rabbitmq(
     endpoint_uuid, get_standard_funcx_client, setup_register_endpoint_response
 ):
