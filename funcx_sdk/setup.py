@@ -8,8 +8,6 @@ REQUIRES = [
     "globus-sdk>=3.6.0,<4",
     # 'websockets' is used for the client-side websocket listener
     "websockets==9.1",
-    # table printing used in search result rendering
-    "texttable>=1.6.4,<2",
     # dill is an extension of `pickle` to a wider array of native python types
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
     # versioning and compatibility policy
