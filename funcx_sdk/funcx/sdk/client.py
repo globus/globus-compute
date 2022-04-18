@@ -19,7 +19,7 @@ from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
 from funcx.utils.handle_service_response import handle_response_errors
 
 from .login_manager import LoginManager, LoginManagerProtocol
-from .version import PARSED_VERSION, parse_version
+from .version import PARSED_VERSION, compare_versions
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,7 @@ class FuncXClient:
         min_sdk_version = data["min_sdk_version"]
 
         if endpoint_version is not None:
-            if parse_version(endpoint_version) < parse_version(min_ep_version):
+            if compare_versions(endpoint_version, min_ep_version) == -1:
                 raise VersionMismatch(
                     f"Your version={endpoint_version} is lower than the "
                     f"minimum version for an endpoint: {min_ep_version}.  "
@@ -193,7 +193,7 @@ class FuncXClient:
                     f"pip install funcx-endpoint>={min_ep_version}"
                 )
         else:
-            if PARSED_VERSION < parse_version(min_sdk_version):
+            if compare_versions(PARSED_VERSION, min_sdk_version) == -1:
                 raise VersionMismatch(
                     f"Your version={PARSED_VERSION} is lower than the "
                     f"minimum version for funcx SDK: {min_sdk_version}.  "
