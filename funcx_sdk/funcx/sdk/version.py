@@ -42,6 +42,5 @@ def parse_version(s: str) -> VersionType:
 
 PARSED_VERSION = parse_version(__version__)
 
-
 # app name to send as part of SDK requests
 app_name = f"funcX SDK v{__version__}"

@@ -9,6 +9,7 @@ import signal
 import sys
 import threading
 import time
+import typing as t
 from typing import Dict
 
 import pika
@@ -46,7 +47,7 @@ class EndpointInterchange:
     def __init__(
         self,
         config: funcx_endpoint.endpoint.utils.config.Config,
-        reg_info: pika.connection.Parameters = None,
+        reg_info: t.Tuple[t.Dict, t.Dict] = None,
         logdir=".",
         endpoint_id=None,
         endpoint_dir=".",
@@ -60,7 +61,8 @@ class EndpointInterchange:
         config : funcx.Config object
              Funcx config object that describes how compute should be provisioned
 
-        reg_info : pika.connection.Parameters
+        reg_info : tuple[Dict, Dict]
+             Tuple of connection info for task_queue and result_queue
              Connection parameters to connect to the service side RabbitMQ pipes
              Optional: If not supplied, the endpoint will use a retry loop to
              attempt registration periodically.
@@ -99,9 +101,9 @@ class EndpointInterchange:
         self.funcx_client = FuncXClient(**funcx_client_options)
 
         self.initial_registration_complete = False
-        self.connection_params = None
+        self.task_q_connection_params, self.result_q_connection_params = None, None
         if reg_info:
-            self.connection_params = reg_info
+            self.task_q_connection_params, self.result_q_connection_params = reg_info
             self.initial_registration_complete = True
 
         self.heartbeat_period = self.config.heartbeat_period
@@ -175,7 +177,7 @@ class EndpointInterchange:
         reg_info = register_endpoint(
             self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name
         )
-        self.connection_params = reg_info
+        self.task_q_connection_params, self.result_q_connection_params = reg_info
 
     def migrate_tasks_to_internal(
         self,
@@ -312,17 +314,13 @@ class EndpointInterchange:
         if not self.initial_registration_complete:
             # Register the endpoint
             log.info("Running endpoint registration retry loop")
-            reg_info = retry_call(
-                self.register_endpoint, delay=10, max_delay=300, backoff=1.2
-            )
-            log.info(
-                "Endpoint registered with UUID: {}".format(reg_info["endpoint_id"])
-            )
+            retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
+            log.info("Endpoint registered with UUID: (FIXME FIXME FIXME)")
 
         self.initial_registration_complete = False
 
         self._task_puller_proc = self.migrate_tasks_to_internal(
-            self.connection_params,
+            self.task_q_connection_params["pika_conn_params"],
             self.endpoint_id,
             self.pending_task_queue,
             self._quiesce_event,
@@ -343,7 +341,7 @@ class EndpointInterchange:
 
         self.results_outgoing = ResultQueuePublisher(
             endpoint_id=self.endpoint_id,
-            pika_conn_params=self.connection_params,
+            pika_conn_params=self.result_q_connection_params["pika_conn_params"],
         )
 
         self.results_outgoing.connect()
@@ -366,7 +364,6 @@ class EndpointInterchange:
         last = time.time()
 
         while not self._quiesce_event.is_set():
-            log.warning("Boop")
             if last + self.heartbeat_threshold < time.time():
                 log.debug("alive")
                 last = time.time()

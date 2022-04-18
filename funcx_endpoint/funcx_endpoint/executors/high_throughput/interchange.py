@@ -241,7 +241,7 @@ class Interchange:
         self.command_channel = self.context.socket(zmq.DEALER)
         self.command_channel.RCVTIMEO = 1000  # in milliseconds
         # self.command_channel.set_hwm(0)
-        log.info(f"Command channel on tcp://{client_address}:{client_ports[2]}")
+        log.info(f"Command _channel on tcp://{client_address}:{client_ports[2]}")
         self.command_channel.connect(f"tcp://{client_address}:{client_ports[2]}")
         log.info("Connected to forwarder")
 
@@ -452,8 +452,8 @@ class Interchange:
                 msg = Message.unpack(raw_msg)
                 log.debug("received Message/Heartbeat? on task queue")
             except Exception:
-                log.exception("Failed to unpack message")
-                pass
+                log.exception(f"Failed to unpack message, RAW:{raw_msg}")
+                continue
 
             if msg == "STOP":
                 # TODO: Yadu. This should be replaced by a proper MessageType
@@ -631,7 +631,7 @@ class Interchange:
                 else:
                     log.error(
                         f"Received unsupported message type:{command.type} on "
-                        "command channel"
+                        "command _channel"
                     )
                     reply = BadCommand(f"Unknown command type: {command.type}")
 
