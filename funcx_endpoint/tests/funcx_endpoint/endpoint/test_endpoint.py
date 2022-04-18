@@ -1,7 +1,7 @@
 import pytest
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
-from funcx_endpoint.endpoint.cli import app
+from funcx_endpoint.cli import app
 
 runner = CliRunner()
 
@@ -27,7 +27,7 @@ def patch_funcx_client(mocker):
 
 
 def test_non_configured_endpoint(mocker):
-    result = runner.invoke(app, ["start", "newendpoint"])
+    result = runner.invoke(app, ["start", "--name", "newendpoint"])
     assert "newendpoint" in result.stdout
     assert "not configured" in result.stdout
 
@@ -37,5 +37,5 @@ def test_using_outofdate_config(mocker, tmp_path):
     config_file.write_text(config_string)
     mock_loader = mocker.patch("funcx_endpoint.endpoint.endpoint.os.path.join")
     mock_loader.return_value = str(config_file)
-    result = runner.invoke(app, ["start", "newendpoint"])
+    result = runner.invoke(app, ["start", "--name", "newendpoint"])
     assert isinstance(result.exception, TypeError)

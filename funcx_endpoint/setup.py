@@ -18,14 +18,8 @@ REQUIRES = [
     "psutil<6",
     # provides easy daemonization of the endpoint
     "python-daemon>=2,<3",
-    # TODO: replace use of `typer` with `click` because
-    # 1. `typer` is a thin wrapper over `click` offering very minimal additional
-    #    functionality
-    # 2. `click` follows semver and releases new major versions when known
-    #    backwards-incompatible changes are introduced, making our application
-    #    safer to distribute
-    "typer==0.4.0",
-    "click==8.0.4",  # pin `click` because typer uses `click` internals
+    # CLI parsing
+    "click>=8,<9",
     # disallow use of 22.3.0; the whl package on some platforms causes ZMQ issues
     #
     # NOTE: 22.3.0 introduced a patched version of libzmq.so to the wheel packaging
@@ -79,7 +73,7 @@ setup(
     keywords=["funcX", "FaaS", "Function Serving"],
     entry_points={
         "console_scripts": [
-            "funcx-endpoint=funcx_endpoint.endpoint.cli:cli_run",
+            "funcx-endpoint=funcx_endpoint.cli:cli_run",
             "funcx-interchange"
             "=funcx_endpoint.executors.high_throughput.interchange:cli_run",
             "funcx-manager"

@@ -9,11 +9,11 @@ import sys
 import uuid
 from string import Template
 
+import click
 import daemon
 import daemon.pidfile
 import psutil
 import texttable
-import typer
 from globus_sdk import GlobusAPIError, NetworkError
 
 from funcx.sdk.client import FuncXClient
@@ -123,7 +123,7 @@ class Endpoint:
         FuncXClient(do_version_check=False, use_offprocess_checker=False)
 
         if os.path.exists(self.funcx_config_file):
-            typer.confirm(
+            click.confirm(
                 "Are you sure you want to initialize this directory? "
                 f"This will erase everything in {self.funcx_dir}",
                 abort=True,
