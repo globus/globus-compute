@@ -7,7 +7,9 @@ import typing as t
 __version__ = "0.4.0a1"
 
 
-VersionType = t.Union[t.Tuple[int, int, int], t.Tuple[int, int, int, str, int]]
+_StandardVersionType = t.Tuple[int, int, int]
+_PreVersionType = t.Tuple[int, int, int, str, int]
+VersionType = t.Union[_StandardVersionType, _PreVersionType]
 
 
 # parse to a tuple
@@ -38,6 +40,63 @@ def parse_version(s: str) -> VersionType:
         patch = int(patch_s)
 
     return t.cast(VersionType, (major, minor, patch) + pre)
+
+
+def _simple_compare_versions(a: VersionType, b: VersionType) -> int:
+    if a < b:
+        return -1
+    elif a == b:
+        return 0
+    else:
+        return 1
+
+
+def _compare_parsed_versions(a: VersionType, b: VersionType) -> int:
+    """
+    returns
+      a < b: -1
+      a == b: 0
+      a > b: 1
+    """
+    if len(a) == len(b):
+        # if versions are triples (no pre-version), simple comparison
+        if len(a) == 3:
+            return _simple_compare_versions(a, b)
+
+        # length is equal, but these are pre-verisons and therefore expected to have a
+        # length of 5
+        # mypy won't infer this, so cast to the correct type
+        a = t.cast(_PreVersionType, a)
+        b = t.cast(_PreVersionType, b)
+
+        # if the pre-version is equal (alpha-to-alpha, beta-to-beta, dev-to-dev)
+        # do simple comparison
+        if a[3] == b[3]:
+            return _simple_compare_versions(a, b)
+
+        # when MAJOR.MINOR.PATCH is equivalent, compare by specifiers
+        if a[:3] == b[:3]:
+            # dev versions "equal everything"
+            if a[3] == "dev" or b[3] == "dev":
+                return 0
+            # alpha < beta
+            if a[3] == "a" and b[3] == "b":
+                return -1
+            elif a[3] == "b" and b[3] == "a":
+                return 1
+
+    # if lengths are not equal, only one of these is a pre-version
+    # or perhaps they are both pre-versions, but with different MAJOR.MINOR.PATCH
+    # trim to triples and compare
+    return _simple_compare_versions(a[:3], b[:3])
+
+
+def compare_versions(a: VersionType | str, b: VersionType | str) -> int:
+    if isinstance(a, str):
+        a = parse_version(a)
+    if isinstance(b, str):
+        b = parse_version(b)
+    return _compare_parsed_versions(a, b)
 
 
 PARSED_VERSION = parse_version(__version__)
