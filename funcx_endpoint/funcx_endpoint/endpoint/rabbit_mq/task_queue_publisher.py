@@ -2,6 +2,8 @@ import logging
 
 import pika
 
+from .base import RabbitPublisherStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,37 +16,41 @@ class TaskQueuePublisher:
 
     def __init__(
         self,
-        endpoint_uuid: str,
-        pika_conn_params: pika.connection.Parameters,
+        *,
+        endpoint_id: str,
+        conn_params: pika.connection.Parameters,
     ):
         """
         Parameters
         ----------
-        endpoint_uuid: str
+        endpoint_id: str
              Endpoint UUID string used to identify the endpoint
-        pika_conn_params: pika.connection.Parameters
+        conn_params: pika.connection.Parameters
              Pika connection parameters to connect to RabbitMQ
         """
-        self.endpoint_uuid = endpoint_uuid
-        self.queue_name = f"{self.endpoint_uuid}.tasks"
-        self.routing_key = f"{self.endpoint_uuid}.tasks"
-        self.params = pika_conn_params
+        self.endpoint_id = endpoint_id
+        self.queue_name = f"{self.endpoint_id}.tasks"
+        self.routing_key = f"{self.endpoint_id}.tasks"
+        self.conn_params = conn_params
 
         self.exchange = "tasks"
         self.exchange_type = "direct"
 
         self._connection = None
         self._channel = None
+        # start closed ("connected" after connect)
+        self.status = RabbitPublisherStatus.closed
 
     def connect(self):
         logger.debug("Connecting as server")
-        self._connection = pika.BlockingConnection(self.params)
+        self._connection = pika.BlockingConnection(self.conn_params)
         self._channel = self._connection.channel()
         self._channel.exchange_declare(
             exchange=self.exchange, exchange_type=self.exchange_type
         )
         self._channel.queue_declare(queue=self.queue_name)
         self._channel.queue_bind(self.queue_name, self.exchange)
+        self.status = RabbitPublisherStatus.connected
 
     def publish(self, payload: bytes):
         """Publish a message to the endpoint from the service
@@ -64,3 +70,4 @@ class TaskQueuePublisher:
     def close(self):
         """Close the connection and channels"""
         self._connection.close()
+        self.status = RabbitPublisherStatus.closed

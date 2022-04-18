@@ -48,9 +48,7 @@ TEST_REQUIRES = [
     "responses",
     "pytest>=5.2",
     "coverage>=5.2",
-    "codecov==2.1.8",
     "pytest-mock==3.2.0",
-    "flake8>=3.8",
 ]
 
 

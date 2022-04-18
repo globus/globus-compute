@@ -98,8 +98,8 @@ def test_endpoint_interchange_against_rabbitmq(
     # Start the service side components:
     # Connect the TaskQueuePublisher and submit some mock tasks
     task_q_out = TaskQueuePublisher(
-        endpoint_uuid=endpoint_uuid,
-        pika_conn_params=task_queue_info["pika_conn_params"],
+        endpoint_id=endpoint_uuid,
+        conn_params=task_queue_info["pika_conn_params"],
     )
     task_q_out.connect()
     task_q_out._channel.queue_purge(task_q_out.queue_name)
@@ -107,7 +107,7 @@ def test_endpoint_interchange_against_rabbitmq(
 
     result_q_in = multiprocessing.Queue()
     result_sub_proc = ResultQueueSubscriber(
-        pika_conn_params=result_queue_info["pika_conn_params"],
+        conn_params=result_queue_info["pika_conn_params"],
         external_queue=result_q_in,
     )
     result_sub_proc.start()
