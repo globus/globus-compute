@@ -1,6 +1,4 @@
 import logging
-import os
-import shutil
 from importlib.machinery import SourceFileLoader
 
 import pika
@@ -12,29 +10,23 @@ from funcx_endpoint.endpoint.interchange import EndpointInterchange
 logger = logging.getLogger("mock_funcx")
 
 
+@pytest.fixture
+def funcx_dir(tmp_path):
+    fxdir = tmp_path / "funcx"
+    fxdir.mkdir()
+    yield fxdir
+
+
 class TestStart:
-    @pytest.fixture(autouse=True)
-    def test_setup_teardown(self):
-        # Code that will run before your test, for example:
-
-        funcx_dir = f"{os.getcwd()}"
-        config_dir = os.path.join(funcx_dir, "mock_endpoint")
-        assert not os.path.exists(config_dir)
-        # A test function will be run at this point
-        yield
-        # Code that will run after your test, for example:
-        shutil.rmtree(config_dir)
-
-    def test_endpoint_id(self, mocker):
+    def test_endpoint_id(self, mocker, funcx_dir):
         mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
         mock_client.return_value = None
 
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        manager = Endpoint(funcx_dir=str(funcx_dir))
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(config_dir, "config.py")
+            "config", str(funcx_dir / "mock_endpoint" / "config.py")
         ).load_module()
 
         for executor in endpoint_config.config.executors:
@@ -49,7 +41,7 @@ class TestStart:
         for executor in ic.executors.values():
             assert executor.endpoint_id == "mock_endpoint_id"
 
-    def test_start_no_reg_info(self, mocker):
+    def test_start_no_reg_info(self, mocker, funcx_dir):
         mocker.patch("funcx_endpoint.endpoint.interchange.threading.Thread")
 
         def _fake_retry(func, *args, **kwargs):
@@ -80,12 +72,11 @@ class TestStart:
             },
         )
 
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        manager = Endpoint(funcx_dir=funcx_dir)
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(config_dir, "config.py")
+            "config", str(funcx_dir / "mock_endpoint" / "config.py")
         ).load_module()
 
         for executor in endpoint_config.config.executors:
