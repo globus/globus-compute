@@ -15,14 +15,18 @@ from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.executors import HighThroughputExecutor
 from funcx_endpoint.executors.high_throughput.messages import EPStatusReport, Task
 
+endpoint_dir = f"{os.getcwd()}/test_interchange_e2e"
+
 config = Config(
     executors=[
         HighThroughputExecutor(
+            max_workers_per_node=1,
             provider=LocalProvider(
                 init_blocks=1,
                 min_blocks=0,
                 max_blocks=1,
             ),
+            run_dir=endpoint_dir,
         )
     ],
     funcx_service_address="https://api2.funcx.org/v2",
@@ -46,18 +50,20 @@ def make_mock_task():
 
 def run_ix_process(reg_info, endpoint_uuid):
     results_ack_handler = ResultsAckHandler(
-        endpoint_dir="../../test_ep_with_mock_service"
+        endpoint_dir=endpoint_dir,
     )
+    logging.warning("Starting Interchange process")
     ix = EndpointInterchange(
         config=config,
         endpoint_id=endpoint_uuid,
         results_ack_handler=results_ack_handler,
         reg_info=reg_info,
+        endpoint_dir=endpoint_dir,
     )
 
     logging.warning("IX created, starting")
     ix.start()
-    logging.warning("Done")
+    logging.warning("Interchange exiting")
 
 
 def test_endpoint_interchange_against_rabbitmq(
@@ -67,6 +73,7 @@ def test_endpoint_interchange_against_rabbitmq(
     uses mock tasks
     """
     logging.warning(f"Current proc pid: {os.getpid()}")
+    logging.warning(f"Using endpoint_uuid: {endpoint_uuid}")
 
     # Use register_endpoint to get connection params
     endpoint_name = "endpoint_foo"
@@ -141,3 +148,4 @@ def test_endpoint_interchange_against_rabbitmq(
     result_sub_proc.terminate()
     task_q_out.close()
     ix_proc.terminate()
+    ix_proc.kill()
