@@ -25,7 +25,7 @@ You will also need the following credentials:
    the `-dev` suffix
 
 ```bash
-$EDITOR funcx_sdk/funcx/sdk/version.py funcx_endpoint/funcx_endpoint/version.py
+$EDITOR funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
 ```
 
 2. Update the changelog by running `scriv collect --edit`
@@ -35,7 +35,7 @@ $EDITOR funcx_sdk/funcx/sdk/version.py funcx_endpoint/funcx_endpoint/version.py
 
 ```bash
 git add changelog.d/ docs/changelog.rst
-git add funcx_sdk/funcx/sdk/version.py funcx_endpoint/funcx_endpoint/version.py
+git add funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
 git commit -m 'Bump versions and changelog for release'
 git push
 ```
@@ -50,8 +50,8 @@ git push
    then commit and push, e.g.
 
 ```bash
-$EDITOR funcx_sdk/funcx/sdk/version.py funcx_endpoint/funcx_endpoint/version.py
-git add funcx_sdk/funcx/sdk/version.py funcx_endpoint/funcx_endpoint/version.py
+$EDITOR funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
+git add funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
 git commit -m 'Bump versions for dev'
 git push
 ```

@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-VERSION="$(grep '^__version__' funcx_sdk/funcx/sdk/version.py | cut -d '"' -f 2)"
+VERSION="$(grep '^__version__' funcx_sdk/funcx/version.py | cut -d '"' -f 2)"
 ENDPOINT_VERSION="$(grep '^__version__' funcx_endpoint/funcx_endpoint/version.py | cut -d '"' -f 2)"
 
 if [[ "$VERSION" != "$ENDPOINT_VERSION" ]]; then

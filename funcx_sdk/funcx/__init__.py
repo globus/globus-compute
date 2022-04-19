@@ -1,7 +1,7 @@
 """ funcX : Fast function serving for clouds, clusters and supercomputers.
 
 """
-from funcx.sdk.version import __version__ as _version
+from funcx.version import __version__ as _version
 
 __author__ = "The funcX team"
 __version__ = _version

@@ -15,11 +15,11 @@ from funcx.sdk.search import SearchHelper
 from funcx.sdk.utils.batch import Batch
 from funcx.sdk.web_client import FunctionRegistrationData
 from funcx.serialize import FuncXSerializer
-from funcx.utils.errors import SerializationError, TaskPending, VersionMismatch
+from funcx.utils.errors import SerializationError, TaskPending
 from funcx.utils.handle_service_response import handle_response_errors
+from funcx.version import __version__, compare_versions
 
 from .login_manager import LoginManager, LoginManagerProtocol
-from .version import PARSED_VERSION, compare_versions
 
 logger = logging.getLogger(__name__)
 
@@ -178,28 +178,20 @@ class FuncXClient:
         return self._searcher
 
     def version_check(self, endpoint_version: str | None = None) -> None:
-        """Check this client version meets the service's minimum supported version."""
+        """Check this client version meets the service's minimum supported version.
+
+        Raises a VersionMismatch error on failure.
+        """
         data = self.web_client.get_version()
 
         min_ep_version = data["min_ep_version"]
         min_sdk_version = data["min_sdk_version"]
 
+        compare_versions(__version__, min_sdk_version)
         if endpoint_version is not None:
-            if compare_versions(endpoint_version, min_ep_version) == -1:
-                raise VersionMismatch(
-                    f"Your version={endpoint_version} is lower than the "
-                    f"minimum version for an endpoint: {min_ep_version}.  "
-                    "Please update. "
-                    f"pip install funcx-endpoint>={min_ep_version}"
-                )
-        else:
-            if compare_versions(PARSED_VERSION, min_sdk_version) == -1:
-                raise VersionMismatch(
-                    f"Your version={PARSED_VERSION} is lower than the "
-                    f"minimum version for funcx SDK: {min_sdk_version}.  "
-                    "Please update. "
-                    f"pip install funcx>={min_sdk_version}"
-                )
+            compare_versions(
+                endpoint_version, min_ep_version, package_name="funcx-endpoint"
+            )
 
     def logout(self):
         """Remove credentials from your local system"""

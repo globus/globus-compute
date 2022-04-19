@@ -1,4 +1,5 @@
 import os
+import re
 
 from setuptools import find_namespace_packages, setup
 
@@ -14,6 +15,9 @@ REQUIRES = [
     "dill==0.3.4",
     # typing_extensions, so we can use Protocol and other typing features on python3.7
     'typing_extensions>=4.0;python_version<"3.8"',
+    # packaging, allowing version parsing
+    # set a version floor but no ceiling as the library offers a stable API under CalVer
+    "packaging>=21.1",
 ]
 DOCS_REQUIRES = [
     "sphinx<5",
@@ -33,14 +37,25 @@ DEV_REQUIRES = TEST_REQUIRES + [
     "pre-commit",
 ]
 
-version_ns = {}
-with open(os.path.join("funcx", "sdk", "version.py")) as f:
-    exec(f.read(), version_ns)
-version = version_ns["__version__"]
+
+def parse_version():
+    # single source of truth for package version
+    version_string = ""
+    version_pattern = re.compile(r'__version__ = "([^"]*)"')
+    with open(os.path.join("funcx", "version.py")) as f:
+        for line in f:
+            match = version_pattern.match(line)
+            if match:
+                version_string = match.group(1)
+                break
+    if not version_string:
+        raise RuntimeError("Failed to parse version information")
+    return version_string
+
 
 setup(
     name="funcx",
-    version=version,
+    version=parse_version(),
     packages=find_namespace_packages(include=["funcx", "funcx.*"]),
     description="funcX: High Performance Function Serving for Science",
     install_requires=REQUIRES,
