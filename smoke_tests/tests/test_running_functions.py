@@ -1,6 +1,9 @@
 import time
 
-from funcx.utils.errors import TaskPending
+try:
+    from funcx.errors import TaskPending
+except ImportError:
+    from funcx.utils.errors import TaskPending
 
 
 def test_run_pre_registered_function(

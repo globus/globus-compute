@@ -2,7 +2,6 @@ import uuid
 from unittest import mock
 
 import pytest
-from tests.unit.utils import randomstring
 
 import funcx
 from funcx.serialize import FuncXSerializer
@@ -86,12 +85,12 @@ def test_client_init_accepts_specified_taskgroup():
         # Weird but currently technically possible
         {"status": "Failed", "result": True},
         {"status": "failed", "exception": True},
-        {"status": "failed", "reason": randomstring()},
+        {"status": "failed", "reason": "foo bar baz"},
         {"status": "failed", "sentinel": 1},
         {"status": "asdf", "sentinel": 1},
     ],
 )
-def test_update_task_table_is_robust(api_data):
+def test_update_task_table_is_robust(api_data, randomstring):
     payload = randomstring()
     exc = KeyError("asdf")
     task_id = "some_task_id"

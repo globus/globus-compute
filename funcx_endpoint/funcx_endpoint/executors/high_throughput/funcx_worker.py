@@ -16,7 +16,7 @@ from funcx_endpoint.executors.high_throughput.messages import Message
 from funcx_endpoint.logging_config import setup_logging
 
 try:
-    from funcx.utils.errors import MaxResultSizeExceeded
+    from funcx.errors import MaxResultSizeExceeded
 except ImportError:
     # to-do: Remove this after funcx,funcx-endpoint==0.3.5 is released
     class MaxResultSizeExceeded(Exception):
