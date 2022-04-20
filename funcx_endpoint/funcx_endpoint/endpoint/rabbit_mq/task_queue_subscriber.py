@@ -201,7 +201,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
         """
         logger.info("Declaring queue %s", queue_name)
-        self._channel.queue_declare(queue_name, callback=self._on_queue_declareok)
+        self._channel.queue_declare(
+            queue_name, durable=True, callback=self._on_queue_declareok
+        )
 
     def _on_queue_declareok(self, method_frame):
         """Method invoked by pika when the Queue.Declare RPC call made in

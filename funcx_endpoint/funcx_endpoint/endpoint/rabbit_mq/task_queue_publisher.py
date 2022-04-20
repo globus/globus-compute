@@ -48,7 +48,7 @@ class TaskQueuePublisher:
         self._channel.exchange_declare(
             exchange=self.exchange, exchange_type=self.exchange_type
         )
-        self._channel.queue_declare(queue=self.queue_name)
+        self._channel.queue_declare(queue=self.queue_name, durable=True)
         self._channel.queue_bind(self.queue_name, self.exchange)
         self.status = RabbitPublisherStatus.connected
 
