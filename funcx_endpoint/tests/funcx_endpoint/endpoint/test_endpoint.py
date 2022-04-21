@@ -1,7 +1,7 @@
 import pytest
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
-from funcx_endpoint.endpoint.cli import app
+from funcx_endpoint.cli import app
 
 runner = CliRunner()
 
