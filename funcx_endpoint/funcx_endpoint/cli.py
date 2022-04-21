@@ -64,10 +64,8 @@ def common_options(f):
     return f
 
 
-def name_option(f):
-    return click.option(
-        "-n", "--name", help="endpoint name", show_default=True, default="default"
-    )(f)
+def name_arg(f):
+    return click.argument("name", required=False, default="default")(f)
 
 
 def config_dir_callback(ctx, param, value):
@@ -105,7 +103,7 @@ def version_command():
 
 @app.command(name="configure", help="Configure an endpoint")
 @click.option("--endpoint-config", default=None, help="a template config to use")
-@name_option
+@name_arg
 @common_options
 def configure_endpoint(*, name: str, endpoint_config: str | None):
     """Configure an endpoint
@@ -118,7 +116,7 @@ def configure_endpoint(*, name: str, endpoint_config: str | None):
 
 
 @app.command(name="start", help="Start an endpoint by name")
-@name_option
+@name_arg
 @click.option(
     "--endpoint-uuid", default=None, help="The UUID for the endpoint to register with"
 )
@@ -177,7 +175,7 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
 
 
 @app.command("stop")
-@name_option
+@name_arg
 @common_options
 def stop_endpoint(*, name: str):
     """Stops an endpoint using the pidfile"""
@@ -186,7 +184,7 @@ def stop_endpoint(*, name: str):
 
 
 @app.command("restart")
-@name_option
+@name_arg
 @common_options
 def restart_endpoint(*, name: str):
     """Restarts an endpoint"""
@@ -203,7 +201,7 @@ def list_endpoints():
 
 
 @app.command("delete")
-@name_option
+@name_arg
 @click.option("--yes", is_flag=True, help="Do not ask for confirmation to delete.")
 @common_options
 def delete_endpoint(*, name: str, yes: bool):
