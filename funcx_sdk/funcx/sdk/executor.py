@@ -289,7 +289,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         Load the set of tasks associated with this Executor's Task Group (FuncXClient)
         from the server and return a set of futures, one for each task.  This is
         nominally intended to "reattach" to a previously initiated session, based on
-        the Task Group ID.  An example use might be:
+        the Task Group ID.  An example use might be::
 
             import sys
             import typing as T
