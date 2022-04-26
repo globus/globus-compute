@@ -17,7 +17,6 @@ import texttable
 from globus_sdk import GlobusAPIError, NetworkError
 
 from funcx.sdk.client import FuncXClient
-from funcx.utils.response_errors import FuncxResponseError
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
@@ -26,6 +25,12 @@ from funcx_endpoint.executors.high_throughput import (
     global_config as funcx_default_config,
 )
 from funcx_endpoint.logging_config import setup_logging
+
+# temporary: try both import paths; update to the new path in the next release
+try:
+    from funcx.errors import FuncxResponseError
+except ImportError:
+    from funcx.utils.response_errors import FuncxResponseError
 
 log = logging.getLogger(__name__)
 

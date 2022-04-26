@@ -1,6 +1,6 @@
 import pytest
 
-from funcx.utils.errors import VersionMismatch
+from funcx.errors import VersionMismatch
 from funcx.version import compare_versions
 
 

@@ -8,17 +8,16 @@ import typing as t
 import uuid
 import warnings
 
+from funcx.errors import SerializationError, TaskPending, handle_response_errors
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from funcx.sdk.search import SearchHelper
-from funcx.sdk.utils.batch import Batch
 from funcx.sdk.web_client import FunctionRegistrationData
 from funcx.serialize import FuncXSerializer
-from funcx.utils.errors import SerializationError, TaskPending
-from funcx.utils.handle_service_response import handle_response_errors
 from funcx.version import __version__, compare_versions
 
+from .batch import Batch
 from .login_manager import LoginManager, LoginManagerProtocol
 
 logger = logging.getLogger(__name__)

@@ -2,7 +2,6 @@ import random
 import uuid
 
 import pytest
-from tests.unit.utils import randomstring
 
 from funcx import FuncXExecutor
 from funcx.sdk.executor import TaskSubmissionInfo
@@ -46,7 +45,7 @@ def test_task_submission_info_stringification():
     assert "endpoint_id='bar_ep'" in as_str
 
 
-def test_property_results_ws_uri_passthru(mocker):
+def test_property_results_ws_uri_passthru(mocker, randomstring):
     fcli = mocker.MagicMock(results_ws_uri=randomstring())
     fexe = FuncXExecutor(funcx_client=fcli)
     assert fexe.results_ws_uri is fcli.results_ws_uri
@@ -55,7 +54,7 @@ def test_property_results_ws_uri_passthru(mocker):
     assert fexe.results_ws_uri is fcli.results_ws_uri
 
 
-def test_property_task_group_id_passthru(mocker):
+def test_property_task_group_id_passthru(mocker, randomstring):
     fcli = mocker.MagicMock(session_task_group_id=randomstring())
     fexe = FuncXExecutor(funcx_client=fcli)
     assert fexe.task_group_id is fcli.session_task_group_id
@@ -65,7 +64,7 @@ def test_property_task_group_id_passthru(mocker):
 
 
 @pytest.mark.parametrize("num_tasks", [0, 1, 2, 10])
-def test_reload_tasks_happy_path(mocker, num_tasks):
+def test_reload_tasks_happy_path(mocker, num_tasks, randomstring):
     mocker.patch("funcx.sdk.executor.ExecutorPollerThread")
     mock_log = mocker.patch("funcx.sdk.executor.log")
 
@@ -101,7 +100,7 @@ def test_reload_tasks_happy_path(mocker, num_tasks):
     assert all(fut.done() for fut in client_futures)
 
 
-def test_reload_tasks_cancels_existing_futures(mocker):
+def test_reload_tasks_cancels_existing_futures(mocker, randomstring):
     mocker.patch("funcx.sdk.executor.ExecutorPollerThread")
 
     tg_uuid = str(uuid.uuid4())
