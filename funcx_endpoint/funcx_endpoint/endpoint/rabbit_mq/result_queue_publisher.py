@@ -82,6 +82,8 @@ class ResultQueuePublisher:
             raise
 
     def close(self):
-        self._channel.close()
-        self._connection.close()
+        if self._channel is not None:
+            self._channel.close()
+        if self._connection is not None:
+            self._connection.close()
         self.status = RabbitPublisherStatus.closed
