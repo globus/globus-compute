@@ -7,7 +7,6 @@ import platform
 import queue
 import signal
 import sys
-import threading
 import time
 import typing as t
 from typing import Dict
@@ -116,9 +115,8 @@ class EndpointInterchange:
         self.containers = {}
         self.total_pending_task_count = 0
 
-        self._quiesce_event = threading.Event()
-        self._quiesce_complete = threading.Event()
-        self._kill_event = threading.Event()
+        self._quiesce_event = multiprocessing.Event()
+        self._kill_event = multiprocessing.Event()
 
         self.results_ack_handler = results_ack_handler
 
@@ -246,7 +244,7 @@ class EndpointInterchange:
         """Temporarily stop everything on the interchange in order to reach a consistent
         state before attempting to start again. This must be called on the main thread
         """
-        log.info("Interchange Quiesce in progress (stopping and joining all threads)")
+        log.info("Interchange Quiesce in progress (stopping and joining processes)")
         self._quiesce_event.set()
 
         log.info("Saving unacked results to disk")
@@ -255,27 +253,26 @@ class EndpointInterchange:
         except Exception:
             log.exception("Caught exception while saving unacked results")
             log.warning("Interchange will continue without saving unacked results")
-        log.warning("Waiting for quiesce complete")
-        self._quiesce_complete.wait()
-        log.warning("Done")
+        log.info("Waiting for quiesce complete")
+
+        self._task_puller_proc.join()
+
+        log.info("Quiesce done")
         # this must be called last to ensure the next interchange run will occur
         self._quiesce_event.clear()
-        self._quiesce_complete.clear()
 
     def stop(self):
         """Prepare the interchange for shutdown"""
         log.info("Shutting down EndpointInterchange")
 
-        self.quiesce()
-
-        # shutdown executors gracefully
-        for label in self.executors:
-            self.executors[label].shutdown()
-
         # kill_event must be set before quiesce_event because we need to guarantee that
         # once the quiesce is complete, the interchange will not try to start again
         self._kill_event.set()
         self._quiesce_event.set()
+
+    def cleanup(self):
+        for label in self.executors:
+            self.executors[label].shutdown()
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
         log.warning("Received SIGTERM, attempting to save unacked results to disk")
@@ -308,6 +305,7 @@ class EndpointInterchange:
             if self._test_start:
                 break
 
+        self.cleanup()
         log.info("EndpointInterchange shutdown complete.")
 
     def _start_threads_and_main(self):
@@ -333,10 +331,7 @@ class EndpointInterchange:
             log.exception("Unhandled exception")
         finally:
             self.results_outgoing.close()
-            self._task_puller_proc.terminate()
             log.info("Thread loop exiting")
-        self._quiesce_event.set()
-        self._task_puller_proc.terminate()
 
     def _main_loop(self):
 
@@ -364,7 +359,7 @@ class EndpointInterchange:
         executor = list(self.executors.values())[0]
         last = time.time()
 
-        while not self._quiesce_event.is_set():
+        while not self._quiesce_event.is_set() and not self._kill_event.is_set():
             if last + self.heartbeat_threshold < time.time():
                 log.debug("alive")
                 last = time.time()
@@ -402,5 +397,3 @@ class EndpointInterchange:
                     "to forwarder queues"
                 )
                 continue
-
-        self._quiesce_complete.set()
