@@ -371,7 +371,8 @@ class Endpoint:
                 processes.append(parent)
                 for p in processes:
                     p.send_signal(signal.SIGTERM)
-                terminated, alive = psutil.wait_procs(processes, timeout=0.2)
+                # graceful RabbitMQ cleanup takes some time
+                terminated, alive = psutil.wait_procs(processes, timeout=10)
                 for p in alive:
                     # sometimes a process that was marked as alive before can terminate
                     # before this signal is sent

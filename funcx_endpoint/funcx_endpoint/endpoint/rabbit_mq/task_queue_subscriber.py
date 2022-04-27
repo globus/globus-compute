@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import signal
 
 import pika
 
@@ -372,6 +373,10 @@ class TaskQueueSubscriber(multiprocessing.Process):
                 self._watcher_poll_period, self.event_watcher
             )
 
+    def handle_sigterm(self, sig_num, curr_stack_frame):
+        logger.warning("Received SIGTERM, setting kill event")
+        self.kill_event.set()
+
     def run(self):
         """Run the example consumer by connecting to RabbitMQ and then
         starting the IOLoop to block and allow the SelectConnection to
@@ -379,6 +384,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
         Note: Only one of these options should be used.
         """
+        signal.signal(signal.SIGTERM, self.handle_sigterm)
         self.status = SubscriberProcessStatus.running
         try:
             self._connection = self._connect()
@@ -386,6 +392,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
             self._connection.ioloop.start()
         except Exception:
             logger.exception("Failed to start subscriber")
+            self.kill_event.set()
 
     def stop(self) -> None:
         """stop() is called by the parent to shutdown the subscriber"""

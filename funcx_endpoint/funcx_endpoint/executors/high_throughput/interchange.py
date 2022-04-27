@@ -7,6 +7,7 @@ import os
 import pickle
 import platform
 import queue
+import signal
 import sys
 import threading
 import time
@@ -590,7 +591,7 @@ class Interchange:
         log.debug("Status reporting loop starting")
         log.info(f"Endpoint id: {self.endpoint_id}")
 
-        while not kill_event.is_set():
+        while not kill_event.wait(self.heartbeat_period):
             log.trace(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
             msg = EPStatusReport(
                 self.endpoint_id, self.get_status_report(), self.task_status_deltas
@@ -598,7 +599,6 @@ class Interchange:
             log.debug("Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
-            time.sleep(self.heartbeat_period)
 
     def _command_server(self, kill_event):
         """Command server to run async command to the interchange
@@ -673,12 +673,18 @@ class Interchange:
                         break
         return
 
+    def handle_sigterm(self, sig_num, curr_stack_frame):
+        log.warning("Received SIGTERM, stopping")
+        self.stop()
+
     def stop(self):
         """Prepare the interchange for shutdown"""
         self._kill_event.set()
 
         self._task_puller_thread.join()
         self._command_thread.join()
+        self._status_report_thread.join()
+        log.info("HighThroughput Interchange stopped")
 
     def start(self, poll_period=None):
         """Start the Interchange
@@ -688,6 +694,7 @@ class Interchange:
         poll_period : int
            poll_period in milliseconds
         """
+        signal.signal(signal.SIGTERM, self.handle_sigterm)
         log.info("Incoming ports bound")
 
         if poll_period is None:
