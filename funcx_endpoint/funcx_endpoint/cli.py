@@ -142,7 +142,7 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
     |     Endpoint    |         daemon
     +-----------------+
     """
-    _do_start_endpoint(name, endpoint_uuid)
+    _do_start_endpoint(name=name, endpoint_uuid=endpoint_uuid)
 
 
 def _do_start_endpoint(*, name: str, endpoint_uuid: str | None):
@@ -183,7 +183,7 @@ def _do_start_endpoint(*, name: str, endpoint_uuid: str | None):
 @common_options
 def stop_endpoint(*, name: str):
     """Stops an endpoint using the pidfile"""
-    _do_stop_endpoint(name)
+    _do_stop_endpoint(name=name)
 
 
 def _do_stop_endpoint(*, name: str) -> None:

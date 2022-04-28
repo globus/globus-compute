@@ -52,6 +52,23 @@ def run_line(cli_runner):
     return func
 
 
+def test_start_endpoint_no_such_ep(run_line, endpoint_obj):
+    res = run_line("start foo")
+    endpoint_obj.start_endpoint.assert_not_called()
+    assert "Endpoint foo is not configured" in res.stdout
+
+
+def test_start_endpoint_existing_ep(run_line, endpoint_obj, make_endpoint_dir):
+    make_endpoint_dir("foo")
+    run_line("start foo")
+    endpoint_obj.start_endpoint.assert_called_once()
+
+
+def test_stop_endpoint(run_line, endpoint_obj, make_endpoint_dir):
+    run_line("stop foo")
+    endpoint_obj.stop_endpoint.assert_called_once()
+
+
 def test_restart_endpoint_does_start_and_stop(
     run_line, endpoint_obj, make_endpoint_dir
 ):
