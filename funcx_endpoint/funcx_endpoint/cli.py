@@ -142,6 +142,10 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
     |     Endpoint    |         daemon
     +-----------------+
     """
+    _do_start_endpoint(name, endpoint_uuid)
+
+
+def _do_start_endpoint(*, name: str, endpoint_uuid: str | None):
     endpoint = get_cli_endpoint()
     endpoint_dir = os.path.join(endpoint.funcx_dir, name)
 
@@ -179,17 +183,22 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
 @common_options
 def stop_endpoint(*, name: str):
     """Stops an endpoint using the pidfile"""
+    _do_stop_endpoint(name)
+
+
+def _do_stop_endpoint(*, name: str) -> None:
     endpoint = get_cli_endpoint()
     endpoint.stop_endpoint(name)
 
 
 @app.command("restart")
 @name_arg
+@click.option("--endpoint-uuid", default=None, hidden=True)
 @common_options
-def restart_endpoint(*, name: str):
+def restart_endpoint(*, name: str, endpoint_uuid: str | None):
     """Restarts an endpoint"""
-    stop_endpoint(name)
-    start_endpoint(name)
+    _do_stop_endpoint(name=name)
+    _do_start_endpoint(name=name, endpoint_uuid=endpoint_uuid)
 
 
 @app.command("list")
