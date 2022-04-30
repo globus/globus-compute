@@ -34,11 +34,8 @@ def get_cli_endpoint() -> Endpoint:
     endpoint = Endpoint(funcx_dir=state.endpoint_config_dir, debug=state.debug)
 
     # ensure that configs exist
-    if not os.path.exists(endpoint.funcx_config_file):
-        log.info(
-            "No existing configuration found at %s. Initializing...",
-            endpoint.funcx_config_file,
-        )
+    if not os.path.exists(endpoint.funcx_dir):
+        log.info("No existing configuration found at %s. Initializing...")
         endpoint.init_endpoint()
 
     return endpoint
@@ -165,7 +162,7 @@ def _do_start_endpoint(*, name: str, endpoint_uuid: str | None):
 
     try:
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(endpoint_dir, endpoint.funcx_config_file_name)
+            "config", os.path.join(endpoint_dir, "config.py")
         ).load_module()
     except Exception:
         log.exception(
