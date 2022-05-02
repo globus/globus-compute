@@ -330,7 +330,7 @@ class EndpointInterchange:
         last = time.time()
 
         while not self._quiesce_event.is_set() and not self._kill_event.is_set():
-            if last + self.heartbeat_threshold < time.time():
+            if last + self.heartbeat_period < time.time():
                 log.debug("alive")
                 last = time.time()
 
