@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import logging
 import multiprocessing
 import os
@@ -18,7 +17,6 @@ from retry.api import retry_call
 import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
 from funcx.sdk.client import FuncXClient
-from funcx.serialize import FuncXSerializer
 from funcx_endpoint import __version__ as funcx_endpoint_version
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
@@ -107,13 +105,8 @@ class EndpointInterchange:
 
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
-        # initalize the last heartbeat time to start the loop
-        self.last_heartbeat = time.time()
-        self.serializer = FuncXSerializer()
 
         self.pending_task_queue = multiprocessing.Queue()
-        self.containers = {}
-        self.total_pending_task_count = 0
 
         self._quiesce_event = multiprocessing.Event()
         self._kill_event = multiprocessing.Event()
@@ -141,9 +134,6 @@ class EndpointInterchange:
         except Exception:
             log.exception("Caught exception")
             raise
-
-        self.tasks = set()
-        self.task_status_deltas = {}
 
         self._test_start = False
 
@@ -219,26 +209,6 @@ class EndpointInterchange:
             raise
 
         return task_q_proc
-
-    def get_container(self, container_uuid):
-        """Get the container image location if it is not known to the interchange"""
-        if container_uuid not in self.containers:
-            if container_uuid == "RAW" or not container_uuid:
-                self.containers[container_uuid] = "RAW"
-            else:
-                try:
-                    container = self.funcx_client.get_container(
-                        container_uuid, self.config.container_type
-                    )
-                except Exception:
-                    log.exception(
-                        "[FETCH_CONTAINER] Unable to resolve container location"
-                    )
-                    self.containers[container_uuid] = "RAW"
-                else:
-                    log.info(f"[FETCH_CONTAINER] Got container info: {container}")
-                    self.containers[container_uuid] = container.get("location", "RAW")
-        return self.containers[container_uuid]
 
     def quiesce(self):
         """Temporarily stop everything on the interchange in order to reach a consistent
