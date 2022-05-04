@@ -19,8 +19,8 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: 3.7
-    - name: Install dependencies for funcx-sdk and test requirements
-      run: python -m pip install 'tox'
+    - run: python -m pip install -U pip setuptools
+    - run: python -m pip install tox
     - name: Run smoke tests to check liveness of hosted services
       env:
         FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}

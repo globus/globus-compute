@@ -15,8 +15,8 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: 3.7
-    - name: install tox
-      run: python -m pip install 'tox'
+    - run: python -m pip install -U pip setuptools
+    - run: python -m pip install 'tox'
     - name: run smoke tests (dev)
       env:
         FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
