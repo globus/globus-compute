@@ -58,7 +58,7 @@ More complex cases
    # Here's how you'd launch several functions:
    futures = []
    for i in range(10):
-       futures.append(fx.submit(double, i, endpoint_id=endpoint_id)
+       futures.append(fx.submit(double, i, endpoint_id=endpoint_id))
 
    # Now wait and print each result:
    for f in futures:
