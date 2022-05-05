@@ -15,6 +15,7 @@ import globus_sdk
 from funcx.sdk._environments import get_web_service_url
 from funcx.sdk.errors import FuncxAPIError
 from funcx.serialize import FuncXSerializer
+from funcx.version import __version__
 
 ID_PARAM_T = t.Union[uuid.UUID, str]
 
@@ -105,11 +106,14 @@ class FuncxWebClient(globus_sdk.BaseClient):
         *,
         environment: t.Optional[str] = None,
         base_url: t.Optional[str] = None,
+        app_name: t.Optional[str] = None,
         **kwargs,
     ):
         if base_url is None:
             base_url = get_web_service_url(environment)
         super().__init__(environment=environment, base_url=base_url, **kwargs)
+        self._user_app_name = None
+        self.user_app_name = app_name
 
     def get_version(self, *, service: str = "all") -> globus_sdk.GlobusHTTPResponse:
         return self.get("version", query_params={"service": service})
@@ -134,6 +138,30 @@ class FuncxWebClient(globus_sdk.BaseClient):
         if additional_fields is not None:
             data.update(additional_fields)
         return self.post("/batch_status", data=data)
+
+    # the FuncXClient needs to send version information through BaseClient.app_name,
+    # so that's overridden here to prevent direct manipulation. use user_app_name
+    # instead to send any custom metadata through the User Agent request header
+    @property
+    def app_name(self) -> t.Optional[str]:
+        return super().app_name
+
+    @app_name.setter
+    def app_name(self, value) -> None:
+        raise NotImplementedError("Use user_app_name instead")
+
+    # support custom user extensions of the default funcx app name
+    @property
+    def user_app_name(self):
+        return self._user_app_name
+
+    @user_app_name.setter
+    def user_app_name(self, value):
+        self._user_app_name = value
+        app_name = f"funcx-sdk-{__version__}"
+        if value is not None:
+            app_name += f"/{value}"
+        globus_sdk.BaseClient.app_name.fset(self, app_name)
 
     def submit(self, batch: t.Dict[str, t.Any]) -> globus_sdk.GlobusHTTPResponse:
         return self.post("submit", data=batch)

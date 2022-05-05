@@ -2,6 +2,7 @@ import pytest
 import responses
 
 from funcx.sdk.web_client import FuncxWebClient
+from funcx.version import __version__
 
 
 @pytest.fixture(autouse=True)
@@ -53,3 +54,36 @@ def test_get_version_service_param(client, service_param):
     kwargs = {} if service_param is None else {"service": service_param}
     res = client.get_version(**kwargs)
     assert res["version"] == 100
+
+
+@pytest.mark.parametrize("user_app_name", [None, "bar"])
+def test_app_name_from_constructor(user_app_name):
+    client = FuncxWebClient(
+        # use the same fake URL and disable retries as in the default test case
+        base_url="https://api.funcx",
+        transport_params={"max_retries": 0},
+        # and also pass in the app_name
+        app_name=user_app_name,
+    )
+
+    assert client.user_app_name == user_app_name
+    assert __version__ in client.app_name
+    assert "funcx" in client.app_name
+    if user_app_name:
+        assert user_app_name in client.app_name
+
+
+@pytest.mark.parametrize("user_app_name", [None, "baz"])
+def test_user_app_name_property(client, user_app_name):
+    client.user_app_name = user_app_name
+
+    assert client.user_app_name == user_app_name
+    assert __version__ in client.app_name
+    assert "funcx" in client.app_name
+    if user_app_name:
+        assert user_app_name in client.app_name
+
+
+def test_app_name_not_settable(client):
+    with pytest.raises(NotImplementedError):
+        client.app_name = "qux"
