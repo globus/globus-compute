@@ -125,8 +125,11 @@ class LoginManager:
             authorizer=self._get_authorizer(SearchScopes.resource_server)
         )
 
-    def get_funcx_web_client(self, *, base_url: str | None = None) -> FuncxWebClient:
+    def get_funcx_web_client(
+        self, *, base_url: str | None = None, app_name: str | None = None
+    ) -> FuncxWebClient:
         return FuncxWebClient(
             base_url=base_url,
+            app_name=app_name,
             authorizer=self._get_authorizer(FuncxScopes.resource_server),
         )
