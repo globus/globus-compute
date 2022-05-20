@@ -132,18 +132,19 @@ def add_trace_level() -> None:
     See https://stackoverflow.com/questions/2183233
     """
 
-    logging.TRACE = 5
+    TRACE = 5
+    logging.TRACE = TRACE  # type: ignore[attr-defined]
 
     def logForLevel(self, message, *args, **kwargs):
-        if self.isEnabledFor(logging.TRACE):
-            self._log(logging.TRACE, message, args, **kwargs)
+        if self.isEnabledFor(TRACE):
+            self._log(TRACE, message, args, **kwargs)
 
     def logToRoot(message, *args, **kwargs):
-        logging.log(logging.TRACE, message, *args, **kwargs)
+        logging.log(TRACE, message, *args, **kwargs)
 
-    logging.addLevelName(logging.TRACE, "TRACE")
-    logging.getLoggerClass().trace = logForLevel
-    logging.trace = logToRoot
+    logging.addLevelName(TRACE, "TRACE")
+    logging.getLoggerClass().trace = logForLevel  # type: ignore[attr-defined]
+    logging.trace = logToRoot  # type: ignore[attr-defined]
 
 
 def setup_logging(
