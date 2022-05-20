@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 import argparse
 import json
@@ -14,7 +15,7 @@ import sys
 import threading
 import time
 import uuid
-from typing import List
+from typing import Any
 
 import psutil
 import zmq
@@ -79,7 +80,7 @@ class Manager:
         result_q_url="tcp://127.0.0.1:50098",
         max_queue_size=10,
         cores_per_worker=1,
-        available_accelerators: List[str] = (),
+        available_accelerators: list[str] | None = None,
         max_workers=float("inf"),
         uid=None,
         heartbeat_threshold=120,
@@ -196,10 +197,11 @@ class Manager:
         )
 
         # Control pinning to accelerators
-        self.available_accelerators = available_accelerators
-        n_accelerators = len(available_accelerators)
-        if n_accelerators > 0:
-            self.max_worker_count = min(self.max_worker_count, n_accelerators)
+        self.available_accelerators = available_accelerators or []
+        if self.available_accelerators:
+            self.max_worker_count = min(
+                self.max_worker_count, len(self.available_accelerators)
+            )
 
         self.worker_map = WorkerMap(self.max_worker_count, self.available_accelerators)
 
@@ -220,11 +222,11 @@ class Manager:
             )
         )
 
-        self.task_queues = {}
+        self.task_queues: dict[str, queue.Queue] = {}
         if worker_type:
             self.task_queues[worker_type] = queue.Queue()
-        self.outstanding_task_count = {}
-        self.task_type_mapping = {}
+        self.outstanding_task_count: dict[str, int] = {}
+        self.task_type_mapping: dict[str, str] = {}
 
         self.pending_result_queue = mpQueue()
 
@@ -235,10 +237,10 @@ class Manager:
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
         self.serializer = FuncXSerializer()
-        self.next_worker_q = []  # FIFO queue for spinning up workers.
-        self.worker_procs = {}
+        self.next_worker_q: list[str] = []  # FIFO queue for spinning up workers.
+        self.worker_procs: dict[str, subprocess.Popen] = {}
 
-        self.task_status_deltas = {}
+        self.task_status_deltas: dict[str, TaskStatusCode] = {}
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
@@ -254,7 +256,7 @@ class Manager:
         self.poller = zmq.Poller()
         self.poller.register(self.task_incoming, zmq.POLLIN)
         self.poller.register(self.funcx_task_socket, zmq.POLLIN)
-        self.task_worker_map = {}
+        self.task_worker_map: dict[str, Any] = {}
 
         self.task_done_counter = 0
         self.task_finalization_lock = threading.Lock()
