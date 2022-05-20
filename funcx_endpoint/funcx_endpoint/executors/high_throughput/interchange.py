@@ -247,7 +247,7 @@ class Interchange:
         self.command_channel.connect(f"tcp://{client_address}:{client_ports[2]}")
         log.info("Connected to forwarder")
 
-        self.pending_task_queue = {}
+        self.pending_task_queue: dict[str, queue.Queue] = {}
         self.containers: dict[str, str] = {}
         self.total_pending_task_count = 0
         # off_process_checker is unnecessary on endpoint-side
@@ -337,7 +337,6 @@ class Interchange:
             log.exception("Caught exception")
             raise
 
-        self.tasks = set()
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
         self.task_status_deltas: dict[str, TaskStatusCode] = {}
@@ -398,30 +397,6 @@ class Interchange:
         if self.scaling_enabled:
             log.info("Scaling ...")
             self.scale_out(self.provider.init_blocks)
-
-    def get_tasks(self, count):
-        """Obtains a batch of tasks from the internal pending_task_queue
-
-        Parameters
-        ----------
-        count: int
-            Count of tasks to get from the queue
-
-        Returns
-        -------
-        List of upto count tasks. May return fewer than count down to an empty list
-            eg. [{'task_id':<x>, 'buffer':<buf>} ... ]
-        """
-        tasks = []
-        for _i in range(0, count):
-            try:
-                x = self.pending_task_queue.get(block=False)
-            except queue.Empty:
-                break
-            else:
-                tasks.append(x)
-
-        return tasks
 
     def migrate_tasks_to_internal(self, kill_event, status_request):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
