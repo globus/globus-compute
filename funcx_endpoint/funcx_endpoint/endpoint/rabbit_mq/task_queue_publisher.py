@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 import pika
@@ -36,8 +38,8 @@ class TaskQueuePublisher:
         self.exchange = "tasks"
         self.exchange_type = "direct"
 
-        self._connection = None
-        self._channel = None
+        self._connection: pika.BlockingConnection | None = None
+        self._channel: pika.Channel | None = None
         # start closed ("connected" after connect)
         self.status = RabbitPublisherStatus.closed
 
@@ -60,6 +62,8 @@ class TaskQueuePublisher:
         payload: bytes:
             Payload as byte buffer to be published
         """
+        if self._channel is None:
+            raise ValueError("cannot publish() without first calling connect()")
         return self._channel.basic_publish(
             self.exchange,
             routing_key=self.routing_key,
