@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 import argparse
 import logging
@@ -7,9 +8,9 @@ import pickle
 import signal
 import sys
 import time
+import traceback
 
 import zmq
-from parsl.app.errors import RemoteExceptionWrapper
 
 try:
     from funcx.errors import MaxResultSizeExceeded
@@ -24,6 +25,22 @@ log = logging.getLogger(__name__)
 
 DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
+
+
+def _get_result_error_details(
+    exc: Exception,
+) -> tuple[str, str]:
+    # code, user_message
+    if isinstance(exc, MaxResultSizeExceeded):
+        return ("MaxResultSizeExceeded", f"remote error: {exc}")
+    return (
+        "RemoteExecutionError",
+        "An error occurred during the execution of this task",
+    )
+
+
+def _now_ms() -> int:
+    return int(time.time() * 1000)
 
 
 class FuncXWorker:
@@ -105,81 +122,60 @@ class FuncXWorker:
 
             log.debug("Waiting for task")
             p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
-            task_id = pickle.loads(p_task_id)
-            container_id = pickle.loads(p_container_id)
-            log.debug(f"Received task_id:{task_id} with task:{msg}")
+            task_id: str = pickle.loads(p_task_id)
+            container_id: str = pickle.loads(p_container_id)
+            log.debug(f"Received task with task_id='{task_id}' and msg='{msg}'")
 
             result = None
-            task_type = None
             if task_id == "KILL":
-                task = Message.unpack(msg)
-                if task.task_buffer.decode("utf-8") == "KILL":
-                    log.info("[KILL] -- Worker KILL message received! ")
-                    task_type = b"WRKR_DIE"
-                else:
-                    log.exception(
-                        "Caught an exception of non-KILL message for KILL task"
-                    )
-                    continue
-            else:
-                log.debug("Executing task...")
-                exec_start = time.time()
-                try:
-                    result = self.execute_task(msg)
-                    serialized_result = self.serialize(result)
-
-                    if len(serialized_result) > self.result_size_limit:
-                        raise MaxResultSizeExceeded(
-                            len(serialized_result), self.result_size_limit
-                        )
-                except Exception as e:
-                    log.exception(f"Caught an exception {e}")
-                    result_package = {
-                        "task_id": task_id,
-                        "container_id": container_id,
-                        "exception": self.serialize(
-                            RemoteExceptionWrapper(*sys.exc_info())
-                        ),
-                    }
-                else:
-                    log.debug("Execution completed without exception")
-                    result_package = {
-                        "task_id": task_id,
-                        "container_id": container_id,
-                        "result": serialized_result,
-                    }
-                finally:
-                    exec_end = time.time()
-
-                exec_duration = exec_end - exec_start
-
-                result = result_package
-                result["times"] = {
-                    "execution_start": exec_start,
-                    "execution_end": exec_end,
-                    "execution_time": exec_duration,
-                }
-
-                task_type = b"TASK_RET"
-
-                log.debug(f"Task {task_id} completed in {exec_duration} seconds")
-
-            log.debug("Sending result")
-
-            self.task_socket.send_multipart(
-                [task_type, pickle.dumps(result)]  # Byte encoded
-            )
-
-            if task_type == b"WRKR_DIE":
+                log.info("[KILL] -- Worker KILL message received! ")
+                # send a "worker die" message back to the manager
+                self.task_socket.send_multipart([b"WRKR_DIE", b""])
                 log.info(f"*** WORKER {self.worker_id} ABOUT TO DIE ***")
                 # Kill the worker after accepting death in message to manager.
                 sys.exit()
                 # We need to return here to allow for sys.exit mocking in tests
                 return
+            else:
+                result = self.execute_task(task_id, msg)
+                result["container_id"] = container_id
+                log.debug("Sending result")
+                # send bytes over the socket back to the manager
+                self.task_socket.send_multipart([b"TASK_RET", pickle.dumps(result)])
 
         log.warning("Broke out of the loop... dying")
 
-    def execute_task(self, message):
+    def execute_task(self, task_id: str, task_body: bytes) -> dict:
+        log.debug("executing task task_id='%s'", task_id)
+        exec_start_ms = _now_ms()
+
+        try:
+            result = self.call_user_function(task_body)
+        except Exception:
+            log.exception("Caught an exception while executing user function")
+            exc_type, exc, tb = sys.exc_info()
+            result_message = dict(
+                task_id=task_id,
+                exception="".join(
+                    traceback.format_exception(exc_type, exc, tb.tb_next.tb_next)
+                ),
+                error_details=_get_result_error_details(exc),
+                exec_start_ms=exec_start_ms,
+                exec_end_ms=_now_ms(),
+            )
+        else:
+            log.debug("Execution completed without exception")
+            result_message = dict(
+                task_id=task_id,
+                data=result,
+                exec_start_ms=exec_start_ms,
+                exec_end_ms=_now_ms(),
+            )
+
+        log.debug("task %s completed", task_id)
+        return result_message
+
+    def call_user_function(self, message: bytes) -> str:
         """Deserialize the buffer and execute the task.
 
         Returns the result or throws exception.
@@ -188,7 +184,13 @@ class FuncXWorker:
         f, args, kwargs = self.serializer.unpack_and_deserialize(
             task.task_buffer.decode("utf-8")
         )
-        return f(*args, **kwargs)
+        result_data = f(*args, **kwargs)
+        serialized_data = self.serialize(result_data)
+
+        if len(serialized_data) > self.result_size_limit:
+            raise MaxResultSizeExceeded(len(serialized_data), self.result_size_limit)
+
+        return serialized_data
 
 
 def cli_run():

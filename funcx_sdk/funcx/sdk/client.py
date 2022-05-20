@@ -8,7 +8,12 @@ import typing as t
 import uuid
 import warnings
 
-from funcx.errors import SerializationError, TaskPending, handle_response_errors
+from funcx.errors import (
+    FuncxTaskExecutionFailed,
+    SerializationError,
+    TaskPending,
+    handle_response_errors,
+)
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
@@ -219,29 +224,19 @@ class FuncXClient:
         status = {"pending": pending, "status": r_status}
 
         if not pending:
-            if "result" in r_dict:
-                try:
-                    r_obj = self.fx_serializer.deserialize(r_dict["result"])
-                    completion_t = r_dict["completion_t"]
-                except Exception:
-                    raise SerializationError("Result Object Deserialization")
+            if "result" in r_dict or "exception" in r_dict:
+                completion_t = r_dict["completion_t"]
+                if "result" in r_dict:
+                    try:
+                        r_obj = self.fx_serializer.deserialize(r_dict["result"])
+                    except Exception:
+                        raise SerializationError("Result Object Deserialization")
+                    else:
+                        status.update({"result": r_obj, "completion_t": completion_t})
+                elif "exception" in r_dict:
+                    raise FuncxTaskExecutionFailed(r_dict["exception"], completion_t)
                 else:
-                    status.update({"result": r_obj, "completion_t": completion_t})
-
-            elif "exception" in r_dict:
-                try:
-                    r_exception = self.fx_serializer.deserialize(r_dict["exception"])
-                    completion_t = r_dict["completion_t"]
-                    logger.info(f"Exception : {r_exception}")
-                except Exception:
-                    raise SerializationError("Task's exception object deserialization")
-                else:
-                    status.update(
-                        {
-                            "exception": r_exception,
-                            "completion_t": completion_t,
-                        }
-                    )
+                    raise ValueError("invalid result payload")
 
             else:
                 reason = r_dict.get("reason", str(r_dict))
