@@ -3,6 +3,11 @@ from __future__ import annotations
 import multiprocessing
 import uuid
 
+# multiprocessing.Event is a method, not a class
+# to annotate, we need the "real" class
+# see: https://github.com/python/typeshed/issues/4266
+from multiprocessing.synchronize import Event as EventType
+
 import pika
 import pytest
 
@@ -83,7 +88,7 @@ def start_task_q_subscriber(running_subscribers, conn_params, default_endpoint_i
         *,
         endpoint_id: str | None = None,
         queue: multiprocessing.Queue | None = None,
-        kill_event: multiprocessing.Event | None = None,
+        kill_event: EventType | None = None,
         override_params: pika.connection.Parameters | None = None,
     ):
         if endpoint_id is None:

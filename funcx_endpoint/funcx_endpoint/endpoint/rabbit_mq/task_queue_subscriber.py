@@ -2,6 +2,11 @@ import logging
 import multiprocessing
 import signal
 
+# multiprocessing.Event is a method, not a class
+# to annotate, we need the "real" class
+# see: https://github.com/python/typeshed/issues/4266
+from multiprocessing.synchronize import Event as EventType
+
 import pika
 
 from .base import SubscriberProcessStatus
@@ -25,7 +30,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         endpoint_id: str,
         conn_params: pika.connection.Parameters,
         external_queue: multiprocessing.Queue,
-        kill_event: multiprocessing.Event,
+        kill_event: EventType,
     ):
         """
 

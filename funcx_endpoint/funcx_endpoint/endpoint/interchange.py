@@ -8,6 +8,11 @@ import signal
 import sys
 import time
 import typing as t
+
+# multiprocessing.Event is a method, not a class
+# to annotate, we need the "real" class
+# see: https://github.com/python/typeshed/issues/4266
+from multiprocessing.synchronize import Event as EventType
 from typing import Dict
 
 import pika
@@ -106,7 +111,7 @@ class EndpointInterchange:
         self.heartbeat_period = self.config.heartbeat_period
         self.heartbeat_threshold = self.config.heartbeat_threshold
 
-        self.pending_task_queue = multiprocessing.Queue()
+        self.pending_task_queue: multiprocessing.Queue = multiprocessing.Queue()
 
         self._quiesce_event = multiprocessing.Event()
         self._kill_event = multiprocessing.Event()
@@ -172,7 +177,7 @@ class EndpointInterchange:
         connection_params: pika.connection.Parameters,
         endpoint_uuid: str,
         pending_task_queue: multiprocessing.Queue,
-        quiesce_event: multiprocessing.Event,
+        quiesce_event: EventType,
     ) -> multiprocessing.Process:
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
