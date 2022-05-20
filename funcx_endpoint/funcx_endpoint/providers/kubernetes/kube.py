@@ -1,7 +1,7 @@
 import logging
 import queue
 import time
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import typeguard
 from parsl.errors import OptionalModuleMissing
@@ -138,9 +138,9 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         self.kube_client = client.CoreV1Api()
 
         # Dictionary that keeps track of jobs, keyed on job_id
-        self.resources_by_pod_name = {}
+        self.resources_by_pod_name: Dict[str, Any] = {}
         # Dictionary that keeps track of jobs, keyed on task_type
-        self.resources_by_task_type = {}
+        self.resources_by_task_type: Dict[str, Any] = {}
 
     def submit(self, cmd_string, tasks_per_node, task_type, job_name="funcx-worker"):
         """Submit a job
