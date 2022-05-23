@@ -57,16 +57,7 @@ class ResultQueuePublisher:
         self._connection = pika.BlockingConnection(self.conn_params)
         self._channel = self._connection.channel()
         self._channel.confirm_delivery()
-        self._channel.exchange_declare(
-            exchange=self.EXCHANGE_NAME, exchange_type=self.EXCHANGE_TYPE
-        )
 
-        self._channel.queue_declare(queue=self.QUEUE_NAME, passive=True)
-        self._channel.queue_bind(
-            queue=self.QUEUE_NAME,
-            exchange=self.EXCHANGE_NAME,
-            routing_key=self.GLOBAL_ROUTING_KEY,
-        )
         self.status = RabbitPublisherStatus.connected
         return self
 
