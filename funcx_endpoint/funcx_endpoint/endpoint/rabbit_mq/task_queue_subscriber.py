@@ -136,9 +136,10 @@ class TaskQueueSubscriber(multiprocessing.Process):
         """
         logger.info(f"Channel opened: {channel}")
         self._channel = channel
+
         logger.info("Adding channel close callback")
         self._channel.add_on_close_callback(self._on_channel_closed)
-        self.setup_exchange(self.EXCHANGE_NAME)
+        self.start_consuming()
 
     def _on_channel_closed(self, channel, exception):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
@@ -174,71 +175,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.debug("marking channel as closed")
         self._channel_closed.set()
 
-    def setup_exchange(self, exchange_name):
-        """Setup the EXCHANGE_NAME on RabbitMQ by invoking the Exchange.Declare RPC
-        command. When it is complete, the on_exchange_declareok method will
-        be invoked by pika.
-
-        :param str|unicode exchange_name: The name of the EXCHANGE_NAME to declare
-        """
-        logger.info(f"Declaring EXCHANGE_NAME {exchange_name}")
-        self._channel.exchange_declare(
-            exchange=exchange_name,
-            exchange_type=self.EXCHANGE_TYPE,
-            callback=self._on_exchange_declareok,
-        )
-
-    def _on_exchange_declareok(self, unused_frame):
-        """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
-        command.
-
-        :param pika.Frame.Method unused_frame: Exchange.DeclareOk response frame
-
-        """
-        logger.info("Exchange declared")
-        self.setup_queue(self.queue_name)
-
-    def setup_queue(self, queue_name):
-        """Setup the queue on RabbitMQ by invoking the Queue.Declare RPC
-        command. When it is complete, the on_queue_declareok method will
-        be invoked by pika.
-
-        :param str|unicode queue_name: The name of the queue to declare.
-
-        """
-        logger.info("Declaring queue %s", queue_name)
-        self._channel.queue_declare(
-            queue_name, durable=True, callback=self._on_queue_declareok
-        )
-
-    def _on_queue_declareok(self, method_frame):
-        """Method invoked by pika when the Queue.Declare RPC call made in
-        setup_queue has completed. In this method we will bind the queue
-        and EXCHANGE_NAME together with the routing key by issuing the Queue.Bind
-        RPC command. When this command is complete, the on_bindok method will
-        be invoked by pika.
-
-        :param pika.frame.Method method_frame: The Queue.DeclareOk frame
-
-        """
-        logger.info(f"Binding EXCHANGE_NAME:{self.EXCHANGE_NAME} to {self.queue_name}")
-
-        # No routing key since we are doing a direct EXCHANGE_NAME
-        self._channel.queue_bind(
-            self.queue_name, self.EXCHANGE_NAME, callback=self._on_bindok
-        )
-
-    def _on_bindok(self, unused_frame):
-        """Invoked by pika when the Queue.Bind method has completed. At this
-        point we will start consuming messages by calling start_consuming
-        which will invoke the needed RPC commands to start the process.
-
-        :param pika.frame.Method unused_frame: The Queue.BindOk response frame
-
-        """
-        logger.info("Queue bound")
-        self.start_consuming()
-
     def start_consuming(self):
         """This method sets up the consumer by first calling
         add_on_cancel_callback so that the object is notified if RabbitMQ
@@ -249,20 +185,13 @@ class TaskQueueSubscriber(multiprocessing.Process):
         will invoke when a message is fully received.
 
         """
+        logger.debug("Adding consumer cancellation callback")
+        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
+
         logger.info("Issuing consumer related RPC commands")
-        self.add_on_cancel_callback()
         self._consumer_tag = self._channel.basic_consume(
             self.queue_name, on_message_callback=self.on_message, exclusive=True
         )
-
-    def add_on_cancel_callback(self):
-        """Add a callback that will be invoked if RabbitMQ cancels the consumer
-        for some reason. If RabbitMQ does cancel the consumer,
-        on_consumer_cancelled will be invoked by pika.
-
-        """
-        logger.info("Adding consumer cancellation callback")
-        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
 
     def on_consumer_cancelled(self, method_frame):
         """Invoked by pika when RabbitMQ sends a Basic.Cancel for a consumer
@@ -275,7 +204,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         if self._channel:
             self._channel.close()
 
-    def on_message(self, unused_channel, basic_deliver, properties, body):
+    def on_message(self, channel, basic_deliver, properties, body):
         """Invoked by pika when a message is delivered from RabbitMQ. The
         channel is passed for your convenience. The basic_deliver object that
         is passed in carries the EXCHANGE_NAME, routing key, delivery tag and
@@ -301,9 +230,10 @@ class TaskQueueSubscriber(multiprocessing.Process):
         try:
             self.external_queue.put(body)
         except Exception:
-            # We only ack the message if the hand-off to queue worked
+            # No sense in waiting for the RMQ default 30m timeout; let it know
+            # *now* that this message failed.
             logger.exception("External queue put failed")
-            self._channel.basic_nack(basic_deliver.delivery_tag, requeue=True)
+            channel.basic_nack(basic_deliver.delivery_tag, requeue=True)
         else:
             self.acknowledge_message(basic_deliver.delivery_tag)
 
