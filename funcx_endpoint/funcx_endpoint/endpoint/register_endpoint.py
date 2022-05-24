@@ -3,15 +3,14 @@ import logging
 import os
 import typing as t
 
-import pika
-
 import funcx_endpoint
+from funcx import FuncXClient
 
 log = logging.getLogger(__name__)
 
 
 def register_endpoint(
-    funcx_client, endpoint_uuid: str, endpoint_dir: str, endpoint_name: str
+    funcx_client: FuncXClient, endpoint_uuid: str, endpoint_dir: str, endpoint_name: str
 ) -> t.Tuple[t.Dict, t.Dict]:
     """Register the endpoint and return the registration info. This function needs
     to be isolated so that the function can both be called from the endpoint start
@@ -51,10 +50,7 @@ def register_endpoint(
         endpoint_uuid,
         endpoint_version=funcx_endpoint.__version__,
     )
-    log.debug(f"Registration returned: {reg_info}")
-
-    task_queue_info = reg_info["task_queue_info"]
-    result_queue_info = reg_info["result_queue_info"]
+    log.info(f"Registration returned: {reg_info}")
 
     # NOTE: While all registration info is saved to endpoint.json, only the
     # endpoint UUID is reused from this file.
@@ -73,13 +69,4 @@ def register_endpoint(
             )
         )
 
-        # Pika conn params are not json serializable, so they are added
-        # after we dump the info to endpoint.json
-        task_queue_info["pika_conn_params"] = pika.URLParameters(
-            task_queue_info["task_url"]
-        )
-        result_queue_info["pika_conn_params"] = pika.URLParameters(
-            result_queue_info["result_url"]
-        )
-
-    return task_queue_info, result_queue_info
+    return reg_info["task_queue_info"], reg_info["result_queue_info"]
