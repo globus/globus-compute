@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 import pika
@@ -37,8 +39,8 @@ class ResultQueuePublisher:
             # result_q is blocking, and shouldn't use heartbeats
             self.conn_params.heartbeat = 0
 
-        self._channel = None
-        self._connection = None
+        self._channel: pika.Channel | None = None
+        self._connection: pika.BlockingConnection | None = None
         # start closed ("connected" after connect)
         self.status = RabbitPublisherStatus.closed
 
@@ -73,6 +75,8 @@ class ResultQueuePublisher:
         Raises: Exception from pika if the message could not be delivered
 
         """
+        if self._channel is None:
+            raise ValueError("cannot publish() without first calling connect()")
         try:
             self._channel.basic_publish(
                 self.EXCHANGE_NAME, self.routing_key, message, mandatory=True

@@ -11,28 +11,14 @@ import time
 import zmq
 from parsl.app.errors import RemoteExceptionWrapper
 
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors.high_throughput.messages import Message
-from funcx_endpoint.logging_config import setup_logging
-
 try:
     from funcx.errors import MaxResultSizeExceeded
 except ImportError:
-    # to-do: Remove this after funcx,funcx-endpoint==0.3.5 is released
-    class MaxResultSizeExceeded(Exception):
-        """Result produced by the function exceeds the maximum supported result size
-        threshold"""
+    from funcx.utils.errors import MaxResultSizeExceeded
 
-        def __init__(self, result_size: int, result_size_limit: int):
-            self.result_size = result_size
-            self.result_size_limit = result_size_limit
-
-        def __str__(self) -> str:
-            return (
-                f"Task result of {self.result_size}B exceeded current "
-                f"limit of {self.result_size_limit}B"
-            )
-
+from funcx.serialize import FuncXSerializer
+from funcx_endpoint.executors.high_throughput.messages import Message
+from funcx_endpoint.logging_config import setup_logging
 
 log = logging.getLogger(__name__)
 

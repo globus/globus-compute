@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+from __future__ import annotations
+
 import argparse
 import collections
 import json
@@ -11,7 +12,7 @@ import signal
 import sys
 import threading
 import time
-from typing import Dict, Sequence, Tuple
+from typing import Any, Sequence
 
 import daemon
 import zmq
@@ -109,7 +110,7 @@ class Interchange:
         scaling_enabled=True,
         client_address="127.0.0.1",
         interchange_address="127.0.0.1",
-        client_ports: Tuple[int, int, int] = (50055, 50056, 50057),
+        client_ports: tuple[int, int, int] = (50055, 50056, 50057),
         worker_ports=None,
         worker_port_range=None,
         cores_per_worker=1.0,
@@ -133,7 +134,7 @@ class Interchange:
              The ip address at which the workers will be able to reach the Interchange.
              Default: "127.0.0.1"
 
-        client_ports : Tuple[int, int, int]
+        client_ports : tuple[int, int, int]
              The ports at which the client can be reached
 
         launch_cmd : str
@@ -246,8 +247,8 @@ class Interchange:
         self.command_channel.connect(f"tcp://{client_address}:{client_ports[2]}")
         log.info("Connected to forwarder")
 
-        self.pending_task_queue = {}
-        self.containers = {}
+        self.pending_task_queue: dict[str, queue.Queue] = {}
+        self.containers: dict[str, str] = {}
         self.total_pending_task_count = 0
         # off_process_checker is unnecessary on endpoint-side
         client_args = {"use_offprocess_checker": False}
@@ -294,10 +295,10 @@ class Interchange:
             )
         )
 
-        self._ready_manager_queue = {}
+        self._ready_manager_queue: dict[str, Any] = {}
 
-        self.blocks = {}  # type: Dict[str, str]
-        self.block_id_map = {}
+        self.blocks: dict[str, str] = {}
+        self.block_id_map: dict[str, str] = {}
         self.launch_cmd = launch_cmd
         self.last_core_hr_counter = 0
         if not launch_cmd:
@@ -336,11 +337,10 @@ class Interchange:
             log.exception("Caught exception")
             raise
 
-        self.tasks = set()
-        self.task_cancel_running_queue = queue.Queue()
-        self.task_cancel_pending_trap = {}
-        self.task_status_deltas = {}
-        self.container_switch_count = {}
+        self.task_cancel_running_queue: queue.Queue = queue.Queue()
+        self.task_cancel_pending_trap: dict[str, str] = {}
+        self.task_status_deltas: dict[str, TaskStatusCode] = {}
+        self.container_switch_count: dict[str, int] = {}
 
     def load_config(self):
         """Load the config"""
@@ -397,30 +397,6 @@ class Interchange:
         if self.scaling_enabled:
             log.info("Scaling ...")
             self.scale_out(self.provider.init_blocks)
-
-    def get_tasks(self, count):
-        """Obtains a batch of tasks from the internal pending_task_queue
-
-        Parameters
-        ----------
-        count: int
-            Count of tasks to get from the queue
-
-        Returns
-        -------
-        List of upto count tasks. May return fewer than count down to an empty list
-            eg. [{'task_id':<x>, 'buffer':<buf>} ... ]
-        """
-        tasks = []
-        for _i in range(0, count):
-            try:
-                x = self.pending_task_queue.get(block=False)
-            except queue.Empty:
-                break
-            else:
-                tasks.append(x)
-
-        return tasks
 
     def migrate_tasks_to_internal(self, kill_event, status_request):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
@@ -592,7 +568,9 @@ class Interchange:
         log.info(f"Endpoint id: {self.endpoint_id}")
 
         while not kill_event.wait(self.heartbeat_period):
-            log.trace(f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}")
+            log.trace(  # type: ignore[attr-defined]
+                f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}"
+            )
             msg = EPStatusReport(
                 self.endpoint_id, self.get_status_report(), self.task_status_deltas
             )

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import uuid
 from abc import ABC, abstractmethod
@@ -55,10 +57,6 @@ class Message(ABC):
     def payload(self):
         return self._payload
 
-    @payload.setter
-    def payload(self, p):
-        return
-
     @classmethod
     def unpack(cls, msg):
         message_type, remaining = MessageType.unpack(msg)
@@ -94,7 +92,7 @@ class Task(Message):
     type = MessageType.TASK
 
     def __init__(
-        self, task_id: str, container_id: str, task_buffer: str, raw_buffer=None
+        self, task_id: str, container_id: str, task_buffer: str | bytes, raw_buffer=None
     ):
         super().__init__()
         self.task_id = task_id
@@ -105,7 +103,18 @@ class Task(Message):
     def pack(self) -> bytes:
 
         if self.raw_buffer is None:
-            add_ons = f"TID={self.task_id};CID={self.container_id};{self.task_buffer}"
+            # a type:ignore is needed here
+            # task_buffer might be a str  or it might be a bytes (see `unpack`)
+            # and we can't tell which is correct
+            #
+            # rather than thinking hard, preserve the exact current runtime behavior
+            #
+            # all of this code is going to be eliminated soonish by
+            # funcx_common.messagepack in part because of issues like this
+            add_ons = (
+                f"TID={self.task_id};CID={self.container_id};"
+                f"{self.task_buffer}"  # type: ignore
+            )
             self.raw_buffer = add_ons.encode("utf-8")
 
         return self.type.pack() + self.raw_buffer

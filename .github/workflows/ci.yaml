@@ -24,6 +24,10 @@ jobs:
         run: |
           cd funcx_sdk
           tox -e mypy
+      - name: mypy (endpoint)
+        run: |
+          cd funcx_endpoint
+          tox -e mypy
 
   # ensure docs can build, imitating the RTD build as best we can
   check-docs:

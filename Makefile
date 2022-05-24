@@ -6,6 +6,9 @@
 .PHONY: lint docs
 lint:
 	pre-commit run -a
+	cd funcx_sdk; tox -e mypy; cd ..
+	cd funcx_endpoint; tox -e mypy; cd ..
+
 docs: .venv-docs
 	# clean the build dir before rebuilding
 	cd docs; rm -rf _build/
