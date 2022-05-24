@@ -6,11 +6,11 @@ import pytest
 
 
 @pytest.mark.parametrize("use_heartbeat", [None, 1])
-def test_no_heartbeat(start_result_q_publisher, conn_params, use_heartbeat):
+def test_no_heartbeat(start_result_q_publisher, pika_conn_params, use_heartbeat):
     """Confirm that result_q_publisher does not disconnect when delay
     between messages exceed heartbeat period
     """
-    conn_params = copy.deepcopy(conn_params)
+    conn_params = copy.deepcopy(pika_conn_params)
     conn_params.heartbeat = use_heartbeat
     conn_params.blocked_connection_timeout = 2
 

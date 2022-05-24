@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import multiprocessing
-import uuid
 
 # multiprocessing.Event is a method, not a class
 # to annotate, we need the "real" class
@@ -18,21 +17,6 @@ from funcx_endpoint.endpoint.rabbit_mq import (
     TaskQueuePublisher,
     TaskQueueSubscriber,
 )
-
-
-@pytest.fixture(scope="session")
-def default_endpoint_id():
-    return str(uuid.UUID(int=1))
-
-
-@pytest.fixture(scope="session")
-def other_endpoint_id():
-    return str(uuid.UUID(int=2))
-
-
-@pytest.fixture(scope="session")
-def rabbitmq_conn_url():
-    return "amqp://guest:guest@localhost:5672/"
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -52,11 +36,6 @@ def ensure_result_queue(rabbitmq_conn_url):
     channel.close()
     connection.close()
     return
-
-
-@pytest.fixture()
-def conn_params(rabbitmq_conn_url):
-    return pika.URLParameters(rabbitmq_conn_url)
 
 
 @pytest.fixture
@@ -83,7 +62,7 @@ def running_subscribers(request):
 
 
 @pytest.fixture
-def start_task_q_subscriber(running_subscribers, conn_params, default_endpoint_id):
+def start_task_q_subscriber(running_subscribers, pika_conn_params, default_endpoint_id):
     def func(
         *,
         endpoint_id: str | None = None,
@@ -98,7 +77,7 @@ def start_task_q_subscriber(running_subscribers, conn_params, default_endpoint_i
         if queue is None:
             queue = multiprocessing.Queue()
         task_q = TaskQueueSubscriber(
-            conn_params=conn_params if override_params is None else override_params,
+            conn_params=pika_conn_params if not override_params else override_params,
             external_queue=queue,
             kill_event=kill_event,
             endpoint_id=endpoint_id,
@@ -111,7 +90,7 @@ def start_task_q_subscriber(running_subscribers, conn_params, default_endpoint_i
 
 
 @pytest.fixture
-def start_result_q_subscriber(running_subscribers, conn_params):
+def start_result_q_subscriber(running_subscribers, pika_conn_params):
     def func(
         *,
         queue: multiprocessing.Queue | None = None,
@@ -123,7 +102,7 @@ def start_result_q_subscriber(running_subscribers, conn_params):
         if queue is None:
             queue = multiprocessing.Queue()
         result_q = ResultQueueSubscriber(
-            conn_params=conn_params if override_params is None else override_params,
+            conn_params=pika_conn_params if not override_params else override_params,
             external_queue=queue,
             kill_event=kill_event,
         )
@@ -148,7 +127,7 @@ def running_publishers(request):
 
 
 @pytest.fixture
-def start_result_q_publisher(running_publishers, conn_params, default_endpoint_id):
+def start_result_q_publisher(running_publishers, pika_conn_params, default_endpoint_id):
     def func(
         *,
         endpoint_id: str | None = None,
@@ -159,7 +138,7 @@ def start_result_q_publisher(running_publishers, conn_params, default_endpoint_i
             endpoint_id = default_endpoint_id
         result_pub = ResultQueuePublisher(
             endpoint_id=endpoint_id,
-            conn_params=conn_params if override_params is None else override_params,
+            conn_params=pika_conn_params if not override_params else override_params,
         )
         result_pub.connect()
         if queue_purge:  # Make sure queue is empty
@@ -171,7 +150,7 @@ def start_result_q_publisher(running_publishers, conn_params, default_endpoint_i
 
 
 @pytest.fixture
-def start_task_q_publisher(running_publishers, conn_params, default_endpoint_id):
+def start_task_q_publisher(running_publishers, pika_conn_params, default_endpoint_id):
     def func(
         *,
         endpoint_id: str | None = None,
@@ -182,7 +161,7 @@ def start_task_q_publisher(running_publishers, conn_params, default_endpoint_id)
             endpoint_id = default_endpoint_id
         task_pub = TaskQueuePublisher(
             endpoint_id=endpoint_id,
-            conn_params=conn_params if override_params is None else override_params,
+            conn_params=pika_conn_params if not override_params else override_params,
         )
         task_pub.connect()
         if queue_purge:  # Make sure queue is empty
