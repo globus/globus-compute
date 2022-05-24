@@ -298,8 +298,11 @@ class EndpointInterchange:
 
         self.initial_registration_complete = False
 
+        pika_params = pika.URLParameters(
+            self.task_q_connection_params["connection_url"]
+        )
         self._task_puller_proc = self.migrate_tasks_to_internal(
-            self.task_q_connection_params["pika_conn_params"],
+            pika_params,
             self.endpoint_id,
             self.pending_task_queue,
             self._quiesce_event,
@@ -310,7 +313,7 @@ class EndpointInterchange:
     def _main_loop(self):
         results_publisher = ResultQueuePublisher(
             endpoint_id=self.endpoint_id,
-            conn_params=self.result_q_connection_params["pika_conn_params"],
+            conn_params=self.result_q_connection_params,
         )
 
         with results_publisher.connect():
