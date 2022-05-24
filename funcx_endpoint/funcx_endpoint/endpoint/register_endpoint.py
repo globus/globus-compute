@@ -59,7 +59,6 @@ def register_endpoint(
             "endpoint_name": endpoint_name,
             # This is named endpoint_id for backward compatibility when
             # funcx-endpoint list is called
-            "connection_info": reg_info,
             "endpoint_id": endpoint_uuid,
         }
         json.dump(endpoint_info, fp)
