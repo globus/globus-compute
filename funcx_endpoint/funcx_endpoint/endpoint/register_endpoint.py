@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import typing as t
 
 import funcx_endpoint
@@ -50,7 +51,11 @@ def register_endpoint(
         endpoint_uuid,
         endpoint_version=funcx_endpoint.__version__,
     )
-    log.info(f"Registration returned: {reg_info}")
+    if reg_info.get("endpoint_id") != endpoint_uuid:
+        raise ValueError("Unexpected response from server: mismatched endpoint id.")
+
+    log_reg_info = re.subn(r"://.*?@", r"://u:p@", repr(reg_info))  # sanitize password
+    log.info(f"Registration returned: {log_reg_info}")
 
     # NOTE: While all registration info is saved to endpoint.json, only the
     # endpoint UUID is reused from this file.
