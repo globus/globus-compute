@@ -254,7 +254,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
         """
         if self._channel:
             logger.info("Sending a Basic.Cancel RPC command to RabbitMQ")
-            self._channel.basic_cancel(self.on_cancelok, self._consumer_tag)
+            self._channel.basic_cancel(
+                consumer_tag=self._consumer_tag, callback=self.on_cancelok
+            )
 
     def on_cancelok(self, unused_frame):
         """This method is invoked by pika when RabbitMQ acknowledges the
