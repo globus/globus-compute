@@ -104,9 +104,9 @@ class EndpointInterchange:
         self.funcx_client = FuncXClient(**funcx_client_options)
 
         self.initial_registration_complete = False
-        self.task_q_connection_params, self.result_q_connection_params = None, None
+        self.task_q_info, self.result_q_info = None, None
         if reg_info:
-            self.task_q_connection_params, self.result_q_connection_params = reg_info
+            self.task_q_info, self.result_q_info = reg_info
             self.initial_registration_complete = True
 
         self.heartbeat_period = self.config.heartbeat_period
@@ -171,7 +171,7 @@ class EndpointInterchange:
         reg_info = register_endpoint(
             self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name
         )
-        self.task_q_connection_params, self.result_q_connection_params = reg_info
+        self.task_q_info, self.result_q_info = reg_info
 
     def migrate_tasks_to_internal(
         self,
@@ -298,9 +298,7 @@ class EndpointInterchange:
 
         self.initial_registration_complete = False
 
-        pika_params = pika.URLParameters(
-            self.task_q_connection_params["connection_url"]
-        )
+        pika_params = pika.URLParameters(self.task_q_info["connection_url"])
         self._task_puller_proc = self.migrate_tasks_to_internal(
             pika_params,
             self.endpoint_id,
@@ -313,7 +311,7 @@ class EndpointInterchange:
     def _main_loop(self):
         results_publisher = ResultQueuePublisher(
             endpoint_id=self.endpoint_id,
-            conn_params=self.result_q_connection_params,
+            conn_params=self.result_q_info,
         )
 
         with results_publisher.connect():
