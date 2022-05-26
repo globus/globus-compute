@@ -274,7 +274,11 @@ class EndpointInterchange:
         self.start_executors()
 
         while not self._kill_event.is_set():
-            self._start_threads_and_main()
+            try:
+                self._start_threads_and_main()
+            except Exception:
+                log.exception("Unhandled exception in main kernel.")
+
             self.quiesce()
             # this check is solely for testing to force this loop to only run once
             if self._test_start:
@@ -300,75 +304,69 @@ class EndpointInterchange:
             self._quiesce_event,
         )
 
-        try:
-            self._main_loop()
-        except Exception:
-            log.exception("Unhandled exception")
-        finally:
-            self.results_outgoing.close()
-            log.info("Thread loop exiting")
+        self._main_loop()
 
     def _main_loop(self):
-
-        self.results_outgoing = ResultQueuePublisher(
+        results_publisher = ResultQueuePublisher(
             endpoint_id=self.endpoint_id,
             conn_params=self.result_q_connection_params["pika_conn_params"],
         )
 
-        self.results_outgoing.connect()
-
-        # TODO: this resend must happen after any endpoint re-registration to
-        # ensure there are not unacked results left
-        resend_results_messages = self.results_ack_handler.get_unacked_results_list()
-        if len(resend_results_messages) > 0:
-            log.info(
-                "Resending %s previously unacked results",
-                len(resend_results_messages),
+        with results_publisher.connect():
+            # TODO: this resend must happen after any endpoint re-registration to
+            # ensure there are not unacked results left
+            resend_results_messages = (
+                self.results_ack_handler.get_unacked_results_list()
             )
-
-        for results in resend_results_messages:
-            # TO-DO: Republishing backlogged/unacked messages is not supported
-            # until the types are sorted out
-            self.results_outgoing.publish(results)
-
-        executor = list(self.executors.values())[0]
-        last = time.time()
-
-        while not self._quiesce_event.is_set() and not self._kill_event.is_set():
-            if last + self.heartbeat_period < time.time():
-                log.debug("alive")
-                last = time.time()
-
-            self.results_ack_handler.check_ack_counts()
-
-            try:
-                task = self.pending_task_queue.get(block=True, timeout=0.01)
-                log.warning(f"Submitting task : {task}")
-                executor.submit_raw(task)
-            except queue.Empty:
-                pass
-            except Exception:
-                log.exception("Unhandled issue while waiting for pending tasks")
-
-            try:
-                results = self.results_passthrough.get(False, 0.01)
-
-                task_id = results["task_id"]
-                if task_id:
-                    self.results_ack_handler.put(task_id, results["message"])
-                    log.info(f"Passing result to forwarder for task {task_id}")
-
-                # results will be a pickled dict with task_id, container_id,
-                # and results/exception
-                log.warning(f"Publishing message {results['message']}")
-                self.results_outgoing.publish(results["message"])
-                log.warning(f"quiesce_Event : {self._quiesce_event.is_set()}")
-            except queue.Empty:
-                pass
-
-            except Exception:
-                log.exception(
-                    "Something broke while forwarding results from executor "
-                    "to forwarder queues"
+            if len(resend_results_messages) > 0:
+                log.info(
+                    "Resending %s previously unacked results",
+                    len(resend_results_messages),
                 )
-                continue
+
+            for results in resend_results_messages:
+                # TO-DO: Republishing backlogged/unacked messages is not supported
+                # until the types are sorted out
+                results_publisher.publish(results)
+
+            executor = list(self.executors.values())[0]
+            last = time.time()
+
+            while not self._quiesce_event.is_set() and not self._kill_event.is_set():
+                if last + self.heartbeat_period < time.time():
+                    log.debug("alive")
+                    last = time.time()
+
+                self.results_ack_handler.check_ack_counts()
+
+                try:
+                    task = self.pending_task_queue.get(block=True, timeout=0.01)
+                    log.warning(f"Submitting task : {task}")
+                    executor.submit_raw(task)
+                except queue.Empty:
+                    pass
+                except Exception:
+                    log.exception("Unhandled issue while waiting for pending tasks")
+
+                try:
+                    results = self.results_passthrough.get(False, 0.01)
+
+                    task_id = results["task_id"]
+                    if task_id:
+                        self.results_ack_handler.put(task_id, results["message"])
+                        log.info(f"Passing result to forwarder for task {task_id}")
+
+                    # results will be a pickled dict with task_id, container_id,
+                    # and results/exception
+                    log.warning(f"Publishing message {results['message']}")
+                    results_publisher.publish(results["message"])
+                    log.warning(f"quiesce_Event : {self._quiesce_event.is_set()}")
+                except queue.Empty:
+                    pass
+
+                except Exception:
+                    log.exception(
+                        "Something broke while forwarding results from executor "
+                        "to forwarder queues"
+                    )
+                    continue
