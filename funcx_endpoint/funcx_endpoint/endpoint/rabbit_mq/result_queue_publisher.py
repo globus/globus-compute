@@ -46,12 +46,14 @@ class ResultQueuePublisher:
 
         self.routing_key = f"{self.endpoint_id}.results"
 
-    def connect(self) -> None:
-        """Connect
+    def __enter__(self):
+        pass
 
-        :rtype: pika.BlockingConnection
-        """
-        logger.info(f"Connecting to {self.conn_params}")
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.status == RabbitPublisherStatus.connected:
+            self.close()
+
+    def connect(self) -> ResultQueuePublisher:
         self._connection = pika.BlockingConnection(self.conn_params)
         self._channel = self._connection.channel()
         self._channel.confirm_delivery()
@@ -66,6 +68,7 @@ class ResultQueuePublisher:
             routing_key=self.GLOBAL_ROUTING_KEY,
         )
         self.status = RabbitPublisherStatus.connected
+        return self
 
     def publish(self, message: bytes) -> None:
         """Publish message to RabbitMQ with the routing key to identify the message source
