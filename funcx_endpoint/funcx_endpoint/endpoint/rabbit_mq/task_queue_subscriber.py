@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import multiprocessing
 import signal
@@ -8,6 +10,9 @@ import signal
 from multiprocessing.synchronize import Event as EventType
 
 import pika
+import pika.channel
+import pika.exceptions
+import pika.frame
 
 from .base import SubscriberProcessStatus
 
@@ -28,7 +33,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self,
         *,
         endpoint_id: str,
-        conn_params: pika.connection.Parameters,
+        queue_info: dict,
         external_queue: multiprocessing.Queue,
         kill_event: EventType,
     ):
@@ -36,7 +41,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
         Parameters
         ----------
-        pika_conn_params: Connection Params
+        queue_info: Queue information
+             Dictionary that includes the key "connection_url", as well as exchange
+             and queue declaration information specified by the server.
 
         external_queue: multiprocessing.Queue
              Each incoming message will be pushed to the queue.
@@ -53,25 +60,25 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self.status = SubscriberProcessStatus.parent
 
         self.endpoint_id = endpoint_id
-        self.conn_params = conn_params
+        self.queue_info = queue_info
         self.external_queue = external_queue
         self.kill_event = kill_event
         self._channel_closed = multiprocessing.Event()
         self._cleanup_complete = multiprocessing.Event()
 
-        self.queue_name = f"{self.endpoint_id}.tasks"
-        self.routing_key = f"{self.endpoint_id}.tasks"
-
-        self._connection = None
-        self._channel = None
+        self._connection: pika.SelectConnection | None = None
+        self._channel: pika.channel.Channel | None = None
+        self._consumer_tag: str | None = None
 
         self._watcher_poll_period = 0.1  # seconds
         logger.debug("Init done")
 
     def _connect(self) -> pika.SelectConnection:
-        logger.info("Connecting to %s", self.conn_params)
+        logger.info("Connecting to %s", self.queue_info)
+
+        pika_params = pika.URLParameters(self.queue_info["connection_url"])
         return pika.SelectConnection(
-            self.conn_params,
+            pika_params,
             on_open_callback=self._on_connection_open,
             on_close_callback=self._on_connection_closed,
             on_open_error_callback=self._on_open_failed,
@@ -125,7 +132,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.info("Creating a new channel")
         self._connection.channel(on_open_callback=self._on_channel_open)
 
-    def _on_channel_open(self, channel):
+    def _on_channel_open(self, channel: pika.channel.Channel):
         """This method is invoked by pika when the channel has been opened.
         The channel object is passed in so we can make use of it.
 
@@ -137,9 +144,18 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.info(f"Channel opened: {channel}")
         self._channel = channel
 
-        logger.info("Adding channel close callback")
-        self._channel.add_on_close_callback(self._on_channel_closed)
-        self.start_consuming()
+        logger.debug("Adding channel close callback")
+        channel.add_on_close_callback(self._on_channel_closed)
+
+        logger.debug("Adding consumer cancellation callback")
+        channel.add_on_cancel_callback(self.on_consumer_cancelled)
+
+        logger.info(f"Ensuring exchange exists: {self.queue_info['exchange']}")
+        channel.exchange_declare(
+            passive=True,  # *we* don't create the exchange
+            callback=self._on_exchange_declareok,
+            exchange=self.queue_info["exchange"],
+        )
 
     def _on_channel_closed(self, channel, exception):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
@@ -168,12 +184,27 @@ class TaskQueueSubscriber(multiprocessing.Process):
         elif isinstance(exception, pika.exceptions.ChannelClosedByClient):
             logger.debug("Detected channel closed by client")
         else:
-            logger.exception(
-                f"Channel closed with code:{exception.reply_code}, "
-                f"error:{exception.reply_text}"
-            )
+            logger.exception("Channel closed by unhandled exception.")
         logger.debug("marking channel as closed")
         self._channel_closed.set()
+
+    def _on_exchange_declareok(self, _frame: pika.frame.Method):
+        """
+        Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC command.
+        """
+        logger.info(
+            "Exchange declared successfully.  Ensuring queue exists:"
+            f" {self.queue_info['queue']}"
+        )
+        assert self._channel is not None
+        self._channel.queue_declare(
+            passive=True,  # *we* don't create the queue, just consume it
+            callback=self._on_queue_declareok,
+            queue=self.queue_info["queue"],
+        )
+
+    def _on_queue_declareok(self, _frame: pika.frame.Method):
+        self.start_consuming()
 
     def start_consuming(self):
         """This method sets up the consumer by first calling
@@ -185,12 +216,11 @@ class TaskQueueSubscriber(multiprocessing.Process):
         will invoke when a message is fully received.
 
         """
-        logger.debug("Adding consumer cancellation callback")
-        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
-
         logger.info("Issuing consumer related RPC commands")
         self._consumer_tag = self._channel.basic_consume(
-            self.queue_name, on_message_callback=self.on_message, exclusive=True
+            queue=self.queue_info["queue"],
+            on_message_callback=self.on_message,
+            exclusive=True,
         )
 
     def on_consumer_cancelled(self, method_frame):
@@ -204,19 +234,19 @@ class TaskQueueSubscriber(multiprocessing.Process):
         if self._channel:
             self._channel.close()
 
-    def on_message(self, channel, basic_deliver, properties, body):
+    def on_message(
+        self,
+        channel: pika.channel.Channel,
+        basic_deliver: pika.spec.Basic.Deliver,
+        properties: pika.spec.BasicProperties,
+        body: bytes,
+    ):
         """Invoked by pika when a message is delivered from RabbitMQ. The
         channel is passed for your convenience. The basic_deliver object that
         is passed in carries the EXCHANGE_NAME, routing key, delivery tag and
         a redelivered flag for the message. The properties passed in is an
         instance of BasicProperties with the message properties and the body
         is the message that was sent.
-
-        :param pika.channel.Channel unused_channel: The channel object
-        :param pika.Spec.Basic.Deliver: basic_deliver method
-        :param pika.Spec.BasicProperties: properties
-        :param str|unicode body: The message body
-
         """
         logger.debug(
             "Received message from %s: %s, %s",
@@ -235,17 +265,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
             logger.exception("External queue put failed")
             channel.basic_nack(basic_deliver.delivery_tag, requeue=True)
         else:
-            self.acknowledge_message(basic_deliver.delivery_tag)
-
-    def acknowledge_message(self, delivery_tag):
-        """Acknowledge the message delivery from RabbitMQ by sending a
-        Basic.Ack RPC method for the delivery tag.
-
-        :param int delivery_tag: The delivery tag from the Basic.Deliver frame
-
-        """
-        logger.info(f"Acknowledging message {delivery_tag}")
-        self._channel.basic_ack(delivery_tag)
+            channel.basic_ack(basic_deliver.delivery_tag)
+            logger.debug("Acknowledged message: %s", basic_deliver.delivery_tag)
 
     def stop_consuming(self):
         """Tell RabbitMQ that you would like to stop consuming by sending the

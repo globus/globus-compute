@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 
 import pika
+import pika.channel
+import pika.exceptions
 from pika.adapters.blocking_connection import BlockingChannel
 
 from .base import RabbitPublisherStatus
@@ -15,34 +17,29 @@ class ResultQueuePublisher:
     the {endpoint_id}.results as a routing key.
     """
 
-    EXCHANGE_NAME = "results"
-    EXCHANGE_TYPE = "topic"
-    QUEUE_NAME = "results"
-    GLOBAL_ROUTING_KEY = "*.results"
-
     def __init__(
         self,
         *,
-        endpoint_id: str,
-        conn_params: dict,
+        queue_info: dict,
     ):
         """
         Parameters
         ----------
         endpoint_uuid: str
             Endpoint UUID string used to identify the endpoint
-        conn_params: pika.connection.Parameters
+        queue_info: pika.connection.Parameters
             Pika connection parameters to connect to RabbitMQ
         """
-        self.endpoint_id = endpoint_id
-        self.conn_params = conn_params
-        self._channel: pika.Channel | None = None
+        self.queue_info = queue_info
         self._channel: BlockingChannel | None = None
         self._connection: pika.BlockingConnection | None = None
         # start closed ("connected" after connect)
         self.status = RabbitPublisherStatus.closed
 
-        self.routing_key = f"{self.endpoint_id}.results"
+        publish_kw = dict(**self.queue_info["queue_publish_kwargs"])
+        if "properties" in publish_kw:
+            publish_kw["properties"] = pika.BasicProperties(**publish_kw["properties"])
+        self._publish_kwargs = publish_kw
 
     def __enter__(self):
         pass
@@ -52,12 +49,12 @@ class ResultQueuePublisher:
             self.close()
 
     def connect(self) -> ResultQueuePublisher:
-        pika_params = pika.URLParameters(self.conn_params["connection_url"])
+        pika_params = pika.URLParameters(self.queue_info["connection_url"])
         pika_params.heartbeat = 0  # result_q is blocking; no heartbeats warranted
         conn = pika.BlockingConnection(pika_params)
-
         channel = conn.channel()
-        channel.queue_declare(queue=self.QUEUE_NAME, passive=True, durable=True)
+        channel.exchange_declare(passive=True, exchange=self.queue_info["exchange"])
+        channel.queue_declare(passive=True, queue=self.queue_info["queue"])
         channel.confirm_delivery()
 
         self._connection = conn
@@ -75,20 +72,13 @@ class ResultQueuePublisher:
         if self._channel is None:
             raise ValueError("cannot publish() without first calling connect()")
 
-        publish_kwargs = {
-            "routing_key": self.conn_params["routing_key"],
-            "body": message,
-            "mandatory": True,
-            "properties": pika.BasicProperties(
-                delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
-            ),
-        }
         try:
-            self._channel.basic_publish(self.EXCHANGE_NAME, **publish_kwargs)
+            self._channel.basic_publish(body=message, **self._publish_kwargs)
         except pika.exceptions.AMQPError as err:
             logger.error(
                 f"Unable to deliver message to exchange.  Error text: {err}\n"
-                f"  Exchange name: {self.EXCHANGE_NAME}, kwargs: {publish_kwargs}"
+                f"  kwargs: {self._publish_kwargs}\n"
+                f"  message: {message!r}"
             )
             raise
 
