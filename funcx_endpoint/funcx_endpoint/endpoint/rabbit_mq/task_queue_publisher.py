@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import pika
+import pika.channel
 
 from .base import RabbitPublisherStatus
 
@@ -19,8 +20,7 @@ class TaskQueuePublisher:
     def __init__(
         self,
         *,
-        endpoint_id: str,
-        conn_params: pika.connection.Parameters,
+        queue_info: dict,
     ):
         """
         Parameters
@@ -30,31 +30,21 @@ class TaskQueuePublisher:
         conn_params: pika.connection.Parameters
              Pika connection parameters to connect to RabbitMQ
         """
-        self.endpoint_id = endpoint_id
-        self.queue_name = f"{self.endpoint_id}.tasks"
-        self.routing_key = f"{self.endpoint_id}.tasks"
-        self.conn_params = conn_params
-
-        self.exchange = "tasks"
-        self.exchange_type = "direct"
+        self.queue_info = queue_info
 
         self._connection: pika.BlockingConnection | None = None
-        self._channel: pika.Channel | None = None
+        self._channel: pika.channel.Channel | None = None
         # start closed ("connected" after connect)
         self.status = RabbitPublisherStatus.closed
 
     def connect(self):
         logger.debug("Connecting as server")
-        self._connection = pika.BlockingConnection(self.conn_params)
+        params = pika.URLParameters(self.queue_info["connection_url"])
+        self._connection = pika.BlockingConnection(params)
         self._channel = self._connection.channel()
-        self._channel.exchange_declare(
-            exchange=self.exchange, exchange_type=self.exchange_type
-        )
-        self._channel.queue_declare(queue=self.queue_name, durable=True)
-        self._channel.queue_bind(self.queue_name, self.exchange)
         self.status = RabbitPublisherStatus.connected
 
-    def publish(self, payload: bytes):
+    def publish(self, payload: bytes) -> None:
         """Publish a message to the endpoint from the service
 
         Parameters
@@ -64,9 +54,9 @@ class TaskQueuePublisher:
         """
         if self._channel is None:
             raise ValueError("cannot publish() without first calling connect()")
-        return self._channel.basic_publish(
-            self.exchange,
-            routing_key=self.routing_key,
+        self._channel.basic_publish(
+            self.queue_info["exchange"],
+            routing_key=self.queue_info["queue"],
             body=payload,
             mandatory=True,  # Raise error if message cannot be routed
         )

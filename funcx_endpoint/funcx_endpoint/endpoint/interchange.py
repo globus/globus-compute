@@ -15,7 +15,6 @@ import typing as t
 from multiprocessing.synchronize import Event as EventType
 from typing import Dict
 
-import pika
 from parsl.version import VERSION as PARSL_VERSION
 from retry.api import retry_call
 
@@ -175,7 +174,7 @@ class EndpointInterchange:
 
     def migrate_tasks_to_internal(
         self,
-        connection_params: pika.connection.Parameters,
+        connection_params: dict,
         endpoint_uuid: str,
         pending_task_queue: multiprocessing.Queue,
         quiesce_event: EventType,
@@ -204,7 +203,7 @@ class EndpointInterchange:
                 f" as {endpoint_uuid}"
             )
             task_q_proc = TaskQueueSubscriber(
-                conn_params=connection_params,
+                queue_info=connection_params,
                 external_queue=pending_task_queue,
                 kill_event=quiesce_event,
                 endpoint_id=endpoint_uuid,
@@ -298,9 +297,8 @@ class EndpointInterchange:
 
         self.initial_registration_complete = False
 
-        pika_params = pika.URLParameters(self.task_q_info["connection_url"])
         self._task_puller_proc = self.migrate_tasks_to_internal(
-            pika_params,
+            self.task_q_info,
             self.endpoint_id,
             self.pending_task_queue,
             self._quiesce_event,
@@ -310,8 +308,7 @@ class EndpointInterchange:
 
     def _main_loop(self):
         results_publisher = ResultQueuePublisher(
-            endpoint_id=self.endpoint_id,
-            conn_params=self.result_q_info,
+            queue_info=self.result_q_info,
         )
 
         with results_publisher.connect():
@@ -363,7 +360,6 @@ class EndpointInterchange:
                     # results will be a packed EPStatusReport or a packed Result
                     log.warning(f"Publishing message {message}")
                     results_publisher.publish(message)
-                    log.warning(f"quiesce_Event : {self._quiesce_event.is_set()}")
                 except queue.Empty:
                     pass
 

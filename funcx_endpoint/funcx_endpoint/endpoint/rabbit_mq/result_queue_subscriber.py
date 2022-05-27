@@ -131,6 +131,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
             exchange=self.EXCHANGE_NAME,
             exchange_type=self.EXCHANGE_TYPE,
             callback=self._on_exchange_declareok,
+            durable=True,
         )
 
     def _on_channel_closed(self, channel, exception):
