@@ -112,8 +112,8 @@ class Task(Message):
             # all of this code is going to be eliminated soonish by
             # funcx_common.messagepack in part because of issues like this
             add_ons = (
-                f"TID={self.task_id};CID={self.container_id};"
-                f"{self.task_buffer}"  # type: ignore
+                f"TID={self.task_id};CID={self.container_id};"  # type: ignore
+                f"{self.task_buffer}"
             )
             self.raw_buffer = add_ons.encode("utf-8")
 
