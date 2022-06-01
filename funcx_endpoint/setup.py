@@ -6,6 +6,7 @@ REQUIRES = [
     "requests>=2.20.0,<3",
     "globus-sdk",  # version will be bounded by `funcx`
     "funcx==0.4.0a1",
+    "funcx_common>=0.0.13",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer
