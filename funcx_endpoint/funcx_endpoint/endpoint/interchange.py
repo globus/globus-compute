@@ -23,6 +23,7 @@ import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
 from funcx.sdk.client import FuncXClient
 from funcx_endpoint import __version__ as funcx_endpoint_version
+from funcx_endpoint.endpoint.messages_compat import try_convert_to_messagepack
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
@@ -356,10 +357,11 @@ class EndpointInterchange:
                         self.results_ack_handler.put(task_id, results["message"])
                         log.info(f"Passing result to forwarder for task {task_id}")
 
-                    # results will be a pickled dict with task_id, container_id,
-                    # and results/exception
-                    log.warning(f"Publishing message {results['message']}")
-                    results_publisher.publish(results["message"])
+                    message = try_convert_to_messagepack(results["message"])
+
+                    # results will be a packed EPStatusReport or a packed Result
+                    log.warning(f"Publishing message {message}")
+                    results_publisher.publish(message)
                     log.warning(f"quiesce_Event : {self._quiesce_event.is_set()}")
                 except queue.Empty:
                     pass
