@@ -76,7 +76,8 @@ class ResultQueuePublisher:
             self._channel.basic_publish(body=message, **self._publish_kwargs)
         except pika.exceptions.AMQPError as err:
             logger.error(
-                f"Unable to deliver message to exchange.  Error text: {err}\n"
+                f"Unable to deliver message to exchange.\n"
+                f"  Error text: {err}\n"
                 f"  kwargs: {self._publish_kwargs}\n"
                 f"  message: {message!r}"
             )

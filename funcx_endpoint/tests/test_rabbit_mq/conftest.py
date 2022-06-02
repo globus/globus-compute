@@ -172,6 +172,8 @@ def start_result_q_subscriber(running_subscribers, pika_conn_params):
         )
         result_q.start()
         running_subscribers.append(result_q)
+        if not result_q.test_class_ready.wait(10):
+            raise AssertionError("Result Queue subscriber failed to initialize")
         return result_q
 
     return func

@@ -55,6 +55,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self.conn_params = conn_params
         self.external_queue = external_queue
         self.kill_event = kill_event
+        self.test_class_ready = multiprocessing.Event()
         self._channel_closed = multiprocessing.Event()
         self._cleanup_complete = multiprocessing.Event()
         self._watcher_poll_period_s = 0.1  # seconds
@@ -214,6 +215,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         logger.info("Adding consumer cancellation callback")
         self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
         logger.debug("Waiting for basic_consume")
+        self.test_class_ready.set()
         self._channel.basic_consume(
             self.QUEUE_NAME, on_message_callback=self.on_message, exclusive=True
         )
