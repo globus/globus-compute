@@ -36,18 +36,33 @@ class CouldNotExecuteUserTaskError(Exception):
     function but which does not come from the user function itself failing"""
 
 
+INTERNAL_ERROR_CLASSES: tuple[type[Exception], ...] = (
+    CouldNotExecuteUserTaskError,
+    MaxResultSizeExceeded,
+)
+
+
 def _get_result_error_details(
     exc: Exception,
 ) -> tuple[str, str]:
     # code, user_message
-    if isinstance(exc, MaxResultSizeExceeded):
-        return ("MaxResultSizeExceeded", f"remote error: {exc}")
-    if isinstance(exc, CouldNotExecuteUserTaskError):
-        return ("CouldNotExecuteUserTask", f"remote error: {exc}")
+    if isinstance(exc, INTERNAL_ERROR_CLASSES):
+        return (exc.__class__.__name__, f"remote error: {exc}")
     return (
         "RemoteExecutionError",
         "An error occurred during the execution of this task",
     )
+
+
+def _get_error_string() -> str:
+    exc_info = t.cast(
+        t.Tuple[t.Type[Exception], Exception, types.TracebackType],
+        sys.exc_info(),
+    )
+    exc_type, exc, tb = exc_info
+    if isinstance(exc, INTERNAL_ERROR_CLASSES):
+        return repr(exc)
+    return "".join(traceback.format_exception(exc_type, exc, _inner_traceback(tb)))
 
 
 def _now_ms() -> int:
@@ -161,19 +176,11 @@ class FuncXWorker:
 
         try:
             result = self.call_user_function(task_body)
-        except Exception:
+        except Exception as exc:
             log.exception("Caught an exception while executing user function")
-            exc_info = t.cast(
-                t.Tuple[t.Type[Exception], Exception, types.TracebackType],
-                sys.exc_info(),
-            )
-            exc_type, exc, tb = exc_info
-
             result_message = dict(
                 task_id=task_id,
-                exception="".join(
-                    traceback.format_exception(exc_type, exc, _inner_traceback(tb))
-                ),
+                exception=_get_error_string(),
                 error_details=_get_result_error_details(exc),
                 exec_start_ms=exec_start_ms,
                 exec_end_ms=_now_ms(),
