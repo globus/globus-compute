@@ -9,6 +9,8 @@ import signal
 import sys
 import time
 import traceback
+import types
+import typing as t
 
 import zmq
 
@@ -50,6 +52,13 @@ def _get_result_error_details(
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def _inner_traceback(tb: types.TracebackType, levels=2) -> types.TracebackType:
+    while levels > 0:
+        tb = tb.tb_next if tb.tb_next is not None else tb
+        levels -= 1
+    return tb
 
 
 class FuncXWorker:
@@ -154,11 +163,16 @@ class FuncXWorker:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
-            exc_type, exc, tb = sys.exc_info()
+            exc_info = t.cast(
+                t.Tuple[t.Type[Exception], Exception, types.TracebackType],
+                sys.exc_info(),
+            )
+            exc_type, exc, tb = exc_info
+
             result_message = dict(
                 task_id=task_id,
                 exception="".join(
-                    traceback.format_exception(exc_type, exc, tb.tb_next.tb_next)
+                    traceback.format_exception(exc_type, exc, _inner_traceback(tb))
                 ),
                 error_details=_get_result_error_details(exc),
                 exec_start_ms=exec_start_ms,
@@ -195,7 +209,7 @@ class FuncXWorker:
             messagepack.UnrecognizedProtocolVersion,
         ):
             task = Message.unpack(message)
-            task_data = task.task_buffer.decode("utf-8")
+            task_data = task.task_buffer.decode("utf-8")  # type: ignore[attr-defined]
 
         f, args, kwargs = self.serializer.unpack_and_deserialize(task_data)
         result_data = f(*args, **kwargs)
