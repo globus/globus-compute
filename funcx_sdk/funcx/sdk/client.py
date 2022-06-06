@@ -224,23 +224,20 @@ class FuncXClient:
         status = {"pending": pending, "status": r_status}
 
         if not pending:
-            if "result" in r_dict or "exception" in r_dict:
-                completion_t = r_dict["completion_t"]
-                if "result" in r_dict:
-                    try:
-                        r_obj = self.fx_serializer.deserialize(r_dict["result"])
-                    except Exception:
-                        raise SerializationError("Result Object Deserialization")
-                    else:
-                        status.update({"result": r_obj, "completion_t": completion_t})
-                elif "exception" in r_dict:
-                    raise FuncxTaskExecutionFailed(r_dict["exception"], completion_t)
+            if "result" not in r_dict and "exception" not in r_dict:
+                raise ValueError("non-pending result is missing result data")
+            completion_t = r_dict["completion_t"]
+            if "result" in r_dict:
+                try:
+                    r_obj = self.fx_serializer.deserialize(r_dict["result"])
+                except Exception:
+                    raise SerializationError("Result Object Deserialization")
                 else:
-                    raise ValueError("invalid result payload")
-
+                    status.update({"result": r_obj, "completion_t": completion_t})
+            elif "exception" in r_dict:
+                raise FuncxTaskExecutionFailed(r_dict["exception"], completion_t)
             else:
-                reason = r_dict.get("reason", str(r_dict))
-                status["exception"] = Exception(reason)
+                raise NotImplementedError("unreachable")
 
         self._task_status_table[task_id] = status
         return status
@@ -264,10 +261,7 @@ class FuncXClient:
 
         r = self.web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
-        try:
-            rets = self._update_task_table(r.text, task_id)
-        except Exception as e:
-            raise e
+        rets = self._update_task_table(r.text, task_id)
         return rets
 
     def get_result(self, task_id):

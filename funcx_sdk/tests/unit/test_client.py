@@ -4,6 +4,7 @@ from unittest import mock
 import pytest
 
 import funcx
+from funcx.errors import FuncxTaskExecutionFailed
 from funcx.serialize import FuncXSerializer
 
 
@@ -80,56 +81,46 @@ def test_client_init_accepts_specified_taskgroup():
 @pytest.mark.parametrize(
     "api_data",
     [
-        {"status": "Success", "result": True},
-        {"status": "success", "result": True},
-        # Weird but currently technically possible
-        {"status": "Failed", "result": True},
-        {"status": "failed", "exception": True},
-        {"status": "failed", "reason": "foo bar baz"},
-        {"status": "failed", "sentinel": 1},
-        {"status": "asdf", "sentinel": 1},
+        {"status": "Success"},  # success without result|exception
+        {"status": "FAILED"},  # failure without result|exception
+        "abc123",  # string, but not valid JSON
     ],
 )
-def test_update_task_table_is_robust(api_data, randomstring):
-    payload = randomstring()
-    exc = KeyError("asdf")
-    task_id = "some_task_id"
-    serde = FuncXSerializer()
-    data = dict(completion_t=1, **api_data)
-    if data.get("result"):
-        data["result"] = serde.serialize(payload)
-    if data.get("exception"):
-        data["exception"] = serde.serialize(exc)
-
-    # test kernel
+def test_update_task_table_on_invalid_data(api_data):
     fxc = funcx.FuncXClient(
         do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
     )
+
+    with pytest.raises(ValueError):
+        fxc._update_task_table(api_data, "task-id-foo")
+
+
+def test_update_task_table_on_exception():
+    api_data = {"status": "success", "exception": "foo-bar-baz", "completion_t": "1.1"}
+    fxc = funcx.FuncXClient(
+        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
+    )
+
+    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+        fxc._update_task_table(api_data, "task-id-foo")
+    assert "foo-bar-baz" in str(excinfo.value)
+
+
+def test_update_task_table_simple_object(randomstring):
+    serde = FuncXSerializer()
+    fxc = funcx.FuncXClient(
+        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
+    )
+    task_id = "some_task_id"
+
+    payload = randomstring()
+    data = {"status": "success", "completion_t": "1.1"}
+    data["result"] = serde.serialize(payload)
+
     st = fxc._update_task_table(data, task_id)
-
-    # verify results
-    if data.get("status", "").lower() in ("success", "failed"):
-        assert not st["pending"]
-    else:
-        assert st["pending"]
-
-    if "result" in data:
-        assert st["result"] == payload
-        assert "exception" not in st
-    elif not st["pending"]:
-        assert "result" not in st
-        assert "exception" in st
-
-    if "exception" in data:
-        assert exc.__class__ is st["exception"].__class__
-        assert exc.args == st["exception"].args
-    elif "reason" in data:
-        assert Exception is st["exception"].__class__
-        assert (data["reason"],) == st["exception"].args
-    elif not st["pending"] and "result" not in data:
-        assert Exception is st["exception"].__class__
-        for key in data:
-            assert str(key) in str(st["exception"].args)
+    assert not st["pending"]
+    assert st["result"] == payload
+    assert "exception" not in st
 
 
 def test_pending_tasks_always_fetched():

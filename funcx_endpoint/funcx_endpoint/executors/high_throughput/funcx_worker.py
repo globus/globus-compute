@@ -104,22 +104,16 @@ class FuncXWorker:
         log.error(f"Signal handler called with signal {signum}")
         sys.exit(1)
 
-    def registration_message(self):
-        return {"worker_id": self.worker_id, "worker_type": self.worker_type}
+    def _send_registration_message(self):
+        log.debug("Sending registration")
+        payload = {"worker_id": self.worker_id, "worker_type": self.worker_type}
+        self.task_socket.send_multipart([b"REGISTER", pickle.dumps(payload)])
 
     def start(self):
-
         log.info("Starting worker")
-
-        result = self.registration_message()
-        task_type = b"REGISTER"
-        log.debug("Sending registration")
-        self.task_socket.send_multipart(
-            [task_type, pickle.dumps(result)]  # Byte encoded
-        )
+        self._send_registration_message()
 
         while True:
-
             log.debug("Waiting for task")
             p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
             task_id: str = pickle.loads(p_task_id)
@@ -134,8 +128,6 @@ class FuncXWorker:
                 log.info(f"*** WORKER {self.worker_id} ABOUT TO DIE ***")
                 # Kill the worker after accepting death in message to manager.
                 sys.exit()
-                # We need to return here to allow for sys.exit mocking in tests
-                return
             else:
                 result = self.execute_task(task_id, msg)
                 result["container_id"] = container_id
