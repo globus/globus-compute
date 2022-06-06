@@ -17,6 +17,8 @@ try:
 except ImportError:
     from funcx.utils.errors import MaxResultSizeExceeded
 
+from funcx_common import messagepack
+
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message
 from funcx_endpoint.logging_config import setup_logging
@@ -27,12 +29,19 @@ DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
 
 
+class CouldNotExecuteUserTaskError(Exception):
+    """generic exception class for errors while attempting to setup and run the user
+    function but which does not come from the user function itself failing"""
+
+
 def _get_result_error_details(
     exc: Exception,
 ) -> tuple[str, str]:
     # code, user_message
     if isinstance(exc, MaxResultSizeExceeded):
         return ("MaxResultSizeExceeded", f"remote error: {exc}")
+    if isinstance(exc, CouldNotExecuteUserTaskError):
+        return ("CouldNotExecuteUserTask", f"remote error: {exc}")
     return (
         "RemoteExecutionError",
         "An error occurred during the execution of this task",
@@ -172,10 +181,23 @@ class FuncXWorker:
 
         Returns the result or throws exception.
         """
-        task = Message.unpack(message)
-        f, args, kwargs = self.serializer.unpack_and_deserialize(
-            task.task_buffer.decode("utf-8")
-        )
+        # try to unpack it as a messagepack message
+        try:
+            task = messagepack.unpack(message)
+            if not isinstance(task, messagepack.message_types.Task):
+                raise CouldNotExecuteUserTaskError(
+                    f"wrong type of message in worker: {type(task)}"
+                )
+            task_data = task.task_buffer
+        # on parse errors, failover to trying the "legacy" message reading
+        except (
+            messagepack.InvalidMessageError,
+            messagepack.UnrecognizedProtocolVersion,
+        ):
+            task = Message.unpack(message)
+            task_data = task.task_buffer.decode("utf-8")
+
+        f, args, kwargs = self.serializer.unpack_and_deserialize(task_data)
         result_data = f(*args, **kwargs)
         serialized_data = self.serialize(result_data)
 
