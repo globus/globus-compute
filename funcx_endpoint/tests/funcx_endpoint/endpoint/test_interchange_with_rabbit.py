@@ -7,9 +7,10 @@ import time
 import pika
 import pytest
 from parsl.providers import LocalProvider
+from tests.test_rabbit_mq.result_queue_subscriber import ResultQueueSubscriber
+from tests.test_rabbit_mq.task_queue_publisher import TaskQueuePublisher
 
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.rabbit_mq import ResultQueueSubscriber, TaskQueuePublisher
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
 from funcx_endpoint.endpoint.utils.config import Config

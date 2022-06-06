@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import multiprocessing
+import random
+import string
 
 # multiprocessing.Event is a method, not a class
 # to annotate, we need the "real" class
 # see: https://github.com/python/typeshed/issues/4266
-import random
-import string
 from multiprocessing.synchronize import Event as EventType
 
 import pika
 import pytest
 from pika.exchange_type import ExchangeType
+from tests.test_rabbit_mq.result_queue_subscriber import ResultQueueSubscriber
+from tests.test_rabbit_mq.task_queue_publisher import TaskQueuePublisher
 
 from funcx_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultQueuePublisher,
-    ResultQueueSubscriber,
-    TaskQueuePublisher,
     TaskQueueSubscriber,
 )
 
