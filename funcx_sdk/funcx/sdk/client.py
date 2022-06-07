@@ -8,7 +8,12 @@ import typing as t
 import uuid
 import warnings
 
-from funcx.errors import SerializationError, TaskPending, handle_response_errors
+from funcx.errors import (
+    FuncxTaskExecutionFailed,
+    SerializationError,
+    TaskPending,
+    handle_response_errors,
+)
 from funcx.sdk._environments import get_web_service_url, get_web_socket_url
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
@@ -219,33 +224,20 @@ class FuncXClient:
         status = {"pending": pending, "status": r_status}
 
         if not pending:
+            if "result" not in r_dict and "exception" not in r_dict:
+                raise ValueError("non-pending result is missing result data")
+            completion_t = r_dict["completion_t"]
             if "result" in r_dict:
                 try:
                     r_obj = self.fx_serializer.deserialize(r_dict["result"])
-                    completion_t = r_dict["completion_t"]
                 except Exception:
                     raise SerializationError("Result Object Deserialization")
                 else:
                     status.update({"result": r_obj, "completion_t": completion_t})
-
             elif "exception" in r_dict:
-                try:
-                    r_exception = self.fx_serializer.deserialize(r_dict["exception"])
-                    completion_t = r_dict["completion_t"]
-                    logger.info(f"Exception : {r_exception}")
-                except Exception:
-                    raise SerializationError("Task's exception object deserialization")
-                else:
-                    status.update(
-                        {
-                            "exception": r_exception,
-                            "completion_t": completion_t,
-                        }
-                    )
-
+                raise FuncxTaskExecutionFailed(r_dict["exception"], completion_t)
             else:
-                reason = r_dict.get("reason", str(r_dict))
-                status["exception"] = Exception(reason)
+                raise NotImplementedError("unreachable")
 
         self._task_status_table[task_id] = status
         return status
@@ -269,10 +261,7 @@ class FuncXClient:
 
         r = self.web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
-        try:
-            rets = self._update_task_table(r.text, task_id)
-        except Exception as e:
-            raise e
+        rets = self._update_task_table(r.text, task_id)
         return rets
 
     def get_result(self, task_id):

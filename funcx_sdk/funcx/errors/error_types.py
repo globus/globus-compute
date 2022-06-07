@@ -1,3 +1,6 @@
+import textwrap
+
+
 class FuncxError(Exception):
     """Base class for all funcx exceptions"""
 
@@ -119,3 +122,16 @@ class MaxResultSizeExceeded(Exception):
             f"Task result of {self.result_size}B exceeded current "
             f"limit of {self.result_size_limit}B"
         )
+
+
+class FuncxTaskExecutionFailed(Exception):
+    """
+    Error result from the remote end, wrapped as an exception object
+    """
+
+    def __init__(self, remote_data: str, completion_t: str):
+        self.remote_data = remote_data
+        self.completion_t = completion_t
+
+    def __str__(self) -> str:
+        return "\n" + textwrap.indent(self.remote_data, "    ")

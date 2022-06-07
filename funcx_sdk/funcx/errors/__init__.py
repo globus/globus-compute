@@ -1,6 +1,7 @@
 from .error_types import (
     FailureResponse,
     FuncxError,
+    FuncxTaskExecutionFailed,
     FuncXUnreachable,
     HTTPError,
     InvalidScopeException,
@@ -44,6 +45,7 @@ from .response_errors import (
 __all__ = (
     "FailureResponse",
     "FuncxError",
+    "FuncxTaskExecutionFailed",
     "FuncXUnreachable",
     "HTTPError",
     "InvalidScopeException",
