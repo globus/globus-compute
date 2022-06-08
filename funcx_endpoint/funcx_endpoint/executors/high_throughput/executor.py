@@ -26,7 +26,6 @@ from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from funcx_endpoint.executors.high_throughput.messages import (
     EPStatusReport,
     Heartbeat,
-    HeartbeatReq,
     Task,
     TaskCancel,
 )
@@ -718,11 +717,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         log.warning("Sending heartbeat to interchange")
         msg = Heartbeat(endpoint_id="")
         self.outgoing_q.put(msg.pack())
-
-    def wait_for_endpoint(self):
-        heartbeat = self.command_client.run(HeartbeatReq())
-        log.debug("Attempting heartbeat to interchange")
-        return heartbeat
 
     @property
     def outstanding(self):
