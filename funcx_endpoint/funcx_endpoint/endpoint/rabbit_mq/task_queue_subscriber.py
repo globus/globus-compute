@@ -8,6 +8,7 @@ import signal
 # to annotate, we need the "real" class
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
+from typing import Callable
 
 import pika
 import pika.channel
@@ -34,7 +35,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         *,
         endpoint_id: str,
         queue_info: dict,
-        external_queue: multiprocessing.Queue,
+        external_callback: Callable,
         kill_event: EventType,
     ):
         """
@@ -61,7 +62,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
         self.endpoint_id = endpoint_id
         self.queue_info = queue_info
-        self.external_queue = external_queue
+        self.external_callback = external_callback
         self.kill_event = kill_event
         self._channel_closed = multiprocessing.Event()
         self._cleanup_complete = multiprocessing.Event()
@@ -258,7 +259,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
         # Not sure if we need to do this in a locked context,
         # rabbit's ACK system should make sure you don't lose tasks.
         try:
-            self.external_queue.put(body)
+            self.external_callback(body)
+            # self.external_queue.put(body)
         except Exception:
             # No sense in waiting for the RMQ default 30m timeout; let it know
             # *now* that this message failed.

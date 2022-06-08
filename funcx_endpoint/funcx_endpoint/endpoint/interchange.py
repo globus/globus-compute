@@ -1,3 +1,4 @@
+import functools
 import logging
 import multiprocessing
 import os
@@ -32,6 +33,11 @@ log = logging.getLogger(__name__)
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
+
+
+def put_message_into_queue(queue: multiprocessing.Queue, body: str):
+    """Callback method that puts a message body into a Queue"""
+    return queue.put(body)
 
 
 class EndpointInterchange:
@@ -202,9 +208,10 @@ class EndpointInterchange:
                 f"[TASK_PULL_PROC Starting the TaskQueueSubscriber"
                 f" as {endpoint_uuid}"
             )
+            callback = functools.partial(put_message_into_queue, pending_task_queue)
             task_q_proc = TaskQueueSubscriber(
                 queue_info=connection_params,
-                external_queue=pending_task_queue,
+                external_callback=callback,
                 kill_event=quiesce_event,
                 endpoint_id=endpoint_uuid,
             )
