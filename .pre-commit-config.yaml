@@ -4,7 +4,7 @@ repos:
     - id: check-hooks-apply
     - id: check-useless-excludes
 - repo: https://github.com/pre-commit/pre-commit-hooks.git
-  rev: v4.2.0
+  rev: v4.3.0
   hooks:
     - id: check-merge-conflict
     - id: trailing-whitespace
@@ -24,7 +24,7 @@ repos:
       # which settings to use based on a file's directory
       args: ["--settings-path", ".isort.cfg"]
 - repo: https://github.com/asottile/pyupgrade
-  rev: v2.32.1
+  rev: v2.34.0
   hooks:
     - id: pyupgrade
       args: ["--py36-plus"]
