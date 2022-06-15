@@ -19,6 +19,7 @@ from typing import Any
 
 import psutil
 import zmq
+from funcx_common.tasks import TaskState
 from parsl.app.errors import RemoteExceptionWrapper
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -29,7 +30,6 @@ from funcx_endpoint.executors.high_throughput.messages import (
     ManagerStatusReport,
     Message,
     Task,
-    TaskStatusCode,
 )
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
 from funcx_endpoint.logging_config import setup_logging
@@ -240,7 +240,7 @@ class Manager:
         self.next_worker_q: list[str] = []  # FIFO queue for spinning up workers.
         self.worker_procs: dict[str, subprocess.Popen] = {}
 
-        self.task_status_deltas: dict[str, TaskStatusCode] = {}
+        self.task_status_deltas: dict[str, TaskState] = {}
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
@@ -646,7 +646,7 @@ class Manager:
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
             log.debug(f"Set task {task.task_id} to RUNNING")
-            self.task_status_deltas[task.task_id] = TaskStatusCode.RUNNING
+            self.task_status_deltas[task.task_id] = TaskState.RUNNING
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,
                 "task_type": task_type,
