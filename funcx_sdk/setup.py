@@ -18,6 +18,7 @@ REQUIRES = [
     # packaging, allowing version parsing
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
+    "funcx-common==0.0.14",
 ]
 DOCS_REQUIRES = [
     "sphinx<5",
