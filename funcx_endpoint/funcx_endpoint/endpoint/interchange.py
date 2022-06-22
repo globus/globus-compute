@@ -22,7 +22,10 @@ import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
 from funcx.sdk.client import FuncXClient
 from funcx_endpoint import __version__ as funcx_endpoint_version
-from funcx_endpoint.endpoint.messages_compat import try_convert_to_messagepack
+from funcx_endpoint.endpoint.messages_compat import (
+    try_convert_from_messagepack,
+    try_convert_to_messagepack,
+)
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
@@ -339,7 +342,10 @@ class EndpointInterchange:
                 self.results_ack_handler.check_ack_counts()
 
                 try:
-                    task = self.pending_task_queue.get(block=True, timeout=0.01)
+                    incoming_task = self.pending_task_queue.get(
+                        block=True, timeout=0.01
+                    )
+                    task = try_convert_from_messagepack(incoming_task)
                     log.warning(f"Submitting task : {task}")
                     executor.submit_raw(task)
                 except queue.Empty:
