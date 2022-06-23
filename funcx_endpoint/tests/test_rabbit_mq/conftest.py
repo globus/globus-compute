@@ -34,7 +34,7 @@ def ensure_result_queue(pika_conn_params):
                 "durable": True,
             }
         if not queue_opts:
-            queue_opts = {"queue": "results"}
+            queue_opts = {"queue": "results", "durable": True}
         # play nice with dev/test resources; auto clean
         queue_opts.setdefault("arguments", {"x-expires": 30 * 1000})
 

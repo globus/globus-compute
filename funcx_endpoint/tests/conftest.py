@@ -69,7 +69,7 @@ def _flush_results(pika_conn_params):
                 exchange_type="topic",
                 durable=True,
             )
-            chan.queue_declare(queue=queue_name)
+            chan.queue_declare(queue=queue_name, durable=True)
             chan.queue_purge(queue=queue_name)
 
 
