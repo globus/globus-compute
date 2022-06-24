@@ -45,4 +45,4 @@ jobs:
           SLACK_CHANNEL: '#commits'
           SLACK_MESSAGE_TITLE: 'Hourly Automated Tests'
           SLACK_FAILURE_MESSAGE: 'Hourly run failed'
-        run: ./.github/_support/github-slack-notify.py ${{ needs.test.result }}
+        run: ./.github/_support/github-slack-notify.py ${{ needs.smoke-test.result }}

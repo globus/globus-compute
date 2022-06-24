@@ -22,7 +22,7 @@ def statusemoji(status):
 
 
 def get_message_title():
-    return os.getenv("SLACK_MESSAGE_TITLE", "GitHub Actions Build")
+    return os.getenv("SLACK_MESSAGE_TITLE", "GitHub Actions Tests")
 
 
 def get_build_url():
@@ -97,7 +97,7 @@ def check_status_changed(status):
 
 
 def get_failure_message():
-    return os.getenv("SLACK_FAILURE_MESSAGE", "tests failed")
+    return os.getenv("SLACK_FAILURE_MESSAGE", "@here tests failed")
 
 
 def build_payload(status):

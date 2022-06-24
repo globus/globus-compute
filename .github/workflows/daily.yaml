@@ -57,6 +57,7 @@ jobs:
 
   slack-notify:
     needs:
+      - smoke-test-dev
       - safety-check-sdk
       - safety-check-endpoint
     if: always()
@@ -73,4 +74,4 @@ jobs:
           SLACK_CHANNEL: '#commits'
           SLACK_MESSAGE_TITLE: 'Daily Smoke Tests'
           SLACK_FAILURE_MESSAGE: 'Daily test failed'
-        run: ./.github/_support/github-slack-notify.py ${{ needs.test.result }}
+        run: ./.github/_support/github-slack-notify.py ${{ needs.smoke-test-dev.result }}
