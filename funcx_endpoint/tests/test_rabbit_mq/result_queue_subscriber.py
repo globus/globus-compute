@@ -170,7 +170,9 @@ class ResultQueueSubscriber(multiprocessing.Process):
 
         """
         logger.info("Exchange declared. Declaring queue %s", self.QUEUE_NAME)
-        self._channel.queue_declare(self.QUEUE_NAME, callback=self._on_queue_declareok)
+        self._channel.queue_declare(
+            self.QUEUE_NAME, callback=self._on_queue_declareok, durable=True
+        )
 
     def _on_queue_declareok(self, method_frame):
         """Method invoked by pika when the Queue.Declare RPC call made in
