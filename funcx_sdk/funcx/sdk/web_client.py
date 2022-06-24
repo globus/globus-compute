@@ -11,6 +11,7 @@ import typing as t
 import uuid
 
 import globus_sdk
+from funcx_common.sdk_version_sharing import user_agent_substring
 
 from funcx.sdk._environments import get_web_service_url
 from funcx.sdk.errors import FuncxAPIError
@@ -158,7 +159,7 @@ class FuncxWebClient(globus_sdk.BaseClient):
     @user_app_name.setter
     def user_app_name(self, value):
         self._user_app_name = value
-        app_name = f"funcx-sdk-{__version__}"
+        app_name = user_agent_substring(__version__)
         if value is not None:
             app_name += f"/{value}"
         globus_sdk.BaseClient.app_name.fset(self, app_name)
