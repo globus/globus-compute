@@ -16,6 +16,7 @@ from typing import Any, Sequence
 
 import daemon
 import zmq
+from funcx_common.tasks import TaskState
 from parsl.app.errors import RemoteExceptionWrapper
 from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
@@ -31,7 +32,6 @@ from funcx_endpoint.executors.high_throughput.messages import (
     Heartbeat,
     Message,
     MessageType,
-    TaskStatusCode,
 )
 from funcx_endpoint.logging_config import setup_logging
 
@@ -339,7 +339,7 @@ class Interchange:
 
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
-        self.task_status_deltas: dict[str, TaskStatusCode] = {}
+        self.task_status_deltas: dict[str, TaskState] = {}
         self.container_switch_count: dict[str, int] = {}
 
     def load_config(self):
@@ -457,7 +457,7 @@ class Interchange:
                     }
                 )
                 self.total_pending_task_count += 1
-                self.task_status_deltas[msg.task_id] = TaskStatusCode.WAITING_FOR_NODES
+                self.task_status_deltas[msg.task_id] = TaskState.WAITING_FOR_NODES
                 log.debug(
                     f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES"
                 )
@@ -891,7 +891,7 @@ class Interchange:
                             log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
                             self.task_status_deltas[
                                 task_id
-                            ] = TaskStatusCode.WAITING_FOR_LAUNCH
+                            ] = TaskState.WAITING_FOR_LAUNCH
 
             # Receive any results and forward to client
             if (

@@ -28,15 +28,6 @@ class MessageType(Enum):
         return MessageType(mtype), buffer[MESSAGE_TYPE_FORMATTER.size :]
 
 
-class TaskStatusCode(int, Enum):
-    WAITING_FOR_NODES = auto()
-    WAITING_FOR_LAUNCH = auto()
-    RUNNING = auto()
-    SUCCESS = auto()
-    FAILED = auto()
-    CANCELLED = auto()
-
-
 COMMAND_TYPES = {MessageType.HEARTBEAT_REQ, MessageType.TASK_CANCEL}
 
 
