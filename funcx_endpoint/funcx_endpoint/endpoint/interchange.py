@@ -400,7 +400,7 @@ class EndpointInterchange:
                 command = Message.unpack(buffer)
                 if command.type not in COMMAND_TYPES:
                     log.error("Received incorrect message type on command channel")
-                    self.command_channel.put(bytes())
+                    self.command_channel.put(b'')
                     continue
 
                 if command.type is MessageType.HEARTBEAT_REQ:
