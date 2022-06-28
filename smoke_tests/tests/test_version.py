@@ -24,27 +24,6 @@ def test_web_service(fxc, endpoint, funcx_test_config):
         ), f"Expected API version >={api_min_version}, got {service_version}"
 
 
-def test_forwarder(fxc, endpoint, funcx_test_config):
-    """This test checks 1) forwarder is online, 2) version of the forwarder"""
-    service_address = fxc.funcx_service_address
-
-    response = requests.get(f"{service_address}/version", params={"service": "all"})
-
-    assert response.status_code == 200, (
-        "Request to version expected status_code=200, "
-        f"got {response.status_code} instead"
-    )
-
-    forwarder_version = response.json()["forwarder"]
-    min_version = funcx_test_config.get("forwarder_min_version")
-    if min_version:
-        parsed_min = LooseVersion(min_version)
-        parsed_forwarder = LooseVersion(forwarder_version)
-        assert (
-            parsed_forwarder >= parsed_min
-        ), f"Expected Forwarder version >= {min_version}, got {forwarder_version}"
-
-
 def say_hello():
     return "Hello World!"
 

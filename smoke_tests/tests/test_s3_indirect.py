@@ -1,14 +1,6 @@
 import pytest
 
-try:
-    from funcx.errors import MaxResultSizeExceeded
-except ImportError:
-    try:
-        from funcx.utils.errors import MaxResultSizeExceeded
-    except ImportError:
-        from funcx_endpoint.executors.high_throughput.funcx_worker import (
-            MaxResultSizeExceeded,
-        )
+from funcx.errors import FuncxTaskExecutionFailed
 
 
 def large_result_producer(size: int) -> str:
@@ -34,15 +26,13 @@ def test_result_size_too_large(submit_function_and_get_result, endpoint):
     funcX should raise a MaxResultSizeExceeded exception when results exceeds 10MB
     limit
     """
-    r = submit_function_and_get_result(
-        endpoint, func=large_result_producer, func_args=(11 * 1024 * 1024,)
-    )
-    assert r.result is None
-    assert "exception" in r.response
-    # the exception that comes back is a wrapper, so we must "reraise()" to get the
-    # true error out
-    with pytest.raises(MaxResultSizeExceeded):
-        r.response["exception"].reraise()
+    # SDK wraps remote execution failures in FuncxTaskExecutionFailed exceptions...
+    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+        submit_function_and_get_result(
+            endpoint, func=large_result_producer, func_args=(11 * 1024 * 1024,)
+        )
+        # ...so unwrap the exception to verify that it's the right type
+        assert "MaxResultSizeExceeded" in excinfo.value.remote_data
 
 
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
