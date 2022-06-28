@@ -1,6 +1,5 @@
-from distutils.version import LooseVersion
-
 import requests
+from packaging.version import Version
 
 
 def test_web_service(fxc, endpoint, funcx_test_config):
@@ -17,8 +16,8 @@ def test_web_service(fxc, endpoint, funcx_test_config):
     service_version = response.json()
     api_min_version = funcx_test_config.get("api_min_version")
     if api_min_version is not None:
-        parsed_min = LooseVersion(api_min_version)
-        parsed_service = LooseVersion(service_version)
+        parsed_min = Version(api_min_version)
+        parsed_service = Version(service_version)
         assert (
             parsed_service >= parsed_min
         ), f"Expected API version >={api_min_version}, got {service_version}"
