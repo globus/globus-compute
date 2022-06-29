@@ -52,7 +52,7 @@ class FuncXClient:
         asynchronous=False,
         loop=None,
         results_ws_uri=None,
-        use_offprocess_checker=True,
+        use_offprocess_checker: bool = False,
         environment: str | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         do_version_check: bool = True,
@@ -99,7 +99,7 @@ class FuncXClient:
         use_offprocess_checker: Bool,
             Use this option to disable the offprocess_checker in the FuncXSerializer
             used by the client.
-            Default: True
+            Default: False
 
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this FuncXClient instance.  Typically,
