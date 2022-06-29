@@ -3,6 +3,44 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-0.4.0a2:
+
+funcx & funcx-endpoint v0.4.0a2
+-------------------------------
+
+Added
+^^^^^
+
+- The `FuncXWebClient` now sends version information via `User-Agent` headers
+  through the `app_name` property exposed by `globus-sdk`
+
+  - Additionally, users can send custom metadata alongside this version
+    information with `user_app_name`
+
+- The funcx-endpoint service now interfaces with RabbitMQ.
+  - As previously, the endpoint registers with the FuncX web service upon
+    startup, but now receives endpoint-specific RabbitMQ connection
+    configuration.
+
+Removed
+^^^^^^^
+
+- The config file in ``~/.funcx/config.py`` has been removed from any
+  application logic. The file will not be automatically cleaned up but is
+  ignored by the funcx-endpoint application.
+
+Changed
+^^^^^^^
+
+- The CLI interface for `funcx-endpoint` has been updated in several ways:
+
+  - `-h` is supported as a help option
+
+  - `funcx-endpoint --version` has been replaced with `funcx-endpoint version`
+
+- The `funcx` error module has been renamed from `funcx.utils.errors` to
+  `funcx.errors`
+
 funcx & funcx-endpoint v0.4.0a1
 -------------------------------
 
