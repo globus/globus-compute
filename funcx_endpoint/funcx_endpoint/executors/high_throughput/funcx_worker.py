@@ -13,14 +13,9 @@ import types
 import typing as t
 
 import zmq
-
-try:
-    from funcx.errors import MaxResultSizeExceeded
-except ImportError:
-    from funcx.utils.errors import MaxResultSizeExceeded
-
 from funcx_common import messagepack
 
+from funcx.errors import MaxResultSizeExceeded
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput.messages import Message
 from funcx_endpoint.logging_config import setup_logging
