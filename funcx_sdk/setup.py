@@ -27,7 +27,6 @@ DOCS_REQUIRES = [
 
 TEST_REQUIRES = [
     "flake8==3.8.0",
-    "numpy",
     "pytest",
     "pytest-mock",
     "coverage",
