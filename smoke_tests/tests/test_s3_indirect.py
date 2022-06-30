@@ -1,7 +1,12 @@
 import pytest
 from funcx_common.task_storage.default_storage import DEFAULT_REDIS_STORAGE_THRESHOLD
 
-from funcx.errors import FuncxTaskExecutionFailed
+try:
+    from funcx.errors import FuncxTaskExecutionFailed
+
+    has_task_exec_error_type = True
+except ImportError:
+    has_task_exec_error_type = False
 
 
 def large_result_producer(size: int) -> str:
@@ -26,6 +31,9 @@ def test_allowed_result_sizes(submit_function_and_get_result, endpoint, size):
     assert len(r.result) == size
 
 
+@pytest.mark.skipif(
+    not has_task_exec_error_type, reason="Test requires newer execution exception type"
+)
 def test_result_size_too_large(submit_function_and_get_result, endpoint):
     """
     funcX should raise a MaxResultSizeExceeded exception when results exceeds 10MB

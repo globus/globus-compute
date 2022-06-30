@@ -2,4 +2,4 @@
 prod:
 	tox
 dev:
-	tox -- --funcx-config dev
+	tox -e localdeps -- --funcx-config dev
