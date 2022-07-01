@@ -1,9 +1,5 @@
 from abc import ABCMeta, abstractmethod
 
-# GLOBALS
-METHODS_MAP_CODE = {}
-METHODS_MAP_DATA = {}
-
 
 class DeserializationError(Exception):
     """Base class for all deserialization errors"""
@@ -18,40 +14,13 @@ class DeserializationError(Exception):
         return self.__repr__()
 
 
-class fxPicker_enforcer(metaclass=ABCMeta):
-    """Ensure that any concrete class will have the serialize and deserialize methods"""
-
-    @abstractmethod
-    def serialize(self, data):
-        pass
-
-    @abstractmethod
-    def deserialize(self, payload):
-        pass
-
-
-class fxPicker_shared:
-    """Adds shared functionality for all serializer implementations"""
-
-    def __init_subclass__(cls, *args, **kwargs):
-        """This forces all child classes to register themselves as
-        methods for serializing code or data
-        """
-        super().__init_subclass__(*args, **kwargs)
-        if cls._for_code:
-            METHODS_MAP_CODE[cls._identifier] = cls
-        else:
-            METHODS_MAP_DATA[cls._identifier] = cls
+class SerializeBase(metaclass=ABCMeta):
+    """Shared functionality for all serializer implementations"""
 
     @property
+    @abstractmethod
     def identifier(self):
-        """Get the identifier of the serialization method
-
-        Returns
-        -------
-        identifier : str
-        """
-        return self._identifier
+        pass
 
     def chomp(self, payload):
         """If the payload starts with the identifier, return the remaining block
@@ -77,6 +46,14 @@ class fxPicker_shared:
         except Exception as e:
             raise SerializerError(f"Serialize-Deserialize combo failed due to {e}")
 
+    @abstractmethod
+    def serialize(self, data):
+        raise NotImplementedError("Concrete class did not implement serialize")
+
+    @abstractmethod
+    def deserialize(self, payload):
+        raise NotImplementedError("Concrete class did not implement deserialize")
+
 
 class SerializerError:
     def __init__(self, reason):
@@ -87,14 +64,3 @@ class SerializerError:
 
     def __repr__(self):
         return self.__str__()
-
-
-class RemoteExceptionWrapper:
-    def __init__(self, e_type, e_value, traceback):
-
-        self.e_type = e_type
-        self.e_value = e_value
-        self.e_traceback = traceback
-
-    def reraise(self):
-        raise self.e_value.with_traceback(self.e_traceback)

@@ -32,7 +32,6 @@ def test_client_init_sets_addresses_by_env(
     kwargs = {
         "login_manager": mock.Mock(),
         "do_version_check": False,
-        "use_offprocess_checker": False,
     }
     # either pass the env as a param or set it in the environment
     if usage_method == "param":
@@ -72,7 +71,6 @@ def test_client_init_accepts_specified_taskgroup():
     fxc = funcx.FuncXClient(
         task_group_id=tg_uuid,
         do_version_check=False,
-        use_offprocess_checker=False,
         login_manager=mock.Mock(),
     )
     assert fxc.session_task_group_id == str(tg_uuid)
@@ -87,9 +85,7 @@ def test_client_init_accepts_specified_taskgroup():
     ],
 )
 def test_update_task_table_on_invalid_data(api_data):
-    fxc = funcx.FuncXClient(
-        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
-    )
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(ValueError):
         fxc._update_task_table(api_data, "task-id-foo")
@@ -97,9 +93,7 @@ def test_update_task_table_on_invalid_data(api_data):
 
 def test_update_task_table_on_exception():
     api_data = {"status": "success", "exception": "foo-bar-baz", "completion_t": "1.1"}
-    fxc = funcx.FuncXClient(
-        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
-    )
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
         fxc._update_task_table(api_data, "task-id-foo")
@@ -108,9 +102,7 @@ def test_update_task_table_on_exception():
 
 def test_update_task_table_simple_object(randomstring):
     serde = FuncXSerializer()
-    fxc = funcx.FuncXClient(
-        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
-    )
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     task_id = "some_task_id"
 
     payload = randomstring()
@@ -128,9 +120,7 @@ def test_pending_tasks_always_fetched():
     should_fetch_02 = str(uuid.uuid4())
     no_fetch = str(uuid.uuid4())
 
-    fxc = funcx.FuncXClient(
-        do_version_check=False, use_offprocess_checker=False, login_manager=mock.Mock()
-    )
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     fxc.web_client = mock.MagicMock()
     fxc._task_status_table.update(
         {should_fetch_01: {"pending": True}, no_fetch: {"pending": False}}

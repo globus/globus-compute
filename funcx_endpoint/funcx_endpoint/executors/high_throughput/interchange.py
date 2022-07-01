@@ -5,7 +5,6 @@ import collections
 import json
 import logging
 import os
-import pickle
 import platform
 import queue
 import signal
@@ -15,6 +14,7 @@ import time
 from typing import Any, Sequence
 
 import daemon
+import dill
 import zmq
 from funcx_common.tasks import TaskState
 from parsl.app.errors import RemoteExceptionWrapper
@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2**32) - 1
-PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
+PKL_HEARTBEAT_CODE = dill.dumps(HEARTBEAT_CODE)
 
 
 class ManagerLost(Exception):
@@ -250,8 +250,8 @@ class Interchange:
         self.pending_task_queue: dict[str, queue.Queue] = {}
         self.containers: dict[str, str] = {}
         self.total_pending_task_count = 0
-        # off_process_checker is unnecessary on endpoint-side
-        client_args = {"use_offprocess_checker": False}
+
+        client_args = {}
         if funcx_service_address:
             client_args["funcx_service_address"] = funcx_service_address
         self.fxs = FuncXClient(**client_args)
@@ -792,8 +792,8 @@ class Interchange:
                                 "task_id": -1,
                                 "exception": self.serializer.serialize(e),
                             }
-                            pkl_package = pickle.dumps(result_package)
-                            self.results_outgoing.send(pickle.dumps([pkl_package]))
+                            pkl_package = dill.dumps(result_package)
+                            self.results_outgoing.send(dill.dumps([pkl_package]))
                         else:
                             log.debug(
                                 "Suppressing bad registration from manager: %s",
@@ -808,7 +808,7 @@ class Interchange:
                             [manager, b"", PKL_HEARTBEAT_CODE]
                         )
                     else:
-                        manager_adv = pickle.loads(message[1])
+                        manager_adv = dill.loads(message[1])
                         log.debug(f"Manager {manager} requested {manager_adv}")
                         self._ready_manager_queue[manager]["free_capacity"].update(
                             manager_adv
@@ -856,7 +856,7 @@ class Interchange:
                         f"Task:{task_id} on manager:{manager} is "
                         "now CANCELLED while running"
                     )
-                    cancel_message = pickle.dumps(("TASK_CANCEL", task_id))
+                    cancel_message = dill.dumps(("TASK_CANCEL", task_id))
                     self.task_outgoing.send_multipart([manager, b"", cancel_message])
 
                 except queue.Empty:
@@ -870,7 +870,7 @@ class Interchange:
                             str(tasks)[:50], manager
                         )
                     )
-                    serializd_raw_tasks_buffer = pickle.dumps(tasks)
+                    serializd_raw_tasks_buffer = dill.dumps(tasks)
                     self.task_outgoing.send_multipart(
                         [manager, b"", serializd_raw_tasks_buffer]
                     )
@@ -882,7 +882,7 @@ class Interchange:
                             and task_id in self.task_cancel_pending_trap
                         ):
                             log.info(f"Task:{task_id} CANCELLED before launch")
-                            cancel_message = pickle.dumps(("TASK_CANCEL", task_id))
+                            cancel_message = dill.dumps(("TASK_CANCEL", task_id))
                             self.task_outgoing.send_multipart(
                                 [manager, b"", cancel_message]
                             )
@@ -934,7 +934,7 @@ class Interchange:
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
                     for b_message in b_messages:
-                        r = pickle.loads(b_message)
+                        r = dill.loads(b_message)
                         if "times" not in r:
                             r["times"] = {}
                         r["times"]["interchange_result"] = time.time()
@@ -960,7 +960,7 @@ class Interchange:
                     # TODO: handle this with a Task message or something?
                     # previously used this; switched to mono-message,
                     # self.results_outgoing.send_multipart(b_messages)
-                    self.results_outgoing.send(pickle.dumps(b_messages))
+                    self.results_outgoing.send(dill.dumps(b_messages))
                     interesting_managers.add(manager)
 
                     log.debug(
@@ -1006,20 +1006,20 @@ class Interchange:
                                     RemoteExceptionWrapper(*sys.exc_info())
                                 ),
                             }
-                            pkl_package = pickle.dumps(result_package)
+                            pkl_package = dill.dumps(result_package)
                             bad_manager_msgs.append(pkl_package)
                 log.warning(f"Sent failure reports, unregistering manager {manager}")
                 self._ready_manager_queue.pop(manager, "None")
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
             if bad_manager_msgs:
-                self.results_outgoing.send(pickle.dumps(bad_manager_msgs))
+                self.results_outgoing.send(dill.dumps(bad_manager_msgs))
             log.trace("ending one main loop iteration")
 
             if self._status_request.is_set():
                 log.info("status request response")
                 result_package = self.get_status_report()
-                pkl_package = pickle.dumps(result_package)
+                pkl_package = dill.dumps(result_package)
                 self.results_outgoing.send(pkl_package)
                 log.info("Sent info response")
                 self._status_request.clear()

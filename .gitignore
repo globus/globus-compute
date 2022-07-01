@@ -127,3 +127,8 @@ venv.bak/
 # emacs buffers
 \#*
 
+# Intellij
+.idea/
+
+# MacOS Finder Cache
+.DS_Store

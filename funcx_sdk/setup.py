@@ -12,7 +12,7 @@ REQUIRES = [
     # dill is an extension of `pickle` to a wider array of native python types
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear
     # versioning and compatibility policy
-    "dill==0.3.4",
+    "dill==0.3.5.1",
     # typing_extensions, so we can use Protocol and other typing features on python3.7
     'typing_extensions>=4.0;python_version<"3.8"',
     # packaging, allowing version parsing
@@ -74,7 +74,6 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering",
     ],
-    scripts=["funcx/serialize/off_process_checker.py"],
     keywords=["funcX", "FaaS", "Function Serving"],
     author="funcX team",
     author_email="labs@globus.org",

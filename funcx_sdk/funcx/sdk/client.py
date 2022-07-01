@@ -52,7 +52,6 @@ class FuncXClient:
         asynchronous=False,
         loop=None,
         results_ws_uri=None,
-        use_offprocess_checker: bool = False,
         environment: str | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         do_version_check: bool = True,
@@ -96,11 +95,6 @@ class FuncXClient:
         instance. If None, then we will access asyncio.get_event_loop()
         Default: None
 
-        use_offprocess_checker: Bool,
-            Use this option to disable the offprocess_checker in the FuncXSerializer
-            used by the client.
-            Default: False
-
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this FuncXClient instance.  Typically,
             one uses this to submit new tasks to an existing session or to reestablish
@@ -117,7 +111,6 @@ class FuncXClient:
             results_ws_uri = get_web_socket_url(environment)
 
         self._task_status_table: t.Dict[str, t.Dict] = {}
-        self.use_offprocess_checker = use_offprocess_checker
         self.funcx_home = os.path.expanduser(funcx_home)
         self.session_task_group_id = (
             task_group_id and str(task_group_id) or str(uuid.uuid4())
@@ -147,9 +140,7 @@ class FuncXClient:
         self.web_client = self.login_manager.get_funcx_web_client(
             base_url=funcx_service_address
         )
-        self.fx_serializer = FuncXSerializer(
-            use_offprocess_checker=self.use_offprocess_checker
-        )
+        self.fx_serializer = FuncXSerializer()
 
         self.funcx_service_address = funcx_service_address
 
