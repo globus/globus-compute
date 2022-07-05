@@ -13,6 +13,7 @@ def get_web_service_url(envname: str | None) -> str:
     urls = {
         "production": "https://api2.funcx.org/v2",
         "dev": "https://api.dev.funcx.org/v2",
+        "local": "http://localhost:5000/v2",
     }
     return urls.get(env, urls["production"])
 
@@ -22,6 +23,7 @@ def get_web_socket_url(envname: str | None) -> str:
     urls = {
         "production": "wss://api2.funcx.org/ws/v2/",
         "dev": "wss://api.dev.funcx.org/ws/v2/",
+        "local": "ws://localhost:6000/v2",
     }
     return urls.get(env, urls["production"])
 
