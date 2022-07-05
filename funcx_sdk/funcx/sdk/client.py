@@ -14,7 +14,11 @@ from funcx.errors import (
     TaskPending,
     handle_response_errors,
 )
-from funcx.sdk._environments import get_web_service_url, get_web_socket_url
+from funcx.sdk._environments import (
+    get_web_service_url,
+    get_web_socket_url,
+    urls_might_mismatch,
+)
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from funcx.sdk.search import SearchHelper
@@ -115,6 +119,14 @@ class FuncXClient:
             funcx_service_address = get_web_service_url(environment)
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
+
+        if urls_might_mismatch(funcx_service_address, results_ws_uri):
+            logger.warning(
+                f"funcx_service_address={funcx_service_address} and "
+                f"results_ws_uri={results_ws_uri} "
+                "look like they might point to different environments. double check "
+                "that they are the correct URLs."
+            )
 
         self._task_status_table: t.Dict[str, t.Dict] = {}
         self.use_offprocess_checker = use_offprocess_checker
