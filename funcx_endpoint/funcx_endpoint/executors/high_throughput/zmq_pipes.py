@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import logging
-import pickle
 import time
 
+import dill
 import zmq
 
 from funcx_endpoint.executors.high_throughput.messages import Message
@@ -153,8 +153,8 @@ class ResultsIncoming:
     def get(self, block=True, timeout=None):
         block_messages = self.results_receiver.recv()
         try:
-            res = pickle.loads(block_messages)
-        except pickle.UnpicklingError:
+            res = dill.loads(block_messages)
+        except dill.UnpicklingError:
             try:
                 res = Message.unpack(block_messages)
             except Exception:
@@ -165,7 +165,7 @@ class ResultsIncoming:
         return res
 
     def request_close(self):
-        status = self.results_receiver.send(pickle.dumps(None))
+        status = self.results_receiver.send(dill.dumps(None))
         time.sleep(0.1)
         return status
 

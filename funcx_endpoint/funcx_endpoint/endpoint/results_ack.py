@@ -1,7 +1,8 @@
 import logging
 import os
-import pickle
 import time
+
+import dill
 
 log = logging.getLogger(__name__)
 
@@ -78,15 +79,15 @@ class ResultsAckHandler:
     def persist(self):
         """Save unacked results to disk"""
         with open(self.data_path, "wb") as fp:
-            pickle.dump(self.unacked_results, fp)
+            dill.dump(self.unacked_results, fp)
 
     def load(self):
         """Load unacked results from disk"""
         try:
             if os.path.exists(self.data_path):
                 with open(self.data_path, "rb") as fp:
-                    self.unacked_results = pickle.load(fp)
-        except pickle.UnpicklingError:
+                    self.unacked_results = dill.load(fp)
+        except dill.UnpicklingError:
             log.warning(
                 "Cached results %s appear to be corrupt. "
                 "Proceeding without loading cached results",

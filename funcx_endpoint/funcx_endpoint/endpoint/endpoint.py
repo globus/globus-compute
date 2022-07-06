@@ -115,7 +115,7 @@ class Endpoint:
         """
         # construct client to force login flow
         # FIXME: `funcx` should provide a cleaner way of doing login
-        FuncXClient(do_version_check=False, use_offprocess_checker=False)
+        FuncXClient(do_version_check=False)
 
         if os.path.exists(self.funcx_dir):
             click.confirm(
@@ -161,8 +161,7 @@ class Endpoint:
             )
 
         funcx_client_options = {
-            "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "use_offprocess_checker": False,
+            "funcx_service_address": endpoint_config.config.funcx_service_address
         }
         funcx_client = FuncXClient(**funcx_client_options)
 

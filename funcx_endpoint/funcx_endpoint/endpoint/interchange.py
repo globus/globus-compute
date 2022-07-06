@@ -1,7 +1,6 @@
 import logging
 import multiprocessing
 import os
-import pickle
 import platform
 import queue
 import signal
@@ -15,6 +14,7 @@ import typing as t
 from multiprocessing.synchronize import Event as EventType
 from typing import Dict
 
+import dill
 from parsl.version import VERSION as PARSL_VERSION
 from retry.api import retry_call
 
@@ -34,7 +34,7 @@ log = logging.getLogger(__name__)
 
 LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2**32) - 1
-PKL_HEARTBEAT_CODE = pickle.dumps(HEARTBEAT_CODE)
+PKL_HEARTBEAT_CODE = dill.dumps(HEARTBEAT_CODE)
 
 
 class EndpointInterchange:
@@ -101,8 +101,6 @@ class EndpointInterchange:
 
         if funcx_client_options is None:
             funcx_client_options = {}
-        # off_process checker is only needed on client side
-        funcx_client_options["use_offprocess_checker"] = False
         self.funcx_client = FuncXClient(**funcx_client_options)
 
         self.initial_registration_complete = False

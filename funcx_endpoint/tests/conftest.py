@@ -159,7 +159,6 @@ def get_standard_funcx_client():
 
     def func():
         return funcx.FuncXClient(
-            use_offprocess_checker=False,
             login_manager=FakeLoginManager(),
             do_version_check=False,
         )

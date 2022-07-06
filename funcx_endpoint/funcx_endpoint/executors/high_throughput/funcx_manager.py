@@ -7,7 +7,6 @@ import logging
 import math
 import multiprocessing
 import os
-import pickle
 import platform
 import queue
 import subprocess
@@ -17,6 +16,7 @@ import time
 import uuid
 from typing import Any
 
+import dill
 import psutil
 import zmq
 from funcx_common.tasks import TaskState
@@ -325,7 +325,7 @@ class Manager:
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
                 log.trace(f"Requesting tasks: {ads}")
-                msg = pickle.dumps(ads)
+                msg = dill.dumps(ads)
                 self.task_incoming.send(msg)
 
             # Receive results from the workers, if any
@@ -350,7 +350,7 @@ class Manager:
                 #   )
                 poll_timer = 0
                 _, pkl_msg = self.task_incoming.recv_multipart()
-                message = pickle.loads(pkl_msg)
+                message = dill.loads(pkl_msg)
                 last_interchange_contact = time.time()
 
                 if message == "STOP":
@@ -409,7 +409,7 @@ class Manager:
                                     RemoteExceptionWrapper(*sys.exc_info())
                                 ),
                             }
-                            self.pending_result_queue.put(pickle.dumps(result_package))
+                            self.pending_result_queue.put(dill.dumps(result_package))
 
                         worker_proc = self.worker_map.add_worker(
                             worker_id=str(self.worker_map.worker_id_counter),
@@ -575,7 +575,7 @@ class Manager:
         try:
             w_id, m_type, message = self.funcx_task_socket.recv_multipart()
             if m_type == b"REGISTER":
-                reg_info = pickle.loads(message)
+                reg_info = dill.loads(message)
                 log.debug(f"Registration received from worker:{w_id} {reg_info}")
                 self.worker_map.register_worker(w_id, reg_info["worker_type"])
 
@@ -583,7 +583,7 @@ class Manager:
                 # the following steps are also shared by task_cancel
                 with self.task_finalization_lock:
                     log.debug(f"Result received from worker: {w_id}")
-                    task_id = pickle.loads(message)["task_id"]
+                    task_id = dill.loads(message)["task_id"]
                     try:
                         self.remove_task(task_id)
                     except KeyError:
@@ -619,7 +619,7 @@ class Manager:
                 log.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
 
             if test:
-                return pickle.loads(message)
+                return dill.loads(message)
 
         except Exception:
             log.exception("Unhandled exception while processing worker messages")
@@ -638,8 +638,8 @@ class Manager:
         # TODO: Some duplication of work could be avoided here
         to_send = [
             worker_id,
-            pickle.dumps(task.task_id),
-            pickle.dumps(task.container_id),
+            dill.dumps(task.task_id),
+            dill.dumps(task.container_id),
             task.pack(),
         ]
         self.funcx_task_socket.send_multipart(to_send)

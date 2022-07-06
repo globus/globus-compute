@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
 import logging
 import os
-import pickle
 import signal
 import sys
 import time
@@ -12,6 +10,7 @@ import traceback
 import types
 import typing as t
 
+import dill
 import zmq
 from funcx_common import messagepack
 
@@ -135,7 +134,7 @@ class FuncXWorker:
     def _send_registration_message(self):
         log.debug("Sending registration")
         payload = {"worker_id": self.worker_id, "worker_type": self.worker_type}
-        self.task_socket.send_multipart([b"REGISTER", pickle.dumps(payload)])
+        self.task_socket.send_multipart([b"REGISTER", dill.dumps(payload)])
 
     def start(self):
         log.info("Starting worker")
@@ -144,8 +143,8 @@ class FuncXWorker:
         while True:
             log.debug("Waiting for task")
             p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
-            task_id: str = pickle.loads(p_task_id)
-            container_id: str = pickle.loads(p_container_id)
+            task_id: str = dill.loads(p_task_id)
+            container_id: str = dill.loads(p_container_id)
             log.debug(f"Received task with task_id='{task_id}' and msg='{msg}'")
 
             result = None
@@ -161,7 +160,7 @@ class FuncXWorker:
                 result["container_id"] = container_id
                 log.debug("Sending result")
                 # send bytes over the socket back to the manager
-                self.task_socket.send_multipart([b"TASK_RET", pickle.dumps(result)])
+                self.task_socket.send_multipart([b"TASK_RET", dill.dumps(result)])
 
         log.warning("Broke out of the loop... dying")
 

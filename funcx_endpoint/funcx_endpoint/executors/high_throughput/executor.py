@@ -7,13 +7,13 @@ to be addressed.
 import concurrent.futures
 import logging
 import os
-import pickle
 import queue
 import threading
 import time
 from multiprocessing import Process
 
 import daemon
+import dill
 from parsl.dataflow.error import ConfigurationError
 from parsl.executors.errors import BadMessage, ScalingFailed
 from parsl.executors.status_handling import StatusHandlingExecutor
@@ -565,16 +565,16 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                     log.debug(f"Received EPStatusReport {msgs}")
                     if self.passthrough:
                         self.results_passthrough.put(
-                            {"task_id": None, "message": pickle.dumps(msgs)}
+                            {"task_id": None, "message": dill.dumps(msgs)}
                         )
 
                 else:
                     log.debug("Unpacking results")
                     for serialized_msg in msgs:
                         try:
-                            msg = pickle.loads(serialized_msg)
+                            msg = dill.loads(serialized_msg)
                             tid = msg["task_id"]
-                        except pickle.UnpicklingError:
+                        except dill.UnpicklingError:
                             raise BadMessage("Message received could not be unpickled")
 
                         except Exception:
