@@ -161,7 +161,10 @@ class Endpoint:
             )
 
         funcx_client_options = {
-            "funcx_service_address": endpoint_config.config.funcx_service_address
+            "funcx_service_address": endpoint_config.config.funcx_service_address,
+            "results_ws_uri": endpoint_config.config.results_ws_uri,
+            "environment": endpoint_config.config.environment,
+            "warn_about_url_mismatch": endpoint_config.config.warn_about_url_mismatch,
         }
         funcx_client = FuncXClient(**funcx_client_options)
 

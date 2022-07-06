@@ -16,9 +16,23 @@ class Config(RepresentationMixin):
         As of 0.2.2, this list should contain only one executor.
         Default: [HighThroughtputExecutor()]
 
-    funcx_service_address: str
+    environment: str
+        Environment the endpoint should connect to. Sets funcx_service_address and
+        results_ws_uri unless they are also specified.
+        Default: "prod"
+
+    funcx_service_address: str | None
         URL address string of the funcX service to which the Endpoint should connect.
-        Default: 'https://api2.funcx.org/v2'
+        Default: None
+
+    results_ws_uri: str | None
+        URL address string of the funcX websocket service passed to the funcX client.
+        Default: None
+
+    warn_about_url_mismatch: Bool
+        Log a warning if funcx_service_address and results_ws_uri appear to point to
+        different environments.
+        Default: False
 
     heartbeat_period: int (seconds)
         The interval at which heartbeat messages are sent from the endpoint to the
@@ -53,7 +67,10 @@ class Config(RepresentationMixin):
         # Execution backed
         executors: list = _DEFAULT_EXECUTORS,
         # Connection info
-        funcx_service_address="https://api2.funcx.org/v2",
+        environment="prod",
+        funcx_service_address=None,
+        results_ws_uri=None,
+        warn_about_url_mismatch=False,
         # Tuning info
         heartbeat_period=30,
         heartbeat_threshold=120,
@@ -68,7 +85,10 @@ class Config(RepresentationMixin):
         self.executors = executors  # List of executors
 
         # Connection info
+        self.environment = environment
         self.funcx_service_address = funcx_service_address
+        self.results_ws_uri = results_ws_uri
+        self.warn_about_url_mismatch = warn_about_url_mismatch
 
         # Tuning info
         self.heartbeat_period = heartbeat_period
