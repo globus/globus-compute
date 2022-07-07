@@ -52,11 +52,12 @@ class FuncXClient:
         self,
         http_timeout=None,
         funcx_home=_FUNCX_HOME,
-        funcx_service_address=None,
         asynchronous=False,
         loop=None,
-        results_ws_uri=None,
         environment: str | None = None,
+        funcx_service_address: str | None = None,
+        results_ws_uri: str | None = None,
+        warn_about_url_mismatch: bool = True,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         do_version_check: bool = True,
         openid_authorizer: t.Any = None,
@@ -75,14 +76,19 @@ class FuncXClient:
             Timeout for any call to service in seconds.
             Default is no timeout
 
+        environment: str
+            For internal use only. The name of the environment to use. Sets
+            funcx_service_address and results_ws_uri unless they are already passed in.
+
         funcx_service_address: str
             For internal use only. The address of the web service.
 
         results_ws_uri: str
             For internal use only. The address of the websocket service.
 
-        environment: str
-            For internal use only. The name of the environment to use.
+        warn_about_url_mismatch:
+            For internal use only. If true, a warning is logged if funcx_service_address
+            and results_ws_uri appear to point to different environments.
 
         do_version_check: bool
             Set to ``False`` to skip the version compatibility check on client
@@ -114,7 +120,9 @@ class FuncXClient:
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
 
-        if urls_might_mismatch(funcx_service_address, results_ws_uri):
+        if warn_about_url_mismatch and urls_might_mismatch(
+            funcx_service_address, results_ws_uri
+        ):
             logger.warning(
                 f"funcx_service_address={funcx_service_address} and "
                 f"results_ws_uri={results_ws_uri} "
