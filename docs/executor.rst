@@ -1,11 +1,11 @@
 FuncX Executor
 ==============
 
-The `FuncXExecutor` provides a future based interface that simplifies both function submission
-and result tracking. The key functionality in the `FuncXExecutor` is the asynchronous event based
-result tracking that propagates new results to the user via the use of `Futures`.
-This asynchronous behavior is widely used in Python and the `FuncXExecutor` extends the popular executor
-interface from the `concurrent.futures.Executor` library.
+The ``FuncXExecutor`` provides a future based interface that simplifies both function submission
+and result tracking. The key functionality in the ``FuncXExecutor`` is the asynchronous event based
+result tracking that propagates new results to the user via the use of ``Futures``.
+This asynchronous behavior is widely used in Python and the ``FuncXExecutor`` extends the popular executor
+interface from the ``concurrent.futures.Executor`` library.
 
 
 Initializing the executor

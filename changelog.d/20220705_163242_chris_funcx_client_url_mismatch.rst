@@ -5,7 +5,7 @@
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- `FuncXClient` now warns you if it thinks you may have supplied `funcx_service_address`
-    and `results_ws_uri` that point to different environments. This behavior can be
-    turned off by passing `warn_about_url_mismatch=False`.
+- ``FuncXClient`` now warns you if it thinks you may have supplied ``funcx_service_address``
+  and ``results_ws_uri`` that point to different environments. This behavior can be
+  turned off by passing ``warn_about_url_mismatch=False``.
 

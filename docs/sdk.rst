@@ -32,12 +32,12 @@ Groups to facilitate sharing and to make authorization decisions.
 funcX allows endpoints and functions to be shared by associating a Globus Group.
 
 .. note:: funcX internally caches function, endpoint, and authorization lookups. Caches are based on user authentication tokens. To force refresh cached
-          entries, you can re-authenticate your client with `force_login=True`.
+          entries, you can re-authenticate your client with ``force_login=True``.
 
 Registering Functions
 ---------------------
 
-You can register a Python function with funcX via `register_function()`. Function registration serializes the
+You can register a Python function with funcX via ``register_function()``. Function registration serializes the
 function body and transmits it to funcX. Once the function is registered with funcX, it is assigned a
 UUID that can be used to manage and invoke the function.
 
@@ -60,8 +60,8 @@ is defined in the same way as any Python function before being registered with f
 Running Functions
 -----------------
 
-You can invoke a function using the UUID returned when registering the function. The `run()` function
-requires that you specify the function (`function_id`) and endpoint (`endpoint_id`) on which to execute
+You can invoke a function using the UUID returned when registering the function. The ``run()`` function
+requires that you specify the function (``function_id``) and endpoint (``endpoint_id``) on which to execute
 the function. funcX will return a UUID for the executing function (called a task) via which you can
 monitor status and retrieve results.
 
@@ -77,7 +77,7 @@ monitor status and retrieve results.
 
 Retrieving Results
 -------------------
-The result of your function's invocation can be retrieved using the `get_result()` function. This will either
+The result of your function's invocation can be retrieved using the ``get_result()`` function. This will either
 return the deserialized result of your invocation or raise an exception indicating that the
 task is still pending.
 
@@ -91,7 +91,7 @@ task is still pending.
     print("Exception: {}".format(e))
 
 .. note:: funcX caches results in the cloud until they have been retrieved. The SDK also caches results
-          during a session. However, calling `get_result()` from a new session will not be able to access the results.
+          during a session. However, calling ``get_result()`` from a new session will not be able to access the results.
 
 
 Arguments and data
@@ -100,7 +100,7 @@ Arguments and data
 funcX functions operate the same as any other Python function. You can pass arguments \*args and \**kwargs
 and return values from functions. The only constraint is that data passed to/from a funcX function must be
 serializable (e.g., via Pickle) and fall within service limits.
-Input arguments can be passed to the function using the `run()` function.
+Input arguments can be passed to the function using the ``run()`` function.
 The following example shows how strings can be passed to and from a function.
 
 .. code-block:: python
@@ -123,7 +123,7 @@ Sharing Functions
 You may share functions publicly (with anyone) or a set of users via a Globus Group.
 You can also add a function description such that it can be discovered by others.
 
-To share with a group, set `group=<globus_group_id>` when registering a function.
+To share with a group, set ``group=<globus_group_id>`` when registering a function.
 
 .. code-block:: python
 
@@ -132,7 +132,7 @@ To share with a group, set `group=<globus_group_id>` when registering a function
 
 Upon execution, funcX will check group membership to ensure that the user is authorized to execute the function.
 
-You can also set a function to be publicly accessible by setting `public=True` when registering the function.
+You can also set a function to be publicly accessible by setting ``public=True`` when registering the function.
 
 .. code-block:: python
 
@@ -144,7 +144,7 @@ Discovering Functions
 
 funcX maintains an access controlled search index of registered functions.
 You can look up your own functions, functions that have been shared with you,
-or publicly accessible functions via the `search_function()` function.
+or publicly accessible functions via the ``search_function()`` function.
 
 .. code-block:: python
 
@@ -175,7 +175,7 @@ corresponding to the functions in the batch with the ordering preserved.
 
 The batch result interface is useful to to fetch the results of a collection of task_ids.
 ``get_batch_result`` is called with a list of task_ids. It is non-blocking and returns
-a `dict` with task_ids as the keys and each value is a dict that contains status information
+a ``dict`` with task_ids as the keys and each value is a dict that contains status information
 and a result if it is available.
 
 .. code-block:: python
