@@ -18,12 +18,12 @@ To install the funcX endpoint agent software ::
    Please note that the funcx endpoint is only supported on Linux and MacOS.
 
 After installing funcX endpoint, you be able to deploy new endpoints and interact
-with existing endpoints using the `funcx-endpoint` command.
+with existing endpoints using the ``funcx-endpoint`` command.
 
 First time setup
 ----------------
 
-You will be required to authenticate the first time you run `funcx-endpoint`.
+You will be required to authenticate the first time you run ``funcx-endpoint``.
 If you have authenticated previously, the endpoint will cache access tokens in
 the local configuration file.
 
@@ -35,9 +35,9 @@ To get started, you will first want to configure a new endpoint.  ::
 
   $ funcx-endpoint configure
 
-Once you've run this command, a directory will be created at `$HOME/.funcx` and a set of default configuration files will be generated.
+Once you've run this command, a directory will be created at ``$HOME/.funcx`` and a set of default configuration files will be generated.
 
-You can also set up auto-completion for the `funcx-endpoint` commands in your shell, by using the command ::
+You can also set up auto-completion for the ``funcx-endpoint`` commands in your shell, by using the command ::
 
   $ funcx-endpoint --install-completion [zsh bash fish ...]
 
@@ -57,8 +57,8 @@ To generate the appropriate directories and default configuration template, run 
 
   $ funcx-endpoint configure <ENDPOINT_NAME>
 
-This command will create a profile for your endpoint in `$HOME/.funcx/<ENDPOINT_NAME>/` and will instantiate a
-`config.py` file. This file should be updated with the appropriate configurations for the computational system you are
+This command will create a profile for your endpoint in ``$HOME/.funcx/<ENDPOINT_NAME>/`` and will instantiate a
+``config.py`` file. This file should be updated with the appropriate configurations for the computational system you are
 targeting before you start the endpoint.
 funcX is configured using a :class:`~funcx_endpoint.endpoint.utils.config.Config` object.
 funcX uses `Parsl <https://parsl-project.org>`_ to manage resources. For more information,
@@ -145,7 +145,7 @@ The funcX endpoint can run functions using independent Python processes or optio
 inside containers. funcX supports various container technologies (e.g., docker and singularity)
 and different routing mechanisms for different use cases.
 
-Raw worker processes (`worker_mode=no_container`):
+Raw worker processes (``worker_mode=no_container``):
 
 * Hard routing: All worker processes are of the same type "RAW". It this case, the funcx endpoint simply routes tasks to any available worker processes. This is the default mode of a funcx endpoint.
 * Soft routing: It is the same as hard routing.

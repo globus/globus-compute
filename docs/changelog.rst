@@ -11,11 +11,11 @@ funcx & funcx-endpoint v0.4.0a2
 Added
 ^^^^^
 
-- The `FuncXWebClient` now sends version information via `User-Agent` headers
-  through the `app_name` property exposed by `globus-sdk`
+- The ``FuncXWebClient`` now sends version information via ``User-Agent`` headers
+  through the ``app_name`` property exposed by ``globus-sdk``
 
   - Additionally, users can send custom metadata alongside this version
-    information with `user_app_name`
+    information with ``user_app_name``
 
 - The funcx-endpoint service now interfaces with RabbitMQ.
 
@@ -33,14 +33,14 @@ Removed
 Changed
 ^^^^^^^
 
-- The CLI interface for `funcx-endpoint` has been updated in several ways:
+- The CLI interface for ``funcx-endpoint`` has been updated in several ways:
 
-  - `-h` is supported as a help option
+  - ``-h`` is supported as a help option
 
-  - `funcx-endpoint --version` has been replaced with `funcx-endpoint version`
+  - ``funcx-endpoint --version`` has been replaced with ``funcx-endpoint version``
 
-- The `funcx` error module has been renamed from `funcx.utils.errors` to
-  `funcx.errors`
+- The ``funcx`` error module has been renamed from ``funcx.utils.errors`` to
+  ``funcx.errors``
 
 funcx & funcx-endpoint v0.4.0a1
 -------------------------------
@@ -48,13 +48,13 @@ funcx & funcx-endpoint v0.4.0a1
 Added
 ^^^^^
 
-* `TaskQueueSubscriber` class added that allows receiving tasks over RabbitMQ
-* `ResultQueuePublisher` class added that allows publishing results and status over RabbitMQ
-* `TaskQueuePublisher` class added for testing
-* `ResultQueueSubscriber` class added for testing
+* ``TaskQueueSubscriber`` class added that allows receiving tasks over RabbitMQ
+* ``ResultQueuePublisher`` class added that allows publishing results and status over RabbitMQ
+* ``TaskQueuePublisher`` class added for testing
+* ``ResultQueueSubscriber`` class added for testing
 * A bunch of tests are added that test the above classes described above
 
-- Implement Task Group reloading on the FuncXExecutor.  Look for `.reload_tasks()`
+- Implement Task Group reloading on the FuncXExecutor.  Look for ``.reload_tasks()``
 
 - FuncXExecutor.submit returns futures with a .task_id attribute
   that will contain the task ID of the corresponding FuncX task.
@@ -143,8 +143,8 @@ Bug Fixes
   In an example kubernetes setup, this can double throughput of
   5 second tasks on 6 workers.
 
-- Pin the version of `click` used by `funcx-endpoint`. This resolves issues
-  stemming from `typer` being incompatible with the latest `click` release.
+- Pin the version of ``click`` used by ``funcx-endpoint``. This resolves issues
+  stemming from ``typer`` being incompatible with the latest ``click`` release.
 
 Removed
 ^^^^^^^
@@ -198,10 +198,10 @@ Changed
   instead of funcx-* to clarify what these pods are to
   observers of 'kubectl get pods'
 
-- Logging for funcx-endpoint no longer writes to `~/.funcx/endpoint.log` at any point.
-  This file is considered deprecated. Use `funcx-endpoint --debug <command>` to
+- Logging for funcx-endpoint no longer writes to ``~/.funcx/endpoint.log`` at any point.
+  This file is considered deprecated. Use ``funcx-endpoint --debug <command>`` to
   get debug output written to stderr.
-- The output formatting of `funcx-endpoint` logging has changed slightly when
+- The output formatting of ``funcx-endpoint`` logging has changed slightly when
   writing to stderr.
 
 funcx & funcx-endpoint v0.3.6
@@ -237,7 +237,7 @@ Changed
   means that the errors no longer inherit from ``FuncxResponseError``. Update
   error handling code as follows:
 
-In prior versions of the `funcx` package:
+In prior versions of the ``funcx`` package:
 
 .. code-block:: python
 
@@ -358,9 +358,9 @@ Stephen Rosen <sirosen@globus.org>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
 Bug Fixes
 ^^^^^^^^^
 
-* Updated requirements to exclude `pyzmq==22.3.0` due to unstable wheel. `Issue#577 <https://github.com/funcx-faas/funcX/issues/611>`_
+* Updated requirements to exclude ``pyzmq==22.3.0`` due to unstable wheel. `Issue#577 <https://github.com/funcx-faas/funcX/issues/611>`_
 
-* Updated requirements specification to `globus-sdk<3.0`
+* Updated requirements specification to ``globus-sdk<3.0``
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -491,7 +491,7 @@ New Functionality
         async_future = fxc.run(endpoint_id=<ENDPOINT_ID>, function_id=fn_id)
         print("Result : ", await async_future)
 
-* A new ``FuncXExecutor`` class exposes funcX functionality using the familiar executor interface from the `concurrent.futures` library.
+* A new ``FuncXExecutor`` class exposes funcX functionality using the familiar executor interface from the ``concurrent.futures`` library.
 
   Here's an example:
 
@@ -517,7 +517,7 @@ New Functionality
 
 * Endpoint states have been renamed to ``running``, ``stopped``, and ``disconnected``. See `PR#525 <https://github.com/funcx-faas/funcX/pull/525>`_
 
-* Container routing behavior has been improved to support `soft` and `hard` routing strategies. See `PR#324 <https://github.com/funcx-faas/funcX/pull/324>`_
+* Container routing behavior has been improved to support ``soft`` and ``hard`` routing strategies. See `PR#324 <https://github.com/funcx-faas/funcX/pull/324>`_
 
 funcx & funcx-endpoint v0.2.3
 -----------------------------
@@ -578,9 +578,9 @@ Yadu Nand Babuji <yadudoc1729@gmail.com> and Zhuozhao Li <zhuozhao@uchicago.edu>
 Bug Fixes
 ^^^^^^^^^
 
-* Fixed a missing package in the `requirements.txt` file
+* Fixed a missing package in the ``requirements.txt`` file
 
-* Updated version requirements in `funcx-endpoint` to match the `funcx` version
+* Updated version requirements in ``funcx-endpoint`` to match the ``funcx`` version
 
 
 funcx & funcx-endpoint v0.2.1
@@ -612,7 +612,7 @@ Bug Fixes
 
 * Fixed an issue with poor error reporting when starting non-existent endpoints. Refer: `issue 432 <https://github.com/funcx-faas/funcX/issues/432>`_
 
-* Fixed a bug in incorrectly passing the `funcx_service_address` to the EndpointInterchange.
+* Fixed a bug in incorrectly passing the ``funcx_service_address`` to the EndpointInterchange.
 
 * Several updates to the docs for clarity.
 
@@ -631,7 +631,7 @@ Ariel Rokem <arokem@gmail.com>, Ben Blaiszik <blaiszik@uchicago.edu>, Ben Galews
 Known Issues
 ^^^^^^^^^^^^
 
-There is an ongoing stability issue with `pyzmq` wheels that causes endpoint crashes.
+There is an ongoing stability issue with ``pyzmq`` wheels that causes endpoint crashes.
 Read more about this `here <https://github.com/zeromq/libzmq/issues/3313>`_.
 To address this issue, we recommend the following:
 
@@ -742,4 +742,4 @@ New Functionality
         }
 
 
-* `get_batch_status` has been renamed to `get_batch_result`
+* ``get_batch_status`` has been renamed to ``get_batch_result``
