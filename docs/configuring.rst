@@ -4,10 +4,6 @@ funcX has been used on various systems around the world. Below are example confi
 for commonly used systems. If you would like to add your system to this list please
 contact the funcX team via Slack.
 
-
-.. contents:: :local:
-
-
 .. note::
    All configuration examples below must be customized for the user's
    allocation, Python environment, file system, etc.
