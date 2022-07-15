@@ -731,6 +731,7 @@ class Interchange:
         # the managers when there are not enough tasks of those types in the task queues
         # on interchange
         last_cold_routing_time = time.time()
+        prev_manager_stat = None
 
         while not self._kill_event.is_set():
             self.socks = dict(poller.poll(timeout=poll_period))
@@ -821,11 +822,11 @@ class Interchange:
             # If we had received any requests, check if there are tasks that could be
             # passed
 
-            log.debug(
-                "[MAIN] Managers count (total/interesting): {}/{}".format(
-                    len(self._ready_manager_queue), len(interesting_managers)
-                )
-            )
+            cur_manager_stat = len(self._ready_manager_queue), len(interesting_managers)
+            if cur_manager_stat != prev_manager_stat:
+                prev_manager_stat = cur_manager_stat
+                _msg = "[MAIN] New managers count (total/interesting): {}/{}"
+                log.debug(_msg.format(*cur_manager_stat))
 
             if time.time() - last_cold_routing_time > self.cold_routing_interval:
                 task_dispatch, dispatched_task = naive_interchange_task_dispatch(
