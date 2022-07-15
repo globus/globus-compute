@@ -4,8 +4,11 @@ task distribution
 There's a slow but sure deviation from Parsl's Executor interface here, that needs
 to be addressed.
 """
+from __future__ import annotations
+
 import concurrent.futures
 import logging
+import multiprocessing
 import os
 import queue
 import threading
@@ -313,6 +316,14 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.passthrough = passthrough
         self.task_status_queue = task_status_queue
 
+        self.outgoing_q: zmq_pipes.TasksOutgoing | None = None
+        self.incoming_q: zmq_pipes.ResultsIncoming | None = None
+        self.command_client: zmq_pipes.CommandClient | None = None
+        self.results_passthrough: multiprocessing.Queue | None = None
+        self._queue_management_thread: threading.Thread | None = None
+
+        self.is_alive = False
+
         # Set the available accelerators
         if available_accelerators is None:
             self.available_accelerators = ()
@@ -395,7 +406,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                 log.error(f"Scaling out failed: {e}")
                 raise e
 
-    def start(self, results_passthrough=None):
+    def start(self, results_passthrough: multiprocessing.Queue = None):
         """Create the Interchange process and connect to it."""
         self.outgoing_q = zmq_pipes.TasksOutgoing(
             "0.0.0.0", self.interchange_port_range
@@ -420,7 +431,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
 
         self._executor_bad_state = threading.Event()
         self._executor_exception = None
-        self._queue_management_thread = None
         self._start_queue_management_thread()
 
         if self.interchange_local is True:
@@ -441,7 +451,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             self._scaling_enabled = False
             log.debug("Starting HighThroughputExecutor with no provider")
 
-        return (self.outgoing_q.port, self.incoming_q.port, self.command_client.port)
+        return self.outgoing_q.port, self.incoming_q.port, self.command_client.port
 
     def _start_local_interchange_process(self):
         """Starts the interchange process locally
