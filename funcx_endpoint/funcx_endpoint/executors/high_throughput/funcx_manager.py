@@ -240,7 +240,7 @@ class Manager:
         self.next_worker_q: list[str] = []  # FIFO queue for spinning up workers.
         self.worker_procs: dict[str, subprocess.Popen] = {}
 
-        self.task_status_deltas: dict[str, TaskState] = {}
+        self.task_status_deltas: dict[str, tuple[float, TaskState]] = {}
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
@@ -645,7 +645,8 @@ class Manager:
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
             log.debug(f"Set task {task.task_id} to RUNNING")
-            self.task_status_deltas[task.task_id] = TaskState.RUNNING
+            ts = (time.monotonic(), TaskState.RUNNING)
+            self.task_status_deltas[task.task_id] = ts
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,
                 "task_type": task_type,
