@@ -547,7 +547,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         """
         log.debug("queue management worker starting")
 
-        while not self._executor_bad_state.is_set():
+        while self.is_alive and not self._executor_bad_state.is_set():
             try:
                 msgs = self.incoming_q.get(timeout=1)
                 self.last_response_time = time.time()
@@ -555,7 +555,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
             except queue.Empty:
                 log.debug("queue empty")
                 # Timed out.
-                pass
+                continue
 
             except OSError as e:
                 log.exception(f"Caught broken queue with exception code {e.errno}: {e}")
@@ -680,8 +680,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
                                 "Message received is neither result or exception"
                             )
 
-            if not self.is_alive:
-                break
         log.info("queue management worker finished")
 
     # When the executor gets lost, the weakref callback will wake up
