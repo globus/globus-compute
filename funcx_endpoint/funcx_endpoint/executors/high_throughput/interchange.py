@@ -339,7 +339,7 @@ class Interchange:
 
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
-        self.task_status_deltas: dict[str, TaskState] = {}
+        self.task_status_deltas: dict[str, tuple[float, TaskState]] = {}
         self.container_switch_count: dict[str, int] = {}
 
     def load_config(self):
@@ -398,7 +398,7 @@ class Interchange:
             log.info("Scaling ...")
             self.scale_out(self.provider.init_blocks)
 
-    def migrate_tasks_to_internal(self, kill_event, status_request):
+    def migrate_tasks_to_internal(self, kill_event, status_request=None):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
@@ -457,7 +457,8 @@ class Interchange:
                     }
                 )
                 self.total_pending_task_count += 1
-                self.task_status_deltas[msg.task_id] = TaskState.WAITING_FOR_NODES
+                ts = (time.monotonic(), TaskState.WAITING_FOR_NODES)
+                self.task_status_deltas[msg.task_id] = ts
                 log.debug(
                     f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES"
                 )
@@ -890,9 +891,8 @@ class Interchange:
                             self.task_cancel_pending_trap.pop(task_id)
                         else:
                             log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
-                            self.task_status_deltas[
-                                task_id
-                            ] = TaskState.WAITING_FOR_LAUNCH
+                            ts = (time.monotonic(), TaskState.WAITING_FOR_LAUNCH)
+                            self.task_status_deltas[task_id] = ts
 
             # Receive any results and forward to client
             if (
