@@ -653,10 +653,10 @@ class Manager:
             }
         log.debug("Sending complete")
 
-    def _status_report_loop(self, kill_event):
+    def _status_report_loop(self, kill_event: threading.Event):
         log.debug("Manager status reporting loop starting")
 
-        while not kill_event.is_set():
+        while not kill_event.wait(timeout=self.heartbeat_period):
             msg = ManagerStatusReport(
                 self.task_status_deltas,
                 self.container_switch_count,
@@ -665,7 +665,6 @@ class Manager:
             self.pending_result_queue.put(msg)
             log.info("Clearing task deltas")
             self.task_status_deltas.clear()
-            time.sleep(self.heartbeat_period)
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """Listens on the pending_result_queue and sends out results via 0mq
