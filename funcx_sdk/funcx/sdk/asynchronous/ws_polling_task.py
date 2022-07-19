@@ -226,7 +226,11 @@ class WebSocketPollingTask:
                     self.funcx_client.fx_serializer.deserialize(task_data["result"])
                 )
             elif "exception" in task_data:
-                task_fut.set_exception(FuncxTaskExecutionFailed(task_data["exception"], task_data["completion_t"]))
+                task_fut.set_exception(
+                    FuncxTaskExecutionFailed(
+                        task_data["exception"], task_data["completion_t"]
+                    )
+                )
             else:
                 msg = f"Data contained neither result nor exception: {task_data}"
                 task_fut.set_exception(Exception(msg))
