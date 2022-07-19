@@ -15,6 +15,7 @@ from websockets.exceptions import (
     InvalidStatusCode,
 )
 
+from funcx.errors import FuncxTaskExecutionFailed
 from funcx.sdk.asynchronous.funcx_future import FuncXFuture
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
@@ -225,10 +226,7 @@ class WebSocketPollingTask:
                     self.funcx_client.fx_serializer.deserialize(task_data["result"])
                 )
             elif "exception" in task_data:
-                r_exception = self.funcx_client.fx_serializer.deserialize(
-                    task_data["exception"]
-                )
-                task_fut.set_exception(dill.loads(r_exception.e_value))
+                task_fut.set_exception(FuncxTaskExecutionFailed(task_data["exception"], task_data["completion_t"]))
             else:
                 msg = f"Data contained neither result nor exception: {task_data}"
                 task_fut.set_exception(Exception(msg))
