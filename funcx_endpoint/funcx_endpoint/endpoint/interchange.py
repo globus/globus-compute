@@ -344,7 +344,7 @@ class EndpointInterchange:
                         block=True, timeout=0.01
                     )
                     task = try_convert_from_messagepack(incoming_task)
-                    log.warning(f"Submitting task : {task}")
+                    log.debug(f"Submitting task : {task}")
                     executor.submit_raw(task)
                 except queue.Empty:
                     pass
