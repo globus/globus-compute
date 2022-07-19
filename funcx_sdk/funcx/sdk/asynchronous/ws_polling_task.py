@@ -4,8 +4,6 @@ import logging
 import typing as t
 from asyncio import AbstractEventLoop
 
-import dill
-
 # import from `websockets.client`, see:
 #   https://github.com/aaugustin/websockets/issues/940
 import websockets.client
@@ -226,7 +224,11 @@ class WebSocketPollingTask:
                     self.funcx_client.fx_serializer.deserialize(task_data["result"])
                 )
             elif "exception" in task_data:
-                task_fut.set_exception(FuncxTaskExecutionFailed(task_data["exception"], task_data["completion_t"]))
+                task_fut.set_exception(
+                    FuncxTaskExecutionFailed(
+                        task_data["exception"], task_data["completion_t"]
+                    )
+                )
             else:
                 msg = f"Data contained neither result nor exception: {task_data}"
                 task_fut.set_exception(Exception(msg))
