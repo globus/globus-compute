@@ -200,7 +200,7 @@ class EndpointInterchange:
 
         try:
             log.info(
-                f"[TASK_PULL_PROC Starting the TaskQueueSubscriber"
+                f"Starting the TaskQueueSubscriber"
                 f" as {endpoint_uuid}"
             )
             task_q_proc = TaskQueueSubscriber(
