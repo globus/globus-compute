@@ -4,8 +4,6 @@ import logging
 import typing as t
 from asyncio import AbstractEventLoop
 
-import dill
-
 # import from `websockets.client`, see:
 #   https://github.com/aaugustin/websockets/issues/940
 import websockets.client
