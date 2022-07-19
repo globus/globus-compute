@@ -362,7 +362,7 @@ class EndpointInterchange:
                     message = try_convert_to_messagepack(results["message"])
 
                     # results will be a packed EPStatusReport or a packed Result
-                    log.warning(f"Publishing message {message}")
+                    log.debug(f"Publishing message {message}")
                     results_publisher.publish(message)
                 except queue.Empty:
                     pass
