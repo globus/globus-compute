@@ -20,10 +20,10 @@ import dill
 import psutil
 import zmq
 from funcx_common.tasks import TaskState
-from parsl.app.errors import RemoteExceptionWrapper
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
 from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from funcx_endpoint.executors.high_throughput.messages import (
@@ -240,7 +240,7 @@ class Manager:
         self.next_worker_q: list[str] = []  # FIFO queue for spinning up workers.
         self.worker_procs: dict[str, subprocess.Popen] = {}
 
-        self.task_status_deltas: dict[str, TaskState] = {}
+        self.task_status_deltas: dict[str, tuple[float, TaskState]] = {}
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
@@ -405,9 +405,8 @@ class Manager:
                             result_package = {
                                 "task_id": task_id,
                                 "container_id": worker_type,
-                                "exception": self.serializer.serialize(
-                                    RemoteExceptionWrapper(*sys.exc_info())
-                                ),
+                                "error_details": get_result_error_details(e),
+                                "exception": get_error_string(tb_levels=0),
                             }
                             self.pending_result_queue.put(dill.dumps(result_package))
 
@@ -646,7 +645,8 @@ class Manager:
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
             log.debug(f"Set task {task.task_id} to RUNNING")
-            self.task_status_deltas[task.task_id] = TaskState.RUNNING
+            ts = (time.monotonic(), TaskState.RUNNING)
+            self.task_status_deltas[task.task_id] = ts
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,
                 "task_type": task_type,

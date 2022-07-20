@@ -344,7 +344,7 @@ class EndpointInterchange:
                         block=True, timeout=0.01
                     )
                     task = try_convert_from_messagepack(incoming_task)
-                    log.warning(f"Submitting task : {task}")
+                    log.debug(f"Submitting task : {task}")
                     executor.submit_raw(task)
                 except queue.Empty:
                     pass
@@ -362,7 +362,7 @@ class EndpointInterchange:
                     message = try_convert_to_messagepack(results["message"])
 
                     # results will be a packed EPStatusReport or a packed Result
-                    log.warning(f"Publishing message {message}")
+                    log.debug(f"Publishing message {message}")
                     results_publisher.publish(message)
                 except queue.Empty:
                     pass

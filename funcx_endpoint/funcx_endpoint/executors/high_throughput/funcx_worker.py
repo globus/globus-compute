@@ -6,9 +6,6 @@ import os
 import signal
 import sys
 import time
-import traceback
-import types
-import typing as t
 
 import dill
 import zmq
@@ -16,6 +13,8 @@ from funcx_common import messagepack
 
 from funcx.errors import MaxResultSizeExceeded
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
+from funcx_endpoint.exceptions import CouldNotExecuteUserTaskError
 from funcx_endpoint.executors.high_throughput.messages import Message
 from funcx_endpoint.logging_config import setup_logging
 
@@ -25,49 +24,8 @@ DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
 
 
-class CouldNotExecuteUserTaskError(Exception):
-    """generic exception class for errors while attempting to setup and run the user
-    function but which does not come from the user function itself failing"""
-
-
-INTERNAL_ERROR_CLASSES: tuple[type[Exception], ...] = (
-    CouldNotExecuteUserTaskError,
-    MaxResultSizeExceeded,
-)
-
-
-def _get_result_error_details(
-    exc: Exception,
-) -> tuple[str, str]:
-    # code, user_message
-    if isinstance(exc, INTERNAL_ERROR_CLASSES):
-        return (exc.__class__.__name__, f"remote error: {exc}")
-    return (
-        "RemoteExecutionError",
-        "An error occurred during the execution of this task",
-    )
-
-
-def _get_error_string() -> str:
-    exc_info = t.cast(
-        t.Tuple[t.Type[Exception], Exception, types.TracebackType],
-        sys.exc_info(),
-    )
-    exc_type, exc, tb = exc_info
-    if isinstance(exc, INTERNAL_ERROR_CLASSES):
-        return repr(exc)
-    return "".join(traceback.format_exception(exc_type, exc, _inner_traceback(tb)))
-
-
 def _now_ms() -> int:
     return int(time.time() * 1000)
-
-
-def _inner_traceback(tb: types.TracebackType, levels=2) -> types.TracebackType:
-    while levels > 0:
-        tb = tb.tb_next if tb.tb_next is not None else tb
-        levels -= 1
-    return tb
 
 
 class FuncXWorker:
@@ -170,12 +128,12 @@ class FuncXWorker:
 
         try:
             result = self.call_user_function(task_body)
-        except Exception as exc:
+        except Exception:
             log.exception("Caught an exception while executing user function")
             result_message = dict(
                 task_id=task_id,
-                exception=_get_error_string(),
-                error_details=_get_result_error_details(exc),
+                exception=get_error_string(),
+                error_details=get_result_error_details(),
                 exec_start_ms=exec_start_ms,
                 exec_end_ms=_now_ms(),
             )
