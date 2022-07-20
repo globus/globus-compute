@@ -199,10 +199,7 @@ class EndpointInterchange:
         log.info("Starting")
 
         try:
-            log.info(
-                f"Starting the TaskQueueSubscriber"
-                f" as {endpoint_uuid}"
-            )
+            log.info("Starting the TaskQueueSubscriber as {endpoint_uuid}")
             task_q_proc = TaskQueueSubscriber(
                 queue_info=connection_params,
                 external_queue=pending_task_queue,
