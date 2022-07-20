@@ -313,6 +313,7 @@ class HighThroughputExecutor(RepresentationMixin):
         self.interchange_local = interchange_local
         self.passthrough = passthrough
         self.task_status_queue = task_status_queue
+        self.tasks = {}
 
         self.outgoing_q: zmq_pipes.TasksOutgoing | None = None
         self.incoming_q: zmq_pipes.ResultsIncoming | None = None
