@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 import time
@@ -36,6 +38,11 @@ class SimpleStrategy(BaseStrategy):
         self.max_idletime = max_idletime
         self.executors = {"idle_since": None}
 
+        # caching vars; for log noise reduction
+        self._prev_info = None
+        self._prev_task_breakdown = None
+        self._prev_status = None
+
     def strategize(self, *args, **kwargs):
         try:
             self._strategize(*args, **kwargs)
@@ -45,7 +52,9 @@ class SimpleStrategy(BaseStrategy):
 
     def _strategize(self, *args, **kwargs):
         task_breakdown = self.interchange.get_outstanding_breakdown()
-        log.debug(f"Task breakdown {task_breakdown}")
+        if task_breakdown != self._prev_task_breakdown:
+            self._prev_task_breakdown = task_breakdown
+            log.debug(f"Task breakdown {task_breakdown}")
 
         min_blocks = self.interchange.provider.min_blocks
         max_blocks = self.interchange.provider.max_blocks
@@ -61,21 +70,30 @@ class SimpleStrategy(BaseStrategy):
 
         active_tasks = sum(self.interchange.get_total_tasks_outstanding().values())
         status = self.interchange.provider_status()
-        log.debug(f"Provider status : {status}")
 
         running = sum(1 for x in status if x.state == JobState.RUNNING)
         pending = sum(1 for x in status if x.state == JobState.PENDING)
         active_blocks = running + pending
         active_slots = active_blocks * tasks_per_node * nodes_per_block
 
-        log.debug(
-            "Endpoint has %s active tasks, %s/%s running/pending blocks, "
-            "and %s connected workers",
+        status = str(status)
+        if status != self._prev_status:
+            self._prev_status = status
+            log.debug(f"Provider status: {status}")
+
+        cur_info = (
             active_tasks,
             running,
             pending,
             self.interchange.get_total_live_workers(),
         )
+        if cur_info != self._prev_info:
+            self._prev_info = cur_info
+            log.debug(
+                "Endpoint has %s active tasks, %s/%s running/pending blocks, "
+                "and %s connected workers",
+                *cur_info,
+            )
 
         # reset kill timer if executor has active tasks
         if active_tasks > 0 and self.executors["idle_since"]:
