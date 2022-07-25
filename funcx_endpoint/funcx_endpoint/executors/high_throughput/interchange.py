@@ -879,7 +879,7 @@ class Interchange:
 
                     for task in tasks:
                         task_id = task["task_id"]
-                        log.info(f'Sent task {task_id} to manager {manager}')
+                        log.info(f"Sent task {task_id} to manager {manager}")
                         if (
                             self.task_cancel_pending_trap
                             and task_id in self.task_cancel_pending_trap
