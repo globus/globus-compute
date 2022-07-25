@@ -439,7 +439,7 @@ class Interchange:
             elif isinstance(msg, Heartbeat):
                 log.debug("Got heartbeat")
             else:
-                log.info(f"Received task:{msg}")
+                log.info(f"Received task: {msg.task_id}")
                 local_container = self.get_container(msg.container_id)
                 msg.set_local_container(local_container)
                 if local_container not in self.pending_task_queue:
