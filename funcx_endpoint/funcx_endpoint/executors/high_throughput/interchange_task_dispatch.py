@@ -131,7 +131,7 @@ def get_tasks_hard(pending_task_queue, manager_ads, real_capacity):
         )
         return tasks, tids
     if task_type not in pending_task_queue:
-        log.debug(f"No task of type {task_type}. Exiting task fetching.")
+        log.trace(f"No task of type {task_type}. Exiting task fetching.")
         return tasks, tids
 
     # dispatch tasks of available types on manager
