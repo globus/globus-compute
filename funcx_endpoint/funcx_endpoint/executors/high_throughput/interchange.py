@@ -427,13 +427,13 @@ class Interchange:
 
             try:
                 msg = Message.unpack(raw_msg)
-                log.debug("received Message/Heartbeat? on task queue")
             except Exception:
                 log.exception(f"Failed to unpack message, RAW:{raw_msg}")
                 continue
 
             if msg == "STOP":
                 # TODO: Yadu. This should be replaced by a proper MessageType
+                log.debug("Received STOP message.")
                 kill_event.set()
                 break
             elif isinstance(msg, Heartbeat):
