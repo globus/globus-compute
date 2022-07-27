@@ -8,7 +8,7 @@ cp /funcx/credentials/storage.db ~/.funcx/
 if [ -z "$2" ]; then
   funcx-endpoint start $1
 else
-  funcx-endpoint start $1 --endpoint-id $2
+  funcx-endpoint start $1 --endpoint-uuid $2
 fi
 
 while pgrep funcx-endpoint >/dev/null;
