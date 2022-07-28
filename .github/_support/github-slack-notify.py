@@ -118,11 +118,15 @@ def build_payload(status):
 
 def on_main_repo():
     """check if running from a fork"""
-    return os.environ["GITHUB_REPOSITORY"] == "funcx-faas/funcx"
+    res = os.environ["GITHUB_REPOSITORY"].lower() == "funcx-faas/funcx"
+    print(f"Checking main repo: {res}")
+    return res
 
 
 def should_notify(status):
-    return check_status_changed(status) and on_main_repo() and not is_pr_build()
+    res = check_status_changed(status) and on_main_repo() and not is_pr_build()
+    print(f"Should notify: {res}")
+    return res
 
 
 def main():
