@@ -79,9 +79,8 @@ To start a new endpoint run the following command::
 
 Starting an endpoint will perform a registration process with funcX.
 The registration process provides funcX with information regarding the endpoint.
-The endpoint establishes three outbound
-ZeroMQ channels to funcX (on the three ports returned during registration)
-to retrieve tasks, send results, and communicate command information.
+The endpoint establishes an outbound connection to RabbitMQ to retrieve tasks, send results, and communicate command information.
+Note that FuncX RabbitMQ outbound access is to default port 5672 and the endpoint also needs HTTPS 443.
 
 Once started, the endpoint uses a daemon process to run in the background.
 
