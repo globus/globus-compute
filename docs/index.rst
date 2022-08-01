@@ -94,7 +94,6 @@ how to download and configure an endpoint for local (multi-process) execution. :
    Tutorial
    actionprovider
    reference/index
-   debugging
    limits
    changelog
 
