@@ -1,3 +1,4 @@
+import pytest
 import requests
 from packaging.version import Version
 
@@ -33,6 +34,7 @@ def test_simple_function(fxc):
     assert func_uuid is not None, "Invalid function uuid returned"
 
 
+@pytest.mark.skip(reason="Endpoint status reports are broken in prod")
 def test_ep_status(fxc, endpoint):
     """Test whether the tutorial EP is online and reporting status"""
     response = fxc.get_endpoint_status(endpoint)
