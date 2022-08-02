@@ -10,6 +10,7 @@ import warnings
 
 from funcx.errors import (
     FuncxTaskExecutionFailed,
+    HTTPStatusCode,
     SerializationError,
     TaskPending,
     handle_response_errors,
@@ -698,8 +699,15 @@ class FuncXClient:
         r = self.web_client.get(f"containers/build/{container_id}")
         if r.http_status == 200:
             return r["status"]
+        elif r.http_status == 400:
+            raise ValueError(f"Container ID {container_id} not found")
         else:
-            raise
+            message = (
+                f"Exception in fetching build status. HTTP Error Code "
+                f"{r.http_status}, {r.http_reason}"
+            )
+            logger.error(message)
+            raise SystemError(message)
 
     def add_to_whitelist(self, endpoint_id, function_ids):
         """Adds the function to the endpoint's whitelist
