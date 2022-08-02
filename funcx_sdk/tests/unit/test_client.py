@@ -4,6 +4,7 @@ from unittest import mock
 import pytest
 
 import funcx
+from funcx import ContainerSpec
 from funcx.errors import FuncxTaskExecutionFailed
 from funcx.serialize import FuncXSerializer
 
@@ -196,3 +197,74 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
         assert submit_data["create_websocket_queue"] is True
     else:
         assert submit_data["create_websocket_queue"] is False
+
+def test_build_container(mocker, login_manager):
+    mock_data = mocker.Mock()
+    mock_data.data = {"container_id": "123-456"}
+    login_manager.get_funcx_web_client.post = mocker.Mock(return_value=mock_data)
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    spec = ContainerSpec(
+        name="MyContainer",
+        pip=[
+            "matplotlib==3.5.1",
+            "numpy==1.18.5",
+        ],
+        # payload_url="https://raw.githubusercontent.com/funcx-faas/funcx-container-service/dev/README.md",  # noqa E501
+        payload_url="https://github.com/funcx-faas/funcx-container-service.git",
+    )
+
+    container_id = fxc.build_container(spec)
+    assert container_id == "123-456"
+    login_manager.get_funcx_web_client.post.assert_called()
+    calls = login_manager.get_funcx_web_client.post.call_args
+    assert calls[0][0] == "containers/build"
+    assert calls[1] == {
+        "data": {
+            "apt": [],
+            "conda": [],
+            "description": None,
+            "name": "MyContainer",
+            "payload_url": "https://github.com/funcx-faas/funcx-container-service.git",
+            "pip": ["matplotlib==3.5.1", "numpy==1.18.5"],
+        }
+    }
+
+
+def test_container_build_status(mocker, login_manager):
+    class MockData(dict):
+        def __init__(self):
+            self["status"] = "building"
+            self.http_status = 200
+
+    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    status = fxc.get_container_build_status("123-434")
+    assert status == "building"
+
+
+def test_container_build_status_not_found(mocker, login_manager):
+    class MockData(dict):
+        def __init__(self):
+            self.http_status = 400
+
+    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+
+    with pytest.raises(ValueError) as excinfo:
+        fxc.get_container_build_status("123-434")
+
+    assert excinfo.value.args[0] == "Container ID 123-434 not found"
+
+
+def test_container_build_status_failure(mocker, login_manager):
+    class MockData(dict):
+        def __init__(self):
+            self.http_status = 500
+
+    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+
+    with pytest.raises(SystemError) as excinfo:
+        fxc.get_container_build_status("123-434")
+
+    assert type(excinfo.value) == SystemError
