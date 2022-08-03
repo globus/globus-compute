@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import multiprocessing
 import random
 import string
@@ -8,6 +9,7 @@ import string
 # to annotate, we need the "real" class
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
+from typing import Callable
 
 import pika
 import pytest
@@ -127,28 +129,38 @@ def start_task_q_subscriber(
     def func(
         *,
         endpoint_id: str | None = None,
-        queue: multiprocessing.Queue | None = None,
+        callback: Callable | None = None,
         kill_event: EventType | None = None,
         override_params: pika.connection.Parameters | None = None,
+        max_reconnect_retry_count: int = 3,
+        retry_delay: int = 0.2,
     ):
         if endpoint_id is None:
             endpoint_id = default_endpoint_id
         if kill_event is None:
             kill_event = multiprocessing.Event()
-        if queue is None:
-            queue = multiprocessing.Queue()
+
+        mp_task_q = multiprocessing.Queue()
+
+        def put_into_queue(task_q, body):
+            return task_q.put(body)
+
+        if callback is None:
+            callback = functools.partial(put_into_queue, mp_task_q)
         q_info = task_queue_info if override_params is None else override_params
         ensure_task_queue(queue_opts={"queue": q_info["queue"]})
 
         task_q = TaskQueueSubscriber(
             queue_info=q_info,
-            external_queue=queue,
+            external_callback=callback,
             kill_event=kill_event,
             endpoint_id=endpoint_id,
+            max_reconnect_retry_count=max_reconnect_retry_count,
+            retry_delay=retry_delay,
         )
         task_q.start()
         running_subscribers.append(task_q)
-        return task_q
+        return task_q, mp_task_q
 
     return func
 
