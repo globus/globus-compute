@@ -321,10 +321,10 @@ class EndpointInterchange:
                     len(resend_results_messages),
                 )
 
-            for results in resend_results_messages:
-                # TO-DO: Republishing backlogged/unacked messages is not supported
-                # until the types are sorted out
-                results_publisher.publish(try_convert_to_messagepack(results))
+                for results in resend_results_messages:
+                    # TO-DO: Republishing backlogged/unacked messages is not supported
+                    # until the types are sorted out
+                    results_publisher.publish(try_convert_to_messagepack(results))
 
             executor = list(self.executors.values())[0]
             last = time.time()
