@@ -8,6 +8,7 @@ import signal
 # to annotate, we need the "real" class
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
+from typing import Callable
 
 import pika
 import pika.channel
@@ -34,8 +35,10 @@ class TaskQueueSubscriber(multiprocessing.Process):
         *,
         endpoint_id: str,
         queue_info: dict,
-        external_queue: multiprocessing.Queue,
+        external_callback: Callable,
         kill_event: EventType,
+        max_reconnect_retry_count: int = 60,
+        retry_delay: int = 5,
     ):
         """
 
@@ -45,15 +48,21 @@ class TaskQueueSubscriber(multiprocessing.Process):
              Dictionary that includes the key "connection_url", as well as exchange
              and queue declaration information specified by the server.
 
-        external_queue: multiprocessing.Queue
-             Each incoming message will be pushed to the queue.
-             Please note that upon pushing a message into this queue, it will be
-             marked as delivered.
+        external_callback: Callable
+             Each incoming message triggers is passed to this callback
+             If the callback fails, the messsage is NACK'ed; expect
+             redelivery
 
         kill_event: multiprocessing.Event
              This event is used to communicate a failure on the subscriber
 
-        endpoint_id: endpoint uuid string
+        max_reconnect_retry_count: int
+             Total number of retry attempts
+             Default: 60
+
+        retry_delay: int (unit seconds)
+              Delay between reconnect retries upon non-client requested
+              disconnect . Default: 5s
         """
 
         super().__init__()
@@ -61,15 +70,17 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
         self.endpoint_id = endpoint_id
         self.queue_info = queue_info
-        self.external_queue = external_queue
+        self.external_callback = external_callback
         self.kill_event = kill_event
         self._channel_closed = multiprocessing.Event()
         self._cleanup_complete = multiprocessing.Event()
-
+        self.max_reconnect_retry_count = max_reconnect_retry_count
+        self.current_retry_count = 0
         self._connection: pika.SelectConnection | None = None
         self._channel: pika.channel.Channel | None = None
         self._consumer_tag: str | None = None
-
+        self.connected = multiprocessing.Event()
+        self.retry_delay = retry_delay
         self._watcher_poll_period = 0.1  # seconds
         logger.debug("Init done")
 
@@ -87,9 +98,13 @@ class TaskQueueSubscriber(multiprocessing.Process):
     def _on_connection_open(self, _unused_connection):
         logger.info("Connection opened")
         self.open_channel()
+        # Reset retry counter on successful connection
+        self.current_retry_count = 0
+        self.connected.set()
 
     def _on_open_failed(self, *args):
         logger.warning(f"Connection failed to open : {args}")
+        self.connected.clear()
 
     def _on_connection_closed(self, connection, exception):
         """This method is invoked by pika when the connection to RabbitMQ is
@@ -100,12 +115,23 @@ class TaskQueueSubscriber(multiprocessing.Process):
         :param exception: Exception object
         """
         logger.warning(f"Connection closing: {exception}")
+        self.connected.clear()
         self._channel = None
         if self.status is SubscriberProcessStatus.closing:
             connection.ioloop.stop()
         else:
             logger.warning(f"Connection closed, reopening in 5 seconds: {exception}")
-            self._connection.ioloop.call_later(5, self.reconnect)
+            self.current_retry_count += 1
+            if self.current_retry_count < self.max_reconnect_retry_count:
+                logger.info(
+                    "Setting up connect retry %d/%d",
+                    self.current_retry_count,
+                    self.max_reconnect_retry_count,
+                )
+                self._connection.ioloop.call_later(self.retry_delay, self.reconnect)
+            else:
+                connection.ioloop.stop()
+                logger.info("Connect retries exhausted")
 
     def reconnect(self):
         """Will be invoked by the IOLoop timer if the connection is
@@ -258,11 +284,11 @@ class TaskQueueSubscriber(multiprocessing.Process):
         # Not sure if we need to do this in a locked context,
         # rabbit's ACK system should make sure you don't lose tasks.
         try:
-            self.external_queue.put(body)
+            self.external_callback(body)
         except Exception:
             # No sense in waiting for the RMQ default 30m timeout; let it know
             # *now* that this message failed.
-            logger.exception("External queue put failed")
+            logger.exception("External callback failed")
             channel.basic_nack(basic_deliver.delivery_tag, requeue=True)
         else:
             channel.basic_ack(basic_deliver.delivery_tag)
@@ -309,10 +335,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.debug("waiting until channel is closed (timeout=1 second)")
         if not self._channel_closed.wait(1.0):
             logger.warning("reached timeout while waiting for channel closed")
-        logger.debug("closing connection to mp queue")
-        self.external_queue.close()
-        logger.debug("joining mp queue background thread")
-        self.external_queue.join_thread()
         logger.info("shutdown done, setting cleanup event")
         self._cleanup_complete.set()
 
