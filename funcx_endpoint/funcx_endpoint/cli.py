@@ -35,7 +35,9 @@ def get_cli_endpoint() -> Endpoint:
 
     # ensure that configs exist
     if not os.path.exists(endpoint.funcx_dir):
-        log.info("No existing configuration found at %s. Initializing...")
+        log.info(
+            "No existing configuration found at %s. Initializing...", endpoint.funcx_dir
+        )
         endpoint.init_endpoint()
 
     return endpoint
