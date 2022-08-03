@@ -5,7 +5,7 @@ import platform
 import queue
 import signal
 import sys
-import time
+import threading
 import typing as t
 
 # multiprocessing.Event is a method, not a class
@@ -193,7 +193,7 @@ class EndpointInterchange:
         pending_task_queue: multiprocessing.Queue
               Internal queue to which tasks should be migrated
 
-        quiesce_event : threading.Event
+        quiesce_event : EventType
               Event to let the thread know when it is time to die.
         """
         log.info("Starting")
@@ -327,47 +327,79 @@ class EndpointInterchange:
                     results_publisher.publish(try_convert_to_messagepack(results))
 
             executor = list(self.executors.values())[0]
-            last = time.time()
 
-            while not self._quiesce_event.is_set() and not self._kill_event.is_set():
-                if last + self.heartbeat_period < time.time():
-                    log.debug("alive")
-                    last = time.time()
+            num_tasks_forwarded = 0
+            num_results_forwarded = 0
 
-                self.results_ack_handler.check_ack_counts()
+            def process_pending_tasks():
+                nonlocal num_tasks_forwarded
+                while not self._quiesce_event.is_set():
+                    try:
+                        incoming_task = self.pending_task_queue.get(timeout=1)
+                        task = try_convert_from_messagepack(incoming_task)
+                        executor.submit_raw(task)
+                        num_tasks_forwarded += 1  # Safe given GIL
 
-                try:
-                    incoming_task = self.pending_task_queue.get(
-                        block=True, timeout=0.01
-                    )
-                    task = try_convert_from_messagepack(incoming_task)
-                    log.debug(f"Submitting task : {task}")
-                    executor.submit_raw(task)
-                except queue.Empty:
-                    pass
-                except Exception:
-                    log.exception("Unhandled issue while waiting for pending tasks")
+                    except queue.Empty:
+                        continue
 
-                try:
-                    results = self.results_passthrough.get(False, 0.01)
+                    except Exception:
+                        log.exception("Unhandled issue while waiting for pending tasks")
 
-                    task_id = results["task_id"]
-                    if task_id:
-                        self.results_ack_handler.put(task_id, results["message"])
-                        log.info(f"Passing result to forwarder for task {task_id}")
+                log.debug("Exit process-pending-tasks thread.")
 
-                    message = try_convert_to_messagepack(results["message"])
+            def process_pending_results():
+                nonlocal num_results_forwarded
+                while not self._quiesce_event.is_set():
+                    try:
+                        results = self.results_passthrough.get(timeout=1)
 
-                    # results will be a packed EPStatusReport or a packed Result
-                    log.debug(f"Publishing message {message}")
-                    results_publisher.publish(message)
-                    self.results_ack_handler.ack(task_id)  # no error; RMQ has it now
-                except queue.Empty:
-                    pass
+                        task_id = results["task_id"]
+                        if task_id:
+                            self.results_ack_handler.put(task_id, results["message"])
+                            log.debug(f"Forwarding result for task {task_id}")
 
-                except Exception:
-                    log.exception(
-                        "Something broke while forwarding results from executor "
-                        "to forwarder queues"
-                    )
-                    continue
+                        message = try_convert_to_messagepack(results["message"])
+
+                        # results will be a packed EPStatusReport or a packed Result
+                        log.debug(f"Publishing message {message}")
+                        results_publisher.publish(message)
+                        self.results_ack_handler.ack(task_id)  # RMQ has it now
+                        num_results_forwarded += 1  # Safe given GIL
+
+                    except queue.Empty:
+                        continue
+
+                    except Exception:
+                        log.exception("Something broke while forwarding results")
+                        continue
+
+                log.debug("Exit process-pending-results thread.")
+
+            task_processor_thread = threading.Thread(
+                target=process_pending_tasks, name="Pending Task Handler"
+            )
+            result_processor_thread = threading.Thread(
+                target=process_pending_results, name="Pending Result Handler"
+            )
+            task_processor_thread.start()
+            result_processor_thread.start()
+
+            last_t, last_r = 0, 0
+            while not self._quiesce_event.wait(self.heartbeat_threshold):
+                # Possibly TOCTOU here, but we don't need to be super precise.  The
+                # point here is to mention "still alive" and that we're still working
+                num_t, num_r = num_tasks_forwarded, num_results_forwarded
+                log.debug(
+                    "Heartbeat.  Approximate Tasks and Results forwarded since last "
+                    "heartbeat: %s (T), %s (R)",
+                    num_t - last_t,
+                    num_r - last_r,
+                )
+                last_t, last_r = num_t, num_r
+
+            # The timeouts aren't nominally necessary because if the above loop has
+            # quit, then the _quiesce_event is set, and both threads check that event
+            # every internal iteration.  But "for kicks."
+            task_processor_thread.join(timeout=5)
+            result_processor_thread.join(timeout=5)
