@@ -63,5 +63,8 @@ class TaskQueuePublisher:
 
     def close(self):
         """Close the connection and channels"""
-        self._connection.close()
+        try:
+            self._connection.close()
+        except pika.exceptions.ConnectionWrongStateError:
+            logger.warning("Connection is already closed")
         self.status = RabbitPublisherStatus.closed
