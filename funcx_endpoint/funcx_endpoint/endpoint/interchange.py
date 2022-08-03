@@ -361,6 +361,7 @@ class EndpointInterchange:
                     # results will be a packed EPStatusReport or a packed Result
                     log.debug(f"Publishing message {message}")
                     results_publisher.publish(message)
+                    self.results_ack_handler.ack(task_id)  # no error; RMQ has it now
                 except queue.Empty:
                     pass
 
