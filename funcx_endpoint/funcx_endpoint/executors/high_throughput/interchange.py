@@ -16,7 +16,10 @@ import typing as t
 import daemon
 import dill
 import zmq
-from funcx_common.tasks import TaskState
+from funcx_common.messagepack.message_types import TaskTransition
+from funcx_common.tasks import ActorName, TaskState
+from parsl.app.errors import RemoteExceptionWrapper
+from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.serialize import FuncXSerializer
@@ -338,7 +341,7 @@ class Interchange:
 
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
-        self.task_status_deltas: dict[str, tuple[float, TaskState]] = {}
+        self.task_status_deltas: dict[str, tuple[float, TaskState, ActorName]] = {}
         self.container_switch_count: dict[str, int] = {}
 
     def load_config(self):
@@ -456,7 +459,11 @@ class Interchange:
                     }
                 )
                 self.total_pending_task_count += 1
-                ts = (time.monotonic(), TaskState.WAITING_FOR_NODES)
+                ts = TaskTransition(
+                    timestamp=time.time_ns(),
+                    state=TaskState.WAITING_FOR_NODES,
+                    actor=ActorName.INTERCHANGE,
+                )
                 self.task_status_deltas[msg.task_id] = ts
                 log.debug(
                     f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES"
@@ -894,7 +901,11 @@ class Interchange:
                             self.task_cancel_pending_trap.pop(task_id)
                         else:
                             log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
-                            ts = (time.monotonic(), TaskState.WAITING_FOR_LAUNCH)
+                            ts = TaskTransition(
+                                timestamp=time.time_ns(),
+                                state=TaskState.WAITING_FOR_LAUNCH,
+                                actor=ActorName.INTERCHANGE,
+                            )
                             self.task_status_deltas[task_id] = ts
 
             # Receive any results and forward to client
