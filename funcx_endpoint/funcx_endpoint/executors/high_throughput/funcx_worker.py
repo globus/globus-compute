@@ -124,29 +124,33 @@ class FuncXWorker:
 
     def execute_task(self, task_id: str, task_body: bytes) -> dict:
         log.debug("executing task task_id='%s'", task_id)
-        exec_start_ms = _now_ms()
+        exec_times = {"exec_start_ms": _now_ms()}
 
         try:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
+            exec_times["exec_end_ms"] = _now_ms()
             result_message = dict(
                 task_id=task_id,
                 exception=get_error_string(),
                 error_details=get_result_error_details(),
-                exec_start_ms=exec_start_ms,
-                exec_end_ms=_now_ms(),
+                times=exec_times,
             )
         else:
             log.debug("Execution completed without exception")
+            exec_times["exec_end_ms"] = _now_ms()
             result_message = dict(
                 task_id=task_id,
                 data=result,
-                exec_start_ms=exec_start_ms,
-                exec_end_ms=_now_ms(),
+                times=exec_times,
             )
 
-        log.debug("task %s completed", task_id)
+        log.debug(
+            "task %s completed in %d ms",
+            task_id,
+            (exec_times["exec_end_ms"] - exec_times["exec_start_ms"]),
+        )
         return result_message
 
     def call_user_function(self, message: bytes) -> str:
