@@ -10,6 +10,11 @@ import time
 import dill
 import zmq
 from funcx_common import messagepack
+<<<<<<< HEAD
+from funcx_common.tasks import ActorName, TaskState
+=======
+from funcx_common.tasks import TaskState
+>>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
 
 from funcx.errors import MaxResultSizeExceeded
 from funcx.serialize import FuncXSerializer
@@ -124,17 +129,55 @@ class FuncXWorker:
 
     def execute_task(self, task_id: str, task_body: bytes) -> dict:
         log.debug("executing task task_id='%s'", task_id)
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+        exec_start = (_now_ms(), TaskState.EXEC_START, ActorName.WORKER)
+=======
         exec_times = {"exec_start_ms": _now_ms()}
+>>>>>>> cbd5779a (Black)
+=======
+        exec_times = {"exec_start_ms": _now_ms()}
+>>>>>>> d375e5fc (Black)
+=======
+        exec_start = (_now_ms(), TaskState.EXEC_START)
+>>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
 
         try:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+            exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
+=======
             exec_times["exec_end_ms"] = _now_ms()
+>>>>>>> cbd5779a (Black)
+=======
+            exec_times["exec_end_ms"] = _now_ms()
+>>>>>>> d375e5fc (Black)
+=======
+            exec_end = (_now_ms(), TaskState.EXEC_END)
+>>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
             result_message = dict(
                 task_id=task_id,
                 exception=get_error_string(),
                 error_details=get_result_error_details(),
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+                statuses=[exec_start, exec_end],
+            )
+        else:
+            log.debug("Execution completed without exception")
+            exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
+            result_message = dict(
+                task_id=task_id,
+                data=result,
+                statuses=[exec_start, exec_end],
+=======
                 times=exec_times,
             )
         else:
@@ -144,12 +187,58 @@ class FuncXWorker:
                 task_id=task_id,
                 data=result,
                 times=exec_times,
+>>>>>>> cbd5779a (Black)
+=======
+                times=exec_times,
+=======
+                status=[exec_start, exec_end],
+>>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
+=======
+                statuses=[exec_start, exec_end],
+>>>>>>> facc8945 (Correct time difference and statuses)
+            )
+        else:
+            log.debug("Execution completed without exception")
+            exec_end = (_now_ms(), TaskState.EXEC_END)
+            result_message = dict(
+                task_id=task_id,
+                data=result,
+<<<<<<< HEAD
+<<<<<<< HEAD
+                times=exec_times,
+>>>>>>> d375e5fc (Black)
+=======
+                status=[exec_start, exec_end],
+>>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
+=======
+                statuses=[exec_start, exec_end],
+>>>>>>> facc8945 (Correct time difference and statuses)
             )
 
         log.debug(
             "task %s completed in %d ms",
             task_id,
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+            (exec_end[0] - exec_start[0]),
+=======
             (exec_times["exec_end_ms"] - exec_times["exec_start_ms"]),
+>>>>>>> cbd5779a (Black)
+=======
+            (exec_times["exec_end_ms"] - exec_times["exec_start_ms"]),
+>>>>>>> d375e5fc (Black)
+=======
+            (exec_end - exec_start),
+>>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
+=======
+            (exec_end[0] - exec_start[1]),
+>>>>>>> facc8945 (Correct time difference and statuses)
+=======
+            (exec_end[0] - exec_start[0]),
+>>>>>>> d504dffe (typo)
         )
         return result_message
 
