@@ -21,7 +21,7 @@ from funcx.sdk.client import FuncXClient
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
-from funcx_endpoint.endpoint.results_ack import ResultsAckHandler
+from funcx_endpoint.endpoint.result_store import ResultStore
 from funcx_endpoint.logging_config import setup_logging
 
 log = logging.getLogger(__name__)
@@ -188,17 +188,7 @@ class Endpoint:
                 )
                 self.pidfile_cleanup(pid_file)
 
-        results_ack_handler = ResultsAckHandler(endpoint_dir=endpoint_dir)
-
-        try:
-            results_ack_handler.load()
-            results_ack_handler.persist()
-        except Exception:
-            log.exception(
-                "Caught exception while attempting load and persist of outstanding "
-                "results"
-            )
-            sys.exit(-1)
+        result_store = ResultStore(endpoint_dir=endpoint_dir)
 
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
@@ -304,8 +294,8 @@ class Endpoint:
                 endpoint_dir,
                 endpoint_config,
                 reg_info,
-                funcx_client_options,
-                results_ack_handler,
+                funcx_client,
+                result_store,
             )
 
     def daemon_launch(
@@ -314,8 +304,8 @@ class Endpoint:
         endpoint_dir,
         endpoint_config,
         reg_info,
-        funcx_client_options,
-        results_ack_handler,
+        funcx_client: FuncXClient,
+        result_store: ResultStore,
     ):
         interchange = EndpointInterchange(
             config=endpoint_config.config,
@@ -323,8 +313,8 @@ class Endpoint:
             endpoint_id=endpoint_uuid,
             endpoint_dir=endpoint_dir,
             endpoint_name=self.name,
-            funcx_client_options=funcx_client_options,
-            results_ack_handler=results_ack_handler,
+            funcx_client=funcx_client,
+            result_store=result_store,
             logdir=endpoint_dir,
         )
 

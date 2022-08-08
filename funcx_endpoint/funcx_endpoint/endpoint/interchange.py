@@ -15,6 +15,8 @@ from multiprocessing.synchronize import Event as EventType
 from typing import Dict
 
 import dill
+from funcx_common.messagepack import pack
+from funcx_common.messagepack.message_types import Result, ResultErrorDetails
 from parsl.version import VERSION as PARSL_VERSION
 from retry.api import retry_call
 
@@ -28,6 +30,7 @@ from funcx_endpoint.endpoint.messages_compat import (
 )
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
+from funcx_endpoint.endpoint.result_store import ResultStore
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 log = logging.getLogger(__name__)
@@ -57,8 +60,8 @@ class EndpointInterchange:
         endpoint_id=None,
         endpoint_dir=".",
         endpoint_name="default",
-        funcx_client_options=None,
-        results_ack_handler=None,
+        funcx_client: FuncXClient | None = None,
+        result_store: ResultStore | None = None,
     ):
         """
         Parameters
@@ -99,9 +102,9 @@ class EndpointInterchange:
         self.endpoint_dir = endpoint_dir
         self.endpoint_name = endpoint_name
 
-        if funcx_client_options is None:
-            funcx_client_options = {}
-        self.funcx_client = FuncXClient(**funcx_client_options)
+        if funcx_client is None:
+            funcx_client = FuncXClient()
+        self.funcx_client = funcx_client
 
         self.initial_registration_complete = False
         self.task_q_info, self.result_q_info = None, None
@@ -117,7 +120,9 @@ class EndpointInterchange:
         self._quiesce_event = multiprocessing.Event()
         self._kill_event = multiprocessing.Event()
 
-        self.results_ack_handler = results_ack_handler
+        if result_store is None:
+            result_store = ResultStore(endpoint_dir=endpoint_dir)
+        self.result_store = result_store
 
         self.endpoint_id = endpoint_id
 
@@ -222,14 +227,7 @@ class EndpointInterchange:
         log.info("Interchange Quiesce in progress (stopping and joining processes)")
         self._quiesce_event.set()
 
-        log.info("Saving unacked results to disk")
-        try:
-            self.results_ack_handler.persist()
-        except Exception:
-            log.exception("Caught exception while saving unacked results")
-            log.warning("Interchange will continue without saving unacked results")
         log.info("Waiting for quiesce complete")
-
         self._task_puller_proc.join()
 
         log.info("Quiesce done")
@@ -304,33 +302,58 @@ class EndpointInterchange:
         self._main_loop()
 
     def _main_loop(self):
+        """
+        This is the "kernel" of the endpoint interchange process.  Conceptually, there
+        are three actions of consequence: forward task messages to the executors,
+        forward results from the executors back to the funcx web services (RMQ), and
+        forward any previous results that may have failed to send previously (e.g., if
+        a RMQ connection was dropped).
+
+        We accomplish this via three threads, one each for each task.
+
+        Of special note is that this kernel does not try very hard to handle the
+        non-happy path.  If an error occurs that is too "unhappy" (e.g., communication
+        with RMQ fails), the catch-all solution is to "reboot" and try again.  That is,
+        this method exits, communication is shutdown, started again, and we restart
+        this method.
+        """
+        log.debug("_main_loop begins")
+
         results_publisher = ResultQueuePublisher(
             queue_info=self.result_q_info,
         )
 
         with results_publisher.connect():
-            # TODO: this resend must happen after any endpoint re-registration to
-            # ensure there are not unacked results left
-            resend_results_messages = (
-                self.results_ack_handler.get_unacked_results_list()
-            )
-            if len(resend_results_messages) > 0:
-                log.info(
-                    "Resending %s previously unacked results",
-                    len(resend_results_messages),
-                )
-
-                for results in resend_results_messages:
-                    # TO-DO: Republishing backlogged/unacked messages is not supported
-                    # until the types are sorted out
-                    results_publisher.publish(try_convert_to_messagepack(results))
-
             executor = list(self.executors.values())[0]
 
             num_tasks_forwarded = 0
             num_results_forwarded = 0
 
+            def process_stored_results():
+                # Handle any previously stored results, either from a previous run or
+                # from a quarter of a second-ago.  Basically, check every second
+                # (.wait()) if there are any items on disk to be sent.  If there are,
+                # don't treat them any differently than "fresh" results: put the into
+                # the same multiprocessing queue as results incoming directly from
+                # the executors.  The normal processing by `process_pending_results()`
+                # will take over from there.
+                while not self._quiesce_event.wait(timeout=1):
+                    for task_id, packed_result in self.result_store:
+                        if self._quiesce_event.is_set():
+                            # important to check every iteration as well, so as not to
+                            # potentially hang up the shutdown procedure
+                            return
+                        log.debug("Retrieved stored result (%s)", task_id)
+                        msg = {"task_id": task_id, "message": packed_result}
+                        self.result_store.discard(task_id)
+                        self.results_passthrough.put(msg)
+
+                log.debug("Exit process-stored-results thread.")
+
             def process_pending_tasks():
+                # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
+                # funcx-manager.  In terms of shutting down (or "rebooting") gracefully,
+                # iterate once a second whether or not a task has arrived.
                 nonlocal num_tasks_forwarded
                 while not self._quiesce_event.is_set():
                     if self.time_to_quit:
@@ -352,39 +375,81 @@ class EndpointInterchange:
                 log.debug("Exit process-pending-tasks thread.")
 
             def process_pending_results():
+                # Forward incoming results from the funcx-manager to the funcx-services.
+                # For graceful handling of shutdown (or "reboot"), wait up to a second
+                # for incoming results before iterating the loop regardless.
                 nonlocal num_results_forwarded
                 while not self._quiesce_event.is_set():
                     try:
-                        results = self.results_passthrough.get(timeout=1)
-
-                        task_id = results["task_id"]
-                        if task_id:
-                            self.results_ack_handler.put(task_id, results["message"])
-                            log.debug(f"Forwarding result for task {task_id}")
-
-                        message = try_convert_to_messagepack(results["message"])
-
-                        # results will be a packed EPStatusReport or a packed Result
-                        log.debug(f"Publishing message {message}")
-                        results_publisher.publish(message)
-                        self.results_ack_handler.ack(task_id)  # RMQ has it now
-                        num_results_forwarded += 1  # Safe given GIL
+                        result = self.results_passthrough.get(timeout=1)
+                        task_id = result["task_id"]
+                        packed_result = result["message"]
 
                     except queue.Empty:
+                        # Empty queue!  Let's see if we have any prior results to send
                         continue
 
-                    except Exception:
-                        log.exception("Something broke while forwarding results")
+                    except Exception as exc:
+                        log.debug(f"Invalid message received: {result}")
+                        log.warning(
+                            f"Invalid message received: no task_id.  Ignoring. {exc}"
+                        )
                         continue
+
+                    try:
+                        # This either works or it doesn't; if it doesn't to serialize
+                        # the to an execption and send _that_
+                        # will be a packed EPStatusReport or Result
+                        message = try_convert_to_messagepack(packed_result)
+                    except Exception as exc:
+                        log.exception(
+                            f"Unable to parse result message for task {task_id}."
+                            "   Marking task as failed."
+                        )
+
+                        kwargs = {
+                            "task_id": task_id,
+                            "data": packed_result,
+                            "error_details": ResultErrorDetails(
+                                code=0,
+                                user_message=(
+                                    "Endpoint failed to serialize."
+                                    f"  Exception text: {exc}"
+                                ),
+                            ),
+                        }
+                        message = pack(Result(**kwargs))
+
+                    if task_id:
+                        log.debug(f"Forwarding result for task {task_id}")
+
+                    try:
+                        results_publisher.publish(message)
+                        num_results_forwarded += 1  # Safe given GIL
+
+                    except Exception:
+                        # Publishing didn't work -- quiesce and see if a simple restart
+                        # fixes the issue.
+                        self._quiesce_event.set()
+
+                        log.exception("Something broke while forwarding results")
+                        if task_id:
+                            log.info("Storing result for later: %s", task_id)
+                            self.result_store[task_id] = packed_result
+                        continue  # just be explicit
 
                 log.debug("Exit process-pending-results thread.")
 
+            stored_processor_thread = threading.Thread(
+                target=process_stored_results, name="Stored Result Handler"
+            )
             task_processor_thread = threading.Thread(
                 target=process_pending_tasks, name="Pending Task Handler"
             )
             result_processor_thread = threading.Thread(
                 target=process_pending_results, name="Pending Result Handler"
             )
+            stored_processor_thread.start()
             task_processor_thread.start()
             result_processor_thread.start()
 
@@ -404,5 +469,6 @@ class EndpointInterchange:
             # The timeouts aren't nominally necessary because if the above loop has
             # quit, then the _quiesce_event is set, and both threads check that event
             # every internal iteration.  But "for kicks."
+            stored_processor_thread.join(timeout=5)
             task_processor_thread.join(timeout=5)
             result_processor_thread.join(timeout=5)
