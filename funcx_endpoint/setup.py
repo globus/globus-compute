@@ -44,6 +44,7 @@ TEST_REQUIRES = [
     "pytest>=5.2",
     "coverage>=5.2",
     "pytest-mock==3.2.0",
+    "pyfakefs",
 ]
 
 
