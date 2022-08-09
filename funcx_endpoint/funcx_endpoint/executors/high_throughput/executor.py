@@ -18,7 +18,6 @@ import daemon
 import dill
 from parsl.dataflow.error import ConfigurationError
 from parsl.executors.errors import BadMessage, ScalingFailed
-from parsl.executors.status_handling import StatusHandlingExecutor
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
@@ -49,7 +48,7 @@ BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
 
 
-class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
+class HighThroughputExecutor(RepresentationMixin):
     """Executor designed for cluster-scale
 
     The HighThroughputExecutor system has the following components:
@@ -269,8 +268,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         task_status_queue=None,
     ):
         log.debug("Initializing HighThroughputExecutor")
-        StatusHandlingExecutor.__init__(self, provider)
-
+        self.provider = provider
         self.label = label
         self.launch_cmd = launch_cmd
         self.worker_debug = worker_debug
@@ -314,6 +312,7 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.interchange_local = interchange_local
         self.passthrough = passthrough
         self.task_status_queue = task_status_queue
+        self.tasks = {}
 
         self.outgoing_q: zmq_pipes.TasksOutgoing | None = None
         self.incoming_q: zmq_pipes.ResultsIncoming | None = None
