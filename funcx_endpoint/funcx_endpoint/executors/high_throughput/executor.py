@@ -12,7 +12,6 @@ import multiprocessing
 import os
 import queue
 import threading
-import time
 from multiprocessing import Process
 
 import daemon
@@ -343,7 +342,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         self.funcx_service_address = funcx_service_address
         self.container_image = container_image
         self.worker_mode = worker_mode
-        self.last_response_time = time.time()
 
         if not launch_cmd:
             self.launch_cmd = (
@@ -550,7 +548,6 @@ class HighThroughputExecutor(StatusHandlingExecutor, RepresentationMixin):
         while self.is_alive and not self._executor_bad_state.is_set():
             try:
                 msgs = self.incoming_q.get(timeout=1)
-                self.last_response_time = time.time()
 
             except queue.Empty:
                 log.debug("queue empty")
