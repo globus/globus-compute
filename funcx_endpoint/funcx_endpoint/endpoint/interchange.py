@@ -109,6 +109,7 @@ class EndpointInterchange:
             self.task_q_info, self.result_q_info = reg_info
             self.initial_registration_complete = True
 
+        self.time_to_quit = False
         self.heartbeat_period = self.config.heartbeat_period
 
         self.pending_task_queue: multiprocessing.Queue = multiprocessing.Queue()
@@ -247,14 +248,8 @@ class EndpointInterchange:
             self.executors[label].shutdown()
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
-        log.warning("Received SIGTERM, attempting to save unacked results to disk")
-        try:
-            self.stop()
-        except Exception:
-            log.exception("Caught exception while saving unacked results")
-        else:
-            log.info("Unacked results successfully saved to disk")
-        # sys.exit(1)
+        log.warning("Received SIGTERM, setting termination flag.")
+        self.time_to_quit = True
 
     def start(self):
         """Start the Interchange"""
@@ -333,6 +328,10 @@ class EndpointInterchange:
             def process_pending_tasks():
                 nonlocal num_tasks_forwarded
                 while not self._quiesce_event.is_set():
+                    if self.time_to_quit:
+                        self.stop()
+                        continue  # nominally == break; but let event do it
+
                     try:
                         incoming_task = self.pending_task_queue.get(timeout=1)
                         task = try_convert_from_messagepack(incoming_task)
