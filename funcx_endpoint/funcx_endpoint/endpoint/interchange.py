@@ -110,7 +110,6 @@ class EndpointInterchange:
             self.initial_registration_complete = True
 
         self.heartbeat_period = self.config.heartbeat_period
-        self.heartbeat_threshold = self.config.heartbeat_threshold
 
         self.pending_task_queue: multiprocessing.Queue = multiprocessing.Queue()
 
@@ -386,7 +385,7 @@ class EndpointInterchange:
             result_processor_thread.start()
 
             last_t, last_r = 0, 0
-            while not self._quiesce_event.wait(self.heartbeat_threshold):
+            while not self._quiesce_event.wait(self.heartbeat_period):
                 # Possibly TOCTOU here, but we don't need to be super precise.  The
                 # point here is to mention "still alive" and that we're still working
                 num_t, num_r = num_tasks_forwarded, num_results_forwarded
