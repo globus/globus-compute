@@ -101,11 +101,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
         """
         logger.warning(f"Connection closing: {exception}")
         self._channel = None
-        if self.status is SubscriberProcessStatus.closing:
-            connection.ioloop.stop()
-        else:
-            logger.warning(f"Connection closed, reopening in 5 seconds: {exception}")
-            self._connection.ioloop.call_later(5, self.reconnect)
+        # Setting the kill_event will trigger shutdown via the event_watcher
+        self.kill_event.set()
 
     def reconnect(self):
         """Will be invoked by the IOLoop timer if the connection is
