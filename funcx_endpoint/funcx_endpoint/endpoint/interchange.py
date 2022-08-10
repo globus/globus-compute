@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import multiprocessing
 import os
@@ -12,7 +14,6 @@ import typing as t
 # to annotate, we need the "real" class
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
-from typing import Dict
 
 import dill
 from funcx_common.messagepack import pack
@@ -153,7 +154,7 @@ class EndpointInterchange:
         log.info("Loading endpoint local config")
 
         self.results_passthrough = mpQueue()
-        self.executors: Dict[str, funcx_endpoint.executors.HighThroughputExecutor] = {}
+        self.executors: dict[str, funcx_endpoint.executors.HighThroughputExecutor] = {}
         for executor in self.config.executors:
             log.info(f"Initializing executor: {executor.label}")
             executor.funcx_service_address = self.config.funcx_service_address
