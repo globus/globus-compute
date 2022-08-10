@@ -8,6 +8,7 @@ import queue
 import signal
 import sys
 import threading
+import time
 import typing as t
 
 # multiprocessing.Event is a method, not a class
@@ -232,8 +233,6 @@ class EndpointInterchange:
         self._task_puller_proc.join()
 
         log.info("Quiesce done")
-        # this must be called last to ensure the next interchange run will occur
-        self._quiesce_event.clear()
 
     def stop(self):
         """Prepare the interchange for shutdown"""
@@ -270,6 +269,11 @@ class EndpointInterchange:
         self.start_executors()
 
         while not self._kill_event.is_set():
+            if self._quiesce_event.is_set():
+                log.info("Interchange will retry connecting in 5s")
+                time.sleep()
+                self._quiesce_event.clear()
+
             try:
                 self._start_threads_and_main()
             except Exception:
