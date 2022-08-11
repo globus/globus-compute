@@ -270,8 +270,8 @@ class EndpointInterchange:
 
         while not self._kill_event.is_set():
             if self._quiesce_event.is_set():
-                log.info("Interchange will retry connecting in 5s")
-                time.sleep()
+                log.warning("Interchange will retry connecting in 5s")
+                time.sleep(5)
                 self._quiesce_event.clear()
 
             try:
