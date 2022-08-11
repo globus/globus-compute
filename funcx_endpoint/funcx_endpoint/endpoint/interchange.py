@@ -203,7 +203,7 @@ class EndpointInterchange:
             task_q_proc = TaskQueueSubscriber(
                 queue_info=connection_params,
                 external_queue=pending_task_queue,
-                kill_event=quiesce_event,
+                quiesce_event=quiesce_event,
                 endpoint_id=endpoint_uuid,
             )
             task_q_proc.start()
