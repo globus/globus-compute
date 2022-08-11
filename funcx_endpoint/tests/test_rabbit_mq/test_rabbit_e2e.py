@@ -26,7 +26,7 @@ def test_simple_roundtrip(
     result_pub.publish(task_message)
     result_message = result_q.get(timeout=2)
 
-    task_sub.kill_event.set()
+    task_sub.quiesce_event.set()
     result_sub.kill_event.set()
 
     expected = (result_pub.queue_info["test_routing_key"], message)

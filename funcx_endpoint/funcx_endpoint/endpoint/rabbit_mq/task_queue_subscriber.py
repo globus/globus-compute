@@ -35,7 +35,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         endpoint_id: str,
         queue_info: dict,
         external_queue: multiprocessing.Queue,
-        kill_event: EventType,
+        quiesce_event: EventType,
     ):
         """
 
@@ -50,7 +50,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
              Please note that upon pushing a message into this queue, it will be
              marked as delivered.
 
-        kill_event: multiprocessing.Event
+        quiesce_event: multiprocessing.Event
              This event is used to communicate a failure on the subscriber
 
         endpoint_id: endpoint uuid string
@@ -62,7 +62,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self.endpoint_id = endpoint_id
         self.queue_info = queue_info
         self.external_queue = external_queue
-        self.kill_event = kill_event
+        self.quiesce_event = quiesce_event
         self._channel_closed = multiprocessing.Event()
         self._cleanup_complete = multiprocessing.Event()
 
@@ -180,7 +180,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
                 )
                 logger.warning("Channel will close without connection retry")
                 self.status = SubscriberProcessStatus.closing
-                self.kill_event.set()
+                self.quiesce_event.set()
         elif isinstance(exception, pika.exceptions.ChannelClosedByClient):
             logger.debug("Detected channel closed by client")
         else:
@@ -317,9 +317,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self._cleanup_complete.set()
 
     def event_watcher(self):
-        """Polls the kill_event periodically to trigger a shutdown"""
-        if self.kill_event.is_set():
-            logger.info("Kill event is set. Start subscriber shutdown")
+        """Polls the quiesce_event periodically to trigger a shutdown"""
+        if self.quiesce_event.is_set():
+            logger.info("Shutting down task queue reader due to quiesce event.")
             try:
                 self._shutdown()
             except Exception:
@@ -332,8 +332,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
             )
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
-        logger.warning("Received SIGTERM, setting kill event")
-        self.kill_event.set()
+        logger.warning("Received SIGTERM, setting stop event")
+        self.quiesce_event.set()
 
     def run(self):
         """Run the example consumer by connecting to RabbitMQ and then
@@ -350,12 +350,12 @@ class TaskQueueSubscriber(multiprocessing.Process):
             self._connection.ioloop.start()
         except Exception:
             logger.exception("Failed to start subscriber")
-            self.kill_event.set()
+            self.quiesce_event.set()
 
     def stop(self) -> None:
         """stop() is called by the parent to shutdown the subscriber"""
         logger.info("Stopping")
-        self.kill_event.set()
+        self.quiesce_event.set()
         logger.info("Waiting for cleanup_complete")
         if not self._cleanup_complete.wait(2 * self._watcher_poll_period):
             logger.warning("Reached timeout while waiting for cleanup complete")

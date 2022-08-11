@@ -41,8 +41,8 @@ def test_subscriber_recovery(start_task_q_publisher, start_task_q_subscriber):
 
     # Listen for 10 messages
     tasks_out = multiprocessing.Queue()
-    kill_event = multiprocessing.Event()
-    proc = start_task_q_subscriber(queue=tasks_out, kill_event=kill_event)
+    quiesce_event = multiprocessing.Event()
+    proc = start_task_q_subscriber(queue=tasks_out, quiesce_event=quiesce_event)
     logging.warning("Proc started")
     for i in range(10):
         message = tasks_out.get()
@@ -64,8 +64,8 @@ def test_subscriber_recovery(start_task_q_publisher, start_task_q_subscriber):
         messages.append(b_message)
 
     # Listen for the messages on a new connection
-    kill_event.clear()
-    proc = start_task_q_subscriber(queue=tasks_out, kill_event=kill_event)
+    quiesce_event.clear()
+    proc = start_task_q_subscriber(queue=tasks_out, quiesce_event=quiesce_event)
 
     logging.warning("Replacement proc started")
     for i in range(10):

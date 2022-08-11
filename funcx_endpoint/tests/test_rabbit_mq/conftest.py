@@ -128,13 +128,13 @@ def start_task_q_subscriber(
         *,
         endpoint_id: str | None = None,
         queue: multiprocessing.Queue | None = None,
-        kill_event: EventType | None = None,
+        quiesce_event: EventType | None = None,
         override_params: pika.connection.Parameters | None = None,
     ):
         if endpoint_id is None:
             endpoint_id = default_endpoint_id
-        if kill_event is None:
-            kill_event = multiprocessing.Event()
+        if quiesce_event is None:
+            quiesce_event = multiprocessing.Event()
         if queue is None:
             queue = multiprocessing.Queue()
         q_info = task_queue_info if override_params is None else override_params
@@ -143,7 +143,7 @@ def start_task_q_subscriber(
         task_q = TaskQueueSubscriber(
             queue_info=q_info,
             external_queue=queue,
-            kill_event=kill_event,
+            quiesce_event=quiesce_event,
             endpoint_id=endpoint_id,
         )
         task_q.start()
