@@ -77,6 +77,7 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.info("Connecting to %s", self.queue_info)
 
         pika_params = pika.URLParameters(self.queue_info["connection_url"])
+        pika_params.client_properties = {"connection_name": "ep_task"}
         return pika.SelectConnection(
             pika_params,
             on_open_callback=self._on_connection_open,

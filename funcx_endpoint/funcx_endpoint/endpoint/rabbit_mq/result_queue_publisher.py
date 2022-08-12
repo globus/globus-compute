@@ -50,6 +50,7 @@ class ResultQueuePublisher:
 
     def connect(self) -> ResultQueuePublisher:
         pika_params = pika.URLParameters(self.queue_info["connection_url"])
+        pika_params.client_properties = {"connection_name": "ep_result"}
         pika_params.heartbeat = 0  # result_q is blocking; no heartbeats warranted
         conn = pika.BlockingConnection(pika_params)
         channel = conn.channel()
