@@ -156,7 +156,9 @@ class EndpointInterchange:
                 executor.endpoint_id = self.endpoint_id
             else:
                 if not executor.endpoint_id == self.endpoint_id:
-                    raise Exception("InconsistentEndpointId")
+                    eep_id = f"Executor({executor.endpoint_id})"
+                    sep_id = f"Interchange({self.endpoint_id})"
+                    raise Exception(f"InconsistentEndpointId: {eep_id} != {sep_id}")
             self.executors[executor.label] = executor
             if executor.run_dir is None:
                 executor.run_dir = self.logdir
