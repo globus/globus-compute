@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import typing as t
+
 import pytest
 import responses
+from pika.exchange_type import ExchangeType
 
 from funcx_endpoint.logging_config import add_trace_level
 
@@ -33,22 +36,35 @@ def _mock_logging_config(monkeypatch):
 
 
 @pytest.fixture
-def setup_register_endpoint_response(endpoint_uuid):
-    responses.add(
-        method=responses.POST,
-        url="https://api2.funcx.org/v2/endpoints",
-        headers={"Content-Type": "application/json"},
-        json={
-            "endpoint_id": endpoint_uuid,
-            "result_queue_info": {
-                "exchange_name": "results",
-                "exchange_type": "topic",
-                "result_url": "amqp://localhost:5672",
+def setup_register_endpoint_response(
+    create_result_queue_info,
+    task_queue_info,
+    ensure_task_queue,
+    ensure_result_queue,
+) -> t.Callable[[str], None]:
+    ensure_task_queue(queue_opts={"queue": task_queue_info["queue"]})
+
+    def resp(endpoint_uuid: str):
+        rq_info = create_result_queue_info(queue_id=endpoint_uuid)
+        exchange_name = rq_info["exchange"]
+        queue_name = rq_info["test_routing_key"]
+        exchange_opts = {
+            "exchange": exchange_name,
+            "exchange_type": ExchangeType.topic.value,
+            "durable": True,
+        }
+        queue_opts = {"queue": queue_name, "durable": True}
+        ensure_result_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
+
+        responses.add(
+            method=responses.POST,
+            url="https://api2.funcx.org/v2/endpoints",
+            headers={"Content-Type": "application/json"},
+            json={
+                "endpoint_id": endpoint_uuid,
+                "task_queue_info": task_queue_info,
+                "result_queue_info": rq_info,
             },
-            "task_queue_info": {
-                "exchange_name": "tasks",
-                "exchange_type": "direct",
-                "task_url": "amqp://localhost:5672",
-            },
-        },
-    )
+        )
+
+    yield resp

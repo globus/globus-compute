@@ -99,7 +99,6 @@ class EndpointInterchange:
             )
         )
         self.config = config
-        log.info(f"Got config: {config}")
 
         self.endpoint_dir = endpoint_dir
         self.endpoint_name = endpoint_name
@@ -205,8 +204,6 @@ class EndpointInterchange:
         quiesce_event : EventType
               Event to let the thread know when it is time to die.
         """
-        log.info("Starting")
-
         try:
             log.info(f"Starting the TaskQueueSubscriber as {endpoint_uuid}")
             task_q_proc = TaskQueueSubscriber(
@@ -273,6 +270,8 @@ class EndpointInterchange:
                 log.warning("Interchange will retry connecting in 5s")
                 time.sleep(5)
                 self._quiesce_event.clear()
+            else:
+                log.debug("Starting threads and main loop")
 
             try:
                 self._start_threads_and_main()
@@ -352,6 +351,7 @@ class EndpointInterchange:
                         msg = {"task_id": task_id, "message": packed_result}
                         self.result_store.discard(task_id)
                         self.results_passthrough.put(msg)
+                log.debug("Exit process-stored-results thread.")
 
                 log.debug("Exit process-stored-results thread.")
 
@@ -406,6 +406,7 @@ class EndpointInterchange:
                         # the to an execption and send _that_
                         # will be a packed EPStatusReport or Result
                         message = try_convert_to_messagepack(packed_result)
+
                     except Exception as exc:
                         log.exception(
                             f"Unable to parse result message for task {task_id}."
@@ -458,6 +459,7 @@ class EndpointInterchange:
             task_processor_thread.start()
             result_processor_thread.start()
 
+            log.debug("_main_loop entered running state")
             last_t, last_r = 0, 0
             while not self._quiesce_event.wait(self.heartbeat_period):
                 # Possibly TOCTOU here, but we don't need to be super precise.  The
