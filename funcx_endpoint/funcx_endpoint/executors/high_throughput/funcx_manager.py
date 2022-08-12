@@ -645,7 +645,7 @@ class Manager:
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
             log.debug(f"Set task {task.task_id} to RUNNING")
-            ts = (time.monotonic(), TaskState.RUNNING, ActorName.MANAGER)
+            ts = (time.time_ns(), TaskState.RUNNING, ActorName.MANAGER)
             self.task_status_deltas[task.task_id] = ts
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,

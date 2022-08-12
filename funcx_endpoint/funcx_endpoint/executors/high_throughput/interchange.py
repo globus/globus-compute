@@ -458,7 +458,7 @@ class Interchange:
                 )
                 self.total_pending_task_count += 1
                 ts = (
-                    time.monotonic(),
+                    time.time_ns(),
                     TaskState.WAITING_FOR_NODES,
                     ActorName.INTERCHANGE,
                 )
@@ -900,7 +900,7 @@ class Interchange:
                         else:
                             log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
                             ts = (
-                                time.monotonic(),
+                                time.time_ns(),
                                 TaskState.WAITING_FOR_LAUNCH,
                                 ActorName.INTERCHANGE,
                             )

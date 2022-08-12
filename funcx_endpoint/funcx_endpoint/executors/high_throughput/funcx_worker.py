@@ -37,10 +37,6 @@ DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
 
 
-def _now_ms() -> int:
-    return int(time.time() * 1000)
-
-
 class FuncXWorker:
     """The FuncX worker
     Parameters
@@ -141,6 +137,7 @@ class FuncXWorker:
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         exec_start = (_now_ms(), TaskState.EXEC_START, ActorName.WORKER)
 =======
         exec_times = {"exec_start_ms": _now_ms()}
@@ -154,11 +151,15 @@ class FuncXWorker:
 =======
         exec_start = (_now_ms(), TaskState.EXEC_START, ActorName.WORKER)
 >>>>>>> ac98dda4 (Fix missing actor name in exec start timestamp)
+=======
+        exec_start = (time.time_ns(), TaskState.EXEC_START, ActorName.WORKER)
+>>>>>>> 5b5e6865 (Switch to time_ns())
 
         try:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -176,6 +177,9 @@ class FuncXWorker:
 =======
             exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
 >>>>>>> 5bd67dfa (Include actor name as part of status update.)
+=======
+            exec_end = (time.time_ns(), TaskState.EXEC_END, ActorName.WORKER)
+>>>>>>> 5b5e6865 (Switch to time_ns())
             result_message = dict(
                 task_id=task_id,
                 exception=get_error_string(),
@@ -188,6 +192,7 @@ class FuncXWorker:
             )
         else:
             log.debug("Execution completed without exception")
+<<<<<<< HEAD
             exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
 <<<<<<< HEAD
             result_message = dict(
@@ -200,6 +205,9 @@ class FuncXWorker:
         else:
             log.debug("Execution completed without exception")
             exec_times["exec_end_ms"] = _now_ms()
+=======
+            exec_end = (time.time_ns(), TaskState.EXEC_END, ActorName.WORKER)
+>>>>>>> 5b5e6865 (Switch to time_ns())
             result_message = dict(
                 task_id=task_id,
                 data=result,
