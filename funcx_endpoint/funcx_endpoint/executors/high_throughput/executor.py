@@ -10,9 +10,10 @@ import concurrent.futures
 import logging
 import multiprocessing
 import os
+import platform
 import queue
 import threading
-from multiprocessing import Process
+from typing import TYPE_CHECKING
 
 import daemon
 import dill
@@ -33,6 +34,22 @@ from funcx_endpoint.executors.high_throughput.messages import (
 )
 from funcx_endpoint.logging_config import setup_logging
 from funcx_endpoint.strategies.simple import SimpleStrategy
+
+"""
+For macOS, Python > 3.7 produces process .lock() issue, see related:
+https://stackoverflow.com/questions/45438323/python-errno-9-bad-file-descriptor-in-mac-os-x
+"""
+
+if TYPE_CHECKING:
+    # For the benefit of mypy
+    pass
+else:
+    if platform.system() == "Darwin":
+        from funcx_endpoint.executors.high_throughput.mac_process import (
+            MacProcess as UniversalProcess,
+        )
+    else:
+        from multiprocessing import Process as UniversalProcess
 
 fx_serializer = FuncXSerializer()
 
@@ -458,7 +475,7 @@ class HighThroughputExecutor(RepresentationMixin):
         """
         comm_q = mpQueue(maxsize=10)
         print(f"Starting local interchange with endpoint id: {self.endpoint_id}")
-        self.queue_proc = Process(
+        self.queue_proc = UniversalProcess(
             target=interchange.starter,
             name="Executor-Interchange",
             args=(comm_q,),
