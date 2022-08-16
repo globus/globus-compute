@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from parsl.utils import RepresentationMixin
 
 from funcx_endpoint.executors import HighThroughputExecutor
@@ -67,7 +69,7 @@ class Config(RepresentationMixin):
         # Execution backed
         executors: list = _DEFAULT_EXECUTORS,
         # Connection info
-        environment="prod",
+        environment: str | None = None,
         funcx_service_address=None,
         results_ws_uri=None,
         warn_about_url_mismatch=False,
