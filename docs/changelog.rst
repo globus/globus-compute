@@ -3,6 +3,51 @@ Changelog
 
 .. scriv-insert-here
 
+funcx & funcx-endpoint v1.0.0
+-----------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+ - Now using the correct HighThroughputExecutor constructor arg to set the log dir for workers
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- ``FuncXClient`` now warns you if it thinks you may have supplied ``funcx_service_address``
+  and ``results_ws_uri`` that point to different environments. This behavior can be
+  turned off by passing ``warn_about_url_mismatch=False``.
+
+Removed
+^^^^^^^
+
+- The off_process_checker, previously used to test function serialization methods, was removed
+
+Changed
+^^^^^^^
+
+- [Breaking] funcx and funcx-endpoint both require v1.0.0+ to connect to cloud-hosted
+  services, and older versions will no longer be supported.
+
+- [Breaking] funcx-endpoint now connects to the cloud-hosted services with RabbitMQ
+  over port:5671 instead of ZeroMQ which previously used ports (55001-55003).
+
+- [Breaking] Communication with the services are now encrypted and go over AMQPS
+  (TLS/SSL encrypted AMQP).
+
+- Pickle module references were replaced with dill
+
+- The order of serialization method attempts has been changed to try dill.dumps first
+
+- Alter the FuncXEndpoint to include a timestamp with each task state change.
+  This is mostly for the development team so as to support retrospective log
+  analyses of where tasks get stuck in the pipeline.
+
+- The Parsl dependency has been upgraded to a more recent
+  parsl master, from the older parsl 1.1 release.
+  This allows recent changes to provider functionality to
+  be accessed by funcX endpoint administrators.
+
 .. _changelog-0.4.0a2:
 
 funcx & funcx-endpoint v0.4.0a2
