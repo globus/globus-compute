@@ -5,8 +5,8 @@ from setuptools import find_packages, setup
 REQUIRES = [
     "requests>=2.20.0,<3",
     "globus-sdk",  # version will be bounded by `funcx`
-    "funcx==0.4.0a2",
-    "funcx-common==0.0.14",
+    "funcx==1.0.0a0",
+    "funcx-common==0.0.15",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer
@@ -35,7 +35,7 @@ REQUIRES = [
     # 'parsl' is a core requirement of the funcx-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
-    "parsl@git+https://github.com/parsl/parsl@efb75b7644f17c89af6c4dbe4e0499030efd103e",
+    "parsl>=1.3.0dev0",
     "pika>=1.2.0",
 ]
 
