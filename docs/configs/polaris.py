@@ -14,6 +14,8 @@ user_opts = {
         # Node setup: activate necessary conda environment and such.
         'worker_init': '',
         'scheduler_options': '',
+        # ALCF allocation to use
+        'account': '',
     }
 }
 
@@ -25,6 +27,7 @@ config = Config(
             address=address_by_hostname(),
             provider=PBSProProvider(
                 launcher=SingleNodeLauncher(),
+                account=user_opts['polaris']['account'],
                 queue='preemptable',
                 cpus_per_node=32,
                 select_options='ngpus=4',
