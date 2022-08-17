@@ -18,7 +18,6 @@ import dill
 import zmq
 from funcx_common.tasks import TaskState
 from parsl.app.errors import RemoteExceptionWrapper
-from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.sdk.client import FuncXClient
@@ -1114,11 +1113,9 @@ class Interchange:
                     internal_block = self.provider.submit(launch_cmd, 1, task_type)
                 log.debug(f"Launched block {external_block_id}->{internal_block}")
                 if not internal_block:
-                    raise (
-                        ScalingFailed(
-                            self.provider.label,
-                            "Attempts to provision nodes via provider has failed",
-                        )
+                    raise RuntimeError(
+                        "Attempt to provision nodes via provider "
+                        f"{self.provider.label} has failed"
                     )
                 self.blocks[external_block_id] = internal_block
                 self.block_id_map[internal_block] = external_block_id
