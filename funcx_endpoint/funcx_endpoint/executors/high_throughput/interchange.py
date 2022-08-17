@@ -1078,6 +1078,7 @@ class Interchange:
                 "min_blocks": self.provider.min_blocks,
                 "max_workers_per_node": self.max_workers_per_node,
                 "nodes_per_block": self.provider.nodes_per_block,
+                "heartbeat_period": self.heartbeat_period,
             },
         }
 
