@@ -43,7 +43,7 @@ class DillCodeSource(SerializeBase):
 
     def serialize(self, data):
         name = data.__name__
-        body = dill.source.getsource(data)
+        body = dill.source.getsource(data, lstrip=True)
         x = codecs.encode(dill.dumps((name, body)), "base64").decode()
         return self.identifier + x
 
@@ -136,8 +136,8 @@ class DillCode(SerializeBase):
 
 METHODS_MAP_CODE = OrderedDict(
     [
-        (DillCode.identifier, DillCode),
         (DillCodeSource.identifier, DillCodeSource),
+        (DillCode.identifier, DillCode),
         (DillCodeTextInspect.identifier, DillCodeTextInspect),
         (PickleCode.identifier, PickleCode),
     ]
