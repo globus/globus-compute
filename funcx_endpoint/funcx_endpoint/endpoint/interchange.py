@@ -258,6 +258,9 @@ class EndpointInterchange:
         log.info("Starting EndpointInterchange")
 
         signal.signal(signal.SIGTERM, self.handle_sigterm)
+        signal.signal(signal.SIGQUIT, self.handle_sigterm)  # hint: Ctrl+\
+        # Intentionally ignoring SIGINT for now, as we're unstable enough to
+        # warrant Python's default developer-friendly Ctrl+C handling
 
         self._quiesce_event.clear()
         self._kill_event.clear()
