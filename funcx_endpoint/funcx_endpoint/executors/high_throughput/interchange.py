@@ -568,7 +568,7 @@ class Interchange:
         log.debug("Status reporting loop starting")
         log.info(f"Endpoint id: {self.endpoint_id}")
 
-        while not kill_event.wait(self.heartbeat_period):
+        while True:
             log.trace(  # type: ignore[attr-defined]
                 f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}"
             )
@@ -578,6 +578,9 @@ class Interchange:
             log.debug("Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
             self.task_status_deltas.clear()
+
+            if kill_event.wait(self.heartbeat_period):
+                break
 
     def _command_server(self, kill_event):
         """Command server to run async command to the interchange
