@@ -94,7 +94,7 @@ jobs:
       - name: run tests
         run: |
           cd funcx_endpoint
-          tox -e py
+          tox -e py -- --log-cli-level=ERROR
       - name: Collect Docker Logs
         if: failure()
         uses: jwalton/gh-docker-logs@v2.2.0
