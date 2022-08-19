@@ -3,6 +3,50 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.0:
+
+funcx & funcx-endpoint v1.0.2
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- New `ResultStore` class, that will store backlogged result messages to
+  `<ENDPOINT_DIR>/unacked_results/`
+
+- Upon disconnect from RabbitMQ, the endpoint will now retry connecting
+  periodically while the executor continues to process tasks
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed issue with `quiesce` event not getting set from the SIGINT handler,
+  resulting in cleaner shutdowns
+
+- DillCodeSource updated to use dill's lstrip option to serialize
+  function definitions in nested contexts.
+
+Removed
+^^^^^^^
+
+- `ResultsAckHandler` is removed, and `unacked_results.p` files are now
+  obsolete.
+
+Changed
+^^^^^^^
+
+- DillCodeSource will now be used ahead of DillCode
+
+funcx & funcx-endpoint v1.0.1
+-----------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fix bug where stored credentials would fail to be loaded (manifesting in an
+  EOF error for background processes while unnecessarily attempting to
+  recollect credentials)
+
 funcx & funcx-endpoint v1.0.0
 -----------------------------
 
