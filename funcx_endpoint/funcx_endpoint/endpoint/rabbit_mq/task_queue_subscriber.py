@@ -74,8 +74,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
         logger.debug("Init done")
 
     def _connect(self) -> pika.SelectConnection:
-        logger.info("Connecting to %s", self.queue_info)
-
         pika_params = pika.URLParameters(self.queue_info["connection_url"])
         return pika.SelectConnection(
             pika_params,

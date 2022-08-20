@@ -54,7 +54,8 @@ def register_endpoint(
     if reg_info.get("endpoint_id") != endpoint_uuid:
         raise ValueError("Unexpected response from server: mismatched endpoint id.")
 
-    log_reg_info = re.subn(r"://.*?@", r"://u:p@", repr(reg_info))  # sanitize password
+    # sanitize passwords in logs
+    log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
     log.info(f"Registration returned: {log_reg_info}")
 
     # NOTE: While all registration info is saved to endpoint.json, only the
