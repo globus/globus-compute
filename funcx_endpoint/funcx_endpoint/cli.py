@@ -17,6 +17,7 @@ class CommandState:
     def __init__(self):
         self.endpoint_config_dir: str = str(pathlib.Path.home() / ".funcx")
         self.debug = False
+        self.log_to_console = False
 
     @classmethod
     def ensure(cls) -> CommandState:
@@ -43,21 +44,31 @@ def get_cli_endpoint() -> Endpoint:
     return endpoint
 
 
+def log_flag_callback(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+
+    state = CommandState.ensure()
+    setattr(state, param.name, value)
+    setup_logging(debug=state.debug)
+
+
 def common_options(f):
-    def debug_callback(ctx, param, value):
-        if not value or ctx.resilient_parsing:
-            return
-
-        state = CommandState.ensure()
-        state.debug = True
-
     f = click.option(
         "--debug",
         is_flag=True,
-        hidden=True,
         expose_value=False,
-        callback=debug_callback,
+        callback=log_flag_callback,
         is_eager=True,
+        help="Emit extra information generally only helpful for developers",
+    )(f)
+    f = click.option(
+        "--log-to-console",
+        is_flag=True,
+        expose_value=False,
+        is_eager=True,
+        callback=log_flag_callback,
+        help="Emit log lines to console as well as log",
     )(f)
     f = click.help_option("-h", "--help")(f)
     return f
@@ -87,8 +98,7 @@ def config_dir_callback(ctx, param, value):
 def app():
     # the main command group body runs on every command, so the block below will always
     # execute
-    state = CommandState.ensure()
-    setup_logging(debug=state.debug)
+    pass
 
 
 @app.command("version")
@@ -141,10 +151,13 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
     |     Endpoint    |         daemon
     +-----------------+
     """
-    _do_start_endpoint(name=name, endpoint_uuid=endpoint_uuid)
+    state = CommandState.ensure()
+    _do_start_endpoint(
+        name=name, endpoint_uuid=endpoint_uuid, log_to_console=state.log_to_console
+    )
 
 
-def _do_start_endpoint(*, name: str, endpoint_uuid: str | None):
+def _do_start_endpoint(*, name: str, endpoint_uuid: str | None, log_to_console: bool):
     endpoint = get_cli_endpoint()
     endpoint_dir = os.path.join(endpoint.funcx_dir, name)
 
@@ -174,7 +187,7 @@ def _do_start_endpoint(*, name: str, endpoint_uuid: str | None):
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
         )
         raise
-    endpoint.start_endpoint(name, endpoint_uuid, endpoint_config)
+    endpoint.start_endpoint(name, endpoint_uuid, endpoint_config, log_to_console)
 
 
 @app.command("stop")
@@ -196,8 +209,11 @@ def _do_stop_endpoint(*, name: str) -> None:
 @common_options
 def restart_endpoint(*, name: str, endpoint_uuid: str | None):
     """Restarts an endpoint"""
+    state = CommandState.ensure()
     _do_stop_endpoint(name=name)
-    _do_start_endpoint(name=name, endpoint_uuid=endpoint_uuid)
+    _do_start_endpoint(
+        name=name, endpoint_uuid=endpoint_uuid, log_to_console=state.log_to_console
+    )
 
 
 @app.command("list")
