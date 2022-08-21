@@ -279,9 +279,6 @@ class EndpointInterchange:
                 log.exception("Unhandled exception in main kernel.")
 
             self.quiesce()
-            # this check is solely for testing to force this loop to only run once
-            if self._test_start:
-                break
 
         self.cleanup()
         log.info("EndpointInterchange shutdown complete.")

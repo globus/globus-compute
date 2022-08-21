@@ -53,8 +53,8 @@ class TestStart:
         mock_register_endpoint = mocker.patch(
             "funcx_endpoint.endpoint.interchange.register_endpoint"
         )
-        result_url = "amqp://localhost:5672"
-        task_url = "amqp://localhost:5672"
+        result_url = "amqp://a.sdf"  # just a filler text for this test; don't ...
+        task_url = "amqp://a.sdf"  # ... mistakenly potentially test the wrong thing
         mock_register_endpoint.return_value = (
             {
                 "exchange_name": "results",
@@ -92,11 +92,11 @@ class TestStart:
             reg_info=None,
             endpoint_id="mock_endpoint_id",
         )
+        ic._kill_event = mocker.Mock()
+        ic._kill_event.is_set.side_effect = (False, True)  # Loop only once
 
         ic.results_outgoing = mocker.Mock()
 
-        # this must be set to force the retry loop in the start method to only run once
-        ic._test_start = True
         ic.start()
         assert ic._task_puller_proc.is_alive()
         ic._quiesce_event.set()
