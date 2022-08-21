@@ -17,6 +17,7 @@ class CommandState:
     def __init__(self):
         self.endpoint_config_dir: str = str(pathlib.Path.home() / ".funcx")
         self.debug = False
+        self.no_color = False
         self.log_to_console = False
 
     @classmethod
@@ -50,7 +51,7 @@ def log_flag_callback(ctx, param, value):
 
     state = CommandState.ensure()
     setattr(state, param.name, value)
-    setup_logging(debug=state.debug)
+    setup_logging(debug=state.debug, no_color=state.no_color)
 
 
 def common_options(f):
@@ -70,6 +71,15 @@ def common_options(f):
         callback=log_flag_callback,
         help="Emit log lines to console as well as log",
     )(f)
+    f = click.option(
+        "--no-color",
+        is_flag=True,
+        expose_value=False,
+        is_eager=True,
+        callback=log_flag_callback,
+        help="Colorize the (console) log lines",
+    )(f)
+
     f = click.help_option("-h", "--help")(f)
     return f
 
@@ -86,7 +96,6 @@ def config_dir_callback(ctx, param, value):
 
 
 @click.group("funcx-endpoint")
-@common_options
 @click.option(
     "-c",
     "--config-dir",
@@ -98,7 +107,7 @@ def config_dir_callback(ctx, param, value):
 def app():
     # the main command group body runs on every command, so the block below will always
     # execute
-    pass
+    setup_logging()  # Until we parse the CLI flags, just setup default logging
 
 
 @app.command("version")
@@ -153,11 +162,20 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
     """
     state = CommandState.ensure()
     _do_start_endpoint(
-        name=name, endpoint_uuid=endpoint_uuid, log_to_console=state.log_to_console
+        name=name,
+        endpoint_uuid=endpoint_uuid,
+        log_to_console=state.log_to_console,
+        no_color=state.no_color,
     )
 
 
-def _do_start_endpoint(*, name: str, endpoint_uuid: str | None, log_to_console: bool):
+def _do_start_endpoint(
+    *,
+    name: str,
+    endpoint_uuid: str | None,
+    log_to_console: bool,
+    no_color: bool,
+):
     endpoint = get_cli_endpoint()
     endpoint_dir = os.path.join(endpoint.funcx_dir, name)
 
@@ -187,7 +205,9 @@ def _do_start_endpoint(*, name: str, endpoint_uuid: str | None, log_to_console: 
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
         )
         raise
-    endpoint.start_endpoint(name, endpoint_uuid, endpoint_config, log_to_console)
+    endpoint.start_endpoint(
+        name, endpoint_uuid, endpoint_config, log_to_console, no_color
+    )
 
 
 @app.command("stop")
@@ -212,7 +232,10 @@ def restart_endpoint(*, name: str, endpoint_uuid: str | None):
     state = CommandState.ensure()
     _do_stop_endpoint(name=name)
     _do_start_endpoint(
-        name=name, endpoint_uuid=endpoint_uuid, log_to_console=state.log_to_console
+        name=name,
+        endpoint_uuid=endpoint_uuid,
+        log_to_console=state.log_to_console,
+        no_color=state.no_color,
     )
 
 
