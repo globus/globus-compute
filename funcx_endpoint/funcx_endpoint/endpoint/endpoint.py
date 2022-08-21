@@ -6,6 +6,7 @@ import pathlib
 import shutil
 import signal
 import sys
+import typing
 import uuid
 from string import Template
 
@@ -147,7 +148,9 @@ class Endpoint:
             endpoint_uuid = str(uuid.uuid4())
         return endpoint_uuid
 
-    def start_endpoint(self, name, endpoint_uuid, endpoint_config):
+    def start_endpoint(
+        self, name, endpoint_uuid, endpoint_config, log_to_console: bool
+    ):
         self.name = name
 
         endpoint_dir = os.path.join(self.funcx_dir, self.name)
@@ -194,10 +197,10 @@ class Endpoint:
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
         if endpoint_config.config.detach_endpoint:
-            stdout = open(
+            stdout: typing.TextIO = open(
                 os.path.join(endpoint_dir, endpoint_config.config.stdout), "a+"
             )
-            stderr = open(
+            stderr: typing.TextIO = open(
                 os.path.join(endpoint_dir, endpoint_config.config.stderr), "a+"
             )
         else:
@@ -288,7 +291,9 @@ class Endpoint:
         )
 
         with context:
-            setup_logging(logfile=logfile, debug=self.debug, console_enabled=False)
+            setup_logging(
+                logfile=logfile, debug=self.debug, console_enabled=log_to_console
+            )
             self.daemon_launch(
                 endpoint_uuid,
                 endpoint_dir,

@@ -162,5 +162,3 @@ def setup_logging(
         config = _get_stream_dict_config(debug)
 
     logging.config.dictConfig(config)
-    if debug:
-        log.debug("debug logging enabled")
