@@ -149,7 +149,12 @@ class Endpoint:
         return endpoint_uuid
 
     def start_endpoint(
-        self, name, endpoint_uuid, endpoint_config, log_to_console: bool
+        self,
+        name,
+        endpoint_uuid,
+        endpoint_config,
+        log_to_console: bool,
+        no_color: bool,
     ):
         self.name = name
 
@@ -292,8 +297,12 @@ class Endpoint:
 
         with context:
             setup_logging(
-                logfile=logfile, debug=self.debug, console_enabled=log_to_console
+                logfile=logfile,
+                debug=self.debug,
+                console_enabled=log_to_console,
+                no_color=no_color,
             )
+
             self.daemon_launch(
                 endpoint_uuid,
                 endpoint_dir,

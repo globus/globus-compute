@@ -310,7 +310,10 @@ class TestStart:
             "missing executor definitions",
         ):
             log_to_console = False
-            manager.start_endpoint("mock_endpoint", None, mock_load(), log_to_console)
+            no_color = True
+            manager.start_endpoint(
+                "mock_endpoint", None, mock_load(), log_to_console, no_color
+            )
 
     @pytest.mark.skip("This test doesn't make much sense")
     def test_daemon_launch(self, mocker):
