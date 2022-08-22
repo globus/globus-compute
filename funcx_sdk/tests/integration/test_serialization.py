@@ -193,6 +193,7 @@ def test_code_dill():
     )
 
     pre_serialized = pre_serialized_add_37
+    mismatch_serialized = pre_serialized_add_39
 
     # dill.dumps()/loads() does not deserialize functions serialized with some
     #     other python versions.  Some info:
@@ -206,6 +207,7 @@ def test_code_dill():
     minor = sys.version_info.minor
     if major == 3 and minor == 9:
         pre_serialized = pre_serialized_add_39
+        mismatch_serialized = pre_serialized_add_37
     elif major == 3 and minor == 10:
         pre_serialized = pre_serialized_add_310
     elif major == 3 and minor > 10:
@@ -215,15 +217,20 @@ def test_code_dill():
 
     check_serialize_deserialize_add(concretes.DillCode(), pre_serialized)
 
+    # dill code doesn't handle mismatched py versions
+    deserialized_add = concretes.DillCode().deserialize(mismatch_serialized)
+    assert 10 == deserialized_add(3, 4, True)
+
 
 def test_code_text_inspect():
     check_serialize_deserialize_foo(concretes.DillCodeTextInspect())
-    # code source inspect doesn't handle the indents of bar
 
 
 def test_code_dill_source():
     check_serialize_deserialize_foo(concretes.DillCodeSource())
-    # code source inspect doesn't handle the indents of bar
+
+    # dill code source doesn't handle the indents of bar
+    check_serialize_deserialize_bar(concretes.DillCodeSource())
 
 
 def test_overall():
@@ -231,3 +238,35 @@ def test_overall():
 
     check_serialize_deserialize_foo(FuncXSerializer())
     check_serialize_deserialize_bar(FuncXSerializer())
+
+
+def test_serialize_deserialize_combined():
+    f = decorated_add
+    combined = concretes.CombinedCode()
+    single_source = concretes.DillCodeSource()
+    single_code = concretes.DillCode()
+    combined_serialized_func = combined.serialize(f)
+    source_serialized_func = single_source.serialize(f)
+    code_serialized_func = single_code.serialize(f)
+
+    # Deserializing decorated functions does not raise exception,
+    # only when one attempts to run it
+    # TODO find example that fails on Category 2 (deserial) for DillCodeSource
+    # the new default
+    # with pytest.raises(Exception) as e:
+    deserial_source = single_source.deserialize(source_serialized_func)
+
+    # Only when attempting to run it
+    with pytest.raises(NameError):
+        assert 11 == deserial_source(3, 5, 2)
+        # pass
+
+    code_deserial = single_code.deserialize(code_serialized_func)
+    assert 14 == code_deserial(4, 6, 3)
+
+    deserialized = combined.deserialize(combined_serialized_func)
+    with pytest.raises(NameError):
+        _ = deserialized(3, 5, 2)
+
+    alternate_deserialized = combined.deserialize(combined_serialized_func, variation=2)
+    assert alternate_deserialized != deserialized
