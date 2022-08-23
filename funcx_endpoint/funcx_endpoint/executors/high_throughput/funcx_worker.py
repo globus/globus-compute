@@ -146,7 +146,7 @@ class FuncXWorker:
                 exec_end_ms=_now_ms(),
             )
 
-        log.debug("task %s completed", task_id)
+        log.debug("task %s completed with result_message: %s", task_id, result_message)
         return result_message
 
     def call_user_function(self, message: bytes) -> str:

@@ -408,6 +408,8 @@ class EndpointInterchange:
                         log.exception(
                             f"Unable to parse result message for task {task_id}."
                             "   Marking task as failed."
+                            "   packed_result: %s",
+                            packed_result,
                         )
 
                         kwargs = {
