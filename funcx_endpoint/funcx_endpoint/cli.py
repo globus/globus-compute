@@ -60,7 +60,7 @@ def common_options(f):
         expose_value=False,
         callback=log_flag_callback,
         is_eager=True,
-        help="Emit extra information generally only helpful for developers",
+        help="Emit extra logging information to console, helpful for developers and others in easier visibility in endpoint activities",
     )(f)
     f = click.option(
         "--log-to-console",
