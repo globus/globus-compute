@@ -96,19 +96,19 @@ class FuncXClient:
             Default: True
 
         asynchronous: bool
-        Should the API use asynchronous interactions with the web service? Currently
-        only impacts the run method
+        Should the API use asynchronous interactions with the web service?
+        Currently only impacts the run method
         Default: False
 
         loop: AbstractEventLoop
-        If asynchronous mode is requested, then you can provide an optional event loop
-        instance. If None, then we will access asyncio.get_event_loop()
+        If asynchronous mode is requested, then you can provide an optional
+        event loop instance. If None, then we will access asyncio.get_event_loop()
         Default: None
 
         task_group_id: str|uuid.UUID
-            Set the TaskGroup ID (a UUID) for this FuncXClient instance.  Typically,
-            one uses this to submit new tasks to an existing session or to reestablish
-            FuncXExecutor futures.
+            Set the TaskGroup ID (a UUID) for this FuncXClient instance.
+            Typically, one uses this to submit new tasks to an existing
+            session or to reestablish FuncXExecutor futures.
             Default: None (will be auto generated)
 
         Keyword arguments are the same as for BaseClient.
@@ -364,13 +364,13 @@ class FuncXClient:
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
-        batch = self.create_batch()
+        batch = self.create_batch(create_websocket_queue=self.asynchronous)
         batch.add(*args, endpoint_id=endpoint_id, function_id=function_id, **kwargs)
         r = self.batch_run(batch)
 
         return r[0]
 
-    def create_batch(self, task_group_id=None) -> Batch:
+    def create_batch(self, task_group_id=None, create_websocket_queue=False) -> Batch:
         """
         Create a Batch instance to handle batch submission in funcX
 
@@ -383,6 +383,10 @@ class FuncXClient:
             If task_group_id is not specified, it will default to using the client's
             session_task_group_id
 
+        create_websocket_queue : bool
+            Whether to create a websocket queue for the task_group_id if
+            it isn't already created
+
         Returns
         -------
         Batch instance
@@ -391,7 +395,9 @@ class FuncXClient:
         if not task_group_id:
             task_group_id = self.session_task_group_id
 
-        return Batch(task_group_id=task_group_id)
+        return Batch(
+            task_group_id=task_group_id, create_websocket_queue=create_websocket_queue
+        )
 
     def batch_run(self, batch) -> t.List[str]:
         """Initiate a batch of tasks to funcX
