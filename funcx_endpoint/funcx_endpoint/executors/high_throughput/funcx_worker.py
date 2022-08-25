@@ -13,6 +13,10 @@ from funcx_common import messagepack
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+from funcx_common.messagepack.message_types import TaskTransition
+>>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
 from funcx_common.tasks import ActorName, TaskState
 =======
 from funcx_common.tasks import TaskState
@@ -138,6 +142,7 @@ class FuncXWorker:
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         exec_start = (_now_ms(), TaskState.EXEC_START, ActorName.WORKER)
 =======
         exec_times = {"exec_start_ms": _now_ms()}
@@ -154,6 +159,11 @@ class FuncXWorker:
 =======
         exec_start = (time.time_ns(), TaskState.EXEC_START, ActorName.WORKER)
 >>>>>>> 5b5e6865 (Switch to time_ns())
+=======
+        exec_start = TaskTransition(
+            timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
+        )
+>>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
 
         try:
             result = self.call_user_function(task_body)
@@ -164,6 +174,7 @@ class FuncXWorker:
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
 =======
             exec_times["exec_end_ms"] = _now_ms()
@@ -180,6 +191,13 @@ class FuncXWorker:
 =======
             exec_end = (time.time_ns(), TaskState.EXEC_END, ActorName.WORKER)
 >>>>>>> 5b5e6865 (Switch to time_ns())
+=======
+            exec_end = TaskTransition(
+                timestamp=time.time_ns(),
+                state=TaskState.EXEC_END,
+                actor=ActorName.WORKER,
+            )
+>>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
             result_message = dict(
                 task_id=task_id,
                 exception=get_error_string(),
@@ -188,6 +206,7 @@ class FuncXWorker:
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                 statuses=[exec_start, exec_end],
             )
         else:
@@ -240,11 +259,27 @@ class FuncXWorker:
 =======
                 statuses=[exec_start, exec_end],
 >>>>>>> facc8945 (Correct time difference and statuses)
+=======
+                transitions=[exec_start, exec_end],
+            )
+        else:
+            log.debug("Execution completed without exception")
+            exec_end = TaskTransition(
+                timestamp=time.time_ns(),
+                state=TaskState.EXEC_END,
+                actor=ActorName.WORKER,
+            )
+            result_message = dict(
+                task_id=task_id,
+                data=result,
+                transitions=[exec_start, exec_end],
+>>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
             )
 
         log.debug(
-            "task %s completed in %d ms",
+            "task %s completed in %d ns",
             task_id,
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -266,6 +301,9 @@ class FuncXWorker:
 =======
             (exec_end[0] - exec_start[0]),
 >>>>>>> d504dffe (typo)
+=======
+            (exec_end.timestamp - exec_start.timestamp),
+>>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
         )
         return result_message
 

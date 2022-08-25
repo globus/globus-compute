@@ -19,6 +19,7 @@ from typing import Any
 import dill
 import psutil
 import zmq
+from funcx_common.messagepack.message_type import TaskTransition
 from funcx_common.tasks import ActorName, TaskState
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -645,7 +646,11 @@ class Manager:
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
             log.debug(f"Set task {task.task_id} to RUNNING")
-            ts = (time.time_ns(), TaskState.RUNNING, ActorName.MANAGER)
+            ts = TaskTransition(
+                timestamp=time.time_ns(),
+                state=TaskState.RUNNING,
+                actor=ActorName.MANAGER,
+            )
             self.task_status_deltas[task.task_id] = ts
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,

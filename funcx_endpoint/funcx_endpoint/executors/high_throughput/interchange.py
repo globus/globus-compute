@@ -16,6 +16,7 @@ from typing import Any, Sequence
 import daemon
 import dill
 import zmq
+from funcx_common.messagepack.message_types import TaskTransition
 from funcx_common.tasks import ActorName, TaskState
 from parsl.app.errors import RemoteExceptionWrapper
 from parsl.executors.errors import ScalingFailed
@@ -457,10 +458,10 @@ class Interchange:
                     }
                 )
                 self.total_pending_task_count += 1
-                ts = (
-                    time.time_ns(),
-                    TaskState.WAITING_FOR_NODES,
-                    ActorName.INTERCHANGE,
+                ts = TaskTransition(
+                    timestamp=time.time_ns(),
+                    state=TaskState.WAITING_FOR_NODES,
+                    actor=ActorName.INTERCHANGE,
                 )
                 self.task_status_deltas[msg.task_id] = ts
                 log.debug(
@@ -899,10 +900,10 @@ class Interchange:
                             self.task_cancel_pending_trap.pop(task_id)
                         else:
                             log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
-                            ts = (
-                                time.time_ns(),
-                                TaskState.WAITING_FOR_LAUNCH,
-                                ActorName.INTERCHANGE,
+                            ts = TaskTransition(
+                                timestamp=time.time_ns(),
+                                state=TaskState.WAITING_FOR_LAUNCH,
+                                actor=ActorName.INTERCHANGE,
                             )
                             self.task_status_deltas[task_id] = ts
 
