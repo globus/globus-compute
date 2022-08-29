@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import atexit
 import concurrent
@@ -111,7 +113,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_enabled = batch_enabled
         self.batch_interval = batch_interval
         self.batch_size = batch_size
-        self.task_outgoing: "queue.Queue[TaskSubmissionInfo]" = queue.Queue()
+        self.task_outgoing: queue.Queue[TaskSubmissionInfo | None] = queue.Queue()
 
         self._counter_future_map: t.Dict[int, FuncXFuture] = {}
         self._future_counter: int = 0
@@ -242,19 +244,25 @@ class FuncXExecutor(concurrent.futures.Executor):
         kill_event : threading.Event
             Sentinel event; used to stop the thread and exit.
         """
+        to_send = self.task_outgoing  # cache lookup
+        interval = self.batch_interval
         while not kill_event.is_set():
             tasks: t.List[TaskSubmissionInfo] = []
-            start = time.time()
             try:
-                while (
-                    time.time() - start < self.batch_interval
-                    and len(tasks) < self.batch_size
-                ):
-                    tasks.append(self.task_outgoing.get(timeout=0.1))
+                task = to_send.get()  # Block while waiting for first result ...
+                beg = time.time()
+                while task is not None:
+                    tasks.append(task)
+                    if (
+                        not (len(tasks) < self.batch_size)
+                        or time.time() - beg > interval
+                    ):
+                        break
+                    task = to_send.get(block=False)  # ... but don't block thereafter
             except queue.Empty:
                 pass
             if tasks:
-                log.info(f"Submitting {len(tasks)} tasks to funcX")
+                log.info(f"Submitting tasks to funcX: {len(tasks)}")
                 self._submit_tasks(tasks)
 
         log.info("Exiting")
@@ -398,6 +406,7 @@ class FuncXExecutor(concurrent.futures.Executor):
     def shutdown(self):
         if self.batch_enabled and self._kill_event:
             self._kill_event.set()  # Reminder: stops the batch submission thread
+            self.task_outgoing.put(None)
 
         self._reset_poller()
 
