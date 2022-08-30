@@ -10,23 +10,8 @@ import time
 import dill
 import zmq
 from funcx_common import messagepack
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 from funcx_common.messagepack.message_types import TaskTransition
->>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
 from funcx_common.tasks import ActorName, TaskState
-=======
-from funcx_common.tasks import TaskState
->>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
-=======
-from funcx_common.tasks.constants import ActorName, TaskState
->>>>>>> 5bd67dfa (Include actor name as part of status update.)
-=======
-from funcx_common.tasks import ActorName, TaskState
->>>>>>> 4149165f (Fix import line)
 
 from funcx.errors import MaxResultSizeExceeded
 from funcx.serialize import FuncXSerializer
@@ -137,131 +122,26 @@ class FuncXWorker:
 
     def execute_task(self, task_id: str, task_body: bytes) -> dict:
         log.debug("executing task task_id='%s'", task_id)
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        exec_start = (_now_ms(), TaskState.EXEC_START, ActorName.WORKER)
-=======
-        exec_times = {"exec_start_ms": _now_ms()}
->>>>>>> cbd5779a (Black)
-=======
-        exec_times = {"exec_start_ms": _now_ms()}
->>>>>>> d375e5fc (Black)
-=======
-        exec_start = (_now_ms(), TaskState.EXEC_START)
->>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
-=======
-        exec_start = (_now_ms(), TaskState.EXEC_START, ActorName.WORKER)
->>>>>>> ac98dda4 (Fix missing actor name in exec start timestamp)
-=======
-        exec_start = (time.time_ns(), TaskState.EXEC_START, ActorName.WORKER)
->>>>>>> 5b5e6865 (Switch to time_ns())
-=======
         exec_start = TaskTransition(
             timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
         )
->>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
 
         try:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-            exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
-=======
-            exec_times["exec_end_ms"] = _now_ms()
->>>>>>> cbd5779a (Black)
-=======
-            exec_times["exec_end_ms"] = _now_ms()
->>>>>>> d375e5fc (Black)
-=======
-            exec_end = (_now_ms(), TaskState.EXEC_END)
->>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
-=======
-            exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
->>>>>>> 5bd67dfa (Include actor name as part of status update.)
-=======
-            exec_end = (time.time_ns(), TaskState.EXEC_END, ActorName.WORKER)
->>>>>>> 5b5e6865 (Switch to time_ns())
-=======
             exec_end = TaskTransition(
                 timestamp=time.time_ns(),
                 state=TaskState.EXEC_END,
                 actor=ActorName.WORKER,
             )
->>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
             result_message = dict(
                 task_id=task_id,
                 exception=get_error_string(),
                 error_details=get_result_error_details(),
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-                statuses=[exec_start, exec_end],
+                task_statuses=[exec_start, exec_end],
             )
-        else:
-            log.debug("Execution completed without exception")
-<<<<<<< HEAD
-            exec_end = (_now_ms(), TaskState.EXEC_END, ActorName.WORKER)
-<<<<<<< HEAD
-            result_message = dict(
-                task_id=task_id,
-                data=result,
-                statuses=[exec_start, exec_end],
-=======
-                times=exec_times,
-            )
-        else:
-            log.debug("Execution completed without exception")
-            exec_times["exec_end_ms"] = _now_ms()
-=======
-            exec_end = (time.time_ns(), TaskState.EXEC_END, ActorName.WORKER)
->>>>>>> 5b5e6865 (Switch to time_ns())
-            result_message = dict(
-                task_id=task_id,
-                data=result,
-                times=exec_times,
->>>>>>> cbd5779a (Black)
-=======
-                times=exec_times,
-=======
-                status=[exec_start, exec_end],
->>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
-=======
-                statuses=[exec_start, exec_end],
->>>>>>> facc8945 (Correct time difference and statuses)
-            )
-        else:
-            log.debug("Execution completed without exception")
-            exec_end = (_now_ms(), TaskState.EXEC_END)
-=======
->>>>>>> 5bd67dfa (Include actor name as part of status update.)
-            result_message = dict(
-                task_id=task_id,
-                data=result,
-<<<<<<< HEAD
-<<<<<<< HEAD
-                times=exec_times,
->>>>>>> d375e5fc (Black)
-=======
-                status=[exec_start, exec_end],
->>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
-=======
-                statuses=[exec_start, exec_end],
->>>>>>> facc8945 (Correct time difference and statuses)
-=======
-                transitions=[exec_start, exec_end],
-            )
+
         else:
             log.debug("Execution completed without exception")
             exec_end = TaskTransition(
@@ -272,38 +152,13 @@ class FuncXWorker:
             result_message = dict(
                 task_id=task_id,
                 data=result,
-                transitions=[exec_start, exec_end],
->>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
+                task_statuses=[exec_start, exec_end],
             )
 
         log.debug(
             "task %s completed in %d ns",
             task_id,
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-            (exec_end[0] - exec_start[0]),
-=======
-            (exec_times["exec_end_ms"] - exec_times["exec_start_ms"]),
->>>>>>> cbd5779a (Black)
-=======
-            (exec_times["exec_end_ms"] - exec_times["exec_start_ms"]),
->>>>>>> d375e5fc (Black)
-=======
-            (exec_end - exec_start),
->>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
-=======
-            (exec_end[0] - exec_start[1]),
->>>>>>> facc8945 (Correct time difference and statuses)
-=======
-            (exec_end[0] - exec_start[0]),
->>>>>>> d504dffe (typo)
-=======
             (exec_end.timestamp - exec_start.timestamp),
->>>>>>> 38ff67fd (Converting status updates to TaskTransition messages)
         )
         return result_message
 
