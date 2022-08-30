@@ -44,5 +44,5 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_CHANNEL: '#commits'
           SLACK_MESSAGE_TITLE: 'Hourly Automated Tests'
-          SLACK_FAILURE_MESSAGE: 'Hourly run failed'
+          SLACK_FAILURE_MESSAGE: '@channel - Hourly run failed'
         run: ./.github/_support/github-slack-notify.py ${{ needs.smoke-test.result }}
