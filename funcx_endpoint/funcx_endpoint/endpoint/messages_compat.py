@@ -45,25 +45,11 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
         # may not be present
         kwargs = {
             "task_id": uuid.UUID(unpacked["task_id"]),
-<<<<<<< HEAD
-<<<<<<< HEAD
             "exec_start_ms": unpacked.get("exec_start_ms", 0),
             "exec_end_ms": unpacked.get("exec_end_ms", 0),
-=======
->>>>>>> e27c9da0 (Black)
         }
         if "statuses" in unpacked:
             kwargs["statuses"] = unpacked["statuses"]
-=======
-        }
-<<<<<<< HEAD
-        if "times" in unpacked:
-            kwargs["times"] = unpacked["times"]
->>>>>>> 3c7dbdbe (Black)
-=======
-        if "statuses" in unpacked:
-            kwargs["statuses"] = unpacked["statuses"]
->>>>>>> baa726ea (Use list of tuples with updated TaskState fields to capture EXEC_START and EXEC_END times)
         if "exception" in unpacked:
             kwargs["data"] = unpacked["exception"]
             code, user_message = unpacked["error_details"]
