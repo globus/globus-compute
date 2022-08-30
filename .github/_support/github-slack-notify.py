@@ -97,13 +97,13 @@ def check_status_changed(status):
 
 
 def get_failure_message():
-    return os.getenv("SLACK_FAILURE_MESSAGE", "@here tests failed")
+    return os.getenv("SLACK_FAILURE_MESSAGE", "@channel tests failed")
 
 
 def build_payload(status):
     context = f"{statusemoji(status)} build for {get_branchname()}: {status}"
     message = f"<{get_build_url()}|{get_message_title()}>"
-    if status == "failure":
+    if "fail" in status.lower():
         message = f"{message}: {get_failure_message()}"
 
     return {
