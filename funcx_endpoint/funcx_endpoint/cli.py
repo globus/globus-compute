@@ -7,6 +7,8 @@ from importlib.machinery import SourceFileLoader
 
 import click
 
+from funcx.sdk.login_manager.manager import LoginManager
+
 from .endpoint.endpoint import Endpoint
 from .logging_config import setup_logging
 
@@ -169,6 +171,32 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
     )
 
 
+@app.command(name="logout", help="Logout from all endpoints")
+@click.option(
+    "--force/--not-forced",
+    default=False,
+    help="--force revokes tokens even with currently running endpoints",
+)
+@common_options
+def logout_endpoint(force: bool):
+    """
+    Logout from all endpoints and remove cached authentication credentials
+    """
+
+    running_endpoints = get_cli_endpoint().get_running_endpoints()
+    if running_endpoints and not force:
+        log.info(
+            "At least one endpoint is currently running.\n"
+            + "Use the --force flag to proceed with logout"
+        )
+    else:
+        tokens_revoked = LoginManager().logout()
+        if tokens_revoked:
+            log.info("Logout succeeded and all cached credentials were revoked")
+        else:
+            log.info("No cached tokens were found, already logged out?")
+
+
 def _do_start_endpoint(
     *,
     name: str,
@@ -244,7 +272,7 @@ def restart_endpoint(*, name: str, endpoint_uuid: str | None):
 def list_endpoints():
     """List all available endpoints"""
     endpoint = get_cli_endpoint()
-    endpoint.list_endpoints()
+    endpoint.print_endpoint_table()
 
 
 @app.command("delete")
