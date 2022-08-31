@@ -6,6 +6,9 @@ import pathlib
 from importlib.machinery import SourceFileLoader
 
 import click
+from click import ClickException
+
+from funcx.sdk.login_manager import LoginManager
 
 from .endpoint.endpoint import Endpoint
 from .logging_config import setup_logging
@@ -169,6 +172,56 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
     )
 
 
+@app.command(name="logout", help="Logout from all endpoints")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Revokes tokens even with currently running endpoints",
+)
+def logout_endpoints(force: bool):
+    success, msg = _do_logout_endpoints(force=force)
+    if not success:
+        # Raising ClickException is apparently the way to do sys.exit(1)
+        #     and return a non-zero value to the command line
+        # See https://click.palletsprojects.com/en/8.1.x/exceptions/
+        if not isinstance(msg, str) or msg is None:
+            # Generic unsuccessful if no reason was given
+            msg = "Logout unsuccessful"
+        raise ClickException(msg)
+
+
+def _do_logout_endpoints(
+    force: bool, running_endpoints: dict | None = None
+) -> tuple[bool, str | None]:
+    """
+    Logout from all endpoints and remove cached authentication credentials
+
+    Returns True, None if logout was successful and tokens were found and revoked
+    Returns False, error_msg if token revocation was not done
+    """
+
+    if running_endpoints is None:
+        running_endpoints = get_cli_endpoint().get_running_endpoints()
+    tokens_revoked = False
+    error_msg = None
+    if running_endpoints and not force:
+        running_list = ", ".join(running_endpoints.keys())
+        log.info(
+            "The following endpoints are currently running: "
+            + running_list
+            + "\nPlease use logout --force to proceed"
+        )
+        error_msg = "Not logging out with running endpoints without --force"
+    else:
+        tokens_revoked = LoginManager().logout()
+        if tokens_revoked:
+            log.info("Logout succeeded and all cached credentials were revoked")
+        else:
+            error_msg = "No cached tokens were found, already logged out?"
+            log.info(error_msg)
+    return tokens_revoked, error_msg
+
+
 def _do_start_endpoint(
     *,
     name: str,
@@ -244,7 +297,7 @@ def restart_endpoint(*, name: str, endpoint_uuid: str | None):
 def list_endpoints():
     """List all available endpoints"""
     endpoint = get_cli_endpoint()
-    endpoint.list_endpoints()
+    endpoint.print_endpoint_table()
 
 
 @app.command("delete")

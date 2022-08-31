@@ -78,14 +78,20 @@ class LoginManager:
 
         do_link_auth_flow(self._token_storage, scopes)
 
-    def logout(self) -> None:
+    def logout(self) -> bool:
+        """
+        Returns True if at least one set of tokens were found and revoked.
+        """
         auth_client = internal_auth_client()
-        for rs, tokendata in self._token_storage.get_by_resource_server().items():
+        tokens_revoked = False
+        for rs, token_data in self._token_storage.get_by_resource_server().items():
             for tok_key in ("access_token", "refresh_token"):
-                token = tokendata[tok_key]
+                token = token_data[tok_key]
                 auth_client.oauth2_revoke_token(token)
-
             self._token_storage.remove_tokens_for_resource_server(rs)
+            tokens_revoked = True
+
+        return tokens_revoked
 
     def ensure_logged_in(self) -> None:
         data = self._token_storage.get_by_resource_server()
