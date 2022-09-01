@@ -11,7 +11,7 @@ import signal
 import sys
 import threading
 import time
-from typing import Any, Sequence
+import typing as t
 
 import daemon
 import dill
@@ -98,7 +98,7 @@ class Interchange:
         provider=None,
         max_workers_per_node=None,
         mem_per_worker=None,
-        available_accelerators: Sequence[str] = (),
+        available_accelerators: t.Sequence[str] = (),
         prefetch_capacity=None,
         scheduler_mode=None,
         container_type=None,
@@ -294,7 +294,7 @@ class Interchange:
             )
         )
 
-        self._ready_manager_queue: dict[str, Any] = {}
+        self._ready_manager_queue: dict[str, t.Any] = {}
 
         self.blocks: dict[str, str] = {}
         self.block_id_map: dict[str, str] = {}
