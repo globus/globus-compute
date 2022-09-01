@@ -1198,12 +1198,21 @@ def starter(comm_q: mp.Queue, *args, **kwargs) -> None:
     The executor is expected to call this function. The args, kwargs match that of the
     Interchange.__init__
     """
-    ic = Interchange(*args, **kwargs)
-    comm_q.put((ic.worker_task_port, ic.worker_result_port))
-    comm_q.close()
-    comm_q.join_thread()
-    del comm_q
-    ic.start()
+    ic = None
+    try:
+        ic = Interchange(*args, **kwargs)
+        comm_q.put((ic.worker_task_port, ic.worker_result_port))
+    finally:
+        if not ic:  # There was an exception
+            comm_q.put(None)
+
+        # no sense in having the queue open past it's usefulness
+        comm_q.close()
+        comm_q.join_thread()
+        del comm_q
+
+    if ic:
+        ic.start()
 
 
 def cli_run():

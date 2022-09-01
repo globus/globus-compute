@@ -2,9 +2,10 @@ import time
 import uuid
 from unittest import mock
 
+import pytest
 from funcx_common.tasks import TaskState
 
-from funcx_endpoint.executors.high_throughput.interchange import Interchange
+from funcx_endpoint.executors.high_throughput.interchange import Interchange, starter
 from funcx_endpoint.executors.high_throughput.messages import Task
 
 # Work with linter's 88 char limit, and be uniform in this file how we do it
@@ -54,3 +55,14 @@ class TestHighThroughputInterchange:
         ts, state = ix.task_status_deltas[task_id]
         assert 0 <= time.monotonic() - ts < 20, "Expecting a timestamp"
         assert state == TaskState.WAITING_FOR_LAUNCH
+
+
+def test_starter_sends_sentinel_upon_error(mocker):
+    q = mocker.Mock()
+    mock_ix = mocker.patch(f"{mod_dot_path}.Interchange")
+    mock_ix.side_effect = ArithmeticError
+    with pytest.raises(ArithmeticError):
+        starter(q)
+    q.put.assert_called()
+    q.close.assert_called()
+    q.join_thread.assert_called()
