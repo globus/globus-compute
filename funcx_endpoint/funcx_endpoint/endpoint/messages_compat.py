@@ -41,13 +41,11 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
             task_statuses=unpacked.task_statuses,
         )
     elif isinstance(unpacked, dict):
-        # exec_start|end_ms is not currently being used in prod and also
-        # may not be present
         kwargs = {
             "task_id": uuid.UUID(unpacked["task_id"]),
         }
         if "task_statuses" in unpacked:
-            kwargs["statuses"] = unpacked["statuses"]
+            kwargs["task_statuses"] = unpacked["task_statuses"]
         if "exception" in unpacked:
             kwargs["data"] = unpacked["exception"]
             code, user_message = unpacked.get("error_details", ("Unknown", "Unknown"))

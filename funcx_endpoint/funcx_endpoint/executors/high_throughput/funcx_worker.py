@@ -130,30 +130,23 @@ class FuncXWorker:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
-            exec_end = TaskTransition(
-                timestamp=time.time_ns(),
-                state=TaskState.EXEC_END,
-                actor=ActorName.WORKER,
-            )
             result_message = dict(
                 task_id=task_id,
                 exception=get_error_string(),
                 error_details=get_result_error_details(),
-                task_statuses=[exec_start, exec_end],
             )
 
         else:
             log.debug("Execution completed without exception")
-            exec_end = TaskTransition(
-                timestamp=time.time_ns(),
-                state=TaskState.EXEC_END,
-                actor=ActorName.WORKER,
-            )
-            result_message = dict(
-                task_id=task_id,
-                data=result,
-                task_statuses=[exec_start, exec_end],
-            )
+            result_message = dict(task_id=task_id, data=result)
+
+        exec_end = TaskTransition(
+            timestamp=time.time_ns(),
+            state=TaskState.EXEC_END,
+            actor=ActorName.WORKER,
+        )
+
+        result_message["task_statuses"] = [exec_start, exec_end]
 
         log.debug(
             "task %s completed in %d ns",
