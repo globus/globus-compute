@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 from struct import Struct
 
+from funcx_common.messagepack.message_types import TaskTransition
+
 MESSAGE_TYPE_FORMATTER = Struct("b")
 
 
@@ -188,12 +190,19 @@ class EPStatusReport(Message):
         endpoint_id = str(uuid.UUID(bytes=msg[:16]))
         msg = msg[16:]
         jsonified = msg.decode("ascii")
-        ep_status, task_statuses = json.loads(jsonified)
+        ep_status, statuses = json.loads(jsonified)
+        task_statuses = {}
+        for tid, ts in statuses.items():
+            task_statuses[tid] = TaskTransition(
+                timestamp=ts["timestamp"], actor=ts["actor"], state=ts["state"]
+            )
         return cls(endpoint_id, ep_status, task_statuses)
 
     def pack(self):
-        # TODO: do we want to do better than JSON?
-        jsonified = json.dumps([self.ep_status, self.task_statuses])
+        statuses = {}
+        for tid, status in self.task_statuses.items():
+            statuses[tid] = status.to_dict()
+        jsonified = json.dumps([self.ep_status, statuses])
         return self.type.pack() + self._header + jsonified.encode("ascii")
 
 
