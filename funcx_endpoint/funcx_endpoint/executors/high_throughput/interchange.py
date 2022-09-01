@@ -34,6 +34,9 @@ from funcx_endpoint.executors.high_throughput.messages import (
 )
 from funcx_endpoint.logging_config import setup_logging
 
+if t.TYPE_CHECKING:
+    import multiprocessing as mp
+
 log = logging.getLogger(__name__)
 
 LOOP_SLOWDOWN = 0.0  # in seconds
@@ -1189,7 +1192,7 @@ class Interchange:
         return status
 
 
-def starter(comm_q, *args, **kwargs):
+def starter(comm_q: mp.Queue, *args, **kwargs) -> None:
     """Start the interchange process
 
     The executor is expected to call this function. The args, kwargs match that of the
@@ -1197,6 +1200,9 @@ def starter(comm_q, *args, **kwargs):
     """
     ic = Interchange(*args, **kwargs)
     comm_q.put((ic.worker_task_port, ic.worker_result_port))
+    comm_q.close()
+    comm_q.join_thread()
+    del comm_q
     ic.start()
 
 
