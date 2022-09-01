@@ -118,8 +118,9 @@ class FuncXExecutor(concurrent.futures.Executor):
         self.batch_size = batch_size
         self.task_outgoing: queue.Queue[TaskSubmissionInfo | None] = queue.Queue()
 
+        self.task_count_submitted = 0
+        self._future_counter = 0
         self._counter_future_map: t.Dict[int, FuncXFuture] = {}
-        self._future_counter: int = 0
         self._function_registry: t.Dict[t.Any, str] = {}
         self._function_future_map: t.Dict[str, FuncXFuture] = {}
         self._kill_event: t.Optional[threading.Event] = None
@@ -283,7 +284,12 @@ class FuncXExecutor(concurrent.futures.Executor):
             log.debug(f"Adding task {task} to funcX batch")
         try:
             batch_tasks = self.funcx_client.batch_run(batch)
-            log.debug(f"Batch submitted to task_group: {self.task_group_id}")
+            self.task_count_submitted += len(batch_tasks)
+            log.debug(
+                "Batch submitted to task_group: %s - %s",
+                self.task_group_id,
+                self.task_count_submitted,
+            )
         except Exception:
             log.error(f"Error submitting {len(tasks)} tasks to funcX")
             raise
