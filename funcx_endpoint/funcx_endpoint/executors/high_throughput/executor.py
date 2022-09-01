@@ -500,6 +500,9 @@ class HighThroughputExecutor(RepresentationMixin):
             (self.worker_task_port, self.worker_result_port) = comm_q.get(
                 block=True, timeout=120
             )
+            comm_q.close()  # not strictly necessary, but be plain about intentions
+            comm_q.join_thread()
+            del comm_q
         except queue.Empty:
             log.error("Interchange has not completed initialization in 120s. Aborting")
             raise Exception("Interchange failed to start")
