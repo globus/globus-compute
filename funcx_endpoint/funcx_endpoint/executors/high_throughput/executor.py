@@ -12,6 +12,7 @@ import multiprocessing
 import os
 import queue
 import threading
+import time
 from multiprocessing import Process
 
 import daemon
@@ -456,16 +457,23 @@ class HighThroughputExecutor(RepresentationMixin):
             },
         )
         self.queue_proc.start()
+        msg = None
         try:
-            (self.worker_task_port, self.worker_result_port) = comm_q.get(
-                block=True, timeout=120
-            )
-            comm_q.close()  # not strictly necessary, but be plain about intentions
-            comm_q.join_thread()
-            del comm_q
+            msg = comm_q.get(block=True, timeout=120)
         except queue.Empty:
-            log.error("Interchange has not completed initialization in 120s. Aborting")
+            log.error("Interchange did not complete initialization.")
+
+        if not msg:
+            # poor-person's attempt to not interweave the traceback log lines
+            # with the subprocess' likely traceback lines
+            time.sleep(0.5)
             raise Exception("Interchange failed to start")
+
+        comm_q.close()  # not strictly necessary, but be plain about intentions
+        comm_q.join_thread()
+        del comm_q
+
+        self.worker_task_port, self.worker_result_port = msg
 
         self.worker_task_url = f"tcp://{self.address}:{self.worker_task_port}"
         self.worker_result_url = "tcp://{}:{}".format(
