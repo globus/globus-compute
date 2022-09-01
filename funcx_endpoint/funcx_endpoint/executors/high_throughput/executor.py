@@ -364,45 +364,6 @@ class HighThroughputExecutor(RepresentationMixin):
             "{suppress_failure} "
         )
 
-    def initialize_scaling(self):
-        """Compose the launch command and call the scale_out
-
-        This should be implemented in the child classes to take care of
-        executor specific oddities.
-        """
-        debug_opts = "--debug" if self.worker_debug else ""
-        max_workers = (
-            ""
-            if self.max_workers == float("inf")
-            else f"--max_workers={self.max_workers}"
-        )
-
-        l_cmd = self.launch_cmd.format(
-            debug=debug_opts,
-            task_url=self.worker_task_url,
-            result_url=self.worker_result_url,
-            cores_per_worker=self.cores_per_worker,
-            max_workers=max_workers,
-            nodes_per_block=self.provider.nodes_per_block,
-            heartbeat_period=self.heartbeat_period,
-            heartbeat_threshold=self.heartbeat_threshold,
-            poll_period=self.poll_period,
-            logdir=os.path.join(self.run_dir, self.label),
-            worker_mode=self.worker_mode,
-            container_image=self.container_image,
-        )
-        self.launch_cmd = l_cmd
-        log.debug(f"Launch command: {self.launch_cmd}")
-
-        self._scaling_enabled = self.provider.scaling_enabled
-        log.debug("Starting HighThroughputExecutor with provider:\n%s", self.provider)
-        if hasattr(self.provider, "init_blocks"):
-            try:
-                self.scale_out(blocks=self.provider.init_blocks)
-            except Exception as e:
-                log.error(f"Scaling out failed: {e}")
-                raise e
-
     def start(self, results_passthrough: multiprocessing.Queue = None):
         """Create the Interchange process and connect to it."""
         self.outgoing_q = zmq_pipes.TasksOutgoing(
@@ -442,7 +403,6 @@ class HighThroughputExecutor(RepresentationMixin):
         log.debug(f"Created management thread: {self._queue_management_thread}")
 
         if self.provider:
-            # self.initialize_scaling()
             pass
         else:
             self._scaling_enabled = False
