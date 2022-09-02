@@ -42,13 +42,13 @@ class ResultQueuePublisher:
         self._publish_kwargs = publish_kw
 
     def __enter__(self):
-        pass
+        if self.status != RabbitPublisherStatus.connected:
+            self.connect()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.status == RabbitPublisherStatus.connected:
-            self.close()
+        self.close()
 
-    def connect(self) -> ResultQueuePublisher:
+    def connect(self):
         pika_params = pika.URLParameters(self.queue_info["connection_url"])
         pika_params.heartbeat = 0  # result_q is blocking; no heartbeats warranted
         conn = pika.BlockingConnection(pika_params)
@@ -60,7 +60,6 @@ class ResultQueuePublisher:
         self._connection = conn
         self._channel = channel
         self.status = RabbitPublisherStatus.connected
-        return self
 
     def publish(self, message: bytes) -> None:
         """Publish message to RabbitMQ with the routing key to identify the message source
@@ -84,8 +83,6 @@ class ResultQueuePublisher:
             raise
 
     def close(self):
-        if self._channel is not None:
-            self._channel.close()
-        if self._connection is not None:
+        if self._connection and self._connection.is_open:
             self._connection.close()
         self.status = RabbitPublisherStatus.closed
