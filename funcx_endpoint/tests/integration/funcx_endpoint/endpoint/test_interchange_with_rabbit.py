@@ -11,7 +11,7 @@ import pika
 import pytest
 from funcx_common.messagepack import pack
 from funcx_common.messagepack.message_types import Result, Task
-from tests.funcx_endpoint.executors.mock_executors import MockExecutor
+from tests.integration.funcx_endpoint.executors.mock_executors import MockExecutor
 from tests.utils import try_for_timeout
 
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
