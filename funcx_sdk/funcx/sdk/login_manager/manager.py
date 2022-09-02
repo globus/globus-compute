@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import typing as t
 
 import globus_sdk
@@ -71,6 +72,16 @@ class LoginManager:
         *,
         scopes: list[str] | None = None,
     ):
+        # The authorization-via-weblink flow requires stdin; the user must visit
+        # the weblink and enter generated code.
+        if not sys.stdin.isatty() or sys.stdin.closed:
+            # Not technically necessary; the login flow would just die with an EOF
+            # during input(), but adding this message here is much more direct --
+            # handle the non-happy path by letting the user know precisely the issue
+            raise RuntimeError(
+                "Unable to run native app login flow: stdin is closed or is not a TTY."
+            )
+
         if scopes is None:  # flatten scopes to list of strings if none provided
             scopes = [
                 s for _rs_name, rs_scopes in self.login_requirements for s in rs_scopes
