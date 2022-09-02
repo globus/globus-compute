@@ -324,7 +324,7 @@ class EndpointInterchange:
             queue_info=self.result_q_info,
         )
 
-        with results_publisher.connect():
+        with results_publisher:
             executor = list(self.executors.values())[0]
 
             num_tasks_forwarded = 0
