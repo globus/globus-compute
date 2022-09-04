@@ -6,9 +6,13 @@ https://github.com/globus/globus-cli/blob/main/src/globus_cli/login_manager/clie
 """
 from __future__ import annotations
 
+import logging
 import os
+import uuid
 
 import globus_sdk
+
+log = logging.getLogger(__name__)
 
 
 def _get_client_creds_from_env() -> tuple[str | None, str | None]:
@@ -31,8 +35,7 @@ def is_client_login() -> bool:
             "variables, or unset them to use a normal login."
         )
 
-    else:
-        return bool(client_id) and bool(client_secret)
+    return bool(client_id) and bool(client_secret)
 
 
 def get_client_login() -> globus_sdk.ConfidentialAppAuthClient:
@@ -45,6 +48,12 @@ def get_client_login() -> globus_sdk.ConfidentialAppAuthClient:
 
     client_id, client_secret = _get_client_creds_from_env()
 
+    try:
+        uuid.UUID(client_id)
+    except ValueError:
+        log.warning(
+            "VERY LIKELY INVALID CLIENT ID (did you copy the username and not the id?"
+        )
     return globus_sdk.ConfidentialAppAuthClient(
         client_id=str(client_id),
         client_secret=str(client_secret),
