@@ -7,6 +7,7 @@ import pathlib
 from globus_sdk.tokenstorage import SQLiteAdapter
 
 from .._environments import _get_envname
+from .client_login import get_client_login, is_client_login
 from .globus_auth import internal_auth_client
 
 
@@ -50,14 +51,22 @@ def _get_storage_filename():
 
 def _resolve_namespace(environment: str | None) -> str:
     """
-    For now, the following namespace will always be used:
+    Return the namespace used to save tokens. This will check
+    if a client login is being used and return either:
       user/<envname>
+    or
+      clientprofile/<envname>/<clientid>
 
     e.g.
 
       user/production
     """
     env = environment if environment is not None else _get_envname()
+
+    if is_client_login():
+        client_id = get_client_login().client_id
+        return f"clientprofile/{env}/{client_id}"
+
     return f"user/{env}"
 
 
