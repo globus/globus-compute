@@ -130,7 +130,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._reset_poller()
 
         if self.batch_enabled:
-            log.info("Batch submission enabled.")
+            log.debug("Batch submission enabled.")
             self.start_batching_thread()
 
         atexit.register(self.shutdown)
@@ -165,7 +165,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         )
         self._task_submit_thread.daemon = True
         self._task_submit_thread.start()
-        log.info("Started task submit thread")
+        log.debug("Started task submit thread")
 
     def register_function(self, func: t.Callable, container_uuid=None):
         # Please note that this is a partial implementation, not all function
@@ -265,7 +265,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                 log.info(f"Submitting tasks to funcX: {len(tasks)}")
                 self._submit_tasks(tasks)
 
-        log.info("Exiting")
+        log.debug("Exiting")
 
     def _submit_tasks(self, messages: t.List[TaskSubmissionInfo]):
         """Submit a batch of tasks"""
@@ -494,9 +494,9 @@ class ExecutorPollerThread:
             if not time_to_disconnect:
                 # handle_incoming broke from a remote side disconnect
                 # we should close and re-connect
-                log.info("Attempting ws close")
+                log.debug("Attempting ws close")
                 await self.ws_handler.close()
-                log.info("Attempting ws re-connect")
+                log.debug("Attempting ws re-connect")
 
     def shutdown(self):
         if self.is_running:
