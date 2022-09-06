@@ -19,7 +19,7 @@ class LoginManagerProtocol(Protocol):
     def ensure_logged_in(self) -> None:
         ...
 
-    def logout(self) -> None:
+    def logout(self) -> bool:
         ...
 
     def get_auth_client(self) -> globus_sdk.AuthClient:

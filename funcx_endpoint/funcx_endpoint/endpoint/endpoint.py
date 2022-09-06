@@ -138,7 +138,8 @@ class Endpoint:
         except Exception as e:
             print(f"[FuncX] Caught exception during registration {e}")
 
-    def check_endpoint_json(self, endpoint_json, endpoint_uuid):
+    @staticmethod
+    def check_endpoint_json(endpoint_json, endpoint_uuid):
         if os.path.exists(endpoint_json):
             with open(endpoint_json) as fp:
                 log.debug("Connection info loaded from prior registration record")
@@ -433,12 +434,27 @@ class Endpoint:
         os.remove(filepath)
         log.info(f"Endpoint <{self.name}> has been cleaned up.")
 
-    def list_endpoints(self):
-        table = texttable.Texttable()
+    def get_endpoints(self, status_filter=None):
+        """
+        Gets a dictionary that contains information about all locally
+        known endpoints.
 
-        headings = ["Endpoint Name", "Status", "Endpoint ID"]
-        table.header(headings)
+        "status" can be one of:
+            ["Running", "Disconnected", "Stopped"]
 
+        Example output:
+        {
+            "default": {
+                 "status": "Running",
+                 "id": "123abcde-a393-4456-8de5-123456789abc"
+            },
+            "my_test_ep": {
+                 "status": "Disconnected",
+                 "id": "xxxxxxxx-xxxx-1234-abcd-xxxxxxxxxxxx"
+            }
+        }
+        """
+        endpoint_dict = {}
         config_files = glob.glob(os.path.join(self.funcx_dir, "*", "config.py"))
         for config_file in config_files:
             endpoint_dir = os.path.dirname(config_file)
@@ -459,7 +475,27 @@ class Endpoint:
                 else:
                     status = "Stopped"
 
-            table.add_row([endpoint_name, status, endpoint_id])
+            if status_filter is None or status_filter == status:
+                endpoint_dict[endpoint_name] = {
+                    "status": status,
+                    "id": endpoint_id,
+                }
+        return endpoint_dict
 
-        s = table.draw()
-        print(s)
+    def get_running_endpoints(self):
+        return self.get_endpoints(status_filter="Running")
+
+    def print_endpoint_table(self):
+        """
+        Converts locally configured endpoint list to a text based table
+        and prints the output.
+          For example format, see the texttable module
+        """
+        endpoints = self.get_endpoints()
+        table = texttable.Texttable()
+        headings = ["Endpoint Name", "Status", "Endpoint ID"]
+        table.header(headings)
+
+        for endpoint_name, endpoint_info in endpoints.items():
+            table.add_row([endpoint_name, endpoint_info["status"], endpoint_info["id"]])
+        print(table.draw())
