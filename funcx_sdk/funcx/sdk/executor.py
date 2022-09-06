@@ -214,7 +214,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
 
-        msg = TaskSubmissionInfo(
+        task = TaskSubmissionInfo(
             future_id=future_id,
             function_id=self._function_registry[function],
             endpoint_id=endpoint_id,
@@ -227,10 +227,10 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         if self.batch_enabled:
             # Put task to the outgoing queue
-            self.task_outgoing.put(msg)
+            self.task_outgoing.put(task)
         else:
             # self._submit_task takes a list of messages
-            self._submit_tasks([msg])
+            self._submit_tasks([task])
 
         return fut
 
@@ -267,30 +267,30 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         log.debug("Exiting")
 
-    def _submit_tasks(self, messages: t.List[TaskSubmissionInfo]):
+    def _submit_tasks(self, tasks: t.List[TaskSubmissionInfo]):
         """Submit a batch of tasks"""
         batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
-        for msg in messages:
+        for task in tasks:
             batch.add(
-                *msg.args,
-                **msg.kwargs,
-                endpoint_id=msg.endpoint_id,
-                function_id=msg.function_id,
+                *task.args,
+                **task.kwargs,
+                endpoint_id=task.endpoint_id,
+                function_id=task.function_id,
             )
-            log.debug(f"Adding msg {msg} to funcX batch")
+            log.debug(f"Adding task {task} to funcX batch")
         try:
             batch_tasks = self.funcx_client.batch_run(batch)
             log.debug(f"Batch submitted to task_group: {self.task_group_id}")
         except Exception:
-            log.error(f"Error submitting {len(messages)} tasks to funcX")
+            log.error(f"Error submitting {len(tasks)} tasks to funcX")
             raise
         else:
-            for i, msg in enumerate(messages):
+            for i, task in enumerate(tasks):
                 task_uuid: str = batch_tasks[i]
-                fut = self._counter_future_map.pop(msg.future_id)
+                fut = self._counter_future_map.pop(task.future_id)
                 fut.task_id = task_uuid
                 self._function_future_map[task_uuid] = fut
-            self.poller_thread.atomic_controller.increment(val=len(messages))
+            self.poller_thread.atomic_controller.increment(val=len(tasks))
 
     def reload_tasks(self) -> t.Iterable[FuncXFuture]:
         """
