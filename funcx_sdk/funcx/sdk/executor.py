@@ -89,7 +89,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
     def __init__(
         self,
-        funcx_client: FuncXClient,
+        funcx_client: FuncXClient | None = None,
         label: str = "FuncXExecutor",
         batch_enabled: bool = True,
         batch_interval: float = 1.0,
@@ -107,7 +107,10 @@ class FuncXExecutor(concurrent.futures.Executor):
             Default: 'FuncXExecutor'
         """
 
-        self.funcx_client: FuncXClient = funcx_client
+        if funcx_client:
+            self.funcx_client = funcx_client
+        else:
+            self.funcx_client = FuncXClient()
 
         self.label = label
         self.batch_enabled = batch_enabled
