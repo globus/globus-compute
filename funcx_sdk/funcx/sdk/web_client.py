@@ -167,9 +167,6 @@ class FuncxWebClient(globus_sdk.BaseClient):
     def submit(self, batch: t.Dict[str, t.Any]) -> globus_sdk.GlobusHTTPResponse:
         return self.post("submit", data=batch)
 
-    def submit_batch(self, batch: t.Dict[str, t.Any]) -> globus_sdk.GlobusHTTPResponse:
-        return self.post("submit_batch", data=batch)
-
     def register_endpoint(
         self,
         endpoint_name: str,
