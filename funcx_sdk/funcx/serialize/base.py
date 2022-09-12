@@ -22,7 +22,7 @@ class SerializeBase(metaclass=ABCMeta):
     def identifier(self):
         pass
 
-    def chomp(self, payload):
+    def chomp(self, payload: str) -> str:
         """If the payload starts with the identifier, return the remaining block
 
         Parameters
@@ -38,7 +38,6 @@ class SerializeBase(metaclass=ABCMeta):
         return payload
 
     def check(self, payload):
-
         try:
             x = self.serialize(payload)
             self.deserialize(x)
