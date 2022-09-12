@@ -19,7 +19,7 @@ from typing import Any
 import dill
 import psutil
 import zmq
-from funcx_common.messagepack.message_type import TaskTransition
+from funcx_common.messagepack.message_types import TaskTransition
 from funcx_common.tasks import ActorName, TaskState
 from parsl.version import VERSION as PARSL_VERSION
 

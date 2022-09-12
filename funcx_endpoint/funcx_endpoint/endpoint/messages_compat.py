@@ -45,7 +45,7 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
             "task_id": uuid.UUID(unpacked["task_id"]),
         }
         if "task_statuses" in unpacked:
-            kwargs["statuses"] = unpacked["statuses"]
+            kwargs["task_statuses"] = unpacked["task_statuses"]
         if "exception" in unpacked:
             kwargs["data"] = unpacked["exception"]
             code, user_message = unpacked["error_details"]
