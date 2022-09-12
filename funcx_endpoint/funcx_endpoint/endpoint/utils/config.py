@@ -20,8 +20,9 @@ class Config(RepresentationMixin):
 
     environment: str
         Environment the endpoint should connect to. Sets funcx_service_address and
-        results_ws_uri unless they are also specified.
-        Default: "prod"
+        results_ws_uri unless they are also specified. If not specified, the endpoint
+        connects to production.
+        Default: None
 
     funcx_service_address: str | None
         URL address string of the funcX service to which the Endpoint should connect.
