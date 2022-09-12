@@ -3,6 +3,43 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.3:
+
+funcx & funcx-endpoint v1.0.3
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add logic to support Globus Auth client credentials. This allows users to
+  specify FUNCX_SDK_CLIENT_ID and FUNCX_SDK_CLIENT_SECRET environment variables
+  to use a client credential.
+
+- Endpoints now report their online status immediately on startup (previously,
+  endpoints waited ``heartbeat_period`` seconds before reporting their status).
+
+- In order to support the new endpoint status format, endpoints now report their
+  heartbeat period as part of their status report package.
+
+- Add `--log-to-console` CLI flag to the endpoint.  This is mostly to entertain
+  additional development styles, but may also be useful for some end-user
+  workflows.
+
+- funcX Endpoint: Implement ANSI escape codes ("color") for log lines emitted
+  to the console.  This is currently targeted to aid the development and
+  debugging process, so color is strictly to the console, not to logs.  Use
+  the `--log-to-console` and `--debug` flags together.
+
+- Added logout command for funcx-endpoint to revoke cached tokens
+
+Changed
+^^^^^^^
+
+- Changed the way that endpoint status is stored in the services - instead of storing a
+  list of the most recent status reports, we now store the single most recent status
+  report with a TTL set to the endpoint's heartbeat period. This affects the formatting
+  of the return value of ``FuncXClient.get_endpoint_status``.
+
 .. _changelog-1.0.0:
 
 funcx & funcx-endpoint v1.0.2
