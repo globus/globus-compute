@@ -113,7 +113,7 @@ class FuncxConsoleFormatter(logging.Formatter):
             else:
                 end_coloring = COLOR_DEBUG
 
-            repl = f"{_byel}\\1{end_coloring}"
+            repl = f"{_byel}\\1{_r}{end_coloring}"
             try:
                 record.msg = self.uuid_re.sub(repl, record.msg)
                 if isinstance(record.args, dict):
