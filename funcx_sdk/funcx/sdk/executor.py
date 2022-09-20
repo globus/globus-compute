@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import atexit
-import concurrent
+import concurrent.futures
 import logging
 import queue
 import threading
@@ -81,11 +81,53 @@ class AtomicController:
 
 
 class FuncXExecutor(concurrent.futures.Executor):
-    """Extends the concurrent.futures.Executor class to layer this interface
-    over funcX. The executor returns future objects that are asynchronously
-    updated with results by the WebSocketPollingTask using a websockets connection
-    to the hosted funcx-websocket-service.
     """
+    The ``FuncXExecutor`` class, a subclass of `concurrent.futures.Executor`_, is the
+    preferred approach to collecting results from the funcX Web Service.  Over
+    polling (the historical approach) where the web service must be repeatedly
+    queried for the status of tasks and results eventually collected in bulk, the
+    ``FuncXExecutor`` class instantiates a WebSocket connection that streams results
+    directly -- and immediately -- as they arrive at the server.  This is a far more
+    efficient paradigm, simultaneously in terms of bytes over the wire, time spent
+    waiting for results, and boilerplate code to check for results.
+
+    An interaction might look like::
+
+        from funcx import FuncXExecutor
+        from funcx.sdk.executor import FuncXFuture
+
+        fxexec = FuncXExecutor()
+        ep_id = "<YOUR_ENDPOINT_UUID>"
+
+        def example_funcx_kernel(num):
+            import time
+            time.sleep(num * random.random())  # simulate some processing
+            return f"result, from task: {num}"
+
+        futs: list[FuncXFuture] = [
+            fxexec.submit(example_funcx_kernel, task_i, endpoint_id=ep_id)
+            for task_i in range(1, 21)
+        ]
+        # FuncXFuture is a subclass of concurrent.futures.Future
+
+        results, exceptions = [], []
+        for f in concurrent.futures.as_completed(futs, timeout=30):
+            # wait no more than 30s for all results
+            try:
+                results.append(f.result())
+            except Exception as exc:
+                exceptions.append((f.task_id, exc))
+
+        print("Results received (unordered):\\n  ", "\\n  ".join(results))
+        for task_id, exc in exceptions:
+            print(f"  Exception received from task {task_id}: {exc}")
+
+    Each future returned by ``.submit()`` is a handle to that particular task's result;
+    that future will be completed by a background thread in the FuncXExecutor as soon
+    as the server sends the result -- no polling, just an event-based interaction.
+
+    .. _concurrent.futures.Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
+    """  # noqa
 
     def __init__(
         self,
@@ -207,8 +249,10 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         Returns
         -------
-        Future : funcx.sdk.asynchronous.funcx_future.FuncXFuture
-            A future object
+        future: FuncXFuture
+           A future object, that will receive a ``.task_id`` when the funcX Web Service
+           acknowledges receipt, and eventually will have a ``.result()`` when the Web
+           Service streams it over the WebSocket.
         """
 
         if function not in self._function_registry:
@@ -370,17 +414,16 @@ class FuncXExecutor(concurrent.futures.Executor):
         -------
         An iterable of futures.
 
-        Known throws
+        Raises
         ------
-        - The usual (unhandled) request errors (e.g., no connection; invalid
-          authorization)
-        - ValueError if the server response is incorrect
-        - KeyError if the server did not return an expected response
+        ValueError: if the server response is incorrect
+        KeyError: if the server did not return an expected response
+        various: the usual (unhandled) request errors (e.g., no connection; invalid authorization)
 
         Notes
         -----
         Any previous futures received from this executor will be cancelled.
-        """
+        """  # noqa
 
         # step 1: cleanup!  Turn off poller_thread, clear _function_future_map
         self._reset_poller()
