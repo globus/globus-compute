@@ -13,7 +13,7 @@ user_opts = {
     'polaris': {
         # Node setup: activate necessary conda environment and such.
         'worker_init': '',
-        'scheduler_options': '',
+        'scheduler_options': '#PBS -l filesystems=home:grand:eagle',
         # ALCF allocation to use
         'account': '',
     }

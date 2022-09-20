@@ -96,7 +96,7 @@ Polaris (ALCF)
 
 The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
 **Polaris** cluster. This example uses the ``HighThroughputExecutor`` and connects to Polaris's PBS scheduler
-using the ``PBSProProvider``. This configuration assumes that the script is being executed on the login node of Polaris (edtb-02).
+using the ``PBSProProvider``. This configuration assumes that the script is being executed on the login node of Polaris.
 
 .. literalinclude:: configs/polaris.py
 
