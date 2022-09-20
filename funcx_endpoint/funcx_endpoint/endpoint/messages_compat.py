@@ -50,7 +50,7 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
         }
         if "exception" in unpacked:
             kwargs["data"] = unpacked["exception"]
-            code, user_message = unpacked["error_details"]
+            code, user_message = unpacked.get("error_details", ("Unknown", "Unknown"))
             kwargs["error_details"] = OutgoingResultErrorDetails(
                 code=code, user_message=user_message
             )
