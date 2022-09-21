@@ -1,10 +1,13 @@
 import json
 import logging
 import multiprocessing
+import threading
 import time
 import uuid
 
 import pytest
+
+from funcx_endpoint.endpoint.rabbit_mq import TaskQueueSubscriber
 
 
 def test_synch(start_task_q_publisher, start_task_q_subscriber, count=10):
@@ -173,6 +176,31 @@ def test_perf_combined_pub_sub_throughput(
         # been introduced
         assert sent_per_second > 500
         assert messages_per_second > 500
+
+
+def test_graceful_shutdown_if_connection_closed_unexpectedly(mocker, task_queue_info):
+    def _run_it():
+        def _stop_connection_now(tqs: TaskQueueSubscriber):
+            _now = time.monotonic()
+            while not tqs._channel and time.monotonic() - _now < 3:
+                time.sleep(0.05)
+            tqs.status = -123  # Just something that's not the sentinel
+            tqs._connection.close()
+
+        tqs = TaskQueueSubscriber(
+            endpoint_id="abc",
+            queue_info=task_queue_info,
+            external_queue=mocker.Mock(),
+            quiesce_event=threading.Event(),
+        )
+        threading.Thread(target=_stop_connection_now, args=(tqs,), daemon=True).start()
+        tqs.run()
+        exit(0 if tqs._cleanup_complete.is_set() is True else 1)
+
+    p = multiprocessing.Process(target=_run_it)
+    p.start()
+    p.join(timeout=4)
+    assert p.exitcode == 0
 
 
 def test_terminate(start_task_q_subscriber):

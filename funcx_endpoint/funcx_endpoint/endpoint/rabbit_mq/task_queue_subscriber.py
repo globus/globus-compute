@@ -297,8 +297,14 @@ class TaskQueueSubscriber(multiprocessing.Process):
     def _shutdown(self):
         logger.debug("set status to 'closing'")
         self.status = SubscriberProcessStatus.closing
-        logger.debug("closing connection")
-        self._connection.close()
+
+        if self._connection and self._connection.is_open:
+            logger.debug("closing connection")
+            try:
+                self._connection.close()
+            except Exception as exc:
+                logger.warning(f"Unexpected error while closing connection: {exc}")
+
         logger.debug("stopping ioloop")
         self._connection.ioloop.stop()
         logger.debug("waiting until channel is closed (timeout=1 second)")
