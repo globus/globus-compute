@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 import typing as t
 
 import globus_sdk
@@ -63,6 +64,7 @@ class LoginManager:
 
     def __init__(self, *, environment: str | None = None) -> None:
         self._token_storage = get_token_storage_adapter(environment=environment)
+        self._access_lock = threading.Lock()
 
     @property
     def login_requirements(self) -> t.Iterator[tuple[str, list[str]]]:
@@ -92,25 +94,28 @@ class LoginManager:
                 s for _rs_name, rs_scopes in self.login_requirements for s in rs_scopes
             ]
 
-        do_link_auth_flow(self._token_storage, scopes)
+        with self._access_lock:
+            do_link_auth_flow(self._token_storage, scopes)
 
     def logout(self) -> bool:
         """
         Returns True if at least one set of tokens were found and revoked.
         """
-        auth_client = internal_auth_client()
-        tokens_revoked = False
-        for rs, token_data in self._token_storage.get_by_resource_server().items():
-            for tok_key in ("access_token", "refresh_token"):
-                token = token_data[tok_key]
-                auth_client.oauth2_revoke_token(token)
-            self._token_storage.remove_tokens_for_resource_server(rs)
-            tokens_revoked = True
+        with self._access_lock:
+            auth_client = internal_auth_client()
+            tokens_revoked = False
+            for rs, token_data in self._token_storage.get_by_resource_server().items():
+                for tok_key in ("access_token", "refresh_token"):
+                    token = token_data[tok_key]
+                    auth_client.oauth2_revoke_token(token)
+                self._token_storage.remove_tokens_for_resource_server(rs)
+                tokens_revoked = True
 
         return tokens_revoked
 
     def ensure_logged_in(self) -> None:
-        data = self._token_storage.get_by_resource_server()
+        with self._access_lock:
+            data = self._token_storage.get_by_resource_server()
         needs_login = False
         for rs_name, _rs_scopes in self.login_requirements:
             if rs_name not in data:
@@ -118,7 +123,8 @@ class LoginManager:
                 break
 
         if needs_login:
-            self.run_login_flow()
+            with self._access_lock:
+                self.run_login_flow()
 
     def _get_authorizer(
         self, resource_server: str
@@ -144,25 +150,27 @@ class LoginManager:
                 access_token = tokens["access_token"]
                 expires_at = tokens["expires_at_seconds"]
 
-            return globus_sdk.ClientCredentialsAuthorizer(
-                confidential_client=get_client_login(),
-                scopes=scopes,
-                access_token=access_token,
-                expires_at=expires_at,
-                on_refresh=self._token_storage.on_refresh,
-            )
+            with self._access_lock:
+                return globus_sdk.ClientCredentialsAuthorizer(
+                    confidential_client=get_client_login(),
+                    scopes=scopes,
+                    access_token=access_token,
+                    expires_at=expires_at,
+                    on_refresh=self._token_storage.on_refresh,
+                )
         else:
             if tokens is None:
                 raise LookupError(
                     f"LoginManager could not find tokens for {resource_server}"
                 )
-            return globus_sdk.RefreshTokenAuthorizer(
-                tokens["refresh_token"],
-                internal_auth_client(),
-                access_token=tokens["access_token"],
-                expires_at=tokens["expires_at_seconds"],
-                on_refresh=self._token_storage.on_refresh,
-            )
+            with self._access_lock:
+                return globus_sdk.RefreshTokenAuthorizer(
+                    tokens["refresh_token"],
+                    internal_auth_client(),
+                    access_token=tokens["access_token"],
+                    expires_at=tokens["expires_at_seconds"],
+                    on_refresh=self._token_storage.on_refresh,
+                )
 
     def get_auth_client(self) -> globus_sdk.AuthClient:
         return globus_sdk.AuthClient(
