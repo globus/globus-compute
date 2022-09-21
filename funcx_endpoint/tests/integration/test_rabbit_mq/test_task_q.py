@@ -4,6 +4,8 @@ import multiprocessing
 import time
 import uuid
 
+import pytest
+
 
 def test_synch(start_task_q_publisher, start_task_q_subscriber, count=10):
 
@@ -171,3 +173,14 @@ def test_perf_combined_pub_sub_throughput(
         # been introduced
         assert sent_per_second > 500
         assert messages_per_second > 500
+
+
+def test_terminate(start_task_q_subscriber):
+    task_q = start_task_q_subscriber()
+    time.sleep(1)
+    task_q.stop()
+    logging.warning("Calling terminate")
+    with pytest.raises(ValueError):
+        # Expected to raise ValueError since the process should
+        # be terminated at this point from the close() call
+        task_q.terminate()
