@@ -62,7 +62,8 @@ class ResultQueuePublisher:
         self.status = RabbitPublisherStatus.connected
 
     def publish(self, message: bytes) -> None:
-        """Publish message to RabbitMQ with the routing key to identify the message source
+        """Publish message to RabbitMQ with the routing key to identify the message
+        source.
         The channel specifies confirm_delivery and with `mandatory=True` this call
         will *block* until a delivery confirmation is received.
 

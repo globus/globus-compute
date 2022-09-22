@@ -17,11 +17,11 @@ import daemon
 import dill
 import zmq
 from funcx_common.tasks import TaskState
-from parsl.app.errors import RemoteExceptionWrapper
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import (
     naive_interchange_task_dispatch,
 )
@@ -1009,9 +1009,8 @@ class Interchange:
                         except Exception:
                             result_package = {
                                 "task_id": tid,
-                                "exception": self.serializer.serialize(
-                                    RemoteExceptionWrapper(*sys.exc_info())
-                                ),
+                                "exception": get_error_string(),
+                                "error_details": get_result_error_details(),
                             }
                             pkl_package = dill.dumps(result_package)
                             bad_manager_msgs.append(pkl_package)
