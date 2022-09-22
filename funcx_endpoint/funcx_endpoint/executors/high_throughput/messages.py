@@ -192,9 +192,9 @@ class EPStatusReport(Message):
         jsonified = msg.decode("ascii")
         ep_status, statuses = json.loads(jsonified)
         task_statuses = {}
-        for tid, ts in statuses.items():
+        for tid, tt in statuses.items():
             task_statuses[tid] = TaskTransition(
-                timestamp=ts["timestamp"], actor=ts["actor"], state=ts["state"]
+                timestamp=tt["timestamp"], actor=tt["actor"], state=tt["state"]
             )
         return cls(endpoint_id, ep_status, task_statuses)
 

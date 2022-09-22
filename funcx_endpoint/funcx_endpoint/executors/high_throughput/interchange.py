@@ -340,7 +340,7 @@ class Interchange:
 
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
-        self.task_status_deltas: dict[str, tuple[float, TaskState, ActorName]] = {}
+        self.task_status_deltas: dict[str, TaskTransition] = {}
         self.container_switch_count: dict[str, int] = {}
 
     def load_config(self):
@@ -458,12 +458,12 @@ class Interchange:
                     }
                 )
                 self.total_pending_task_count += 1
-                ts = TaskTransition(
+                tt = TaskTransition(
                     timestamp=time.time_ns(),
                     state=TaskState.WAITING_FOR_NODES,
                     actor=ActorName.INTERCHANGE,
                 )
-                self.task_status_deltas[msg.task_id] = ts
+                self.task_status_deltas[msg.task_id] = tt
                 log.debug(
                     f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES"
                 )
@@ -900,12 +900,12 @@ class Interchange:
                             self.task_cancel_pending_trap.pop(task_id)
                         else:
                             log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
-                            ts = TaskTransition(
+                            tt = TaskTransition(
                                 timestamp=time.time_ns(),
                                 state=TaskState.WAITING_FOR_LAUNCH,
                                 actor=ActorName.INTERCHANGE,
                             )
-                            self.task_status_deltas[task_id] = ts
+                            self.task_status_deltas[task_id] = tt
 
             # Receive any results and forward to client
             if (
