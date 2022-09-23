@@ -79,7 +79,7 @@ class FuncxConsoleFormatter(logging.Formatter):
             d_fmt, i_fmt, w_fmt, e_fmt = (
                 C_DEBUG_FMT,
                 C_INFO_FMT,
-                C_DEBUG_FMT,
+                C_WARNING_FMT,
                 C_ERROR_FMT,
             )
 
