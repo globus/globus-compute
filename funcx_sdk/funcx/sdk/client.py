@@ -52,12 +52,12 @@ class FuncXClient:
         self,
         http_timeout=None,
         funcx_home=_FUNCX_HOME,
-        asynchronous=False,
+        asynchronous: bool | None = None,
         loop=None,
         environment: str | None = None,
         funcx_service_address: str | None = None,
         results_ws_uri: str | None = None,
-        warn_about_url_mismatch: bool = True,
+        warn_about_url_mismatch: bool | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         do_version_check: bool = True,
         openid_authorizer: t.Any = None,
@@ -86,9 +86,13 @@ class FuncXClient:
         results_ws_uri: str
             For internal use only. The address of the websocket service.
 
-        warn_about_url_mismatch:
+            DEPRECATED - use FuncXExecutor instead.
+
+        warn_about_url_mismatch: bool
             For internal use only. If true, a warning is logged if funcx_service_address
             and results_ws_uri appear to point to different environments.
+
+            DEPRECATED - use FuncXExecutor instead.
 
         do_version_check: bool
             Set to ``False`` to skip the version compatibility check on client
@@ -96,14 +100,22 @@ class FuncXClient:
             Default: True
 
         asynchronous: bool
-        Should the API use asynchronous interactions with the web service?
-        Currently only impacts the run method
-        Default: False
+            Should the API use asynchronous interactions with the web service?
+            Currently only impacts the run method.
+
+            DEPRECATED - this was an early attempt at asynchronous result gathering.
+                Use the FuncXExecutor instead.
+
+            Default: False
 
         loop: AbstractEventLoop
-        If asynchronous mode is requested, then you can provide an optional
-        event loop instance. If None, then we will access asyncio.get_event_loop()
-        Default: None
+            If asynchronous mode is requested, then you can provide an optional
+            event loop instance. If None, then we will access asyncio.get_event_loop()
+
+            DEPRECATED - part of an early attempt at asynchronous result gathering.
+                Use the FuncXExecutor instead.
+
+            Default: None
 
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this FuncXClient instance.
@@ -117,6 +129,29 @@ class FuncXClient:
         # resolve URLs if not set
         if funcx_service_address is None:
             funcx_service_address = get_web_service_url(environment)
+
+        self._task_status_table: t.Dict[str, t.Dict] = {}
+        self.funcx_home = os.path.expanduser(funcx_home)
+        self.session_task_group_id = (
+            task_group_id and str(task_group_id) or str(uuid.uuid4())
+        )
+
+        for (arg, name) in [
+            (openid_authorizer, "openid_authorizer"),
+            (fx_authorizer, "fx_authorizer"),
+            (search_authorizer, "search_authorizer"),
+            (asynchronous, "asynchronous"),
+            (loop, "loop"),
+            (results_ws_uri, "results_ws_uri"),
+            (warn_about_url_mismatch, "warn_about_url_mismatch"),
+        ]:
+            if arg is not None:
+                warnings.warn(
+                    f"The '{name}' argument is deprecated. "
+                    "It will be removed in a future release.",
+                    DeprecationWarning,
+                )
+
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
 
@@ -129,24 +164,6 @@ class FuncXClient:
                 "look like they might point to different environments. double check "
                 "that they are the correct URLs."
             )
-
-        self._task_status_table: t.Dict[str, t.Dict] = {}
-        self.funcx_home = os.path.expanduser(funcx_home)
-        self.session_task_group_id = (
-            task_group_id and str(task_group_id) or str(uuid.uuid4())
-        )
-
-        for (arg, name) in [
-            (openid_authorizer, "openid_authorizer"),
-            (fx_authorizer, "fx_authorizer"),
-            (search_authorizer, "search_authorizer"),
-        ]:
-            if arg is not None:
-                warnings.warn(
-                    f"The '{name}' argument is deprecated. "
-                    "It will be removed in a future release.",
-                    DeprecationWarning,
-                )
 
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
@@ -168,7 +185,7 @@ class FuncXClient:
             self.version_check()
 
         self.results_ws_uri = results_ws_uri
-        self.asynchronous = asynchronous
+        self.asynchronous = asynchronous or False
         if asynchronous:
             self.loop = loop if loop else asyncio.get_event_loop()
 
@@ -460,7 +477,7 @@ class FuncXClient:
 
         Returns
         -------
-        A dict
+        dict
             {'endpoint_id' : <>,
              'address' : <>,
              'client_ports': <>}
@@ -473,6 +490,10 @@ class FuncXClient:
             metadata=metadata,
             endpoint_version=endpoint_version,
         )
+        return r.data
+
+    def get_result_amqp_url(self) -> dict[str, str]:
+        r = self.web_client.get_result_amqp_url()
         return r.data
 
     def get_containers(self, name, description=None):
@@ -542,7 +563,7 @@ class FuncXClient:
         public=False,
         group=None,
         searchable=True,
-    ):
+    ) -> str:
         """Register a function code with the funcX service.
 
         Parameters

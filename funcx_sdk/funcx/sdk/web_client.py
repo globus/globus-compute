@@ -187,6 +187,9 @@ class FuncxWebClient(globus_sdk.BaseClient):
             data.update(additional_fields)
         return self.post("/endpoints", data=data)
 
+    def get_result_amqp_url(self) -> globus_sdk.GlobusHTTPResponse:
+        return self.get("get_amqp_result_connection_url")
+
     def get_endpoint_status(
         self, endpoint_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
