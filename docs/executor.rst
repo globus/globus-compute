@@ -13,9 +13,9 @@ Initializing the executor
 
 .. code-block:: python
 
-   from funcx import FuncXClient, FuncXExecutor
+   from funcx import FuncXExecutor
 
-   fx = FuncXExecutor(FuncXClient())
+   fx = FuncXExecutor(endpoint_id=endpoint_id)
 
 
 Running functions
@@ -23,24 +23,22 @@ Running functions
 
 .. code-block:: python
 
-   ...
-   fx = FuncXExecutor(FuncXClient())
-
    def double(x):
        return x * 2
 
-   # The executor.submit method deviates from the concurrent.futures.Executor in that
-   # you can specify funcX specific attributes such as endpoint_id and container_id
-   # as keyword args
-   future = fx.submit(double, x, endpoint_id=endpoint_id)
+   future = fx.submit(double, x)  # will execute on endpoint_id
 
-   # the future.done() method can be used to check the status of the function, without blocking
-   # this will return a Bool indicating whether the task is complete
+   # Use the .done() method to check the status of the function without blocking;
+   # this will return a Bool indicating whether the result is ready
    print("Status : ", future.done())
 
-   # the future.result() is a blocking call that waits until the function's result is available
-   # if the function failed, an exception would be raised
+   # Alternatively, the .result() method will block, not returning until the
+   # function's result is available.  If the function instead fails, it will
+   # raise an exception.
    print("Result : ", future.result())
+
+   # When done with the executor, shut down the background threads via .shutdown():
+   fx.shutdown()
 
 
 More complex cases
@@ -48,18 +46,34 @@ More complex cases
 
 .. code-block:: python
 
-   ...
-   fx = FuncXExecutor(FuncXClient(batch_enabled=True))
+   import concurrent.futures
 
+   # The FuncXExecutor also works as a `with` statement, avoiding the need
+   # to remember to shut it down:
+   with FuncXExecutor(endpoint_id=endpoint_id) as fx:
 
-   def double(x):
-       return x * 2
+       def double(x):
+           return f"{x} -> {x * 2}"
 
-   # Here's how you'd launch several functions:
-   futures = []
-   for i in range(10):
-       futures.append(fx.submit(double, i, endpoint_id=endpoint_id))
+       # Launching several function invocations is the same as launching
+       # one: .submit()
 
-   # Now wait and print each result:
-   for f in futures:
-       print("Result : ", f.result())
+       futs = []
+       for i in range(10):
+           futs.append(fx.submit(double, i))
+
+       # The futures were appended to the `futs` list in order, so one could
+       # wait for each result in turn to get an ordered set:
+       print("Results:", [f.result() for f in futs])
+
+       # But often acting on the results *as they arrive* is more desirable
+       # as results are NOT guaranteed to arrive in the order they were
+       # submitted:
+       def slow_double(x):
+           import random, time
+           time.sleep(x * random.random())
+           return f"{x} -> {x * 2}"
+
+       futs = [fx.submit(slow_double, i) for i in range(10, 20)]
+       for f in concurrent.futures.as_completed(futs):
+           print("Received:", f.result())

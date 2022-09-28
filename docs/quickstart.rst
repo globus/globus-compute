@@ -22,11 +22,11 @@ To check if you have the right Python version, run the following commands::
 
 This should return the Python version, for example: ``Python 3.8.10``.
 
-To check if your endpoint/client have network access and can connect to the funcX service, run ::
+To check if your endpoint/client has network access and can connect to the funcX service, run::
 
   >>> curl https://api2.funcx.org/v2/version
 
-This should return a version string, for example: ``"1.0.2"``
+This should return a version string, for example: ``"1.0.5"``
 
 .. note:: The funcx client is supported on MacOS, Linux, and Windows. The funcx-endpoint
    is only supported on Linux.

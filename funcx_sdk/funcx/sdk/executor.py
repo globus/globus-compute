@@ -1,19 +1,38 @@
 from __future__ import annotations
 
-import asyncio
-import atexit
 import concurrent.futures
 import logging
 import queue
+import random
+import sys
 import threading
+import time
 import typing as t
 import warnings
 
+if sys.version_info >= (3, 8):
+    from concurrent.futures import InvalidStateError
+else:
+
+    class InvalidStateError(Exception):
+        pass
+
+
+import pika
+from funcx_common import messagepack
+from funcx_common.messagepack.message_types import Result
+
+from funcx.errors import FuncxTaskExecutionFailed
 from funcx.sdk.asynchronous.funcx_future import FuncXFuture
-from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from funcx.sdk.client import FuncXClient
 
 log = logging.getLogger(__name__)
+
+if t.TYPE_CHECKING:
+    import pika.exceptions
+    from pika.channel import Channel
+    from pika.frame import Method
+    from pika.spec import Basic, BasicProperties
 
 
 class TaskSubmissionInfo:
@@ -23,8 +42,8 @@ class TaskSubmissionInfo:
         task_num: int,
         function_id: str,
         endpoint_id: str,
-        args: t.Tuple[t.Any],
-        kwargs: t.Dict[str, t.Any],
+        args: tuple,
+        kwargs: dict,
     ):
         self.task_num = task_num
         self.function_id = function_id
@@ -83,10 +102,10 @@ class AtomicController:
 class FuncXExecutor(concurrent.futures.Executor):
     """
     The ``FuncXExecutor`` class, a subclass of `concurrent.futures.Executor`_, is the
-    preferred approach to collecting results from the funcX Web Service.  Over
+    preferred approach to collecting results from the funcX web services.  Over
     polling (the historical approach) where the web service must be repeatedly
     queried for the status of tasks and results eventually collected in bulk, the
-    ``FuncXExecutor`` class instantiates a WebSocket connection that streams results
+    ``FuncXExecutor`` class instantiates an AMQPS connection that streams results
     directly -- and immediately -- as they arrive at the server.  This is a far more
     efficient paradigm, simultaneously in terms of bytes over the wire, time spent
     waiting for results, and boilerplate code to check for results.
@@ -94,335 +113,422 @@ class FuncXExecutor(concurrent.futures.Executor):
     An interaction might look like::
 
         from funcx import FuncXExecutor
-        from funcx.sdk.executor import FuncXFuture
 
-        fxexec = FuncXExecutor()
-        ep_id = "<YOUR_ENDPOINT_UUID>"
-
-        def example_funcx_kernel(num):
+        def task_func(num):
             import time
             time.sleep(num * random.random())  # simulate some processing
             return f"result, from task: {num}"
 
-        futs: list[FuncXFuture] = [
-            fxexec.submit(example_funcx_kernel, task_i, endpoint_id=ep_id)
-            for task_i in range(1, 21)
-        ]
-        # FuncXFuture is a subclass of concurrent.futures.Future
+        ep_id = "<YOUR_ENDPOINT_UUID>"
+        num_tasks = 10
 
-        results, exceptions = [], []
-        for f in concurrent.futures.as_completed(futs, timeout=30):
-            # wait no more than 30s for all results
-            try:
-                results.append(f.result())
-            except Exception as exc:
-                exceptions.append((f.task_id, exc))
+        fxe = FuncXExecutor(endpoint_id=ep_id)
+        futures = [fxe.submit(task_func, t_i + 1) for t_i in range(num_tasks)]
+        futures.append(fxe.submit(task_func, num_tasks + 1))  # an additional task
+        futures.extend(fxe.submit(task_func, t_i + 1) for t_i in range(num_tasks+2, num_tasks+5))
+        fxe.shutdown()  # default args: wait for all 14 futures (tasks) to complete
 
-        print("Results received (unordered):\\n  ", "\\n  ".join(results))
-        for task_id, exc in exceptions:
-            print(f"  Exception received from task {task_id}: {exc}")
+        results = [f.result() for f in futures]
+
+        print("Results:\\n  ", "\\n  ".join(results))
+
+    The ``FuncXExecutor`` class may also be used as a context manager, eliding the
+    need to explicitly call the ``.shutdown()`` method::
+
+        import concurrent.futures
+
+        with FuncXExecutor(endpoint_id=ep_id) as fxe:
+            futures = [fxe.submit(task_func, task_i +1) for task_i in range(num_tasks)]
+
+            # Stream the results as they come in, rather than waiting for
+            # total completion like the previous example.
+            for f in concurrent.futures.as_completed(futures, timeout=30):
+                try:
+                    results.append(f.result())
+                except Exception as exc:
+                    exceptions.append((f.task_id, exc))
 
     Each future returned by ``.submit()`` is a handle to that particular task's result;
-    that future will be completed by a background thread in the FuncXExecutor as soon
-    as the server sends the result -- no polling, just an event-based interaction.
+    that future will be completed (`.set_result()`_ called) by a background thread as
+    soon as the server sends the result -- no polling, just an event-based interaction.
 
+    .. _.set_result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.set_result
     .. _concurrent.futures.Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
+
+    :param endpoint_id: id of the endpoint to which to submit tasks
+    :param container_id: id of the container in which to execute tasks
+    :param funcx_client: instance of FuncXClient to be used by the
+        executor.  If not provided, the executor will instantiate one with default
+        arguments.
+    :param label: a label to name the executor; mainly utilized for
+        logging and advanced needs with multiple executors.
+    :param batch_size: the maximum number of tasks to coalesce before
+        sending upstream [min: 1, default: 128]
+    :param batch_interval: [DEPRECATED; unused] number of seconds to coalesce tasks
+        before submitting upstream
+    :param batch_enabled: [DEPRECATED; unused] whether to batch results
     """  # noqa
 
     def __init__(
         self,
+        endpoint_id: str | None = None,
+        container_id: str | None = None,
         funcx_client: FuncXClient | None = None,
-        label: str = "FuncXExecutor",
-        batch_enabled: bool = True,
-        batch_size: int = 100,
+        label: str = "",
+        batch_size: int = 128,
         **kwargs,
     ):
-        """
-        Parameters
-        ==========
+        deprecated_kwargs = {"batch_interval", "batch_enabled"}
+        for key in kwargs:
+            if key in deprecated_kwargs:
+                warnings.warn(
+                    f"`{key}` is not utilized and will be removed in a future release",
+                    DeprecationWarning,
+                )
+                continue
+            msg = f"'{key}' is an invalid argument for {self.__class__.__name__}"
+            raise TypeError(msg)
 
-        funcx_client : client object
-            Instance of FuncXClient to be used by the executor
+        if not funcx_client:
+            funcx_client = FuncXClient()
+        self.funcx_client = funcx_client
 
-        label : str
-            Optional string label to name the executor.
-            Default: 'FuncXExecutor'
-        """
-
-        if "batch_interval" in kwargs:
-            warnings.warn(
-                "`batch_interval` is deprecated; it will be removed in "
-                "a future release",
-                DeprecationWarning,
-            )
-
-        if funcx_client:
-            self.funcx_client = funcx_client
-        else:
-            self.funcx_client = FuncXClient()
-
+        self.endpoint_id = endpoint_id
+        self.container_id = container_id
         self.label = label
-        self.batch_enabled = batch_enabled
-        self.batch_size = batch_size
-        self.task_outgoing: queue.Queue[
-            tuple[FuncXFuture, TaskSubmissionInfo] | tuple[None, None]
-        ] = queue.Queue()
+        self.batch_size = max(1, batch_size)
 
         self.task_count_submitted = 0
         self._task_counter: int = 0
-        self._function_registry: t.Dict[t.Any, str] = {}
-        self._function_future_map: t.Dict[str, FuncXFuture] = {}
-        self._kill_event: t.Optional[threading.Event] = None
-        self._task_submit_thread: t.Optional[threading.Thread] = None
+        self._task_group_id: str | None = None
+        self._tasks_to_send: queue.Queue[
+            tuple[FuncXFuture, TaskSubmissionInfo] | tuple[None, None]
+        ] = queue.Queue()
+        self._function_registry: dict[t.Callable, str] = {}
 
-        self.poller_thread = ExecutorPollerThread(
-            self.funcx_client,
-            self._function_future_map,
-        )
+        self._stopped = False
+        self._stopped_in_error = False
+        self._shutdown_lock = threading.RLock()
+        self._result_watcher: _ResultWatcher | None = None
 
-        self._reset_poller()
+        log.debug("%s: initiated on thread: %s", self, threading.get_ident())
+        self._task_submitter = threading.Thread(target=self._task_submitter_impl)
+        self._task_submitter.start()
 
-        if self.batch_enabled:
-            log.debug("Batch submission enabled.")
-            self.start_batching_thread()
-
-        atexit.register(self.shutdown)
-
-    def _reset_poller(self):
-        if self.poller_thread.is_running:
-            self.poller_thread.shutdown()
-        self.poller_thread.atomic_controller.reset()
-
-        self._task_counter = 0
-        while self._function_future_map:
-            _, fut = self._function_future_map.popitem()
-            if not fut.done():
-                fut.cancel()
-
-    @property
-    def results_ws_uri(self) -> str:
-        return self.funcx_client.results_ws_uri
+    def __repr__(self) -> str:
+        name, label = self.__class__.__name__, self.label and f"{self.label}, " or ""
+        return f"{name}<{label}{self.batch_size}, ep_id:{self.endpoint_id}>"
 
     @property
     def task_group_id(self) -> str:
-        return self.funcx_client.session_task_group_id
+        """
+        The Task Group with which this instance is currently associated.  New tasks will
+        be sent to this Task Group upstream, and the result listener will only listen
+        for results for this group.  If not set, the default value matches the
+        ``task_group_id`` of the underlying FuncXClient object.
 
-    def start_batching_thread(self):
-        self._kill_event = threading.Event()
-        # Start the task submission thread
-        self._task_submit_thread = threading.Thread(
-            target=self._submit_task_kernel,
-            args=(self._kill_event,),
-            name="FuncX-Submit-Thread",
-        )
-        self._task_submit_thread.daemon = True
-        self._task_submit_thread.start()
-        log.debug("Started task submit thread")
+        May be a string, or ``None``.  Set by simple assignment::
 
-    def register_function(self, func: t.Callable, container_uuid=None):
-        # Please note that this is a partial implementation, not all function
-        # registration options are fleshed out here.
-        log.debug(f"Function:{func} is not registered. Registering")
+            fxe = FuncXExecutor(endpoint_id="...")
+            fxe.task_group_id = "Some-stored-id"
+            fxe.task_group_id = None  # Use the backing FuncXClient's task group id
+
+        This is typically used when reattaching to a previously initiated set of tasks.
+        See `reload_tasks()`_ for more information.
+
+        [default: ``None``, which translates to the FuncXClient task group id]
+        """
+        return self._task_group_id or self.funcx_client.session_task_group_id
+
+    @task_group_id.setter
+    def task_group_id(self, task_group_id: str | None):
+        self._task_group_id = task_group_id
+
+    def register_function(
+        self, fn: t.Callable, function_id: str | None = None, **func_register_kwargs
+    ) -> str:
+        """
+        Register a task function with this Executor's cache.
+
+        All function execution submissions (i.e., ``.submit()``) communicate which
+        pre-registered function to execute on the endpoint by the function's
+        identifier, the ``function_id``.  This method makes the appropriate API
+        call to the funcX web services to first register the task function, and
+        then stores the returned ``function_id`` in the Executor's cache.
+
+        In the standard workflow, ``.submit()`` will automatically handle invoking
+        this method, so the common use-case will not need to use this method.
+        However, some advanced use-cases may need to fine-tune the registration
+        of a function and so may manually set the registration arguments via this
+        method.
+
+        If a function has already been registered (perhaps in a previous
+        iteration), the upstream API call may be avoided by specifying the known
+        ``function_id``.
+
+        If a function already exists in the Executor's cache, this method will
+        raise a ValueError to help track down the errant double registration
+        attempt.
+
+        :param fn: function to be registered for remote execution
+        :param function_id: if specified, associate the ``function_id`` to the
+            ``fn`` immediately, short-circuiting the upstream registration call.
+        :param func_register_kwargs: all other keyword arguments are passed to
+            the ``FuncXClient.register_function()``.
+        :returns: the function's ``function_id`` string, as returned by
+            registration upstream
+        """
+        if self._stopped:
+            err_fmt = "%s is shutdown; refusing to register function"
+            raise RuntimeError(err_fmt % repr(self))
+
+        if fn in self._function_registry:
+            msg = f"Function already registered as function id: {function_id}"
+            log.error(msg)
+            self.shutdown(wait=False, cancel_futures=True)
+            raise ValueError(msg)
+
+        if function_id:
+            self._function_registry[fn] = function_id
+            return function_id
+
+        log.debug("Function not registered. Registering: %s", fn)
+        func_register_kwargs.pop("function", None)
+        reg_kwargs = {"function_name": fn.__name__}
+        reg_kwargs.update(func_register_kwargs)
         try:
-            function_id = self.funcx_client.register_function(
-                func,
-                function_name=func.__name__,
-                container_uuid=container_uuid,
-            )
+            function_id = self.funcx_client.register_function(fn, **reg_kwargs)
         except Exception:
-            log.error(f"Error in registering {func.__name__}")
+            log.error(f"Unable to register function: {fn.__name__}")
+            self.shutdown(wait=False, cancel_futures=True)
             raise
-        else:
-            self._function_registry[func] = function_id
-            log.debug(f"Function registered with id:{function_id}")
+        self._function_registry[fn] = function_id
+        log.debug("Function registered with id: %s", function_id)
+        return function_id
 
-    def submit(self, function, *args, endpoint_id=None, container_uuid=None, **kwargs):
-        """Initiate an invocation
+    def submit(self, fn, *args, **kwargs):
+        """
+        Submit a function to be executed on the Executor's specified endpoint
+        with the given arguments.
 
-        Parameters
-        ----------
-        function : Function/Callable
-            Function / Callable to execute
+        Schedules the callable to be executed as ``fn(*args, **kwargs)`` and
+        returns a FuncXFuture instance representing the execution of the
+        callable.
 
-        *args : Any
-            Args as specified by the function signature
+        Example use::
 
-        endpoint_id : uuid str
-            Endpoint UUID string. Required
+            >>> def add(a: int, b: int) -> int: return a + b
+            >>> fxe = FuncXExecutor(endpoint_id="some-ep-id")
+            >>> fut = fxe.submit(add, 1, 2)
+            >>> fut.result()    # wait (block) until result is received from remote
+            3
 
-        **kwargs : Any
-            Arbitrary kwargs
+        :param fn: Python function to execute on endpoint
+        :param args: positional arguments (if any) as required to execute
+            the function
+        :param kwargs: keyword arguments (if any) as required to execute
+            the function
+        :returns: a future object that will receive a ``.task_id`` when the
+            funcX Web Service acknowledges receipt, and eventually will have
+            a ``.result()`` when the funcX web services receive and stream it.
+        """
+        if fn not in self._function_registry:
+            self.register_function(fn)
 
-        Returns
-        -------
-        future: FuncXFuture
-           A future object, that will receive a ``.task_id`` when the funcX Web Service
-           acknowledges receipt, and eventually will have a ``.result()`` when the Web
-           Service streams it over the WebSocket.
+        fn_id = self._function_registry[fn]
+        return self.submit_to_registered_function(
+            function_id=fn_id, args=args, kwargs=kwargs
+        )
+
+    def submit_to_registered_function(
+        self,
+        function_id: str,
+        args: tuple | None = None,
+        kwargs: dict | None = None,
+    ):
+        """
+        Request an execution of an already registered function.
+
+        This method supports use of public functions with the FuncXExecutor, or
+        knowledge of an already registered function.  An example use might be::
+
+            # pre_registration.py
+            from funcx import FuncXExecutor
+
+            def some_processor(*args, **kwargs):
+                # ... function logic ...
+                return ["some", "result"]
+
+            fxe = FuncXExecutor()
+            fn_id = fxe.register_function(some_processor)
+            print(f"Function registered successfully.\\nFunction ID: {fn_id}")
+
+            # Example output:
+            #
+            # Function registered successfully.
+            # Function ID: c407ae80-b31f-447a-9fa6-124098492057
+
+        In this case, the function would be privately registered to you, but note that
+        the function id is just a string.  One could substitute for a publically
+        available function.  For instance, ``b0a5d1a0-2b22-4381-b899-ba73321e41e0`` is
+        a "well-known" uuid for the "Hello, World!" function (same as the example in
+        the FuncX tutorial), which is publicly available::
+
+            from funcx import FuncXExecutor
+
+            fn_id = "b0a5d1a0-2b22-4381-b899-ba73321e41e0"  # public; "Hello World"
+            with FuncXExecutor(endpoint_id="your-endpoint-id") as fxe:
+                futs = [
+                    fxe.submit_to_registered_function(function_id=fn_id)
+                    for i in range(5)
+                ]
+
+            for f in futs:
+                print(f.result())
+
+        :param function_id: identifier (str) of registered Python function
+        :param args: positional arguments (if any) as required to execute
+            the function
+        :param kwargs: keyword arguments (if any) as required to execute
+            the function
+        :returns: a future object that (eventually) will have a ``.result()``
+            when the funcX web services receive and stream it.
         """
 
-        if function not in self._function_registry:
-            self.register_function(function)
-        self._task_counter += 1
+        if self._stopped:
+            err_fmt = "%s is shutdown; no new functions may be executed"
+            raise RuntimeError(err_fmt % repr(self))
 
-        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
+        if not self.endpoint_id:
+            msg = (
+                "No endpoint_id set.  Did you forget to set it at construction?\n"
+                "  Hint:\n\n"
+                "    fxe = FuncXExecutor(endpoint_id=<ep_id>)\n"
+                "    fxe.endpoint_id = <ep_id>    # alternative"
+            )
+            self.shutdown(wait=False, cancel_futures=True)
+            raise ValueError(msg)
+
+        if args is None:
+            args = ()
+        if kwargs is None:
+            kwargs = {}
+
+        self._task_counter += 1
 
         task = TaskSubmissionInfo(
             task_num=self._task_counter,  # unnecessary; maybe useful for debugging?
-            function_id=self._function_registry[function],
-            endpoint_id=endpoint_id,
+            function_id=function_id,
+            endpoint_id=self.endpoint_id,
             args=args,
             kwargs=kwargs,
         )
 
         fut = FuncXFuture()
-
-        if self.batch_enabled:
-            self.task_outgoing.put((fut, task))
-        else:
-            self._submit_tasks([fut], [task])
-
+        self._tasks_to_send.put((fut, task))
         return fut
 
-    def _submit_task_kernel(self, kill_event: threading.Event):
+    def map(self, fn: t.Callable, *iterables, timeout=None, chunksize=1) -> t.Iterator:
         """
-        Fetch enqueued tasks task_outgoing queue and submit them to funcX in batches
-        of up to self.batch_size.
+        FuncX does not currently implement the `.map()`_ method of the `Executor
+        interface`_.  In a naive implementation, this method would merely be
+        syntactic sugar for bulk use of the ``.submit()`` method.  For example::
 
-        Parameters
-        ==========
-        kill_event : threading.Event
-            Sentinel event; used to stop the thread and exit.
-        """
-        to_send = self.task_outgoing  # cache lookup
-        while not kill_event.is_set():
-            futs: list[FuncXFuture] = []
-            tasks: list[TaskSubmissionInfo] = []
-            try:
-                fut, task = to_send.get()  # Block while waiting for first result ...
-                while task is not None:
-                    assert fut is not None  # Come on, mypy; this contextually clear
-                    tasks.append(task)
-                    futs.append(fut)
-                    if not (len(tasks) < self.batch_size):
-                        break
-                    fut, task = to_send.get(block=False)  # ... don't block thereafter
-            except queue.Empty:
-                pass
-            if tasks:
-                log.info(f"Submitting tasks to funcX: {len(tasks)}")
-                self._submit_tasks(futs, tasks)
+            def map(fxexec, fn, *fn_args_kwargs):
+                return [fxexec.submit(fn, *a, **kw) for a, kw in fn_args_kwargs]
 
-        log.debug("Exiting")
+        This naive implementation ignores a number of potential optimizations, so
+        we have decided to look at this at a future date if there is interest.
 
-    def _submit_tasks(self, futs: list[FuncXFuture], tasks: list[TaskSubmissionInfo]):
-        """Submit a batch of tasks"""
-        batch = self.funcx_client.create_batch(
-            task_group_id=self.task_group_id,
-            create_websocket_queue=True,
-        )
-        for task in tasks:
-            batch.add(task.function_id, task.endpoint_id, task.args, task.kwargs)
-            log.debug(f"Adding task {task} to funcX batch")
-        try:
-            batch_tasks = self.funcx_client.batch_run(batch)
-            self.task_count_submitted += len(batch_tasks)
-            log.debug(
-                "Batch submitted to task_group: %s - %s",
-                self.task_group_id,
-                self.task_count_submitted,
-            )
-        except Exception:
-            log.error(f"Error submitting {len(tasks)} tasks to funcX")
-            raise
-        else:
-            for fut, task_uuid in zip(futs, batch_tasks):
-                fut.task_id = task_uuid
-                self._function_future_map[task_uuid] = fut
-            self.poller_thread.atomic_controller.increment(val=len(batch_tasks))
+        .. _.map(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor.map
+        .. _Executor interface: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
+
+        Raises
+        ------
+        NotImplementedError
+          always raised
+
+        """  # noqa
+        raise NotImplementedError()
 
     def reload_tasks(self) -> t.Iterable[FuncXFuture]:
         """
-        Load the set of tasks associated with this Executor's Task Group (FuncXClient)
-        from the server and return a set of futures, one for each task.  This is
-        nominally intended to "reattach" to a previously initiated session, based on
-        the Task Group ID.  An example use might be::
+        .. _reload_tasks():
 
-            import sys
-            import typing as T
-            from funcx import FuncXClient, FuncXExecutor
+        Load the set of tasks associated with this Executor's Task Group from the
+        web services and return a list of futures, one for each task.  This is
+        nominally intended to "reattach" to a previously initiated session, based on
+        the Task Group ID.  A (contrived) interaction might be::
+
+            # execute initially as:
+            # $ python contrived.py
+            #  ... this Task Group ID: <TG_UUID_STR>
+            #  ...
+            # The run with the Task Group ID as an argument:
+            # $ python contrived.py <TG_UUID_STR>
+
+            import os, signal, sys, time, typing as t
+            from funcx import FuncXExecutor
             from funcx.sdk.executor import FuncXFuture
 
-            fxc_kwargs = {}
-            if len(sys.argv) > 1:
-                fxc_kwargs["task_group_id"] = sys.argv[1]
+            task_group_id = sys.argv[1] if len(sys.argv) > 1 else None
 
-            def example_funcx_kernel(num):
+            def task_kernel(num):
+                import time
+                time.sleep(10)
                 result = f"your funcx logic result, from task: {num}"
                 return result
 
-            fxclient = FuncXClient(**fxc_kwargs)
-            fxexec = FuncXExecutor(fxclient)
+            ep_id = "<YOUR_ENDPOINT_UUID>"
+            with FuncXExecutor(endpoint_id=ep_id) as fxe:
+                futures: t.Iterable[FuncXFuture]
+                if task_group_id:
+                    print(f"Reloading tasks from Task Group ID: {task_group_id}")
+                    fxe.task_group_id = task_group_id
+                    futures = fxe.reload_tasks()
 
-            # Save the task_group_id somewhere.  Perhaps in a file, or less
-            # robustly "as mere text" on your console:
-            print("If this script dies, rehydrate futures with this "
-                 f"Task Group ID: {fxexec.task_group_id}")
-
-            futures: T.Iterable[FuncXFuture] = []
-            results, exceptions = [], []
-            if "task_group_id" in fxc_kwargs:
-                print(f"Reloading tasks from Task Group ID: {fxexec.task_group_id}")
-                futures = fxexec.reload_tasks()
-
-                # Ask server once up-front if there are any known results before
-                # waiting for each result in turn (below):
-                task_ids = [f.task_id for f in futures]
-                finished_tasks = set()
-                for task_id, state in fxclient.get_batch_result(task_ids).items():
-                    if not state["pending"]:
-                        finished_tasks.add(task_id)
-                        if state["status"] == "success":
-                            results.append(state["result"])
-                        else:
-                            exceptions.append(state["exception"])
-                futures = [f for f in futures if f.task_id not in finished_tasks]
-
-            else:
-                print("New session; creating FuncX tasks ...")
-                ep_id = "<YOUR_ENDPOINT_UUID>"
-                for i in range(1, 5):
-                    futures.append(
-                        fxexec.submit(example_funcx_kernel, endpoint_id=ep_id)
+                else:
+                    # Save the task_group_id somewhere.  Perhaps in a file, or less
+                    # robustly "as mere text" on your console:
+                    print(
+                        "New session; creating funcX tasks; if this script dies, rehydrate"
+                        f" futures with this Task Group ID: {fxe.task_group_id}"
                     )
+                    num_tasks = 5
+                    futures = [fxe.submit(task_kernel, i + 1) for i in range(num_tasks)]
 
-                # ... Right here, your script dies for [SILLY REASON;
-                #           DID YOU LOSE POWER?] ...
+                    # Ensure all tasks have been sent upstream ...
+                    while fxe.task_count_submitted < num_tasks:
+                        time.sleep(1)
+                        print(f"Tasks submitted upstream: {fxe.task_count_submitted}")
+
+                    # ... before script death for [silly reason; did you lose power!?]
+                    print("Simulating unexpected process death!")
+                    os.kill(os.getpid(), signal.SIGKILL)
+                    exit(1)  # In case KILL takes split-second to process
 
             # Get results:
+            results, exceptions = [], []
             for f in futures:
                 try:
                     results.append(f.result(timeout=10))
                 except Exception as exc:
                     exceptions.append(exc)
 
-        Returns
-        -------
-        An iterable of futures.
-
-        Raises
-        ------
-        ValueError: if the server response is incorrect
-        KeyError: if the server did not return an expected response
-        various: the usual (unhandled) request errors (e.g., no connection; invalid authorization)
+        :returns: An iterable of futures.
+        :raises ValueError: if the server response is incorrect or invalid
+        :raises KeyError: the server did not return an expected response
+        :raises various: the usual (unhandled) request errors (e.g., no connection;
+            invalid authorization)
 
         Notes
         -----
         Any previous futures received from this executor will be cancelled.
         """  # noqa
-
-        # step 1: cleanup!  Turn off poller_thread, clear _function_future_map
-        self._reset_poller()
+        # step 1: cleanup!
+        if self._result_watcher:
+            self._result_watcher.shutdown(wait=False, cancel_futures=True)
+            self._result_watcher = None
 
         # step 2: from server, acquire list of related task ids and make futures
         r = self.funcx_client.web_client.get_taskgroup_tasks(self.task_group_id)
@@ -435,121 +541,648 @@ class FuncXExecutor(concurrent.futures.Executor):
             raise ValueError(msg)
 
         # step 3: create the associated set of futures
-        futures: t.List[FuncXFuture] = []
-        for task in r.get("tasks", []):
-            task_uuid: str = task["id"]
-            fut = FuncXFuture(task_uuid)
-            self._function_future_map[task_uuid] = fut
-            futures.append(fut)
+        task_ids: list[str] = [task["id"] for task in r.get("tasks", [])]
+        futures: list[FuncXFuture] = []
 
-        if not futures:
+        if task_ids:
+            # Complete the futures that already have results.
+            pending: list[FuncXFuture] = []
+            deserialize = self.funcx_client.fx_serializer.deserialize
+            res = self.funcx_client.web_client.get_batch_status(task_ids)
+            for task_id, task in res.data.get("results", {}).items():
+                fut = FuncXFuture(task_id)
+                futures.append(fut)
+                completed_t = task.get("completion_t")
+                if not completed_t:
+                    pending.append(fut)
+                else:
+                    try:
+                        if task.get("status") == "success":
+                            fut.set_result(deserialize(task["result"]))
+                        else:
+                            exc = FuncxTaskExecutionFailed(
+                                task["exception"], completed_t or "0"
+                            )
+                            fut.set_exception(exc)
+                    except Exception as exc:
+                        funcx_err = FuncxTaskExecutionFailed(
+                            "Failed to set result or exception", str(time.time())
+                        )
+                        funcx_err.__cause__ = exc
+                        fut.set_exception(funcx_err)
+
+            if pending:
+                self._result_watcher = _ResultWatcher(self)
+                self._result_watcher.watch_for_task_results(pending)
+                self._result_watcher.start()
+        else:
             log.warning(f"Received no tasks for Task Group ID: {self.task_group_id}")
-
-        # step 4: start up polling!
-        self.poller_thread.atomic_controller.increment(val=len(futures))
 
         # step 5: the goods for the consumer
         return futures
 
-    def shutdown(self):
-        if self.batch_enabled and self._kill_event:
-            self._kill_event.set()  # Reminder: stops the batch submission thread
-            self.task_outgoing.put((None, None))
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        thread_id = threading.get_ident()
+        log.debug("%s: initiating shutdown (thread: %s)", self, thread_id)
+        if self._task_submitter.is_alive():
+            self._tasks_to_send.put((None, None))
+            if wait:
+                self._tasks_to_send.join()
 
-        self._reset_poller()
+        with self._shutdown_lock:
+            self._stopped = True
+            if self._result_watcher:
+                self._result_watcher.shutdown(wait=wait, cancel_futures=cancel_futures)
+                self._result_watcher = None
 
-        log.debug(f"Executor:{self.label} shutting down")
+        if thread_id != self._task_submitter.ident and self._stopped_in_error:
+            # In an unhappy path scenario, there's the potential for multiple
+            # tracebacks, which means that the tracebacks will likely be
+            # interwoven in the logs.  Attempt to make debugging easier for
+            # that scenario by adding a slight delay on the *main* thread.
+            time.sleep(0.1)
+        log.debug("%s: shutdown complete (thread: %s)", self, thread_id)
+
+    def _task_submitter_impl(self):
+        """
+        Coalesce tasks from the interthread queue (``_tasks_to_send``), up to
+        ``self.batch_size``, submit them, and then send the futures to the
+        ResultWatcher.
+
+        The main job of this method is to loop forever, forwarding task
+        requests upstream and the associated futures to the ResultWatcher.
+
+        This thread stops when it receives a poison-pill of ``(None, None)``
+        in the queue.  (See ``shutdown()``.)
+        """
+        log.debug(
+            "%s: task submission thread started (%s)", self, threading.get_ident()
+        )
+        to_send = self._tasks_to_send  # cache lookup
+        futs: list[FuncXFuture] = []  # for mypy/the exception branch
+        try:
+            fut = FuncXFuture()  # just start the loop; please
+            while fut is not None:
+                futs: list[FuncXFuture] = []
+                tasks: list[TaskSubmissionInfo] = []
+                task_count = 0
+                try:
+                    fut, task = to_send.get()  # Block; wait for first result ...
+                    task_count += 1
+                    bs = max(1, self.batch_size)  # May have changed while waiting
+                    while task is not None:
+                        assert fut is not None  # Come on mypy; contextually clear!
+                        tasks.append(task)
+                        futs.append(fut)
+                        if not (len(tasks) < bs):
+                            break
+                        fut, task = to_send.get(block=False)  # ... don't block again
+                        task_count += 1
+                except queue.Empty:
+                    pass
+
+                if tasks:
+                    log.info(f"Submitting tasks to funcX: {len(tasks)}")
+                    self._submit_tasks(futs, tasks)
+
+                    with self._shutdown_lock:
+                        if self._stopped:
+                            continue
+
+                        if not (
+                            self._result_watcher and self._result_watcher.is_alive()
+                        ):
+                            # Don't initialize the result watcher unless at least
+                            # one batch has been sent
+                            self._result_watcher = _ResultWatcher(self)
+                            self._result_watcher.start()
+                        try:
+                            self._result_watcher.watch_for_task_results(futs)
+                        except self._result_watcher.__class__.ShuttingDownError:
+                            log.debug("Waiting for previous ResultWatcher to shutdown")
+                            self._result_watcher.join()
+                            self._result_watcher = _ResultWatcher(self)
+                            self._result_watcher.start()
+                            self._result_watcher.watch_for_task_results(futs)
+
+                    futs.clear()
+
+                    while task_count:
+                        task_count -= 1
+                        to_send.task_done()
+
+        except Exception as exc:
+            self._stopped = True
+            self._stopped_in_error = True
+            log.debug(
+                "%s: task submission thread encountered error ([%s] %s)",
+                self,
+                exc.__class__.__name__,
+                exc,
+            )
+
+            if self._shutdown_lock.acquire(blocking=False):
+                self.shutdown(wait=False, cancel_futures=True)
+                self._shutdown_lock.release()
+
+            log.debug("%s: task submission thread dies", self)
+            raise
+        finally:
+            if sys.exc_info() != (None, None, None):
+                time.sleep(0.1)  # give any in-flight Futures a chance to be .put() ...
+            while not self._tasks_to_send.empty():
+                fut, _task = self._tasks_to_send.get()
+                if fut:
+                    futs.append(fut)
+
+            for fut in futs:
+                fut.cancel()
+                fut.set_running_or_notify_cancel()
+            try:
+                while True:
+                    self._tasks_to_send.task_done()
+            except ValueError:
+                pass
+            log.debug("%s: task submission thread complete", self)
+
+    def _submit_tasks(self, futs: list[FuncXFuture], tasks: list[TaskSubmissionInfo]):
+        """
+        Submit a batch of tasks to the webservice, destined for self.endpoint_id.
+        Upon success, update the futures with their associated task_id.
+
+        :param futs: a list of FuncXFutures; will have their task_id attribute
+            set when function completes successfully.
+        :param tasks: a list of tasks to submit upstream in a batch.
+        """
+        batch = self.funcx_client.create_batch(
+            task_group_id=self.task_group_id,
+            create_websocket_queue=True,
+        )
+        for task in tasks:
+            batch.add(task.function_id, task.endpoint_id, task.args, task.kwargs)
+            log.debug("Added task to funcX batch: %s", task)
+
+        try:
+            batch_tasks = self.funcx_client.batch_run(batch)
+        except Exception:
+            log.error(f"Error submitting {len(tasks)} tasks to funcX")
+            raise
+
+        self.task_count_submitted += len(batch_tasks)
+        log.debug(
+            "Batch submitted to task_group: %s - %s",
+            self.task_group_id,
+            self.task_count_submitted,
+        )
+
+        for fut, task_uuid in zip(futs, batch_tasks):
+            fut.task_id = task_uuid
 
 
-def noop():
-    return
-
-
-class ExecutorPollerThread:
-    """This encapsulates the creation of the thread on which event loop lives,
-    the instantiation of the WebSocketPollingTask onto the event loop and the
-    synchronization primitives used (AtomicController)
+class _ResultWatcher(threading.Thread):
     """
+    _ResultWatcher is an internal SDK class meant for consumption by the
+    FuncXExecutor.  It is a standard async AMQP consumer implementation
+    using the Pika library that matches futures from the Executor against
+    results received from the funcX hosted services.
+
+    Expected usage::
+
+        rw = _ResultWatcher(self)  # assert isinstance(self, FuncXExecutor)
+        rw.start()
+
+        # rw is its own thread; it will use the FuncXClient attached to the
+        # FuncXExecutor to acquire AMQP credentials, and then will open a
+        # connection to the AMQP service.
+
+        rw.watch_for_task_results(some_list_of_futures)
+
+    When there are no more open futures and no more results, the thread
+    will opportunistically shutdown; the caller must handle this scenario
+    if new futures arrive, and create a new _ResultWatcher instance.
+
+    :param funcx_executor: A FuncXExecutor instance
+    :param poll_period_s: [default: 0.5] how frequently to check for and
+        handle events.  For example, if the thread should stop due to user
+        request or if there are results to match.
+    :param connect_attempt_limit: [default: 3] how many times to attempt
+        connecting to the AMQP server before bailing.
+    :param channel_close_window_s: [default: 10] how large a window to
+        tally channel open events.
+    :param channel_close_window_limit: [default: 3] how many reopen
+        attempts to allow within the tally window before concluding
+        there is an external error and shutting down the watcher.
+    """
+
+    class ShuttingDownError(Exception):
+        pass
 
     def __init__(
         self,
-        funcx_client: FuncXClient,
-        function_future_map: t.Dict[str, FuncXFuture],
+        funcx_executor: FuncXExecutor,
+        poll_period_s=0.5,
+        connect_attempt_limit=3,
+        channel_close_window_s=10,
+        channel_close_window_limit=3,
+    ):
+        super().__init__()
+        self.funcx_executor = funcx_executor
+        self._to_ack: list[int] = []  # outstanding amqp messages not-yet-acked
+        self._time_to_check_results = threading.Event()
+        self._new_futures_lock = threading.Lock()
+
+        self._connection: pika.SelectConnection | None = None
+        self._channel: Channel | None = None
+        self._consumer_tag: str | None = None
+
+        self._queue_prefix = ""
+
+        self._open_futures: dict[str, FuncXFuture] = {}
+        self._received_results: dict[str, tuple[BasicProperties, Result]] = {}
+
+        self._open_futures_empty = threading.Event()
+        self._open_futures_empty.set()
+        self._time_to_stop = False
+
+        # how often to check for work; every `poll_period_s`, the `_event_watcher`
+        # method will invoke to match results to tasks, ack upstream, and see if
+        # it's time to shut down the connection and thread.
+        self.poll_period_s = poll_period_s
+        self._connection_tries = 0  # count of connection events; reset on success
+
+        # how many times to attempt connection before giving up and shutting
+        # down the thread
+        self.connect_attempt_limit = connect_attempt_limit
+
+        self._thread_id = 0  # 0 == the parent process; will be set by .run()
+        self._cancellation_reason: Exception | None = None
+        self._closed = False  # precursor flag until the thread stops completely
+
+        # list of times that channel was last closed
+        self._channel_closes: list[float] = []
+
+        # how long a time frame to keep previous channel close times
+        self.channel_close_window_s = channel_close_window_s
+
+        # how many times allowed to retry opening a channel in the above time
+        # window before giving up and shutting down the thread
+        self.channel_close_window_limit = channel_close_window_limit
+
+    def __repr__(self):
+        return "{}<{}; fut={:,d}; res={:,d}; qp={}>".format(
+            self.__class__.__name__,
+            "✓" if self._consumer_tag else "✗",
+            len(self._open_futures),
+            len(self._received_results),
+            self._queue_prefix if self._queue_prefix else "-",
+        )
+
+    def run(self):
+        log.debug("AMQP thread begins")
+        self._thread_id = threading.get_ident()
+
+        while self._connection_tries < self.connect_attempt_limit and not (
+            self._time_to_stop or self._cancellation_reason
+        ):
+            if self._connection or self._connection_tries:
+                wait_for = 2.0 + 3 * random.random()
+                log.warning(f"Reconnecting in {wait_for:.1f}s.")
+                time.sleep(wait_for)
+
+            self._connection_tries += 1
+            try:
+                log.debug(
+                    "Opening connection to AMQP service.  Attempt: %s (of %s)",
+                    self._connection_tries,
+                    self.connect_attempt_limit,
+                )
+                self._connection = self._connect()
+                self._event_watcher()
+                self._connection.ioloop.start()  # Reminder: blocks
+
+            except Exception:
+                log.exception("Unhandled error; shutting down %s", self)
+
+        with self._new_futures_lock:
+            if self._open_futures:
+                if not self._time_to_stop or self._cancellation_reason:
+                    # We're not shutting down intentionally; cancel outstanding
+                    # futures so consumer learns right away of problem.
+                    self._time_to_stop = True  # prevent new futures from arriving
+                    log.warning("Cancelling all known futures")
+                    if not self._cancellation_reason:
+                        self._cancellation_reason = RuntimeError(
+                            "SDK thread quit unexpectedly."
+                        )
+
+                    while self._open_futures:
+                        _, fut = self._open_futures.popitem()
+                        fut.set_exception(self._cancellation_reason)
+                        log.debug("Cancelled: %s", fut.task_id)
+                    self._open_futures_empty.set()
+        log.debug("AMQP thread complete.")
+
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        if not self.is_alive():
+            return
+
+        self._closed = True  # No more futures will be accepted
+
+        if threading.get_ident() == self._thread_id:
+            self._stop_ioloop()
+
+        else:
+            # External thread called this method
+            if cancel_futures:
+                with self._new_futures_lock:
+                    while self._open_futures:
+                        _, fut = self._open_futures.popitem()
+                        fut.cancel()
+                        fut.set_running_or_notify_cancel()
+                    self._open_futures_empty.set()
+
+            # N.B. Per Python Executor documentation, the whole program can't
+            # exit() until all futures are complete, regardless of the `wait`
+            # argument.  Thus, the _stopper_thread is *not* daemonized, and
+            # the stopping of the processing thread happens *after* there
+            # are no more pending futures.
+            # See: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor.shutdown # noqa
+            def _stopper_thread():
+                if self._open_futures:
+                    self._open_futures_empty.wait()
+                self._time_to_stop = True
+                self.join()
+
+            join_thread = threading.Thread(target=_stopper_thread)
+            join_thread.start()
+            if wait:
+                join_thread.join()
+
+    def watch_for_task_results(self, futures: list[FuncXFuture]) -> int:
+        """
+        Add list of FuncXFutures to internal watch list.
+
+        Updates the thread's dictionary of futures that will be resolved when
+        upstream sends associated results.  The internal dictionary is keyed
+        on the FuncXFuture.task_id attribute, but this method does not verify
+        that it is set -- it is up to the caller to ensure the future is
+        initialized fully.  In particular, if a task_id is not set, it will
+        not be added to the watch list.
+
+        ``watch_for_task_results()`` may raise ``_ResultWatcher.ShuttingDownError``
+        if, when called, the object is shutting down.  This may happen for a
+        few reasons (e.g., connection errors, channel errors) -- it is the
+        caller's responsibility to handle this error.
+
+        :returns: number of tasks added to watch list
+        :raises ShuttingDownError: if called while this object is shutting down
+        """
+        with self._new_futures_lock:
+            if self._closed:
+                msg = "Unable to watch futures: %s is shutting down."
+                raise self.__class__.ShuttingDownError(msg % self.__class__.__name__)
+
+            to_watch = {
+                f.task_id: f
+                for f in futures
+                if f.task_id and f.task_id not in self._open_futures
+            }
+            self._open_futures.update(to_watch)
+
+            if self._open_futures:  # futures as an empty list is acceptable
+                self._open_futures_empty.clear()
+                if self._received_results:
+                    # no sense is setting the event if there are not yet
+                    # any results
+                    self._time_to_check_results.set()
+        return len(to_watch)
+
+    def _match_results_to_futures(self):
+        """
+        Match the internal ``_received_results`` and ``_open_futures`` on their
+        keys, and complete the associated futures.  All matching items will,
+        after processing, be forgotten (i.e., ``.pop()``).
+
+        This method will set the _open_futures_empty event if there are no open
+        futures *at the time of processing*.
+        """
+        deserialize = self.funcx_executor.funcx_client.fx_serializer.deserialize
+        with self._new_futures_lock:
+            futures_to_complete = [
+                self._open_futures.pop(tid)
+                for tid in self._open_futures.keys() & self._received_results.keys()
+            ]
+            if not self._open_futures:
+                self._open_futures_empty.set()
+
+        for fut in futures_to_complete:
+            props, res = self._received_results.pop(fut.task_id)
+
+            if res.is_error:
+                fut.set_exception(
+                    FuncxTaskExecutionFailed(res.data, str(props.timestamp or 0))
+                )
+            else:
+                try:
+                    fut.set_result(deserialize(res.data))
+                except InvalidStateError as err:
+                    log.error(
+                        f"Unable to set future state ({err}) for task: {fut.task_id}"
+                    )
+                except Exception as exc:
+                    task_exc = Exception(
+                        f"Malformed or unexpected data structure. Data: {res.data}",
+                    )
+                    task_exc.__cause__ = exc
+                    fut.set_exception(task_exc)
+
+    def _event_watcher(self):
+        """
+        Check, every iteration, for the following events and act accordingly::
+
+        - If it's time to stop the thread (``_time_to_stop``)
+        - If there are any open messages to ACKnowledge to the AMQP service
+        - If there are new results or futures to match (``_time_to_check_results``)
+
+        Notably, if, at the end of processing, there are no open futures or
+        results, then initiate a shutdown.
+
+        The ``_event_watcher()` method is initiated before the eventloop starts
+        (see ``.run()``), and rearms itself every iteration.
+        """
+        if self._time_to_stop:
+            self.shutdown()
+            log.debug("Shutdown complete")
+            return
+
+        try:
+            if self._to_ack:
+                self._to_ack.sort()  # no change in the happy path
+                latest_msg_id = self._to_ack[-1]
+                self._channel.basic_ack(latest_msg_id, multiple=True)
+                self._to_ack.clear()
+                log.debug("Acknowledged through message: %s", latest_msg_id)
+
+            if self._time_to_check_results.is_set():
+                self._time_to_check_results.clear()
+                self._match_results_to_futures()
+                with self._new_futures_lock:
+                    if not (self._open_futures or self._received_results):
+                        log.debug(
+                            "Finished processing; no results or futures to match."
+                        )
+                        self._closed = True
+                        self._time_to_stop = True
+        finally:
+            self._connection.ioloop.call_later(self.poll_period_s, self._event_watcher)
+
+    def _on_message(
+        self,
+        channel: Channel,
+        basic_deliver: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
     ):
         """
-        Parameters
-        ==========
+        Nominally, the kernel of this whole class -- called by the Pika library
+        (ioloop) when a new Result message has arrived from upstream.  This
+        method will attempt to unpack the bytes so as to minimally verify that
+        the message is a valid Result object, and then store the unpacked
+        object in self._received_results for later processing and set the
+        ``_time_to_check_results`` event.
 
-        funcx_client : client object
-            Instance of FuncXClient to be used by the executor
-
-        function_future_map
-            A mapping of task_uuid to associated FuncXFutures; used for updating
-            when the upstream websocket service sends updates
+        If the received message is *not* a result, then immediately NACK the
+        message to AMQP service -- the responsibility to handle invalid messages
+        is not with this class.
         """
+        msg_id: int = basic_deliver.delivery_tag
+        log.debug("Received message %s: [%s] %s", msg_id, props, body)
 
-        self.funcx_client: FuncXClient = funcx_client
-        self._function_future_map: t.Dict[str, FuncXFuture] = function_future_map
-        self.eventloop = asyncio.new_event_loop()
-        self.atomic_controller = AtomicController(self._start, noop)
-        self.ws_handler = WebSocketPollingTask(
-            self.funcx_client,
-            self.eventloop,
-            atomic_controller=self.atomic_controller,
-            init_task_group_id=self.task_group_id,
-            results_ws_uri=self.results_ws_uri,
-            auto_start=False,
-        )
-        self._thread: t.Optional[threading.Thread] = None
+        try:
+            res = messagepack.unpack(body)
+            if not isinstance(res, Result):
+                raise TypeError(f"Non-Result object received ({type(res)})")
 
-    @property
-    def results_ws_uri(self) -> str:
-        return self.funcx_client.results_ws_uri
+            self._received_results[str(res.task_id)] = (props, res)
+            self._to_ack.append(msg_id)
+            self._time_to_check_results.set()
+        except Exception:
+            # No sense in waiting for the RMQ default 30m timeout; let it know
+            # *now* that this message failed.
+            log.exception("Invalid message type queue put failed")
+            channel.basic_nack(msg_id, requeue=True)
 
-    @property
-    def task_group_id(self) -> str:
-        return self.funcx_client.session_task_group_id
+    def _stop_ioloop(self):
+        """
+        Gracefully stop the ioloop.
 
-    @property
-    def is_running(self) -> bool:
-        return self.eventloop.is_running()
+        In an effort play nice with upstream, attempt to follow the AMQP protocol
+        by closing the channel and connections gracefully.  This method will
+        rearm itself while the connection is still open, continually working
+        toward eventually and gracefully stopping the connection, before finally
+        stopping the ioloop.
+        """
+        if self._connection:
+            self._connection.ioloop.call_later(0.1, self._stop_ioloop)
+            if self._connection.is_open:
+                if self._channel:
+                    if self._channel.is_open:
+                        self._channel.close()
+                    elif self._channel.is_closed:
+                        self._channel = None
+                else:
+                    self._connection.close()
+            elif self._connection.is_closed:
+                self._connection.ioloop.stop()
+                self._connection = None
 
-    def _start(self):
-        """Start the result polling thread"""
-        # Currently we need to put the batch id's we launch into this queue
-        # to tell the web_socket_poller to listen on them. Later we'll associate
+    def _connect(self) -> pika.SelectConnection:
+        with self._new_futures_lock:
+            res = self.funcx_executor.funcx_client.get_result_amqp_url()
+            self._queue_prefix = res["queue_prefix"]
+            connection_url = res["connection_url"]
 
-        self.ws_handler.closed_by_main_thread = False
-        self._thread = threading.Thread(
-            target=self.event_loop_thread, daemon=True, name="FuncX-Poller-Thread"
-        )
-        self._thread.start()
-        log.debug("Started web_socket_poller thread")
-
-    def event_loop_thread(self):
-        asyncio.set_event_loop(self.eventloop)
-        self.eventloop.run_until_complete(self.web_socket_poller())
-
-    async def web_socket_poller(self):
-        """Start ws and listen for tasks.
-        If a remote disconnect breaks the ws, close the ws and reconnect"""
-        time_to_disconnect = False
-        while not time_to_disconnect:
-            await self.ws_handler.init_ws(start_message_handlers=False)
-            time_to_disconnect = await self.ws_handler.handle_incoming(
-                self._function_future_map, auto_close=True
+            pika_params = pika.URLParameters(connection_url)
+            return pika.SelectConnection(
+                pika_params,
+                on_close_callback=self._on_connection_closed,
+                on_open_error_callback=self._on_open_failed,
+                on_open_callback=self._on_connection_open,
             )
-            if not time_to_disconnect:
-                # handle_incoming broke from a remote side disconnect
-                # we should close and re-connect
-                log.debug("Attempting ws close")
-                await self.ws_handler.close()
-                log.debug("Attempting ws re-connect")
 
-    def shutdown(self):
-        if self.is_running:
-            self.ws_handler.closed_by_main_thread = True
-            asyncio.run_coroutine_threadsafe(
-                self.ws_handler.close(), self.eventloop
-            ).result()
-            self.eventloop.stop()
+    def _on_open_failed(self, _mq_conn: pika.BaseConnection, exc: str | Exception):
+        assert self._connection is not None, "Strictly called _by_ ioloop"
+        count = f"attempt {self._connection_tries} (of {self.connect_attempt_limit})"
+        log.warning(
+            f"[{count}] Failed to open connection ({exc.__class__.__name__}) - {exc}\n"
+        )
+        if not isinstance(exc, Exception):
+            exc = Exception(str(exc))
+        self._cancellation_reason = exc
+        self._connection.ioloop.stop()
+
+    def _on_connection_closed(self, _mq_conn: pika.BaseConnection, exc: Exception):
+        assert self._connection is not None, "Strictly called _by_ ioloop"
+        log.debug("Connection closed: %s", exc)
+        self._consumer_tag = None
+        self._connection.ioloop.stop()
+
+    def _on_connection_open(self, _mq_conn: pika.BaseConnection):
+        log.debug("Connection established; creating channel")
+        self._connection_tries = 0
+        self._open_channel()
+
+    def _open_channel(self):
+        if self._connection.is_open:
+            self._connection.channel(on_open_callback=self._on_channel_open)
+
+    def _on_channel_open(self, channel: Channel):
+        self._channel = channel
+
+        channel.add_on_close_callback(self._on_channel_closed)
+        channel.add_on_cancel_callback(self._on_consumer_cancelled)
+
+        log.debug(
+            "Channel %s opened (%s); begin consuming messages.",
+            channel.channel_number,
+            channel.connection.params,
+        )
+        self._start_consuming()
+
+    def _on_channel_closed(self, channel: Channel, exc: Exception):
+        if self._closed:
+            return
+
+        self._consumer_tag = None
+        assert self._connection is not None, "Strictly called _by_ ioloop"
+        # Doh!  Channel closed unexpectedly.
+        now = time.monotonic()
+        then = now - self.channel_close_window_s
+        self._channel_closes = [cc for cc in self._channel_closes if cc > then]
+        self._channel_closes.append(now)
+        if len(self._channel_closes) < self.channel_close_window_limit:
+            msg = f"Channel closed.  Reopening.\n  {channel}\n  ({exc})"
+            log.debug(msg, exc_info=exc)
+            log.warning(msg)
+            self._connection.ioloop.call_later(1, self._open_channel)
+
+        else:
+            msg = (
+                f"Unable to sustain channel after {len(self._channel_closes)} attempts"
+                f" in {self.channel_close_window_limit} seconds. ({exc})"
+            )
+            log.error(msg)
+            self._closed = True
+            self._cancellation_reason = RuntimeError(msg)
+            self.shutdown()
+
+    def _start_consuming(self):
+        self._consumer_tag = self._channel.basic_consume(
+            queue=f"{self._queue_prefix}{self.funcx_executor.task_group_id}",
+            on_message_callback=self._on_message,
+        )
+
+    def _on_consumer_cancelled(self, frame: Method[Basic.CancelOk]):
+        log.info("Consumer cancelled remotely, shutting down: %r", frame)
+        if self._channel:
+            self._channel.close()
