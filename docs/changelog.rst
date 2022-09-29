@@ -3,6 +3,38 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.4:
+
+funcx & funcx-endpoint v1.0.4
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add `.task_count_submitted` member to FuncXExecutor.  This value is useful
+  for determining in client code how many tasks have *actually* made it to the
+  funcX Web Services.
+
+Bug Fixes
+^^^^^^^^^
+
+- gh#907 - Enable concurrent access to the token store by manually serializing
+  access to the SQLite DB.
+
+Deprecated
+^^^^^^^^^^
+
+- The `batch_interval` keyword argument to the FuncXExecutor is no longer
+  utilized.  Internally, the executor no longer waits to coalesce tasks.
+  Instead, it pulls them as fast as possible until either the input queue lags
+  or the count of tasks in the batch reaches `batch_size`.
+
+Changed
+^^^^^^^
+
+- The `funcx_client` argument to `FuncXExecutor()` has been made optional. If nothing
+  is passed in, the `FuncXExecutor` now creates a `FuncXClient` for itself.
+
 .. _changelog-1.0.3:
 
 funcx & funcx-endpoint v1.0.3
