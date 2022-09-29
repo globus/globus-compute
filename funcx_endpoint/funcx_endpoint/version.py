@@ -1,6 +1,6 @@
 # single source of truth for package version,
 # see https://packaging.python.org/en/latest/single_source_version/
-__version__ = "1.0.3"
+__version__ = "1.0.4a0"
 
 # TODO: remove after a `funcx` release
 # this variable is needed because it's imported by `funcx` to do the version check
