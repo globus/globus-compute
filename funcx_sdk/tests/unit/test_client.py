@@ -147,3 +147,62 @@ def test_pending_tasks_always_fetched():
         if should_fetch:
             args, _ = fxc.web_client.get_task.call_args
             assert sf == args[0]
+
+
+@pytest.mark.parametrize("create_ws_queue", [True, False, None])
+def test_batch_created_websocket_queue(create_ws_queue):
+    eid = str(uuid.uuid4())
+    fid = str(uuid.uuid4())
+
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc.web_client = mock.MagicMock()
+    if create_ws_queue is None:
+        batch = fxc.create_batch()
+    else:
+        batch = fxc.create_batch(create_websocket_queue=create_ws_queue)
+
+    batch.add(1, endpoint_id=eid, function_id=fid)
+    batch.add(2, endpoint_id=eid, function_id=fid)
+
+    fxc.batch_run(batch)
+
+    assert fxc.web_client.submit.called
+    submit_data = fxc.web_client.submit.call_args[0][0]
+    assert "create_websocket_queue" in submit_data
+    if create_ws_queue:
+        assert submit_data["create_websocket_queue"] is True
+    else:
+        assert submit_data["create_websocket_queue"] is False
+
+
+@pytest.mark.parametrize("asynchronous", [True, False, None])
+def test_single_run_websocket_queue_depend_async(asynchronous):
+
+    if asynchronous is None:
+        fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    else:
+        fxc = funcx.FuncXClient(
+            asynchronous=asynchronous, do_version_check=False, login_manager=mock.Mock()
+        )
+
+    fxc.web_client = mock.MagicMock()
+
+    fake_results = {
+        "results": [
+            {
+                "task_uuid": str(uuid.uuid4()),
+                "http_status_code": 200,
+            }
+        ],
+        "task_group_id": str(uuid.uuid4()),
+    }
+    fxc.web_client.submit = mock.MagicMock(return_value=fake_results)
+    fxc.run(endpoint_id=str(uuid.uuid4()), function_id=str(uuid.uuid4()))
+
+    assert fxc.web_client.submit.called
+    submit_data = fxc.web_client.submit.call_args[0][0]
+    assert "create_websocket_queue" in submit_data
+    if asynchronous:
+        assert submit_data["create_websocket_queue"] is True
+    else:
+        assert submit_data["create_websocket_queue"] is False

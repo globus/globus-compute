@@ -317,7 +317,10 @@ class FuncXExecutor(concurrent.futures.Executor):
 
     def _submit_tasks(self, futs: list[FuncXFuture], tasks: list[TaskSubmissionInfo]):
         """Submit a batch of tasks"""
-        batch = self.funcx_client.create_batch(task_group_id=self.task_group_id)
+        batch = self.funcx_client.create_batch(
+            task_group_id=self.task_group_id,
+            create_websocket_queue=True,
+        )
         for task in tasks:
             batch.add(
                 *task.args,
