@@ -322,12 +322,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             create_websocket_queue=True,
         )
         for task in tasks:
-            batch.add(
-                *task.args,
-                **task.kwargs,
-                endpoint_id=task.endpoint_id,
-                function_id=task.function_id,
-            )
+            batch.add(task.function_id, task.endpoint_id, task.args, task.kwargs)
             log.debug(f"Adding task {task} to funcX batch")
         try:
             batch_tasks = self.funcx_client.batch_run(batch)

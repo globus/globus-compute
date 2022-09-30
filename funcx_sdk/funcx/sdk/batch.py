@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import typing as t
+
 from funcx.serialize import FuncXSerializer
 
 
@@ -12,32 +16,39 @@ class Batch:
         task_group_id : str
             UUID indicating the task group that this batch belongs to
         """
-        self.tasks = []
+        self.tasks: list[dict[str, str]] = []
         self.fx_serializer = FuncXSerializer()
         self.task_group_id = task_group_id
         self.create_websocket_queue = create_websocket_queue
 
-    def add(self, *args, endpoint_id=None, function_id=None, **kwargs):
-        """Add an function invocation to a batch submission
+    def add(
+        self,
+        function_id: str,
+        endpoint_id: str,
+        args: tuple[t.Any, ...] | None = None,
+        kwargs: dict[str, t.Any] | None = None,
+    ) -> None:
+        """Add a function invocation to a batch submission
 
         Parameters
         ----------
-        *args : Any
-            Args as specified by the function signature
-        endpoint_id : uuid str
-            Endpoint UUID string. Required
         function_id : uuid str
             Function UUID string. Required
-        asynchronous : bool
-            Whether or not to run the function asynchronously
+        endpoint_id : uuid str
+            Endpoint UUID string. Required
+        args : tuple[Any, ...]
+            Arguments as specified by the function signature
+        kwargs : dict[str, Any]
+            Keyword arguments as specified by the function signature
 
         Returns
         -------
         None
         """
-        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
-        assert function_id is not None, "function_id key-word argument must be set"
-
+        if args is None:
+            args = ()
+        if kwargs is None:
+            kwargs = {}
         ser_args = self.fx_serializer.serialize(args)
         ser_kwargs = self.fx_serializer.serialize(kwargs)
         payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])

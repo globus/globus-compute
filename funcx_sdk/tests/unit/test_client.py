@@ -161,8 +161,8 @@ def test_batch_created_websocket_queue(create_ws_queue):
     else:
         batch = fxc.create_batch(create_websocket_queue=create_ws_queue)
 
-    batch.add(1, endpoint_id=eid, function_id=fid)
-    batch.add(2, endpoint_id=eid, function_id=fid)
+    batch.add(fid, eid, (1,))
+    batch.add(fid, eid, (2,))
 
     fxc.batch_run(batch)
 
