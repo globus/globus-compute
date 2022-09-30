@@ -1,4 +1,4 @@
-FuncX Executor
+funcX Executor
 ==============
 
 The ``FuncXExecutor`` provides a future based interface that simplifies both function submission

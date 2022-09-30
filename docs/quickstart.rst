@@ -26,30 +26,38 @@ To check if your endpoint/client have network access and can connect to the func
 
   >>> curl https://api2.funcx.org/v2/version
 
-This should return a version string, for example: ``"0.3.0"``
+This should return a version string, for example: ``"1.0.2"``
 
 .. note:: The funcx client is supported on MacOS, Linux, and Windows. The funcx-endpoint
    is only supported on Linux.
 
-Installation using Pip
-^^^^^^^^^^^^^^^^^^^^^^
+Installing funcX in a Virtual Environment
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 While ``pip`` and ``pip3`` can be used to install funcX we suggest the following approach
-for reliable installation when many Python environments are available.
+for reliable installation to avoid python package dependency conflicts.
 
-1. Install the funcX client::
+1. Install the funcX client in its own `venv <https://docs.python.org/3/tutorial/venv.html>`_ environment::
 
-     $ python3 -m pip install funcx
+    $ python3 -m venv path/to/funcx_venv
+    $ source path/to/funcx_venv/bin/activate
+    (funcx_venv) $ python3 -m pip install funcx
 
-To update a previously installed funcX to a newer version, use: ``python3 -m pip install -U funcx``
+  To update a previously installed funcX to a newer version in the virtual environment, use::
 
-2. Optionally install the funcX endpoint::
+    (funcx_venv) $ python3 -m pip install -U funcx``
 
-     $ python3 -m pip install funcx_endpoint
+2. (Optional) The funcX endpoint can be installed using `Pipx <https://pypa.github.io/pipx/installation/>`_ or using pip in the venv::
 
-3. Install Jupyter for Tutorial notebooks::
+     $ python3 -m pipx install funcx_endpoint
 
-     $ python3 -m pip install jupyter
+          or
+
+     (funcx_venv) $ python3 -m pip install funcx_endpoint
+
+3. (Optional) Install Jupyter for Tutorial notebooks in the venv::
+
+     (funcx_venv) $ python3 -m pip install jupyter
 
 
 .. note:: For more detailed info on setting up Jupyter with Python3.5 go `here <https://jupyter.readthedocs.io/en/latest/install.html>`_
