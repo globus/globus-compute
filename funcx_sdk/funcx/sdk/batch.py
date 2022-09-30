@@ -16,7 +16,7 @@ class Batch:
         task_group_id : str
             UUID indicating the task group that this batch belongs to
         """
-        self.tasks: list[dict[str, str]] = []
+        self.tasks: list[tuple[str, str, str]] = []
         self.fx_serializer = FuncXSerializer()
         self.task_group_id = task_group_id
         self.create_websocket_queue = create_websocket_queue
@@ -53,11 +53,9 @@ class Batch:
         ser_kwargs = self.fx_serializer.serialize(kwargs)
         payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
 
-        data = {"endpoint": endpoint_id, "function": function_id, "payload": payload}
+        self.tasks.append((function_id, endpoint_id, payload))
 
-        self.tasks.append(data)
-
-    def prepare(self):
+    def prepare(self) -> dict[str, str | list[tuple[str, str, str]]]:
         """Prepare the payloads to be post to web service in a batch
 
         Parameters
@@ -65,16 +63,10 @@ class Batch:
 
         Returns
         -------
-        payloads in dictionary, Dict[str, list]
+        payloads in dictionary, Dict[str, list | str]
         """
-        data = {
+        return {
             "task_group_id": self.task_group_id,
-            "tasks": [],
             "create_websocket_queue": self.create_websocket_queue,
+            "tasks": self.tasks,
         }
-
-        for task in self.tasks:
-            new_task = (task["function"], task["endpoint"], task["payload"])
-            data["tasks"].append(new_task)
-
-        return data
