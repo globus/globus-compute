@@ -365,7 +365,7 @@ class FuncXClient:
         assert function_id is not None, "function_id key-word argument must be set"
 
         batch = self.create_batch(create_websocket_queue=self.asynchronous)
-        batch.add(*args, endpoint_id=endpoint_id, function_id=function_id, **kwargs)
+        batch.add(function_id, endpoint_id, args, kwargs)
         r = self.batch_run(batch)
 
         return r[0]
