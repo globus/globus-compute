@@ -123,8 +123,7 @@ class LoginManager:
                 break
 
         if needs_login:
-            with self._access_lock:
-                self.run_login_flow()
+            self.run_login_flow()
 
     def _get_authorizer(
         self, resource_server: str
