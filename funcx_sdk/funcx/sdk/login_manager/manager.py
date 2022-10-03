@@ -70,6 +70,12 @@ class LoginManager:
     def login_requirements(self) -> t.Iterator[tuple[str, list[str]]]:
         yield from self.SCOPES.items()
 
+    @staticmethod
+    def is_jupyter():
+        # Simplest way to find out if we are in Jupyter without having to
+        # check imports
+        return "jupyter_core" in sys.modules
+
     def run_login_flow(
         self,
         *,
@@ -81,7 +87,9 @@ class LoginManager:
 
         # The authorization-via-weblink flow requires stdin; the user must visit
         # the weblink and enter generated code.
-        if not sys.stdin.isatty() or sys.stdin.closed:
+        if (
+            not sys.stdin.isatty() or sys.stdin.closed
+        ) and not LoginManager.is_jupyter():
             # Not technically necessary; the login flow would just die with an EOF
             # during input(), but adding this message here is much more direct --
             # handle the non-happy path by letting the user know precisely the issue
