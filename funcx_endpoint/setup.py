@@ -35,7 +35,7 @@ REQUIRES = [
     # 'parsl' is a core requirement of the funcx-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
-    "parsl>=1.3.0dev0",
+    "parsl>=2022.10.4",
     "pika>=1.2.0",
 ]
 
