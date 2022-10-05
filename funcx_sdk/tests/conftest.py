@@ -1,7 +1,6 @@
 import pytest
 
 from funcx import FuncXClient
-from funcx.sdk.executor import FuncXExecutor
 
 config = {
     "funcx_service_address": "https://api2.funcx.org/v2",
@@ -65,27 +64,3 @@ def fxc_args(pytestconfig):
 def fxc(fxc_args):
     fxc = FuncXClient(**fxc_args)
     return fxc
-
-
-@pytest.fixture
-def async_fxc(fxc_args):
-    fxc = FuncXClient(**fxc_args, asynchronous=True)
-    return fxc
-
-
-@pytest.fixture
-def fx(fxc):
-    fx = FuncXExecutor(fxc)
-    return fx
-
-
-@pytest.fixture
-def batch_fx(fxc):
-    fx = FuncXExecutor(fxc, batch_enabled=True)
-    return fx
-
-
-@pytest.fixture
-def endpoint(pytestconfig):
-    endpoint = pytestconfig.getoption("--endpoint")[0]
-    return endpoint
