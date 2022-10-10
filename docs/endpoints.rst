@@ -9,16 +9,20 @@ or a Kubernetes cluster, for example.
 The endpoint requires outbound network connectivity. That is, it must be able to connect to
 funcX at `funcx.org <https://api2.funcx.org/v2>`_.
 
-To install the funcX endpoint agent software ::
+The funcX endpoint is available on pypi.org (and thus available via ``pip``).
+However, *we strongly recommend installing the funcX endpoint into an isolated virtual environment*.
+`Pipx <https://pypa.github.io/pipx/installation/>`_ automatically manages
+package-specific virtual environments for command line applications, so install funcX endpoint via::
 
-     $ python3 -m pip install funcx_endpoint
+     $ python3 -m pipx install funcx_endpoint
 
 .. note::
 
-   Please note that the funcx endpoint is only supported on Linux and MacOS.
+   Please note that the funcX endpoint is only supported on Linux.
 
-After installing funcX endpoint, you be able to deploy new endpoints and interact
-with existing endpoints using the ``funcx-endpoint`` command.
+
+After installing the funcX endpoint, use the ``funcx-endpoint`` command to manage existing endpoints.
+
 
 First time setup
 ----------------
@@ -45,11 +49,11 @@ You can also set up auto-completion for the ``funcx-endpoint`` commands in your 
 Configuring an Endpoint
 ----------------------------
 
-FuncX endpoints act as gateways to diverse computational resources, including clusters, clouds,
+funcX endpoints act as gateways to diverse computational resources, including clusters, clouds,
 supercomputers, and even your laptop. To make the best use of your resources, the endpoint must be
 configured to match the capabilities of the resource on which it is deployed.
 
-FuncX provides a Python class-based configuration model that allows you to specify the shape of the
+funcX provides a Python class-based configuration model that allows you to specify the shape of the
 resources (number of nodes, number of cores per worker, walltime, etc.) as well as allowing you to place
 limits on how funcX may scale the resources in response to changing workload demands.
 
@@ -79,8 +83,8 @@ To start a new endpoint run the following command::
 
 Starting an endpoint will perform a registration process with funcX.
 The registration process provides funcX with information regarding the endpoint.
-The endpoint establishes an outbound connection to RabbitMQ to retrieve tasks, send results, and communicate command information.
-Note that FuncX RabbitMQ outbound access is to default port 5672 and the endpoint also needs HTTPS 443.
+The endpoint also establishes an outbound connection to RabbitMQ to retrieve tasks, send results, and communicate command information.
+Thus, the funcX endpoint requires outbound access to the funcX services over HTTPS (port 443) and AMQPS (port 5671).
 
 Once started, the endpoint uses a daemon process to run in the background.
 

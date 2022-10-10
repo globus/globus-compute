@@ -75,7 +75,7 @@ A funcX endpoint can be created by installing the funcX endpoint software
 and configuring it for the target resources. The following steps show
 how to download and configure an endpoint for local (multi-process) execution. ::
 
-  $ python3 -m pip install funcx_endpoint
+  $ python3 -m pipx install funcx_endpoint
 
   $ funcx-endpoint configure
 

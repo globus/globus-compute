@@ -1,4 +1,4 @@
-FuncX SDK User Guide
+funcX SDK User Guide
 ====================
 
 The **funcX SDK** provides a programmatic interface to funcX from Python.

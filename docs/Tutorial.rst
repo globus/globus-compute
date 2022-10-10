@@ -9,11 +9,13 @@ You can setup and use your own endpoint by following the `endpoint documentation
 funcX Python SDK
 ----------------
 
-The funcX Python SDK provides programming abstractions for interacting with the funcX service. Before running this tutorial you should first install the funcX SDK as follows:
+The funcX Python SDK provides programming abstractions for interacting with the funcX service. Before running this tutorial you should first install the funcX SDK in its own `venv <https://docs.python.org/3/tutorial/venv.html>`_ environment:
 
 .. code-block:: bash
 
-    $ pip install funcx
+    $ python3 -m venv path/to/funcx_venv
+    $ source path/to/funcx_venv/bin/activate
+    (funcx_venv) $ python3 -m pip install funcx
 
 The funcX SDK exposes a ``FuncXClient`` object for all interactions with the funcX service.
 In order to use the funcX service you must first authenticate using one of hundreds of supported identity provides (e.g., your institution, ORCID, Google).
