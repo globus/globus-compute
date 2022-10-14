@@ -19,7 +19,6 @@ import zmq
 from funcx_common.tasks import TaskState
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.sdk.client import FuncXClient
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
 from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import (
@@ -121,6 +120,7 @@ class Interchange:
         logdir=".",
         endpoint_id=None,
         suppress_failure=False,
+        funcx_client=None,
     ):
         """
         Parameters
@@ -185,9 +185,9 @@ class Interchange:
              When set to True, the interchange will attempt to suppress failures.
              Default: False
 
-        funcx_service_address: str
-             Override funcx_service_address used by the FuncXClient. If no address is
-             specified, the FuncXClient's default funcx_service_address is used.
+        funcx_client: FuncXClient
+             Only used for querying container information. If not present, container
+             info will default to RAW (ie, no container).
              Default: None
         """
 
@@ -253,10 +253,7 @@ class Interchange:
         self.containers: dict[str, str] = {}
         self.total_pending_task_count = 0
 
-        client_args = {}
-        if funcx_service_address:
-            client_args["funcx_service_address"] = funcx_service_address
-        self.fxs = FuncXClient(**client_args)
+        self.funcx_client = funcx_client
 
         log.info(f"Interchange address is {self.interchange_address}")
         self.worker_ports = worker_ports
@@ -479,7 +476,7 @@ class Interchange:
                 self.containers[container_uuid] = "RAW"
             else:
                 try:
-                    container = self.fxs.get_container(
+                    container = self.funcx_client.get_container(
                         container_uuid, self.container_type
                     )
                 except Exception:
