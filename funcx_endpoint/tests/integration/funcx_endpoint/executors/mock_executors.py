@@ -6,6 +6,7 @@ import unittest.mock
 import dill
 from funcx_common.messagepack.message_types import Result, Task
 
+from funcx import FuncXClient
 from funcx_endpoint.executors.high_throughput.messages import Message
 
 
@@ -15,8 +16,13 @@ class MockExecutor(unittest.mock.Mock):
         self.results_passthrough: multiprocessing.Queue | None = None
         self.passthrough = True
 
-    def start(self, results_passthrough: multiprocessing.Queue = None):
+    def start(
+        self,
+        results_passthrough: multiprocessing.Queue = None,
+        funcx_client: FuncXClient = None,
+    ):
         self.results_passthrough = results_passthrough
+        self.funcx_client = funcx_client
 
     def submit_raw(self, packed_task: bytes):
         task: Task = Message.unpack(packed_task)

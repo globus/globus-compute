@@ -22,6 +22,7 @@ from parsl.executors.errors import BadMessage, ScalingFailed
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
+from funcx import FuncXClient
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput import interchange, zmq_pipes
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
@@ -222,11 +223,6 @@ class HighThroughputExecutor(RepresentationMixin):
         offers forked processes, and SlurmProvider interfaces to request
         resources from the Slurm batch scheduler.
         Default: LocalProvider
-
-    funcx_service_address: str
-        Override funcx_service_address used by the FuncXClient. If no address
-        is specified, the FuncXClient's default funcx_service_address is used.
-        Default: None
     """
 
     def __init__(
@@ -265,7 +261,6 @@ class HighThroughputExecutor(RepresentationMixin):
         managed=True,
         interchange_local=True,
         passthrough=True,
-        funcx_service_address=None,
         task_status_queue=None,
     ):
         log.debug("Initializing HighThroughputExecutor")
@@ -339,7 +334,6 @@ class HighThroughputExecutor(RepresentationMixin):
             )
 
         # FuncX specific options
-        self.funcx_service_address = funcx_service_address
         self.container_image = container_image
         self.worker_mode = worker_mode
 
@@ -365,7 +359,11 @@ class HighThroughputExecutor(RepresentationMixin):
             "{suppress_failure} "
         )
 
-    def start(self, results_passthrough: multiprocessing.Queue = None):
+    def start(
+        self,
+        results_passthrough: multiprocessing.Queue = None,
+        funcx_client: FuncXClient = None,
+    ):
         """Create the Interchange process and connect to it."""
         self.outgoing_q = zmq_pipes.TasksOutgoing(
             "0.0.0.0", self.interchange_port_range
@@ -391,6 +389,8 @@ class HighThroughputExecutor(RepresentationMixin):
         self._executor_bad_state = threading.Event()
         self._executor_exception = None
         self._start_queue_management_thread()
+
+        self.funcx_client = funcx_client
 
         if self.interchange_local is True:
             log.info("Attempting local interchange start")
@@ -447,13 +447,13 @@ class HighThroughputExecutor(RepresentationMixin):
                 "container_type": self.container_type,
                 "container_cmd_options": self.container_cmd_options,
                 "cold_routing_interval": self.cold_routing_interval,
-                "funcx_service_address": self.funcx_service_address,
                 "interchange_address": self.address,
                 "worker_ports": self.worker_ports,
                 "worker_port_range": self.worker_port_range,
                 "logdir": os.path.join(self.run_dir, self.label),
                 "suppress_failure": self.suppress_failure,
                 "endpoint_id": self.endpoint_id,
+                "funcx_client": self.funcx_client,
             },
         )
         self.queue_proc.start()

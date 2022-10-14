@@ -173,7 +173,10 @@ class EndpointInterchange:
         log.info("Starting Executors")
         for executor in self.config.executors:
             if hasattr(executor, "passthrough") and executor.passthrough is True:
-                executor.start(results_passthrough=self.results_passthrough)
+                executor.start(
+                    results_passthrough=self.results_passthrough,
+                    funcx_client=self.funcx_client,
+                )
 
     def register_endpoint(self):
         reg_info = register_endpoint(

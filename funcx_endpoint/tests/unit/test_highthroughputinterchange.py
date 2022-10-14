@@ -13,12 +13,9 @@ mod_dot_path = "funcx_endpoint.executors.high_throughput.interchange"
 
 
 @mock.patch(f"{mod_dot_path}.zmq")
-@mock.patch(f"{mod_dot_path}.FuncXClient")
 @mock.patch(f"{mod_dot_path}.Interchange.load_config")
 class TestHighThroughputInterchange:
-    def test_migrate_internal_task_status(
-        self, _mzmq, _mfxc, _mfn_conf, tmp_path, mocker
-    ):
+    def test_migrate_internal_task_status(self, _mzmq, _mfn_conf, tmp_path, mocker):
         mock_evt = mock.Mock()
         mock_evt.is_set.side_effect = [False, True]  # run once, please
         task_id = str(uuid.uuid4())
@@ -34,7 +31,7 @@ class TestHighThroughputInterchange:
         assert 0 <= time.monotonic() - ts < 20, "Expecting a timestamp"
         assert state == TaskState.WAITING_FOR_NODES
 
-    def test_start_task_status(self, _mzmq, _mfxc, _mfn_conf, tmp_path, mocker):
+    def test_start_task_status(self, _mzmq, _mfn_conf, tmp_path, mocker):
         mock_evt = mock.Mock()
         mock_evt.is_set.side_effect = [False, False, True]  # run once, please
         task_id = str(uuid.uuid4())
