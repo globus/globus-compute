@@ -143,6 +143,6 @@ Bebop (LCRC, ANL)
 .. image:: _static/images/Bebop.jpeg
 
 The following snippet shows an example configuration for accessing the Bebop system at Argonne's LCRC. The configuration below assumes that the user is
-running on a login node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the ``SingleNodeLauncher`` to launch workers.
+running on a login node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 
 .. literalinclude:: configs/bebop.py
