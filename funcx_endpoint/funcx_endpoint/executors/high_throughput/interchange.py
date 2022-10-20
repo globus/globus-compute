@@ -18,8 +18,6 @@ import dill
 import zmq
 from funcx_common.messagepack.message_types import TaskTransition
 from funcx_common.tasks import ActorName, TaskState
-from parsl.app.errors import RemoteExceptionWrapper
-from parsl.executors.errors import ScalingFailed
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.serialize import FuncXSerializer
@@ -341,7 +339,7 @@ class Interchange:
 
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
-        self.task_status_deltas: dict[str, TaskTransition] = {}
+        self.task_status_deltas: dict[str, list[TaskTransition]] = {}
         self.container_switch_count: dict[str, int] = {}
 
     def load_config(self):
@@ -464,7 +462,12 @@ class Interchange:
                     state=TaskState.WAITING_FOR_NODES,
                     actor=ActorName.INTERCHANGE,
                 )
-                self.task_status_deltas[msg.task_id] = tt
+
+                self.task_status_deltas[msg.task_id] = self.task_status_deltas.get(
+                    msg.task_id, []
+                )
+                self.task_status_deltas[msg.task_id].append(tt)
+
                 log.debug(
                     f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES"
                 )
@@ -906,7 +909,10 @@ class Interchange:
                                 state=TaskState.WAITING_FOR_LAUNCH,
                                 actor=ActorName.INTERCHANGE,
                             )
-                            self.task_status_deltas[task_id] = tt
+                            self.task_status_deltas[
+                                task_id
+                            ] = self.task_status_deltas.get(task_id, [])
+                            self.task_status_deltas[task_id].append(tt)
 
             # Receive any results and forward to client
             if (
@@ -931,7 +937,14 @@ class Interchange:
                                 "Got manager status report: %s",
                                 manager_report.task_statuses,
                             )
-                        self.task_status_deltas.update(manager_report.task_statuses)
+
+                        # merge the two dicts of statuses
+                        for tid, statuses in manager_report.task_statuses.items():
+                            if tid in self.task_status_deltas.keys():
+                                self.task_status_deltas[tid] += statuses
+                            else:
+                                self.task_status_deltas[tid] = statuses
+
                         self.task_outgoing.send_multipart(
                             [manager, b"", PKL_HEARTBEAT_CODE]
                         )
@@ -950,9 +963,7 @@ class Interchange:
                         log.info(f"Got {len(b_messages)} result items in batch")
                     for b_message in b_messages:
                         r = dill.loads(b_message)
-                        if "times" not in r:
-                            r["times"] = {}
-                        r["times"]["interchange_result"] = time.time()
+
                         log.debug(
                             "Received result for task {} from {}".format(
                                 r["task_id"], manager
