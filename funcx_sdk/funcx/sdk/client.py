@@ -146,11 +146,11 @@ class FuncXClient:
             (warn_about_url_mismatch, "warn_about_url_mismatch"),
         ]:
             if arg is not None:
-                warnings.warn(
+                msg = (
                     f"The '{name}' argument is deprecated. "
-                    "It will be removed in a future release.",
-                    DeprecationWarning,
+                    "It will be removed in a future release."
                 )
+                warnings.warn(msg)
 
         if results_ws_uri is None:
             results_ws_uri = get_web_socket_url(environment)
