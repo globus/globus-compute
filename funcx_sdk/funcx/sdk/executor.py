@@ -101,72 +101,10 @@ class AtomicController:
 
 class FuncXExecutor(concurrent.futures.Executor):
     """
-    The ``FuncXExecutor`` class, a subclass of `concurrent.futures.Executor`_, is the
-    preferred approach to collecting results from the funcX web services.  Over
-    polling (the historical approach) where the web service must be repeatedly
-    queried for the status of tasks and results eventually collected in bulk, the
-    ``FuncXExecutor`` class instantiates an AMQPS connection that streams results
-    directly -- and immediately -- as they arrive at the server.  This is a far more
-    efficient paradigm, simultaneously in terms of bytes over the wire, time spent
-    waiting for results, and boilerplate code to check for results.
+    Extend Python's |Executor|_ base class for funcX's purposes.
 
-    An interaction might look like::
-
-        from funcx import FuncXExecutor
-
-        def task_func(num):
-            import time
-            time.sleep(num * random.random())  # simulate some processing
-            return f"result, from task: {num}"
-
-        ep_id = "<YOUR_ENDPOINT_UUID>"
-        num_tasks = 10
-
-        fxe = FuncXExecutor(endpoint_id=ep_id)
-        futures = [fxe.submit(task_func, t_i + 1) for t_i in range(num_tasks)]
-        futures.append(fxe.submit(task_func, num_tasks + 1))  # an additional task
-        futures.extend(fxe.submit(task_func, t_i + 1) for t_i in range(num_tasks+2, num_tasks+5))
-        fxe.shutdown()  # default args: wait for all 14 futures (tasks) to complete
-
-        results = [f.result() for f in futures]
-
-        print("Results:\\n  ", "\\n  ".join(results))
-
-    The ``FuncXExecutor`` class may also be used as a context manager, eliding the
-    need to explicitly call the ``.shutdown()`` method::
-
-        import concurrent.futures
-
-        with FuncXExecutor(endpoint_id=ep_id) as fxe:
-            futures = [fxe.submit(task_func, task_i +1) for task_i in range(num_tasks)]
-
-            # Stream the results as they come in, rather than waiting for
-            # total completion like the previous example.
-            for f in concurrent.futures.as_completed(futures, timeout=30):
-                try:
-                    results.append(f.result())
-                except Exception as exc:
-                    exceptions.append((f.task_id, exc))
-
-    Each future returned by ``.submit()`` is a handle to that particular task's result;
-    that future will be completed (`.set_result()`_ called) by a background thread as
-    soon as the server sends the result -- no polling, just an event-based interaction.
-
-    .. _.set_result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.set_result
-    .. _concurrent.futures.Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
-
-    :param endpoint_id: id of the endpoint to which to submit tasks
-    :param container_id: id of the container in which to execute tasks
-    :param funcx_client: instance of FuncXClient to be used by the
-        executor.  If not provided, the executor will instantiate one with default
-        arguments.
-    :param label: a label to name the executor; mainly utilized for
-        logging and advanced needs with multiple executors.
-    :param batch_size: the maximum number of tasks to coalesce before
-        sending upstream [min: 1, default: 128]
-    :param batch_interval: [DEPRECATED; unused] number of seconds to coalesce tasks
-        before submitting upstream
-    :param batch_enabled: [DEPRECATED; unused] whether to batch results
+    .. |Executor| replace:: ``FuncXExecutor``
+    .. _Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
     """  # noqa
 
     def __init__(
@@ -178,6 +116,22 @@ class FuncXExecutor(concurrent.futures.Executor):
         batch_size: int = 128,
         **kwargs,
     ):
+        """
+        :param endpoint_id: id of the endpoint to which to submit tasks
+        :param container_id: id of the container in which to execute tasks
+        :param funcx_client: instance of FuncXClient to be used by the
+            executor.  If not provided, the executor will instantiate one with default
+            arguments.
+        :param task_group_id: The Task Group to which to associate tasks.  If not set,
+            one will be instantiated.
+        :param label: a label to name the executor; mainly utilized for
+            logging and advanced needs with multiple executors.
+        :param batch_size: the maximum number of tasks to coalesce before
+            sending upstream [min: 1, default: 128]
+        :param batch_interval: [DEPRECATED; unused] number of seconds to coalesce tasks
+            before submitting upstream
+        :param batch_enabled: [DEPRECATED; unused] whether to batch results
+        """
         deprecated_kwargs = {"batch_interval", "batch_enabled"}
         for key in kwargs:
             if key in deprecated_kwargs:
@@ -369,7 +323,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             # Function ID: c407ae80-b31f-447a-9fa6-124098492057
 
         In this case, the function would be privately registered to you, but note that
-        the function id is just a string.  One could substitute for a publically
+        the function id is just a string.  One could substitute for a publicly
         available function.  For instance, ``b0a5d1a0-2b22-4381-b899-ba73321e41e0`` is
         a "well-known" uuid for the "Hello, World!" function (same as the example in
         the FuncX tutorial), which is publicly available::
@@ -394,7 +348,6 @@ class FuncXExecutor(concurrent.futures.Executor):
         :returns: a future object that (eventually) will have a ``.result()``
             when the funcX web services receive and stream it.
         """
-
         if self._stopped:
             err_fmt = "%s is shutdown; no new functions may be executed"
             raise RuntimeError(err_fmt % repr(self))
@@ -447,7 +400,6 @@ class FuncXExecutor(concurrent.futures.Executor):
         ------
         NotImplementedError
           always raised
-
         """  # noqa
         raise NotImplementedError()
 
@@ -458,62 +410,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         Load the set of tasks associated with this Executor's Task Group from the
         web services and return a list of futures, one for each task.  This is
         nominally intended to "reattach" to a previously initiated session, based on
-        the Task Group ID.  A (contrived) interaction might be::
-
-            # execute initially as:
-            # $ python contrived.py
-            #  ... this Task Group ID: <TG_UUID_STR>
-            #  ...
-            # The run with the Task Group ID as an argument:
-            # $ python contrived.py <TG_UUID_STR>
-
-            import os, signal, sys, time, typing as t
-            from funcx import FuncXExecutor
-            from funcx.sdk.executor import FuncXFuture
-
-            task_group_id = sys.argv[1] if len(sys.argv) > 1 else None
-
-            def task_kernel(num):
-                import time
-                time.sleep(10)
-                result = f"your funcx logic result, from task: {num}"
-                return result
-
-            ep_id = "<YOUR_ENDPOINT_UUID>"
-            with FuncXExecutor(endpoint_id=ep_id) as fxe:
-                futures: t.Iterable[FuncXFuture]
-                if task_group_id:
-                    print(f"Reloading tasks from Task Group ID: {task_group_id}")
-                    fxe.task_group_id = task_group_id
-                    futures = fxe.reload_tasks()
-
-                else:
-                    # Save the task_group_id somewhere.  Perhaps in a file, or less
-                    # robustly "as mere text" on your console:
-                    print(
-                        "New session; creating funcX tasks; if this script dies, rehydrate"
-                        f" futures with this Task Group ID: {fxe.task_group_id}"
-                    )
-                    num_tasks = 5
-                    futures = [fxe.submit(task_kernel, i + 1) for i in range(num_tasks)]
-
-                    # Ensure all tasks have been sent upstream ...
-                    while fxe.task_count_submitted < num_tasks:
-                        time.sleep(1)
-                        print(f"Tasks submitted upstream: {fxe.task_count_submitted}")
-
-                    # ... before script death for [silly reason; did you lose power!?]
-                    print("Simulating unexpected process death!")
-                    os.kill(os.getpid(), signal.SIGKILL)
-                    exit(1)  # In case KILL takes split-second to process
-
-            # Get results:
-            results, exceptions = [], []
-            for f in futures:
-                try:
-                    results.append(f.result(timeout=10))
-                except Exception as exc:
-                    exceptions.append(exc)
+        the Task Group ID.
 
         :returns: An iterable of futures.
         :raises ValueError: if the server response is incorrect or invalid

@@ -47,25 +47,20 @@ Using funcX
 ^^^^^^^^^^^^^^^^^^
 
 funcX offers a Python SDK for registering, sharing, and executing functions.
-The following code shows how funcX can be used to register and run a "hello world"
-function on a remote endpoint.
-
+The following code block examples how funcX can be used to execute a "hello
+world" function on a remote endpoint.
 
 .. code-block:: python
 
-    from funcx.sdk.client import FuncXClient
-
-    fxc = FuncXClient()
+    from funcx import FuncXExecutor
 
     def hello_world():
-      return "Hello World!"
+        return "Hello World!"
 
-    func_uuid = fxc.register_function(hello_world)
-
-    tutorial_endpoint = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
-    result = fxc.run(endpoint_id=tutorial_endpoint, function_id=func_uuid)
-
-    print(fxc.get_result(result))
+    tutorial_endpoint_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
+    with FuncXExecutor(endpoint_id=tutorial_endpoint_id) as fxe:
+        future = fxe.submit(hello_world)
+        print(future.result())
 
 
 Deploying an endpoint
