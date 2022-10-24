@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import typing as t
+import uuid
 import warnings
 
 if sys.version_info >= (3, 8):
@@ -25,6 +26,7 @@ from funcx_common.messagepack.message_types import Result
 from funcx.errors import FuncxTaskExecutionFailed
 from funcx.sdk.asynchronous.funcx_future import FuncXFuture
 from funcx.sdk.client import FuncXClient
+from funcx.sdk.utils import chunk_by
 
 log = logging.getLogger(__name__)
 
@@ -112,6 +114,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         endpoint_id: str | None = None,
         container_id: str | None = None,
         funcx_client: FuncXClient | None = None,
+        task_group_id: str | None = None,
         label: str = "",
         batch_size: int = 128,
         **kwargs,
@@ -154,7 +157,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         self.task_count_submitted = 0
         self._task_counter: int = 0
-        self._task_group_id: str | None = None
+        self._task_group_id: str = task_group_id or str(uuid.uuid4())
         self._tasks_to_send: queue.Queue[
             tuple[FuncXFuture, TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
@@ -170,7 +173,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._task_submitter.start()
 
     def __repr__(self) -> str:
-        name, label = self.__class__.__name__, self.label and f"{self.label}, " or ""
+        name = self.__class__.__name__
+        label = self.label and f"{self.label}, " or ""
         return f"{name}<{label}{self.batch_size}, ep_id:{self.endpoint_id}>"
 
     @property
@@ -178,24 +182,22 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
         The Task Group with which this instance is currently associated.  New tasks will
         be sent to this Task Group upstream, and the result listener will only listen
-        for results for this group.  If not set, the default value matches the
-        ``task_group_id`` of the underlying FuncXClient object.
+        for results for this group.
 
-        May be a string, or ``None``.  Set by simple assignment::
+        Must be a string.  Set by simple assignment::
 
             fxe = FuncXExecutor(endpoint_id="...")
             fxe.task_group_id = "Some-stored-id"
-            fxe.task_group_id = None  # Use the backing FuncXClient's task group id
 
         This is typically used when reattaching to a previously initiated set of tasks.
         See `reload_tasks()`_ for more information.
 
         [default: ``None``, which translates to the FuncXClient task group id]
         """
-        return self._task_group_id or self.funcx_client.session_task_group_id
+        return self._task_group_id
 
     @task_group_id.setter
-    def task_group_id(self, task_group_id: str | None):
+    def task_group_id(self, task_group_id: str):
         self._task_group_id = task_group_id
 
     def register_function(
@@ -286,6 +288,10 @@ class FuncXExecutor(concurrent.futures.Executor):
             funcX Web Service acknowledges receipt, and eventually will have
             a ``.result()`` when the funcX web services receive and stream it.
         """
+        if self._stopped:
+            err_fmt = "%s is shutdown; no new functions may be executed"
+            raise RuntimeError(err_fmt % repr(self))
+
         if fn not in self._function_registry:
             self.register_function(fn)
 
@@ -427,12 +433,13 @@ class FuncXExecutor(concurrent.futures.Executor):
             self._result_watcher.shutdown(wait=False, cancel_futures=True)
             self._result_watcher = None
 
+        task_group_id = self.task_group_id  # snapshot
         # step 2: from server, acquire list of related task ids and make futures
-        r = self.funcx_client.web_client.get_taskgroup_tasks(self.task_group_id)
-        if r["taskgroup_id"] != self.task_group_id:
+        r = self.funcx_client.web_client.get_taskgroup_tasks(task_group_id)
+        if r["taskgroup_id"] != task_group_id:
             msg = (
                 "Server did not respond with requested TaskGroup Tasks.  "
-                f"(Requested tasks for {self.task_group_id} but received "
+                f"(Requested tasks for {task_group_id} but received "
                 f"tasks for {r['taskgroup_id']}"
             )
             raise ValueError(msg)
@@ -445,35 +452,50 @@ class FuncXExecutor(concurrent.futures.Executor):
             # Complete the futures that already have results.
             pending: list[FuncXFuture] = []
             deserialize = self.funcx_client.fx_serializer.deserialize
-            res = self.funcx_client.web_client.get_batch_status(task_ids)
-            for task_id, task in res.data.get("results", {}).items():
-                fut = FuncXFuture(task_id)
-                futures.append(fut)
-                completed_t = task.get("completion_t")
-                if not completed_t:
-                    pending.append(fut)
-                else:
-                    try:
-                        if task.get("status") == "success":
-                            fut.set_result(deserialize(task["result"]))
-                        else:
-                            exc = FuncxTaskExecutionFailed(
-                                task["exception"], completed_t or "0"
+            chunk_size = 1024
+            num_chunks = len(task_ids) // chunk_size + 1
+            for chunk_no, id_chunk in enumerate(
+                chunk_by(task_ids, chunk_size), start=1
+            ):
+                if num_chunks > 1:
+                    log.debug(
+                        "Large task group (%s tasks; %s chunks); retrieving chunk %s"
+                        " (%s tasks)",
+                        len(task_ids),
+                        num_chunks,
+                        chunk_no,
+                        len(id_chunk),
+                    )
+
+                res = self.funcx_client.web_client.get_batch_status(id_chunk)
+                for task_id, task in res.data.get("results", {}).items():
+                    fut = FuncXFuture(task_id)
+                    futures.append(fut)
+                    completed_t = task.get("completion_t")
+                    if not completed_t:
+                        pending.append(fut)
+                    else:
+                        try:
+                            if task.get("status") == "success":
+                                fut.set_result(deserialize(task["result"]))
+                            else:
+                                exc = FuncxTaskExecutionFailed(
+                                    task["exception"], completed_t or "0"
+                                )
+                                fut.set_exception(exc)
+                        except Exception as exc:
+                            funcx_err = FuncxTaskExecutionFailed(
+                                "Failed to set result or exception", str(time.time())
                             )
-                            fut.set_exception(exc)
-                    except Exception as exc:
-                        funcx_err = FuncxTaskExecutionFailed(
-                            "Failed to set result or exception", str(time.time())
-                        )
-                        funcx_err.__cause__ = exc
-                        fut.set_exception(funcx_err)
+                            funcx_err.__cause__ = exc
+                            fut.set_exception(funcx_err)
 
             if pending:
                 self._result_watcher = _ResultWatcher(self)
                 self._result_watcher.watch_for_task_results(pending)
                 self._result_watcher.start()
         else:
-            log.warning(f"Received no tasks for Task Group ID: {self.task_group_id}")
+            log.warning(f"Received no tasks for Task Group ID: {task_group_id}")
 
         # step 5: the goods for the consumer
         return futures
@@ -538,35 +560,39 @@ class FuncXExecutor(concurrent.futures.Executor):
                 except queue.Empty:
                     pass
 
-                if tasks:
-                    log.info(f"Submitting tasks to funcX: {len(tasks)}")
-                    self._submit_tasks(futs, tasks)
+                if not tasks:
+                    continue
 
-                    with self._shutdown_lock:
-                        if self._stopped:
-                            continue
+                log.info(f"Submitting tasks to funcX: {len(tasks)}")
+                self._submit_tasks(futs, tasks)
 
-                        if not (
-                            self._result_watcher and self._result_watcher.is_alive()
-                        ):
-                            # Don't initialize the result watcher unless at least
-                            # one batch has been sent
-                            self._result_watcher = _ResultWatcher(self)
-                            self._result_watcher.start()
-                        try:
-                            self._result_watcher.watch_for_task_results(futs)
-                        except self._result_watcher.__class__.ShuttingDownError:
-                            log.debug("Waiting for previous ResultWatcher to shutdown")
-                            self._result_watcher.join()
-                            self._result_watcher = _ResultWatcher(self)
-                            self._result_watcher.start()
-                            self._result_watcher.watch_for_task_results(futs)
+                with self._shutdown_lock:
+                    if self._stopped:
+                        continue
 
-                    futs.clear()
+                    if not (self._result_watcher and self._result_watcher.is_alive()):
+                        # Don't initialize the result watcher unless at least
+                        # one batch has been sent
+                        self._result_watcher = _ResultWatcher(self)
+                        self._result_watcher.start()
+                    try:
+                        self._result_watcher.watch_for_task_results(futs)
+                    except self._result_watcher.__class__.ShuttingDownError:
+                        log.debug("Waiting for previous ResultWatcher to shutdown")
+                        self._result_watcher.join()
+                        self._result_watcher = _ResultWatcher(self)
+                        self._result_watcher.start()
+                        self._result_watcher.watch_for_task_results(futs)
 
-                    while task_count:
-                        task_count -= 1
-                        to_send.task_done()
+                # important to clear futures; else a legitimately early-shutdown
+                # request (e.g., __exit__()) can cancel these (finally block,
+                # below) before the result comes back, even though _result_watcher
+                # is already watching them.
+                futs.clear()
+
+                while task_count:
+                    task_count -= 1
+                    to_send.task_done()
 
         except Exception as exc:
             self._stopped = True
