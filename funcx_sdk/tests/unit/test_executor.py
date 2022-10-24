@@ -158,24 +158,12 @@ def test_executor_context_manager(fxexecutor):
     assert _is_stopped(fxe._result_watcher)
 
 
-def test_property_task_group_id_passthru(fxexecutor):
+def test_property_task_group_id_is_isolated(fxexecutor):
     fxc, fxe = fxexecutor
-    fxc.session_task_group_id = uuid.uuid4()
-    assert fxe.task_group_id is fxc.session_task_group_id
-
-    fxc.session_task_group_id = uuid.uuid4()
-    assert fxe.task_group_id is fxc.session_task_group_id
-
-
-def test_property_task_group_id_override(fxexecutor):
-    fxc, fxe = fxexecutor
-    assert fxe.task_group_id is fxc.session_task_group_id
+    assert fxe.task_group_id != fxc.session_task_group_id
 
     fxe.task_group_id = uuid.uuid4()
-    assert fxe.task_group_id is not fxc.session_task_group_id
-
-    fxe.task_group_id = None
-    assert fxe.task_group_id is fxc.session_task_group_id
+    assert fxe.task_group_id != fxc.session_task_group_id
 
 
 def test_multiple_register_function_fails(fxexecutor, mocker):
