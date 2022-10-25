@@ -47,7 +47,7 @@ You can also set up auto-completion for the ``funcx-endpoint`` commands in your 
 
 
 Configuring an Endpoint
-----------------------------
+-----------------------
 
 funcX endpoints act as gateways to diverse computational resources, including clusters, clouds,
 supercomputers, and even your laptop. To make the best use of your resources, the endpoint must be
@@ -94,6 +94,11 @@ Once started, the endpoint uses a daemon process to run in the background.
 
     Only the owner of an endpoint is authorized to start an endpoint. Thus if you register an endpoint
     using one identity and try to start an endpoint owned by another identity, it will fail.
+
+
+An endpoint may be started with a client identity, rather than as a user, removing
+the requirement to perform a Native App login flow. To assume the identity of the client you can export FUNCX_SDK_CLIENT_ID and FUNCX_SDK_CLIENT_SECRET
+environment variables. This is explained in detail in :ref:`client credentials`.
 
 
 Stopping an Endpoint
