@@ -205,6 +205,8 @@ and a result if it is available.
 Client Credentials with FuncXClients
 ------------------------------------
 
+Client credentials can be useful if you need an endpoint to run in a service account or to be started automatically with a process manager.
+
 The funcX SDK supports use of Globus Auth client credentials for login, if you have `registered a client. <https://docs.globus.org/api/auth/developer-guide/#register-app>`_
 
 To use client credentials, you must set the envrionment variables **FUNCX_SDK_CLIENT_ID** to your client ID, and **FUNCX_SDK_CLIENT_SECRET** to your client secret.
