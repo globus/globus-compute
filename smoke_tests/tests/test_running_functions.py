@@ -28,13 +28,13 @@ def ohai():
 def test_batch(fxc, endpoint):
     """Test batch submission and get_batch_result"""
 
-    double_fn = fxc.register_function(double)
+    double_fn_id = fxc.register_function(double)
 
     inputs = list(range(10))
     batch = fxc.create_batch()
 
     for x in inputs:
-        batch.add(x, endpoint_id=endpoint, function_id=double_fn)
+        batch.add(double_fn_id, endpoint, args=(x,))
 
     batch_res = fxc.batch_run(batch)
 
