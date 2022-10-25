@@ -235,6 +235,7 @@ More details on the funcX login manager prototcol are available `here. <https://
 
 .. code:: python
 
+  import globus_sdk
   from globus_sdk.scopes import AuthScopes, SearchScopes
   from funcx.sdk.login_manager import LoginManager
   from funcx.sdk.web_client import FuncxWebClient
@@ -258,12 +259,9 @@ More details on the funcX login manager prototcol are available `here. <https://
             authorizer=self.authorizers[SearchScopes.all]
         )
 
-    def get_funcx_web_client(
-        self, *, base_url: str | None = None, app_name: str | None = None
-    ) -> FuncxWebClient:
+    def get_funcx_web_client(self, *, base_url: str) -> FuncxWebClient:
         return FuncxWebClient(
             base_url=base_url,
-            app_name=app_name,
             authorizer=self.authorizers[FuncXClient.FUNCX_SCOPE],
         )
 
@@ -274,13 +272,13 @@ More details on the funcX login manager prototcol are available `here. <https://
         log.warning("logout cannot be invoked from here!")
 
   # Create authorizers from existing tokens
-  funcx_auth = AccessTokenAuthorizer(funcx_token)
-  search_auth = AccessTokenAuthorizer(search_token)
-  openid_auth = AccessTokenAuthorizer(openid_token)
+  funcx_auth = globus_sdk.AccessTokenAuthorizer(funcx_token)
+  search_auth = globus_sdk.AccessTokenAuthorizer(search_token)
+  openid_auth = globus_sdk.AccessTokenAuthorizer(openid_token)
 
   # Create a new login manager and use it to create a client
   funcx_login_manager = FuncXLoginManager(
-      authorizers={FuncXClient.FUNCX_SCOPE: auth,
+      authorizers={FuncXClient.FUNCX_SCOPE: funcx_auth,
                    SearchScopes.all: search_auth,
                    AuthScopes.openid: openid_auth}
   )
