@@ -96,8 +96,7 @@ Once started, the endpoint uses a daemon process to run in the background.
     using one identity and try to start an endpoint owned by another identity, it will fail.
 
 
-An endpoint may be started with a client identity, rather than as a user, removing
-the requirement to perform a Native App login flow. To assume the identity of the client you can export FUNCX_SDK_CLIENT_ID and FUNCX_SDK_CLIENT_SECRET
+To start an endpoint using a client identity, rather than as a user, you can export the FUNCX_SDK_CLIENT_ID and FUNCX_SDK_CLIENT_SECRET
 environment variables. This is explained in detail in :ref:`client credentials`.
 
 

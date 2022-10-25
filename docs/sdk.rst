@@ -205,7 +205,7 @@ and a result if it is available.
 Client Credentials with FuncXClients
 ------------------------------------
 
-The funcX SDK supports use of Globus Auth client credentials for login, if you have `registered a client. <https://docs.globus.org/api/auth/developer-guide/#register-app`_
+The funcX SDK supports use of Globus Auth client credentials for login, if you have `registered a client. <https://docs.globus.org/api/auth/developer-guide/#register-app>`_
 
 To use client credentials, you must set the envrionment variables **FUNCX_SDK_CLIENT_ID** to your client ID, and **FUNCX_SDK_CLIENT_SECRET** to your client secret.
 
@@ -230,7 +230,7 @@ The LoginManager is responsible for serving tokens to the FuncXClient as needed.
 
 A custom LoginManager can be used to simply return static tokens and enable programmatic use of the FuncXClient.
 
-More details on the funcX login manager prototcol are available `here. <https://github.com/funcx-faas/funcX/blob/main/funcx_sdk/funcx/sdk/login_manager/protocol.py#L18>`_
+More details on the funcX login manager prototcol are available `here. <https://github.com/funcx-faas/funcX/blob/main/funcx_sdk/funcx/sdk/login_manager/protocol.py>`_
 
 
 .. code:: python
@@ -243,8 +243,6 @@ More details on the funcX login manager prototcol are available `here. <https://
   class FuncXLoginManager:
     """
     Implements the funcx.sdk.login_manager.protocol.LoginManagerProtocol class.
-
-    https://github.com/funcx-faas/funcX/blob/main/funcx_sdk/funcx/sdk/login_manager/protocol.py#L18
     """
 
     def __init__(self, authorizers: dict[str, globus_sdk.RefreshTokenAuthorizer]):
