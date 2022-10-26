@@ -17,7 +17,7 @@ You can instantiate a funcX client as follows:
 
 .. code-block:: python
 
-  from funcx.sdk.client import FuncXClient
+  from funcx import FuncXClient
   fxc = FuncXClient()
 
 Instantiating a client will start an authentication process where you will be asked to authenticate via Globus Auth.
@@ -155,7 +155,7 @@ or publicly accessible functions via the ``search_function()`` function.
 .. _batching:
 
 Batching
---------------
+--------
 
 The SDK includes a batch interface to reduce the overheads of launching a function many times.
 To use this interface, you must first create a batch object and then pass that object
@@ -198,3 +198,91 @@ and a result if it is available.
    'e453a993-73e6-4149-8078-86e7b8370c35': {'pending': True,
                                             'status': 'waiting-for-ep'}
   }
+
+
+.. _client credentials:
+
+Client Credentials with FuncXClients
+------------------------------------
+
+Client credentials can be useful if you need an endpoint to run in a service account or to be started automatically with a process manager.
+
+The funcX SDK supports use of Globus Auth client credentials for login, if you have `registered a client. <https://docs.globus.org/api/auth/developer-guide/#register-app>`_
+
+To use client credentials, you must set the envrionment variables **FUNCX_SDK_CLIENT_ID** to your client ID, and **FUNCX_SDK_CLIENT_SECRET** to your client secret.
+
+When these envrionment variables are set they will take priority over any other credentials on the system and the FuncXClient will assume the identity of the client app.
+This also applies when starting a funcX endpoint.
+
+.. code:: bash
+
+  $ export FUNCX_SDK_CLIENT_ID="b0500dab-ebd4-430f-b962-0c85bd43bdbb"
+  $ export FUNCX_SDK_CLIENT_SECRET="ABCDEFGHIJKLMNOP0123456789="
+
+.. note:: funcX clients and endpoints will use the client credentials if they are set, so it is important to ensure the client submitting requests has access to an endpoint.
+
+
+.. _login manager:
+
+Using a Custom LoginManager
+---------------------------
+
+To programmatically create a FuncXClient from tokens and remove the need to perform a Native App login flow you can use a custom *LoginManager*.
+The LoginManager is responsible for serving tokens to the FuncXClient as needed. Typically, this would perform a Native App login flow, store tokens, and return them as needed.
+
+A custom LoginManager can be used to simply return static tokens and enable programmatic use of the FuncXClient.
+
+More details on the funcX login manager prototcol are available `here. <https://github.com/funcx-faas/funcX/blob/main/funcx_sdk/funcx/sdk/login_manager/protocol.py>`_
+
+
+.. code:: python
+
+  import globus_sdk
+  from globus_sdk.scopes import AuthScopes, SearchScopes
+  from funcx.sdk.login_manager import LoginManager
+  from funcx.sdk.web_client import FuncxWebClient
+  from funcx import FuncXClient
+
+  class FuncXLoginManager:
+    """
+    Implements the funcx.sdk.login_manager.protocol.LoginManagerProtocol class.
+    """
+
+    def __init__(self, authorizers: dict[str, globus_sdk.RefreshTokenAuthorizer]):
+        self.authorizers = authorizers
+
+    def get_auth_client(self) -> globus_sdk.AuthClient:
+        return globus_sdk.AuthClient(
+            authorizer=self.authorizers[AuthScopes.openid]
+        )
+
+    def get_search_client(self) -> globus_sdk.SearchClient:
+        return globus_sdk.SearchClient(
+            authorizer=self.authorizers[SearchScopes.all]
+        )
+
+    def get_funcx_web_client(self, *, base_url: str) -> FuncxWebClient:
+        return FuncxWebClient(
+            base_url=base_url,
+            authorizer=self.authorizers[FuncXClient.FUNCX_SCOPE],
+        )
+
+    def ensure_logged_in(self):
+        return True
+
+    def logout(self):
+        log.warning("logout cannot be invoked from here!")
+
+  # Create authorizers from existing tokens
+  funcx_auth = globus_sdk.AccessTokenAuthorizer(funcx_token)
+  search_auth = globus_sdk.AccessTokenAuthorizer(search_token)
+  openid_auth = globus_sdk.AccessTokenAuthorizer(openid_token)
+
+  # Create a new login manager and use it to create a client
+  funcx_login_manager = FuncXLoginManager(
+      authorizers={FuncXClient.FUNCX_SCOPE: funcx_auth,
+                   SearchScopes.all: search_auth,
+                   AuthScopes.openid: openid_auth}
+  )
+
+  fx = FuncXClient(login_manager=funcx_login_manager)
