@@ -15,6 +15,7 @@ from funcx_common.messagepack.message_types import (
     ResultErrorDetails as OutgoingResultErrorDetails,
 )
 from funcx_common.messagepack.message_types import Task as OutgoingTask
+from funcx_common.messagepack.message_types import TaskTransition
 
 from funcx_endpoint.executors.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
@@ -41,7 +42,9 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
             task_statuses=unpacked.task_statuses,
         )
     elif isinstance(unpacked, dict):
-        kwargs = {
+        kwargs: dict[
+            str, str | uuid.UUID | OutgoingResultErrorDetails | list[TaskTransition]
+        ] = {
             "task_id": uuid.UUID(unpacked["task_id"]),
         }
         if "task_statuses" in unpacked:

@@ -130,7 +130,9 @@ class FuncXWorker:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
-            result_message = dict(
+            result_message: dict[
+                str, str | tuple[str, str] | list[TaskTransition]
+            ] = dict(
                 task_id=task_id,
                 exception=get_error_string(),
                 error_details=get_result_error_details(),
