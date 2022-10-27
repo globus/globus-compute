@@ -28,7 +28,7 @@ class TestHighThroughputInterchange:
         assert task_id in ix.task_status_deltas
 
         tt = ix.task_status_deltas[task_id][0]
-        assert 0 <= time.time_ns() - tt.timestamp < 2000000, "Expecting a timestamp"
+        assert 0 <= time.time_ns() - tt.timestamp < 2000000000, "Expecting a timestamp"
         assert tt.state == TaskState.WAITING_FOR_NODES
 
     def test_start_task_status(self, _mzmq, _mfn_conf, tmp_path, mocker):
@@ -50,7 +50,7 @@ class TestHighThroughputInterchange:
         assert task_id in ix.task_status_deltas
 
         tt = ix.task_status_deltas[task_id][0]
-        assert 0 <= time.time_ns() - tt.timestamp < 2000000, "Expecting a timestamp"
+        assert 0 <= time.time_ns() - tt.timestamp < 2000000000, "Expecting a timestamp"
         assert tt.state == TaskState.WAITING_FOR_LAUNCH
 
 

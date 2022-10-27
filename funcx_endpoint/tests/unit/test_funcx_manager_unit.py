@@ -24,5 +24,5 @@ class TestFuncxManager:
         assert task_id in mgr.task_status_deltas
 
         tt = mgr.task_status_deltas[task_id][0]
-        assert time.time_ns() - tt.timestamp < 2000000, "Expecting a timestamp"
+        assert time.time_ns() - tt.timestamp < 2000000000, "Expecting a timestamp"
         assert tt.state == TaskState.RUNNING
