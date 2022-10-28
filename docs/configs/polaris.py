@@ -28,7 +28,7 @@ config = Config(
             provider=PBSProProvider(
                 launcher=MpiExecLauncher(
                     bind_cmd="--cpu-bind", overrides="--depth=64 --ppn 1"
-                ),  # Ensures 1 manger per node and allows it to divide work to all 64 cores
+                ),  # Ensures 1 manger per node, work on all 64 cores
                 account=user_opts['polaris']['account'],
                 queue='preemptable',
                 cpus_per_node=32,
