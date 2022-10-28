@@ -1,9 +1,17 @@
 import time
 
+import pytest
+from packaging.version import Version
+
+import funcx
+
 try:
     from funcx.errors import TaskPending
 except ImportError:
     from funcx.utils.errors import TaskPending
+
+
+sdk_version = Version(funcx.version.__version__)
 
 
 def test_run_pre_registered_function(
@@ -25,6 +33,7 @@ def ohai():
     return "ohai"
 
 
+@pytest.mark.skipif(sdk_version.release < (1, 0, 5), reason="batch.add iface updated")
 def test_batch(fxc, endpoint):
     """Test batch submission and get_batch_result"""
 
