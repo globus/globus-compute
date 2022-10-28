@@ -14,12 +14,14 @@ import sys
 import threading
 import time
 import uuid
+from collections import defaultdict
 from typing import Any
 
 import dill
 import psutil
 import zmq
-from funcx_common.tasks import TaskState
+from funcx_common.messagepack.message_types import TaskTransition
+from funcx_common.tasks import ActorName, TaskState
 from parsl.version import VERSION as PARSL_VERSION
 
 from funcx.serialize import FuncXSerializer
@@ -240,7 +242,7 @@ class Manager:
         self.next_worker_q: list[str] = []  # FIFO queue for spinning up workers.
         self.worker_procs: dict[str, subprocess.Popen] = {}
 
-        self.task_status_deltas: dict[str, tuple[float, TaskState]] = {}
+        self.task_status_deltas: dict[str, list[TaskTransition]] = defaultdict(list)
 
         self._kill_event = threading.Event()
         self._result_pusher_thread = threading.Thread(
@@ -645,8 +647,12 @@ class Manager:
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
             log.debug(f"Set task {task.task_id} to RUNNING")
-            ts = (time.monotonic(), TaskState.RUNNING)
-            self.task_status_deltas[task.task_id] = ts
+            tt = TaskTransition(
+                timestamp=time.time_ns(),
+                state=TaskState.RUNNING,
+                actor=ActorName.MANAGER,
+            )
+            self.task_status_deltas[task.task_id].append(tt)
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,
                 "task_type": task_type,

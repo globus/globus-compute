@@ -23,6 +23,6 @@ class TestFuncxManager:
 
         assert task_id in mgr.task_status_deltas
 
-        ts, state = mgr.task_status_deltas[task_id]
-        assert time.monotonic() - ts < 20, "Expecting a timestamp"
-        assert state == TaskState.RUNNING
+        tt = mgr.task_status_deltas[task_id][0]
+        assert time.time_ns() - tt.timestamp < 2000000000, "Expecting a timestamp"
+        assert tt.state == TaskState.RUNNING

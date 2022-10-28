@@ -6,6 +6,8 @@ from funcx_common.messagepack.message_types import (
     EPStatusReport as OutgoingEPStatusReport,
 )
 from funcx_common.messagepack.message_types import Task as OutgoingTask
+from funcx_common.messagepack.message_types import TaskTransition
+from funcx_common.tasks.constants import ActorName, TaskState
 
 from funcx_endpoint.endpoint.messages_compat import (
     try_convert_from_messagepack,
@@ -21,7 +23,22 @@ from funcx_endpoint.executors.high_throughput.messages import Task as InternalTa
 def test_ep_status_report_conversion():
     ep_id = uuid.uuid4()
     ep_status_report = {"looking": "good"}
-    task_statuses = {"1": "done", "2": "still working on that one"}
+    task_statuses = {
+        "1": [
+            TaskTransition(
+                timestamp=1,
+                state=TaskState.EXEC_END,
+                actor=ActorName.INTERCHANGE,
+            )
+        ],
+        "2": [
+            TaskTransition(
+                timestamp=1,
+                state=TaskState.EXEC_END,
+                actor=ActorName.INTERCHANGE,
+            )
+        ],
+    }
 
     internal = InternalEPStatusReport(str(ep_id), ep_status_report, task_statuses)
     message = pickle.dumps(internal)

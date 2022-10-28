@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import uuid
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from enum import Enum, auto
 from struct import Struct
+
+from funcx_common.messagepack.message_types import TaskTransition
 
 MESSAGE_TYPE_FORMATTER = Struct("b")
 
@@ -188,12 +191,26 @@ class EPStatusReport(Message):
         endpoint_id = str(uuid.UUID(bytes=msg[:16]))
         msg = msg[16:]
         jsonified = msg.decode("ascii")
-        ep_status, task_statuses = json.loads(jsonified)
+        ep_status, statuses = json.loads(jsonified)
+        task_statuses = defaultdict(list)
+        for tid, tt in statuses.items():
+            for trans in tt:
+                task_statuses[tid].append(
+                    TaskTransition(
+                        timestamp=trans["timestamp"],
+                        actor=trans["actor"],
+                        state=trans["state"],
+                    )
+                )
         return cls(endpoint_id, ep_status, task_statuses)
 
     def pack(self):
-        # TODO: do we want to do better than JSON?
-        jsonified = json.dumps([self.ep_status, self.task_statuses])
+        statuses = {}
+        for tid, tt in self.task_statuses.items():
+            for status in tt:
+                statuses[tid] = statuses.get(tid, [])
+                statuses[tid].append(status.to_dict())
+        jsonified = json.dumps([self.ep_status, statuses])
         return self.type.pack() + self._header + jsonified.encode("ascii")
 
 
@@ -215,12 +232,28 @@ class ManagerStatusReport(Message):
         container_switch_count = int.from_bytes(msg[:10], "little")
         msg = msg[10:]
         jsonified = msg.decode("ascii")
-        task_statuses = json.loads(jsonified)
+        statuses = json.loads(jsonified)
+        task_statuses = defaultdict(list)
+        for tid, tt in statuses.items():
+            for trans in tt:
+                task_statuses[tid].append(
+                    TaskTransition(
+                        timestamp=trans["timestamp"],
+                        actor=trans["actor"],
+                        state=trans["state"],
+                    )
+                )
         return cls(task_statuses, container_switch_count)
 
     def pack(self):
         # TODO: do better than JSON?
-        jsonified = json.dumps(self.task_statuses)
+        statuses = {}
+        for tid, tt in self.task_statuses.items():
+            for status in tt:
+                statuses[tid] = statuses.get(tid, [])
+                statuses[tid].append(status.to_dict())
+
+        jsonified = json.dumps(statuses)
         return (
             self.type.pack()
             + self.container_switch_count.to_bytes(10, "little")

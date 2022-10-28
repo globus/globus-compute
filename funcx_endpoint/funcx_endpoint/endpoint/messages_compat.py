@@ -15,6 +15,7 @@ from funcx_common.messagepack.message_types import (
     ResultErrorDetails as OutgoingResultErrorDetails,
 )
 from funcx_common.messagepack.message_types import Task as OutgoingTask
+from funcx_common.messagepack.message_types import TaskTransition
 
 from funcx_endpoint.executors.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
@@ -41,13 +42,13 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
             task_statuses=unpacked.task_statuses,
         )
     elif isinstance(unpacked, dict):
-        # exec_start|end_ms is not currently being used in prod and also
-        # may not be present
-        kwargs = {
+        kwargs: dict[
+            str, str | uuid.UUID | OutgoingResultErrorDetails | list[TaskTransition]
+        ] = {
             "task_id": uuid.UUID(unpacked["task_id"]),
-            "exec_start_ms": unpacked.get("exec_start_ms", 0),
-            "exec_end_ms": unpacked.get("exec_end_ms", 0),
         }
+        if "task_statuses" in unpacked:
+            kwargs["task_statuses"] = unpacked["task_statuses"]
         if "exception" in unpacked:
             kwargs["data"] = unpacked["exception"]
             code, user_message = unpacked.get("error_details", ("Unknown", "Unknown"))

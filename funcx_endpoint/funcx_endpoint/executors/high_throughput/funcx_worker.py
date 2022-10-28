@@ -10,6 +10,8 @@ import time
 import dill
 import zmq
 from funcx_common import messagepack
+from funcx_common.messagepack.message_types import TaskTransition
+from funcx_common.tasks import ActorName, TaskState
 
 from funcx.errors import MaxResultSizeExceeded
 from funcx.serialize import FuncXSerializer
@@ -22,10 +24,6 @@ log = logging.getLogger(__name__)
 
 DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 class FuncXWorker:
@@ -124,29 +122,39 @@ class FuncXWorker:
 
     def execute_task(self, task_id: str, task_body: bytes) -> dict:
         log.debug("executing task task_id='%s'", task_id)
-        exec_start_ms = _now_ms()
+        exec_start = TaskTransition(
+            timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
+        )
 
         try:
             result = self.call_user_function(task_body)
         except Exception:
             log.exception("Caught an exception while executing user function")
-            result_message = dict(
+            result_message: dict[
+                str, str | tuple[str, str] | list[TaskTransition]
+            ] = dict(
                 task_id=task_id,
                 exception=get_error_string(),
                 error_details=get_result_error_details(),
-                exec_start_ms=exec_start_ms,
-                exec_end_ms=_now_ms(),
-            )
-        else:
-            log.debug("Execution completed without exception")
-            result_message = dict(
-                task_id=task_id,
-                data=result,
-                exec_start_ms=exec_start_ms,
-                exec_end_ms=_now_ms(),
             )
 
-        log.debug("task %s completed", task_id)
+        else:
+            log.debug("Execution completed without exception")
+            result_message = dict(task_id=task_id, data=result)
+
+        exec_end = TaskTransition(
+            timestamp=time.time_ns(),
+            state=TaskState.EXEC_END,
+            actor=ActorName.WORKER,
+        )
+
+        result_message["task_statuses"] = [exec_start, exec_end]
+
+        log.debug(
+            "task %s completed in %d ns",
+            task_id,
+            (exec_end.timestamp - exec_start.timestamp),
+        )
         return result_message
 
     def call_user_function(self, message: bytes) -> str:
