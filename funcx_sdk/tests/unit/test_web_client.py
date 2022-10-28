@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import responses
 
@@ -99,3 +101,14 @@ def test_get_amqp_url(client, randomstring):
 
     res = client.get_result_amqp_url()
     assert res["some_key"] == expected_response
+
+
+@pytest.mark.parametrize("multi_tenant", [None, True, False])
+def test_multi_tenant_post(client, multi_tenant):
+    responses.post(url="https://api.funcx/endpoints")
+    resp = client.register_endpoint("ep_name", "ep_id", multi_tenant=multi_tenant)
+    req_body = json.loads(resp._response.request.body)
+    if multi_tenant:
+        assert req_body["multi_tenant"] == multi_tenant
+    else:
+        assert "multi_tenant" not in req_body

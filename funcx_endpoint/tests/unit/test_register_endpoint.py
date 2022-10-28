@@ -99,3 +99,44 @@ def test_register_endpoint_invalid_response(
             endpoint_dir=tmp_path,
             endpoint_name="Some EP Name",
         )
+
+
+@responses.activate
+@pytest.mark.parametrize("multi_tenant", [None, True, False])
+def test_register_endpoint_multi_tenant(
+    tmp_path,
+    endpoint_uuid,
+    register_endpoint_response,
+    get_standard_funcx_client,
+    randomstring,
+    multi_tenant,
+):
+    ep_uuid = str(uuid.uuid4())
+    ep_name = randomstring()
+    register_endpoint_response(endpoint_id=ep_uuid)
+
+    fxc = get_standard_funcx_client()
+    if multi_tenant is not None:
+        register_endpoint(
+            fxc,
+            endpoint_uuid=ep_uuid,
+            endpoint_dir=str(tmp_path),
+            endpoint_name=ep_name,
+            multi_tenant=multi_tenant,
+        )
+    else:
+        register_endpoint(
+            fxc,
+            endpoint_uuid=ep_uuid,
+            endpoint_dir=str(tmp_path),
+            endpoint_name=ep_name,
+        )
+
+    ep_json_p = tmp_path / "endpoint.json"
+    assert ep_json_p.exists()
+
+    request_body = str(responses.calls[1].request.body)
+    if multi_tenant is True:
+        assert '"multi_tenant": true' in request_body
+    else:
+        assert "multi_tenant" not in request_body
