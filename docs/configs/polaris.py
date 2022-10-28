@@ -1,5 +1,5 @@
 from parsl.addresses import address_by_hostname
-from parsl.launchers import SingleNodeLauncher
+from parsl.launchers import MpiExecLauncher
 from parsl.providers import PBSProProvider
 
 from funcx_endpoint.endpoint.utils.config import Config
@@ -22,11 +22,13 @@ user_opts = {
 config = Config(
     executors=[
         HighThroughputExecutor(
-            max_workers_per_node=1,
+            available_accelerators=4,  # Pin each worker to a different GPU
             strategy=SimpleStrategy(max_idletime=300),
             address=address_by_hostname(),
             provider=PBSProProvider(
-                launcher=SingleNodeLauncher(),
+                launcher=MpiExecLauncher(
+                    bind_cmd="--cpu-bind", overrides="--depth=64 --ppn 1"
+                ),  # Ensures 1 manger per node and allows it to divide work to all 64 cores
                 account=user_opts['polaris']['account'],
                 queue='preemptable',
                 cpus_per_node=32,
