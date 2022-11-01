@@ -97,7 +97,7 @@ Once started, the endpoint uses a daemon process to run in the background.
 
 
 To start an endpoint using a client identity, rather than as a user, you can export the FUNCX_SDK_CLIENT_ID and FUNCX_SDK_CLIENT_SECRET
-environment variables. This is explained in detail in :ref:`client credentials`.
+environment variables. This is explained in detail in :ref:`client credentials with funcxclients`.
 
 
 Stopping an Endpoint
