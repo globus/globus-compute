@@ -3,6 +3,60 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.5a0:
+
+funcx & funcx-endpoint v1.0.5a0
+-------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``.get_result_amqp_url()`` to ``FuncXClient`` to acquire user
+  credentials to the AMQP service.  Globus credentials are first verified
+  before user-specific AMQP credentials are (re)created and returned.  The only
+  expected use of this method comes from ``FuncXExecutor``.
+
+- Captures timing information throughout the endpoint by reporting
+  TaskTransitions.
+
+Bug Fixes
+^^^^^^^^^
+
+- General and specific attention to the ``FuncXExecutor``, especially around
+  non-happy path interactions
+    - Addressed the often-hanging end-of-script problem
+    - Address web-socket race condition (GH#591)
+
+Deprecated
+^^^^^^^^^^
+
+- ``batch_enabled`` argument to ``FuncXExecutor`` class; batch communication is
+  now enforced transparently.  Simply use ``.submit()`` normally, and the class
+  will batch the tasks automatically.  ``batch_size`` remains available.
+
+- ``asynchronous``, ``results_ws_uri``, and ``loop`` arguments to
+  ``FuncXClient`` class; use ``FuncXExecutor`` instead.
+
+Changed
+^^^^^^^
+
+- Refactor ``funcx.sdk.batch.Batch.add`` method interface.  ``function_id`` and
+  ``endpoint_id`` are now positional arguments, using language semantics to
+  enforce their use, rather than (internal) manual ``assert`` checks.  The
+  arguments (``args``) and keyword arguments (``kwargs``) arguments are no
+  longer varargs, and thus no longer prevent function use of ``function_id``
+  and ``endpoint_id``.
+
+- ``FuncXExecutor`` no longer creates a web socket connection; instead it
+  communicates directly with the backing AMQP service.  This removes an
+  internal round trip and is marginally more performant.
+
+- ``FuncXExecutor`` now much more faithfully implements the
+  ``_concurrent.futures.Executor`` interface.  In particular, the
+  ``endpoint_id`` and ``container_id`` items are specified on the executor
+  _object_ and not per ``.submit()`` invocation.  See the class documentation
+  for more information.
+
 .. _changelog-1.0.4:
 
 funcx & funcx-endpoint v1.0.4
