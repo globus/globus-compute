@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-import sqlite3
 
 from globus_sdk.tokenstorage import SQLiteAdapter
 
@@ -78,6 +77,8 @@ def get_token_storage_adapter(*, environment: str | None = None) -> SQLiteAdapte
     if not os.path.exists(fname):
         invalidate_old_config()
     # namespace is equal to the current environment
-    adapter = SQLiteAdapter(fname, namespace=_resolve_namespace(environment))
-    adapter._connection = sqlite3.connect(adapter.dbname, check_same_thread=False)
-    return adapter
+    return SQLiteAdapter(
+        fname,
+        namespace=_resolve_namespace(environment),
+        connect_params={"check_same_thread": False},
+    )
