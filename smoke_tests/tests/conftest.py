@@ -27,6 +27,7 @@ from funcx.sdk.web_client import FuncxWebClient
 #
 #  this var starts with the ID env var load
 _LOCAL_ENDPOINT_ID = os.getenv("FUNCX_LOCAL_ENDPOINT_ID")
+_LOCAL_FUNCTION_ID = os.getenv("FUNCX_LOCAL_KNOWN_FUNCTION_ID")
 
 _CONFIGS = {
     "dev": {
@@ -52,10 +53,8 @@ _CONFIGS = {
     },
     "local": {
         # localhost; typical defaults for a helm deploy
-        "client_args": {
-            "funcx_service_address": "http://localhost:5000/v2",
-            "results_ws_uri": "ws://localhost:6000/ws/v2/",
-        },
+        "client_args": {"environment": "local"},
+        "public_hello_fn_uuid": _LOCAL_FUNCTION_ID,
         "endpoint_uuid": _LOCAL_ENDPOINT_ID,
     },
 }
