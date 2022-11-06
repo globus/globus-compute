@@ -485,17 +485,53 @@ class Endpoint:
     def get_running_endpoints(self):
         return self.get_endpoints(status_filter="Running")
 
-    def print_endpoint_table(self):
+    def print_endpoint_table(self, ofile=None):
         """
         Converts locally configured endpoint list to a text based table
         and prints the output.
           For example format, see the texttable module
         """
+        if not ofile:
+            ofile = sys.stdout
+
         endpoints = self.get_endpoints()
+        if not endpoints:
+            print(
+                "No endpoints configured!\n\n  (Hint: funcx-endpoint configure)",
+                file=ofile,
+            )
+            return
+
         table = texttable.Texttable()
-        headings = ["Endpoint Name", "Status", "Endpoint ID"]
+        headings = ["Endpoint ID", "Status", "Endpoint Name"]
         table.header(headings)
 
-        for endpoint_name, endpoint_info in endpoints.items():
-            table.add_row([endpoint_name, endpoint_info["status"], endpoint_info["id"]])
-        print(table.draw())
+        idx_id = 0
+        idx_st = 1
+        idx_name = 2
+        width_st = len(headings[idx_st])
+        width_id = len(headings[idx_id])
+        for ep_name, ep_info in endpoints.items():
+            table.add_row([ep_info["id"], ep_info["status"], ep_name])
+            width_id = max(width_id, len(str(ep_info["id"])))
+            width_st = max(width_st, len(str(ep_info["status"])))
+
+        tsize = shutil.get_terminal_size()
+        max_width = max(68, tsize.columns)  # require at least a reasonable size ...
+        table.set_max_width(max_width)  # ... but allow to expand to terminal width
+
+        # trickery here, but don't want to subclass texttable -- a very stable
+        # library -- at this time; ensure that the only "fungible" column is the
+        # name.  Can redress ~when~ *if* this becomes a problem.  "Simple"
+        table._compute_cols_width()
+        if table._width[idx_id] < width_id:
+            table._width[idx_name] -= width_id - table._width[idx_id]
+            table._width[idx_id] = width_id
+        if table._width[idx_st] < width_st:
+            table._width[idx_name] -= width_st - table._width[idx_st]
+            table._width[idx_st] = width_st
+
+        # ensure no mistakes -- width of name (well, _any_) column can't be < 0
+        table._width[idx_name] = max(10, table._width[idx_name])
+
+        print(table.draw(), file=ofile)
