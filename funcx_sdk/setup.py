@@ -6,7 +6,7 @@ from setuptools import find_namespace_packages, setup
 REQUIRES = [
     # request sending and authorization tools
     "requests>=2.20.0",
-    "globus-sdk>=3.6.0,<4",
+    "globus-sdk>=3.14.0,<4",
     # 'websockets' is used for the client-side websocket listener
     "websockets==10.3",
     # dill is an extension of `pickle` to a wider array of native python types
