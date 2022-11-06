@@ -97,38 +97,33 @@ def test_executor(fxc, endpoint, tutorial_function_id):
         )
 
     num_tasks = 10
+    submit_count = 2  # we've had at least one bug that prevented executor re-use
 
     with FuncXExecutor(endpoint_id=endpoint, funcx_client=fxc) as fxe:
-        futures = [
-            fxe.submit_to_registered_function(tutorial_function_id)
-            for _ in range(num_tasks)
-        ]
+        for _ in range(submit_count):
+
+            futures = [
+                fxe.submit_to_registered_function(tutorial_function_id)
+                for _ in range(num_tasks)
+            ]
+
+            results = []
+            for f in concurrent.futures.as_completed(futures, timeout=30):
+                results.append(f.result())
+
+            assert (
+                len(results) == num_tasks
+            ), f"Expected {num_tasks} results; received: {len(results)}"
+            assert all(
+                "Hello World!" == item for item in results
+            ), f"Invalid result: {results}"
+
+        futures = list(fxe.reload_tasks())
+        assert len(futures) == submit_count * num_tasks
 
         results = []
         for f in concurrent.futures.as_completed(futures, timeout=30):
             results.append(f.result())
-
-        assert (
-            len(results) == num_tasks
-        ), f"Expected {num_tasks} results; received: {len(results)}"
-        assert all(
-            "Hello World!" == item for item in results
-        ), f"Invalid result: {results}"
-
-        # Run one more time; we've had at least one bug that prevented
-        # executor re-use
-        futures = [
-            fxe.submit_to_registered_function(tutorial_function_id)
-            for _ in range(num_tasks)
-        ]
-
-        results = []
-        for f in concurrent.futures.as_completed(futures, timeout=30):
-            results.append(f.result())
-
-        assert (
-            len(results) == num_tasks
-        ), f"Expected {num_tasks} results; received: {len(results)}"
         assert all(
             "Hello World!" == item for item in results
         ), f"Invalid result: {results}"
