@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
@@ -36,7 +38,7 @@ class WebSocketPollingTask:
         funcx_client,
         loop: AbstractEventLoop,
         atomic_controller=None,
-        init_task_group_id: str = None,
+        init_task_group_id: str | None = None,
         results_ws_uri: str = "wss://api2.funcx.org/ws/v2/",
         auto_start: bool = True,
     ):
