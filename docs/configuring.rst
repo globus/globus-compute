@@ -152,7 +152,7 @@ Pinning Workers to devices
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Many modern clusters provide multiple accelerators per compute note, yet many applications are best suited to using a
-single accelerator per task. funcX supports pinning each worker to difference accelerators using ``available_accelerators``
+single accelerator per task. funcX supports pinning each worker to different accelerators using the ``available_accelerators``
 option of the ``HighThroughputExecutor``. Provide either the number of accelerators (funcX will assume they are named
 in integers starting from zero) or a list of the names of the accelerators available on the node. Each funcX worker
 will have the following environment variables set to the worker specific identity assigned:

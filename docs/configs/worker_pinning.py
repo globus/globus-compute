@@ -10,11 +10,13 @@ config = Config(
         HighThroughputExecutor(
             max_workers_per_node=4,
 
-            # Each worker launched will have env vars set to one of (0..3)
+            # `available_accelerators` may be a natural number or a list of strings.
+            # If an integer, then each worker launched will have an automatically
+            # generated environment variable. In this case, one of 0, 1, 2, or 3.
+            # Alternatively, specific strings may be utilized.
             available_accelerators=4,
+            # available_accelerators=['opencl:gpu:1', 'opencl:gpu:2'] # alternative
 
-            # Alternatively a list of strings may be supplied
-            # available_accelerators=['opencl:gpu:1', 'opencl:gpu:2']
             provider=LocalProvider(
                 init_blocks=1,
                 min_blocks=0,
@@ -22,7 +24,6 @@ config = Config(
             ),
         )
     ],
-    funcx_service_address="https://api2.funcx.org/v2",
 )
 
 # fmt: on
