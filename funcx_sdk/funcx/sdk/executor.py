@@ -522,7 +522,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             time.sleep(0.1)
         log.debug("%s: shutdown complete (thread: %s)", self, thread_id)
 
-    def _task_submitter_impl(self):
+    def _task_submitter_impl(self) -> None:
         """
         Coalesce tasks from the interthread queue (``_tasks_to_send``), up to
         ``self.batch_size``, submit them, and then send the futures to the
@@ -540,9 +540,9 @@ class FuncXExecutor(concurrent.futures.Executor):
         to_send = self._tasks_to_send  # cache lookup
         futs: list[FuncXFuture] = []  # for mypy/the exception branch
         try:
-            fut = FuncXFuture()  # just start the loop; please
+            fut: FuncXFuture | None = FuncXFuture()  # just start the loop; please
             while fut is not None:
-                futs: list[FuncXFuture] = []
+                futs = []
                 tasks: list[TaskSubmissionInfo] = []
                 task_count = 0
                 try:
