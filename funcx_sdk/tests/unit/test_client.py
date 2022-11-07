@@ -198,6 +198,7 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
     else:
         assert submit_data["create_websocket_queue"] is False
 
+
 def test_build_container(mocker, login_manager):
     mock_data = mocker.Mock()
     mock_data.data = {"container_id": "123-456"}
