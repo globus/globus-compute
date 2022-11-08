@@ -3,6 +3,24 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.5:
+
+funcx & funcx-endpoint v1.0.5
+-----------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Prevent Endpoint ID from wrapping in ``funcx-endpoint list`` output.
+
+Changed
+^^^^^^^
+
+- Updated minimum Globus SDK requirement to v3.14.0
+
+- Reorder ``funcx-endpoint list`` output: ``Endpoint ID`` column is now first
+  and ``Endpoint Name`` is now last.
+
 .. _changelog-1.0.5a0:
 
 funcx & funcx-endpoint v1.0.5a0
