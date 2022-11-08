@@ -96,7 +96,7 @@ execution to available endpoints.  For most use-cases that will use the
 
 .. code-block:: python
 
-    from funcx.sdk.client import FuncXExecutor
+    from funcx import FuncXExecutor
 
     # First, define the function ...
     def add_func(a, b):
@@ -132,10 +132,13 @@ endpoint can be configured and started as follows. During the
 configuration process you will be prompted to authenticate
 following the same process as using the SDK.
 For more advanced deployments (e.g., on clouds and clusters) please
-refer to the `endpoints` documentation. ::
+refer to the `endpoints`_ documentation. ::
 
   $ python3 -m pip install funcx_endpoint
 
   $ funcx-endpoint configure
 
   $ funcx-endpoint start <ENDPOINT_NAME>
+
+
+.. _endpoints: endpoints.html
