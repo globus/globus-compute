@@ -395,7 +395,6 @@ class EndpointInterchange:
                         continue
 
                     except Exception as exc:
-                        log.debug(f"Invalid message received: {result}")
                         log.warning(
                             f"Invalid message received: no task_id.  Ignoring. {exc}"
                         )
