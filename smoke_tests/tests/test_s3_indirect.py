@@ -1,5 +1,4 @@
 import pytest
-from funcx_common.task_storage.default_storage import DEFAULT_REDIS_STORAGE_THRESHOLD
 
 try:
     from funcx.errors import FuncxTaskExecutionFailed
@@ -20,11 +19,6 @@ def large_arg_consumer(data: str) -> int:
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
 def test_allowed_result_sizes(submit_function_and_get_result, endpoint, size):
     """funcX should allow all listed result sizes which are under 512KB limit"""
-    if size >= DEFAULT_REDIS_STORAGE_THRESHOLD:
-        pytest.skip(
-            "prod currently has a race condition with S3, which has been fixed in dev"
-        )
-
     r = submit_function_and_get_result(
         endpoint, func=large_result_producer, func_args=(size,)
     )
@@ -51,11 +45,6 @@ def test_result_size_too_large(submit_function_and_get_result, endpoint):
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
 def test_allowed_arg_sizes(submit_function_and_get_result, endpoint, size):
     """funcX should allow all listed result sizes which are under 512KB limit"""
-    if size >= DEFAULT_REDIS_STORAGE_THRESHOLD:
-        pytest.skip(
-            "prod currently has a race condition with S3, which has been fixed in dev"
-        )
-
     r = submit_function_and_get_result(
         endpoint, func=large_arg_consumer, func_args=(bytearray(size),)
     )
