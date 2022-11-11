@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import os
 import queue
 import random
 import sys
@@ -704,7 +705,7 @@ class _ResultWatcher(threading.Thread):
         self,
         funcx_executor: FuncXExecutor,
         poll_period_s=0.5,
-        connect_attempt_limit=3,
+        connect_attempt_limit=5,
         channel_close_window_s=10,
         channel_close_window_limit=3,
     ):
@@ -752,30 +753,35 @@ class _ResultWatcher(threading.Thread):
         self.channel_close_window_limit = channel_close_window_limit
 
     def __repr__(self):
-        return "{}<{}; fut={:,d}; res={:,d}; qp={}>".format(
+        return "{}<{}; pid={}; fut={:,d}; res={:,d}; qp={}>".format(
             self.__class__.__name__,
             "✓" if self._consumer_tag else "✗",
+            os.getpid(),
             len(self._open_futures),
             len(self._received_results),
             self._queue_prefix if self._queue_prefix else "-",
         )
 
     def run(self):
-        log.debug("AMQP thread begins")
+        log.debug("%r AMQP thread begins", self)
         self._thread_id = threading.get_ident()
 
         while self._connection_tries < self.connect_attempt_limit and not (
             self._time_to_stop or self._cancellation_reason
         ):
             if self._connection or self._connection_tries:
-                wait_for = 2.0 + 3 * random.random()
-                log.warning(f"Reconnecting in {wait_for:.1f}s.")
+                wait_for = random.uniform(0.5, 10)
+                msg = f"%r AMQP reconnecting in {wait_for:.1f}s."
+                log.debug(msg, self)
+                if self._connection_tries == self.connect_attempt_limit - 1:
+                    log.warning(f"{msg}  (final attempt)", self)
                 time.sleep(wait_for)
 
             self._connection_tries += 1
             try:
                 log.debug(
-                    "Opening connection to AMQP service.  Attempt: %s (of %s)",
+                    "%r Opening connection to AMQP service.  Attempt: %s (of %s)",
+                    self,
                     self._connection_tries,
                     self.connect_attempt_limit,
                 )
@@ -784,7 +790,7 @@ class _ResultWatcher(threading.Thread):
                 self._connection.ioloop.start()  # Reminder: blocks
 
             except Exception:
-                log.exception("Unhandled error; shutting down %s", self)
+                log.exception("%r Unhandled error; shutting down", self)
 
         with self._new_futures_lock:
             if self._open_futures:
@@ -803,7 +809,7 @@ class _ResultWatcher(threading.Thread):
                         fut.set_exception(self._cancellation_reason)
                         log.debug("Cancelled: %s", fut.task_id)
                     self._open_futures_empty.set()
-        log.debug("AMQP thread complete.")
+        log.debug("%r AMQP thread complete.", self)
 
     def shutdown(self, wait=True, *, cancel_futures=False):
         if not self.is_alive():
@@ -935,7 +941,7 @@ class _ResultWatcher(threading.Thread):
         """
         if self._time_to_stop:
             self.shutdown()
-            log.debug("Shutdown complete")
+            log.debug("%r Shutdown complete", self)
             return
 
         try:
@@ -944,18 +950,13 @@ class _ResultWatcher(threading.Thread):
                 latest_msg_id = self._to_ack[-1]
                 self._channel.basic_ack(latest_msg_id, multiple=True)
                 self._to_ack.clear()
-                log.debug("Acknowledged through message: %s", latest_msg_id)
+                log.debug("%r Acknowledged through message: %s", self, latest_msg_id)
 
             if self._time_to_check_results.is_set():
                 self._time_to_check_results.clear()
                 self._match_results_to_futures()
-                with self._new_futures_lock:
-                    if not (self._open_futures or self._received_results):
-                        log.debug(
-                            "Finished processing; no results or futures to match."
-                        )
-                        self._closed = True
-                        self._time_to_stop = True
+                if not (self._open_futures or self._received_results):
+                    log.debug("%r Idle; no outstanding results or futures.", self)
         finally:
             self._connection.ioloop.call_later(self.poll_period_s, self._event_watcher)
 
@@ -1035,13 +1036,17 @@ class _ResultWatcher(threading.Thread):
 
     def _on_open_failed(self, _mq_conn: pika.BaseConnection, exc: str | Exception):
         assert self._connection is not None, "Strictly called _by_ ioloop"
-        count = f"attempt {self._connection_tries} (of {self.connect_attempt_limit})"
-        log.warning(
-            f"[{count}] Failed to open connection ({exc.__class__.__name__}) - {exc}\n"
-        )
-        if not isinstance(exc, Exception):
-            exc = Exception(str(exc))
-        self._cancellation_reason = exc
+        count = f"[attempt {self._connection_tries} (of {self.connect_attempt_limit})]"
+        pid = f"(pid: {os.getpid()})"
+        exc_text = f"Failed to open connection - ({exc.__class__.__name__}) {exc}"
+        msg = f"{count} {pid} {exc_text}"
+        log.debug(msg)
+
+        if not (self._connection_tries < self.connect_attempt_limit):
+            log.warning(msg)
+            if not isinstance(exc, Exception):
+                exc = Exception(str(exc))
+            self._cancellation_reason = exc
         self._connection.ioloop.stop()
 
     def _on_connection_closed(self, _mq_conn: pika.BaseConnection, exc: Exception):
