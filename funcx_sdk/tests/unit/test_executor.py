@@ -627,21 +627,6 @@ def test_resultwatcher_checks_match_if_results():
     mrw.shutdown(cancel_futures=True)
 
 
-def test_resultwatcher_opportunistically_stops():
-    fut = FuncXFuture(task_id=uuid.uuid4())
-    res = Result(task_id=fut.task_id, data="abc123")
-
-    mrw = MockedResultWatcher(mock.Mock())
-    mrw._received_results[fut.task_id] = (None, res)
-
-    mrw.watch_for_task_results([fut])
-    mrw.start()
-    mrw._event_watcher()
-    mrw._event_watcher()
-
-    try_assert(lambda: not mrw.is_alive())
-
-
 def test_resultwatcher_repr():
     mrw = MockedResultWatcher(mock.Mock())
     assert "<✗;" in repr(mrw)
@@ -680,10 +665,10 @@ def test_resultwatcher_match_sets_exception(randomstring):
     mrw.watch_for_task_results([fut])
     mrw.start()
     mrw._event_watcher()
-    mrw._event_watcher()
 
     assert payload in str(fut.exception())
     assert isinstance(fut.exception(), FuncxTaskExecutionFailed)
+    mrw.shutdown()
 
 
 def test_resultwatcher_match_sets_result(randomstring):
@@ -698,9 +683,9 @@ def test_resultwatcher_match_sets_result(randomstring):
     mrw.watch_for_task_results([fut])
     mrw.start()
     mrw._event_watcher()
-    mrw._event_watcher()
 
     assert fut.result() == payload
+    mrw.shutdown()
 
 
 def test_resultwatcher_match_handles_deserialization_error():
@@ -715,11 +700,11 @@ def test_resultwatcher_match_handles_deserialization_error():
     mrw.watch_for_task_results([fut])
     mrw.start()
     mrw._event_watcher()
-    mrw._event_watcher()
 
     exc = fut.exception()
     assert "Malformed or unexpected data structure" in str(exc)
     assert invalid_payload in str(exc)
+    mrw.shutdown()
 
 
 @pytest.mark.parametrize("unpacked", ("not_a_Result", Exception))
@@ -750,13 +735,30 @@ def test_resultwatcher_onmessage_sets_check_results_flag():
 
 
 @pytest.mark.parametrize("exc", (MemoryError("some description"), "some description"))
-def test_resultwatcher_stops_loop_on_open_failure(exc):
+def test_resultwatcher_stops_loop_on_open_failure(mocker, exc):
+    mock_log = mocker.patch("funcx.sdk.executor.log", autospec=True)
+
     mrw = MockedResultWatcher(mock.Mock())
     mrw.start()
-    mrw._connection.ioloop.stop.assert_not_called()
-    assert not mrw._cancellation_reason
-    mrw._on_open_failed(mock.Mock(), exc)
-    mrw._connection.ioloop.stop.assert_called()
+    assert not mrw._connection.ioloop.stop.called, "Test setup verification"
+
+    while not mrw._cancellation_reason:
+        mrw._connection_tries += 1
+
+        assert not mrw._cancellation_reason, "Test setup verification"
+        assert not mock_log.warning.called
+        mrw._connection.ioloop.stop.reset_mock()
+        mock_log.debug.reset_mock()
+
+        mrw._on_open_failed(mock.Mock(), exc)  # kernel of test
+
+        assert mrw._connection.ioloop.stop.called
+        assert mock_log.debug.called
+        log_args, *_ = mock_log.debug.call_args
+        assert "Failed to open connection" in log_args[0]
+
+    assert mrw._connection_tries == mrw.connect_attempt_limit
+    assert mock_log.warning.called, "Expected warning only on watcher quit"
     assert "some description" in str(mrw._cancellation_reason)
     mrw.shutdown()
 
