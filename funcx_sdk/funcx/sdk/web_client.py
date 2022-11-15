@@ -12,9 +12,9 @@ import uuid
 
 import globus_sdk
 from funcx_common.sdk_version_sharing import user_agent_substring
+from globus_sdk.exc.api import GlobusAPIError
 
 from funcx.sdk._environments import get_web_service_url
-from funcx.sdk.errors import FuncxAPIError
 from funcx.serialize import FuncXSerializer
 from funcx.version import __version__
 
@@ -100,7 +100,7 @@ class FuncxWebClient(globus_sdk.BaseClient):
     # it does not have any other effects
     service_name: str = "funcx"
     # use the FuncX-specific error class
-    error_class = FuncxAPIError
+    error_class = GlobusAPIError
 
     def __init__(
         self,

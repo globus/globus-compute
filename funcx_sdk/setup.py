@@ -19,7 +19,7 @@ REQUIRES = [
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
     "pika>=1.2",
-    "funcx-common==0.0.20",
+    "funcx-common==0.0.23",
     "tblib==1.7.0",
 ]
 DOCS_REQUIRES = [

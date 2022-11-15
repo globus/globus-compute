@@ -3,8 +3,8 @@ import uuid
 
 import pytest
 import responses
+from globus_sdk.exc.api import GlobusAPIError
 
-from funcx.sdk.errors.api_error import FuncxAPIError
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 
 
@@ -128,7 +128,7 @@ def test_register_endpoint_locked_error(
     ep_uuid = str(uuid.uuid4())
     register_endpoint_failure_response(endpoint_id=ep_uuid, status_code=423)
     fxc = get_standard_funcx_client()
-    with pytest.raises(FuncxAPIError):
+    with pytest.raises(GlobusAPIError):
         register_endpoint(
             fxc, endpoint_uuid=ep_uuid, endpoint_dir=tmp_path, endpoint_name="a"
         )
