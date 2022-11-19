@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import inspect
+import warnings
+
 from parsl.utils import RepresentationMixin
 
 from funcx_endpoint.executors import HighThroughputExecutor
@@ -72,8 +75,6 @@ class Config(RepresentationMixin):
         # Connection info
         environment: str | None = None,
         funcx_service_address=None,
-        results_ws_uri=None,
-        warn_about_url_mismatch=False,
         # Tuning info
         heartbeat_period=30,
         heartbeat_threshold=120,
@@ -82,7 +83,28 @@ class Config(RepresentationMixin):
         log_dir=None,
         stdout="./endpoint.log",
         stderr="./endpoint.log",
+        **kwargs,
     ):
+        for deprecated_name in ("results_ws_uri", "warn_about_url_mismatch"):
+            if deprecated_name in kwargs:
+                caller_filename = inspect.stack()[1].filename
+                msg = (
+                    f"The '{deprecated_name}' argument is deprecated.  It will"
+                    f" be removed in a future release.  Found in: {caller_filename}"
+                )
+                warnings.warn(msg)
+                del kwargs[deprecated_name]
+
+        for unknown_arg in kwargs:
+            # Calculated multiple times, but only in errant case -- nominally
+            # fixed and then "not an issue."
+            caller_filename = inspect.stack()[1].filename
+            cls_name = self.__class__.__name__
+            msg = (
+                f"Unknown argument to {cls_name} ignored: {unknown_arg}"
+                f"\n  Specified in: {caller_filename}"
+            )
+            warnings.warn(msg)
 
         # Execution backends
         self.executors = executors  # List of executors
@@ -90,8 +112,6 @@ class Config(RepresentationMixin):
         # Connection info
         self.environment = environment
         self.funcx_service_address = funcx_service_address
-        self.results_ws_uri = results_ws_uri
-        self.warn_about_url_mismatch = warn_about_url_mismatch
 
         # Tuning info
         self.heartbeat_period = heartbeat_period
