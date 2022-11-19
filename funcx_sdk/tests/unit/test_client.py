@@ -13,18 +13,18 @@ def _clear_sdk_env(monkeypatch):
     monkeypatch.delenv("FUNCX_SDK_ENVIRONMENT", raising=False)
 
 
-@pytest.mark.parametrize("env", [None, "dev", "production"])
+@pytest.mark.parametrize("env", [None, "local", "dev", "production"])
 @pytest.mark.parametrize("usage_method", ["env_var", "param"])
-@pytest.mark.parametrize("explicit_params", ["neither", "web", "ws", "both"])
+@pytest.mark.parametrize("explicit_params", [None, "web"])
 def test_client_init_sets_addresses_by_env(
-    monkeypatch, env, usage_method, explicit_params
+    monkeypatch, env, usage_method, explicit_params, randomstring
 ):
     if env in (None, "production"):
         web_uri = "https://api2.funcx.org/v2"
-        ws_uri = "wss://api2.funcx.org/ws/v2/"
-    elif env in ("dev",):
+    elif env == "dev":
         web_uri = "https://api.dev.funcx.org/v2"
-        ws_uri = "wss://api.dev.funcx.org/ws/v2/"
+    elif env == "local":
+        web_uri = "http://localhost:5000/v2"
     else:
         raise NotImplementedError
 
@@ -44,26 +44,16 @@ def test_client_init_sets_addresses_by_env(
 
     # create the client, either with just the input env or with explicit parameters
     # for explicit params, alter the expected URI(s)
-    if explicit_params == "neither":
+    if not explicit_params:
         client = funcx.FuncXClient(**kwargs)
     elif explicit_params == "web":
-        web_uri = "http://localhost:5000"
+        web_uri = f"http://{randomstring()}.fqdn:1234/{randomstring()}"
         client = funcx.FuncXClient(funcx_service_address=web_uri, **kwargs)
-    elif explicit_params == "ws":
-        ws_uri = "ws://localhost:8081"
-        client = funcx.FuncXClient(results_ws_uri=ws_uri, **kwargs)
-    elif explicit_params == "both":
-        web_uri = "http://localhost:5000"
-        ws_uri = "ws://localhost:8081"
-        client = funcx.FuncXClient(
-            funcx_service_address=web_uri, results_ws_uri=ws_uri, **kwargs
-        )
     else:
         raise NotImplementedError
 
-    # finally, confirm that the addresses were set correctly
+    # finally, confirm that the address was set correctly
     assert client.funcx_service_address == web_uri
-    assert client.results_ws_uri == ws_uri
 
 
 def test_client_init_accepts_specified_taskgroup():

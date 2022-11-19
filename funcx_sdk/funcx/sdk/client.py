@@ -152,19 +152,6 @@ class FuncXClient:
                 )
                 warnings.warn(msg)
 
-        if results_ws_uri is None:
-            results_ws_uri = get_web_socket_url(environment)
-
-        if warn_about_url_mismatch and urls_might_mismatch(
-            funcx_service_address, results_ws_uri
-        ):
-            logger.warning(
-                f"funcx_service_address={funcx_service_address} and "
-                f"results_ws_uri={results_ws_uri} "
-                "look like they might point to different environments. double check "
-                "that they are the correct URLs."
-            )
-
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
             self.login_manager: LoginManagerProtocol = login_manager
@@ -184,10 +171,24 @@ class FuncXClient:
         if do_version_check:
             self.version_check()
 
-        self.results_ws_uri = results_ws_uri
+        self.results_ws_uri = None
         self.asynchronous = asynchronous or False
         if asynchronous:
             self.loop = loop if loop else asyncio.get_event_loop()
+
+            if results_ws_uri is None:
+                results_ws_uri = get_web_socket_url(environment)
+            self.results_ws_uri = results_ws_uri
+
+            if warn_about_url_mismatch and urls_might_mismatch(
+                funcx_service_address, results_ws_uri
+            ):  # noqa
+                logger.warning(
+                    f"funcx_service_address={funcx_service_address} and "
+                    f"results_ws_uri={results_ws_uri} "
+                    "look like they might point to different environments.  "
+                    "Double check that they are the correct URLs."
+                )
 
             # Start up an asynchronous polling loop in the background
             self.ws_polling_task = WebSocketPollingTask(
