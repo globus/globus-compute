@@ -17,86 +17,86 @@ def funcx_dir(tmp_path):
     yield fxdir
 
 
-class TestStart:
-    def test_endpoint_id(self, mocker, funcx_dir):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
-        mock_client.return_value = None
+def test_endpoint_id(mocker, funcx_dir):
+    mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
+    mock_client.return_value = None
 
-        manager = Endpoint(funcx_dir=str(funcx_dir))
+    manager = Endpoint(funcx_dir=str(funcx_dir))
 
-        manager.configure_endpoint("mock_endpoint", None)
-        endpoint_config = SourceFileLoader(
-            "config", str(funcx_dir / "mock_endpoint" / "config.py")
-        ).load_module()
+    manager.configure_endpoint("mock_endpoint", None)
+    endpoint_config = SourceFileLoader(
+        "config", str(funcx_dir / "mock_endpoint" / "config.py")
+    ).load_module()
 
-        for executor in endpoint_config.config.executors:
-            executor.passthrough = False
+    for executor in endpoint_config.config.executors:
+        executor.passthrough = False
 
-        ic = EndpointInterchange(
-            endpoint_config.config,
-            reg_info=None,
-            endpoint_id="mock_endpoint_id",
-        )
+    ic = EndpointInterchange(
+        endpoint_config.config,
+        reg_info=None,
+        endpoint_id="mock_endpoint_id",
+    )
 
-        for executor in ic.executors.values():
-            assert executor.endpoint_id == "mock_endpoint_id"
+    for executor in ic.executors.values():
+        assert executor.endpoint_id == "mock_endpoint_id"
 
-    def test_start_no_reg_info(self, mocker, funcx_dir):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
-        mock_client.return_value = None
 
-        mock_register_endpoint = mocker.patch(
-            "funcx_endpoint.endpoint.interchange.register_endpoint"
-        )
-        result_url = "amqp://a.sdf"  # just a filler text for this test; don't ...
-        task_url = "amqp://a.sdf"  # ... mistakenly potentially test the wrong thing
-        mock_register_endpoint.return_value = (
-            {
-                "exchange_name": "results",
-                "exchange_type": "topic",
-                "result_url": result_url,
-                "pika_conn_params": pika.URLParameters(result_url),
-            },
-            {
-                "exchange_name": "tasks",
-                "exchange_type": "direct",
-                "task_url": task_url,
-                "pika_conn_params": pika.URLParameters(task_url),
-            },
-        )
+def test_start_no_reg_info(mocker, funcx_dir):
+    mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
+    mock_client.return_value = None
 
-        manager = Endpoint(funcx_dir=funcx_dir)
+    mock_register_endpoint = mocker.patch(
+        "funcx_endpoint.endpoint.interchange.register_endpoint"
+    )
+    result_url = "amqp://a.sdf"  # just a filler text for this test; don't ...
+    task_url = "amqp://a.sdf"  # ... mistakenly potentially test the wrong thing
+    mock_register_endpoint.return_value = (
+        {
+            "exchange_name": "results",
+            "exchange_type": "topic",
+            "result_url": result_url,
+            "pika_conn_params": pika.URLParameters(result_url),
+        },
+        {
+            "exchange_name": "tasks",
+            "exchange_type": "direct",
+            "task_url": task_url,
+            "pika_conn_params": pika.URLParameters(task_url),
+        },
+    )
 
-        manager.configure_endpoint("mock_endpoint", None)
-        endpoint_config = SourceFileLoader(
-            "config", str(funcx_dir / "mock_endpoint" / "config.py")
-        ).load_module()
+    manager = Endpoint(funcx_dir=funcx_dir)
 
-        for executor in endpoint_config.config.executors:
-            executor.passthrough = False
+    manager.configure_endpoint("mock_endpoint", None)
+    endpoint_config = SourceFileLoader(
+        "config", str(funcx_dir / "mock_endpoint" / "config.py")
+    ).load_module()
 
-        mock_quiesce = mocker.patch.object(
-            EndpointInterchange, "quiesce", return_value=None
-        )
-        mock_main_loop = mocker.patch.object(
-            EndpointInterchange, "_main_loop", return_value=None
-        )
+    for executor in endpoint_config.config.executors:
+        executor.passthrough = False
 
-        ic = EndpointInterchange(
-            config=endpoint_config.config,
-            reg_info=None,
-            endpoint_id="mock_endpoint_id",
-        )
-        ic._kill_event = mocker.Mock()
-        ic._kill_event.is_set.side_effect = (False, True)  # Loop only once
+    mock_quiesce = mocker.patch.object(
+        EndpointInterchange, "quiesce", return_value=None
+    )
+    mock_main_loop = mocker.patch.object(
+        EndpointInterchange, "_main_loop", return_value=None
+    )
 
-        ic.results_outgoing = mocker.Mock()
+    ic = EndpointInterchange(
+        config=endpoint_config.config,
+        reg_info=None,
+        endpoint_id="mock_endpoint_id",
+    )
+    ic._kill_event = mocker.Mock()
+    ic._kill_event.is_set.side_effect = (False, True)  # Loop only once
 
-        ic.start()
-        assert ic._task_puller_proc.is_alive()
-        ic._quiesce_event.set()
-        ic._task_puller_proc.join()
+    ic.results_outgoing = mocker.Mock()
 
-        mock_quiesce.assert_called()
-        mock_main_loop.assert_called()
-        mock_register_endpoint.assert_called()
+    ic.start()
+    assert ic._task_puller_proc.is_alive()
+    ic._quiesce_event.set()
+    ic._task_puller_proc.join()
+
+    mock_quiesce.assert_called()
+    mock_main_loop.assert_called()
+    mock_register_endpoint.assert_called()
