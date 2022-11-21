@@ -20,7 +20,6 @@ import dill
 from funcx_common.messagepack import pack
 from funcx_common.messagepack.message_types import Result, ResultErrorDetails
 from parsl.version import VERSION as PARSL_VERSION
-from retry.api import retry_call
 
 import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
@@ -183,6 +182,7 @@ class EndpointInterchange:
             self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name
         )
         self.task_q_info, self.result_q_info = reg_info
+        log.info(f"Endpoint registered with UUID: {self.endpoint_id}")
 
     def migrate_tasks_to_internal(
         self,
@@ -289,10 +289,7 @@ class EndpointInterchange:
     def _start_threads_and_main(self):
         # re-register on every loop start
         if not self.initial_registration_complete:
-            # Register the endpoint
-            log.info("Running endpoint registration retry loop")
-            retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
-            log.info("Endpoint registered with UUID: (FIXME FIXME FIXME)")
+            self.register_endpoint()
 
         self.initial_registration_complete = False
 
