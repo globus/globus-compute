@@ -42,11 +42,6 @@ class TestStart:
             assert executor.endpoint_id == "mock_endpoint_id"
 
     def test_start_no_reg_info(self, mocker, funcx_dir):
-        def _fake_retry(func, *args, **kwargs):
-            return func()
-
-        mocker.patch("funcx_endpoint.endpoint.interchange.retry_call", _fake_retry)
-
         mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
         mock_client.return_value = None
 
@@ -102,8 +97,6 @@ class TestStart:
         ic._quiesce_event.set()
         ic._task_puller_proc.join()
 
-        # we need to ensure that retry_call is called during interchange
-        # start if reg_info has not been passed into the interchange
         mock_quiesce.assert_called()
         mock_main_loop.assert_called()
         mock_register_endpoint.assert_called()
