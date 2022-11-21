@@ -29,7 +29,7 @@ DOCS_REQUIRES = [
 
 TEST_REQUIRES = [
     "flake8==3.8.0",
-    "pytest",
+    "pytest>=7.2",
     "pytest-mock",
     "coverage",
     # easy mocking of the `requests` library

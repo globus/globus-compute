@@ -41,7 +41,7 @@ REQUIRES = [
 
 TEST_REQUIRES = [
     "responses",
-    "pytest>=5.2",
+    "pytest>=7.2",
     "coverage>=5.2",
     "pytest-mock==3.2.0",
     "pyfakefs",
