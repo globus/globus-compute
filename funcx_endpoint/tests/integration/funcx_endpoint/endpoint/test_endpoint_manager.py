@@ -9,6 +9,7 @@ import pytest
 import requests
 from globus_sdk import GlobusAPIError
 
+from funcx_endpoint.endpoint import default_config
 from funcx_endpoint.endpoint.endpoint import Endpoint
 
 logger = logging.getLogger("mock_funcx")
@@ -25,12 +26,16 @@ def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.R
 
 class TestStart:
     @pytest.fixture(autouse=True)
-    def test_setup_teardown(self):
+    def test_setup_teardown(self, fs):
         # Code that will run before your test, for example:
 
         funcx_dir = f"{os.getcwd()}"
         config_dir = os.path.join(funcx_dir, "mock_endpoint")
         assert not os.path.exists(config_dir)
+
+        # pyfakefs will take care of newly created files, not existing config
+        fs.add_real_file(default_config.__file__)
+
         # A test function will be run at this point
         yield
         # Code that will run after your test, for example:
@@ -50,6 +55,46 @@ class TestStart:
         assert os.path.exists(config_dir)
         with pytest.raises(Exception, match="ConfigExists"):
             manager.configure_endpoint("mock_endpoint", None)
+
+    @pytest.mark.parametrize("mt", [None, True, False])
+    def test_configure_multi_tenant_existing_config(self, mt):
+        manager = Endpoint(funcx_dir=os.getcwd())
+        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_file = os.path.join(config_dir, "config.py")
+        config_copy = os.path.join(manager.funcx_dir, "config2.py")
+
+        # First, make an entry with multi_tenant
+        manager.configure_endpoint("mock_endpoint", None, multi_tenant=True)
+        shutil.move(config_file, config_copy)
+        shutil.rmtree(config_dir)
+
+        # Then, modify it with new setting
+        manager.configure_endpoint("mock_endpoint", config_copy, multi_tenant=mt)
+
+        with open(config_file) as f:
+            config = f.read()
+            assert f"multi_tenant={mt is True}," in config
+
+        os.remove(config_copy)
+
+    @pytest.mark.parametrize("mt", [None, True, False])
+    def test_configure_multi_tenant(self, mt):
+        manager = Endpoint(funcx_dir=os.getcwd())
+        config_file = os.path.join(manager.funcx_dir, "mock_endpoint", "config.py")
+
+        if mt is not None:
+            manager.configure_endpoint("mock_endpoint", None, multi_tenant=mt)
+        else:
+            manager.configure_endpoint("mock_endpoint", None)
+
+        assert os.path.exists(config_file)
+
+        with open(config_file) as f:
+            config = f.read()
+            if mt:
+                assert f"multi_tenant={mt is True}," in config
+            else:
+                assert "multi_tenant" not in config
 
     @pytest.mark.skip(
         "This test needs to be re-written after endpoint_register is updated"

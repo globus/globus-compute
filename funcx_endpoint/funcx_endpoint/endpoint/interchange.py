@@ -179,7 +179,11 @@ class EndpointInterchange:
 
     def register_endpoint(self):
         reg_info = register_endpoint(
-            self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name
+            self.funcx_client,
+            self.endpoint_id,
+            self.endpoint_dir,
+            self.endpoint_name,
+            self.config.multi_tenant is True,
         )
         self.task_q_info, self.result_q_info = reg_info
         log.info(f"Endpoint registered with UUID: {self.endpoint_id}")

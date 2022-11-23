@@ -461,20 +461,23 @@ class FuncXClient:
         return task_uuids
 
     def register_endpoint(
-        self, name, endpoint_id, metadata=None, endpoint_version=None
+        self,
+        name,
+        endpoint_id,
+        metadata=None,
+        endpoint_version=None,
+        multi_tenant=False,
     ):
         """Register an endpoint with the funcX service.
 
         Parameters
         ----------
-        name : str
-            Name of the endpoint
-        endpoint_id : str
-                The uuid of the endpoint
-        metadata : dict
-            endpoint metadata, see default_config example
-        endpoint_version: str
-            Version string to be passed to the webService as a compatibility check
+        :param name str Name of the endpoint
+        :param endpoint_id str The uuid of the endpoint
+        :param metadata dict endpoint metadata, see default_config example
+        :param endpoint_version str Version string to be passed to the
+               webService as a compatibility check
+        :param multi_tenant bool Whether the endpoint supports multiple users
 
         Returns
         -------
@@ -490,6 +493,7 @@ class FuncXClient:
             endpoint_id=endpoint_id,
             metadata=metadata,
             endpoint_version=endpoint_version,
+            multi_tenant=multi_tenant,
         )
         return r.data
 

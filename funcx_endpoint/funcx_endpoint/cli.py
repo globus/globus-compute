@@ -124,16 +124,28 @@ def version_command():
 
 @app.command(name="configure", help="Configure an endpoint")
 @click.option("--endpoint-config", default=None, help="a template config to use")
+@click.option(
+    "--multi-tenant",
+    is_flag=True,
+    default=False,
+    hidden=True,
+    help="Configure endpoint as multi-tenant capable",
+)
 @name_arg
 @common_options
-def configure_endpoint(*, name: str, endpoint_config: str | None):
+def configure_endpoint(
+    *,
+    name: str,
+    endpoint_config: str | None,
+    multi_tenant: bool,
+):
     """Configure an endpoint
 
     Drops a config.py template into the funcx configs directory.
     The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
     """
     endpoint = get_cli_endpoint()
-    endpoint.configure_endpoint(name, endpoint_config)
+    endpoint.configure_endpoint(name, endpoint_config, multi_tenant)
 
 
 @app.command(name="start", help="Start an endpoint by name")

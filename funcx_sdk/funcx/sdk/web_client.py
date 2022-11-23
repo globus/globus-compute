@@ -174,6 +174,7 @@ class FuncxWebClient(globus_sdk.BaseClient):
         *,
         metadata: t.Optional[t.Dict[str, t.Any]] = None,
         endpoint_version: t.Optional[str] = None,
+        multi_tenant: t.Optional[bool] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
         data: t.Dict[str, t.Any] = {
@@ -181,6 +182,12 @@ class FuncxWebClient(globus_sdk.BaseClient):
             "endpoint_uuid": str(endpoint_id),
             "version": endpoint_version,
         }
+
+        # Only send this param if True.  Will have to change to
+        # `if multi_tenant is not None` if we want to always pass it
+        if multi_tenant:
+            data["multi_tenant"] = multi_tenant
+
         if metadata:
             data["meta"] = metadata
         if additional_fields is not None:

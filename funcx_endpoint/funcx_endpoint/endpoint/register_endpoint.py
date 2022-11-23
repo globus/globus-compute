@@ -11,27 +11,26 @@ log = logging.getLogger(__name__)
 
 
 def register_endpoint(
-    funcx_client: FuncXClient, endpoint_uuid: str, endpoint_dir: str, endpoint_name: str
+    funcx_client: FuncXClient,
+    endpoint_uuid: str,
+    endpoint_dir: str,
+    endpoint_name: str,
+    multi_tenant: bool = False,
 ) -> t.Tuple[t.Dict, t.Dict]:
     """Register the endpoint and return the registration info. This function needs
     to be isolated so that the function can both be called from the endpoint start
-    process as well as the daemon process that it spawns.
+    process and the daemon process that it spawns.
 
-    Parameters
-    ----------
-    funcx_client : FuncXClient
-        The auth'd client to communicate with the funcX service
+    :param funcx_client: FuncXClient The auth'd client to communicate with
+     the funcX service
+    :param endpoint_uuid: str The uuid to register the endpoint with
+    :param endpoint_dir: str The endpoint directory path to store data in
+    :param endpoint_name: str The name of the endpoint
+    :param multi_tenant: bool Whether the endpoint should be multi-tenant
 
-    endpoint_uuid : str
-        The uuid to register the endpoint with
+    :return: Registration params
+    :rtype: tuple[dict, dict]
 
-    endpoint_dir : str
-        The endpoint directory path to store data in
-
-    endpoint_name : str
-        The name of the endpoint
-
-    Returns: tuple[dict, dict]
         Eg return value:
         ({'pika_conn_params': <PIKA_URLParameters>,
           'exchange_name': 'tasks',
@@ -50,6 +49,7 @@ def register_endpoint(
         endpoint_name,
         endpoint_uuid,
         endpoint_version=funcx_endpoint.__version__,
+        multi_tenant=multi_tenant,
     )
     if reg_info.get("endpoint_id") != endpoint_uuid:
         raise ValueError("Unexpected response from server: mismatched endpoint id.")

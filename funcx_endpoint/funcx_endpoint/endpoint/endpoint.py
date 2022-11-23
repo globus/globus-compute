@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import pathlib
+import re
 import shutil
 import signal
 import sys
@@ -61,47 +62,68 @@ class Endpoint:
     def _config_file_path(self):
         return os.path.join(self._endpoint_dir, "config.py")
 
-    def init_endpoint_dir(self, endpoint_config=None):
+    def update_config_file(self, original_path, target_path, multi_tenant):
+        with open(original_path) as r:
+            endpoint_config = Template(r.read())
+        endpoint_config = endpoint_config.substitute(name=self.name)
+
+        if endpoint_config.find("multi_tenant=") != -1:
+            # If the option is already in the config, merely update the value
+            endpoint_config = re.sub(
+                "multi_tenant=(True|False)",
+                f"multi_tenant={multi_tenant is True}",
+                endpoint_config,
+            )
+        elif multi_tenant:
+            # If the option isn't pre-existing, add only if set to True
+            endpoint_config = endpoint_config.replace(
+                "\nconfig = Config(\n", "\nconfig = Config(\n    multi_tenant=True,\n"
+            )
+
+        with open(target_path, "w") as w:
+            w.write(endpoint_config)
+
+    def init_endpoint_dir(self, endpoint_config=None, multi_tenant=False):
         """Initialize a clean endpoint dir
         Returns if an endpoint_dir already exists
 
-        Parameters
-        ----------
-        endpoint_config : str
-            Path to a config file to be used instead of the funcX default config file
+        :param endpoint_config str Path to a config file to be used instead
+         of the funcX default config file
+        :param multi_tenant bool Whether the endpoint is a multi-user endpoint
         """
 
         log.debug(f"Creating endpoint dir {self._endpoint_dir}")
         os.makedirs(self._endpoint_dir, exist_ok=True)
 
         endpoint_config_target_file = self._config_file_path
-        if endpoint_config:
-            shutil.copyfile(endpoint_config, endpoint_config_target_file)
-            return self._endpoint_dir
 
-        endpoint_config = endpoint_default_config.__file__
-        with open(endpoint_config) as r:
-            endpoint_config_template = Template(r.read())
+        if endpoint_config is None:
+            endpoint_config = endpoint_default_config.__file__
 
-        endpoint_config_template = endpoint_config_template.substitute(name=self.name)
-        with open(endpoint_config_target_file, "w") as w:
-            w.write(endpoint_config_template)
+        self.update_config_file(
+            endpoint_config,
+            endpoint_config_target_file,
+            multi_tenant,
+        )
 
         return self._endpoint_dir
 
-    def configure_endpoint(self, name, endpoint_config):
+    def configure_endpoint(self, name, endpoint_config, multi_tenant: bool = False):
         self.name = name
 
         if not os.path.exists(self._endpoint_dir):
-            self.init_endpoint_dir(endpoint_config=endpoint_config)
+            self.init_endpoint_dir(
+                endpoint_config=endpoint_config, multi_tenant=multi_tenant
+            )
+            tenant = "multi-tenant endpoint " if multi_tenant else ""
             print(
-                f"A default profile has been create for <{self.name}> "
+                f"Created default {tenant}profile for <{self.name}> "
                 f"at {self._config_file_path}"
             )
             print("Configure this file and try restarting with:")
             print(f"    $ funcx-endpoint start {self.name}")
         else:
-            print(f"config dir <{self.name}> already exsits")
+            print(f"config dir <{self.name}> already exists")
             raise Exception("ConfigExists")
 
     def init_endpoint(self):
@@ -232,7 +254,11 @@ class Endpoint:
         reg_info = None
         try:
             reg_info = register_endpoint(
-                funcx_client, endpoint_uuid, endpoint_dir, self.name
+                funcx_client,
+                endpoint_uuid,
+                endpoint_dir,
+                self.name,
+                endpoint_config.config.multi_tenant,
             )
         # if the service sends back an error response, it will be a FuncxResponseError
         except FuncxResponseError as e:
