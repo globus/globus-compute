@@ -339,11 +339,10 @@ class TestStart:
 
         mock_context.return_value.pidfile.path = ""
 
-        class mock_load:
-            class mock_executors:
-                executors = None
+        class mock_executors:
+            executors = None
 
-            config = mock_executors()
+        mock_config = mock_executors()
 
         manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
@@ -357,7 +356,7 @@ class TestStart:
             log_to_console = False
             no_color = True
             manager.start_endpoint(
-                "mock_endpoint", None, mock_load(), log_to_console, no_color
+                "mock_endpoint", None, mock_config, log_to_console, no_color
             )
 
     @pytest.mark.skip("This test doesn't make much sense")

@@ -9,6 +9,7 @@ import click
 from click import ClickException
 
 from funcx.sdk.login_manager import LoginManager
+from funcx_endpoint.endpoint.utils.config import Config
 
 from .endpoint.endpoint import Endpoint
 from .logging_config import setup_logging
@@ -259,9 +260,11 @@ def _do_start_endpoint(
         return
 
     try:
-        endpoint_config = SourceFileLoader(
-            "config", os.path.join(endpoint_dir, "config.py")
-        ).load_module()
+        endpoint_config: Config = (
+            SourceFileLoader("config", os.path.join(endpoint_dir, "config.py"))
+            .load_module()
+            .config
+        )
     except Exception:
         log.exception(
             "funcX v0.2.0 made several non-backwards compatible changes to the config. "
