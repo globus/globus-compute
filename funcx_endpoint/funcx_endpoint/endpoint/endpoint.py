@@ -24,6 +24,7 @@ from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.result_store import ResultStore
+from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.logging_config import setup_logging
 
 log = logging.getLogger(__name__)
@@ -175,7 +176,7 @@ class Endpoint:
         self,
         name,
         endpoint_uuid,
-        endpoint_config,
+        endpoint_config: Config,
         log_to_console: bool,
         no_color: bool,
     ):
@@ -185,15 +186,15 @@ class Endpoint:
         endpoint_json = os.path.join(endpoint_dir, "endpoint.json")
 
         # This is to ensure that at least 1 executor is defined
-        if not endpoint_config.config.executors:
+        if not endpoint_config.executors:
             raise Exception(
                 f"Endpoint config file at {endpoint_dir} is missing "
                 "executor definitions"
             )
 
         funcx_client_options = {
-            "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "environment": endpoint_config.config.environment,
+            "funcx_service_address": endpoint_config.funcx_service_address,
+            "environment": endpoint_config.environment,
         }
         funcx_client = FuncXClient(**funcx_client_options)
 
@@ -222,12 +223,12 @@ class Endpoint:
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
-        if endpoint_config.config.detach_endpoint:
+        if endpoint_config.detach_endpoint:
             stdout: typing.TextIO = open(
-                os.path.join(endpoint_dir, endpoint_config.config.stdout), "a+"
+                os.path.join(endpoint_dir, endpoint_config.stdout), "a+"
             )
             stderr: typing.TextIO = open(
-                os.path.join(endpoint_dir, endpoint_config.config.stderr), "a+"
+                os.path.join(endpoint_dir, endpoint_config.stderr), "a+"
             )
         else:
             stdout = sys.stdout
@@ -240,7 +241,7 @@ class Endpoint:
                 pidfile=daemon.pidfile.PIDLockFile(pid_file),
                 stdout=stdout,
                 stderr=stderr,
-                detach_process=endpoint_config.config.detach_endpoint,
+                detach_process=endpoint_config.detach_endpoint,
             )
 
         except Exception:
@@ -258,7 +259,7 @@ class Endpoint:
                 endpoint_uuid,
                 endpoint_dir,
                 self.name,
-                endpoint_config.config.multi_tenant,
+                endpoint_config.multi_tenant,
             )
         # if the service sends back an error response, it will be a FuncxResponseError
         except FuncxResponseError as e:
@@ -341,13 +342,13 @@ class Endpoint:
         self,
         endpoint_uuid,
         endpoint_dir,
-        endpoint_config,
+        endpoint_config: Config,
         reg_info,
         funcx_client: FuncXClient,
         result_store: ResultStore,
     ):
         interchange = EndpointInterchange(
-            config=endpoint_config.config,
+            config=endpoint_config,
             reg_info=reg_info,
             endpoint_id=endpoint_uuid,
             endpoint_dir=endpoint_dir,

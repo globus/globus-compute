@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shlex
 from unittest import mock
 
@@ -10,12 +9,16 @@ from click.testing import CliRunner
 from funcx_endpoint.cli import app
 
 
+@pytest.fixture
+def funcx_dir_path(tmp_path):
+    yield tmp_path / "funcx-dir"
+
+
 @pytest.fixture(autouse=True)
-def endpoint_obj(tmp_path):
-    funcx_dir = tmp_path / "funcx-dir"
+def endpoint_obj(funcx_dir_path):
     with mock.patch("funcx_endpoint.cli.get_cli_endpoint") as m:
         mock_ep = mock.Mock()
-        mock_ep.funcx_dir = str(funcx_dir)
+        mock_ep.funcx_dir = funcx_dir_path
         mock_ep.funcx_config_file_name = "config.py"
 
         m.return_value = mock_ep
@@ -25,12 +28,10 @@ def endpoint_obj(tmp_path):
 @pytest.fixture
 def make_endpoint_dir(endpoint_obj):
     def func(name):
-        ep_dir = os.path.join(endpoint_obj.funcx_dir, name)
-        ep_config = os.path.join(ep_dir, "config.py")
-        os.makedirs(ep_dir, exist_ok=True)
-        # touch the config file, so loading will work
-        with open(ep_config, "w"):
-            pass
+        ep_dir = endpoint_obj.funcx_dir / name
+        ep_dir.mkdir(parents=True, exist_ok=True)
+        ep_config = ep_dir / endpoint_obj.funcx_config_file_name
+        ep_config.write_text("config = 1")  # minimal setup to make loading work
 
     return func
 
