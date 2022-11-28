@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 import pathlib
-from importlib.machinery import SourceFileLoader
 
 import click
 from click import ClickException
@@ -242,29 +242,51 @@ def _do_start_endpoint(
     log_to_console: bool,
     no_color: bool,
 ):
-    endpoint = get_cli_endpoint()
-    endpoint_dir = os.path.join(endpoint.funcx_dir, name)
+    state = CommandState.ensure()
 
-    if not os.path.exists(endpoint_dir):
-        configure_command = "funcx-endpoint configure"
-        if name != "default":
-            configure_command += f" -n {name}"
-        msg = (
-            f"\nEndpoint {name} is not configured!\n"
-            "1. Please create a configuration template with:\n"
-            f"\t{configure_command}\n"
-            "2. Update the configuration\n"
-            "3. Start the endpoint\n"
-        )
-        click.echo(msg)
-        return
+    funcx_dir = pathlib.Path(state.endpoint_config_dir)
+    endpoint_dir = funcx_dir / name
 
     try:
-        endpoint_config: Config = (
-            SourceFileLoader("config", os.path.join(endpoint_dir, "config.py"))
-            .load_module()
-            .config
+        conf_path = endpoint_dir / "config.py"
+        spec = importlib.util.spec_from_file_location("config", conf_path)
+        if not (spec and spec.loader):
+            raise Exception(f"Unable to import configuration (no spec): {conf_path}")
+        config = importlib.util.module_from_spec(spec)
+        if not config:
+            raise Exception(f"Unable to import configuration (no config): {conf_path}")
+        spec.loader.exec_module(config)
+        endpoint_config: Config = config.config
+
+    except FileNotFoundError as err:
+        if not endpoint_dir.exists():
+            configure_command = "funcx-endpoint configure"
+            if name != "default":
+                configure_command += f" {name}"
+            msg = (
+                f"{err}"
+                f"\n\nEndpoint '{name}' is not configured!"
+                "\n1. Please create a configuration template with:"
+                f"\n\t{configure_command}"
+                "\n2. Update the configuration"
+                "\n3. Start the endpoint\n"
+            )
+            raise ClickException(msg) from err
+        msg = (
+            f"{err}"
+            "\n\nUnable to find required configuration file; has the configuration"
+            "\ndirectory been corrupted?"
         )
+        raise ClickException(msg) from err
+
+    except AttributeError as err:
+        msg = (
+            f"{err}"
+            "\n\nFailed to find expected data structure in configuration file."
+            "\nHas the configuration file been corrupted or modified incorrectly?\n"
+        )
+        raise ClickException(msg) from err
+
     except Exception:
         log.exception(
             "funcX v0.2.0 made several non-backwards compatible changes to the config. "
@@ -273,7 +295,8 @@ def _do_start_endpoint(
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
         )
         raise
-    endpoint.start_endpoint(
+
+    get_cli_endpoint().start_endpoint(
         name, endpoint_uuid, endpoint_config, log_to_console, no_color
     )
 
