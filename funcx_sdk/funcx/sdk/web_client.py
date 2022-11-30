@@ -230,3 +230,8 @@ class FuncxWebClient(globus_sdk.BaseClient):
         self, endpoint_id: ID_PARAM_T, function_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.delete(f"/endpoints/{endpoint_id}/whitelist/{function_id}")
+
+    def add_endpoint_uuid_lock(
+        self, endpoint_id: ID_PARAM_T
+    ) -> globus_sdk.GlobusHTTPResponse:
+        return self.post(f"/endpoints/{endpoint_id}/lock", data={})

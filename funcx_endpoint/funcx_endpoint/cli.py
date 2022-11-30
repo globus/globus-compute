@@ -303,15 +303,20 @@ def _do_start_endpoint(
 
 @app.command("stop")
 @name_arg
+@click.option(
+    "--remote",
+    is_flag=True,
+    help="send stop signal to all endpoints with this UUID, local or elsewhere",
+)
 @common_options
-def stop_endpoint(*, name: str):
+def stop_endpoint(*, name: str, remote: bool):
     """Stops an endpoint using the pidfile"""
-    _do_stop_endpoint(name=name)
+    _do_stop_endpoint(name=name, remote=remote)
 
 
-def _do_stop_endpoint(*, name: str) -> None:
+def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
     endpoint = get_cli_endpoint()
-    endpoint.stop_endpoint(name)
+    endpoint.stop_endpoint(name, lock_uuid=remote)
 
 
 @app.command("restart")

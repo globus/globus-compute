@@ -16,9 +16,13 @@ import daemon
 import daemon.pidfile
 import psutil
 import texttable
+from funcx_common.response_errors.error_base import FuncxResponseError
+from funcx_common.response_errors.error_classes import (
+    EndpointInUseError,
+    EndpointLockedError,
+)
 from globus_sdk import GlobusAPIError, NetworkError
 
-from funcx.errors import FuncxResponseError
 from funcx.sdk.client import FuncXClient
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
@@ -54,6 +58,8 @@ class Endpoint:
         self.debug = debug
         self.funcx_dir = funcx_dir if funcx_dir is not None else _DEFAULT_FUNCX_DIR
         self.name = "default"
+
+        self.fx_client = None
 
     @property
     def _endpoint_dir(self):
@@ -127,6 +133,11 @@ class Endpoint:
             print(f"config dir <{self.name}> already exists")
             raise Exception("ConfigExists")
 
+    def initialize_fx_client(self, do_version_check: bool = False):
+        if self.fx_client is None:
+            self.fx_client = FuncXClient(do_version_check=do_version_check)
+        return self.fx_client
+
     def init_endpoint(self):
         """Setup funcx dirs and default endpoint config files
 
@@ -139,7 +150,7 @@ class Endpoint:
         """
         # construct client to force login flow
         # FIXME: `funcx` should provide a cleaner way of doing login
-        FuncXClient(do_version_check=False)
+        self.initialize_fx_client()
 
         if os.path.exists(self.funcx_dir):
             click.confirm(
@@ -196,7 +207,8 @@ class Endpoint:
             "funcx_service_address": endpoint_config.funcx_service_address,
             "environment": endpoint_config.environment,
         }
-        funcx_client = FuncXClient(**funcx_client_options)
+
+        self.fx_client = FuncXClient(**funcx_client_options)
 
         endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
 
@@ -255,7 +267,7 @@ class Endpoint:
         reg_info = None
         try:
             reg_info = register_endpoint(
-                funcx_client,
+                self.fx_client,
                 endpoint_uuid,
                 endpoint_dir,
                 self.name,
@@ -274,6 +286,11 @@ class Endpoint:
                     "registered."
                 )
             else:
+                if (
+                    e.http_status_code == EndpointLockedError.http_status_code
+                    or e.http_status_code == EndpointInUseError.http_status_code
+                ):
+                    log.warning(f"Endpoint registration blocked. {e.reason}")
                 raise e
         # if the service has an unexpected internal error and is unable to send
         # back a FuncxResponseError
@@ -334,7 +351,7 @@ class Endpoint:
                 endpoint_dir,
                 endpoint_config,
                 reg_info,
-                funcx_client,
+                self.fx_client,
                 result_store,
             )
 
@@ -362,11 +379,26 @@ class Endpoint:
 
         log.critical("Interchange terminated.")
 
-    def stop_endpoint(self, name):
+    @staticmethod
+    def get_endpoint_id(endpoint_dir: str) -> typing.Union[str, None]:
+        info_file_path = os.path.join(endpoint_dir, "endpoint.json")
+        if os.path.exists(info_file_path):
+            with open(info_file_path) as f:
+                endpoint_info = json.load(f)
+                return endpoint_info["endpoint_id"]
+        return None
+
+    def stop_endpoint(self, name: str, lock_uuid: bool = None):
         self.name = name
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
-        pid_file = os.path.join(endpoint_dir, "daemon.pid")
+        pid_file = os.path.join(self._endpoint_dir, "daemon.pid")
         pid_check = self.check_pidfile(pid_file)
+
+        if lock_uuid is True:
+            endpoint_id = Endpoint.get_endpoint_id(self._endpoint_dir)
+            if endpoint_id:
+                self.initialize_fx_client().lock_endpoint(endpoint_id)
+            else:
+                raise ValueError(f"Endpoint {name} could not be located")
 
         # The process is active if the PID file exists and the process it points to is
         # a funcx-endpoint
@@ -485,13 +517,9 @@ class Endpoint:
             endpoint_dir = os.path.dirname(config_file)
             endpoint_name = os.path.basename(endpoint_dir)
             status = "Initialized"
-            endpoint_id = None
+            endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
 
-            endpoint_json = os.path.join(endpoint_dir, "endpoint.json")
-            if os.path.exists(endpoint_json):
-                with open(endpoint_json) as f:
-                    endpoint_info = json.load(f)
-                    endpoint_id = endpoint_info["endpoint_id"]
+            if endpoint_id:
                 pid_check = self.check_pidfile(os.path.join(endpoint_dir, "daemon.pid"))
                 if pid_check["active"]:
                     status = "Running"
