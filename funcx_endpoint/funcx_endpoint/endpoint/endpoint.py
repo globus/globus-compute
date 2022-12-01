@@ -1,4 +1,5 @@
-import glob
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -11,7 +12,6 @@ import typing
 import uuid
 from string import Template
 
-import click
 import daemon
 import daemon.pidfile
 import psutil
@@ -65,14 +65,18 @@ class Endpoint:
     def _endpoint_dir(self):
         return os.path.join(self.funcx_dir, self.name)
 
-    @property
-    def _config_file_path(self):
-        return os.path.join(self._endpoint_dir, "config.py")
+    @staticmethod
+    def _config_file_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+        return endpoint_dir / "config.py"
 
-    def update_config_file(self, original_path, target_path, multi_tenant):
-        with open(original_path) as r:
-            endpoint_config = Template(r.read())
-        endpoint_config = endpoint_config.substitute(name=self.name)
+    @staticmethod
+    def update_config_file(
+        ep_name: str,
+        original_path: pathlib.Path,
+        target_path: pathlib.Path,
+        multi_tenant: bool,
+    ):
+        endpoint_config = Template(original_path.read_text()).substitute(name=ep_name)
 
         if endpoint_config.find("multi_tenant=") != -1:
             # If the option is already in the config, merely update the value
@@ -87,90 +91,57 @@ class Endpoint:
                 "\nconfig = Config(\n", "\nconfig = Config(\n    multi_tenant=True,\n"
             )
 
-        with open(target_path, "w") as w:
-            w.write(endpoint_config)
+        target_path.write_text(endpoint_config)
 
-    def init_endpoint_dir(self, endpoint_config=None, multi_tenant=False):
+    @staticmethod
+    def init_endpoint_dir(
+        endpoint_dir: pathlib.Path,
+        endpoint_config: pathlib.Path | None = None,
+        multi_tenant=False,
+    ):
         """Initialize a clean endpoint dir
-        Returns if an endpoint_dir already exists
 
+        :param endpoint_dir pathlib.Path Path to the endpoint configuration dir
         :param endpoint_config str Path to a config file to be used instead
          of the funcX default config file
         :param multi_tenant bool Whether the endpoint is a multi-user endpoint
         """
+        log.debug(f"Creating endpoint dir {endpoint_dir}")
+        endpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        log.debug(f"Creating endpoint dir {self._endpoint_dir}")
-        os.makedirs(self._endpoint_dir, exist_ok=True)
-
-        endpoint_config_target_file = self._config_file_path
+        config_target_path = Endpoint._config_file_path(endpoint_dir)
 
         if endpoint_config is None:
-            endpoint_config = endpoint_default_config.__file__
+            endpoint_config = pathlib.Path(endpoint_default_config.__file__)
 
-        self.update_config_file(
+        Endpoint.update_config_file(
+            endpoint_dir.name,
             endpoint_config,
-            endpoint_config_target_file,
+            config_target_path,
             multi_tenant,
         )
 
-        return self._endpoint_dir
-
-    def configure_endpoint(self, name, endpoint_config, multi_tenant: bool = False):
-        self.name = name
-
-        if not os.path.exists(self._endpoint_dir):
-            self.init_endpoint_dir(
-                endpoint_config=endpoint_config, multi_tenant=multi_tenant
-            )
-            tenant = "multi-tenant endpoint " if multi_tenant else ""
-            print(
-                f"Created default {tenant}profile for <{self.name}> "
-                f"at {self._config_file_path}"
-            )
-            print("Configure this file and try restarting with:")
-            print(f"    $ funcx-endpoint start {self.name}")
-        else:
-            print(f"config dir <{self.name}> already exists")
+    @staticmethod
+    def configure_endpoint(
+        conf_dir: pathlib.Path, endpoint_config: str | None, multi_tenant: bool = False
+    ):
+        ep_name = conf_dir.name
+        if conf_dir.exists():
+            print(f"config dir <{ep_name}> already exists")
             raise Exception("ConfigExists")
 
-    def initialize_fx_client(self, do_version_check: bool = False):
-        if self.fx_client is None:
-            self.fx_client = FuncXClient(do_version_check=do_version_check)
-        return self.fx_client
-
-    def init_endpoint(self):
-        """Setup funcx dirs and default endpoint config files
-
-        TO-DO : Every mechanism that will update the config file, must be using a
-        locking mechanism, ideally something like fcntl [1]
-        to ensure that multiple endpoint invocations do not mangle the funcx config
-        files or the lockfile module.
-
-        [1] https://docs.python.org/3/library/fcntl.html
-        """
-        # construct client to force login flow
-        # FIXME: `funcx` should provide a cleaner way of doing login
-        self.initialize_fx_client()
-
-        if os.path.exists(self.funcx_dir):
-            click.confirm(
-                "Are you sure you want to initialize this directory? "
-                f"This will erase everything in {self.funcx_dir}",
-                abort=True,
-            )
-            log.info(f"Wiping all current configs in {self.funcx_dir}")
-            backup_dir = self.funcx_dir + ".bak"
-            try:
-                log.debug(f"Removing old backups in {backup_dir}")
-                shutil.rmtree(backup_dir)
-            except OSError:
-                pass
-            os.renames(self.funcx_dir, backup_dir)
-
-        try:
-            os.makedirs(self.funcx_dir, exist_ok=True)
-        except Exception as e:
-            print(f"[FuncX] Caught exception during registration {e}")
+        templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
+        Endpoint.init_endpoint_dir(conf_dir, templ_conf_path, multi_tenant)
+        config_path = Endpoint._config_file_path(conf_dir)
+        if multi_tenant:
+            print(f"Created multi-tenant profile for <{ep_name}>")
+        else:
+            print(f"Created profile for <{ep_name}>")
+        print(
+            f"\n    Configuration file: {config_path}\n"
+            "\nUse the `start` subcommand to run it:\n"
+            f"\n    $ funcx-endpoint start {ep_name}"
+        )
 
     @staticmethod
     def check_endpoint_json(endpoint_json, endpoint_uuid):
@@ -193,7 +164,7 @@ class Endpoint:
     ):
         self.name = name
 
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
+        endpoint_dir = self._endpoint_dir
         endpoint_json = os.path.join(endpoint_dir, "endpoint.json")
 
         # This is to ensure that at least 1 executor is defined
@@ -210,12 +181,12 @@ class Endpoint:
 
         self.fx_client = FuncXClient(**funcx_client_options)
 
-        endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
+        endpoint_uuid = Endpoint.check_endpoint_json(endpoint_json, endpoint_uuid)
 
         log.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
         pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        pid_check = self.check_pidfile(pid_file)
+        pid_check = Endpoint.check_pidfile(pid_file)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
         # potentially running with the existing pidfile
@@ -228,7 +199,7 @@ class Endpoint:
                     "A prior Endpoint instance appears to have been terminated without "
                     "proper cleanup. Cleaning up now."
                 )
-                self.pidfile_cleanup(pid_file)
+                Endpoint.pidfile_cleanup(pid_file)
 
         result_store = ResultStore(endpoint_dir=endpoint_dir)
 
@@ -260,7 +231,7 @@ class Endpoint:
             log.exception(
                 "Caught exception while trying to setup endpoint context dirs"
             )
-            sys.exit(-1)
+            exit(-1)
 
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
@@ -346,7 +317,8 @@ class Endpoint:
                 no_color=no_color,
             )
 
-            self.daemon_launch(
+            Endpoint.daemon_launch(
+                self.name,
                 endpoint_uuid,
                 endpoint_dir,
                 endpoint_config,
@@ -355,8 +327,9 @@ class Endpoint:
                 result_store,
             )
 
+    @staticmethod
     def daemon_launch(
-        self,
+        ep_name,
         endpoint_uuid,
         endpoint_dir,
         endpoint_config: Config,
@@ -369,7 +342,7 @@ class Endpoint:
             reg_info=reg_info,
             endpoint_id=endpoint_uuid,
             endpoint_dir=endpoint_dir,
-            endpoint_name=self.name,
+            endpoint_name=ep_name,
             funcx_client=funcx_client,
             result_store=result_store,
             logdir=endpoint_dir,
@@ -380,85 +353,77 @@ class Endpoint:
         log.critical("Interchange terminated.")
 
     @staticmethod
-    def get_endpoint_id(endpoint_dir: str) -> typing.Union[str, None]:
-        info_file_path = os.path.join(endpoint_dir, "endpoint.json")
-        if os.path.exists(info_file_path):
-            with open(info_file_path) as f:
-                endpoint_info = json.load(f)
-                return endpoint_info["endpoint_id"]
+    def get_endpoint_id(endpoint_dir: pathlib.Path) -> str | None:
+        info_file_path = endpoint_dir / "endpoint.json"
+        if info_file_path.is_file():
+            return json.loads(info_file_path.read_bytes())["endpoint_id"]
         return None
 
-    def stop_endpoint(self, name: str, lock_uuid: bool = None):
-        self.name = name
-        pid_file = os.path.join(self._endpoint_dir, "daemon.pid")
-        pid_check = self.check_pidfile(pid_file)
+    @staticmethod
+    def stop_endpoint(endpoint_dir: pathlib.Path, lock_uuid: bool = False):
+        pid_path = endpoint_dir / "daemon.pid"
+        ep_name = endpoint_dir.name
 
         if lock_uuid is True:
-            endpoint_id = Endpoint.get_endpoint_id(self._endpoint_dir)
-            if endpoint_id:
-                self.initialize_fx_client().lock_endpoint(endpoint_id)
+            endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
+            if not endpoint_id:
+                raise ValueError(f"Endpoint <{ep_name}> could not be located")
+            FuncXClient(do_version_check=False).lock_endpoint(endpoint_id)
+
+        ep_status = Endpoint.check_pidfile(pid_path)
+        if ep_status["exists"] and not ep_status["active"]:
+            Endpoint.pidfile_cleanup(pid_path)
+            return
+        elif not ep_status["exists"]:
+            log.info(f"Endpoint <{ep_name}> is not active.")
+            return
+
+        log.debug(f"{ep_name} has a daemon.pid file")
+        pid = int(pid_path.read_text().strip())
+        try:
+            log.debug(f"Signaling process: {pid}")
+            # For all the processes, including the deamon and its descendants,
+            # send SIGTERM, wait for 10s, and then SIGKILL any still alive.
+            grace_period_s = 10
+            parent = psutil.Process(pid)
+            processes = parent.children(recursive=True)
+            processes.append(parent)
+            for p in processes:
+                p.send_signal(signal.SIGTERM)
+            terminated, alive = psutil.wait_procs(processes, timeout=grace_period_s)
+            for p in alive:
+                try:
+                    p.send_signal(signal.SIGKILL)
+                except psutil.NoSuchProcess:
+                    pass
+
+            if pid_path.exists():
+                log.warning(f"Endpoint <{ep_name}> did not gracefully shutdown")
             else:
-                raise ValueError(f"Endpoint {name} could not be located")
+                log.info(f"Endpoint <{ep_name}> is now stopped")
+        except OSError:
+            log.warning(f"Endpoint <{ep_name}> could not be terminated")
+            log.warning(f"Attempting Endpoint <{ep_name}> cleanup")
+            pid_path.unlink(missing_ok=True)
+            exit(-1)
 
-        # The process is active if the PID file exists and the process it points to is
-        # a funcx-endpoint
-        if pid_check["active"]:
-            log.debug(f"{self.name} has a daemon.pid file")
-            pid = None
-            with open(pid_file) as f:
-                pid = int(f.read())
-            # Attempt terminating
-            try:
-                log.debug(f"Signalling process: {pid}")
-                # For all the processes, including the deamon and its child process tree
-                # Send SIGTERM to the processes
-                # Wait for 200ms
-                # Send SIGKILL to the processes that are still alive
-                parent = psutil.Process(pid)
-                processes = parent.children(recursive=True)
-                processes.append(parent)
-                for p in processes:
-                    p.send_signal(signal.SIGTERM)
-                # graceful RabbitMQ cleanup takes some time
-                terminated, alive = psutil.wait_procs(processes, timeout=10)
-                for p in alive:
-                    # sometimes a process that was marked as alive before can terminate
-                    # before this signal is sent
-                    try:
-                        p.send_signal(signal.SIGKILL)
-                    except psutil.NoSuchProcess:
-                        pass
-                # Wait to confirm that the pid file disappears
-                if not os.path.exists(pid_file):
-                    log.info(f"Endpoint <{self.name}> is now stopped")
+    @staticmethod
+    def delete_endpoint(endpoint_dir: pathlib.Path):
+        ep_name = endpoint_dir.name
 
-            except OSError:
-                log.warning(f"Endpoint <{self.name}> could not be terminated")
-                log.warning(f"Attempting Endpoint <{self.name}> cleanup")
-                os.remove(pid_file)
-                sys.exit(-1)
-        # The process is not active, but the PID file exists and needs to be deleted
-        elif pid_check["exists"]:
-            self.pidfile_cleanup(pid_file)
-        else:
-            log.info(f"Endpoint <{self.name}> is not active.")
-
-    def delete_endpoint(self, name):
-        self.name = name
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
-
-        if not os.path.exists(endpoint_dir):
-            log.warning(f"Endpoint <{self.name}> does not exist")
-            sys.exit(-1)
+        if not endpoint_dir.exists():
+            log.warning(f"Endpoint <{ep_name}> does not exist")
+            exit(-1)
 
         # stopping the endpoint should handle all of the process cleanup before
         # deletion of the directory
-        self.stop_endpoint(self.name)
+        Endpoint.stop_endpoint(endpoint_dir)
 
         shutil.rmtree(endpoint_dir)
-        log.info(f"Endpoint <{self.name}> has been deleted.")
+        log.info(f"Endpoint <{ep_name}> has been deleted.")
 
-    def check_pidfile(self, filepath):
+    @staticmethod
+    def check_pidfile(pid_path: pathlib.Path | str):
         """Helper function to identify possible dead endpoints
 
         Returns a record with 'exists' and 'active' fields indicating
@@ -467,37 +432,38 @@ class Endpoint:
 
         Parameters
         ----------
-        filepath : str
-            Path to the pidfile
+        pid_path : str
+            Path to the pid file
         """
-        if not os.path.exists(filepath):
-            return {"exists": False, "active": False}
+        status = {"exists": False, "active": False}
+        pid_path = pathlib.Path(pid_path)
+        if not pid_path.exists():
+            return status
 
-        pid = int(open(filepath).read().strip())
-
-        active = False
+        pid = int(pid_path.read_text().strip())
         try:
             psutil.Process(pid)
+            status["active"] = True
         except psutil.NoSuchProcess:
             pass
-        else:
-            # this is the only case where the endpoint is active. If no process exists,
-            # it means the endpoint has been terminated without proper cleanup
-            active = True
 
-        return {"exists": True, "active": active}
+        return status
 
-    def pidfile_cleanup(self, filepath):
-        os.remove(filepath)
-        log.info(f"Endpoint <{self.name}> has been cleaned up.")
+    @staticmethod
+    def pidfile_cleanup(pid_path: pathlib.Path | str):
+        pid_path = pathlib.Path(pid_path)
+        pid_path.unlink(missing_ok=True)
+        ep_name = pid_path.parent.name
+        log.info(f"Endpoint <{ep_name}> has been cleaned up.")
 
-    def get_endpoints(self, status_filter=None):
+    @staticmethod
+    def get_endpoints(funcx_conf_dir: pathlib.Path | str) -> dict[str, dict]:
         """
         Gets a dictionary that contains information about all locally
         known endpoints.
 
         "status" can be one of:
-            ["Running", "Disconnected", "Stopped"]
+            ["Initialized", "Running", "Disconnected", "Stopped"]
 
         Example output:
         {
@@ -511,34 +477,39 @@ class Endpoint:
             }
         }
         """
-        endpoint_dict = {}
-        config_files = glob.glob(os.path.join(self.funcx_dir, "*", "config.py"))
-        for config_file in config_files:
-            endpoint_dir = os.path.dirname(config_file)
-            endpoint_name = os.path.basename(endpoint_dir)
-            status = "Initialized"
-            endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
+        ep_statuses = {}
 
-            if endpoint_id:
-                pid_check = self.check_pidfile(os.path.join(endpoint_dir, "daemon.pid"))
-                if pid_check["active"]:
-                    status = "Running"
-                elif pid_check["exists"]:
-                    status = "Disconnected"
-                else:
-                    status = "Stopped"
+        funcx_conf_dir = pathlib.Path(funcx_conf_dir)
+        ep_dir_paths = (p.parent for p in funcx_conf_dir.glob("*/config.py"))
+        for ep_path in ep_dir_paths:
+            ep_status = {
+                "status": "Initialized",
+                "id": Endpoint.get_endpoint_id(ep_path),
+            }
+            ep_statuses[ep_path.name] = ep_status
+            if not ep_status["id"]:
+                continue
 
-            if status_filter is None or status_filter == status:
-                endpoint_dict[endpoint_name] = {
-                    "status": status,
-                    "id": endpoint_id,
-                }
-        return endpoint_dict
+            pid_check = Endpoint.check_pidfile(ep_path / "daemon.pid")
+            if pid_check["active"]:
+                ep_status["status"] = "Running"
+            elif pid_check["exists"]:
+                ep_status["status"] = "Disconnected"
+            else:
+                ep_status["status"] = "Stopped"
 
-    def get_running_endpoints(self):
-        return self.get_endpoints(status_filter="Running")
+        return ep_statuses
 
-    def print_endpoint_table(self, ofile=None):
+    @staticmethod
+    def get_running_endpoints(conf_dir: pathlib.Path):
+        return {
+            ep_name: ep_status
+            for ep_name, ep_status in Endpoint.get_endpoints(conf_dir).items()
+            if ep_status["status"].lower() == "running"
+        }
+
+    @staticmethod
+    def print_endpoint_table(conf_dir: pathlib.Path, ofile=None):
         """
         Converts locally configured endpoint list to a text based table
         and prints the output.
@@ -547,7 +518,7 @@ class Endpoint:
         if not ofile:
             ofile = sys.stdout
 
-        endpoints = self.get_endpoints()
+        endpoints = Endpoint.get_endpoints(conf_dir)
         if not endpoints:
             print(
                 "No endpoints configured!\n\n  (Hint: funcx-endpoint configure)",

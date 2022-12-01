@@ -1,4 +1,5 @@
 import logging
+import pathlib
 from importlib.machinery import SourceFileLoader
 
 import pika
@@ -22,8 +23,9 @@ def test_endpoint_id(mocker, funcx_dir):
     mock_client.return_value = None
 
     manager = Endpoint(funcx_dir=str(funcx_dir))
+    config_dir = funcx_dir / "mock_endpoint"
 
-    manager.configure_endpoint("mock_endpoint", None)
+    manager.configure_endpoint(config_dir, None)
     endpoint_config = SourceFileLoader(
         "config", str(funcx_dir / "mock_endpoint" / "config.py")
     ).load_module()
@@ -66,8 +68,9 @@ def test_start_no_reg_info(mocker, funcx_dir):
     )
 
     manager = Endpoint(funcx_dir=funcx_dir)
+    config_dir = pathlib.Path(funcx_dir) / "mock_endpoint"
 
-    manager.configure_endpoint("mock_endpoint", None)
+    manager.configure_endpoint(config_dir, None)
     endpoint_config = SourceFileLoader(
         "config", str(funcx_dir / "mock_endpoint" / "config.py")
     ).load_module()
