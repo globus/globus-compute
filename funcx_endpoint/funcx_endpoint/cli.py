@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import logging
-import os
 import pathlib
 
 import click
@@ -29,22 +28,42 @@ class CommandState:
         return click.get_current_context().ensure_object(CommandState)
 
 
+def init_endpoint_configuration_dir(funcx_conf_dir: pathlib.Path):
+    if not funcx_conf_dir.exists():
+        log.info(
+            "No existing configuration found at %s. Initializing...", funcx_conf_dir
+        )
+        try:
+            funcx_conf_dir.mkdir(mode=0o700, exist_ok=True)
+        except Exception as exc:
+            e = click.ClickException(
+                f"{exc}\n\nUnable to create configuration directory"
+            )
+            raise e from exc
+
+    elif not funcx_conf_dir.is_dir():
+        raise click.ClickException(
+            f"File already exists: {funcx_conf_dir}\n\n"
+            "Refusing to initialize funcX configuration directory: path already exists"
+        )
+
+
+def get_config_dir() -> pathlib.Path:
+    state = CommandState.ensure()
+    return pathlib.Path(state.endpoint_config_dir)
+
+
 def get_cli_endpoint() -> Endpoint:
     # this getter creates an Endpoint object from the CommandState
     # it takes its various configurable values from the current CommandState
     # as a result, any number of CLI options may be used to tweak the CommandState
     # via callbacks, and the Endpoint will only be constructed within commands which
     # access the Endpoint via this getter
+    funcx_dir = get_config_dir()
+    init_endpoint_configuration_dir(funcx_dir)
+
     state = CommandState.ensure()
-
-    endpoint = Endpoint(funcx_dir=state.endpoint_config_dir, debug=state.debug)
-
-    # ensure that configs exist
-    if not os.path.exists(endpoint.funcx_dir):
-        log.info(
-            "No existing configuration found at %s. Initializing...", endpoint.funcx_dir
-        )
-        endpoint.init_endpoint()
+    endpoint = Endpoint(funcx_dir=str(funcx_dir), debug=state.debug)
 
     return endpoint
 
@@ -145,8 +164,9 @@ def configure_endpoint(
     Drops a config.py template into the funcx configs directory.
     The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
     """
-    endpoint = get_cli_endpoint()
-    endpoint.configure_endpoint(name, endpoint_config, multi_tenant)
+    funcx_dir = get_config_dir()
+    ep_dir = funcx_dir / name
+    Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant)
 
 
 @app.command(name="start", help="Start an endpoint by name")
@@ -212,9 +232,9 @@ def _do_logout_endpoints(
     Returns True, None if logout was successful and tokens were found and revoked
     Returns False, error_msg if token revocation was not done
     """
-
     if running_endpoints is None:
-        running_endpoints = get_cli_endpoint().get_running_endpoints()
+        funcx_dir = get_config_dir()
+        running_endpoints = Endpoint.get_running_endpoints(funcx_dir)
     tokens_revoked = False
     error_msg = None
     if running_endpoints and not force:
@@ -242,9 +262,7 @@ def _do_start_endpoint(
     log_to_console: bool,
     no_color: bool,
 ):
-    state = CommandState.ensure()
-
-    funcx_dir = pathlib.Path(state.endpoint_config_dir)
+    funcx_dir = get_config_dir()
     endpoint_dir = funcx_dir / name
 
     try:
@@ -315,8 +333,9 @@ def stop_endpoint(*, name: str, remote: bool):
 
 
 def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
-    endpoint = get_cli_endpoint()
-    endpoint.stop_endpoint(name, lock_uuid=remote)
+    funcx_dir = get_config_dir()
+    ep_dir = funcx_dir / name
+    Endpoint.stop_endpoint(ep_dir, lock_uuid=remote)
 
 
 @app.command("restart")
@@ -339,8 +358,8 @@ def restart_endpoint(*, name: str, endpoint_uuid: str | None):
 @common_options
 def list_endpoints():
     """List all available endpoints"""
-    endpoint = get_cli_endpoint()
-    endpoint.print_endpoint_table()
+    funcx_dir = get_config_dir()
+    Endpoint.print_endpoint_table(funcx_dir)
 
 
 @app.command("delete")
@@ -354,8 +373,8 @@ def delete_endpoint(*, name: str, yes: bool):
             f"Are you sure you want to delete the endpoint <{name}>?", abort=True
         )
 
-    endpoint = get_cli_endpoint()
-    endpoint.delete_endpoint(name)
+    ep_dir = get_config_dir() / name
+    Endpoint.delete_endpoint(ep_dir)
 
 
 def cli_run():

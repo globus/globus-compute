@@ -1,3 +1,4 @@
+import pathlib
 from unittest.mock import Mock, patch
 
 import pytest
@@ -6,7 +7,6 @@ from click.testing import CliRunner
 import funcx.sdk.client
 import funcx.sdk.login_manager
 from funcx_endpoint.cli import _do_logout_endpoints, _do_stop_endpoint, app
-from funcx_endpoint.endpoint.endpoint import Endpoint
 
 runner = CliRunner()
 
@@ -82,9 +82,9 @@ def test_endpoint_logout(monkeypatch):
     "funcx_endpoint.endpoint.endpoint.Endpoint.get_endpoint_id",
     return_value="abc-uuid",
 )
-@patch("funcx_endpoint.cli.get_cli_endpoint", return_value=Endpoint())
+@patch("funcx_endpoint.cli.get_config_dir", return_value=pathlib.Path("some_ep_dir"))
 @patch("funcx_endpoint.endpoint.endpoint.FuncXClient.lock_endpoint")
-def test_endpoint_lock(mock_get_id, mock_get_cli, mock_lock_endpoint):
+def test_endpoint_lock(mock_get_id, mock_get_conf, mock_lock_endpoint):
     _do_stop_endpoint(name="abc-endpoint", remote=False)
     assert not mock_lock_endpoint.called
     _do_stop_endpoint(name="abc-endpoint", remote=True)

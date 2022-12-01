@@ -16,9 +16,8 @@ def funcx_dir_path(tmp_path):
 
 @pytest.fixture(autouse=True)
 def mock_cli_state(funcx_dir_path):
-    with mock.patch("funcx_endpoint.cli.get_cli_endpoint") as mock_cli:
-        mock_ep = mock.Mock()
-        mock_cli.return_value = mock_ep
+    with mock.patch("funcx_endpoint.cli.Endpoint") as mock_ep:
+        mock_ep.return_value = mock_ep
         with mock.patch("funcx_endpoint.cli.CommandState.ensure") as m_state:
             mock_state = mock.Mock()
             mock_state.endpoint_config_dir = funcx_dir_path
@@ -35,7 +34,10 @@ def make_endpoint_dir(mock_cli_state):
         ep_dir = mock_state.endpoint_config_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
         ep_config = ep_dir / "config.py"
-        ep_config.write_text("config = 1")  # minimal setup to make loading work
+        ep_config.write_text(  # minimal setup to make loading work
+            "from funcx_endpoint.endpoint.utils.config import Config\n"
+            "config = Config(multi_tenant=False)"
+        )
 
     return func
 
