@@ -1,10 +1,12 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
 
+import funcx.sdk.client
 import funcx.sdk.login_manager
-from funcx_endpoint.cli import _do_logout_endpoints, app
+from funcx_endpoint.cli import _do_logout_endpoints, _do_stop_endpoint, app
+from funcx_endpoint.endpoint.endpoint import Endpoint
 
 runner = CliRunner()
 
@@ -26,7 +28,7 @@ config = Config(
 
 @pytest.fixture(autouse=True)
 def patch_funcx_client(mocker):
-    mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+    return mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
 
 
 def test_non_configured_endpoint(mocker):
@@ -74,3 +76,16 @@ def test_endpoint_logout(monkeypatch):
     success, msg = _do_logout_endpoints(True, running_endpoints=one_running)
     logout_true.assert_called_once()
     assert success
+
+
+@patch(
+    "funcx_endpoint.endpoint.endpoint.Endpoint.get_endpoint_id",
+    return_value="abc-uuid",
+)
+@patch("funcx_endpoint.cli.get_cli_endpoint", return_value=Endpoint())
+@patch("funcx_endpoint.endpoint.endpoint.FuncXClient.lock_endpoint")
+def test_endpoint_lock(mock_get_id, mock_get_cli, mock_lock_endpoint):
+    _do_stop_endpoint(name="abc-endpoint", remote=False)
+    assert not mock_lock_endpoint.called
+    _do_stop_endpoint(name="abc-endpoint", remote=True)
+    assert mock_lock_endpoint.called

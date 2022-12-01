@@ -4,6 +4,7 @@ import uuid
 import pytest
 import responses
 
+from funcx.sdk.errors.api_error import FuncxAPIError
 from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 
 
@@ -43,6 +44,20 @@ def register_endpoint_response(endpoint_uuid):
                     "routing_key": f"{endpoint_uuid}.results",
                 },
             },
+        )
+
+    return create_response
+
+
+@pytest.fixture
+def register_endpoint_failure_response(endpoint_uuid):
+    def create_response(endpoint_id=endpoint_uuid, status_code=200):
+        responses.add(
+            method=responses.POST,
+            url="https://api2.funcx.org/v2/endpoints",
+            headers={"Content-Type": "application/json"},
+            json={"error": "error msg"},
+            status=status_code,
         )
 
     return create_response
@@ -93,7 +108,7 @@ def test_register_endpoint_invalid_response(
     register_endpoint_response(endpoint_id=other_endpoint_id)
     fxc = get_standard_funcx_client()
     with pytest.raises(ValueError):
-        tq_info, rq_info = register_endpoint(
+        register_endpoint(
             fxc,
             endpoint_uuid=endpoint_uuid,
             endpoint_dir=tmp_path,
@@ -102,7 +117,25 @@ def test_register_endpoint_invalid_response(
 
 
 @responses.activate
+def test_register_endpoint_locked_error(
+    tmp_path,
+    register_endpoint_failure_response,
+    get_standard_funcx_client,
+):
+    """
+    Check to ensure endpoint registration escalates up with API error
+    """
+    ep_uuid = str(uuid.uuid4())
+    register_endpoint_failure_response(endpoint_id=ep_uuid, status_code=423)
+    fxc = get_standard_funcx_client()
+    with pytest.raises(FuncxAPIError):
+        register_endpoint(
+            fxc, endpoint_uuid=ep_uuid, endpoint_dir=tmp_path, endpoint_name="a"
+        )
+
+
 @pytest.mark.parametrize("multi_tenant", [None, True, False])
+@responses.activate
 def test_register_endpoint_multi_tenant(
     tmp_path,
     endpoint_uuid,
@@ -113,6 +146,7 @@ def test_register_endpoint_multi_tenant(
 ):
     ep_uuid = str(uuid.uuid4())
     ep_name = randomstring()
+
     register_endpoint_response(endpoint_id=ep_uuid)
 
     fxc = get_standard_funcx_client()

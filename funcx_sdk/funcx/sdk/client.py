@@ -732,3 +732,10 @@ class FuncXClient:
         for fid in function_ids:
             res.append(self.web_client.whitelist_remove(endpoint_id, fid))
         return res
+
+    def lock_endpoint(self, endpoint_id):
+        """Set a lock for the specified endpoint UUID such that any clients
+        that attempts to connect will be rejected for a brief period
+
+        """
+        return self.web_client.add_endpoint_uuid_lock(endpoint_id)
