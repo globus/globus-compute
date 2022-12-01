@@ -137,10 +137,6 @@ class Endpoint:
 
         [1] https://docs.python.org/3/library/fcntl.html
         """
-        # construct client to force login flow
-        # FIXME: `funcx` should provide a cleaner way of doing login
-        FuncXClient(do_version_check=False)
-
         if os.path.exists(self.funcx_dir):
             click.confirm(
                 "Are you sure you want to initialize this directory? "
