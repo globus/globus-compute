@@ -5,6 +5,13 @@ Changelog
 
 .. _changelog-1.0.5:
 
+funcx & funcx-endpoint v1.0.6a0
+-----------------------------
+
+Dev release - features TBD filled in prod 1.0.6 release
+
+.. _changelog-1.0.5:
+
 funcx & funcx-endpoint v1.0.5
 -----------------------------
 
