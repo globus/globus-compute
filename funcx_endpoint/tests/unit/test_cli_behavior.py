@@ -83,7 +83,8 @@ def test_start_endpoint_existing_ep(run_line, mock_cli_state, make_endpoint_dir)
     mock_ep.start_endpoint.assert_called_once()
 
 
-def test_stop_endpoint(run_line, mock_cli_state, make_endpoint_dir):
+@mock.patch("funcx_endpoint.cli.read_config")
+def test_stop_endpoint(read_config, run_line, mock_cli_state, make_endpoint_dir):
     run_line("stop foo")
     mock_ep, _ = mock_cli_state
     mock_ep.stop_endpoint.assert_called_once()

@@ -255,15 +255,8 @@ def _do_logout_endpoints(
     return tokens_revoked, error_msg
 
 
-def _do_start_endpoint(
-    *,
-    name: str,
-    endpoint_uuid: str | None,
-    log_to_console: bool,
-    no_color: bool,
-):
-    funcx_dir = get_config_dir()
-    endpoint_dir = funcx_dir / name
+def read_config(endpoint_name: str) -> Config:
+    endpoint_dir = get_config_dir() / endpoint_name
 
     try:
         conf_path = endpoint_dir / "config.py"
@@ -274,16 +267,16 @@ def _do_start_endpoint(
         if not config:
             raise Exception(f"Unable to import configuration (no config): {conf_path}")
         spec.loader.exec_module(config)
-        endpoint_config: Config = config.config
+        return config.config
 
     except FileNotFoundError as err:
         if not endpoint_dir.exists():
             configure_command = "funcx-endpoint configure"
-            if name != "default":
-                configure_command += f" {name}"
+            if endpoint_name != "default":
+                configure_command += f" {endpoint_name}"
             msg = (
                 f"{err}"
-                f"\n\nEndpoint '{name}' is not configured!"
+                f"\n\nEndpoint '{endpoint_name}' is not configured!"
                 "\n1. Please create a configuration template with:"
                 f"\n\t{configure_command}"
                 "\n2. Update the configuration"
@@ -314,8 +307,16 @@ def _do_start_endpoint(
         )
         raise
 
+
+def _do_start_endpoint(
+    *,
+    name: str,
+    endpoint_uuid: str | None,
+    log_to_console: bool,
+    no_color: bool,
+):
     get_cli_endpoint().start_endpoint(
-        name, endpoint_uuid, endpoint_config, log_to_console, no_color
+        name, endpoint_uuid, read_config(name), log_to_console, no_color
     )
 
 
@@ -333,9 +334,8 @@ def stop_endpoint(*, name: str, remote: bool):
 
 
 def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
-    funcx_dir = get_config_dir()
-    ep_dir = funcx_dir / name
-    Endpoint.stop_endpoint(ep_dir, lock_uuid=remote)
+    ep_dir = get_config_dir() / name
+    Endpoint.stop_endpoint(ep_dir, read_config(name), lock_uuid=remote)
 
 
 @app.command("restart")
