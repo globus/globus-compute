@@ -210,7 +210,7 @@ def test_build_container(mocker, login_manager):
             "matplotlib==3.5.1",
             "numpy==1.18.5",
         ],
-        # payload_url="https://raw.githubusercontent.com/funcx-faas/funcx-container-service/dev/README.md",  # noqa E501
+        python_version="3.8",
         payload_url="https://github.com/funcx-faas/funcx-container-service.git",
     )
 
