@@ -55,7 +55,6 @@ class EndpointInterchange:
         logdir=".",
         endpoint_id=None,
         endpoint_dir=".",
-        endpoint_name="default",
         funcx_client: FuncXClient | None = None,
         result_store: ResultStore | None = None,
     ):
@@ -77,11 +76,8 @@ class EndpointInterchange:
         endpoint_id : str
              Identity string that identifies the endpoint to the broker
 
-        endpoint_dir : str
+        endpoint_dir : pathlib.Path
              Endpoint directory path to store registration info in
-
-        endpoint_name : str
-             Name of endpoint
 
         funcx_client_options : Dict
              FuncXClient initialization options
@@ -95,7 +91,6 @@ class EndpointInterchange:
         self.config = config
 
         self.endpoint_dir = endpoint_dir
-        self.endpoint_name = endpoint_name
 
         if funcx_client is None:
             funcx_client = FuncXClient()

@@ -317,7 +317,6 @@ class Endpoint:
             )
 
             Endpoint.daemon_launch(
-                self.name,
                 endpoint_uuid,
                 endpoint_dir,
                 endpoint_config,
@@ -328,7 +327,6 @@ class Endpoint:
 
     @staticmethod
     def daemon_launch(
-        ep_name,
         endpoint_uuid,
         endpoint_dir,
         endpoint_config: Config,
@@ -341,7 +339,6 @@ class Endpoint:
             reg_info=reg_info,
             endpoint_id=endpoint_uuid,
             endpoint_dir=endpoint_dir,
-            endpoint_name=ep_name,
             funcx_client=funcx_client,
             result_store=result_store,
             logdir=endpoint_dir,

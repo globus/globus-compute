@@ -43,8 +43,7 @@ class ResultStore:
     """
 
     def __init__(self, endpoint_dir: str | pathlib.Path):
-        self.endpoint_dir = pathlib.Path(endpoint_dir)
-        self.data_path = self.endpoint_dir / "unacked_results"
+        self.data_path = pathlib.Path(endpoint_dir) / "unacked_results"
         self.data_path.mkdir(exist_ok=True)
 
         self.data_path.chmod(mode=0o0700)

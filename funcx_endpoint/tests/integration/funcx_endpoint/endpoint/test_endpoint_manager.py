@@ -28,8 +28,6 @@ def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.R
 class TestStart:
     @pytest.fixture(autouse=True)
     def test_setup_teardown(self, fs):
-        # Code that will run before your test, for example:
-
         funcx_dir = f"{os.getcwd()}"
         config_dir = pathlib.Path(funcx_dir) / "mock_endpoint"
         assert not config_dir.exists()
@@ -37,10 +35,7 @@ class TestStart:
         # pyfakefs will take care of newly created files, not existing config
         fs.add_real_file(default_config.__file__)
 
-        # A test function will be run at this point
         yield
-        # Code that will run after your test, for example:
-        # shutil.rmtree(config_dir)
 
     def test_configure(self):
         manager = Endpoint(funcx_dir=os.getcwd())
