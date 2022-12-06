@@ -1,5 +1,6 @@
 import functools
 import io
+import pathlib
 import random
 import uuid
 from collections import namedtuple
@@ -7,7 +8,9 @@ from unittest import mock
 
 import pytest
 
+from funcx_endpoint.endpoint import endpoint
 from funcx_endpoint.endpoint.endpoint import Endpoint
+from funcx_endpoint.endpoint.utils.config import Config
 
 
 @pytest.fixture
@@ -22,6 +25,34 @@ def mock_ep_buf():
         Endpoint.print_endpoint_table, conf_dir="unused", ofile=buf
     )
     yield buf
+
+
+def test_start_endpoint(mocker, fs, randomstring):
+    mock_daemon = mocker.patch("funcx_endpoint.endpoint.endpoint.daemon")
+    mock_epinterchange = mocker.patch(
+        "funcx_endpoint.endpoint.endpoint.EndpointInterchange"
+    )
+    mock_funcxclient = mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+
+    funcx_dir = pathlib.Path(endpoint._DEFAULT_FUNCX_DIR)
+    ep = endpoint.Endpoint()
+
+    (funcx_dir / ep.name).mkdir(parents=True, exist_ok=True)
+
+    ep_id = str(uuid.uuid4())
+    log_to_console = False
+    no_color = True
+    ep_conf = Config()
+
+    mock_funcxclient.return_value.register_endpoint.return_value = {
+        "endpoint_id": ep_id,
+        "task_queue_info": {},
+        "result_queue_info": {},
+    }
+
+    ep.start_endpoint(ep.name, ep_id, ep_conf, log_to_console, no_color)
+    mock_epinterchange.assert_called()
+    mock_daemon.DaemonContext.assert_called()
 
 
 def test_list_endpoints_none_configured(mock_ep_buf):
