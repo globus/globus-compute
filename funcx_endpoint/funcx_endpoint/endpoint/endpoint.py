@@ -256,32 +256,34 @@ class Endpoint:
             # an example of an error that could conceivably occur here would be
             # if the service could not register this endpoint with the forwarder
             # because the forwarder was unreachable
-            if e.http_status_code >= 500:
-                log.exception("Caught exception while attempting endpoint registration")
-                log.critical(
-                    "Endpoint registration will be retried in the new endpoint daemon "
-                    "process. The endpoint will not work until it is successfully "
-                    "registered."
-                )
-            else:
-                if (
-                    e.http_status_code == EndpointLockedError.http_status_code
-                    or e.http_status_code == EndpointInUseError.http_status_code
-                ):
-                    log.warning(f"Endpoint registration blocked. {e.reason}")
-                raise e
+            if e.http_status_code < 500:
+                raise
+
+            log.exception("Caught exception while attempting endpoint registration")
+            log.critical(
+                "Endpoint registration will be retried in the new endpoint daemon "
+                "process. The endpoint will not work until it is successfully "
+                "registered."
+            )
+
         # if the service has an unexpected internal error and is unable to send
         # back a FuncxResponseError
         except GlobusAPIError as e:
-            if e.http_status >= 500:
-                log.exception("Caught exception while attempting endpoint registration")
-                log.critical(
-                    "Endpoint registration will be retried in the new endpoint daemon "
-                    "process. The endpoint will not work until it is successfully "
-                    "registered."
-                )
-            else:
-                raise e
+            if e.http_status < 500:
+                if (
+                    e.http_status == EndpointLockedError.http_status_code
+                    or e.http_status == EndpointInUseError.http_status_code
+                ):
+                    log.warning(f"Endpoint registration blocked.  [{e.message}]")
+                    exit(-1)
+                raise
+
+            log.exception("Caught exception while attempting endpoint registration")
+            log.critical(
+                "Endpoint registration will be retried in the new endpoint daemon "
+                "process. The endpoint will not work until it is successfully "
+                "registered."
+            )
         # if the service is unreachable due to a timeout or connection error
         except NetworkError as e:
             # the output of a NetworkError exception is huge and unhelpful, so
