@@ -154,6 +154,18 @@ class Endpoint:
             endpoint_uuid = str(uuid.uuid4())
         return endpoint_uuid
 
+    @staticmethod
+    def get_funcx_client(config: Config | None) -> FuncXClient:
+        if config:
+            funcx_client_options = {
+                "funcx_service_address": config.funcx_service_address,
+                "environment": config.environment,
+            }
+
+            return FuncXClient(**funcx_client_options)
+        else:
+            return FuncXClient()
+
     def start_endpoint(
         self,
         name,
@@ -174,12 +186,7 @@ class Endpoint:
                 "executor definitions"
             )
 
-        funcx_client_options = {
-            "funcx_service_address": endpoint_config.funcx_service_address,
-            "environment": endpoint_config.environment,
-        }
-
-        self.fx_client = FuncXClient(**funcx_client_options)
+        fx_client = Endpoint.get_funcx_client(endpoint_config)
 
         endpoint_uuid = Endpoint.check_endpoint_json(endpoint_json, endpoint_uuid)
 
@@ -238,7 +245,7 @@ class Endpoint:
         reg_info = None
         try:
             reg_info = register_endpoint(
-                self.fx_client,
+                fx_client,
                 endpoint_uuid,
                 endpoint_dir,
                 self.name,
@@ -321,7 +328,7 @@ class Endpoint:
                 endpoint_dir,
                 endpoint_config,
                 reg_info,
-                self.fx_client,
+                fx_client,
                 result_store,
             )
 
@@ -358,7 +365,11 @@ class Endpoint:
         return None
 
     @staticmethod
-    def stop_endpoint(endpoint_dir: pathlib.Path, lock_uuid: bool = False):
+    def stop_endpoint(
+        endpoint_dir: pathlib.Path,
+        endpoint_config: Config | None,
+        lock_uuid: bool = False,
+    ):
         pid_path = endpoint_dir / "daemon.pid"
         ep_name = endpoint_dir.name
 
@@ -366,7 +377,9 @@ class Endpoint:
             endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
             if not endpoint_id:
                 raise ValueError(f"Endpoint <{ep_name}> could not be located")
-            FuncXClient(do_version_check=False).lock_endpoint(endpoint_id)
+
+            fx_client = Endpoint.get_funcx_client(endpoint_config)
+            fx_client.lock_endpoint(endpoint_id)
 
         ep_status = Endpoint.check_pidfile(pid_path)
         if ep_status["exists"] and not ep_status["active"]:
@@ -415,7 +428,7 @@ class Endpoint:
 
         # stopping the endpoint should handle all of the process cleanup before
         # deletion of the directory
-        Endpoint.stop_endpoint(endpoint_dir)
+        Endpoint.stop_endpoint(endpoint_dir, None)
 
         shutil.rmtree(endpoint_dir)
         log.info(f"Endpoint <{ep_name}> has been deleted.")

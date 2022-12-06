@@ -83,8 +83,9 @@ def test_endpoint_logout(monkeypatch):
     return_value="abc-uuid",
 )
 @patch("funcx_endpoint.cli.get_config_dir", return_value=pathlib.Path("some_ep_dir"))
+@patch("funcx_endpoint.cli.read_config")
 @patch("funcx_endpoint.endpoint.endpoint.FuncXClient.lock_endpoint")
-def test_endpoint_lock(mock_get_id, mock_get_conf, mock_lock_endpoint):
+def test_endpoint_lock(mock_get_id, mock_get_conf, mock_get_fxc, mock_lock_endpoint):
     _do_stop_endpoint(name="abc-endpoint", remote=False)
     assert not mock_lock_endpoint.called
     _do_stop_endpoint(name="abc-endpoint", remote=True)
