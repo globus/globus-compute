@@ -692,6 +692,30 @@ class FuncXClient:
         return r.data["container_id"]
 
     def build_container(self, container_spec):
+        """
+        Submit a request to build a docker image based on a container spec. This
+        container build service is based on repo2docker, so the spec reflects features
+        supported by it.
+
+        Only members of a managed globus group are allowed to use this service at
+        present. This call will throw a ContainerBuildForbidden exception if you are
+        not a member of this group.
+
+        Parameters
+        ----------
+        container_spec : funcx.sdk.container_spec.ContainerSpec
+            Complete specification of what goes into the container
+
+        Returns
+        -------
+        str
+            UUID of the container which can be used to register your function
+
+        Raises
+        ------
+        ContainerBuildForbidden
+            User is not in the globus group that protects the build
+        """
         r = self.web_client.post("containers/build", data=container_spec.to_json())
         return r.data["container_id"]
 
