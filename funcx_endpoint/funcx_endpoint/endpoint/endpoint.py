@@ -412,6 +412,8 @@ class Endpoint:
 
             if pid_path.exists():
                 log.warning(f"Endpoint <{ep_name}> did not gracefully shutdown")
+                # Do cleanup anyway, TODO figure out where it should have done that
+                pid_path.unlink(missing_ok=True)
             else:
                 log.info(f"Endpoint <{ep_name}> is now stopped")
         except OSError:
@@ -453,10 +455,15 @@ class Endpoint:
         if not pid_path.exists():
             return status
 
-        pid = int(pid_path.read_text().strip())
+        status["exists"] = True
+
         try:
+            pid = int(pid_path.read_text().strip())
             psutil.Process(pid)
             status["active"] = True
+        except ValueError:
+            # Invalid literal for int() parsing
+            pass
         except psutil.NoSuchProcess:
             pass
 
