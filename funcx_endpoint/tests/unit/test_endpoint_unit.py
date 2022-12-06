@@ -101,3 +101,24 @@ def test_list_endpoints_long_names_wrapped(
         assert ep["status"] in buf.getvalue(), "expected no wrapping of status"
         assert str(ep["id"]) in buf.getvalue(), "expected no wrapping of id"
         assert ep_name not in buf.getvalue(), "expected only name column is wrapped"
+
+
+@pytest.mark.parametrize(
+    "pid_info",
+    [
+        [False, None, False, False],
+        [True, "", True, False],
+        [True, "123", True, False],
+    ],
+)
+def test_pid_file_check(pid_info, fs):
+    has_file, pid_content, should_exist, should_active = pid_info
+
+    pid_path = "sample_daemon.pid"
+    if has_file:
+        with open(pid_path, "w") as f:
+            f.write(pid_content)
+
+    pid_status = Endpoint.check_pidfile(pid_path)
+    assert should_exist == pid_status["exists"]
+    assert should_active == pid_status["active"]
