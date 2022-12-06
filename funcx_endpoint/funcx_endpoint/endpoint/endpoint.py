@@ -290,8 +290,6 @@ class Endpoint:
                 "and then attempt restarting the endpoint"
             )
             exit(-1)
-        except Exception:
-            raise
 
         if reg_info:
             log.info("Launching endpoint daemon process")
