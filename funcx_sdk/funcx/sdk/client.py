@@ -559,6 +559,17 @@ class FuncXClient:
         r = self.web_client.get_endpoint_status(endpoint_uuid)
         return r.data
 
+    def get_endpoints(self):
+        """Get a list of all endpoints owned by the current user across all systems.
+
+        Returns
+        -------
+        list
+            A list of dictionaries which contain endpoint info
+        """
+        r = self.web_client.get_endpoints()
+        return r.data
+
     def register_function(
         self,
         function,

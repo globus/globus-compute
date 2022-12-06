@@ -202,6 +202,9 @@ class FuncxWebClient(globus_sdk.BaseClient):
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"endpoints/{endpoint_id}/status")
 
+    def get_endpoints(self) -> globus_sdk.GlobusHTTPResponse:
+        return self.get("/endpoints")
+
     def register_function(
         self,
         function_registration_data: t.Union[
