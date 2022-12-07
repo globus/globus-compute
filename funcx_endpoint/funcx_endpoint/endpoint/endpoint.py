@@ -437,8 +437,10 @@ class Endpoint:
         """
         status = {"exists": False, "active": False}
         pid_path = pathlib.Path(pid_path)
+
         if not pid_path.exists():
             return status
+        status["exists"] = True
 
         pid = int(pid_path.read_text().strip())
         try:

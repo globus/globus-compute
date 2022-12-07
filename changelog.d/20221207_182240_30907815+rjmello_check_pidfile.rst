@@ -1,0 +1,4 @@
+Bug Fixes
+^^^^^^^^^
+
+- Added a line indicating when a pidfile is present to the `check_pidfile()` function.
