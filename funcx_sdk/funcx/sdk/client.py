@@ -723,7 +723,7 @@ class FuncXClient:
         r = self.web_client.get(f"containers/build/{container_id}")
         if r.http_status == 200:
             return r["status"]
-        elif r.http_status == 400:
+        elif r.http_status == HTTPStatusCode.NOT_FOUND:
             raise ValueError(f"Container ID {container_id} not found")
         else:
             message = (
