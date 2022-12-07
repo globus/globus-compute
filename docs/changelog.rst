@@ -3,6 +3,19 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.6:
+
+funcx & funcx-endpoint v1.0.6
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add a '--remote' option when stopping endpoints to create a temporary lock such that any running endpoints with the same UUID will get a locked response and exit.
+
+- Added `get_endpoints` methods to `FuncXWebClient` and `FuncXClient`, which retrieve
+  a list of all endpoints owned by the current user
+
 .. _changelog-1.0.5:
 
 funcx & funcx-endpoint v1.0.5
