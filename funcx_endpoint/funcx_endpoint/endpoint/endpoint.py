@@ -370,12 +370,12 @@ class Endpoint:
     def stop_endpoint(
         endpoint_dir: pathlib.Path,
         endpoint_config: Config | None,
-        lock_uuid: bool = False,
+        remote: bool = False,
     ):
         pid_path = endpoint_dir / "daemon.pid"
         ep_name = endpoint_dir.name
 
-        if lock_uuid is True:
+        if remote is True:
             endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
             if not endpoint_id:
                 raise ValueError(f"Endpoint <{ep_name}> could not be located")

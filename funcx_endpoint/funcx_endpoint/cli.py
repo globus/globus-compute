@@ -335,7 +335,7 @@ def stop_endpoint(*, name: str, remote: bool):
 
 def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
     ep_dir = get_config_dir() / name
-    Endpoint.stop_endpoint(ep_dir, read_config(name), lock_uuid=remote)
+    Endpoint.stop_endpoint(ep_dir, read_config(name), remote=remote)
 
 
 @app.command("restart")
