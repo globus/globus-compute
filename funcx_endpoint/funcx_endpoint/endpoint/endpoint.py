@@ -381,7 +381,7 @@ class Endpoint:
                 raise ValueError(f"Endpoint <{ep_name}> could not be located")
 
             fx_client = Endpoint.get_funcx_client(endpoint_config)
-            fx_client.lock_endpoint(endpoint_id)
+            fx_client.stop_endpoint(endpoint_id)
 
         ep_status = Endpoint.check_pidfile(pid_path)
         if ep_status["exists"] and not ep_status["active"]:

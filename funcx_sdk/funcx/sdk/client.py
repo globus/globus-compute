@@ -744,9 +744,17 @@ class FuncXClient:
             res.append(self.web_client.whitelist_remove(endpoint_id, fid))
         return res
 
-    def lock_endpoint(self, endpoint_id):
-        """Set a lock for the specified endpoint UUID such that any clients
-        that attempts to connect will be rejected for a brief period
+    def stop_endpoint(self, endpoint_id):
+        """Stop an endpoint by temporarily blocking connection attempts.
 
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+
+        Returns
+        -------
+        json
+            The response of the request
         """
-        return self.web_client.add_endpoint_uuid_lock(endpoint_id)
+        return self.web_client.stop_endpoint(endpoint_id)
