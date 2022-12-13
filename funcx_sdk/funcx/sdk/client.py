@@ -744,8 +744,8 @@ class FuncXClient:
             res.append(self.web_client.whitelist_remove(endpoint_id, fid))
         return res
 
-    def stop_endpoint(self, endpoint_id):
-        """Stop an endpoint by temporarily blocking connection attempts.
+    def stop_endpoint(self, endpoint_id: str):
+        """Stop an endpoint by dropping it's active connections.
 
         Parameters
         ----------
