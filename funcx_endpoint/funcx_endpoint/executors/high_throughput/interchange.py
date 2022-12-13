@@ -961,7 +961,7 @@ class Interchange:
                         pass
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
-                    for b_message in b_messages:
+                    for idx, b_message in enumerate(b_messages):
                         r = dill.loads(b_message)
 
                         log.debug(
@@ -976,11 +976,21 @@ class Interchange:
                             self._ready_manager_queue,
                         )
 
-                        if r["task_id"] in self.task_status_deltas:
-                            del self.task_status_deltas[r["task_id"]]
                         self._ready_manager_queue[manager]["tasks"][task_type].remove(
                             r["task_id"]
                         )
+
+                        # Transfer any outstanding task statuses to the result message
+                        if r["task_id"] in self.task_status_deltas:
+                            r["task_statuses"] += self.task_status_deltas[r["task_id"]]
+                            b_messages[idx] = dill.dumps(r)
+                            log.debug(
+                                "Transferring statuses for {}: {}".format(
+                                    r["task_id"], r["task_statuses"]
+                                )
+                            )
+                            del self.task_status_deltas[r["task_id"]]
+
                     self._ready_manager_queue[manager]["total_tasks"] -= len(b_messages)
 
                     # TODO: handle this with a Task message or something?
