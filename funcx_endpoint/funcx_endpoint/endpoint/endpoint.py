@@ -4,9 +4,11 @@ import json
 import logging
 import os
 import pathlib
+import pwd
 import re
 import shutil
 import signal
+import socket
 import sys
 import typing
 import uuid
@@ -237,6 +239,8 @@ class Endpoint:
             )
             exit(-1)
 
+        metadata = Endpoint.get_metadata(endpoint_config)
+
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
         reg_info = None
@@ -248,7 +252,7 @@ class Endpoint:
             reg_info = fx_client.register_endpoint(
                 endpoint_dir.name,
                 endpoint_uuid,
-                endpoint_version=__version__,
+                metadata=metadata,
                 multi_tenant=endpoint_config.multi_tenant,
             )
 
@@ -559,3 +563,58 @@ class Endpoint:
         table._width[idx_name] = max(10, table._width[idx_name])
 
         print(table.draw(), file=ofile)
+
+    @staticmethod
+    def get_metadata(config: Config) -> dict:
+        metadata: dict = {}
+
+        metadata["endpoint_version"] = __version__
+        metadata["hostname"] = socket.getfqdn()
+
+        # should be more accurate than `getpass.getuser()` in non-login situations
+        metadata["local_user"] = pwd.getpwuid(os.getuid()).pw_name
+
+        # the following are read from the HTTP request by the web service, but can be
+        # overridden here if desired:
+        metadata["ip_address"] = None
+        metadata["sdk_version"] = None
+
+        try:
+            metadata["config"] = _serialize_config(config)
+        except Exception as e:
+            log.warning(
+                f"Error when serializing config ({type(e).__name__}). Ignoring."
+            )
+            log.debug("Config serialization exception details", exc_info=e)
+
+        return metadata
+
+
+def _serialize_config(config: Config) -> dict:
+    """
+    Short-term serialization method until config.py is replaced with config.yaml
+    """
+
+    expand_list = ["strategy", "provider", "launcher"]
+
+    def to_dict(o):
+        mems = {"_type": type(o).__name__}
+
+        for k, v in o.__dict__.items():
+            if k.startswith("_"):
+                continue
+
+            if k in expand_list:
+                mems[k] = to_dict(v)
+            elif not isinstance(v, str):
+                mems[k] = repr(v)
+            else:
+                mems[k] = v
+
+        return mems
+
+    result = to_dict(config)
+    # when we move to config.yaml, should only need to support a single executor
+    result["executors"] = [to_dict(executor) for executor in config.executors]
+
+    return result
