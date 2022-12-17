@@ -172,15 +172,13 @@ class FuncxWebClient(globus_sdk.BaseClient):
         endpoint_name: str,
         endpoint_id: ID_PARAM_T,
         *,
-        metadata: t.Optional[t.Dict[str, t.Any]] = None,
-        endpoint_version: t.Optional[str] = None,
+        metadata: t.Optional[dict] = None,
         multi_tenant: t.Optional[bool] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
         data: t.Dict[str, t.Any] = {
             "endpoint_name": endpoint_name,
             "endpoint_uuid": str(endpoint_id),
-            "version": endpoint_version,
         }
 
         # Only send this param if True.  Will have to change to
@@ -189,7 +187,7 @@ class FuncxWebClient(globus_sdk.BaseClient):
             data["multi_tenant"] = multi_tenant
 
         if metadata:
-            data["meta"] = metadata
+            data["metadata"] = metadata
         if additional_fields is not None:
             data.update(additional_fields)
         return self.post("/endpoints", data=data)
