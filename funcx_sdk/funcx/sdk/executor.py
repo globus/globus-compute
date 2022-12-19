@@ -253,14 +253,14 @@ class FuncXExecutor(concurrent.futures.Executor):
         reg_kwargs = {"function_name": fn.__name__}
         reg_kwargs.update(func_register_kwargs)
         try:
-            function_id = self.funcx_client.register_function(fn, **reg_kwargs)
+            func_reg_id = self.funcx_client.register_function(fn, **reg_kwargs)
         except Exception:
             log.error(f"Unable to register function: {fn.__name__}")
             self.shutdown(wait=False, cancel_futures=True)
             raise
-        self._function_registry[fn] = function_id
-        log.debug("Function registered with id: %s", function_id)
-        return function_id
+        self._function_registry[fn] = func_reg_id
+        log.debug("Function registered with id: %s", func_reg_id)
+        return func_reg_id
 
     def submit(self, fn, *args, **kwargs):
         """
