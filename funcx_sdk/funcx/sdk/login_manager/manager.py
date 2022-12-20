@@ -122,16 +122,37 @@ class LoginManager:
         return tokens_revoked
 
     def ensure_logged_in(self) -> None:
-        with self._access_lock:
-            data = self._token_storage.get_by_resource_server()
-        needs_login = False
-        for rs_name, _rs_scopes in self.login_requirements:
-            if rs_name not in data:
-                needs_login = True
+        """Ensures that the user has valid refresh tokens. If a token
+        is found to be invalid, a new login flow is initiated.
+        """
+        for server, _scopes in self.login_requirements:
+            if not self.has_login(server):
+                self.run_login_flow()
                 break
 
-        if needs_login:
-            self.run_login_flow()
+    def _validate_token(self, token: str) -> bool:
+        auth_client = internal_auth_client()
+        try:
+            res = auth_client.oauth2_validate_token(token)
+        except globus_sdk.AuthAPIError:
+            return False
+        return res["active"] is True
+
+    def has_login(self, resource_server: str) -> bool:
+        """
+        Determines if the user has a valid refresh token for the given
+        resource server
+        """
+        # Client identities are always logged in
+        if is_client_login():
+            return True
+
+        with self._access_lock:
+            tokens = self._token_storage.get_token_data(resource_server)
+        if tokens is None or "refresh_token" not in tokens:
+            return False
+        rt = tokens["refresh_token"]
+        return self._validate_token(rt)
 
     def _get_authorizer(
         self, resource_server: str
