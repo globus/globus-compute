@@ -28,7 +28,7 @@ from funcx.serialize import FuncXSerializer
 from funcx.version import __version__, compare_versions
 
 from .batch import Batch
-from .login_manager import LoginManager, LoginManagerProtocol
+from .login_manager import LoginManager, LoginManagerProtocol, requires_login
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +272,7 @@ class FuncXClient:
         self._task_status_table[task_id] = status
         return status
 
+    @requires_login
     def get_task(self, task_id):
         """Get a funcX task.
 
@@ -294,6 +295,7 @@ class FuncXClient:
         rets = self._update_task_table(r.text, task_id)
         return rets
 
+    @requires_login
     def get_result(self, task_id):
         """Get the result of a funcX task
 
@@ -320,6 +322,7 @@ class FuncXClient:
                 logger.warning("We have an exception : {}".format(task["exception"]))
                 task["exception"].reraise()
 
+    @requires_login
     def get_batch_result(self, task_id_list):
         """Request status for a batch of task_ids"""
         assert isinstance(
@@ -357,6 +360,7 @@ class FuncXClient:
 
         return results
 
+    @requires_login
     def run(self, *args, endpoint_id=None, function_id=None, **kwargs) -> str:
         """Initiate an invocation
 
@@ -418,6 +422,7 @@ class FuncXClient:
             task_group_id=task_group_id, create_websocket_queue=create_websocket_queue
         )
 
+    @requires_login
     def batch_run(self, batch) -> t.List[str]:
         """Initiate a batch of tasks to funcX
 
@@ -461,6 +466,7 @@ class FuncXClient:
 
         return task_uuids
 
+    @requires_login
     def register_endpoint(
         self,
         name,
@@ -498,10 +504,12 @@ class FuncXClient:
         )
         return r.data
 
+    @requires_login
     def get_result_amqp_url(self) -> dict[str, str]:
         r = self.web_client.get_result_amqp_url()
         return r.data
 
+    @requires_login
     def get_containers(self, name, description=None):
         """
         Register a DLHub endpoint with the funcX service and get the containers to
@@ -524,6 +532,7 @@ class FuncXClient:
         r = self.web_client.post("get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
+    @requires_login
     def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
 
@@ -544,6 +553,7 @@ class FuncXClient:
         r = self.web_client.get(f"containers/{container_uuid}/{container_type}")
         return r.data["container"]
 
+    @requires_login
     def get_endpoint_status(self, endpoint_uuid):
         """Get the status reports for an endpoint.
 
@@ -560,6 +570,7 @@ class FuncXClient:
         r = self.web_client.get_endpoint_status(endpoint_uuid)
         return r.data
 
+    @requires_login
     def get_endpoints(self):
         """Get a list of all endpoints owned by the current user across all systems.
 
@@ -571,6 +582,7 @@ class FuncXClient:
         r = self.web_client.get_endpoints()
         return r.data
 
+    @requires_login
     def register_function(
         self,
         function,
@@ -621,6 +633,7 @@ class FuncXClient:
         r = self.web_client.register_function(data)
         return r.data["function_uuid"]
 
+    @requires_login
     def search_function(self, q, offset=0, limit=10, advanced=False):
         """Search for function via the funcX service
 
@@ -643,6 +656,7 @@ class FuncXClient:
             q, offset=offset, limit=limit, advanced=advanced
         )
 
+    @requires_login
     def search_endpoint(self, q, scope="all", owner_id=None):
         """
 
@@ -660,6 +674,7 @@ class FuncXClient:
         """
         return self.searcher.search_endpoint(q, scope=scope, owner_id=owner_id)
 
+    @requires_login
     def register_container(self, location, container_type, name="", description=""):
         """Register a container with the funcX service.
 
@@ -691,6 +706,7 @@ class FuncXClient:
         r = self.web_client.post("containers", data=payload)
         return r.data["container_id"]
 
+    @requires_login
     def build_container(self, container_spec):
         """
         Submit a request to build a docker image based on a container spec. This
@@ -733,6 +749,7 @@ class FuncXClient:
             logger.error(message)
             raise SystemError(message)
 
+    @requires_login
     def add_to_whitelist(self, endpoint_id, function_ids):
         """Adds the function to the endpoint's whitelist
 
@@ -750,6 +767,7 @@ class FuncXClient:
         """
         return self.web_client.whitelist_add(endpoint_id, function_ids)
 
+    @requires_login
     def get_whitelist(self, endpoint_id):
         """List the endpoint's whitelist
 
@@ -765,6 +783,7 @@ class FuncXClient:
         """
         return self.web_client.get_whitelist(endpoint_id)
 
+    @requires_login
     def delete_from_whitelist(self, endpoint_id, function_ids):
         """List the endpoint's whitelist
 
@@ -787,6 +806,7 @@ class FuncXClient:
             res.append(self.web_client.whitelist_remove(endpoint_id, fid))
         return res
 
+    @requires_login
     def stop_endpoint(self, endpoint_id: str):
         """Stop an endpoint by dropping it's active connections.
 
