@@ -5,7 +5,6 @@ from unittest.mock import Mock, patch
 import pytest
 import responses
 from click.testing import CliRunner
-from funcx_common.response_errors.constants import HTTPStatusCode
 
 import funcx.sdk.client
 import funcx.sdk.login_manager
@@ -52,7 +51,7 @@ def test_start_endpoint_ep_locked(mocker, fs, randomstring, patch_funcx_client):
         responses.POST,
         fx_addy + "endpoints",
         json={"reason": reason_msg},
-        status=HTTPStatusCode.RESOURCE_LOCKED,
+        status=423,
     )
 
     funcx_dir = pathlib.Path(endpoint._DEFAULT_FUNCX_DIR)

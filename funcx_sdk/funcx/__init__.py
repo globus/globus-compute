@@ -8,7 +8,6 @@ __version__ = _version
 
 from funcx.sdk.client import FuncXClient
 from funcx.sdk.container_spec import ContainerSpec
-from funcx.sdk.errors import FuncxAPIError
 from funcx.sdk.executor import FuncXExecutor
 
-__all__ = ("FuncXExecutor", "FuncXClient", "FuncxAPIError", "ContainerSpec")
+__all__ = ("FuncXExecutor", "FuncXClient", "ContainerSpec")
