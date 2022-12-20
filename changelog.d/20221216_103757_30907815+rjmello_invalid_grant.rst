@@ -1,0 +1,9 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- When a `FuncXClient` is instantiated, the validity of the user's refresh
+  tokens will be verified. If a token is found to be invalid, a new auth flow
+  will be initiated.
+
+- When an API auth error is raised by a `FuncXClient` method, a new auth flow
+  will be initiated.
