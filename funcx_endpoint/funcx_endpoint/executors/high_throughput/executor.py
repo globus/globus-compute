@@ -366,13 +366,13 @@ class HighThroughputExecutor(RepresentationMixin):
     ):
         """Create the Interchange process and connect to it."""
         self.outgoing_q = zmq_pipes.TasksOutgoing(
-            "0.0.0.0", self.interchange_port_range
+            "127.0.0.1", self.interchange_port_range
         )
         self.incoming_q = zmq_pipes.ResultsIncoming(
-            "0.0.0.0", self.interchange_port_range
+            "127.0.0.1", self.interchange_port_range
         )
         self.command_client = zmq_pipes.CommandClient(
-            "0.0.0.0", self.interchange_port_range
+            "127.0.0.1", self.interchange_port_range
         )
 
         self.is_alive = True
