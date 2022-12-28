@@ -2,7 +2,9 @@ import logging
 import math
 import random
 
-log = logging.getLogger(__name__)
+from funcx_endpoint.logging_config import FXLogger
+
+log: FXLogger = logging.getLogger(__name__)  # type: ignore
 
 
 def naive_scheduler(
@@ -17,7 +19,7 @@ def naive_scheduler(
     """
 
     log.trace("Entering scheduler...")
-    log.trace(f"old_worker_map: {old_worker_map}")
+    log.trace("old_worker_map: %s", old_worker_map)
     q_sizes = {}
     q_types = []
     new_worker_map = {}

@@ -8,7 +8,9 @@ import time
 from queue import Empty, Queue
 from typing import Any
 
-log = logging.getLogger(__name__)
+from funcx_endpoint.logging_config import FXLogger
+
+log: FXLogger = logging.getLogger(__name__)  # type: ignore
 
 
 class WorkerMap:
@@ -142,10 +144,10 @@ class WorkerMap:
         """
         spin_ups = {}
 
-        log.trace(f"Next Worker Qsize: {len(next_worker_q)}")
-        log.trace(f"Active Workers: {self.active_workers}")
-        log.trace(f"Pending Workers: {self.pending_workers}")
-        log.trace(f"Max Worker Count: {self.max_worker_count}")
+        log.trace("Next Worker Qsize: %s", len(next_worker_q))
+        log.trace("Active Workers: %s", self.active_workers)
+        log.trace("Pending Workers: %s", self.pending_workers)
+        log.trace("Max Worker Count: %s", self.max_worker_count)
 
         if (
             len(next_worker_q) > 0
@@ -245,19 +247,19 @@ class WorkerMap:
         """
         spin_downs = []
         container_switch_count = 0
+        now = time.time()
         for worker_type in self.total_worker_type_counts:
             if worker_type == "unused":
                 continue
             if (
                 check_idle
-                and time.time() - self.worker_idle_since[worker_type]
-                < worker_max_idletime
+                and now - self.worker_idle_since[worker_type] < worker_max_idletime
             ):
-                log.trace(f"Current time: {time.time()}")
-                log.trace(f"Idle since: {self.worker_idle_since[worker_type]}")
                 log.trace(
-                    "Worker type %s has not exceeded maximum idle "
-                    "time %s, continuing",
+                    "Current time: %s (idle since: %s).  Worker type %s has not "
+                    "exceeded maximum idle time %s; continuing",
+                    now,
+                    self.worker_idle_since[worker_type],
                     worker_type,
                     worker_max_idletime,
                 )
