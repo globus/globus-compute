@@ -34,14 +34,13 @@ from funcx_endpoint.executors.high_throughput.messages import (
     Task,
 )
 from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
-from funcx_endpoint.logging_config import setup_logging
+from funcx_endpoint.logging_config import FXLogger, setup_logging
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2**32) - 1
 
-
-log = logging.getLogger(__name__)
+log: FXLogger = logging.getLogger(__name__)  # type: ignore
 
 
 class TaskCancelled(Exception):
@@ -326,7 +325,7 @@ class Manager:
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
-                log.trace(f"Requesting tasks: {ads}")
+                log.trace("Requesting tasks: %s", ads)
                 msg = dill.dumps(ads)
                 self.task_incoming.send(msg)
 
@@ -482,11 +481,10 @@ class Manager:
                     log.critical("Exiting")
                     break
 
-            log.trace(f"To-Die Counts: {self.worker_map.to_die_count}")
             log.trace(
-                "Alive worker counts: {}".format(
-                    self.worker_map.total_worker_type_counts
-                )
+                "To-Die Counts: %s, alive worker counts: %s",
+                self.worker_map.to_die_count,
+                self.worker_map.total_worker_type_counts,
             )
 
             new_worker_map = naive_scheduler(
@@ -496,7 +494,7 @@ class Manager:
                 new_worker_map,
                 self.worker_map.to_die_count,
             )
-            log.trace(f"New worker map: {new_worker_map}")
+            log.trace("New worker map: %s", new_worker_map)
 
             # NOTE: Wipes the queue -- previous scheduling loops don't affect what's
             # needed now.
@@ -518,7 +516,7 @@ class Manager:
                     worker_port=self.worker_port,
                 )
             )
-            log.trace(f"Worker processes: {self.worker_procs}")
+            log.trace("Worker processes: %s", self.worker_procs)
 
             #  Count the workers of each type that need to be removed
             spin_downs, container_switch_count = self.worker_map.spin_down_workers(
@@ -529,9 +527,9 @@ class Manager:
             )
             self.container_switch_count += container_switch_count
             log.trace(
-                "Container switch count: total {}, cur {}".format(
-                    self.container_switch_count, container_switch_count
-                )
+                "Container switch count: total %s, cur %s",
+                self.container_switch_count,
+                container_switch_count,
             )
 
             for w_type in spin_downs:
@@ -546,9 +544,7 @@ class Manager:
                 else:
                     available_workers = current_worker_map[task_type]
                     log.trace(
-                        "Available workers of type {}: {}".format(
-                            task_type, available_workers
-                        )
+                        "Available workers of type %s: %s", task_type, available_workers
                     )
 
                     for _i in range(available_workers):

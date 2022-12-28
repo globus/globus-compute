@@ -6,8 +6,6 @@ import pytest
 import responses
 from pika.exchange_type import ExchangeType
 
-from funcx_endpoint.logging_config import add_trace_level
-
 
 @pytest.fixture(autouse=True)
 def _autouse_responses():
@@ -17,11 +15,6 @@ def _autouse_responses():
 
     responses.stop()
     responses.reset()
-
-
-@pytest.fixture(autouse=True, scope="session")
-def _set_logging_trace_level():
-    add_trace_level()
 
 
 # mock logging config to do nothing
