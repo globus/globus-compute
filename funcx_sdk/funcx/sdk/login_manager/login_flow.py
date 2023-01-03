@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import platform
 
-from globus_sdk.tokenstorage import SQLiteAdapter
-
 from .globus_auth import internal_auth_client
 
 
-def do_link_auth_flow(tokenstore: SQLiteAdapter, scopes: list[str]) -> None:
+def do_link_auth_flow(scopes: list[str]):
     auth_client = internal_auth_client()
 
     # start the Confidential App Grant flow
@@ -33,5 +31,4 @@ def do_link_auth_flow(tokenstore: SQLiteAdapter, scopes: list[str]) -> None:
     auth_code = input("Enter the resulting Authorization Code here: ").strip()
 
     # finish auth flow
-    tkn = auth_client.oauth2_exchange_code_for_tokens(auth_code)
-    tokenstore.store(tkn)
+    return auth_client.oauth2_exchange_code_for_tokens(auth_code)

@@ -13,6 +13,7 @@ from funcx.sdk.login_manager.client_login import (
     get_client_login,
     is_client_login,
 )
+from funcx.sdk.login_manager.manager import AuthScopes, FuncxScopes, SearchScopes
 from funcx.sdk.login_manager.tokenstore import _resolve_namespace
 
 CID_KEY = "FUNCX_SDK_CLIENT_ID"
@@ -171,27 +172,30 @@ def test_get_authorizer(mocker, logman):
         logman._get_authorizer("some_resource_server")
 
 
-@pytest.mark.parametrize("has_login", (True, False))
-def test_ensure_logged_in(mocker, logman, has_login):
-    logman.has_login = mock.Mock(return_value=has_login)
+@pytest.mark.parametrize(
+    "test_data",
+    (
+        (True, dict(LoginManager.SCOPES).pop(FuncxScopes.resource_server)),
+        (True, dict(LoginManager.SCOPES).pop(AuthScopes.resource_server)),
+        (True, dict(LoginManager.SCOPES).pop(SearchScopes.resource_server)),
+        (False, dict(LoginManager.SCOPES)),
+    ),
+)
+def test_ensure_logged_in(mocker, logman, test_data):
+    needs_login, token_data = test_data
+
+    def _get_data():
+        return token_data
+
+    logman._token_storage.get_by_resource_server = _get_data
+
     mock_run_login_flow = mocker.patch(
         f"{MOCK_BASE}.manager.LoginManager.run_login_flow"
     )
 
     logman.ensure_logged_in()
 
-    assert has_login is not mock_run_login_flow.called
-
-
-@pytest.mark.parametrize("tokens", ({"refresh_token": "123"}, {}))
-def test_has_login(mocker, logman, tokens):
-    logman._token_storage.get_token_data = mock.Mock(return_value=tokens)
-    logman._validate_token = mock.Mock(return_value=True)
-    env = {CID_KEY: "some_id", CSC_KEY: "some_secret"}
-
-    assert logman.has_login("funcx") is bool(tokens)
-    with mock.patch.dict(os.environ, env):
-        assert logman.has_login("funcx") is True
+    assert needs_login == mock_run_login_flow.called
 
 
 def test_requires_login_decorator(mocker, logman):
