@@ -1,4 +1,4 @@
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_interface
 from parsl.launchers import SrunLauncher
 from parsl.providers import SlurmProvider
 
@@ -11,9 +11,9 @@ from funcx_endpoint.executors import HighThroughputExecutor
 user_opts = {
     'frontera': {
         'worker_init': 'source ~/setup_funcx_test_env.sh',
-        'scheduler_options': '#SBATCH -A MCB20024',
+        'account': 'EAR22001',
         'partition': 'development',
-
+        'scheduler_options': '',
     }
 }
 
@@ -22,8 +22,9 @@ config = Config(
         HighThroughputExecutor(
             max_workers_per_node=2,
             worker_debug=False,
-            address=address_by_hostname(),
+            address=address_by_interface('ib0'),
             provider=SlurmProvider(
+                account=user_opts['frontera']['account'],
                 partition=user_opts['frontera']['partition'],
                 launcher=SrunLauncher(),
 
