@@ -1,5 +1,6 @@
 import os
 import uuid
+from itertools import chain, combinations
 from unittest import mock
 
 import globus_sdk
@@ -13,7 +14,6 @@ from funcx.sdk.login_manager.client_login import (
     get_client_login,
     is_client_login,
 )
-from funcx.sdk.login_manager.manager import AuthScopes, FuncxScopes, SearchScopes
 from funcx.sdk.login_manager.tokenstore import _resolve_namespace
 
 CID_KEY = "FUNCX_SDK_CLIENT_ID"
@@ -173,18 +173,23 @@ def test_get_authorizer(mocker, logman):
 
 
 @pytest.mark.parametrize(
-    "test_data",
-    (
-        (True, dict(LoginManager.SCOPES).pop(FuncxScopes.resource_server)),
-        (True, dict(LoginManager.SCOPES).pop(AuthScopes.resource_server)),
-        (True, dict(LoginManager.SCOPES).pop(SearchScopes.resource_server)),
-        (False, dict(LoginManager.SCOPES)),
+    "missing_keys",
+    list(
+        chain(
+            combinations(LoginManager.SCOPES, 1),
+            combinations(LoginManager.SCOPES, 2),
+            combinations(LoginManager.SCOPES, 3),
+            [()],
+        )
     ),
 )
-def test_ensure_logged_in(mocker, logman, test_data):
-    needs_login, token_data = test_data
+def test_ensure_logged_in(mocker, logman, missing_keys):
+    needs_login = bool(missing_keys)
 
     def _get_data():
+        token_data = dict(LoginManager.SCOPES)
+        for k in missing_keys:
+            token_data.pop(k, None)
         return token_data
 
     logman._token_storage.get_by_resource_server = _get_data
