@@ -268,26 +268,28 @@ class Interchange:
         self.results_incoming.set_hwm(0)
 
         self.endpoint_id = endpoint_id
+        worker_bind_address = f"tcp://{self.interchange_address}"
+        log.info(f"Interchange binding worker ports to {worker_bind_address}")
         if self.worker_ports:
             self.worker_task_port = self.worker_ports[0]
             self.worker_result_port = self.worker_ports[1]
 
             self.task_outgoing.bind(
-                f"tcp://{self.interchange_address}:{self.worker_task_port}"
+                f"{worker_bind_address}:{self.worker_task_port}"
             )
             self.results_incoming.bind(
-                f"tcp://{self.interchange_address}:{self.worker_result_port}"
+                f"{worker_bind_address}:{self.worker_result_port}"
             )
 
         else:
             self.worker_task_port = self.task_outgoing.bind_to_random_port(
-                "tcp://*",
+                worker_bind_address,
                 min_port=worker_port_range[0],
                 max_port=worker_port_range[1],
                 max_tries=100,
             )
             self.worker_result_port = self.results_incoming.bind_to_random_port(
-                "tcp://*",
+                worker_bind_address,
                 min_port=worker_port_range[0],
                 max_port=worker_port_range[1],
                 max_tries=100,
