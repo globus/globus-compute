@@ -114,11 +114,10 @@ def test_list_endpoints_long_names_wrapped(
 def test_pid_file_check(pid_info, fs):
     has_file, pid_content, should_exist, should_active = pid_info
 
-    pid_path = "sample_daemon.pid"
+    ep_dir = pathlib.Path(".")
     if has_file:
-        with open(pid_path, "w") as f:
-            f.write(pid_content)
+        (ep_dir / "daemon.pid").write_text(pid_content)
 
-    pid_status = Endpoint.check_pidfile(pid_path)
+    pid_status = Endpoint.check_pidfile(ep_dir)
     assert should_exist == pid_status["exists"]
     assert should_active == pid_status["active"]

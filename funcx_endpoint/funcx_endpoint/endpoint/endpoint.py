@@ -195,8 +195,7 @@ class Endpoint:
 
         log.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
-        pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        pid_check = Endpoint.check_pidfile(pid_file)
+        pid_check = Endpoint.check_pidfile(endpoint_dir)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
         # potentially running with the existing pidfile
@@ -209,7 +208,7 @@ class Endpoint:
                     "A prior Endpoint instance appears to have been terminated without "
                     "proper cleanup. Cleaning up now."
                 )
-                Endpoint.pidfile_cleanup(pid_file)
+                Endpoint.pidfile_cleanup(endpoint_dir)
 
         result_store = ResultStore(endpoint_dir=endpoint_dir)
 
@@ -228,6 +227,7 @@ class Endpoint:
             stderr = sys.stderr
 
         try:
+            pid_file = endpoint_dir / "daemon.pid"
             context = daemon.DaemonContext(
                 working_directory=endpoint_dir,
                 umask=0o002,
@@ -361,9 +361,9 @@ class Endpoint:
             fx_client = Endpoint.get_funcx_client(endpoint_config)
             fx_client.stop_endpoint(endpoint_id)
 
-        ep_status = Endpoint.check_pidfile(pid_path)
+        ep_status = Endpoint.check_pidfile(endpoint_dir)
         if ep_status["exists"] and not ep_status["active"]:
-            Endpoint.pidfile_cleanup(pid_path)
+            Endpoint.pidfile_cleanup(endpoint_dir)
             return
         elif not ep_status["exists"]:
             log.info(f"Endpoint <{ep_name}> is not active.")
@@ -416,7 +416,7 @@ class Endpoint:
         log.info(f"Endpoint <{ep_name}> has been deleted.")
 
     @staticmethod
-    def check_pidfile(pid_path: pathlib.Path | str):
+    def check_pidfile(endpoint_dir: pathlib.Path):
         """Helper function to identify possible dead endpoints
 
         Returns a record with 'exists' and 'active' fields indicating
@@ -425,11 +425,11 @@ class Endpoint:
 
         Parameters
         ----------
-        pid_path : str
-            Path to the pid file
+        endpoint_dir : pathlib.Path
+            Configuration directory of the endpoint
         """
         status = {"exists": False, "active": False}
-        pid_path = pathlib.Path(pid_path)
+        pid_path = endpoint_dir / "daemon.pid"
         if not pid_path.exists():
             return status
 
@@ -448,11 +448,9 @@ class Endpoint:
         return status
 
     @staticmethod
-    def pidfile_cleanup(pid_path: pathlib.Path | str):
-        pid_path = pathlib.Path(pid_path)
-        pid_path.unlink(missing_ok=True)
-        ep_name = pid_path.parent.name
-        log.info(f"Endpoint <{ep_name}> has been cleaned up.")
+    def pidfile_cleanup(endpoint_dir: pathlib.Path):
+        (endpoint_dir / "daemon.pid").unlink(missing_ok=True)
+        log.info(f"Endpoint <{endpoint_dir.name}> has been cleaned up.")
 
     @staticmethod
     def get_endpoints(funcx_conf_dir: pathlib.Path | str) -> dict[str, dict]:
@@ -488,7 +486,7 @@ class Endpoint:
             if not ep_status["id"]:
                 continue
 
-            pid_check = Endpoint.check_pidfile(ep_path / "daemon.pid")
+            pid_check = Endpoint.check_pidfile(ep_path)
             if pid_check["active"]:
                 ep_status["status"] = "Running"
             elif pid_check["exists"]:
