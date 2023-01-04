@@ -274,9 +274,7 @@ class Interchange:
             self.worker_task_port = self.worker_ports[0]
             self.worker_result_port = self.worker_ports[1]
 
-            self.task_outgoing.bind(
-                f"{worker_bind_address}:{self.worker_task_port}"
-            )
+            self.task_outgoing.bind(f"{worker_bind_address}:{self.worker_task_port}")
             self.results_incoming.bind(
                 f"{worker_bind_address}:{self.worker_result_port}"
             )

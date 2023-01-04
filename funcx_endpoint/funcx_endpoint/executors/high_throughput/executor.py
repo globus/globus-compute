@@ -424,7 +424,7 @@ class HighThroughputExecutor(RepresentationMixin):
             name="Executor-Interchange",
             args=(comm_q,),
             kwargs={
-                "client_address": "127.0.0.1", # executor and ix are on the same node
+                "client_address": "127.0.0.1",  # executor and ix are on the same node
                 "client_ports": (
                     self.outgoing_q.port,
                     self.incoming_q.port,
