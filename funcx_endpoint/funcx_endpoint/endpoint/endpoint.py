@@ -57,8 +57,8 @@ class Endpoint:
         self.fx_client = None
 
     @property
-    def _endpoint_dir(self):
-        return os.path.join(self.funcx_dir, self.name)
+    def _endpoint_dir(self) -> pathlib.Path:
+        return pathlib.Path(self.funcx_dir) / self.name
 
     @staticmethod
     def _config_file_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
@@ -139,15 +139,22 @@ class Endpoint:
         )
 
     @staticmethod
-    def check_endpoint_json(endpoint_json, endpoint_uuid):
-        if os.path.exists(endpoint_json):
-            with open(endpoint_json) as fp:
-                log.debug("Connection info loaded from prior registration record")
-                reg_info = json.load(fp)
-                endpoint_uuid = reg_info["endpoint_id"]
-        elif not endpoint_uuid:
-            endpoint_uuid = str(uuid.uuid4())
-        return endpoint_uuid
+    def get_endpoint_id(endpoint_dir: pathlib.Path) -> str | None:
+        info_file_path = endpoint_dir / "endpoint.json"
+        try:
+            return json.loads(info_file_path.read_bytes())["endpoint_id"]
+        except FileNotFoundError:
+            pass
+        return None
+
+    @staticmethod
+    def get_or_create_endpoint_uuid(
+        endpoint_dir: pathlib.Path, endpoint_uuid: str | None
+    ) -> str:
+        ep_id = Endpoint.get_endpoint_id(endpoint_dir)
+        if not ep_id:
+            ep_id = endpoint_uuid or str(uuid.uuid4())
+        return ep_id
 
     @staticmethod
     def get_funcx_client(config: Config | None) -> FuncXClient:
@@ -172,7 +179,6 @@ class Endpoint:
         self.name = name
 
         endpoint_dir = self._endpoint_dir
-        endpoint_json = os.path.join(endpoint_dir, "endpoint.json")
 
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.executors:
@@ -183,7 +189,9 @@ class Endpoint:
 
         fx_client = Endpoint.get_funcx_client(endpoint_config)
 
-        endpoint_uuid = Endpoint.check_endpoint_json(endpoint_json, endpoint_uuid)
+        endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(
+            endpoint_dir, endpoint_uuid
+        )
 
         log.info(f"Starting endpoint with uuid: {endpoint_uuid}")
 
@@ -242,7 +250,7 @@ class Endpoint:
             reg_info = register_endpoint(
                 fx_client,
                 endpoint_uuid,
-                endpoint_dir,
+                str(endpoint_dir),
                 self.name,
                 endpoint_config.multi_tenant,
             )
@@ -335,13 +343,6 @@ class Endpoint:
         interchange.start()
 
         log.critical("Interchange terminated.")
-
-    @staticmethod
-    def get_endpoint_id(endpoint_dir: pathlib.Path) -> str | None:
-        info_file_path = endpoint_dir / "endpoint.json"
-        if info_file_path.is_file():
-            return json.loads(info_file_path.read_bytes())["endpoint_id"]
-        return None
 
     @staticmethod
     def stop_endpoint(
