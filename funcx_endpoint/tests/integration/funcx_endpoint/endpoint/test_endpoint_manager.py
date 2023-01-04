@@ -451,7 +451,7 @@ class TestStart:
             **mock_optionals,
         )
 
-    def test_check_endpoint_json_no_json_no_uuid(self, mocker):
+    def test_get_or_create_endpoint_uuid_no_json_no_uuid(self, mocker):
         mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint.uuid.uuid4")
         mock_uuid.return_value = 123456
 
@@ -459,20 +459,16 @@ class TestStart:
         config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
         manager.configure_endpoint(config_dir, None)
-        assert "123456" == manager.check_endpoint_json(
-            os.path.join(config_dir, "endpoint.json"), None
-        )
+        assert "123456" == manager.get_or_create_endpoint_uuid(config_dir, None)
 
-    def test_check_endpoint_json_no_json_given_uuid(self, mocker):
+    def test_get_or_create_endpoint_uuid_no_json_given_uuid(self):
         manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
         manager.configure_endpoint(config_dir, None)
-        assert "234567" == manager.check_endpoint_json(
-            os.path.join(config_dir, "endpoint.json"), "234567"
-        )
+        assert "234567" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
 
-    def test_check_endpoint_json_given_json(self, mocker):
+    def test_get_or_create_endpoint_uuid_given_json(self):
         manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
@@ -482,6 +478,4 @@ class TestStart:
         with open(os.path.join(config_dir, "endpoint.json"), "w") as fd:
             json.dump(mock_dict, fd)
 
-        assert "abcde12345" == manager.check_endpoint_json(
-            os.path.join(config_dir, "endpoint.json"), "234567"
-        )
+        assert "abcde12345" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
