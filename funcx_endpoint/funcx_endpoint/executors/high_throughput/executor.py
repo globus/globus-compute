@@ -142,9 +142,6 @@ class HighThroughputExecutor(RepresentationMixin):
     worker_debug : Bool
         Enables worker debug logging.
 
-    managed : Bool
-        If this executor is managed by the DFK or externally handled.
-
     cores_per_worker : float
         cores to be assigned to each worker. Oversubscription is possible
         by setting cores_per_worker < 1.0. Default=1
@@ -259,8 +256,6 @@ class HighThroughputExecutor(RepresentationMixin):
         suppress_failure=True,
         run_dir=None,
         endpoint_id=None,
-        managed=True,
-        interchange_local=True,
         passthrough=True,
         task_status_queue=None,
     ):
@@ -291,7 +286,6 @@ class HighThroughputExecutor(RepresentationMixin):
                 "Multiple storage access schemes are not supported"
             )
         self.working_dir = working_dir
-        self.managed = managed
         self.blocks = []
         self.cores_per_worker = cores_per_worker
         self.endpoint_id = endpoint_id
@@ -315,7 +309,6 @@ class HighThroughputExecutor(RepresentationMixin):
         self.suppress_failure = suppress_failure
         self.run_dir = run_dir
         self.queue_proc = None
-        self.interchange_local = interchange_local
         self.passthrough = passthrough
         self.task_status_queue = task_status_queue
         self.tasks = {}
@@ -361,14 +354,6 @@ class HighThroughputExecutor(RepresentationMixin):
                 "--container_image={container_image} "
             )
 
-        self.ix_launch_cmd = (
-            "funcx-interchange {debug} -c={client_address} "
-            "--client_ports={client_ports} "
-            "--worker_port_range={worker_port_range} "
-            "--logdir={logdir} "
-            "{suppress_failure} "
-        )
-
     def start(
         self,
         results_passthrough: multiprocessing.Queue = None,
@@ -402,14 +387,13 @@ class HighThroughputExecutor(RepresentationMixin):
 
         self.funcx_client = funcx_client
 
-        if self.interchange_local is True:
-            log.info("Attempting local interchange start")
-            self._start_local_interchange_process()
-            log.info(
-                "Started local interchange with ports: %s. %s",
-                self.worker_task_port,
-                self.worker_result_port,
-            )
+        log.info("Attempting local interchange start")
+        self._start_local_interchange_process()
+        log.info(
+            "Started local interchange with ports: %s. %s",
+            self.worker_task_port,
+            self.worker_result_port,
+        )
 
         log.debug(f"Created management thread: {self._queue_management_thread}")
 
