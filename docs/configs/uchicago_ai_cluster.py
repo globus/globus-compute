@@ -1,4 +1,4 @@
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_interface
 from parsl.launchers import SrunLauncher
 from parsl.providers import SlurmProvider
 
@@ -23,7 +23,7 @@ config = Config(
         HighThroughputExecutor(
             label="fe.cs.uchicago",
             worker_debug=False,
-            address=address_by_hostname(),
+            address=address_by_interface('ens2f1'),
             provider=SlurmProvider(
                 partition='general',
 

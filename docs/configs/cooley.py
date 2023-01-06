@@ -1,4 +1,4 @@
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_interface
 from parsl.launchers import MpiExecLauncher
 from parsl.providers import CobaltProvider
 
@@ -22,7 +22,7 @@ config = Config(
         HighThroughputExecutor(
             max_workers_per_node=2,
             worker_debug=False,
-            address=address_by_hostname(),
+            address=address_by_interface('ib0'),
             provider=CobaltProvider(
                 queue='default',
                 account=user_opts['cooley']['account'],
