@@ -1,4 +1,4 @@
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_interface
 from parsl.launchers import SrunLauncher
 from parsl.providers import SlurmProvider
 
@@ -19,7 +19,7 @@ user_opts = {
 config = Config(
     executors=[
         HighThroughputExecutor(
-            address=address_by_hostname(),
+            address=address_by_interface('ib0'),
             provider=SlurmProvider(
                 partition=user_opts['bebop']['partition'],
                 launcher=SrunLauncher(),

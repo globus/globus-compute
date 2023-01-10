@@ -7,6 +7,7 @@ to be addressed.
 from __future__ import annotations
 
 import concurrent.futures
+import ipaddress
 import logging
 import multiprocessing
 import os
@@ -295,6 +296,15 @@ class HighThroughputExecutor(RepresentationMixin):
         self.cores_per_worker = cores_per_worker
         self.endpoint_id = endpoint_id
         self._task_counter = 0
+
+        try:
+            ipaddress.ip_address(address=address)
+        except Exception:
+            log.critical(
+                f"Invalid address supplied: {address}. "
+                "Please use a valid IPv4 or IPv6 address"
+            )
+            raise
         self.address = address
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
@@ -366,13 +376,13 @@ class HighThroughputExecutor(RepresentationMixin):
     ):
         """Create the Interchange process and connect to it."""
         self.outgoing_q = zmq_pipes.TasksOutgoing(
-            "0.0.0.0", self.interchange_port_range
+            "127.0.0.1", self.interchange_port_range
         )
         self.incoming_q = zmq_pipes.ResultsIncoming(
-            "0.0.0.0", self.interchange_port_range
+            "127.0.0.1", self.interchange_port_range
         )
         self.command_client = zmq_pipes.CommandClient(
-            "0.0.0.0", self.interchange_port_range
+            "127.0.0.1", self.interchange_port_range
         )
 
         self.is_alive = True
@@ -424,7 +434,7 @@ class HighThroughputExecutor(RepresentationMixin):
             name="Executor-Interchange",
             args=(comm_q,),
             kwargs={
-                "client_address": self.address,
+                "client_address": "127.0.0.1",  # executor and ix are on the same node
                 "client_ports": (
                     self.outgoing_q.port,
                     self.incoming_q.port,
