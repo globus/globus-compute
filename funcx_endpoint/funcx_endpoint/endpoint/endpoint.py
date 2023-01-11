@@ -19,9 +19,9 @@ import texttable
 from globus_sdk import GlobusAPIError, NetworkError
 
 from funcx.sdk.client import FuncXClient
+from funcx_endpoint import __version__
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.result_store import ResultStore
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.logging_config import setup_logging
@@ -189,12 +189,6 @@ class Endpoint:
 
         fx_client = Endpoint.get_funcx_client(endpoint_config)
 
-        endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(
-            endpoint_dir, endpoint_uuid
-        )
-
-        log.info(f"Starting endpoint with uuid: {endpoint_uuid}")
-
         pid_check = Endpoint.check_pidfile(endpoint_dir)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
@@ -246,13 +240,16 @@ class Endpoint:
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
         reg_info = None
+        endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(
+            endpoint_dir, endpoint_uuid
+        )
+        log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
         try:
-            reg_info = register_endpoint(
-                fx_client,
+            reg_info = fx_client.register_endpoint(
+                endpoint_dir.name,
                 endpoint_uuid,
-                str(endpoint_dir),
-                self.name,
-                endpoint_config.multi_tenant,
+                endpoint_version=__version__,
+                multi_tenant=endpoint_config.multi_tenant,
             )
 
         except GlobusAPIError as e:
@@ -260,16 +257,9 @@ class Endpoint:
                 if e.http_status == 409 or e.http_status == 423:
                     # RESOURCE_CONFLICT or RESOURCE_LOCKED
                     log.warning(f"Endpoint registration blocked.  [{e.message}]")
-                    exit(-1)
-                raise
+                    exit(os.EX_UNAVAILABLE)
+            raise
 
-            log.exception("Caught exception while attempting endpoint registration")
-            log.critical(
-                "Endpoint registration will be retried in the new endpoint daemon "
-                "process. The endpoint will not work until it is successfully "
-                "registered."
-            )
-        # if the service is unreachable due to a timeout or connection error
         except NetworkError as e:
             # the output of a NetworkError exception is huge and unhelpful, so
             # it seems better to just stringify it here and get a concise error
@@ -283,20 +273,37 @@ class Endpoint:
                 "reachable \n"
                 "and then attempt restarting the endpoint"
             )
-            exit(-1)
+            exit(os.EX_TEMPFAIL)
 
-        if reg_info:
-            log.info("Launching endpoint daemon process")
-        else:
-            log.critical("Launching endpoint daemon process with errors noted above")
+        ret_ep_uuid = reg_info.get("endpoint_id")
+        if ret_ep_uuid != endpoint_uuid:
+            log.error(
+                "Unexpected response from server: mismatched endpoint id."
+                f"\n  Expected: {endpoint_uuid}, received: {ret_ep_uuid}"
+            )
+            exit(os.EX_SOFTWARE)
+
+        # sanitize passwords in logs
+        log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
+        log.debug(f"Registration information: {log_reg_info}")
+
+        json_file = endpoint_dir / "endpoint.json"
+
+        # `endpoint_id` key kept for backward compatibility when
+        # funcx-endpoint list is called
+        ep_info = {"endpoint_id": endpoint_uuid}
+        json_file.write_text(json.dumps(ep_info))
+        log.debug(f"Registration info written to {json_file}")
+
+        log.info("Launching endpoint daemon process")
 
         # NOTE
         # It's important that this log is emitted before we enter the daemon context
         # because daemonization closes down everything, a log message inside the
         # context won't write the currently configured loggers
-        logfile = os.path.join(endpoint_dir, "endpoint.log")
+        logfile = endpoint_dir / "endpoint.log"
         log.info(
-            "Logging will be reconfigured for the daemon. logfile=%s , debug=%s",
+            "Reconfiguring logging for daemonization. logfile: %s , debug: %s",
             logfile,
             self.debug,
         )

@@ -1,14 +1,15 @@
 """
 This module contains logging configuration for the funcx-endpoint application.
 """
+from __future__ import annotations
 
 import logging
 import logging.config
 import logging.handlers
 import os
+import pathlib
 import re
 import sys
-import typing as t
 
 log = logging.getLogger(__name__)
 
@@ -231,13 +232,13 @@ logger = logging.getLogger(__name__)
 
 def setup_logging(
     *,
-    logfile: t.Optional[str] = None,
+    logfile: pathlib.Path | str | None = None,
     console_enabled: bool = True,
     debug: bool = False,
     no_color: bool = False,
 ) -> None:
     if logfile is not None:
-        config = _get_file_dict_config(logfile, console_enabled, debug, no_color)
+        config = _get_file_dict_config(str(logfile), console_enabled, debug, no_color)
     else:
         config = _get_stream_dict_config(debug, no_color)
 
