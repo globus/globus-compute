@@ -15,6 +15,8 @@ def test_main_exception_always_quiesces(mocker, tmp_path):
     mocker.patch("funcx_endpoint.endpoint.interchange.mpQueue")
     ei = EndpointInterchange(
         config=mock_conf,
+        funcx_client=mocker.Mock(),
+        reg_info={"task_queue_info": {}, "result_queue_info": {}},
         logdir=str(tmp_path),
         endpoint_dir=str(tmp_path),
     )
