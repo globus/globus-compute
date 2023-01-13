@@ -57,6 +57,7 @@ class EndpointInterchange:
         endpoint_dir=".",
         funcx_client: FuncXClient | None = None,
         result_store: ResultStore | None = None,
+        reconnect_attempt_limit: int = 5,
     ):
         """
         Parameters
@@ -104,6 +105,8 @@ class EndpointInterchange:
 
         self.pending_task_queue: multiprocessing.Queue = multiprocessing.Queue()
 
+        self._reconnect_fail_counter = 0
+        self.reconnect_attempt_limit = max(1, reconnect_attempt_limit)
         self._quiesce_event = multiprocessing.Event()
         self._kill_event = multiprocessing.Event()
 
@@ -249,6 +252,15 @@ class EndpointInterchange:
         self.start_executors()
 
         while not self._kill_event.is_set():
+            if self._reconnect_fail_counter >= self.reconnect_attempt_limit:
+                log.critical(
+                    f"Failed {self._reconnect_fail_counter} consecutive times."
+                    "  Shutting down."
+                )
+                self.stop()
+                self.quiesce()
+                break
+
             if self._quiesce_event.is_set():
                 idle_for = random.uniform(2.0, 10.0)
                 log.warning(f"Interchange will retry connecting in {idle_for:.2f}s")
@@ -257,13 +269,24 @@ class EndpointInterchange:
             else:
                 log.debug("Starting threads and main loop")
 
+            if self.time_to_quit:
+                self.stop()
+                self.quiesce()
+                break
+
             try:
                 self._start_threads_and_main()
             except pika.exceptions.ProbableAuthenticationError as e:
                 log.error(f"Unable to connect to AMQP service: {e}")
                 self._kill_event.set()
             except Exception:
+                self._reconnect_fail_counter += 1
                 log.exception("Unhandled exception in main kernel.")
+                log.info(
+                    "Reconnection count: %s (of %s)",
+                    self._reconnect_fail_counter,
+                    self.reconnect_attempt_limit,
+                )
 
             self.quiesce()
 
@@ -444,6 +467,9 @@ class EndpointInterchange:
                     num_r - last_r,
                 )
                 last_t, last_r = num_t, num_r
+
+                # only reset come heartbeat and still alive
+                self._reconnect_fail_counter = 0
 
             # The timeouts aren't nominally necessary because if the above loop has
             # quit, then the _quiesce_event is set, and both threads check that event
