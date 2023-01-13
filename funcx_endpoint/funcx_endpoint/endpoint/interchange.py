@@ -66,10 +66,10 @@ class EndpointInterchange:
              Funcx config object that describes how compute should be provisioned
 
         reg_info : dict[str, dict]
-             Tuple of connection info for task_queue and result_queue
-             Connection parameters to connect to the service side RabbitMQ pipes
-             Optional: If not supplied, the endpoint will use a retry loop to
-             attempt registration periodically.
+             Dictionary containing connection information for both the task and
+             result queues.  The required data structure is returned from the
+             Endpoint registration API call, encapsulated in the SDK by
+             `FuncXClient.register_endpoint()`.
 
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'
@@ -265,7 +265,7 @@ class EndpointInterchange:
             try:
                 self._start_threads_and_main()
             except pika.exceptions.ProbableAuthenticationError as e:
-                log.warning(f"Unable to start endpoint: {e}")
+                log.error(f"Unable to connect to AMQP service: {e}")
                 self._kill_event.set()
             except Exception:
                 log.exception("Unhandled exception in main kernel.")
