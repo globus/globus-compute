@@ -16,7 +16,6 @@ import time
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
 
-import dill
 import pika.exceptions
 from funcx_common.messagepack import pack
 from funcx_common.messagepack.message_types import Result, ResultErrorDetails
@@ -35,10 +34,6 @@ from funcx_endpoint.endpoint.result_store import ResultStore
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 log = logging.getLogger(__name__)
-
-LOOP_SLOWDOWN = 0.0  # in seconds
-HEARTBEAT_CODE = (2**32) - 1
-PKL_HEARTBEAT_CODE = dill.dumps(HEARTBEAT_CODE)
 
 
 class EndpointInterchange:

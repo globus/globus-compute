@@ -39,7 +39,6 @@ if t.TYPE_CHECKING:
 
 log: FXLogger = logging.getLogger(__name__)  # type: ignore
 
-LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = dill.dumps(HEARTBEAT_CODE)
 
