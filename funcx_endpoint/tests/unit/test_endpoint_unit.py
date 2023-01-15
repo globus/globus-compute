@@ -6,12 +6,14 @@ import pathlib
 import random
 import uuid
 from collections import namedtuple
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
 import responses
 
 from funcx_endpoint.endpoint import endpoint
+from funcx_endpoint.endpoint.default_config import config as default_config
 from funcx_endpoint.endpoint.endpoint import Endpoint
 from funcx_endpoint.endpoint.utils.config import Config
 
@@ -294,3 +296,35 @@ def test_pid_file_check(pid_info, fs):
     pid_status = Endpoint.check_pidfile(ep_dir)
     assert should_exist == pid_status["exists"]
     assert should_active == pid_status["active"]
+
+
+def test_endpoint_get_metadata(mocker):
+    mock_data = {
+        "endpoint_version": "106.7",
+        "hostname": "oneohtrix.never",
+        "local_user": "daniel",
+    }
+
+    mocker.patch(
+        "funcx_endpoint.endpoint.endpoint.__version__", mock_data["endpoint_version"]
+    )
+
+    mock_fqdn = mocker.patch("funcx_endpoint.endpoint.endpoint.socket.getfqdn")
+    mock_fqdn.return_value = mock_data["hostname"]
+
+    mock_pwuid = mocker.patch("funcx_endpoint.endpoint.endpoint.pwd.getpwuid")
+    mock_pwuid.return_value = SimpleNamespace(pw_name=mock_data["local_user"])
+
+    meta = Endpoint.get_metadata(default_config)
+
+    for k, v in mock_data.items():
+        assert meta[k] == v
+
+    assert meta["ip_address"] is None
+    assert meta["sdk_version"] is None
+
+    config = meta["config"]
+    assert "funcx_service_address" in config
+    assert len(config["executors"]) == 1
+    assert config["executors"][0]["_type"] == "HighThroughputExecutor"
+    assert config["executors"][0]["provider"]["_type"] == "LocalProvider"
