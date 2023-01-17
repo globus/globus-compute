@@ -1,5 +1,0 @@
-Changed
-^^^^^^^
-
-- Renamed the ``FuncXClient`` method ``lock_endpoint`` to ``stop_endpoint``.
-- Renamed the ``Endpoint.stop_endpoint()`` parameter ``lock_uuid`` to ``remote``.
