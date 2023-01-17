@@ -255,8 +255,8 @@ def _do_logout_endpoints(
     return tokens_revoked, error_msg
 
 
-def read_config(endpoint_name: str) -> Config:
-    endpoint_dir = get_config_dir() / endpoint_name
+def read_config(endpoint_dir: pathlib.Path) -> Config:
+    endpoint_name = endpoint_dir.name
 
     try:
         conf_path = endpoint_dir / "config.py"
@@ -315,8 +315,9 @@ def _do_start_endpoint(
     log_to_console: bool,
     no_color: bool,
 ):
+    ep_dir = get_config_dir() / name
     get_cli_endpoint().start_endpoint(
-        name, endpoint_uuid, read_config(name), log_to_console, no_color
+        name, endpoint_uuid, read_config(ep_dir), log_to_console, no_color
     )
 
 
@@ -335,7 +336,7 @@ def stop_endpoint(*, name: str, remote: bool):
 
 def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
     ep_dir = get_config_dir() / name
-    Endpoint.stop_endpoint(ep_dir, read_config(name), remote=remote)
+    Endpoint.stop_endpoint(ep_dir, read_config(ep_dir), remote=remote)
 
 
 @app.command("restart")
