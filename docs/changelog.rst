@@ -3,6 +3,75 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.7:
+
+funcx & funcx-endpoint v1.0.7
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- When an API auth error is raised by a ``FuncXClient`` method, a new auth flow
+  will be initiated.
+
+- The funcX Endpoint will now shutdown after 5 consecutive failures to
+  initialize.  (The previous behavior was to try indefinitely, even if the
+  error was unrecoverable.)
+
+- Add API Calls to request a docker image build and to check on the status of a
+  submitted build
+
+Changed
+^^^^^^^
+
+- The exceptions raised by ``FuncXClient`` when the web service sends back an
+  error response are now instances of ``globus_sdk.GlobusAPIError`` and the
+  FuncX specific subclass FuncxAPIError has been removed.
+
+  Previous code that checked for FuncxAPIError.code_name should now check for
+  GlobusAPIError.code
+
+In prior versions of the ``funcx`` package:
+
+.. code-block:: python
+
+    import funcx
+
+    client = funcx.FuncXClient()
+    try:
+        client.some_method(...)
+    except funcx.FuncxAPIError as err:
+        if err.code_name == "invalid_uuid":
+            ...
+
+In the new version:
+
+.. code-block:: python
+
+    import funcx
+    import globus_sdk
+
+    client = funcx.FuncXClient()
+    try:
+        client.some_method(...)
+    except globus_sdk.GlobusAPIError as err:
+        if err.code == "INVALID_UUID":
+            ...
+
+- Renamed the ``FuncXClient`` method ``lock_endpoint`` to ``stop_endpoint``.
+
+- Renamed the ``Endpoint.stop_endpoint()`` parameter ``lock_uuid`` to ``remote``.
+
+- ``HighThroughputExecutor.address`` now accepts only IPv4 and IPv6. Example
+  configs have been updated to use ``parsl.address_by_interface`` instead of
+  ``parsl.address_by_hostname``.  Please note that following this change,
+  endpoints that were previously configured with
+  ``HighThroughputExecutor(address=address_by_hostname())`` will now raise a
+  ``ValueError`` and will need updating.
+
+- For better security, ``HighThroughputExecutor`` now listens only on a
+  specific interface rather than all interfaces.
+
 .. _changelog-1.0.6:
 
 funcx & funcx-endpoint v1.0.6
