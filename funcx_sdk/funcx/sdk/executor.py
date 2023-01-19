@@ -481,12 +481,12 @@ class FuncXExecutor(concurrent.futures.Executor):
                                 fut.set_result(deserialize(task["result"]))
                             else:
                                 exc = FuncxTaskExecutionFailed(
-                                    task["exception"], completed_t or "0"
+                                    task["exception"], completed_t
                                 )
                                 fut.set_exception(exc)
                         except Exception as exc:
                             funcx_err = FuncxTaskExecutionFailed(
-                                "Failed to set result or exception", str(time.time())
+                                "Failed to set result or exception"
                             )
                             funcx_err.__cause__ = exc
                             fut.set_exception(funcx_err)
