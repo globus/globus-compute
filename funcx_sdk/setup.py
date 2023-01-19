@@ -21,6 +21,7 @@ REQUIRES = [
     "pika>=1.2",
     "funcx-common==0.0.24",
     "tblib==1.7.0",
+    "texttable>=1.6.7",
 ]
 DOCS_REQUIRES = [
     "sphinx<5",
