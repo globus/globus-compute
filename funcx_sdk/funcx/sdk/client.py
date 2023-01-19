@@ -566,6 +566,25 @@ class FuncXClient:
         return r.data
 
     @requires_login
+    def get_endpoint_metadata(self, endpoint_uuid):
+        """Get the metadata for an endpoint.
+
+        Parameters
+        ----------
+        endpoint_uuid : str
+            UUID of the endpoint in question
+
+        Returns
+        -------
+        dict
+            Informational fields about the metadata, such as IP, hostname, and
+            configuration values. If there were any issues deserializing this data, may
+            also include an "errors" key.
+        """
+        r = self.web_client.get_endpoint_metadata(endpoint_uuid)
+        return r.data
+
+    @requires_login
     def get_endpoints(self):
         """Get a list of all endpoints owned by the current user across all systems.
 

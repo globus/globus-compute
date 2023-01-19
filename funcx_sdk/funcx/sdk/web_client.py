@@ -200,6 +200,11 @@ class FuncxWebClient(globus_sdk.BaseClient):
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"endpoints/{endpoint_id}/status")
 
+    def get_endpoint_metadata(
+        self, endpoint_id: ID_PARAM_T
+    ) -> globus_sdk.GlobusHTTPResponse:
+        return self.get(f"endpoints/{endpoint_id}")
+
     def get_endpoints(self) -> globus_sdk.GlobusHTTPResponse:
         return self.get("/endpoints")
 
