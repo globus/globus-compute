@@ -5,4 +5,8 @@
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- 'whoami' has been added to the cli to show the current logged in identity and linked identities
+- 'whoami' has been added to the cli to show the current logged in
+  identity and linked identities.
+    * A --linked-identities optional argument shows all linked identities
+    * ie. `funcx-endpoint whoami` or `funcx-endpoint whoami --linked-identities`
+

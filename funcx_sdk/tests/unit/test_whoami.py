@@ -14,7 +14,32 @@ MOCK_BASE = "funcx.sdk.login_manager.whoami"
             {
                 "sub": "id_abc",
                 "last_authentication": 1674588197,
-                "identity_set": [{"sub": "id_abc", "last_authentication": 1674588197}],
+                "identity_set": [{"sub": "id_def", "last_authentication": 1674588197}],
+            },
+            {
+                "identities": [
+                    {
+                        "id": "id_abc",
+                        "username": "abc@example.com",
+                        "name": "first last",
+                        "email": "abc@example.com",
+                    },
+                ]
+            },
+            False,
+            "",
+            1,
+            ["abc@example.com", "first last", "id_abc", "abc@example.com"],
+        ],
+        [
+            True,
+            {
+                "sub": "id_abc",
+                "last_authentication": 1674588197,
+                "identity_set": [
+                    {"sub": "id_abc", "last_authentication": 1674588197},
+                    {"sub": "id_def", "last_authentication": 1674588197},
+                ],
             },
             {
                 "identities": [
@@ -22,13 +47,14 @@ MOCK_BASE = "funcx.sdk.login_manager.whoami"
                         "id": "id_def",
                         "username": "def@example.com",
                         "name": "first last",
-                    }
+                        "email": "def@example.com",
+                    },
                 ]
             },
             False,
             "",
             2,
-            "def@example.com",
+            ["def@example.com", "first last", "id_def", "def@example.com"],
         ],
         [
             True,
@@ -42,18 +68,19 @@ MOCK_BASE = "funcx.sdk.login_manager.whoami"
                         "id": "id_abc",
                         "username": "abc@example.com",
                         "name": "first last",
+                        "email": "abc@example.com",
                     }
                 ]
             },
             True,
             "full identity set",
             0,
-            "",
+            [],
         ],
     ],
 )
 def test_whoami(response_output, mocker, monkeypatch):
-    linked, resp, profile, has_err, err_msg, num_rows, username = response_output
+    linked, resp, profile, has_err, err_msg, num_rows, user_info = response_output
 
     print_mock = mocker.patch(f"{MOCK_BASE}.print_table")
     oa_mock = mocker.Mock()
@@ -69,5 +96,5 @@ def test_whoami(response_output, mocker, monkeypatch):
     else:
         print_whoami_info(linked)
         print_mock.assert_called_once()
-        assert num_rows == len(print_mock.call_args)
-        assert username == print_mock.call_args[0][1][0][0]
+        assert num_rows == len(print_mock.call_args[0][1])
+        assert user_info == print_mock.call_args[0][1][-1]
