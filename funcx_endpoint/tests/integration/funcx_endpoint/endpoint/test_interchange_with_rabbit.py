@@ -15,7 +15,6 @@ from tests.integration.funcx_endpoint.executors.mock_executors import MockExecut
 from tests.utils import try_for_timeout
 
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.utils.config import Config
 
 
@@ -30,40 +29,33 @@ def run_interchange_process(
     a random endpoint id, and the mocked registration info.
     """
 
-    def run_it(reg_info, endpoint_uuid, endpoint_dir, mock_funcx_cli=True):
+    def run_it(reg_info: dict, endpoint_uuid, endpoint_dir, mock_funcx_cli=True):
         fake_client = mock.Mock() if mock_funcx_cli else None
 
         mock_exe = MockExecutor()
         mock_exe.endpoint_id = endpoint_uuid
 
-        config = Config(
-            executors=[mock_exe],
-            funcx_service_address="https://api2.funcx.org/v2",
+        config = Config(executors=[mock_exe])
+
+        ix = EndpointInterchange(
+            config=config,
+            endpoint_id=endpoint_uuid,
+            reg_info=reg_info,
+            funcx_client=fake_client,
+            endpoint_dir=endpoint_dir,
         )
 
-        base_ref_mock = "funcx_endpoint.endpoint.interchange"
-        with mock.patch(f"{base_ref_mock}.register_endpoint") as mock_reg:
-            mock_reg.return_value = reg_info
-            ix = EndpointInterchange(
-                config=config,
-                endpoint_id=endpoint_uuid,
-                funcx_client=fake_client,
-                endpoint_dir=endpoint_dir,
-            )
-
-            ix.start()
+        ix.start()
 
     endpoint_uuid = str(uuid.uuid4())
     endpoint_name = "endpoint_foo"
     fxc = get_standard_funcx_client()
     setup_register_endpoint_response(endpoint_uuid)
-    reg_info = register_endpoint(
-        fxc,
-        endpoint_uuid=endpoint_uuid,
-        endpoint_dir=tmp_path,
-        endpoint_name=endpoint_name,
-    )
-    assert isinstance(reg_info, tuple), "Test setup verification"
+    reg_info = fxc.register_endpoint(endpoint_name, endpoint_uuid)
+    assert isinstance(reg_info, dict), "Test setup verification"
+    assert reg_info["endpoint_id"] == endpoint_uuid, "Test setup verification"
+    assert "task_queue_info" in reg_info
+    assert "result_queue_info" in reg_info
 
     ix_proc = multiprocessing.Process(
         target=run_it, args=(reg_info, endpoint_uuid), kwargs={"endpoint_dir": tmp_path}
@@ -120,7 +112,7 @@ def test_epi_forwards_tasks_and_results(
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
 
-    task_q, res_q = reg_info
+    task_q, res_q = reg_info["task_queue_info"], reg_info["result_queue_info"]
     res_q_name = res_q["queue"]
     task_q_name = task_q["queue"]
     task_exch = task_q["exchange"]

@@ -12,9 +12,9 @@ import uuid
 
 import globus_sdk
 from funcx_common.sdk_version_sharing import user_agent_substring
+from globus_sdk.exc.api import GlobusAPIError
 
 from funcx.sdk._environments import get_web_service_url
-from funcx.sdk.errors import FuncxAPIError
 from funcx.serialize import FuncXSerializer
 from funcx.version import __version__
 
@@ -100,7 +100,7 @@ class FuncxWebClient(globus_sdk.BaseClient):
     # it does not have any other effects
     service_name: str = "funcx"
     # use the FuncX-specific error class
-    error_class = FuncxAPIError
+    error_class = GlobusAPIError
 
     def __init__(
         self,
@@ -172,25 +172,41 @@ class FuncxWebClient(globus_sdk.BaseClient):
         endpoint_name: str,
         endpoint_id: ID_PARAM_T,
         *,
-        metadata: t.Optional[t.Dict[str, t.Any]] = None,
-        endpoint_version: t.Optional[str] = None,
+        metadata: t.Optional[dict] = None,
+        multi_tenant: t.Optional[bool] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
         data: t.Dict[str, t.Any] = {
             "endpoint_name": endpoint_name,
             "endpoint_uuid": str(endpoint_id),
-            "version": endpoint_version,
         }
+
+        # Only send this param if True.  Will have to change to
+        # `if multi_tenant is not None` if we want to always pass it
+        if multi_tenant:
+            data["multi_tenant"] = multi_tenant
+
         if metadata:
-            data["meta"] = metadata
+            data["metadata"] = metadata
         if additional_fields is not None:
             data.update(additional_fields)
         return self.post("/endpoints", data=data)
+
+    def get_result_amqp_url(self) -> globus_sdk.GlobusHTTPResponse:
+        return self.get("get_amqp_result_connection_url")
 
     def get_endpoint_status(
         self, endpoint_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"endpoints/{endpoint_id}/status")
+
+    def get_endpoint_metadata(
+        self, endpoint_id: ID_PARAM_T
+    ) -> globus_sdk.GlobusHTTPResponse:
+        return self.get(f"endpoints/{endpoint_id}")
+
+    def get_endpoints(self) -> globus_sdk.GlobusHTTPResponse:
+        return self.get("/endpoints")
 
     def register_function(
         self,
@@ -220,3 +236,6 @@ class FuncxWebClient(globus_sdk.BaseClient):
         self, endpoint_id: ID_PARAM_T, function_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.delete(f"/endpoints/{endpoint_id}/whitelist/{function_id}")
+
+    def stop_endpoint(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
+        return self.post(f"/endpoints/{endpoint_id}/lock", data={})

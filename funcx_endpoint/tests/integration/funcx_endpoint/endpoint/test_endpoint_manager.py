@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import pathlib
 import shutil
 from importlib.machinery import SourceFileLoader
 from unittest.mock import ANY
@@ -9,6 +10,7 @@ import pytest
 import requests
 from globus_sdk import GlobusAPIError
 
+from funcx_endpoint.endpoint import default_config
 from funcx_endpoint.endpoint.endpoint import Endpoint
 
 logger = logging.getLogger("mock_funcx")
@@ -25,31 +27,69 @@ def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.R
 
 class TestStart:
     @pytest.fixture(autouse=True)
-    def test_setup_teardown(self):
-        # Code that will run before your test, for example:
-
+    def test_setup_teardown(self, fs):
         funcx_dir = f"{os.getcwd()}"
-        config_dir = os.path.join(funcx_dir, "mock_endpoint")
-        assert not os.path.exists(config_dir)
-        # A test function will be run at this point
+        config_dir = pathlib.Path(funcx_dir) / "mock_endpoint"
+        assert not config_dir.exists()
+
+        # pyfakefs will take care of newly created files, not existing config
+        fs.add_real_file(default_config.__file__)
+
         yield
-        # Code that will run after your test, for example:
-        shutil.rmtree(config_dir)
 
     def test_configure(self):
         manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
-        manager.configure_endpoint("mock_endpoint", None)
-        assert os.path.exists(config_dir)
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        manager.configure_endpoint(config_dir, None)
+        assert config_dir.exists() and config_dir.is_dir()
 
     def test_double_configure(self):
         manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
-        manager.configure_endpoint("mock_endpoint", None)
-        assert os.path.exists(config_dir)
+        manager.configure_endpoint(config_dir, None)
+        assert config_dir.exists() and config_dir.is_dir()
         with pytest.raises(Exception, match="ConfigExists"):
-            manager.configure_endpoint("mock_endpoint", None)
+            manager.configure_endpoint(config_dir, None)
+
+    @pytest.mark.parametrize("mt", [None, True, False])
+    def test_configure_multi_tenant_existing_config(self, mt):
+        manager = Endpoint(funcx_dir=os.getcwd())
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        config_file = config_dir / "config.py"
+        config_copy = str(config_dir.parent / "config2.py")
+
+        # First, make an entry with multi_tenant
+        manager.configure_endpoint(config_dir, None, multi_tenant=True)
+        shutil.move(config_file, config_copy)
+        shutil.rmtree(config_dir)
+
+        # Then, modify it with new setting
+        manager.configure_endpoint(config_dir, config_copy, multi_tenant=mt)
+
+        config = config_file.read_text()
+        assert f"multi_tenant={mt is True}," in config
+
+        os.remove(config_copy)
+
+    @pytest.mark.parametrize("mt", [None, True, False])
+    def test_configure_multi_tenant(self, mt):
+        manager = Endpoint(funcx_dir=os.getcwd())
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        config_file = config_dir / "config.py"
+
+        if mt is not None:
+            manager.configure_endpoint(config_dir, None, multi_tenant=mt)
+        else:
+            manager.configure_endpoint(config_dir, None)
+
+        assert config_file.exists()
+
+        config = config_file.read_text()
+        if mt:
+            assert f"multi_tenant={mt is True}," in config
+        else:
+            assert "multi_tenant" not in config
 
     @pytest.mark.skip(
         "This test needs to be re-written after endpoint_register is updated"
@@ -294,16 +334,15 @@ class TestStart:
 
         mock_context.return_value.pidfile.path = ""
 
-        class mock_load:
-            class mock_executors:
-                executors = None
+        class mock_executors:
+            executors = None
 
-            config = mock_executors()
+        mock_config = mock_executors()
 
         manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
-        manager.configure_endpoint("mock_endpoint", None)
+        manager.configure_endpoint(config_dir, None)
         with pytest.raises(
             Exception,
             match=f"Endpoint config file at {config_dir} is "
@@ -312,7 +351,7 @@ class TestStart:
             log_to_console = False
             no_color = True
             manager.start_endpoint(
-                "mock_endpoint", None, mock_load(), log_to_console, no_color
+                config_dir.name, None, mock_config, log_to_console, no_color
             )
 
     @pytest.mark.skip("This test doesn't make much sense")
@@ -407,37 +446,31 @@ class TestStart:
             **mock_optionals,
         )
 
-    def test_check_endpoint_json_no_json_no_uuid(self, mocker):
+    def test_get_or_create_endpoint_uuid_no_json_no_uuid(self, mocker):
         mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint.uuid.uuid4")
         mock_uuid.return_value = 123456
 
         manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
-        manager.configure_endpoint("mock_endpoint", None)
-        assert "123456" == manager.check_endpoint_json(
-            os.path.join(config_dir, "endpoint.json"), None
-        )
+        manager.configure_endpoint(config_dir, None)
+        assert "123456" == manager.get_or_create_endpoint_uuid(config_dir, None)
 
-    def test_check_endpoint_json_no_json_given_uuid(self, mocker):
+    def test_get_or_create_endpoint_uuid_no_json_given_uuid(self):
         manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
-        manager.configure_endpoint("mock_endpoint", None)
-        assert "234567" == manager.check_endpoint_json(
-            os.path.join(config_dir, "endpoint.json"), "234567"
-        )
+        manager.configure_endpoint(config_dir, None)
+        assert "234567" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
 
-    def test_check_endpoint_json_given_json(self, mocker):
+    def test_get_or_create_endpoint_uuid_given_json(self):
         manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
 
-        manager.configure_endpoint("mock_endpoint", None)
+        manager.configure_endpoint(config_dir, None)
 
         mock_dict = {"endpoint_id": "abcde12345"}
         with open(os.path.join(config_dir, "endpoint.json"), "w") as fd:
             json.dump(mock_dict, fd)
 
-        assert "abcde12345" == manager.check_endpoint_json(
-            os.path.join(config_dir, "endpoint.json"), "234567"
-        )
+        assert "abcde12345" == manager.get_or_create_endpoint_uuid(config_dir, "234567")

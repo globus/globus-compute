@@ -3,6 +3,160 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.7:
+
+funcx & funcx-endpoint v1.0.7
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- When an API auth error is raised by a ``FuncXClient`` method, a new auth flow
+  will be initiated.
+
+- The funcX Endpoint will now shutdown after 5 consecutive failures to
+  initialize.  (The previous behavior was to try indefinitely, even if the
+  error was unrecoverable.)
+
+- Add API Calls to request a docker image build and to check on the status of a
+  submitted build
+
+Changed
+^^^^^^^
+
+- The exceptions raised by ``FuncXClient`` when the web service sends back an
+  error response are now instances of ``globus_sdk.GlobusAPIError`` and the
+  FuncX specific subclass FuncxAPIError has been removed.
+
+  Previous code that checked for FuncxAPIError.code_name should now check for
+  GlobusAPIError.code
+
+In prior versions of the ``funcx`` package:
+
+.. code-block:: python
+
+    import funcx
+
+    client = funcx.FuncXClient()
+    try:
+        client.some_method(...)
+    except funcx.FuncxAPIError as err:
+        if err.code_name == "invalid_uuid":
+            ...
+
+In the new version:
+
+.. code-block:: python
+
+    import funcx
+    import globus_sdk
+
+    client = funcx.FuncXClient()
+    try:
+        client.some_method(...)
+    except globus_sdk.GlobusAPIError as err:
+        if err.code == "INVALID_UUID":
+            ...
+
+- Renamed the ``FuncXClient`` method ``lock_endpoint`` to ``stop_endpoint``.
+
+- Renamed the ``Endpoint.stop_endpoint()`` parameter ``lock_uuid`` to ``remote``.
+
+- ``HighThroughputExecutor.address`` now accepts only IPv4 and IPv6. Example
+  configs have been updated to use ``parsl.address_by_interface`` instead of
+  ``parsl.address_by_hostname``.  Please note that following this change,
+  endpoints that were previously configured with
+  ``HighThroughputExecutor(address=address_by_hostname())`` will now raise a
+  ``ValueError`` and will need updating.
+
+- For better security, ``HighThroughputExecutor`` now listens only on a
+  specific interface rather than all interfaces.
+
+.. _changelog-1.0.6:
+
+funcx & funcx-endpoint v1.0.6
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add a '--remote' option when stopping endpoints to create a temporary lock such that any running endpoints with the same UUID will get a locked response and exit.
+
+- Added `get_endpoints` methods to `FuncXWebClient` and `FuncXClient`, which retrieve
+  a list of all endpoints owned by the current user
+
+.. _changelog-1.0.5:
+
+funcx & funcx-endpoint v1.0.5
+-----------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Prevent Endpoint ID from wrapping in ``funcx-endpoint list`` output.
+
+Changed
+^^^^^^^
+
+- Updated minimum Globus SDK requirement to v3.14.0
+
+- Reorder ``funcx-endpoint list`` output: ``Endpoint ID`` column is now first
+  and ``Endpoint Name`` is now last.
+
+.. _changelog-1.0.5a0:
+
+funcx & funcx-endpoint v1.0.5a0
+-------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``.get_result_amqp_url()`` to ``FuncXClient`` to acquire user
+  credentials to the AMQP service.  Globus credentials are first verified
+  before user-specific AMQP credentials are (re)created and returned.  The only
+  expected use of this method comes from ``FuncXExecutor``.
+
+- Captures timing information throughout the endpoint by reporting
+  TaskTransitions.
+
+Bug Fixes
+^^^^^^^^^
+
+- General and specific attention to the ``FuncXExecutor``, especially around
+  non-happy path interactions
+    - Addressed the often-hanging end-of-script problem
+    - Address web-socket race condition (GH#591)
+
+Deprecated
+^^^^^^^^^^
+
+- ``batch_enabled`` argument to ``FuncXExecutor`` class; batch communication is
+  now enforced transparently.  Simply use ``.submit()`` normally, and the class
+  will batch the tasks automatically.  ``batch_size`` remains available.
+
+- ``asynchronous``, ``results_ws_uri``, and ``loop`` arguments to
+  ``FuncXClient`` class; use ``FuncXExecutor`` instead.
+
+Changed
+^^^^^^^
+
+- Refactor ``funcx.sdk.batch.Batch.add`` method interface.  ``function_id`` and
+  ``endpoint_id`` are now positional arguments, using language semantics to
+  enforce their use, rather than (internal) manual ``assert`` checks.  The
+  arguments (``args``) and keyword arguments (``kwargs``) arguments are no
+  longer varargs, and thus no longer prevent function use of ``function_id``
+  and ``endpoint_id``.
+
+- ``FuncXExecutor`` no longer creates a web socket connection; instead it
+  communicates directly with the backing AMQP service.  This removes an
+  internal round trip and is marginally more performant.
+
+- ``FuncXExecutor`` now much more faithfully implements the
+  ``_concurrent.futures.Executor`` interface.  In particular, the
+  ``endpoint_id`` and ``container_id`` items are specified on the executor
+  _object_ and not per ``.submit()`` invocation.  See the class documentation
+  for more information.
+
 .. _changelog-1.0.4:
 
 funcx & funcx-endpoint v1.0.4

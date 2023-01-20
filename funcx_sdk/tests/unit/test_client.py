@@ -4,6 +4,7 @@ from unittest import mock
 import pytest
 
 import funcx
+from funcx import ContainerSpec
 from funcx.errors import FuncxTaskExecutionFailed
 from funcx.serialize import FuncXSerializer
 
@@ -13,18 +14,18 @@ def _clear_sdk_env(monkeypatch):
     monkeypatch.delenv("FUNCX_SDK_ENVIRONMENT", raising=False)
 
 
-@pytest.mark.parametrize("env", [None, "dev", "production"])
+@pytest.mark.parametrize("env", [None, "local", "dev", "production"])
 @pytest.mark.parametrize("usage_method", ["env_var", "param"])
-@pytest.mark.parametrize("explicit_params", ["neither", "web", "ws", "both"])
+@pytest.mark.parametrize("explicit_params", [None, "web"])
 def test_client_init_sets_addresses_by_env(
-    monkeypatch, env, usage_method, explicit_params
+    monkeypatch, env, usage_method, explicit_params, randomstring
 ):
     if env in (None, "production"):
         web_uri = "https://api2.funcx.org/v2"
-        ws_uri = "wss://api2.funcx.org/ws/v2/"
-    elif env in ("dev",):
+    elif env == "dev":
         web_uri = "https://api.dev.funcx.org/v2"
-        ws_uri = "wss://api.dev.funcx.org/ws/v2/"
+    elif env == "local":
+        web_uri = "http://localhost:5000/v2"
     else:
         raise NotImplementedError
 
@@ -44,26 +45,16 @@ def test_client_init_sets_addresses_by_env(
 
     # create the client, either with just the input env or with explicit parameters
     # for explicit params, alter the expected URI(s)
-    if explicit_params == "neither":
+    if not explicit_params:
         client = funcx.FuncXClient(**kwargs)
     elif explicit_params == "web":
-        web_uri = "http://localhost:5000"
+        web_uri = f"http://{randomstring()}.fqdn:1234/{randomstring()}"
         client = funcx.FuncXClient(funcx_service_address=web_uri, **kwargs)
-    elif explicit_params == "ws":
-        ws_uri = "ws://localhost:8081"
-        client = funcx.FuncXClient(results_ws_uri=ws_uri, **kwargs)
-    elif explicit_params == "both":
-        web_uri = "http://localhost:5000"
-        ws_uri = "ws://localhost:8081"
-        client = funcx.FuncXClient(
-            funcx_service_address=web_uri, results_ws_uri=ws_uri, **kwargs
-        )
     else:
         raise NotImplementedError
 
-    # finally, confirm that the addresses were set correctly
+    # finally, confirm that the address was set correctly
     assert client.funcx_service_address == web_uri
-    assert client.results_ws_uri == ws_uri
 
 
 def test_client_init_accepts_specified_taskgroup():
@@ -175,6 +166,39 @@ def test_batch_created_websocket_queue(create_ws_queue):
         assert submit_data["create_websocket_queue"] is False
 
 
+def test_batch_error():
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc.web_client = mock.MagicMock()
+
+    error_reason = "reason 1 2 3"
+    error_results = {
+        "response": "batch",
+        "results": [
+            {
+                "http_status_code": 200,
+                "status": "Success",
+                "task_uuid": "abc",
+            },
+            {
+                "http_status_code": 400,
+                "status": "Failed",
+                "task_uuid": "def",
+                "reason": error_reason,
+            },
+        ],
+        "task_group_id": "tg_id",
+    }
+    fxc.web_client.submit = mock.MagicMock(return_value=error_results)
+
+    batch = fxc.create_batch()
+    batch.add("fid1", "eid1", "arg1")
+    batch.add("fid2", "eid2", "arg2")
+    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+        fxc.batch_run(batch)
+
+    assert error_reason in str(excinfo)
+
+
 @pytest.mark.parametrize("asynchronous", [True, False, None])
 def test_single_run_websocket_queue_depend_async(asynchronous):
 
@@ -206,3 +230,69 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
         assert submit_data["create_websocket_queue"] is True
     else:
         assert submit_data["create_websocket_queue"] is False
+
+
+def test_build_container(mocker, login_manager):
+    mock_data = mocker.Mock()
+    mock_data.data = {"container_id": "123-456"}
+    login_manager.get_funcx_web_client.post = mocker.Mock(return_value=mock_data)
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    spec = ContainerSpec(
+        name="MyContainer",
+        pip=[
+            "matplotlib==3.5.1",
+            "numpy==1.18.5",
+        ],
+        python_version="3.8",
+        payload_url="https://github.com/funcx-faas/funcx-container-service.git",
+    )
+
+    container_id = fxc.build_container(spec)
+    assert container_id == "123-456"
+    login_manager.get_funcx_web_client.post.assert_called()
+    calls = login_manager.get_funcx_web_client.post.call_args
+    assert calls[0][0] == "containers/build"
+    assert calls[1] == {"data": spec.to_json()}
+
+
+def test_container_build_status(mocker, login_manager, randomstring):
+    expected_status = randomstring()
+
+    class MockData(dict):
+        def __init__(self):
+            self["status"] = expected_status
+            self.http_status = 200
+
+    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    status = fxc.get_container_build_status("123-434")
+    assert status == expected_status
+
+
+def test_container_build_status_not_found(mocker, login_manager):
+    class MockData(dict):
+        def __init__(self):
+            self.http_status = 404
+
+    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+
+    with pytest.raises(ValueError) as excinfo:
+        fxc.get_container_build_status("123-434")
+
+    assert excinfo.value.args[0] == "Container ID 123-434 not found"
+
+
+def test_container_build_status_failure(mocker, login_manager):
+    class MockData(dict):
+        def __init__(self):
+            self.http_status = 500
+            self.http_reason = "This is a reason"
+
+    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+
+    with pytest.raises(SystemError) as excinfo:
+        fxc.get_container_build_status("123-434")
+
+    assert type(excinfo.value) == SystemError

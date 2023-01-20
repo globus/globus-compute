@@ -146,3 +146,17 @@ The following snippet shows an example configuration for accessing the Bebop sys
 running on a login node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 
 .. literalinclude:: configs/bebop.py
+
+
+Pinning Workers to devices
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Many modern clusters provide multiple accelerators per compute note, yet many applications are best suited to using a
+single accelerator per task. funcX supports pinning each worker to different accelerators using the ``available_accelerators``
+option of the ``HighThroughputExecutor``. Provide either the number of accelerators (funcX will assume they are named
+in integers starting from zero) or a list of the names of the accelerators available on the node. Each funcX worker
+will have the following environment variables set to the worker specific identity assigned:
+``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``, ``SYCL_DEVICE_FILTER``.
+
+
+.. literalinclude:: configs/worker_pinning.py

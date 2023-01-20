@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import importlib.util
 import logging
-import os
 import pathlib
-from importlib.machinery import SourceFileLoader
 
 import click
 from click import ClickException
 
 from funcx.sdk.login_manager import LoginManager
+from funcx_endpoint.endpoint.utils.config import Config
 
 from .endpoint.endpoint import Endpoint
 from .logging_config import setup_logging
@@ -28,22 +28,42 @@ class CommandState:
         return click.get_current_context().ensure_object(CommandState)
 
 
+def init_endpoint_configuration_dir(funcx_conf_dir: pathlib.Path):
+    if not funcx_conf_dir.exists():
+        log.info(
+            "No existing configuration found at %s. Initializing...", funcx_conf_dir
+        )
+        try:
+            funcx_conf_dir.mkdir(mode=0o700, exist_ok=True)
+        except Exception as exc:
+            e = click.ClickException(
+                f"{exc}\n\nUnable to create configuration directory"
+            )
+            raise e from exc
+
+    elif not funcx_conf_dir.is_dir():
+        raise click.ClickException(
+            f"File already exists: {funcx_conf_dir}\n\n"
+            "Refusing to initialize funcX configuration directory: path already exists"
+        )
+
+
+def get_config_dir() -> pathlib.Path:
+    state = CommandState.ensure()
+    return pathlib.Path(state.endpoint_config_dir)
+
+
 def get_cli_endpoint() -> Endpoint:
     # this getter creates an Endpoint object from the CommandState
     # it takes its various configurable values from the current CommandState
     # as a result, any number of CLI options may be used to tweak the CommandState
     # via callbacks, and the Endpoint will only be constructed within commands which
     # access the Endpoint via this getter
+    funcx_dir = get_config_dir()
+    init_endpoint_configuration_dir(funcx_dir)
+
     state = CommandState.ensure()
-
-    endpoint = Endpoint(funcx_dir=state.endpoint_config_dir, debug=state.debug)
-
-    # ensure that configs exist
-    if not os.path.exists(endpoint.funcx_dir):
-        log.info(
-            "No existing configuration found at %s. Initializing...", endpoint.funcx_dir
-        )
-        endpoint.init_endpoint()
+    endpoint = Endpoint(funcx_dir=str(funcx_dir), debug=state.debug)
 
     return endpoint
 
@@ -124,16 +144,29 @@ def version_command():
 
 @app.command(name="configure", help="Configure an endpoint")
 @click.option("--endpoint-config", default=None, help="a template config to use")
+@click.option(
+    "--multi-tenant",
+    is_flag=True,
+    default=False,
+    hidden=True,
+    help="Configure endpoint as multi-tenant capable",
+)
 @name_arg
 @common_options
-def configure_endpoint(*, name: str, endpoint_config: str | None):
+def configure_endpoint(
+    *,
+    name: str,
+    endpoint_config: str | None,
+    multi_tenant: bool,
+):
     """Configure an endpoint
 
     Drops a config.py template into the funcx configs directory.
     The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
     """
-    endpoint = get_cli_endpoint()
-    endpoint.configure_endpoint(name, endpoint_config)
+    funcx_dir = get_config_dir()
+    ep_dir = funcx_dir / name
+    Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant)
 
 
 @app.command(name="start", help="Start an endpoint by name")
@@ -199,9 +232,9 @@ def _do_logout_endpoints(
     Returns True, None if logout was successful and tokens were found and revoked
     Returns False, error_msg if token revocation was not done
     """
-
     if running_endpoints is None:
-        running_endpoints = get_cli_endpoint().get_running_endpoints()
+        funcx_dir = get_config_dir()
+        running_endpoints = Endpoint.get_running_endpoints(funcx_dir)
     tokens_revoked = False
     error_msg = None
     if running_endpoints and not force:
@@ -222,34 +255,49 @@ def _do_logout_endpoints(
     return tokens_revoked, error_msg
 
 
-def _do_start_endpoint(
-    *,
-    name: str,
-    endpoint_uuid: str | None,
-    log_to_console: bool,
-    no_color: bool,
-):
-    endpoint = get_cli_endpoint()
-    endpoint_dir = os.path.join(endpoint.funcx_dir, name)
-
-    if not os.path.exists(endpoint_dir):
-        configure_command = "funcx-endpoint configure"
-        if name != "default":
-            configure_command += f" -n {name}"
-        msg = (
-            f"\nEndpoint {name} is not configured!\n"
-            "1. Please create a configuration template with:\n"
-            f"\t{configure_command}\n"
-            "2. Update the configuration\n"
-            "3. Start the endpoint\n"
-        )
-        click.echo(msg)
-        return
+def read_config(endpoint_dir: pathlib.Path) -> Config:
+    endpoint_name = endpoint_dir.name
 
     try:
-        endpoint_config = SourceFileLoader(
-            "config", os.path.join(endpoint_dir, "config.py")
-        ).load_module()
+        conf_path = endpoint_dir / "config.py"
+        spec = importlib.util.spec_from_file_location("config", conf_path)
+        if not (spec and spec.loader):
+            raise Exception(f"Unable to import configuration (no spec): {conf_path}")
+        config = importlib.util.module_from_spec(spec)
+        if not config:
+            raise Exception(f"Unable to import configuration (no config): {conf_path}")
+        spec.loader.exec_module(config)
+        return config.config
+
+    except FileNotFoundError as err:
+        if not endpoint_dir.exists():
+            configure_command = "funcx-endpoint configure"
+            if endpoint_name != "default":
+                configure_command += f" {endpoint_name}"
+            msg = (
+                f"{err}"
+                f"\n\nEndpoint '{endpoint_name}' is not configured!"
+                "\n1. Please create a configuration template with:"
+                f"\n\t{configure_command}"
+                "\n2. Update the configuration"
+                "\n3. Start the endpoint\n"
+            )
+            raise ClickException(msg) from err
+        msg = (
+            f"{err}"
+            "\n\nUnable to find required configuration file; has the configuration"
+            "\ndirectory been corrupted?"
+        )
+        raise ClickException(msg) from err
+
+    except AttributeError as err:
+        msg = (
+            f"{err}"
+            "\n\nFailed to find expected data structure in configuration file."
+            "\nHas the configuration file been corrupted or modified incorrectly?\n"
+        )
+        raise ClickException(msg) from err
+
     except Exception:
         log.exception(
             "funcX v0.2.0 made several non-backwards compatible changes to the config. "
@@ -258,22 +306,37 @@ def _do_start_endpoint(
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
         )
         raise
-    endpoint.start_endpoint(
-        name, endpoint_uuid, endpoint_config, log_to_console, no_color
+
+
+def _do_start_endpoint(
+    *,
+    name: str,
+    endpoint_uuid: str | None,
+    log_to_console: bool,
+    no_color: bool,
+):
+    ep_dir = get_config_dir() / name
+    get_cli_endpoint().start_endpoint(
+        name, endpoint_uuid, read_config(ep_dir), log_to_console, no_color
     )
 
 
 @app.command("stop")
 @name_arg
+@click.option(
+    "--remote",
+    is_flag=True,
+    help="send stop signal to all endpoints with this UUID, local or elsewhere",
+)
 @common_options
-def stop_endpoint(*, name: str):
+def stop_endpoint(*, name: str, remote: bool):
     """Stops an endpoint using the pidfile"""
-    _do_stop_endpoint(name=name)
+    _do_stop_endpoint(name=name, remote=remote)
 
 
-def _do_stop_endpoint(*, name: str) -> None:
-    endpoint = get_cli_endpoint()
-    endpoint.stop_endpoint(name)
+def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
+    ep_dir = get_config_dir() / name
+    Endpoint.stop_endpoint(ep_dir, read_config(ep_dir), remote=remote)
 
 
 @app.command("restart")
@@ -296,8 +359,8 @@ def restart_endpoint(*, name: str, endpoint_uuid: str | None):
 @common_options
 def list_endpoints():
     """List all available endpoints"""
-    endpoint = get_cli_endpoint()
-    endpoint.print_endpoint_table()
+    funcx_dir = get_config_dir()
+    Endpoint.print_endpoint_table(funcx_dir)
 
 
 @app.command("delete")
@@ -311,8 +374,8 @@ def delete_endpoint(*, name: str, yes: bool):
             f"Are you sure you want to delete the endpoint <{name}>?", abort=True
         )
 
-    endpoint = get_cli_endpoint()
-    endpoint.delete_endpoint(name)
+    ep_dir = get_config_dir() / name
+    Endpoint.delete_endpoint(ep_dir)
 
 
 def cli_run():

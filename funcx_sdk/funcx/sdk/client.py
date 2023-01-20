@@ -8,12 +8,7 @@ import typing as t
 import uuid
 import warnings
 
-from funcx.errors import (
-    FuncxTaskExecutionFailed,
-    SerializationError,
-    TaskPending,
-    handle_response_errors,
-)
+from funcx.errors import FuncxTaskExecutionFailed, SerializationError, TaskPending
 from funcx.sdk._environments import (
     get_web_service_url,
     get_web_socket_url,
@@ -27,7 +22,7 @@ from funcx.serialize import FuncXSerializer
 from funcx.version import __version__, compare_versions
 
 from .batch import Batch
-from .login_manager import LoginManager, LoginManagerProtocol
+from .login_manager import LoginManager, LoginManagerProtocol, requires_login
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +47,12 @@ class FuncXClient:
         self,
         http_timeout=None,
         funcx_home=_FUNCX_HOME,
-        asynchronous=False,
+        asynchronous: bool | None = None,
         loop=None,
         environment: str | None = None,
         funcx_service_address: str | None = None,
         results_ws_uri: str | None = None,
-        warn_about_url_mismatch: bool = True,
+        warn_about_url_mismatch: bool | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         do_version_check: bool = True,
         openid_authorizer: t.Any = None,
@@ -86,9 +81,13 @@ class FuncXClient:
         results_ws_uri: str
             For internal use only. The address of the websocket service.
 
-        warn_about_url_mismatch:
+            DEPRECATED - use FuncXExecutor instead.
+
+        warn_about_url_mismatch: bool
             For internal use only. If true, a warning is logged if funcx_service_address
             and results_ws_uri appear to point to different environments.
+
+            DEPRECATED - use FuncXExecutor instead.
 
         do_version_check: bool
             Set to ``False`` to skip the version compatibility check on client
@@ -96,14 +95,22 @@ class FuncXClient:
             Default: True
 
         asynchronous: bool
-        Should the API use asynchronous interactions with the web service?
-        Currently only impacts the run method
-        Default: False
+            Should the API use asynchronous interactions with the web service?
+            Currently only impacts the run method.
+
+            DEPRECATED - this was an early attempt at asynchronous result gathering.
+                Use the FuncXExecutor instead.
+
+            Default: False
 
         loop: AbstractEventLoop
-        If asynchronous mode is requested, then you can provide an optional
-        event loop instance. If None, then we will access asyncio.get_event_loop()
-        Default: None
+            If asynchronous mode is requested, then you can provide an optional
+            event loop instance. If None, then we will access asyncio.get_event_loop()
+
+            DEPRECATED - part of an early attempt at asynchronous result gathering.
+                Use the FuncXExecutor instead.
+
+            Default: None
 
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this FuncXClient instance.
@@ -117,18 +124,6 @@ class FuncXClient:
         # resolve URLs if not set
         if funcx_service_address is None:
             funcx_service_address = get_web_service_url(environment)
-        if results_ws_uri is None:
-            results_ws_uri = get_web_socket_url(environment)
-
-        if warn_about_url_mismatch and urls_might_mismatch(
-            funcx_service_address, results_ws_uri
-        ):
-            logger.warning(
-                f"funcx_service_address={funcx_service_address} and "
-                f"results_ws_uri={results_ws_uri} "
-                "look like they might point to different environments. double check "
-                "that they are the correct URLs."
-            )
 
         self._task_status_table: t.Dict[str, t.Dict] = {}
         self.funcx_home = os.path.expanduser(funcx_home)
@@ -140,13 +135,17 @@ class FuncXClient:
             (openid_authorizer, "openid_authorizer"),
             (fx_authorizer, "fx_authorizer"),
             (search_authorizer, "search_authorizer"),
+            (asynchronous, "asynchronous"),
+            (loop, "loop"),
+            (results_ws_uri, "results_ws_uri"),
+            (warn_about_url_mismatch, "warn_about_url_mismatch"),
         ]:
             if arg is not None:
-                warnings.warn(
+                msg = (
                     f"The '{name}' argument is deprecated. "
-                    "It will be removed in a future release.",
-                    DeprecationWarning,
+                    "It will be removed in a future release."
                 )
+                warnings.warn(msg)
 
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
@@ -167,10 +166,24 @@ class FuncXClient:
         if do_version_check:
             self.version_check()
 
-        self.results_ws_uri = results_ws_uri
-        self.asynchronous = asynchronous
+        self.results_ws_uri = None
+        self.asynchronous = asynchronous or False
         if asynchronous:
             self.loop = loop if loop else asyncio.get_event_loop()
+
+            if results_ws_uri is None:
+                results_ws_uri = get_web_socket_url(environment)
+            self.results_ws_uri = results_ws_uri
+
+            if warn_about_url_mismatch and urls_might_mismatch(
+                funcx_service_address, results_ws_uri
+            ):  # noqa
+                logger.warning(
+                    f"funcx_service_address={funcx_service_address} and "
+                    f"results_ws_uri={results_ws_uri} "
+                    "look like they might point to different environments.  "
+                    "Double check that they are the correct URLs."
+                )
 
             # Start up an asynchronous polling loop in the background
             self.ws_polling_task = WebSocketPollingTask(
@@ -253,6 +266,7 @@ class FuncXClient:
         self._task_status_table[task_id] = status
         return status
 
+    @requires_login
     def get_task(self, task_id):
         """Get a funcX task.
 
@@ -275,6 +289,7 @@ class FuncXClient:
         rets = self._update_task_table(r.text, task_id)
         return rets
 
+    @requires_login
     def get_result(self, task_id):
         """Get the result of a funcX task
 
@@ -301,6 +316,7 @@ class FuncXClient:
                 logger.warning("We have an exception : {}".format(task["exception"]))
                 task["exception"].reraise()
 
+    @requires_login
     def get_batch_result(self, task_id_list):
         """Request status for a batch of task_ids"""
         assert isinstance(
@@ -338,6 +354,7 @@ class FuncXClient:
 
         return results
 
+    @requires_login
     def run(self, *args, endpoint_id=None, function_id=None, **kwargs) -> str:
         """Initiate an invocation
 
@@ -399,6 +416,7 @@ class FuncXClient:
             task_group_id=task_group_id, create_websocket_queue=create_websocket_queue
         )
 
+    @requires_login
     def batch_run(self, batch) -> t.List[str]:
         """Initiate a batch of tasks to funcX
 
@@ -422,11 +440,16 @@ class FuncXClient:
         for result in r["results"]:
             task_id = result["task_uuid"]
             task_uuids.append(task_id)
-            if result["http_status_code"] != 200:
+            if not (200 <= result["http_status_code"] < 300):
                 # this method of handling errors for a batch response is not
                 # ideal, as it will raise any error in the multi-response,
                 # but it will do until batch_run is deprecated in favor of Executer
-                handle_response_errors(result)
+                # Note that some errors may already be caught and raised
+                # by funcx.sdk.client.request as GlobusAPIError
+
+                # Checking for 'Failed' is how FuncxResponseError.unpack
+                # originally checked for errors.
+                raise FuncxTaskExecutionFailed(result.get("reason"))
 
         if self.asynchronous:
             task_group_id = r["task_group_id"]
@@ -442,25 +465,26 @@ class FuncXClient:
 
         return task_uuids
 
+    @requires_login
     def register_endpoint(
-        self, name, endpoint_id, metadata=None, endpoint_version=None
+        self,
+        name,
+        endpoint_id,
+        metadata=None,
+        multi_tenant=False,
     ):
         """Register an endpoint with the funcX service.
 
         Parameters
         ----------
-        name : str
-            Name of the endpoint
-        endpoint_id : str
-                The uuid of the endpoint
-        metadata : dict
-            endpoint metadata, see default_config example
-        endpoint_version: str
-            Version string to be passed to the webService as a compatibility check
+        :param name str Name of the endpoint
+        :param endpoint_id str The uuid of the endpoint
+        :param metadata dict endpoint metadata
+        :param multi_tenant bool Whether the endpoint supports multiple users
 
         Returns
         -------
-        A dict
+        dict
             {'endpoint_id' : <>,
              'address' : <>,
              'client_ports': <>}
@@ -471,10 +495,16 @@ class FuncXClient:
             endpoint_name=name,
             endpoint_id=endpoint_id,
             metadata=metadata,
-            endpoint_version=endpoint_version,
+            multi_tenant=multi_tenant,
         )
         return r.data
 
+    @requires_login
+    def get_result_amqp_url(self) -> dict[str, str]:
+        r = self.web_client.get_result_amqp_url()
+        return r.data
+
+    @requires_login
     def get_containers(self, name, description=None):
         """
         Register a DLHub endpoint with the funcX service and get the containers to
@@ -497,6 +527,7 @@ class FuncXClient:
         r = self.web_client.post("get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
+    @requires_login
     def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
 
@@ -517,6 +548,7 @@ class FuncXClient:
         r = self.web_client.get(f"containers/{container_uuid}/{container_type}")
         return r.data["container"]
 
+    @requires_login
     def get_endpoint_status(self, endpoint_uuid):
         """Get the status reports for an endpoint.
 
@@ -533,6 +565,38 @@ class FuncXClient:
         r = self.web_client.get_endpoint_status(endpoint_uuid)
         return r.data
 
+    @requires_login
+    def get_endpoint_metadata(self, endpoint_uuid):
+        """Get the metadata for an endpoint.
+
+        Parameters
+        ----------
+        endpoint_uuid : str
+            UUID of the endpoint in question
+
+        Returns
+        -------
+        dict
+            Informational fields about the metadata, such as IP, hostname, and
+            configuration values. If there were any issues deserializing this data, may
+            also include an "errors" key.
+        """
+        r = self.web_client.get_endpoint_metadata(endpoint_uuid)
+        return r.data
+
+    @requires_login
+    def get_endpoints(self):
+        """Get a list of all endpoints owned by the current user across all systems.
+
+        Returns
+        -------
+        list
+            A list of dictionaries which contain endpoint info
+        """
+        r = self.web_client.get_endpoints()
+        return r.data
+
+    @requires_login
     def register_function(
         self,
         function,
@@ -542,7 +606,7 @@ class FuncXClient:
         public=False,
         group=None,
         searchable=True,
-    ):
+    ) -> str:
         """Register a function code with the funcX service.
 
         Parameters
@@ -583,6 +647,7 @@ class FuncXClient:
         r = self.web_client.register_function(data)
         return r.data["function_uuid"]
 
+    @requires_login
     def search_function(self, q, offset=0, limit=10, advanced=False):
         """Search for function via the funcX service
 
@@ -605,6 +670,7 @@ class FuncXClient:
             q, offset=offset, limit=limit, advanced=advanced
         )
 
+    @requires_login
     def search_endpoint(self, q, scope="all", owner_id=None):
         """
 
@@ -622,6 +688,7 @@ class FuncXClient:
         """
         return self.searcher.search_endpoint(q, scope=scope, owner_id=owner_id)
 
+    @requires_login
     def register_container(self, location, container_type, name="", description=""):
         """Register a container with the funcX service.
 
@@ -653,6 +720,50 @@ class FuncXClient:
         r = self.web_client.post("containers", data=payload)
         return r.data["container_id"]
 
+    @requires_login
+    def build_container(self, container_spec):
+        """
+        Submit a request to build a docker image based on a container spec. This
+        container build service is based on repo2docker, so the spec reflects features
+        supported by it.
+
+        Only members of a managed globus group are allowed to use this service at
+        present. This call will throw a ContainerBuildForbidden exception if you are
+        not a member of this group.
+
+        Parameters
+        ----------
+        container_spec : funcx.sdk.container_spec.ContainerSpec
+            Complete specification of what goes into the container
+
+        Returns
+        -------
+        str
+            UUID of the container which can be used to register your function
+
+        Raises
+        ------
+        ContainerBuildForbidden
+            User is not in the globus group that protects the build
+        """
+        r = self.web_client.post("containers/build", data=container_spec.to_json())
+        return r.data["container_id"]
+
+    def get_container_build_status(self, container_id):
+        r = self.web_client.get(f"containers/build/{container_id}")
+        if r.http_status == 200:
+            return r["status"]
+        elif r.http_status == 404:
+            raise ValueError(f"Container ID {container_id} not found")
+        else:
+            message = (
+                f"Exception in fetching build status. HTTP Error Code "
+                f"{r.http_status}, {r.http_reason}"
+            )
+            logger.error(message)
+            raise SystemError(message)
+
+    @requires_login
     def add_to_whitelist(self, endpoint_id, function_ids):
         """Adds the function to the endpoint's whitelist
 
@@ -670,6 +781,7 @@ class FuncXClient:
         """
         return self.web_client.whitelist_add(endpoint_id, function_ids)
 
+    @requires_login
     def get_whitelist(self, endpoint_id):
         """List the endpoint's whitelist
 
@@ -685,6 +797,7 @@ class FuncXClient:
         """
         return self.web_client.get_whitelist(endpoint_id)
 
+    @requires_login
     def delete_from_whitelist(self, endpoint_id, function_ids):
         """List the endpoint's whitelist
 
@@ -706,3 +819,19 @@ class FuncXClient:
         for fid in function_ids:
             res.append(self.web_client.whitelist_remove(endpoint_id, fid))
         return res
+
+    @requires_login
+    def stop_endpoint(self, endpoint_id: str):
+        """Stop an endpoint by dropping it's active connections.
+
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        return self.web_client.stop_endpoint(endpoint_id)

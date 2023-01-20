@@ -8,7 +8,7 @@ from funcx.serialize import FuncXSerializer
 class Batch:
     """Utility class for creating batch submission in funcX"""
 
-    def __init__(self, task_group_id=None, create_websocket_queue=False):
+    def __init__(self, task_group_id: str | None = None, create_websocket_queue=False):
         """
         Parameters
         ==========
@@ -65,6 +65,9 @@ class Batch:
         -------
         payloads in dictionary, Dict[str, list | str]
         """
+        if not self.task_group_id:
+            raise ValueError("Unable to prepare batch without a task group id")
+
         return {
             "task_group_id": self.task_group_id,
             "create_websocket_queue": self.create_websocket_queue,

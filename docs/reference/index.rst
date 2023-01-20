@@ -7,4 +7,3 @@ funcX SDK
 
     executor
     client
-    errors

@@ -1,4 +1,4 @@
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_interface
 from parsl.launchers import MpiExecLauncher
 from parsl.providers import PBSProProvider
 
@@ -13,7 +13,7 @@ user_opts = {
     'polaris': {
         # Node setup: activate necessary conda environment and such.
         'worker_init': '',
-        'scheduler_options': '#PBS -l filesystems=home:grand:eagle',
+        'scheduler_options': '#PBS -l filesystems=home:grand:eagle\n#PBS -k doe',
         # ALCF allocation to use
         'account': '',
     }
@@ -24,7 +24,7 @@ config = Config(
         HighThroughputExecutor(
             available_accelerators=4,  # Pin each worker to a different GPU
             strategy=SimpleStrategy(max_idletime=300),
-            address=address_by_hostname(),
+            address=address_by_interface('bond0'),
             provider=PBSProProvider(
                 launcher=MpiExecLauncher(
                     bind_cmd="--cpu-bind", overrides="--depth=64 --ppn 1"

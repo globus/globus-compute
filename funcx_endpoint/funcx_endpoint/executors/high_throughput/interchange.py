@@ -32,14 +32,13 @@ from funcx_endpoint.executors.high_throughput.messages import (
     Message,
     MessageType,
 )
-from funcx_endpoint.logging_config import setup_logging
+from funcx_endpoint.logging_config import FXLogger
 
 if t.TYPE_CHECKING:
     import multiprocessing as mp
 
-log = logging.getLogger(__name__)
+log: FXLogger = logging.getLogger(__name__)  # type: ignore
 
-LOOP_SLOWDOWN = 0.0  # in seconds
 HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = dill.dumps(HEARTBEAT_CODE)
 
@@ -96,7 +95,7 @@ class Interchange:
         strategy=None,
         poll_period=None,
         heartbeat_period=None,
-        heartbeat_threshold=None,
+        heartbeat_threshold=1,
         working_dir=None,
         provider=None,
         max_workers_per_node=None,
@@ -268,22 +267,26 @@ class Interchange:
         self.results_incoming.set_hwm(0)
 
         self.endpoint_id = endpoint_id
+        worker_bind_address = f"tcp://{self.interchange_address}"
+        log.info(f"Interchange binding worker ports to {worker_bind_address}")
         if self.worker_ports:
             self.worker_task_port = self.worker_ports[0]
             self.worker_result_port = self.worker_ports[1]
 
-            self.task_outgoing.bind(f"tcp://*:{self.worker_task_port}")
-            self.results_incoming.bind(f"tcp://*:{self.worker_result_port}")
+            self.task_outgoing.bind(f"{worker_bind_address}:{self.worker_task_port}")
+            self.results_incoming.bind(
+                f"{worker_bind_address}:{self.worker_result_port}"
+            )
 
         else:
             self.worker_task_port = self.task_outgoing.bind_to_random_port(
-                "tcp://*",
+                worker_bind_address,
                 min_port=worker_port_range[0],
                 max_port=worker_port_range[1],
                 max_tries=100,
             )
             self.worker_result_port = self.results_incoming.bind_to_random_port(
-                "tcp://*",
+                worker_bind_address,
                 min_port=worker_port_range[0],
                 max_port=worker_port_range[1],
                 max_tries=100,
@@ -295,7 +298,7 @@ class Interchange:
             )
         )
 
-        self._ready_manager_queue: dict[str, t.Any] = {}
+        self._ready_manager_queue: dict[bytes, t.Any] = {}
 
         self.blocks: dict[str, str] = {}
         self.block_id_map: dict[str, str] = {}
@@ -340,7 +343,7 @@ class Interchange:
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
         self.task_status_deltas: dict[str, list[TaskTransition]] = {}
-        self.container_switch_count: dict[str, int] = {}
+        self.container_switch_count: dict[bytes, int] = {}
 
     def load_config(self):
         """Load the config"""
@@ -419,9 +422,8 @@ class Interchange:
                 self.last_heartbeat = time.time()
             except zmq.Again:
                 log.trace(
-                    "No new incoming task - {} tasks in internal queue".format(
-                        self.total_pending_task_count
-                    )
+                    "No new incoming task - %s tasks in internal queue",
+                    self.total_pending_task_count,
                 )
                 continue
 
@@ -578,9 +580,7 @@ class Interchange:
         log.info(f"Endpoint id: {self.endpoint_id}")
 
         while True:
-            log.trace(  # type: ignore[attr-defined]
-                f"Endpoint id : {self.endpoint_id}, {type(self.endpoint_id)}"
-            )
+            log.trace("Endpoint id : %s, %s", self.endpoint_id, type(self.endpoint_id))
             msg = EPStatusReport(
                 self.endpoint_id, self.get_status_report(), self.task_status_deltas
             )
@@ -677,7 +677,7 @@ class Interchange:
         self._status_report_thread.join()
         log.info("HighThroughput Interchange stopped")
 
-    def start(self, poll_period=None):
+    def start(self, poll_period: int | None = None) -> None:
         """Start the Interchange
 
         Parameters:
@@ -711,7 +711,7 @@ class Interchange:
         )
         self._command_thread.start()
 
-        status_report_queue = queue.Queue()
+        status_report_queue: queue.Queue[bytes] = queue.Queue()
         self._status_report_thread = threading.Thread(
             target=self._status_report_loop,
             args=(self._kill_event, status_report_queue),
@@ -735,7 +735,7 @@ class Interchange:
         # for scheduling a job (or maybe any other attention?).
         # Anything altering the state of the manager should add it
         # onto this list.
-        interesting_managers = set()
+        interesting_managers: set[bytes] = set()
 
         # This value records when the last cold routing in soft mode happens
         # When the cold routing in soft mode happens, it may cause worker containers to
@@ -758,7 +758,8 @@ class Interchange:
                 message = self.task_outgoing.recv_multipart()
                 manager = message[0]
 
-                if manager not in self._ready_manager_queue:
+                mdata = self._ready_manager_queue.get(manager)
+                if not mdata:
                     reg_flag = False
 
                     try:
@@ -766,15 +767,16 @@ class Interchange:
                         reg_flag = True
                     except Exception:
                         log.warning(
-                            "Got a non-json registration message from " "manager:%s",
+                            "Got a non-json registration message from manager:%s",
                             manager,
                         )
-                        log.debug(f"Message :\n{message}\n")
+                        log.debug("Message :\n%s\n", message)
 
                     # By default we set up to ignore bad nodes/registration messages.
-                    self._ready_manager_queue[manager] = {
-                        "last": time.time(),
-                        "reg_time": time.time(),
+                    now = time.time()
+                    mdata = {
+                        "last": now,
+                        "reg_time": now,
                         "free_capacity": {"total_workers": 0},
                         "max_worker_count": 0,
                         "active": True,
@@ -783,9 +785,10 @@ class Interchange:
                     }
                     if reg_flag is True:
                         interesting_managers.add(manager)
-                        log.info(f"Adding manager: {manager} to ready queue")
-                        self._ready_manager_queue[manager].update(msg)
-                        log.info(f"Registration info for manager {manager}: {msg}")
+                        log.info(f"Adding manager: {manager!r} to ready queue")
+                        mdata.update(msg)
+                        log.info(f"Registration info for manager {manager!r}: {msg}")
+                        self._ready_manager_queue[manager] = mdata
 
                         if (
                             msg["python_v"].rsplit(".", 1)[0]
@@ -793,7 +796,7 @@ class Interchange:
                             or msg["parsl_v"] != self.current_platform["parsl_v"]
                         ):
                             log.info(
-                                f"Manager:{manager} version:{msg['python_v']} "
+                                f"Manager:{manager!r} version:{msg['python_v']} "
                                 "does not match the interchange"
                             )
                     else:
@@ -815,22 +818,19 @@ class Interchange:
                             )
 
                 else:
-                    self._ready_manager_queue[manager]["last"] = time.time()
+                    mdata["last"] = time.time()
                     if message[1] == b"HEARTBEAT":
-                        log.debug(f"Manager {manager} sends heartbeat")
+                        log.debug("Manager %s sends heartbeat", manager)
                         self.task_outgoing.send_multipart(
                             [manager, b"", PKL_HEARTBEAT_CODE]
                         )
                     else:
                         manager_adv = dill.loads(message[1])
-                        log.debug(f"Manager {manager} requested {manager_adv}")
-                        self._ready_manager_queue[manager]["free_capacity"].update(
-                            manager_adv
-                        )
-                        self._ready_manager_queue[manager]["free_capacity"][
-                            "total_workers"
-                        ] = sum(manager_adv["free"].values())
+                        log.debug("Manager %s requested %s", manager, manager_adv)
+                        manager_adv["total_workers"] = sum(manager_adv["free"].values())
+                        mdata["free_capacity"].update(manager_adv)
                         interesting_managers.add(manager)
+                        del manager_adv
 
             # If we had received any requests, check if there are tasks that could be
             # passed
@@ -863,24 +863,22 @@ class Interchange:
 
             # Task cancel is high priority, so we'll process all requests
             # in one go
-            while True:
-                try:
+            try:
+                while True:
                     manager, task_id = self.task_cancel_running_queue.get(block=False)
                     log.debug(
-                        f"Task:{task_id} on manager:{manager} is "
-                        "now CANCELLED while running"
+                        "CANCELLED running task (id: %s, manager: %s)", task_id, manager
                     )
                     cancel_message = dill.dumps(("TASK_CANCEL", task_id))
                     self.task_outgoing.send_multipart([manager, b"", cancel_message])
-
-                except queue.Empty:
-                    break
+            except queue.Empty:
+                pass
 
             for manager in task_dispatch:
                 tasks = task_dispatch[manager]
                 if tasks:
                     log.info(
-                        'Sending task message "{}..." to manager {}'.format(
+                        'Sending task message "{}..." to manager {!r}'.format(
                             str(tasks)[:50], manager
                         )
                     )
@@ -891,7 +889,7 @@ class Interchange:
 
                     for task in tasks:
                         task_id = task["task_id"]
-                        log.info(f"Sent task {task_id} to manager {manager}")
+                        log.info(f"Sent task {task_id} to manager {manager!r}")
                         if (
                             self.task_cancel_pending_trap
                             and task_id in self.task_cancel_pending_trap
@@ -903,15 +901,13 @@ class Interchange:
                             )
                             self.task_cancel_pending_trap.pop(task_id)
                         else:
-                            log.debug(f"Task:{task_id} is now WAITING_FOR_LAUNCH")
+                            log.debug("Task:%s is now WAITING_FOR_LAUNCH", task_id)
                             tt = TaskTransition(
                                 timestamp=time.time_ns(),
                                 state=TaskState.WAITING_FOR_LAUNCH,
                                 actor=ActorName.INTERCHANGE,
                             )
-                            self.task_status_deltas[
-                                task_id
-                            ] = self.task_status_deltas.get(task_id, [])
+                            self.task_status_deltas.setdefault(task_id, [])
                             self.task_status_deltas[task_id].append(tt)
 
             # Receive any results and forward to client
@@ -921,7 +917,8 @@ class Interchange:
             ):
                 log.debug("entering results_incoming section")
                 manager, *b_messages = self.results_incoming.recv_multipart()
-                if manager not in self._ready_manager_queue:
+                mdata = self._ready_manager_queue.get(manager)
+                if not mdata:
                     log.warning(
                         "Received a result from a un-registered manager: %s",
                         manager,
@@ -930,7 +927,7 @@ class Interchange:
                     # We expect the batch of messages to be (optionally) a task status
                     # update message followed by 0 or more task results
                     try:
-                        log.debug("Trying to unpack ")
+                        log.debug("Trying to unpack")
                         manager_report = Message.unpack(b_messages[0])
                         if manager_report.task_statuses:
                             log.info(
@@ -949,7 +946,7 @@ class Interchange:
                             [manager, b"", PKL_HEARTBEAT_CODE]
                         )
                         b_messages = b_messages[1:]
-                        self._ready_manager_queue[manager]["last"] = time.time()
+                        mdata["last"] = time.time()
                         self.container_switch_count[
                             manager
                         ] = manager_report.container_switch_count
@@ -961,13 +958,11 @@ class Interchange:
                         pass
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
-                    for b_message in b_messages:
+                    for idx, b_message in enumerate(b_messages):
                         r = dill.loads(b_message)
 
                         log.debug(
-                            "Received result for task {} from {}".format(
-                                r["task_id"], manager
-                            )
+                            "Received task result %s (from %s)", r["task_id"], manager
                         )
                         task_type = self.containers[r["container_id"]]
                         log.debug(
@@ -976,12 +971,20 @@ class Interchange:
                             self._ready_manager_queue,
                         )
 
+                        mdata["tasks"][task_type].remove(r["task_id"])
+
+                        # Transfer any outstanding task statuses to the result message
                         if r["task_id"] in self.task_status_deltas:
+                            r["task_statuses"] += self.task_status_deltas[r["task_id"]]
+                            b_messages[idx] = dill.dumps(r)
+                            log.debug(
+                                "Transferring statuses for %s: %s",
+                                r["task_id"],
+                                r["task_statuses"],
+                            )
                             del self.task_status_deltas[r["task_id"]]
-                        self._ready_manager_queue[manager]["tasks"][task_type].remove(
-                            r["task_id"]
-                        )
-                    self._ready_manager_queue[manager]["total_tasks"] -= len(b_messages)
+
+                    mdata["total_tasks"] -= len(b_messages)
 
                     # TODO: handle this with a Task message or something?
                     # previously used this; switched to mono-message,
@@ -989,38 +992,34 @@ class Interchange:
                     self.results_outgoing.send(dill.dumps(b_messages))
                     interesting_managers.add(manager)
 
-                    log.debug(
-                        "Current tasks: {}".format(
-                            self._ready_manager_queue[manager]["tasks"]
-                        )
-                    )
+                    log.debug(f"Current tasks: {mdata['tasks']}")
                 log.debug("leaving results_incoming section")
 
             # Send status reports from this main thread to avoid thread-safety on zmq
             # sockets
             try:
                 packed_status_report = status_report_queue.get(block=False)
-                log.trace(f"forwarding status report: {packed_status_report}")
+                log.trace("forwarding status report: %s", packed_status_report)
                 self.results_outgoing.send(packed_status_report)
             except queue.Empty:
                 pass
 
             log.trace("entering bad_managers section")
+            now = time.time()
+            hbt_window_start = now - self.heartbeat_threshold
             bad_managers = [
                 manager
                 for manager in self._ready_manager_queue
-                if time.time() - self._ready_manager_queue[manager]["last"]
-                > self.heartbeat_threshold
+                if hbt_window_start > self._ready_manager_queue[manager]["last"]
             ]
             bad_manager_msgs = []
             for manager in bad_managers:
                 log.debug(
-                    "Last: {} Current: {}".format(
-                        self._ready_manager_queue[manager]["last"], time.time()
-                    )
+                    "Last: %s Current: %s",
+                    self._ready_manager_queue[manager]["last"],
+                    now,
                 )
-                log.warning(f"Too many heartbeats missed for manager {manager}")
-                e = ManagerLost(manager)
+                log.warning(f"Too many heartbeats missed for manager {manager!r}")
                 for task_type in self._ready_manager_queue[manager]["tasks"]:
                     for tid in self._ready_manager_queue[manager]["tasks"][task_type]:
                         try:
@@ -1033,8 +1032,8 @@ class Interchange:
                             }
                             pkl_package = dill.dumps(result_package)
                             bad_manager_msgs.append(pkl_package)
-                log.warning(f"Sent failure reports, unregistering manager {manager}")
-                self._ready_manager_queue.pop(manager, "None")
+                log.warning(f"Sent failure reports, unregistering manager {manager!r}")
+                self._ready_manager_queue.pop(manager, None)
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
             if bad_manager_msgs:
@@ -1203,9 +1202,9 @@ class Interchange:
         """
         status = []
         if self.provider:
-            log.trace(f"Getting the status of {list(self.blocks.values())} blocks.")
+            log.trace("Getting the status of %s blocks.", list(self.blocks.values()))
             status = self.provider.status(list(self.blocks.values()))
-            log.trace(f"The status is {status}")
+            log.trace("The status is %s", status)
 
         return status
 
@@ -1234,6 +1233,7 @@ def starter(comm_q: mp.Queue, *args, **kwargs) -> None:
 
 
 def cli_run():
+    from funcx_endpoint.logging_config import setup_logging
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--client_address", required=True, help="Client address")

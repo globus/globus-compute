@@ -3,7 +3,7 @@ Quickstart
 
 **funcX** client and endpoint software releases are available on `PyPI <https://pypi.org/project/funcx/>`_.
 
-You can try funcX on `Binder <https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb>`_
+You can try funcX on a hosted Jupyter notebook with `Binder <https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb>`_
 
 
 Installation
@@ -22,11 +22,11 @@ To check if you have the right Python version, run the following commands::
 
 This should return the Python version, for example: ``Python 3.8.10``.
 
-To check if your endpoint/client have network access and can connect to the funcX service, run ::
+To check if your endpoint/client has network access and can connect to the funcX service, run::
 
   >>> curl https://api2.funcx.org/v2/version
 
-This should return a version string, for example: ``"1.0.2"``
+This should return a version string, for example: ``"1.0.5"``
 
 .. note:: The funcx client is supported on MacOS, Linux, and Windows. The funcx-endpoint
    is only supported on Linux.
@@ -45,7 +45,7 @@ for reliable installation to avoid python package dependency conflicts.
 
   To update a previously installed funcX to a newer version in the virtual environment, use::
 
-    (funcx_venv) $ python3 -m pip install -U funcx``
+    (funcx_venv) $ python3 -m pip install -U funcx
 
 2. (Optional) The funcX endpoint can be installed using `Pipx <https://pypa.github.io/pipx/installation/>`_ or using pip in the venv::
 
@@ -63,64 +63,64 @@ for reliable installation to avoid python package dependency conflicts.
 .. note:: For more detailed info on setting up Jupyter with Python3.5 go `here <https://jupyter.readthedocs.io/en/latest/install.html>`_
 
 
+First Run
+---------
+
+The funcX SDK makes use of the funcX web services, most of which restrict use
+to Globus authenticated users.  Consequently, if you have not previously used
+funcX from your workstation, or have otherwise not authenticated with Globus,
+then the FuncXClient will present a one-time URL.  The one-time URL workflow
+will culminate in a token code to be pasted back into the terminal.  The
+easiest approach is typically from the command line:
+
+.. code-block:: python
+
+    >>> from funcx import FuncXClient
+    >>> FuncXClient()
+    Please authenticate with Globus here:
+    ------------------------------------
+    https://auth.globus.org/v2/oauth2/authorize?[...very...long...url]&prompt=login
+    ------------------------------------
+
+    Enter the resulting Authorization Code here:
+
+funcX will then cache the credentials for future invocations, so this workflow
+will only be initiated once.
+
 Running a function
 ------------------
 
-After installing the funcX SDK, you can register functions and execute
-them on available endpoints.  To use the SDK, you should first instantiate
-a funcX client and authenticate with the funcX service. funcX uses
-Globus to manage authentication and authorization, enabling you to
-authenticate using one of several hundred supported identity providers
-(e.g., institution, ORCID, Google). If you have not authenticated previously,
-funcX will present a one-time URL that you can use to authenticate
-with your chosen identity. You will then need to copy and paste the resulting
-access code into the prompt.
+After installing the funcX SDK, you can define a function and submit it for
+execution to available endpoints.  For most use-cases that will use the
+``FuncXExecutor``:
 
 .. code-block:: python
 
-    from funcx.sdk.client import FuncXClient
+    from funcx import FuncXExecutor
 
-    fxc = FuncXClient()
+    # First, define the function ...
+    def add_func(a, b):
+        return a + b
 
+    tutorial_endpoint_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
+    # ... then create the executor, ...
+    with FuncXExecutor(endpoint_id=tutorial_endpoint_id) as fxe:
+        # ... then submit for execution, ...
+        future = fxe.submit(add_func, 5, 10)
 
-Like most FaaS platforms, you must first register a function before you can
-execute or share it. To do so, you can simply write a Python function
-and register it using the SDK.
+        # ... and finally, wait for the result
+        print(future.result())
 
-.. code-block:: python
+.. note::
+    Like most FaaS platforms, the function must be registered with the upstream
+    web services before it can be executed on a remote endopint.  While one can
+    manually register a function (see the FuncXClient or FuncXExecutor API
+    documentation), the above workflow will automatically handle registration.
 
-  def add_func(a, b):
-    return a + b
-
-  func_uuid = fxc.register_function(add_func)
-
-
-When executing the function, you must specify the function ID and the
-endpoint ID on which you wish to execute the function. You can pass
-arbitrary input arguments like standard Python functions. The following
-code shows how to run the add function on the tutorial endpoint.
-
-Note: the tutorial endpoint is open for anyone to use; please limit
-the number of functions you send to this endpoint.
-
-.. code-block:: python
-
-    tutorial_endpoint = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
-    res = fxc.run(5, 10, function_id=func_uuid, endpoint_id=tutorial_endpoint)
-
-Finally, you can retrieve the result (or check on the status of the execution)
-via the SDK. The SDK will raise an exception if the result is not yet ready
-or it will return the Python result from your function.
-
-Note: the tutorial endpoint is hosted on a small Kubernetes cluster and
-occasionally it becomes overwhelmed. If you are unable to retrieve the
-result, please try again later (funcX will cache results until you return)
-or deploy an endpoint on local resources.
-
-.. code-block:: python
-
- print(fxc.get_result(res))
-
+A word on the above example: while the tutorial endpoint is open for anyone to
+use, it is hosted on a small Kubernetes cluster -- somewhat intentionally
+underpowered.  As it is a shared (and tiny) resource, please be conscientious
+with the size and number of functions you send to this endpoint.
 
 Deploying an endpoint
 ----------------------
@@ -132,10 +132,13 @@ endpoint can be configured and started as follows. During the
 configuration process you will be prompted to authenticate
 following the same process as using the SDK.
 For more advanced deployments (e.g., on clouds and clusters) please
-refer to the `endpoints` documentation. ::
+refer to the `endpoints`_ documentation. ::
 
   $ python3 -m pip install funcx_endpoint
 
   $ funcx-endpoint configure
 
   $ funcx-endpoint start <ENDPOINT_NAME>
+
+
+.. _endpoints: endpoints.html

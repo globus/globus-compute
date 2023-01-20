@@ -29,7 +29,7 @@ from funcx_endpoint.endpoint.rabbit_mq import (
 @pytest.fixture(scope="session")
 def rabbitmq_conn_url():
     env_var_name = "RABBITMQ_INTEGRATION_TEST_URI"
-    rmq_test_uri = os.getenv(env_var_name, "amqp://guest:guest@localhost:5672/")
+    rmq_test_uri = os.getenv(env_var_name, "amqp:///")
 
     try:
         # Die here and now, first thing, with a hopefully-helpful direct fix suggestion

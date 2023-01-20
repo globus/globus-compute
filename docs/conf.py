@@ -31,6 +31,8 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
 
+autoclass_content = "both"
+
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.

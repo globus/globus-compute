@@ -200,7 +200,7 @@ and a result if it is available.
   }
 
 
-.. _client credentials:
+.. _client credentials with funcxclients:
 
 Client Credentials with FuncXClients
 ------------------------------------

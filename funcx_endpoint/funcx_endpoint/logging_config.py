@@ -1,14 +1,15 @@
 """
 This module contains logging configuration for the funcx-endpoint application.
 """
+from __future__ import annotations
 
 import logging
 import logging.config
 import logging.handlers
 import os
+import pathlib
 import re
 import sys
-import typing as t
 
 log = logging.getLogger(__name__)
 
@@ -218,38 +219,26 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
     }
 
 
-def add_trace_level() -> None:
-    """This adds a trace level to the logging system.
+class FXLogger(logging.Logger):
+    TRACE = logging.DEBUG - 5
 
-    See https://stackoverflow.com/questions/2183233
-    """
+    def trace(self, msg, *args, **kwargs):
+        self.log(FXLogger.TRACE, msg, args, **kwargs)
 
-    TRACE = 5
-    logging.TRACE = TRACE  # type: ignore[attr-defined]
 
-    def logForLevel(self, message, *args, **kwargs):
-        if self.isEnabledFor(TRACE):
-            self._log(TRACE, message, args, **kwargs)
-
-    def logToRoot(message, *args, **kwargs):
-        logging.log(TRACE, message, *args, **kwargs)
-
-    logging.addLevelName(TRACE, "TRACE")
-    logging.getLoggerClass().trace = logForLevel  # type: ignore[attr-defined]
-    logging.trace = logToRoot  # type: ignore[attr-defined]
+logging.setLoggerClass(FXLogger)
+logger = logging.getLogger(__name__)
 
 
 def setup_logging(
     *,
-    logfile: t.Optional[str] = None,
+    logfile: pathlib.Path | str | None = None,
     console_enabled: bool = True,
     debug: bool = False,
     no_color: bool = False,
 ) -> None:
-    add_trace_level()
-
     if logfile is not None:
-        config = _get_file_dict_config(logfile, console_enabled, debug, no_color)
+        config = _get_file_dict_config(str(logfile), console_enabled, debug, no_color)
     else:
         config = _get_stream_dict_config(debug, no_color)
 

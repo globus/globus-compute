@@ -6,7 +6,7 @@ from setuptools import find_namespace_packages, setup
 REQUIRES = [
     # request sending and authorization tools
     "requests>=2.20.0",
-    "globus-sdk>=3.6.0,<4",
+    "globus-sdk>=3.14.0,<4",
     # 'websockets' is used for the client-side websocket listener
     "websockets==10.3",
     # dill is an extension of `pickle` to a wider array of native python types
@@ -18,7 +18,8 @@ REQUIRES = [
     # packaging, allowing version parsing
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
-    "funcx-common==0.0.18",
+    "pika>=1.2",
+    "funcx-common==0.0.23",
     "tblib==1.7.0",
 ]
 DOCS_REQUIRES = [
@@ -28,7 +29,7 @@ DOCS_REQUIRES = [
 
 TEST_REQUIRES = [
     "flake8==3.8.0",
-    "pytest",
+    "pytest>=7.2",
     "pytest-mock",
     "coverage",
     # easy mocking of the `requests` library

@@ -1,28 +1,31 @@
-import glob
+from __future__ import annotations
+
 import json
 import logging
 import os
 import pathlib
+import pwd
+import re
 import shutil
 import signal
+import socket
 import sys
 import typing
 import uuid
 from string import Template
 
-import click
 import daemon
 import daemon.pidfile
 import psutil
 import texttable
 from globus_sdk import GlobusAPIError, NetworkError
 
-from funcx.errors import FuncxResponseError
 from funcx.sdk.client import FuncXClient
+from funcx_endpoint import __version__
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.result_store import ResultStore
+from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.logging_config import setup_logging
 
 log = logging.getLogger(__name__)
@@ -53,136 +56,142 @@ class Endpoint:
         self.funcx_dir = funcx_dir if funcx_dir is not None else _DEFAULT_FUNCX_DIR
         self.name = "default"
 
-    @property
-    def _endpoint_dir(self):
-        return os.path.join(self.funcx_dir, self.name)
+        self.fx_client = None
 
     @property
-    def _config_file_path(self):
-        return os.path.join(self._endpoint_dir, "config.py")
-
-    def init_endpoint_dir(self, endpoint_config=None):
-        """Initialize a clean endpoint dir
-        Returns if an endpoint_dir already exists
-
-        Parameters
-        ----------
-        endpoint_config : str
-            Path to a config file to be used instead of the funcX default config file
-        """
-
-        log.debug(f"Creating endpoint dir {self._endpoint_dir}")
-        os.makedirs(self._endpoint_dir, exist_ok=True)
-
-        endpoint_config_target_file = self._config_file_path
-        if endpoint_config:
-            shutil.copyfile(endpoint_config, endpoint_config_target_file)
-            return self._endpoint_dir
-
-        endpoint_config = endpoint_default_config.__file__
-        with open(endpoint_config) as r:
-            endpoint_config_template = Template(r.read())
-
-        endpoint_config_template = endpoint_config_template.substitute(name=self.name)
-        with open(endpoint_config_target_file, "w") as w:
-            w.write(endpoint_config_template)
-
-        return self._endpoint_dir
-
-    def configure_endpoint(self, name, endpoint_config):
-        self.name = name
-
-        if not os.path.exists(self._endpoint_dir):
-            self.init_endpoint_dir(endpoint_config=endpoint_config)
-            print(
-                f"A default profile has been create for <{self.name}> "
-                f"at {self._config_file_path}"
-            )
-            print("Configure this file and try restarting with:")
-            print(f"    $ funcx-endpoint start {self.name}")
-        else:
-            print(f"config dir <{self.name}> already exsits")
-            raise Exception("ConfigExists")
-
-    def init_endpoint(self):
-        """Setup funcx dirs and default endpoint config files
-
-        TO-DO : Every mechanism that will update the config file, must be using a
-        locking mechanism, ideally something like fcntl [1]
-        to ensure that multiple endpoint invocations do not mangle the funcx config
-        files or the lockfile module.
-
-        [1] https://docs.python.org/3/library/fcntl.html
-        """
-        # construct client to force login flow
-        # FIXME: `funcx` should provide a cleaner way of doing login
-        FuncXClient(do_version_check=False)
-
-        if os.path.exists(self.funcx_dir):
-            click.confirm(
-                "Are you sure you want to initialize this directory? "
-                f"This will erase everything in {self.funcx_dir}",
-                abort=True,
-            )
-            log.info(f"Wiping all current configs in {self.funcx_dir}")
-            backup_dir = self.funcx_dir + ".bak"
-            try:
-                log.debug(f"Removing old backups in {backup_dir}")
-                shutil.rmtree(backup_dir)
-            except OSError:
-                pass
-            os.renames(self.funcx_dir, backup_dir)
-
-        try:
-            os.makedirs(self.funcx_dir, exist_ok=True)
-        except Exception as e:
-            print(f"[FuncX] Caught exception during registration {e}")
+    def _endpoint_dir(self) -> pathlib.Path:
+        return pathlib.Path(self.funcx_dir) / self.name
 
     @staticmethod
-    def check_endpoint_json(endpoint_json, endpoint_uuid):
-        if os.path.exists(endpoint_json):
-            with open(endpoint_json) as fp:
-                log.debug("Connection info loaded from prior registration record")
-                reg_info = json.load(fp)
-                endpoint_uuid = reg_info["endpoint_id"]
-        elif not endpoint_uuid:
-            endpoint_uuid = str(uuid.uuid4())
-        return endpoint_uuid
+    def _config_file_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+        return endpoint_dir / "config.py"
+
+    @staticmethod
+    def update_config_file(
+        ep_name: str,
+        original_path: pathlib.Path,
+        target_path: pathlib.Path,
+        multi_tenant: bool,
+    ):
+        endpoint_config = Template(original_path.read_text()).substitute(name=ep_name)
+
+        if endpoint_config.find("multi_tenant=") != -1:
+            # If the option is already in the config, merely update the value
+            endpoint_config = re.sub(
+                "multi_tenant=(True|False)",
+                f"multi_tenant={multi_tenant is True}",
+                endpoint_config,
+            )
+        elif multi_tenant:
+            # If the option isn't pre-existing, add only if set to True
+            endpoint_config = endpoint_config.replace(
+                "\nconfig = Config(\n", "\nconfig = Config(\n    multi_tenant=True,\n"
+            )
+
+        target_path.write_text(endpoint_config)
+
+    @staticmethod
+    def init_endpoint_dir(
+        endpoint_dir: pathlib.Path,
+        endpoint_config: pathlib.Path | None = None,
+        multi_tenant=False,
+    ):
+        """Initialize a clean endpoint dir
+
+        :param endpoint_dir pathlib.Path Path to the endpoint configuration dir
+        :param endpoint_config str Path to a config file to be used instead
+         of the funcX default config file
+        :param multi_tenant bool Whether the endpoint is a multi-user endpoint
+        """
+        log.debug(f"Creating endpoint dir {endpoint_dir}")
+        endpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        config_target_path = Endpoint._config_file_path(endpoint_dir)
+
+        if endpoint_config is None:
+            endpoint_config = pathlib.Path(endpoint_default_config.__file__)
+
+        Endpoint.update_config_file(
+            endpoint_dir.name,
+            endpoint_config,
+            config_target_path,
+            multi_tenant,
+        )
+
+    @staticmethod
+    def configure_endpoint(
+        conf_dir: pathlib.Path, endpoint_config: str | None, multi_tenant: bool = False
+    ):
+        ep_name = conf_dir.name
+        if conf_dir.exists():
+            print(f"config dir <{ep_name}> already exists")
+            raise Exception("ConfigExists")
+
+        templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
+        Endpoint.init_endpoint_dir(conf_dir, templ_conf_path, multi_tenant)
+        config_path = Endpoint._config_file_path(conf_dir)
+        if multi_tenant:
+            print(f"Created multi-tenant profile for <{ep_name}>")
+        else:
+            print(f"Created profile for <{ep_name}>")
+        print(
+            f"\n    Configuration file: {config_path}\n"
+            "\nUse the `start` subcommand to run it:\n"
+            f"\n    $ funcx-endpoint start {ep_name}"
+        )
+
+    @staticmethod
+    def get_endpoint_id(endpoint_dir: pathlib.Path) -> str | None:
+        info_file_path = endpoint_dir / "endpoint.json"
+        try:
+            return json.loads(info_file_path.read_bytes())["endpoint_id"]
+        except FileNotFoundError:
+            pass
+        return None
+
+    @staticmethod
+    def get_or_create_endpoint_uuid(
+        endpoint_dir: pathlib.Path, endpoint_uuid: str | None
+    ) -> str:
+        ep_id = Endpoint.get_endpoint_id(endpoint_dir)
+        if not ep_id:
+            ep_id = endpoint_uuid or str(uuid.uuid4())
+        return ep_id
+
+    @staticmethod
+    def get_funcx_client(config: Config | None) -> FuncXClient:
+        if config:
+            funcx_client_options = {
+                "funcx_service_address": config.funcx_service_address,
+                "environment": config.environment,
+            }
+
+            return FuncXClient(**funcx_client_options)
+        else:
+            return FuncXClient()
 
     def start_endpoint(
         self,
         name,
         endpoint_uuid,
-        endpoint_config,
+        endpoint_config: Config,
         log_to_console: bool,
         no_color: bool,
     ):
         self.name = name
 
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
-        endpoint_json = os.path.join(endpoint_dir, "endpoint.json")
+        endpoint_dir = self._endpoint_dir
 
         # This is to ensure that at least 1 executor is defined
-        if not endpoint_config.config.executors:
+        if not endpoint_config.executors:
             raise Exception(
                 f"Endpoint config file at {endpoint_dir} is missing "
                 "executor definitions"
             )
 
-        funcx_client_options = {
-            "funcx_service_address": endpoint_config.config.funcx_service_address,
-            "results_ws_uri": endpoint_config.config.results_ws_uri,
-            "environment": endpoint_config.config.environment,
-            "warn_about_url_mismatch": endpoint_config.config.warn_about_url_mismatch,
-        }
-        funcx_client = FuncXClient(**funcx_client_options)
+        fx_client = Endpoint.get_funcx_client(endpoint_config)
 
-        endpoint_uuid = self.check_endpoint_json(endpoint_json, endpoint_uuid)
-
-        log.info(f"Starting endpoint with uuid: {endpoint_uuid}")
-
-        pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        pid_check = self.check_pidfile(pid_file)
+        pid_check = Endpoint.check_pidfile(endpoint_dir)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
         # potentially running with the existing pidfile
@@ -195,74 +204,66 @@ class Endpoint:
                     "A prior Endpoint instance appears to have been terminated without "
                     "proper cleanup. Cleaning up now."
                 )
-                self.pidfile_cleanup(pid_file)
+                Endpoint.pidfile_cleanup(endpoint_dir)
 
         result_store = ResultStore(endpoint_dir=endpoint_dir)
 
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
-        if endpoint_config.config.detach_endpoint:
+        if endpoint_config.detach_endpoint:
             stdout: typing.TextIO = open(
-                os.path.join(endpoint_dir, endpoint_config.config.stdout), "a+"
+                os.path.join(endpoint_dir, endpoint_config.stdout), "a+"
             )
             stderr: typing.TextIO = open(
-                os.path.join(endpoint_dir, endpoint_config.config.stderr), "a+"
+                os.path.join(endpoint_dir, endpoint_config.stderr), "a+"
             )
         else:
             stdout = sys.stdout
             stderr = sys.stderr
 
         try:
+            pid_file = endpoint_dir / "daemon.pid"
             context = daemon.DaemonContext(
                 working_directory=endpoint_dir,
                 umask=0o002,
                 pidfile=daemon.pidfile.PIDLockFile(pid_file),
                 stdout=stdout,
                 stderr=stderr,
-                detach_process=endpoint_config.config.detach_endpoint,
+                detach_process=endpoint_config.detach_endpoint,
             )
 
         except Exception:
             log.exception(
                 "Caught exception while trying to setup endpoint context dirs"
             )
-            sys.exit(-1)
+            exit(-1)
+
+        metadata = Endpoint.get_metadata(endpoint_config)
 
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
         reg_info = None
+        endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(
+            endpoint_dir, endpoint_uuid
+        )
+        log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
         try:
-            reg_info = register_endpoint(
-                funcx_client, endpoint_uuid, endpoint_dir, self.name
+            reg_info = fx_client.register_endpoint(
+                endpoint_dir.name,
+                endpoint_uuid,
+                metadata=metadata,
+                multi_tenant=endpoint_config.multi_tenant,
             )
-        # if the service sends back an error response, it will be a FuncxResponseError
-        except FuncxResponseError as e:
-            # an example of an error that could conceivably occur here would be
-            # if the service could not register this endpoint with the forwarder
-            # because the forwarder was unreachable
-            if e.http_status_code >= 500:
-                log.exception("Caught exception while attempting endpoint registration")
-                log.critical(
-                    "Endpoint registration will be retried in the new endpoint daemon "
-                    "process. The endpoint will not work until it is successfully "
-                    "registered."
-                )
-            else:
-                raise e
-        # if the service has an unexpected internal error and is unable to send
-        # back a FuncxResponseError
+
         except GlobusAPIError as e:
-            if e.http_status >= 500:
-                log.exception("Caught exception while attempting endpoint registration")
-                log.critical(
-                    "Endpoint registration will be retried in the new endpoint daemon "
-                    "process. The endpoint will not work until it is successfully "
-                    "registered."
-                )
-            else:
-                raise e
-        # if the service is unreachable due to a timeout or connection error
+            if e.http_status < 500:
+                if e.http_status == 409 or e.http_status == 423:
+                    # RESOURCE_CONFLICT or RESOURCE_LOCKED
+                    log.warning(f"Endpoint registration blocked.  [{e.message}]")
+                    exit(os.EX_UNAVAILABLE)
+            raise
+
         except NetworkError as e:
             # the output of a NetworkError exception is huge and unhelpful, so
             # it seems better to just stringify it here and get a concise error
@@ -276,22 +277,37 @@ class Endpoint:
                 "reachable \n"
                 "and then attempt restarting the endpoint"
             )
-            exit(-1)
-        except Exception:
-            raise
+            exit(os.EX_TEMPFAIL)
 
-        if reg_info:
-            log.info("Launching endpoint daemon process")
-        else:
-            log.critical("Launching endpoint daemon process with errors noted above")
+        ret_ep_uuid = reg_info.get("endpoint_id")
+        if ret_ep_uuid != endpoint_uuid:
+            log.error(
+                "Unexpected response from server: mismatched endpoint id."
+                f"\n  Expected: {endpoint_uuid}, received: {ret_ep_uuid}"
+            )
+            exit(os.EX_SOFTWARE)
+
+        # sanitize passwords in logs
+        log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
+        log.debug(f"Registration information: {log_reg_info}")
+
+        json_file = endpoint_dir / "endpoint.json"
+
+        # `endpoint_id` key kept for backward compatibility when
+        # funcx-endpoint list is called
+        ep_info = {"endpoint_id": endpoint_uuid}
+        json_file.write_text(json.dumps(ep_info))
+        log.debug(f"Registration info written to {json_file}")
+
+        log.info("Launching endpoint daemon process")
 
         # NOTE
         # It's important that this log is emitted before we enter the daemon context
         # because daemonization closes down everything, a log message inside the
         # context won't write the currently configured loggers
-        logfile = os.path.join(endpoint_dir, "endpoint.log")
+        logfile = endpoint_dir / "endpoint.log"
         log.info(
-            "Logging will be reconfigured for the daemon. logfile=%s , debug=%s",
+            "Reconfiguring logging for daemonization. logfile: %s , debug: %s",
             logfile,
             self.debug,
         )
@@ -304,30 +320,29 @@ class Endpoint:
                 no_color=no_color,
             )
 
-            self.daemon_launch(
+            Endpoint.daemon_launch(
                 endpoint_uuid,
                 endpoint_dir,
                 endpoint_config,
                 reg_info,
-                funcx_client,
+                fx_client,
                 result_store,
             )
 
+    @staticmethod
     def daemon_launch(
-        self,
         endpoint_uuid,
         endpoint_dir,
-        endpoint_config,
+        endpoint_config: Config,
         reg_info,
         funcx_client: FuncXClient,
         result_store: ResultStore,
     ):
         interchange = EndpointInterchange(
-            config=endpoint_config.config,
+            config=endpoint_config,
             reg_info=reg_info,
             endpoint_id=endpoint_uuid,
             endpoint_dir=endpoint_dir,
-            endpoint_name=self.name,
             funcx_client=funcx_client,
             result_store=result_store,
             logdir=endpoint_dir,
@@ -337,71 +352,79 @@ class Endpoint:
 
         log.critical("Interchange terminated.")
 
-    def stop_endpoint(self, name):
-        self.name = name
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
-        pid_file = os.path.join(endpoint_dir, "daemon.pid")
-        pid_check = self.check_pidfile(pid_file)
+    @staticmethod
+    def stop_endpoint(
+        endpoint_dir: pathlib.Path,
+        endpoint_config: Config | None,
+        remote: bool = False,
+    ):
+        pid_path = endpoint_dir / "daemon.pid"
+        ep_name = endpoint_dir.name
 
-        # The process is active if the PID file exists and the process it points to is
-        # a funcx-endpoint
-        if pid_check["active"]:
-            log.debug(f"{self.name} has a daemon.pid file")
-            pid = None
-            with open(pid_file) as f:
-                pid = int(f.read())
-            # Attempt terminating
-            try:
-                log.debug(f"Signalling process: {pid}")
-                # For all the processes, including the deamon and its child process tree
-                # Send SIGTERM to the processes
-                # Wait for 200ms
-                # Send SIGKILL to the processes that are still alive
-                parent = psutil.Process(pid)
-                processes = parent.children(recursive=True)
-                processes.append(parent)
-                for p in processes:
-                    p.send_signal(signal.SIGTERM)
-                # graceful RabbitMQ cleanup takes some time
-                terminated, alive = psutil.wait_procs(processes, timeout=10)
-                for p in alive:
-                    # sometimes a process that was marked as alive before can terminate
-                    # before this signal is sent
-                    try:
-                        p.send_signal(signal.SIGKILL)
-                    except psutil.NoSuchProcess:
-                        pass
-                # Wait to confirm that the pid file disappears
-                if not os.path.exists(pid_file):
-                    log.info(f"Endpoint <{self.name}> is now stopped")
+        if remote is True:
+            endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
+            if not endpoint_id:
+                raise ValueError(f"Endpoint <{ep_name}> could not be located")
 
-            except OSError:
-                log.warning(f"Endpoint <{self.name}> could not be terminated")
-                log.warning(f"Attempting Endpoint <{self.name}> cleanup")
-                os.remove(pid_file)
-                sys.exit(-1)
-        # The process is not active, but the PID file exists and needs to be deleted
-        elif pid_check["exists"]:
-            self.pidfile_cleanup(pid_file)
-        else:
-            log.info(f"Endpoint <{self.name}> is not active.")
+            fx_client = Endpoint.get_funcx_client(endpoint_config)
+            fx_client.stop_endpoint(endpoint_id)
 
-    def delete_endpoint(self, name):
-        self.name = name
-        endpoint_dir = os.path.join(self.funcx_dir, self.name)
+        ep_status = Endpoint.check_pidfile(endpoint_dir)
+        if ep_status["exists"] and not ep_status["active"]:
+            Endpoint.pidfile_cleanup(endpoint_dir)
+            return
+        elif not ep_status["exists"]:
+            log.info(f"Endpoint <{ep_name}> is not active.")
+            return
 
-        if not os.path.exists(endpoint_dir):
-            log.warning(f"Endpoint <{self.name}> does not exist")
-            sys.exit(-1)
+        log.debug(f"{ep_name} has a daemon.pid file")
+        pid = int(pid_path.read_text().strip())
+        try:
+            log.debug(f"Signaling process: {pid}")
+            # For all the processes, including the deamon and its descendants,
+            # send SIGTERM, wait for 10s, and then SIGKILL any still alive.
+            grace_period_s = 10
+            parent = psutil.Process(pid)
+            processes = parent.children(recursive=True)
+            processes.append(parent)
+            for p in processes:
+                p.send_signal(signal.SIGTERM)
+            terminated, alive = psutil.wait_procs(processes, timeout=grace_period_s)
+            for p in alive:
+                try:
+                    p.send_signal(signal.SIGKILL)
+                except psutil.NoSuchProcess:
+                    pass
+
+            if pid_path.exists():
+                log.warning(f"Endpoint <{ep_name}> did not gracefully shutdown")
+                # Do cleanup anyway, TODO figure out where it should have done that
+                pid_path.unlink(missing_ok=True)
+            else:
+                log.info(f"Endpoint <{ep_name}> is now stopped")
+        except OSError:
+            log.warning(f"Endpoint <{ep_name}> could not be terminated")
+            log.warning(f"Attempting Endpoint <{ep_name}> cleanup")
+            pid_path.unlink(missing_ok=True)
+            exit(-1)
+
+    @staticmethod
+    def delete_endpoint(endpoint_dir: pathlib.Path):
+        ep_name = endpoint_dir.name
+
+        if not endpoint_dir.exists():
+            log.warning(f"Endpoint <{ep_name}> does not exist")
+            exit(-1)
 
         # stopping the endpoint should handle all of the process cleanup before
         # deletion of the directory
-        self.stop_endpoint(self.name)
+        Endpoint.stop_endpoint(endpoint_dir, None)
 
         shutil.rmtree(endpoint_dir)
-        log.info(f"Endpoint <{self.name}> has been deleted.")
+        log.info(f"Endpoint <{ep_name}> has been deleted.")
 
-    def check_pidfile(self, filepath):
+    @staticmethod
+    def check_pidfile(endpoint_dir: pathlib.Path):
         """Helper function to identify possible dead endpoints
 
         Returns a record with 'exists' and 'active' fields indicating
@@ -410,37 +433,41 @@ class Endpoint:
 
         Parameters
         ----------
-        filepath : str
-            Path to the pidfile
+        endpoint_dir : pathlib.Path
+            Configuration directory of the endpoint
         """
-        if not os.path.exists(filepath):
-            return {"exists": False, "active": False}
+        status = {"exists": False, "active": False}
+        pid_path = endpoint_dir / "daemon.pid"
+        if not pid_path.exists():
+            return status
 
-        pid = int(open(filepath).read().strip())
+        status["exists"] = True
 
-        active = False
         try:
+            pid = int(pid_path.read_text().strip())
             psutil.Process(pid)
+            status["active"] = True
+        except ValueError:
+            # Invalid literal for int() parsing
+            pass
         except psutil.NoSuchProcess:
             pass
-        else:
-            # this is the only case where the endpoint is active. If no process exists,
-            # it means the endpoint has been terminated without proper cleanup
-            active = True
 
-        return {"exists": True, "active": active}
+        return status
 
-    def pidfile_cleanup(self, filepath):
-        os.remove(filepath)
-        log.info(f"Endpoint <{self.name}> has been cleaned up.")
+    @staticmethod
+    def pidfile_cleanup(endpoint_dir: pathlib.Path):
+        (endpoint_dir / "daemon.pid").unlink(missing_ok=True)
+        log.info(f"Endpoint <{endpoint_dir.name}> has been cleaned up.")
 
-    def get_endpoints(self, status_filter=None):
+    @staticmethod
+    def get_endpoints(funcx_conf_dir: pathlib.Path | str) -> dict[str, dict]:
         """
         Gets a dictionary that contains information about all locally
         known endpoints.
 
         "status" can be one of:
-            ["Running", "Disconnected", "Stopped"]
+            ["Initialized", "Running", "Disconnected", "Stopped"]
 
         Example output:
         {
@@ -454,48 +481,140 @@ class Endpoint:
             }
         }
         """
-        endpoint_dict = {}
-        config_files = glob.glob(os.path.join(self.funcx_dir, "*", "config.py"))
-        for config_file in config_files:
-            endpoint_dir = os.path.dirname(config_file)
-            endpoint_name = os.path.basename(endpoint_dir)
-            status = "Initialized"
-            endpoint_id = None
+        ep_statuses = {}
 
-            endpoint_json = os.path.join(endpoint_dir, "endpoint.json")
-            if os.path.exists(endpoint_json):
-                with open(endpoint_json) as f:
-                    endpoint_info = json.load(f)
-                    endpoint_id = endpoint_info["endpoint_id"]
-                pid_check = self.check_pidfile(os.path.join(endpoint_dir, "daemon.pid"))
-                if pid_check["active"]:
-                    status = "Running"
-                elif pid_check["exists"]:
-                    status = "Disconnected"
-                else:
-                    status = "Stopped"
+        funcx_conf_dir = pathlib.Path(funcx_conf_dir)
+        ep_dir_paths = (p.parent for p in funcx_conf_dir.glob("*/config.py"))
+        for ep_path in ep_dir_paths:
+            ep_status = {
+                "status": "Initialized",
+                "id": Endpoint.get_endpoint_id(ep_path),
+            }
+            ep_statuses[ep_path.name] = ep_status
+            if not ep_status["id"]:
+                continue
 
-            if status_filter is None or status_filter == status:
-                endpoint_dict[endpoint_name] = {
-                    "status": status,
-                    "id": endpoint_id,
-                }
-        return endpoint_dict
+            pid_check = Endpoint.check_pidfile(ep_path)
+            if pid_check["active"]:
+                ep_status["status"] = "Running"
+            elif pid_check["exists"]:
+                ep_status["status"] = "Disconnected"
+            else:
+                ep_status["status"] = "Stopped"
 
-    def get_running_endpoints(self):
-        return self.get_endpoints(status_filter="Running")
+        return ep_statuses
 
-    def print_endpoint_table(self):
+    @staticmethod
+    def get_running_endpoints(conf_dir: pathlib.Path):
+        return {
+            ep_name: ep_status
+            for ep_name, ep_status in Endpoint.get_endpoints(conf_dir).items()
+            if ep_status["status"].lower() == "running"
+        }
+
+    @staticmethod
+    def print_endpoint_table(conf_dir: pathlib.Path, ofile=None):
         """
         Converts locally configured endpoint list to a text based table
         and prints the output.
           For example format, see the texttable module
         """
-        endpoints = self.get_endpoints()
+        if not ofile:
+            ofile = sys.stdout
+
+        endpoints = Endpoint.get_endpoints(conf_dir)
+        if not endpoints:
+            print(
+                "No endpoints configured!\n\n  (Hint: funcx-endpoint configure)",
+                file=ofile,
+            )
+            return
+
         table = texttable.Texttable()
-        headings = ["Endpoint Name", "Status", "Endpoint ID"]
+        headings = ["Endpoint ID", "Status", "Endpoint Name"]
         table.header(headings)
 
-        for endpoint_name, endpoint_info in endpoints.items():
-            table.add_row([endpoint_name, endpoint_info["status"], endpoint_info["id"]])
-        print(table.draw())
+        idx_id = 0
+        idx_st = 1
+        idx_name = 2
+        width_st = len(headings[idx_st])
+        width_id = len(headings[idx_id])
+        for ep_name, ep_info in endpoints.items():
+            table.add_row([ep_info["id"], ep_info["status"], ep_name])
+            width_id = max(width_id, len(str(ep_info["id"])))
+            width_st = max(width_st, len(str(ep_info["status"])))
+
+        tsize = shutil.get_terminal_size()
+        max_width = max(68, tsize.columns)  # require at least a reasonable size ...
+        table.set_max_width(max_width)  # ... but allow to expand to terminal width
+
+        # trickery here, but don't want to subclass texttable -- a very stable
+        # library -- at this time; ensure that the only "fungible" column is the
+        # name.  Can redress ~when~ *if* this becomes a problem.  "Simple"
+        table._compute_cols_width()
+        if table._width[idx_id] < width_id:
+            table._width[idx_name] -= width_id - table._width[idx_id]
+            table._width[idx_id] = width_id
+        if table._width[idx_st] < width_st:
+            table._width[idx_name] -= width_st - table._width[idx_st]
+            table._width[idx_st] = width_st
+
+        # ensure no mistakes -- width of name (well, _any_) column can't be < 0
+        table._width[idx_name] = max(10, table._width[idx_name])
+
+        print(table.draw(), file=ofile)
+
+    @staticmethod
+    def get_metadata(config: Config) -> dict:
+        metadata: dict = {}
+
+        metadata["endpoint_version"] = __version__
+        metadata["hostname"] = socket.getfqdn()
+
+        # should be more accurate than `getpass.getuser()` in non-login situations
+        metadata["local_user"] = pwd.getpwuid(os.getuid()).pw_name
+
+        # the following are read from the HTTP request by the web service, but can be
+        # overridden here if desired:
+        metadata["ip_address"] = None
+        metadata["sdk_version"] = None
+
+        try:
+            metadata["config"] = _serialize_config(config)
+        except Exception as e:
+            log.warning(
+                f"Error when serializing config ({type(e).__name__}). Ignoring."
+            )
+            log.debug("Config serialization exception details", exc_info=e)
+
+        return metadata
+
+
+def _serialize_config(config: Config) -> dict:
+    """
+    Short-term serialization method until config.py is replaced with config.yaml
+    """
+
+    expand_list = ["strategy", "provider", "launcher"]
+
+    def to_dict(o):
+        mems = {"_type": type(o).__name__}
+
+        for k, v in o.__dict__.items():
+            if k.startswith("_"):
+                continue
+
+            if k in expand_list:
+                mems[k] = to_dict(v)
+            elif not isinstance(v, str):
+                mems[k] = repr(v)
+            else:
+                mems[k] = v
+
+        return mems
+
+    result = to_dict(config)
+    # when we move to config.yaml, should only need to support a single executor
+    result["executors"] = [to_dict(executor) for executor in config.executors]
+
+    return result

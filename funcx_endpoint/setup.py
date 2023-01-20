@@ -5,8 +5,8 @@ from setuptools import find_packages, setup
 REQUIRES = [
     "requests>=2.20.0,<3",
     "globus-sdk",  # version will be bounded by `funcx`
-    "funcx>=1.0.0",
-    "funcx-common==0.0.18",
+    "funcx>=1.0.8a",
+    "funcx-common==0.0.23",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer
@@ -29,9 +29,6 @@ REQUIRES = [
     # further investigation may be needed if the issue persists in the next pyzmq
     # release
     "pyzmq>=22.0.0,!=22.3.0,<=23.2.0",
-    # TODO: evaluate removal of the 'retry' library after the update to
-    # globus-sdk v3, which provides automatic retries on all API calls
-    "retry==0.9.2",
     # 'parsl' is a core requirement of the funcx-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
@@ -41,7 +38,7 @@ REQUIRES = [
 
 TEST_REQUIRES = [
     "responses",
-    "pytest>=5.2",
+    "pytest>=7.2",
     "coverage>=5.2",
     "pytest-mock==3.2.0",
     "pyfakefs",

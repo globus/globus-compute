@@ -5,22 +5,21 @@ import multiprocessing
 import os
 import platform
 import queue
+import random
 import signal
 import sys
 import threading
 import time
-import typing as t
 
 # multiprocessing.Event is a method, not a class
 # to annotate, we need the "real" class
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
 
-import dill
+import pika.exceptions
 from funcx_common.messagepack import pack
 from funcx_common.messagepack.message_types import Result, ResultErrorDetails
 from parsl.version import VERSION as PARSL_VERSION
-from retry.api import retry_call
 
 import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
@@ -31,15 +30,10 @@ from funcx_endpoint.endpoint.messages_compat import (
     try_convert_to_messagepack,
 )
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
-from funcx_endpoint.endpoint.register_endpoint import register_endpoint
 from funcx_endpoint.endpoint.result_store import ResultStore
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 log = logging.getLogger(__name__)
-
-LOOP_SLOWDOWN = 0.0  # in seconds
-HEARTBEAT_CODE = (2**32) - 1
-PKL_HEARTBEAT_CODE = dill.dumps(HEARTBEAT_CODE)
 
 
 class EndpointInterchange:
@@ -57,13 +51,13 @@ class EndpointInterchange:
     def __init__(
         self,
         config: funcx_endpoint.endpoint.utils.config.Config,
-        reg_info: t.Tuple[t.Dict, t.Dict] = None,
+        reg_info: dict[str, dict],
         logdir=".",
         endpoint_id=None,
         endpoint_dir=".",
-        endpoint_name="default",
         funcx_client: FuncXClient | None = None,
         result_store: ResultStore | None = None,
+        reconnect_attempt_limit: int = 5,
     ):
         """
         Parameters
@@ -71,11 +65,11 @@ class EndpointInterchange:
         config : funcx.Config object
              Funcx config object that describes how compute should be provisioned
 
-        reg_info : tuple[Dict, Dict]
-             Tuple of connection info for task_queue and result_queue
-             Connection parameters to connect to the service side RabbitMQ pipes
-             Optional: If not supplied, the endpoint will use a retry loop to
-             attempt registration periodically.
+        reg_info : dict[str, dict]
+             Dictionary containing connection information for both the task and
+             result queues.  The required data structure is returned from the
+             Endpoint registration API call, encapsulated in the SDK by
+             `FuncXClient.register_endpoint()`.
 
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'
@@ -83,11 +77,8 @@ class EndpointInterchange:
         endpoint_id : str
              Identity string that identifies the endpoint to the broker
 
-        endpoint_dir : str
+        endpoint_dir : pathlib.Path
              Endpoint directory path to store registration info in
-
-        endpoint_name : str
-             Name of endpoint
 
         funcx_client_options : Dict
              FuncXClient initialization options
@@ -101,23 +92,21 @@ class EndpointInterchange:
         self.config = config
 
         self.endpoint_dir = endpoint_dir
-        self.endpoint_name = endpoint_name
 
         if funcx_client is None:
             funcx_client = FuncXClient()
         self.funcx_client = funcx_client
 
-        self.initial_registration_complete = False
-        self.task_q_info, self.result_q_info = None, None
-        if reg_info:
-            self.task_q_info, self.result_q_info = reg_info
-            self.initial_registration_complete = True
+        self.task_q_info = reg_info["task_queue_info"]
+        self.result_q_info = reg_info["result_queue_info"]
 
         self.time_to_quit = False
         self.heartbeat_period = self.config.heartbeat_period
 
         self.pending_task_queue: multiprocessing.Queue = multiprocessing.Queue()
 
+        self._reconnect_fail_counter = 0
+        self.reconnect_attempt_limit = max(1, reconnect_attempt_limit)
         self._quiesce_event = multiprocessing.Event()
         self._kill_event = multiprocessing.Event()
 
@@ -177,12 +166,6 @@ class EndpointInterchange:
                     results_passthrough=self.results_passthrough,
                     funcx_client=self.funcx_client,
                 )
-
-    def register_endpoint(self):
-        reg_info = register_endpoint(
-            self.funcx_client, self.endpoint_id, self.endpoint_dir, self.endpoint_name
-        )
-        self.task_q_info, self.result_q_info = reg_info
 
     def migrate_tasks_to_internal(
         self,
@@ -269,17 +252,41 @@ class EndpointInterchange:
         self.start_executors()
 
         while not self._kill_event.is_set():
+            if self._reconnect_fail_counter >= self.reconnect_attempt_limit:
+                log.critical(
+                    f"Failed {self._reconnect_fail_counter} consecutive times."
+                    "  Shutting down."
+                )
+                self.stop()
+                self.quiesce()
+                break
+
             if self._quiesce_event.is_set():
-                log.warning("Interchange will retry connecting in 5s")
-                time.sleep(5)
+                idle_for = random.uniform(2.0, 10.0)
+                log.warning(f"Interchange will retry connecting in {idle_for:.2f}s")
+                time.sleep(idle_for)
                 self._quiesce_event.clear()
             else:
                 log.debug("Starting threads and main loop")
 
+            if self.time_to_quit:
+                self.stop()
+                self.quiesce()
+                break
+
             try:
                 self._start_threads_and_main()
+            except pika.exceptions.ProbableAuthenticationError as e:
+                log.error(f"Unable to connect to AMQP service: {e}")
+                self._kill_event.set()
             except Exception:
+                self._reconnect_fail_counter += 1
                 log.exception("Unhandled exception in main kernel.")
+                log.info(
+                    "Reconnection count: %s (of %s)",
+                    self._reconnect_fail_counter,
+                    self.reconnect_attempt_limit,
+                )
 
             self.quiesce()
 
@@ -287,15 +294,6 @@ class EndpointInterchange:
         log.info("EndpointInterchange shutdown complete.")
 
     def _start_threads_and_main(self):
-        # re-register on every loop start
-        if not self.initial_registration_complete:
-            # Register the endpoint
-            log.info("Running endpoint registration retry loop")
-            retry_call(self.register_endpoint, delay=10, max_delay=300, backoff=1.2)
-            log.info("Endpoint registered with UUID: (FIXME FIXME FIXME)")
-
-        self.initial_registration_complete = False
-
         self._task_puller_proc = self.migrate_tasks_to_internal(
             self.task_q_info,
             self.endpoint_id,
@@ -353,8 +351,6 @@ class EndpointInterchange:
                         self.results_passthrough.put(msg)
                 log.debug("Exit process-stored-results thread.")
 
-                log.debug("Exit process-stored-results thread.")
-
             def process_pending_tasks():
                 # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
                 # funcx-manager.  In terms of shutting down (or "rebooting") gracefully,
@@ -395,7 +391,6 @@ class EndpointInterchange:
                         continue
 
                     except Exception as exc:
-                        log.debug(f"Invalid message received: {result}")
                         log.warning(
                             f"Invalid message received: no task_id.  Ignoring. {exc}"
                         )
@@ -472,6 +467,9 @@ class EndpointInterchange:
                     num_r - last_r,
                 )
                 last_t, last_r = num_t, num_r
+
+                # only reset come heartbeat and still alive
+                self._reconnect_fail_counter = 0
 
             # The timeouts aren't nominally necessary because if the above loop has
             # quit, then the _quiesce_event is set, and both threads check that event

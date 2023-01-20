@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import responses
 
@@ -87,3 +89,26 @@ def test_user_app_name_property(client, user_app_name):
 def test_app_name_not_settable(client):
     with pytest.raises(NotImplementedError):
         client.app_name = "qux"
+
+
+def test_get_amqp_url(client, randomstring):
+    expected_response = randomstring()
+    responses.add(
+        responses.GET,
+        "https://api.funcx/get_amqp_result_connection_url",
+        json={"some_key": expected_response},
+    )
+
+    res = client.get_result_amqp_url()
+    assert res["some_key"] == expected_response
+
+
+@pytest.mark.parametrize("multi_tenant", [None, True, False])
+def test_multi_tenant_post(client, multi_tenant):
+    responses.post(url="https://api.funcx/endpoints")
+    resp = client.register_endpoint("ep_name", "ep_id", multi_tenant=multi_tenant)
+    req_body = json.loads(resp._response.request.body)
+    if multi_tenant:
+        assert req_body["multi_tenant"] == multi_tenant
+    else:
+        assert "multi_tenant" not in req_body

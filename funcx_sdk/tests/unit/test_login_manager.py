@@ -1,22 +1,33 @@
 import os
 import uuid
+from itertools import chain, combinations
 from unittest import mock
 
 import globus_sdk
 import pytest
+import requests
 
 from funcx.sdk._environments import _get_envname
+from funcx.sdk.login_manager import LoginManager, requires_login
 from funcx.sdk.login_manager.client_login import (
     _get_client_creds_from_env,
     get_client_login,
     is_client_login,
 )
-from funcx.sdk.login_manager.manager import LoginManager
 from funcx.sdk.login_manager.tokenstore import _resolve_namespace
 
 CID_KEY = "FUNCX_SDK_CLIENT_ID"
 CSC_KEY = "FUNCX_SDK_CLIENT_SECRET"
 MOCK_BASE = "funcx.sdk.login_manager"
+
+
+def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.Response:
+    req = requests.Request(method, "https://funcx.example.org/")
+    p_req = req.prepare()
+    res = requests.Response()
+    res.request = p_req
+    res.status_code = status
+    return res
 
 
 @pytest.fixture
@@ -159,3 +170,69 @@ def test_get_authorizer(mocker, logman):
 
     with pytest.raises(LookupError):
         logman._get_authorizer("some_resource_server")
+
+
+@pytest.mark.parametrize(
+    "missing_keys",
+    list(
+        chain(
+            combinations(LoginManager.SCOPES, 1),
+            combinations(LoginManager.SCOPES, 2),
+            combinations(LoginManager.SCOPES, 3),
+            [()],
+        )
+    ),
+)
+def test_ensure_logged_in(mocker, logman, missing_keys):
+    needs_login = bool(missing_keys)
+
+    def _get_data():
+        token_data = dict(LoginManager.SCOPES)
+        for k in missing_keys:
+            token_data.pop(k, None)
+        return token_data
+
+    logman._token_storage.get_by_resource_server = _get_data
+
+    mock_run_login_flow = mocker.patch(
+        f"{MOCK_BASE}.manager.LoginManager.run_login_flow"
+    )
+
+    logman.ensure_logged_in()
+
+    assert needs_login == mock_run_login_flow.called
+
+
+def test_requires_login_decorator(mocker, logman):
+    mocked_run_login_flow = mocker.patch(
+        f"{MOCK_BASE}.manager.LoginManager.run_login_flow"
+    )
+    mocked_get_funcx_web_client = mocker.patch(
+        f"{MOCK_BASE}.manager.LoginManager.get_funcx_web_client"
+    )
+
+    expected = "expected result"
+    mock_method = mock.Mock()
+    mock_method.side_effect = [
+        expected,
+        globus_sdk.AuthAPIError(_fake_http_response(status=400, method="POST")),
+        expected,
+    ]
+    mock_method.__name__ = "mock_method"
+
+    class MockClient:
+        login_manager = logman
+        funcx_service_address = "127.0.0.1"
+        upstream_call = requires_login(mock_method)
+
+    mock_client = MockClient()
+
+    res = mock_client.upstream_call(None)  # case: no need to reauth
+    assert res == expected
+    assert not mocked_run_login_flow.called
+    assert not mocked_get_funcx_web_client.called
+
+    res = mock_client.upstream_call(None)  # case: now must reauth
+    assert res == expected
+    assert mocked_run_login_flow.called
+    assert mocked_get_funcx_web_client.called

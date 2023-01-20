@@ -102,8 +102,9 @@ class LoginManager:
                 s for _rs_name, rs_scopes in self.login_requirements for s in rs_scopes
             ]
 
+        token = do_link_auth_flow(scopes)
         with self._access_lock:
-            do_link_auth_flow(self._token_storage, scopes)
+            self._token_storage.store(token)
 
     def logout(self) -> bool:
         """
@@ -122,16 +123,16 @@ class LoginManager:
         return tokens_revoked
 
     def ensure_logged_in(self) -> None:
+        """Ensures that the user has valid refresh tokens. If a token
+        is found to be invalid, a new login flow is initiated.
+        """
         with self._access_lock:
             data = self._token_storage.get_by_resource_server()
-        needs_login = False
-        for rs_name, _rs_scopes in self.login_requirements:
-            if rs_name not in data:
-                needs_login = True
-                break
 
-        if needs_login:
-            self.run_login_flow()
+        for server, _scopes in self.login_requirements:
+            if server not in data:
+                self.run_login_flow()
+                break
 
     def _get_authorizer(
         self, resource_server: str

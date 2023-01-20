@@ -19,7 +19,7 @@ config = Config(
     executors=[
         HighThroughputExecutor(
             worker_debug=False,
-            address=address_by_interface('bond0.144'),
+            address=address_by_interface('nmn0'),
             provider=SlurmProvider(
                 partition='GPU',  # Partition / QOS
 
