@@ -1,7 +1,7 @@
 import pickle
 import uuid
 
-from funcx_common.messagepack import pack, unpack
+from funcx_common.messagepack import unpack
 from funcx_common.messagepack.message_types import (
     EPStatusReport as OutgoingEPStatusReport,
 )
@@ -10,7 +10,7 @@ from funcx_common.messagepack.message_types import TaskTransition
 from funcx_common.tasks.constants import ActorName, TaskState
 
 from funcx_endpoint.endpoint.messages_compat import (
-    try_convert_from_messagepack,
+    convert_to_internaltask,
     try_convert_to_messagepack,
 )
 from funcx_endpoint.executors.high_throughput.messages import (
@@ -60,9 +60,8 @@ def test_external_task_to_internal_task():
     external = OutgoingTask(
         task_id=task_id, container_id=container_id, task_buffer=task_buffer
     )
-    message = pack(external)
 
-    incoming = try_convert_from_messagepack(message)
+    incoming = convert_to_internaltask(external)
     internal = InternalMessage.unpack(incoming)
 
     assert isinstance(internal, InternalTask)
@@ -76,9 +75,8 @@ def test_external_task_without_container_id_converts_to_RAW():
     task_buffer = b"task_buffer"
 
     external = OutgoingTask(task_id=task_id, container_id=None, task_buffer=task_buffer)
-    message = pack(external)
 
-    incoming = try_convert_from_messagepack(message)
+    incoming = convert_to_internaltask(external)
     internal = InternalMessage.unpack(incoming)
 
     assert isinstance(internal, InternalTask)
