@@ -107,7 +107,6 @@ class Interchange:
         container_cmd_options="",
         worker_mode=None,
         cold_routing_interval=10.0,
-        funcx_service_address=None,
         scaling_enabled=True,
         client_address="127.0.0.1",
         interchange_address="127.0.0.1",
@@ -120,7 +119,6 @@ class Interchange:
         logdir=".",
         endpoint_id=None,
         suppress_failure=False,
-        funcx_client=None,
     ):
         """
         Parameters
@@ -184,11 +182,6 @@ class Interchange:
         suppress_failure : Bool
              When set to True, the interchange will attempt to suppress failures.
              Default: False
-
-        funcx_client: FuncXClient
-             Only used for querying container information. If not present, container
-             info will default to RAW (ie, no container).
-             Default: None
         """
 
         self.logdir = logdir
@@ -252,8 +245,6 @@ class Interchange:
         self.pending_task_queue: dict[str, queue.Queue] = {}
         self.containers: dict[str, str] = {}
         self.total_pending_task_count = 0
-
-        self.funcx_client = funcx_client
 
         log.info(f"Interchange address is {self.interchange_address}")
         self.worker_ports = worker_ports
@@ -442,7 +433,8 @@ class Interchange:
                 log.debug("Got heartbeat")
             else:
                 log.info(f"Received task: {msg.task_id}")
-                local_container = self.get_container(msg.container_id)
+                local_container = msg.container_id
+                self.containers[local_container] = local_container
                 msg.set_local_container(local_container)
                 if local_container not in self.pending_task_queue:
                     self.pending_task_queue[local_container] = queue.Queue(
@@ -480,26 +472,6 @@ class Interchange:
                 )
                 task_counter += 1
                 log.debug(f"[TASK_PULL_THREAD] Fetched task:{task_counter}")
-
-    def get_container(self, container_uuid):
-        """Get the container image location if it is not known to the interchange"""
-        if container_uuid not in self.containers:
-            if container_uuid == "RAW" or not container_uuid:
-                self.containers[container_uuid] = "RAW"
-            else:
-                try:
-                    container = self.funcx_client.get_container(
-                        container_uuid, self.container_type
-                    )
-                except Exception:
-                    log.exception(
-                        "[FETCH_CONTAINER] Unable to resolve container location"
-                    )
-                    self.containers[container_uuid] = "RAW"
-                else:
-                    log.info(f"[FETCH_CONTAINER] Got container info: {container}")
-                    self.containers[container_uuid] = container.get("location", "RAW")
-        return self.containers[container_uuid]
 
     def get_total_tasks_outstanding(self):
         """Get the outstanding tasks in total"""
@@ -964,14 +936,14 @@ class Interchange:
                         log.debug(
                             "Received task result %s (from %s)", r["task_id"], manager
                         )
-                        task_type = self.containers[r["container_id"]]
+                        task_container = self.containers[r["container_id"]]
                         log.debug(
                             "Removing for manager: %s from %s",
                             manager,
                             self._ready_manager_queue,
                         )
 
-                        mdata["tasks"][task_type].remove(r["task_id"])
+                        mdata["tasks"][task_container].remove(r["task_id"])
 
                         # Transfer any outstanding task statuses to the result message
                         if r["task_id"] in self.task_status_deltas:
@@ -1020,18 +992,17 @@ class Interchange:
                     now,
                 )
                 log.warning(f"Too many heartbeats missed for manager {manager!r}")
-                for task_type in self._ready_manager_queue[manager]["tasks"]:
-                    for tid in self._ready_manager_queue[manager]["tasks"][task_type]:
-                        try:
-                            raise ManagerLost(manager)
-                        except Exception:
-                            result_package = {
-                                "task_id": tid,
-                                "exception": get_error_string(),
-                                "error_details": get_result_error_details(),
-                            }
-                            pkl_package = dill.dumps(result_package)
-                            bad_manager_msgs.append(pkl_package)
+                for tid in self._ready_manager_queue[manager]["tasks"].values():
+                    try:
+                        raise ManagerLost(manager)
+                    except Exception:
+                        result_package = {
+                            "task_id": tid,
+                            "exception": get_error_string(),
+                            "error_details": get_result_error_details(),
+                        }
+                        pkl_package = dill.dumps(result_package)
+                        bad_manager_msgs.append(pkl_package)
                 log.warning(f"Sent failure reports, unregistering manager {manager!r}")
                 self._ready_manager_queue.pop(manager, None)
                 if manager in interesting_managers:

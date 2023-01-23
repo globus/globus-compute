@@ -23,7 +23,6 @@ from parsl.executors.errors import BadMessage, ScalingFailed
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
-from funcx import FuncXClient
 from funcx.serialize import FuncXSerializer
 from funcx_endpoint.executors.high_throughput import interchange, zmq_pipes
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
@@ -354,11 +353,7 @@ class HighThroughputExecutor(RepresentationMixin):
                 "--container_image={container_image} "
             )
 
-    def start(
-        self,
-        results_passthrough: multiprocessing.Queue = None,
-        funcx_client: FuncXClient = None,
-    ):
+    def start(self, results_passthrough: multiprocessing.Queue = None):
         """Create the Interchange process and connect to it."""
         self.outgoing_q = zmq_pipes.TasksOutgoing(
             "127.0.0.1", self.interchange_port_range
@@ -384,8 +379,6 @@ class HighThroughputExecutor(RepresentationMixin):
         self._executor_bad_state = threading.Event()
         self._executor_exception = None
         self._start_queue_management_thread()
-
-        self.funcx_client = funcx_client
 
         log.info("Attempting local interchange start")
         self._start_local_interchange_process()
@@ -447,7 +440,6 @@ class HighThroughputExecutor(RepresentationMixin):
                 "logdir": os.path.join(self.run_dir, self.label),
                 "suppress_failure": self.suppress_failure,
                 "endpoint_id": self.endpoint_id,
-                "funcx_client": self.funcx_client,
             },
         )
         self.queue_proc.start()

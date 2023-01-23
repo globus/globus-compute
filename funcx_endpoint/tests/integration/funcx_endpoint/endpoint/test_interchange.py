@@ -23,9 +23,6 @@ def funcx_dir(tmp_path):
 
 
 def test_endpoint_id(mocker, funcx_dir):
-    mock_client = mocker.patch(f"{_MOCK_BASE}FuncXClient")
-    mock_client.return_value = None
-
     manager = Endpoint(funcx_dir=str(funcx_dir))
     config_dir = funcx_dir / "mock_endpoint"
 
@@ -47,11 +44,10 @@ def test_endpoint_id(mocker, funcx_dir):
         assert executor.endpoint_id == "mock_endpoint_id"
 
 
-def test_start_requires_pre_registered(mocker, funcx_dir):
+def test_start_requires_pre_registered(funcx_dir):
     with pytest.raises(TypeError):
         EndpointInterchange(
             config=Config(),
-            funcx_client=mocker.Mock(),
             reg_info=None,
             endpoint_id="mock_endpoint_id",
         )
@@ -60,7 +56,6 @@ def test_start_requires_pre_registered(mocker, funcx_dir):
 def test_invalid_message_result_returned(mocker):
     ei = EndpointInterchange(
         config=Config(executors=[mocker.Mock(endpoint_id=None)]),
-        funcx_client=mocker.Mock(),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
     )
 

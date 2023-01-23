@@ -325,7 +325,6 @@ class Endpoint:
                 endpoint_dir,
                 endpoint_config,
                 reg_info,
-                fx_client,
                 result_store,
             )
 
@@ -335,7 +334,6 @@ class Endpoint:
         endpoint_dir,
         endpoint_config: Config,
         reg_info,
-        funcx_client: FuncXClient,
         result_store: ResultStore,
     ):
         interchange = EndpointInterchange(
@@ -343,7 +341,6 @@ class Endpoint:
             reg_info=reg_info,
             endpoint_id=endpoint_uuid,
             endpoint_dir=endpoint_dir,
-            funcx_client=funcx_client,
             result_store=result_store,
             logdir=endpoint_dir,
         )

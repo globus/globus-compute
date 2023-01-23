@@ -24,7 +24,6 @@ def test_main_exception_always_quiesces(mocker, fs):
     mocker.patch(f"{_mock_base}mpQueue")
     ei = EndpointInterchange(
         config=Config(executors=[]),
-        funcx_client="stub",
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=num_iterations + 10,
     )
@@ -56,7 +55,6 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit):
     mock_log = mocker.patch(f"{_mock_base}log")
     ei = EndpointInterchange(
         config=Config(executors=[]),
-        funcx_client="stub",
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=reconnect_attempt_limit,
     )

@@ -64,10 +64,16 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
     return message
 
 
-def convert_to_internaltask(message: OutgoingTask) -> bytes:
-    container_id = "RAW" if message.container_id is None else message.container_id
+def convert_to_internaltask(message: OutgoingTask, container_type: str | None) -> bytes:
+    container_loc = "RAW"
+    if message.container:
+        for img in message.container.images:
+            if img.image_type == container_type:
+                container_loc = img.location
+                break
+
     return InternalTask(
         task_id=str(message.task_id),
-        container_id=str(container_id),
+        container_id=container_loc,
         task_buffer=message.task_buffer,
     ).pack()
