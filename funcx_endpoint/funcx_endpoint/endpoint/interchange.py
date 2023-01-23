@@ -17,8 +17,8 @@ import time
 from multiprocessing.synchronize import Event as EventType
 
 import pika.exceptions
-from funcx_common.messagepack import pack
-from funcx_common.messagepack.message_types import Result, ResultErrorDetails
+from funcx_common.messagepack import InvalidMessageError, pack, unpack
+from funcx_common.messagepack.message_types import Result, ResultErrorDetails, Task
 from parsl.version import VERSION as PARSL_VERSION
 
 import funcx_endpoint.endpoint.utils.config
@@ -26,11 +26,12 @@ from funcx import __version__ as funcx_sdk_version
 from funcx.sdk.client import FuncXClient
 from funcx_endpoint import __version__ as funcx_endpoint_version
 from funcx_endpoint.endpoint.messages_compat import (
-    try_convert_from_messagepack,
+    convert_to_internaltask,
     try_convert_to_messagepack,
 )
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.result_store import ResultStore
+from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
 from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 log = logging.getLogger(__name__)
@@ -363,15 +364,31 @@ class EndpointInterchange:
 
                     try:
                         incoming_task = self.pending_task_queue.get(timeout=1)
-                        task = try_convert_from_messagepack(incoming_task)
-                        executor.submit_raw(task)
-                        num_tasks_forwarded += 1  # Safe given GIL
+                        task_msg = unpack(incoming_task)
+                        if not isinstance(task_msg, Task):
+                            raise InvalidMessageError()
 
                     except queue.Empty:
                         continue
 
                     except Exception:
-                        log.exception("Unhandled issue while waiting for pending tasks")
+                        log.exception("Unhandled error processing incoming task")
+                        continue
+
+                    try:
+                        task = convert_to_internaltask(task_msg)
+                        executor.submit_raw(task)
+                        num_tasks_forwarded += 1  # Safe given GIL
+
+                    except Exception as exc:
+                        log.exception(f"Failed to process {task_msg.task_id}")
+                        result = {
+                            "task_id": task_msg.task_id,
+                            "exception": f"Failed to start task: {get_error_string()}",
+                            "error_details": get_result_error_details(),
+                            "message": f"Failed to start task.  Exception text: {exc}",
+                        }
+                        self.results_passthrough.put(result)
 
                 log.debug("Exit process-pending-tasks thread.")
 
@@ -397,8 +414,8 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        # This either works or it doesn't; if it doesn't to serialize
-                        # the to an execption and send _that_
+                        # This either works or it doesn't; if it doesn't, then
+                        # serialize an execption and send _that_
                         # will be a packed EPStatusReport or Result
                         message = try_convert_to_messagepack(packed_result)
 

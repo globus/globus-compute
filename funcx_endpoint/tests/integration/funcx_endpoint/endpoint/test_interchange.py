@@ -1,14 +1,18 @@
-import logging
 import pathlib
+import threading
+import uuid
 from importlib.machinery import SourceFileLoader
 
 import pytest
+from funcx_common.messagepack import pack, unpack
+from funcx_common.messagepack.message_types import Result, Task
+from tests.utils import try_for_timeout
 
-from funcx_endpoint.endpoint.config import Config
 from funcx_endpoint.endpoint.endpoint import Endpoint
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
+from funcx_endpoint.endpoint.utils.config import Config
 
-logger = logging.getLogger("mock_funcx")
+_MOCK_BASE = "funcx_endpoint.endpoint.interchange."
 
 
 @pytest.fixture
@@ -19,7 +23,7 @@ def funcx_dir(tmp_path):
 
 
 def test_endpoint_id(mocker, funcx_dir):
-    mock_client = mocker.patch("funcx_endpoint.endpoint.interchange.FuncXClient")
+    mock_client = mocker.patch(f"{_MOCK_BASE}FuncXClient")
     mock_client.return_value = None
 
     manager = Endpoint(funcx_dir=str(funcx_dir))
@@ -51,3 +55,29 @@ def test_start_requires_pre_registered(mocker, funcx_dir):
             reg_info=None,
             endpoint_id="mock_endpoint_id",
         )
+
+
+def test_invalid_message_result_returned(mocker):
+    ei = EndpointInterchange(
+        config=Config(executors=[mocker.Mock(endpoint_id=None)]),
+        funcx_client=mocker.Mock(),
+        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+    )
+
+    mock_results = mocker.MagicMock()
+    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_results)
+    mocker.patch(f"{_MOCK_BASE}convert_to_internaltask", side_effect=Exception("BLAR"))
+    task = Task(task_id=uuid.uuid4(), task_buffer="")
+    ei.pending_task_queue.put(pack(task))
+    t = threading.Thread(target=ei._main_loop, daemon=True)
+    t.start()
+
+    try_for_timeout(lambda: mock_results.publish.called, timeout_ms=1000)
+    ei.time_to_quit = True
+    t.join()
+
+    assert mock_results.publish.called
+    msg = mock_results.publish.call_args[0][0]
+    result: Result = unpack(msg)
+    assert result.task_id == task.task_id
+    assert "Failed to start task" in result.data
