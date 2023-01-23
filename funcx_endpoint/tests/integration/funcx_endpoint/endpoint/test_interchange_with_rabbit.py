@@ -4,7 +4,6 @@ import multiprocessing
 import time
 import uuid
 import warnings
-from unittest import mock
 
 import dill
 import pika
@@ -29,9 +28,7 @@ def run_interchange_process(
     a random endpoint id, and the mocked registration info.
     """
 
-    def run_it(reg_info: dict, endpoint_uuid, endpoint_dir, mock_funcx_cli=True):
-        fake_client = mock.Mock() if mock_funcx_cli else None
-
+    def run_it(reg_info: dict, endpoint_uuid, endpoint_dir):
         mock_exe = MockExecutor()
         mock_exe.endpoint_id = endpoint_uuid
 
@@ -41,7 +38,6 @@ def run_interchange_process(
             config=config,
             endpoint_id=endpoint_uuid,
             reg_info=reg_info,
-            funcx_client=fake_client,
             endpoint_dir=endpoint_dir,
         )
 

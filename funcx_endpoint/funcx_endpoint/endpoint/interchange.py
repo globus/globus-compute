@@ -23,7 +23,6 @@ from parsl.version import VERSION as PARSL_VERSION
 
 import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
-from funcx.sdk.client import FuncXClient
 from funcx_endpoint import __version__ as funcx_endpoint_version
 from funcx_endpoint.endpoint.messages_compat import (
     convert_to_internaltask,
@@ -56,7 +55,6 @@ class EndpointInterchange:
         logdir=".",
         endpoint_id=None,
         endpoint_dir=".",
-        funcx_client: FuncXClient | None = None,
         result_store: ResultStore | None = None,
         reconnect_attempt_limit: int = 5,
     ):
@@ -80,9 +78,6 @@ class EndpointInterchange:
 
         endpoint_dir : pathlib.Path
              Endpoint directory path to store registration info in
-
-        funcx_client_options : Dict
-             FuncXClient initialization options
         """
         self.logdir = logdir
         log.info(
@@ -93,10 +88,6 @@ class EndpointInterchange:
         self.config = config
 
         self.endpoint_dir = endpoint_dir
-
-        if funcx_client is None:
-            funcx_client = FuncXClient()
-        self.funcx_client = funcx_client
 
         self.task_q_info = reg_info["task_queue_info"]
         self.result_q_info = reg_info["result_queue_info"]
@@ -163,10 +154,7 @@ class EndpointInterchange:
         log.info("Starting Executors")
         for executor in self.config.executors:
             if hasattr(executor, "passthrough") and executor.passthrough is True:
-                executor.start(
-                    results_passthrough=self.results_passthrough,
-                    funcx_client=self.funcx_client,
-                )
+                executor.start(results_passthrough=self.results_passthrough)
 
     def migrate_tasks_to_internal(
         self,
@@ -357,11 +345,11 @@ class EndpointInterchange:
                 # funcx-manager.  In terms of shutting down (or "rebooting") gracefully,
                 # iterate once a second whether or not a task has arrived.
                 nonlocal num_tasks_forwarded
+                ctype = executor.container_type
                 while not self._quiesce_event.is_set():
                     if self.time_to_quit:
                         self.stop()
                         continue  # nominally == break; but let event do it
-
                     try:
                         incoming_task = self.pending_task_queue.get(timeout=1)
                         task_msg = unpack(incoming_task)
@@ -376,7 +364,7 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        task = convert_to_internaltask(task_msg)
+                        task = convert_to_internaltask(task_msg, ctype)
                         executor.submit_raw(task)
                         num_tasks_forwarded += 1  # Safe given GIL
 

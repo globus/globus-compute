@@ -2,6 +2,7 @@ import pickle
 import uuid
 
 from funcx_common.messagepack import unpack
+from funcx_common.messagepack.message_types import Container, ContainerImage
 from funcx_common.messagepack.message_types import (
     EPStatusReport as OutgoingEPStatusReport,
 )
@@ -52,21 +53,35 @@ def test_ep_status_report_conversion():
     assert external.task_statuses == task_statuses
 
 
-def test_external_task_to_internal_task():
+def test_external_task_to_internal_task(randomstring):
     task_id = uuid.uuid4()
-    container_id = uuid.uuid4()
     task_buffer = b"task_buffer"
+    container_type = randomstring()
+    location = randomstring()
 
     external = OutgoingTask(
-        task_id=task_id, container_id=container_id, task_buffer=task_buffer
+        task_id=task_id,
+        container=Container(
+            container_id=uuid.uuid4(),
+            name="",
+            images=[
+                ContainerImage(
+                    image_type=container_type,
+                    location=location,
+                    created_at=0,
+                    modified_at=0,
+                )
+            ],
+        ),
+        task_buffer=task_buffer,
     )
 
-    incoming = convert_to_internaltask(external)
+    incoming = convert_to_internaltask(external, container_type)
     internal = InternalMessage.unpack(incoming)
 
     assert isinstance(internal, InternalTask)
     assert internal.task_id == str(task_id)
-    assert internal.container_id == str(container_id)
+    assert internal.container_id == location
     assert internal.task_buffer == task_buffer
 
 
@@ -76,7 +91,7 @@ def test_external_task_without_container_id_converts_to_RAW():
 
     external = OutgoingTask(task_id=task_id, container_id=None, task_buffer=task_buffer)
 
-    incoming = convert_to_internaltask(external)
+    incoming = convert_to_internaltask(external, None)
     internal = InternalMessage.unpack(incoming)
 
     assert isinstance(internal, InternalTask)
