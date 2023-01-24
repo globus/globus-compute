@@ -3,6 +3,22 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.8:
+
+funcx & funcx-endpoint v1.0.8
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The endpoint can now register metadata such as IP, hostname, and configuration values
+  with the funcX services.
+
+Changed
+^^^^^^^
+
+- Pin Parsl version required by the funcX Endpoint to v2023.1.23
+
 .. _changelog-1.0.7:
 
 funcx & funcx-endpoint v1.0.7
