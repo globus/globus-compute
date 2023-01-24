@@ -38,6 +38,20 @@ if t.TYPE_CHECKING:
     from pika.spec import Basic, BasicProperties
 
 
+_REGISTERED_FXEXECUTORS: dict[int, t.Any] = {}
+
+
+def __funcxexecutor_atexit():
+    threading.main_thread().join()
+    to_shutdown = list(_REGISTERED_FXEXECUTORS.values())
+    while to_shutdown:
+        fxe = to_shutdown.pop()
+        fxe.shutdown()
+
+
+threading.Thread(target=__funcxexecutor_atexit).start()
+
+
 class TaskSubmissionInfo:
     def __init__(
         self,
@@ -170,13 +184,19 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._result_watcher: _ResultWatcher | None = None
 
         log.debug("%s: initiated on thread: %s", self, threading.get_ident())
-        self._task_submitter = threading.Thread(target=self._task_submitter_impl)
+        self._task_submitter = threading.Thread(
+            target=self._task_submitter_impl, name="TaskSubmitter"
+        )
         self._task_submitter.start()
+        _REGISTERED_FXEXECUTORS[id(self)] = self
 
     def __repr__(self) -> str:
         name = self.__class__.__name__
         label = self.label and f"{self.label}, " or ""
-        return f"{name}<{label}{self.batch_size}, ep_id:{self.endpoint_id}>"
+        ep_id = self.endpoint_id and f", ep_id:{self.endpoint_id}" or ""
+        c_id = self.container_id and f", c_id:{self.container_id}" or ""
+        tg_id = f", tg_id:{self.task_group_id}"
+        return f"{name}<{label}{self.batch_size}{ep_id}{c_id}{tg_id}>"
 
     @property
     def task_group_id(self) -> str:
@@ -505,9 +525,15 @@ class FuncXExecutor(concurrent.futures.Executor):
         thread_id = threading.get_ident()
         log.debug("%s: initiating shutdown (thread: %s)", self, thread_id)
         if self._task_submitter.is_alive():
+            log.debug(
+                "%s: %s still alive; sending poison pill",
+                self,
+                self._task_submitter.name,
+            )
             self._tasks_to_send.put((None, None))
-            if wait:
-                self._tasks_to_send.join()
+            if wait and self._task_submitter.ident != thread_id:
+                while self._task_submitter.is_alive():
+                    self._task_submitter.join(0.1)
 
         with self._shutdown_lock:
             self._stopped = True
@@ -521,6 +547,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             # interwoven in the logs.  Attempt to make debugging easier for
             # that scenario by adding a slight delay on the *main* thread.
             time.sleep(0.1)
+        _REGISTERED_FXEXECUTORS.pop(id(self), None)
         log.debug("%s: shutdown complete (thread: %s)", self, thread_id)
 
     def _task_submitter_impl(self) -> None:

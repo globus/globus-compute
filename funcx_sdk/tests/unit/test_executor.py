@@ -463,7 +463,7 @@ def test_reload_handles_deseralization_error_gracefully(fxexecutor):
 
 
 @pytest.mark.parametrize("batch_size", tuple(range(1, 11)))
-def test_task_submitter_respects_batch_size(fxexecutor, batch_size):
+def test_task_submitter_respects_batch_size(fxexecutor, batch_size: int):
     fxc, fxe = fxexecutor
 
     fxc.create_batch.side_effect = mock.MagicMock

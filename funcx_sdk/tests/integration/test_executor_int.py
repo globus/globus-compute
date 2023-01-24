@@ -1,4 +1,7 @@
 import os
+import subprocess
+import sys
+import textwrap
 from unittest import mock
 
 import pytest
@@ -26,3 +29,30 @@ def test_resultwatcher_graceful_shutdown():
     try_assert(lambda: not rw._connection or rw._connection.is_closed)
     try_assert(lambda: not rw.is_alive())
     fxe.shutdown()
+
+
+def test_executor_atexit_handler_catches_all_instances(tmp_path):
+    test_script = tmp_path / "test.py"
+    script_content = textwrap.dedent(
+        """
+        import random
+        from funcx import FuncXExecutor
+        from funcx.sdk.executor import _REGISTERED_FXEXECUTORS
+
+        fxc = " a fake funcx_client"
+        num_executors = random.randrange(1, 10)
+        for i in range(num_executors):
+            FuncXExecutor(funcx_client=fxc)  # start N threads, none shutdown
+        fxe = FuncXExecutor(funcx_client=fxc)  # intentionally overwritten
+        fxe = FuncXExecutor(funcx_client=fxc)
+
+        num_executors += 2
+        assert len(_REGISTERED_FXEXECUTORS) == num_executors, (
+            f"Verify test setup: {len(_REGISTERED_FXEXECUTORS)} != {num_executors}"
+        )
+        fxe.shutdown()  # only shutting down _last_ instance.  Should still exit cleanly
+        """
+    )
+    test_script.write_text(script_content)
+    res = subprocess.run([sys.executable, str(test_script)], timeout=5)
+    assert res.returncode == 0
