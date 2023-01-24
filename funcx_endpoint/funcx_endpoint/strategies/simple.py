@@ -4,7 +4,7 @@ import logging
 import math
 import time
 
-from parsl.providers.provider_base import JobState
+from parsl.providers.base import JobState
 
 from funcx_endpoint.strategies.base import BaseStrategy
 

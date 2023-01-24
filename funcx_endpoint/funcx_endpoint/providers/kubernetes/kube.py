@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import typeguard
 from parsl.errors import OptionalModuleMissing
-from parsl.providers.provider_base import ExecutionProvider
+from parsl.providers.base import ExecutionProvider
 from parsl.utils import RepresentationMixin
 
 from funcx_endpoint.providers.kubernetes.template import template_string
