@@ -17,6 +17,7 @@ from string import Template
 import daemon
 import daemon.pidfile
 import psutil
+import setproctitle
 import texttable
 from globus_sdk import GlobusAPIError, NetworkError
 
@@ -279,6 +280,12 @@ class Endpoint:
         ep_info = {"endpoint_id": endpoint_uuid}
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
+
+        ptitle = f"funcX Endpoint ({endpoint_uuid}, {endpoint_dir.name})"
+        if endpoint_config.environment:
+            ptitle += f" - {endpoint_config.environment}"
+        ptitle += f" [{setproctitle.getproctitle()}]"
+        setproctitle.setproctitle(ptitle)
 
         log.info("Launching endpoint daemon process")
 
