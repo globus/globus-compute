@@ -34,6 +34,7 @@ REQUIRES = [
     # pin exact versions because it does not use semver
     "parsl==2023.1.23",
     "pika>=1.2.0",
+    "setproctitle>=1.3.2,<1.4",
 ]
 
 TEST_REQUIRES = [

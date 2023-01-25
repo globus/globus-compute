@@ -325,3 +325,32 @@ def test_endpoint_get_metadata(mocker):
     assert len(config["executors"]) == 1
     assert config["executors"][0]["_type"] == "HighThroughputExecutor"
     assert config["executors"][0]["provider"]["_type"] == "LocalProvider"
+
+
+@pytest.mark.parametrize("env", [None, "blar", "local", "production"])
+def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_id = str(uuid.uuid4())
+    ep_conf.environment = env
+
+    orig_proc_title = randomstring()
+
+    mock_fxc = mocker.Mock()
+    mock_fxc.register_endpoint.return_value = {"endpoint_id": ep_id}
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_fxc)
+
+    mock_spt = mocker.patch(f"{_mock_base}setproctitle")
+    mock_spt.getproctitle.return_value = orig_proc_title
+    mock_spt.setproctitle.side_effect = StopIteration("Sentinel")
+
+    with pytest.raises(StopIteration, match="Sentinel"):
+        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
+
+    a, _k = mock_spt.setproctitle.call_args
+    assert a[0].startswith("funcX Endpoint"), "Expect easily identifiable process name"
+    assert f"{ep_id}, {ep_dir.name}" in a[0], "Expect easily match process to ep conf"
+    if not env:
+        assert " - " not in a[0], "Default is not 'do not show env' for prod"
+    else:
+        assert f" - {env}" in a[0], "Expected environment name in title"
+    assert a[0].endswith(f"[{orig_proc_title}]"), "Save original cmdline for debugging"
