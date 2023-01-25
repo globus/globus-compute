@@ -54,18 +54,17 @@ def test_start_endpoint_ep_locked(mocker, fs, randomstring, patch_funcx_client):
         status=423,
     )
 
-    funcx_dir = pathlib.Path(endpoint._DEFAULT_FUNCX_DIR)
-    ep = endpoint.Endpoint()
-
-    (funcx_dir / ep.name).mkdir(parents=True, exist_ok=True)
+    ep_dir = pathlib.Path("/some/path/some_endpoint_name")
+    ep_dir.mkdir(parents=True, exist_ok=True)
 
     ep_id = str(uuid.uuid4())
     log_to_console = False
     no_color = True
     ep_conf = Config()
 
+    ep = endpoint.Endpoint()
     with pytest.raises(SystemExit):
-        ep.start_endpoint(ep.name, ep_id, ep_conf, log_to_console, no_color)
+        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
     args, kwargs = mock_log.warning.call_args
     assert "blocked" in args[0]
     assert reason_msg in args[0]

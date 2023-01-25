@@ -31,36 +31,21 @@ from funcx_endpoint.logging_config import setup_logging
 log = logging.getLogger(__name__)
 
 
-_DEFAULT_FUNCX_DIR = str(pathlib.Path.home() / ".funcx")
-
-
 class Endpoint:
     """
     Endpoint is primarily responsible for configuring, launching and stopping
     the Endpoint.
     """
 
-    def __init__(self, funcx_dir=None, debug=False):
+    def __init__(self, debug=False):
         """Initialize the Endpoint
 
         Parameters
         ----------
-
-        funcx_dir: str
-            Directory path to the root of the funcx dirs. Usually ~/.funcx.
-
         debug: Bool
             Enable debug logging. Default: False
         """
         self.debug = debug
-        self.funcx_dir = funcx_dir if funcx_dir is not None else _DEFAULT_FUNCX_DIR
-        self.name = "default"
-
-        self.fx_client = None
-
-    @property
-    def _endpoint_dir(self) -> pathlib.Path:
-        return pathlib.Path(self.funcx_dir) / self.name
 
     @staticmethod
     def _config_file_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
@@ -172,16 +157,12 @@ class Endpoint:
 
     def start_endpoint(
         self,
-        name,
+        endpoint_dir,
         endpoint_uuid,
         endpoint_config: Config,
         log_to_console: bool,
         no_color: bool,
     ):
-        self.name = name
-
-        endpoint_dir = self._endpoint_dir
-
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.executors:
             raise Exception(

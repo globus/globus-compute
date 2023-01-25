@@ -77,12 +77,9 @@ def register_endpoint_failure_response(endpoint_uuid):
 
 @pytest.fixture
 def mock_ep_data(fs):
-    funcx_dir = pathlib.Path(endpoint._DEFAULT_FUNCX_DIR)
     ep = endpoint.Endpoint()
-
-    ep_dir = funcx_dir / ep.name
+    ep_dir = pathlib.Path("/some/path/mock_endpoint")
     ep_dir.mkdir(parents=True, exist_ok=True)
-
     log_to_console = False
     no_color = True
     ep_conf = Config()
@@ -124,7 +121,7 @@ def test_start_endpoint(
     uname, pword = randomstring(), randomstring()
     register_endpoint_response(endpoint_id=ep_id, username=uname, password=pword)
 
-    ep.start_endpoint(ep.name, ep_id, ep_conf, log_to_console, no_color)
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
 
     assert mock_epinterchange.called
     assert mock_daemon.DaemonContext.called
@@ -156,11 +153,11 @@ def test_register_endpoint_invalid_response(
     mock_log = mocker.patch(f"{_mock_base}log")
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
 
-    ep, _ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
 
     register_endpoint_response(endpoint_id=other_endpoint_id)
     with pytest.raises(SystemExit) as pytest_exc:
-        ep.start_endpoint(ep.name, endpoint_uuid, ep_conf, log_to_console, no_color)
+        ep.start_endpoint(ep_dir, endpoint_uuid, ep_conf, log_to_console, no_color)
     assert pytest_exc.value.code == os.EX_SOFTWARE
     assert "mismatched endpoint id" in mock_log.error.call_args[0][0]
     assert "Expected" in mock_log.error.call_args[0][0]
@@ -183,11 +180,11 @@ def test_register_endpoint_locked_error(
     mock_fxc = get_standard_funcx_client()
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
 
-    ep, funcx_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
     register_endpoint_failure_response(endpoint_id=ep_id, status_code=423)
     with pytest.raises(SystemExit) as pytest_exc:
-        ep.start_endpoint(ep.name, ep_id, ep_conf, log_to_console, no_color)
+        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
     assert pytest_exc.value.code == os.EX_UNAVAILABLE
 
 
@@ -215,7 +212,7 @@ def test_register_endpoint_multi_tenant(
     if multi_tenant is not None:
         ep_conf.multi_tenant = multi_tenant
 
-    ep.start_endpoint(ep.name, ep_id, ep_conf, log_to_console, no_color)
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
 
     assert mock_epinterchange.called
     assert mock_daemon.DaemonContext.called

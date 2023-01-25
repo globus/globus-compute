@@ -63,7 +63,7 @@ def get_cli_endpoint() -> Endpoint:
     init_endpoint_configuration_dir(funcx_dir)
 
     state = CommandState.ensure()
-    endpoint = Endpoint(funcx_dir=str(funcx_dir), debug=state.debug)
+    endpoint = Endpoint(debug=state.debug)
 
     return endpoint
 
@@ -317,7 +317,7 @@ def _do_start_endpoint(
 ):
     ep_dir = get_config_dir() / name
     get_cli_endpoint().start_endpoint(
-        name, endpoint_uuid, read_config(ep_dir), log_to_console, no_color
+        ep_dir, endpoint_uuid, read_config(ep_dir), log_to_console, no_color
     )
 
 

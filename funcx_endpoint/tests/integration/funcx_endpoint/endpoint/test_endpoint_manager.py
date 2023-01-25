@@ -38,14 +38,14 @@ class TestStart:
         yield
 
     def test_configure(self):
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
         manager.configure_endpoint(config_dir, None)
         assert config_dir.exists() and config_dir.is_dir()
 
     def test_double_configure(self):
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
 
         manager.configure_endpoint(config_dir, None)
         assert config_dir.exists() and config_dir.is_dir()
@@ -54,8 +54,8 @@ class TestStart:
 
     @pytest.mark.parametrize("mt", [None, True, False])
     def test_configure_multi_tenant_existing_config(self, mt):
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = config_dir / "config.py"
         config_copy = str(config_dir.parent / "config2.py")
 
@@ -74,8 +74,8 @@ class TestStart:
 
     @pytest.mark.parametrize("mt", [None, True, False])
     def test_configure_multi_tenant(self, mt):
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = config_dir / "config.py"
 
         if mt is not None:
@@ -339,8 +339,8 @@ class TestStart:
 
         mock_config = mock_executors()
 
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
 
         manager.configure_endpoint(config_dir, None)
         with pytest.raises(
@@ -351,7 +351,7 @@ class TestStart:
             log_to_console = False
             no_color = True
             manager.start_endpoint(
-                config_dir.name, None, mock_config, log_to_console, no_color
+                config_dir, None, mock_config, log_to_console, no_color
             )
 
     @pytest.mark.skip("This test doesn't make much sense")
@@ -450,23 +450,20 @@ class TestStart:
         mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint.uuid.uuid4")
         mock_uuid.return_value = 123456
 
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
-
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
+        manager = Endpoint()
         manager.configure_endpoint(config_dir, None)
         assert "123456" == manager.get_or_create_endpoint_uuid(config_dir, None)
 
     def test_get_or_create_endpoint_uuid_no_json_given_uuid(self):
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
-
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
+        manager = Endpoint()
         manager.configure_endpoint(config_dir, None)
         assert "234567" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
 
     def test_get_or_create_endpoint_uuid_given_json(self):
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = pathlib.Path(manager.funcx_dir) / "mock_endpoint"
-
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
+        manager = Endpoint()
         manager.configure_endpoint(config_dir, None)
 
         mock_dict = {"endpoint_id": "abcde12345"}
