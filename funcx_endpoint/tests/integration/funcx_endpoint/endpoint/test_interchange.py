@@ -22,8 +22,8 @@ def funcx_dir(tmp_path):
     yield fxdir
 
 
-def test_endpoint_id(mocker, funcx_dir):
-    manager = Endpoint(funcx_dir=str(funcx_dir))
+def test_endpoint_id(funcx_dir):
+    manager = Endpoint()
     config_dir = funcx_dir / "mock_endpoint"
 
     manager.configure_endpoint(config_dir, None)
