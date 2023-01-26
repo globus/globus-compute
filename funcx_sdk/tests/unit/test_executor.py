@@ -166,7 +166,7 @@ def test_property_task_group_id_is_isolated(fxexecutor):
     assert fxe.task_group_id != fxc.session_task_group_id
 
 
-def test_multiple_register_function_fails(fxexecutor, mocker):
+def test_multiple_register_function_fails(fxexecutor):
     fxc, fxe = fxexecutor
 
     fxc.register_function.return_value = "abc"
@@ -228,7 +228,7 @@ def test_submit_auto_registers_function(fxexecutor):
     fxe.endpoint_id = "some_ep_id"
     fxe.submit(noop)
 
-    fxc.register_function.assert_called()
+    assert fxc.register_function.called
 
 
 def test_submit_value_error_if_no_endpoint(fxexecutor):
@@ -241,6 +241,18 @@ def test_submit_value_error_if_no_endpoint(fxexecutor):
     assert "No endpoint_id set" in str(err)
     assert "    fxe = FuncXExecutor(endpoint_id=" in str(err), "Expected hint"
     try_assert(_is_stopped(fxe._task_submitter), "Expected graceful shutdown on error")
+
+
+def test_same_function_different_containers_allowed(fxexecutor):
+    fxc, fxe = fxexecutor
+    c1_id, c2_id = str(uuid.uuid4()), str(uuid.uuid4())
+
+    fxe.container_id = c1_id
+    fxe.register_function(noop)
+    fxe.container_id = c2_id
+    fxe.register_function(noop)
+    with pytest.raises(ValueError, match="already registered"):
+        fxe.register_function(noop)
 
 
 def test_map_raises(fxexecutor):
