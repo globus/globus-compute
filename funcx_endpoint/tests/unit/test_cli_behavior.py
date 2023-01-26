@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shlex
 from unittest import mock
 
@@ -81,6 +82,45 @@ def test_start_endpoint_existing_ep(run_line, mock_cli_state, make_endpoint_dir)
     run_line("start foo")
     mock_ep, _ = mock_cli_state
     mock_ep.start_endpoint.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "reg_data",
+    [
+        (False, "..."),
+        (False, "()"),
+        (False, json.dumps([1, 2, 3])),
+        (False, json.dumps("abc")),
+        (True, json.dumps({"a": 1})),
+        (True, json.dumps({})),
+    ],
+)
+def test_start_ep_reads_stdin(
+    mocker, run_line, mock_cli_state, make_endpoint_dir, reg_data
+):
+    data_is_valid, reg_info = reg_data
+
+    mock_log = mocker.patch("funcx_endpoint.cli.log")
+    mock_sys = mocker.patch("funcx_endpoint.cli.sys")
+    mock_sys.stdin.closed = False
+    mock_sys.stdin.isatty.return_value = False
+    mock_sys.stdin.read.return_value = reg_info
+
+    make_endpoint_dir("foo")
+
+    run_line("start foo")
+    mock_ep, _ = mock_cli_state
+    assert mock_ep.start_endpoint.called
+    reg_info_found = mock_ep.start_endpoint.call_args[0][-1]
+
+    if data_is_valid:
+        assert reg_info_found == json.loads(reg_info)
+
+    else:
+        assert mock_log.debug.called
+        a, k = mock_log.debug.call_args
+        assert "Invalid registration info on stdin" in a[0]
+        assert reg_info_found == {}
 
 
 @mock.patch("funcx_endpoint.cli.read_config")
