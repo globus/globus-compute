@@ -64,7 +64,7 @@ def test_start_endpoint_ep_locked(mocker, fs, randomstring, patch_funcx_client):
 
     ep = endpoint.Endpoint()
     with pytest.raises(SystemExit):
-        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
+        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
     args, kwargs = mock_log.warning.call_args
     assert "blocked" in args[0]
     assert reason_msg in args[0]

@@ -163,6 +163,7 @@ class Endpoint:
         endpoint_config: Config,
         log_to_console: bool,
         no_color: bool,
+        reg_info: dict,
     ):
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.executors:
@@ -170,8 +171,6 @@ class Endpoint:
                 f"Endpoint config file at {endpoint_dir} is missing "
                 "executor definitions"
             )
-
-        fx_client = Endpoint.get_funcx_client(endpoint_config)
 
         pid_check = Endpoint.check_pidfile(endpoint_dir)
         # if the pidfile exists, we should return early because we don't
@@ -225,49 +224,55 @@ class Endpoint:
 
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
-        reg_info = None
-        endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(
-            endpoint_dir, endpoint_uuid
-        )
-        log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
-        try:
-            reg_info = fx_client.register_endpoint(
-                endpoint_dir.name,
-                endpoint_uuid,
-                metadata=metadata,
-                multi_tenant=endpoint_config.multi_tenant,
+        if not reg_info:
+            endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(
+                endpoint_dir, endpoint_uuid
             )
+            log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
+            try:
+                fx_client = Endpoint.get_funcx_client(endpoint_config)
+                reg_info = fx_client.register_endpoint(
+                    endpoint_dir.name,
+                    endpoint_uuid,
+                    metadata=metadata,
+                    multi_tenant=endpoint_config.multi_tenant,
+                )
 
-        except GlobusAPIError as e:
-            if e.http_status < 500:
+            except GlobusAPIError as e:
                 if e.http_status == 409 or e.http_status == 423:
                     # RESOURCE_CONFLICT or RESOURCE_LOCKED
                     log.warning(f"Endpoint registration blocked.  [{e.message}]")
                     exit(os.EX_UNAVAILABLE)
-            raise
+                raise
 
-        except NetworkError as e:
-            # the output of a NetworkError exception is huge and unhelpful, so
-            # it seems better to just stringify it here and get a concise error
-            log.exception(
-                f"Caught exception while attempting endpoint registration: {e}"
-            )
-            log.critical(
-                "funcx-endpoint is unable to reach the funcX service due to a "
-                "NetworkError \n"
-                "Please make sure that the funcX service address you provided is "
-                "reachable \n"
-                "and then attempt restarting the endpoint"
-            )
-            exit(os.EX_TEMPFAIL)
+            except NetworkError as e:
+                # the output of a NetworkError exception is huge and unhelpful, so
+                # it seems better to just stringify it here and get a concise error
+                log.exception(
+                    f"Caught exception while attempting endpoint registration: {e}"
+                )
+                log.critical(
+                    "funcx-endpoint is unable to reach the funcX service due to a "
+                    "NetworkError \n"
+                    "Please make sure that the funcX service address you provided is "
+                    "reachable \n"
+                    "and then attempt restarting the endpoint"
+                )
+                exit(os.EX_TEMPFAIL)
 
-        ret_ep_uuid = reg_info.get("endpoint_id")
-        if ret_ep_uuid != endpoint_uuid:
-            log.error(
-                "Unexpected response from server: mismatched endpoint id."
-                f"\n  Expected: {endpoint_uuid}, received: {ret_ep_uuid}"
-            )
-            exit(os.EX_SOFTWARE)
+            ret_ep_uuid = reg_info.get("endpoint_id")
+            if ret_ep_uuid != endpoint_uuid:
+                log.error(
+                    "Unexpected response from server: mismatched endpoint id."
+                    f"\n  Expected: {endpoint_uuid}, received: {ret_ep_uuid}"
+                )
+                exit(os.EX_SOFTWARE)
+
+        try:
+            endpoint_uuid = reg_info["endpoint_id"]
+        except KeyError:
+            log.error("Invalid credential structure")
+            exit(os.EX_DATAERR)
 
         # sanitize passwords in logs
         log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))

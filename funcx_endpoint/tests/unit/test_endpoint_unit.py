@@ -121,7 +121,7 @@ def test_start_endpoint(
     uname, pword = randomstring(), randomstring()
     register_endpoint_response(endpoint_id=ep_id, username=uname, password=pword)
 
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
 
     assert mock_epinterchange.called
     assert mock_daemon.DaemonContext.called
@@ -157,7 +157,9 @@ def test_register_endpoint_invalid_response(
 
     register_endpoint_response(endpoint_id=other_endpoint_id)
     with pytest.raises(SystemExit) as pytest_exc:
-        ep.start_endpoint(ep_dir, endpoint_uuid, ep_conf, log_to_console, no_color)
+        ep.start_endpoint(
+            ep_dir, endpoint_uuid, ep_conf, log_to_console, no_color, reg_info={}
+        )
     assert pytest_exc.value.code == os.EX_SOFTWARE
     assert "mismatched endpoint id" in mock_log.error.call_args[0][0]
     assert "Expected" in mock_log.error.call_args[0][0]
@@ -184,7 +186,7 @@ def test_register_endpoint_locked_error(
     ep_id = str(uuid.uuid4())
     register_endpoint_failure_response(endpoint_id=ep_id, status_code=423)
     with pytest.raises(SystemExit) as pytest_exc:
-        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
+        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
     assert pytest_exc.value.code == os.EX_UNAVAILABLE
 
 
@@ -212,7 +214,7 @@ def test_register_endpoint_multi_tenant(
     if multi_tenant is not None:
         ep_conf.multi_tenant = multi_tenant
 
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
 
     assert mock_epinterchange.called
     assert mock_daemon.DaemonContext.called
@@ -344,7 +346,7 @@ def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env
     mock_spt.setproctitle.side_effect = StopIteration("Sentinel")
 
     with pytest.raises(StopIteration, match="Sentinel"):
-        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color)
+        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
 
     a, _k = mock_spt.setproctitle.call_args
     assert a[0].startswith("funcX Endpoint"), "Expect easily identifiable process name"
@@ -354,3 +356,29 @@ def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env
     else:
         assert f" - {env}" in a[0], "Expected environment name in title"
     assert a[0].endswith(f"[{orig_proc_title}]"), "Save original cmdline for debugging"
+
+
+def test_endpoint_needs_no_fxclient_if_reg_info(mocker, fs, randomstring, mock_ep_data):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_id = str(uuid.uuid4())
+
+    mock_fxc = mocker.Mock()
+    mock_fxc.register_endpoint.return_value = {"endpoint_id": ep_id}
+    mock_get_funcx_client = mocker.patch(
+        f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_fxc
+    )
+    mock_daemon = mocker.patch(f"{_mock_base}daemon")
+    mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
+
+    reg_info = {"endpoint_id": ep_id}
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+
+    assert mock_epinterchange.called, "Has registration, should start."
+    assert mock_daemon.DaemonContext.called
+    assert not mock_get_funcx_client.called, "No need for FXClient!"
+
+    reg_info.clear()
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+    assert mock_epinterchange.called, "Has registration, should start."
+    assert mock_daemon.DaemonContext.called
+    assert mock_get_funcx_client.called, "Need registration info, need FXClient"

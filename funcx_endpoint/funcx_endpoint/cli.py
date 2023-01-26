@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
 import pathlib
+import sys
 
 import click
 from click import ClickException
@@ -330,9 +332,24 @@ def _do_start_endpoint(
     log_to_console: bool,
     no_color: bool,
 ):
+    reg_info = {}
+    if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
+        try:
+            stdin_data = json.loads(sys.stdin.read())
+            if not isinstance(stdin_data, dict):
+                type_name = stdin_data.__class__.__name__
+                raise ValueError(
+                    "Expecting JSON dictionary with endpoint registration info; got"
+                    f" {type_name} instead"
+                )
+            reg_info = stdin_data
+        except Exception as e:
+            exc_type = e.__class__.__name__
+            log.debug("Invalid registration info on stdin -- (%s) %s", exc_type, e)
+
     ep_dir = get_config_dir() / name
     get_cli_endpoint().start_endpoint(
-        ep_dir, endpoint_uuid, read_config(ep_dir), log_to_console, no_color
+        ep_dir, endpoint_uuid, read_config(ep_dir), log_to_console, no_color, reg_info
     )
 
 
