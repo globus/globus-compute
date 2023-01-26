@@ -176,7 +176,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._tasks_to_send: queue.Queue[
             tuple[FuncXFuture, TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
-        self._function_registry: dict[t.Callable, str] = {}
+        self._function_registry: dict[tuple[t.Callable, str | None], str] = {}
 
         self._stopped = False
         self._stopped_in_error = False
@@ -221,6 +221,9 @@ class FuncXExecutor(concurrent.futures.Executor):
     def task_group_id(self, task_group_id: str):
         self._task_group_id = task_group_id
 
+    def _fn_cache_key(self, fn: t.Callable):
+        return (fn, self.container_id)
+
     def register_function(
         self, fn: t.Callable, function_id: str | None = None, **func_register_kwargs
     ) -> str:
@@ -259,27 +262,29 @@ class FuncXExecutor(concurrent.futures.Executor):
             err_fmt = "%s is shutdown; refusing to register function"
             raise RuntimeError(err_fmt % repr(self))
 
-        if fn in self._function_registry:
+        fn_cache_key = self._fn_cache_key(fn)
+        if fn_cache_key in self._function_registry:
             msg = f"Function already registered as function id: {function_id}"
             log.error(msg)
             self.shutdown(wait=False, cancel_futures=True)
             raise ValueError(msg)
 
         if function_id:
-            self._function_registry[fn] = function_id
+            self._function_registry[fn_cache_key] = function_id
             return function_id
 
         log.debug("Function not registered. Registering: %s", fn)
-        func_register_kwargs.pop("function", None)
-        reg_kwargs = {"function_name": fn.__name__}
+        func_register_kwargs.pop("function", None)  # just to be sure
+        reg_kwargs = {"function_name": fn.__name__, "container_uuid": self.container_id}
         reg_kwargs.update(func_register_kwargs)
+
         try:
             func_reg_id = self.funcx_client.register_function(fn, **reg_kwargs)
         except Exception:
             log.error(f"Unable to register function: {fn.__name__}")
             self.shutdown(wait=False, cancel_futures=True)
             raise
-        self._function_registry[fn] = func_reg_id
+        self._function_registry[fn_cache_key] = func_reg_id
         log.debug("Function registered with id: %s", func_reg_id)
         return func_reg_id
 
@@ -313,10 +318,11 @@ class FuncXExecutor(concurrent.futures.Executor):
             err_fmt = "%s is shutdown; no new functions may be executed"
             raise RuntimeError(err_fmt % repr(self))
 
-        if fn not in self._function_registry:
+        fn_cache_key = self._fn_cache_key(fn)
+        if fn_cache_key not in self._function_registry:
             self.register_function(fn)
 
-        fn_id = self._function_registry[fn]
+        fn_id = self._function_registry[fn_cache_key]
         return self.submit_to_registered_function(
             function_id=fn_id, args=args, kwargs=kwargs
         )
