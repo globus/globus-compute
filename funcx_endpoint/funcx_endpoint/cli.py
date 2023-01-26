@@ -8,6 +8,7 @@ import click
 from click import ClickException
 
 from funcx.sdk.login_manager import LoginManager
+from funcx.sdk.login_manager.whoami import print_whoami_info
 from funcx_endpoint.endpoint.utils.config import Config
 
 from .endpoint.endpoint import Endpoint
@@ -221,6 +222,20 @@ def logout_endpoints(force: bool):
             # Generic unsuccessful if no reason was given
             msg = "Logout unsuccessful"
         raise ClickException(msg)
+
+
+@app.command("whoami", help="Show the currently logged-in identity")
+@click.option(
+    "--linked-identities",
+    is_flag=True,
+    default=False,
+    help="Also show identities linked to the currently logged-in primary identity.",
+)
+def whoami(linked_identities: bool) -> None:
+    try:
+        print_whoami_info(linked_identities)
+    except ValueError as ve:
+        raise ClickException(str(ve))
 
 
 def _do_logout_endpoints(
