@@ -9,7 +9,7 @@ repos:
     - id: check-merge-conflict
     - id: trailing-whitespace
 - repo: https://github.com/python-jsonschema/check-jsonschema
-  rev: 0.20.0
+  rev: 0.21.0
   hooks:
     - id: check-github-workflows
 - repo: https://github.com/psf/black
