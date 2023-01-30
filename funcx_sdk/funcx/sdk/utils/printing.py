@@ -35,9 +35,6 @@ def print_table(
     table.set_max_width(shutil.get_terminal_size().columns)
 
     for row in table_rows:
-        if len(row) < max_columns:
-            table.add_row(row + ["" for i in range(max_columns - len(row))])
-        else:
-            table.add_row(row)
+        table.add_row(row + [""] * (max_columns - len(row)))
 
     print(table.draw(), file=output_file)
