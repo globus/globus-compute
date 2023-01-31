@@ -3,6 +3,45 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.9:
+
+funcx & funcx-endpoint v1.0.9
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- 'whoami' has been added to the cli to show the current logged in
+  identity and linked identities.
+    * A --linked-identities optional argument shows all linked identities
+    * ie. `funcx-endpoint whoami` or `funcx-endpoint whoami --linked-identities`
+
+Bug Fixes
+^^^^^^^^^
+
+- FuncXExecutor no longer ignores the specified ``container_id``.  The same
+  function may now be utilized in containers via the normal workflow:
+
+    .. code-block:: python
+        import funcx
+
+        def some_func():
+            return 1
+        with funcx.FuncXExecutor() as fxe:
+            fxe.endpoint_id = "some-endpoint-uuid"
+            fxe.container_id = "some-container_uuid"
+            fxe.submit(some_func)
+            fxe.container_id = "some-other-container-uuid"
+            fxe.submit(some_func)  # same function, different container!
+            # ...
+
+Changed
+^^^^^^^
+
+- Initiate shutdown of any currently running FuncXExecutor objects when the main
+  thread ends (a.k.a., "end of script").  This follows the same behavior as
+  both ``ThreadPoolExecutor`` and ``ProcessPoolExecutor``.
+
 .. _changelog-1.0.8:
 
 funcx & funcx-endpoint v1.0.8
