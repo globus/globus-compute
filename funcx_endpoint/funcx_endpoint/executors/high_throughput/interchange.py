@@ -992,22 +992,24 @@ class Interchange:
                     now,
                 )
                 log.warning(f"Too many heartbeats missed for manager {manager!r}")
-                for tid in self._ready_manager_queue[manager]["tasks"].values():
-                    try:
-                        raise ManagerLost(manager)
-                    except Exception:
-                        result_package = {
-                            "task_id": tid,
-                            "exception": get_error_string(),
-                            "error_details": get_result_error_details(),
-                        }
-                        pkl_package = dill.dumps(result_package)
-                        bad_manager_msgs.append(pkl_package)
-                log.warning(f"Sent failure reports, unregistering manager {manager!r}")
+                for tasks in self._ready_manager_queue[manager]["tasks"].values():
+                    for tid in tasks:
+                        try:
+                            raise ManagerLost(manager)
+                        except Exception:
+                            result_package = {
+                                "task_id": tid,
+                                "exception": get_error_string(),
+                                "error_details": get_result_error_details(),
+                            }
+                            pkl_package = dill.dumps(result_package)
+                            bad_manager_msgs.append(pkl_package)
+                log.warning(f"Unregistering manager {manager!r}")
                 self._ready_manager_queue.pop(manager, None)
                 if manager in interesting_managers:
                     interesting_managers.remove(manager)
             if bad_manager_msgs:
+                log.warning(f"Sending task failure reports of manager {manager!r}")
                 self.results_outgoing.send(dill.dumps(bad_manager_msgs))
             log.trace("ending one main loop iteration")
 
