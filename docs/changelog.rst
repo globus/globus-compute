@@ -3,6 +3,16 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.10:
+
+funcx & funcx-endpoint v1.0.10
+------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fix idle-executor handling in manager that was broken in v1.0.9
+
 .. _changelog-1.0.9:
 
 funcx & funcx-endpoint v1.0.9
