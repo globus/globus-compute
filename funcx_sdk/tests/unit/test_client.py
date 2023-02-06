@@ -201,7 +201,6 @@ def test_batch_error():
 
 @pytest.mark.parametrize("asynchronous", [True, False, None])
 def test_single_run_websocket_queue_depend_async(asynchronous):
-
     if asynchronous is None:
         fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     else:

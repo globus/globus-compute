@@ -13,13 +13,11 @@ class RemoteExceptionWrapper:
     def __init__(
         self, e_type: type, e_value: Exception, traceback: TracebackType
     ) -> None:
-
         self.e_type = dill.dumps(e_type)
         self.e_value = dill.dumps(e_value)
         self.e_traceback = Traceback(traceback)
 
     def reraise(self) -> None:
-
         t = dill.loads(self.e_type)
 
         # the type is logged here before deserialising v and tb

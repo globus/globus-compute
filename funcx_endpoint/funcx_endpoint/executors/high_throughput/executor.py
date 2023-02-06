@@ -519,7 +519,6 @@ class HighThroughputExecutor(RepresentationMixin):
                 return
 
             else:
-
                 if msgs is None:
                     log.debug("Got None, exiting")
                     return
@@ -881,7 +880,6 @@ FINISHED = "FINISHED"
 
 class HTEXFuture(concurrent.futures.Future):
     def __init__(self, executor):
-
         super().__init__()
         self.executor = executor
 

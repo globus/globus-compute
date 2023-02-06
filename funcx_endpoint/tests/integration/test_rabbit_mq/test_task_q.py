@@ -11,7 +11,6 @@ from funcx_endpoint.endpoint.rabbit_mq import TaskQueueSubscriber
 
 
 def test_synch(start_task_q_publisher, start_task_q_subscriber, count=10):
-
     """Open publisher, and publish to task_q, then open subscriber a fetch"""
     task_q_pub = start_task_q_publisher()
 

@@ -111,7 +111,6 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self._connection.ioloop.stop()
 
         if self.status is SubscriberProcessStatus.running:
-
             # Create a new connection
             self._connection = self._connect()
 

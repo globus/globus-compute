@@ -131,7 +131,7 @@ class FuncXClient:
             task_group_id and str(task_group_id) or str(uuid.uuid4())
         )
 
-        for (arg, name) in [
+        for arg, name in [
             (openid_authorizer, "openid_authorizer"),
             (fx_authorizer, "fx_authorizer"),
             (search_authorizer, "search_authorizer"),

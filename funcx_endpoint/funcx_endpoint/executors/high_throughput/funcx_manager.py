@@ -340,7 +340,6 @@ class Manager:
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
-
                 # If we want to wrap the task_incoming polling into a separate function,
                 # we need to
                 #   self.poll_task_incoming(
@@ -554,7 +553,6 @@ class Manager:
                             and not self.worker_map.worker_queues[task_type].qsize()
                             == 0
                         ):
-
                             log.debug(
                                 "Task type {} has task queue size {}".format(
                                     task_type, self.task_queues[task_type].qsize()
@@ -771,7 +769,6 @@ class Manager:
 
 
 def cli_run():
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-d", "--debug", action="store_true", help="Count of apps to launch"
