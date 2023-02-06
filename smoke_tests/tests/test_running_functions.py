@@ -64,7 +64,6 @@ def test_batch(fxc, endpoint):
 
 
 def test_wait_on_new_hello_world_func(fxc, endpoint):
-
     func_id = fxc.register_function(ohai)
     task_id = fxc.run(endpoint_id=endpoint, function_id=func_id)
 
@@ -101,7 +100,6 @@ def test_executor(fxc, endpoint, tutorial_function_id):
 
     with FuncXExecutor(endpoint_id=endpoint, funcx_client=fxc) as fxe:
         for _ in range(submit_count):
-
             futures = [
                 fxe.submit_to_registered_function(tutorial_function_id)
                 for _ in range(num_tasks)

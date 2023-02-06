@@ -58,7 +58,6 @@ class FuncXWorker:
         worker_type="RAW",
         result_size_limit=DEFAULT_RESULT_SIZE_LIMIT_B,
     ):
-
         self.worker_id = worker_id
         self.address = address
         self.port = port

@@ -95,7 +95,6 @@ class Task(Message):
         self.raw_buffer = raw_buffer
 
     def pack(self) -> bytes:
-
         if self.raw_buffer is None:
             # a type:ignore is needed here
             # task_buffer might be a str  or it might be a bytes (see `unpack`)

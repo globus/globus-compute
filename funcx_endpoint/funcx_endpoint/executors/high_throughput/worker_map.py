@@ -166,7 +166,6 @@ class WorkerMap:
                 self.total_worker_type_counts["unused"],
             )
             for _ in range(num_slots):
-
                 try:
                     proc = self.add_worker(
                         worker_id=str(self.worker_id_counter),
@@ -434,7 +433,6 @@ class WorkerMap:
                 worker_type, 0
             ) + self.pending_worker_type_counts.get(worker_type, 0)
             if new_worker_map[worker_type] > cur_workers:
-
                 for _i in range(new_worker_map[worker_type] - cur_workers):
                     # Add worker
                     new_worker_list.append(worker_type)
