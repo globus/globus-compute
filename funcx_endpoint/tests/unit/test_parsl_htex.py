@@ -93,7 +93,6 @@ def test_executor_basic_submit(x, parsl_htex_executor, proc_pool_executor):
 
 
 def test_proc_pool_basic_submit_raw(parsl_htex_executor):
-
     q = parsl_htex_executor.results_passthrough
     task_id = uuid.uuid1()
     serializer = FuncXSerializer()
@@ -115,7 +114,6 @@ def test_proc_pool_basic_submit_raw(parsl_htex_executor):
 
 
 def test_parsl_htex_basic(parsl_htex_executor):
-
     q = parsl_htex_executor.results_passthrough
     task_id = uuid.uuid1()
     serializer = FuncXSerializer()

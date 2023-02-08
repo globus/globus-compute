@@ -42,7 +42,6 @@ class ParslHTEX(HighThroughputExecutor):
         self.results_passthrough.put(future.result())
 
     def submit_raw(self, packed_task: bytes) -> Future:
-
         unpacked_task: Task = messagepack.unpack(packed_task)
         future = self.submit(execute_task, {}, unpacked_task.task_id, packed_task)
 
