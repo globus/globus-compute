@@ -90,7 +90,16 @@ class Endpoint:
         :param multi_tenant bool Whether the endpoint is a multi-user endpoint
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
-        endpoint_dir.mkdir(parents=True, exist_ok=True)
+        user_umask = os.umask(0o0077)
+        os.umask(0o0077 | (user_umask & 0o0400))  # honor only the UR bit for dirs
+        try:
+            # pathlib.Path does not handle unusual umasks (e.g., 0o0111) so well
+            # in the parents=True case, so temporarily change it.  This is nominally
+            # only an issue for totally new users (no .funcx/!), but that is also
+            # precisely the interaction -- the first one -- that should go smoothly
+            endpoint_dir.mkdir(parents=True, exist_ok=True)
+        finally:
+            os.umask(user_umask)
 
         config_target_path = Endpoint._config_file_path(endpoint_dir)
 

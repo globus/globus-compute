@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import io
 import json
@@ -98,6 +100,21 @@ def mock_ep_buf():
         Endpoint.print_endpoint_table, conf_dir="unused", ofile=buf
     )
     yield buf
+
+
+@pytest.fixture
+def umask():
+    orig_umask = os.umask(0)
+    os.umask(orig_umask)
+
+    def _wrapped_umask(new_umask: int | None) -> int:
+        if new_umask is None:
+            return orig_umask
+        return os.umask(new_umask)
+
+    yield _wrapped_umask
+
+    os.umask(orig_umask)
 
 
 @responses.activate
@@ -382,3 +399,20 @@ def test_endpoint_needs_no_fxclient_if_reg_info(mocker, fs, randomstring, mock_e
     assert mock_epinterchange.called, "Has registration, should start."
     assert mock_daemon.DaemonContext.called
     assert mock_get_funcx_client.called, "Need registration info, need FXClient"
+
+
+def test_endpoint_sets_owner_only_access(tmp_path, umask):
+    umask(0)
+    ep_dir = tmp_path / "new_endpoint_dir"
+    Endpoint.init_endpoint_dir(ep_dir)
+
+    # assert ep_dir.stat() & 0o77 == 0, "Expected no group or other access"
+    assert ep_dir.stat().st_mode & 0o777 == 0o700, "Expected user-only access"
+
+
+def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
+    umask(0o777)  # No access whatsoever
+    ep_dir = tmp_path / "new_endpoint_dir"
+    Endpoint.init_endpoint_dir(ep_dir)
+
+    assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
