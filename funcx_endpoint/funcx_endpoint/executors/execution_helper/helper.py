@@ -1,9 +1,10 @@
 import logging
 import time
+import typing as t
 import uuid
 
 from funcx_common import messagepack
-from funcx_common.messagepack.message_types import Result, TaskTransition
+from funcx_common.messagepack.message_types import Result, Task, TaskTransition
 from funcx_common.tasks import ActorName, TaskState
 
 from funcx.errors import MaxResultSizeExceeded
@@ -17,9 +18,7 @@ log = logging.getLogger(__name__)
 serializer = FuncXSerializer()
 
 
-def execute_task(
-    task_id: uuid.UUID, task_body: bytes, result_size_limit: int = 10 * 1024 * 1024
-) -> bytes:
+def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) -> bytes:
     """
 
     Parameters
@@ -33,21 +32,25 @@ def execute_task(
     messagepack packed Result
 
     """
-    log.debug("executing task task_id='%s'", task_id)
     exec_start = TaskTransition(
         timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
     )
 
+    result_message: dict[
+        str,
+        t.Union[uuid.UUID, str, tuple[str, str], list[TaskTransition], dict[str, str]],
+    ] = {}
+
     try:
-        result = call_user_function(task_body, result_size_limit=result_size_limit)
+        task, task_buffer = unpack_messagebody(task_body)
+        log.debug("executing task task_id='%s'", task.task_id)
+        result = call_user_function(task_buffer, result_size_limit=result_size_limit)
     except Exception:
         log.exception("Caught an exception while executing user function")
         code, user_message = get_result_error_details()
         error_details = {"code": code, "user_message": user_message}
-        result_message: dict[
-            str, str | tuple[str, str] | list[TaskTransition] | dict[str, str]
-        ] = dict(
-            task_id=task_id,
+        result_message = dict(
+            task_id=task.task_id,
             data=get_error_string(),
             exception=get_error_string(),
             error_details=error_details,
@@ -55,7 +58,7 @@ def execute_task(
 
     else:
         log.debug("Execution completed without exception")
-        result_message = dict(task_id=task_id, data=result)
+        result_message = dict(task_id=task.task_id, data=result)
 
     exec_end = TaskTransition(
         timestamp=time.time_ns(),
@@ -67,37 +70,60 @@ def execute_task(
 
     log.debug(
         "task %s completed in %d ns",
-        task_id,
+        task.task_id,
         (exec_end.timestamp - exec_start.timestamp),
     )
 
     return messagepack.pack(Result(**result_message))
 
 
-def call_user_function(
-    message: bytes, result_size_limit: int, serializer=serializer
-) -> str:
-    """Deserialize the buffer and execute the task.
+def unpack_messagebody(message: bytes) -> t.Tuple[Task, str]:
+    """Unpack messagebody as a messagepack message with
+    some legacy handling
 
-    Returns the result or throws exception.
+    Parameters
+    ----------
+    message: messagepack'ed message body
+
+    Returns
+    -------
+    tuple(task, task_buffer)
+
     """
-    # try to unpack it as a messagepack message
     try:
         task = messagepack.unpack(message)
         if not isinstance(task, messagepack.message_types.Task):
             raise CouldNotExecuteUserTaskError(
                 f"wrong type of message in worker: {type(task)}"
             )
-        task_data = task.task_buffer
+        task_buffer = task.task_buffer
     # on parse errors, failover to trying the "legacy" message reading
     except (
         messagepack.InvalidMessageError,
         messagepack.UnrecognizedProtocolVersion,
     ):
         task = Message.unpack(message)
-        task_data = task.task_buffer.decode("utf-8")  # type: ignore[attr-defined]
+        assert isinstance(task, Task)
+        task_buffer = task.task_buffer.decode("utf-8")  # type: ignore[attr-defined]
+    return task, task_buffer
 
-    f, args, kwargs = serializer.unpack_and_deserialize(task_data)
+
+def call_user_function(
+    task_buffer: str, result_size_limit: int, serializer=serializer
+) -> str:
+    """Deserialize the buffer and execute the task.
+
+    Parameters
+    ----------
+    task_buffer: serialized buffer of (fn, args, kwargs)
+    result_size_limit: size limit in bytes for results
+    serializer: serializer for the buffers
+
+    Returns
+    -------
+    Returns serialized result or throws exception.
+    """
+    f, args, kwargs = serializer.unpack_and_deserialize(task_buffer)
     result_data = f(*args, **kwargs)
     serialized_data = serializer.serialize(result_data)
 

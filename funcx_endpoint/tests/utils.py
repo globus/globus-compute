@@ -13,3 +13,16 @@ def try_for_timeout(
             return True
         time.sleep(check_period_s)
     return False
+
+
+def ez_pack_function(serializer, func, args, kwargs):
+    serialized_func = serializer.serialize(func)
+    serialized_args = serializer.serialize(args)
+    serialized_kwargs = serializer.serialize(kwargs)
+    return serializer.pack_buffers(
+        [serialized_func, serialized_args, serialized_kwargs]
+    )
+
+
+def double(x: int) -> int:
+    return x * 2
