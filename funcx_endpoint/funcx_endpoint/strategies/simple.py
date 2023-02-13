@@ -76,10 +76,10 @@ class SimpleStrategy(BaseStrategy):
         active_blocks = running + pending
         active_slots = active_blocks * tasks_per_node * nodes_per_block
 
-        status = str(status)
+        status = "; ".join(str(js) for js in status)
         if status != self._prev_status:
             self._prev_status = status
-            log.debug(f"Provider status: {status}")
+            log.debug(f"Provider states: {status}")
 
         cur_info = (
             active_tasks,
