@@ -111,7 +111,7 @@ def test_start_ep_reads_stdin(
     run_line("start foo")
     mock_ep, _ = mock_cli_state
     assert mock_ep.start_endpoint.called
-    reg_info_found = mock_ep.start_endpoint.call_args[0][-1]
+    reg_info_found = mock_ep.start_endpoint.call_args[0][5]
 
     if data_is_valid:
         assert reg_info_found == json.loads(reg_info)

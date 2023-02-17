@@ -173,6 +173,7 @@ class Endpoint:
         log_to_console: bool,
         no_color: bool,
         reg_info: dict,
+        die_with_parent: bool = False,
     ):
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.executors:
@@ -301,6 +302,10 @@ class Endpoint:
         ptitle += f" [{setproctitle.getproctitle()}]"
         setproctitle.setproctitle(ptitle)
 
+        parent_pid = 0
+        if die_with_parent:
+            parent_pid = os.getppid()
+
         log.info("Launching endpoint daemon process")
 
         # NOTE
@@ -328,6 +333,7 @@ class Endpoint:
                 endpoint_config,
                 reg_info,
                 result_store,
+                parent_pid,
             )
 
     @staticmethod
@@ -337,6 +343,7 @@ class Endpoint:
         endpoint_config: Config,
         reg_info,
         result_store: ResultStore,
+        parent_pid: int,
     ):
         interchange = EndpointInterchange(
             config=endpoint_config,
@@ -345,6 +352,7 @@ class Endpoint:
             endpoint_dir=endpoint_dir,
             result_store=result_store,
             logdir=endpoint_dir,
+            parent_pid=parent_pid,
         )
 
         interchange.start()
