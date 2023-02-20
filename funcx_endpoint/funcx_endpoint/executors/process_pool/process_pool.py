@@ -2,29 +2,46 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
+import threading
+import typing as t
 import uuid
 from concurrent.futures import Future
 from concurrent.futures import ProcessPoolExecutor as NativeProcessPoolExecutor
+from multiprocessing.queues import Queue as mpQueue
 
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import Task
-from parsl.executors.status_handling import NoStatusHandlingExecutor
+import psutil
+from funcx_common.messagepack.message_types import EPStatusReport, TaskTransition
 
-from funcx_endpoint.executors.execution_helper.helper import execute_task
+from funcx_endpoint.executors.base import GCExecutorBase, ReportingThread
 
 logger = logging.getLogger(__name__)
 
 
-class ProcessPoolExecutor(NoStatusHandlingExecutor):
-    def __init__(self, *args, **kwargs):
+class ProcessPoolExecutor(GCExecutorBase):
+    def __init__(
+        self,
+        *args,
+        label: str = "ProcessPoolExecutor",
+        heartbeat_period: float = 30.0,
+        **kwargs,
+    ):
+        self.label = label
         self.executor = NativeProcessPoolExecutor(*args, **kwargs)
-        self.results_passthrough: multiprocessing.Queue | None = None
+        self._status_report_thread: t.Optional[threading.Thread] = None
+        super().__init__(*args, heartbeat_period=heartbeat_period, **kwargs)
 
-    def start(self, results_passthrough: multiprocessing.Queue, run_dir=None) -> None:
+    def start(
+        self,
+        endpoint_id: uuid.UUID,
+        *args,
+        results_passthrough: t.Optional[mpQueue] = None,
+        **kwargs,
+    ) -> None:
         """
 
         Parameters
         ----------
+        endpoint_id: Endpoint UUID
         results_passthrough: Queue to which packed results will be posted
         run_dir Not used
 
@@ -32,58 +49,62 @@ class ProcessPoolExecutor(NoStatusHandlingExecutor):
         -------
 
         """
-        self.results_passthrough = results_passthrough
-        return
+        self.endpoint_id = endpoint_id
+        if results_passthrough:
+            self.results_passthrough = results_passthrough
+        assert self.results_passthrough
+        self._status_report_thread = ReportingThread(
+            target=self.report_status, args=[], reporting_period=self._heartbeat_period
+        )
 
-    def _future_done_callback(self, future: Future):
-        """Callback to post result to the passthrough queue
+        self._status_report_thread.start()
 
-        Parameters
-        ----------
-        future: Future for which the callback is triggerd
+    def get_status_report(self) -> EPStatusReport:
+        """
+        endpoint_id: uuid.UUID
+        ep_status_report: t.Dict[str, t.Any]
+        task_statuses: t.Dict[str, t.List[TaskTransition]]
 
         Returns
         -------
-        None
 
         """
-        logger.warning(f"[YADU] task:{future.task_id} completed")
-        self.results_passthrough.put(future.result())
+        executor_status: t.Dict[str, t.Any] = {
+            "task_id": -2,
+            "info": {
+                "total_cores": multiprocessing.cpu_count(),
+                "total_mem": round(psutil.virtual_memory().available / (2**30), 1),
+                "total_core_hrs": 0,
+                "total_workers": self.executor._max_workers,
+                "pending_tasks": 0,
+                "outstanding_tasks": 0,
+                "scaling_enabled": False,
+                "max_blocks": 1,
+                "min_blocks": 1,
+                "max_workers_per_node": self.executor._max_workers,
+                "nodes_per_block": 1,
+                "heartbeat_period": self._heartbeat_period,
+            },
+        }
+        task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}
 
-    def submit(self, func, resource_specification: dict, *args, **kwargs) -> Future:
-        """submits func to the executor and returns a future
-        Parameters
-        ----------
-        func: Callable to be executed
-        resource_specification: This resource_spec dict is added only to match
-            Parsl's interface
-        args
-        kwargs
+        return EPStatusReport(
+            endpoint_id=self.endpoint_id,
+            ep_status_report=executor_status,
+            task_statuses=task_status_deltas,
+        )
 
-        Returns
-        -------
-        future
+    def submit(
+        self,
+        func: t.Callable,
+        *args: t.Any,
+        **kwargs: t.Any,
+    ) -> Future:
+        """We basically pass all params except the resource_specification
+        over to executor.submit
         """
-        logger.warning(f"calling {func=} {args=}")
+        logger.warning("Got task")
         return self.executor.submit(func, *args, **kwargs)
-
-    def submit_raw(self, packed_task: bytes) -> Future:
-        """
-
-        Parameters
-        ----------
-        packed_task
-
-        Returns
-        -------
-
-        """
-        unpacked_task: Task = messagepack.unpack(packed_task)
-        future = self.submit(execute_task, {}, unpacked_task.task_id, packed_task)
-
-        future.task_id: uuid.UUID = unpacked_task.task_id
-        future.add_done_callback(self._future_done_callback)
-        return future
 
     def status_polling_interval(self) -> int:
         return 30
@@ -97,13 +118,6 @@ class ProcessPoolExecutor(NoStatusHandlingExecutor):
     def status(self) -> dict:
         return {}
 
-    def shutdown(self) -> bool:
-        return self.executor.shutdown()
-
-
-def double(x):
-    return x * 2
-
-
-p = ProcessPoolExecutor(max_workers=4)
-future = p.submit(double, {}, 5)
+    def shutdown(self):
+        self._status_report_thread.stop()
+        self.executor.shutdown()
