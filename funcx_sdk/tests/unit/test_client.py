@@ -199,6 +199,29 @@ def test_batch_error():
     assert error_reason in str(excinfo)
 
 
+def test_batch_no_reason():
+    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc.web_client = mock.MagicMock()
+
+    error_results = {
+        "response": "batch",
+        "results": [
+            {
+                "http_status_code": 500,
+                "status": "Failed",
+                "task_uuid": "def",
+            },
+        ],
+        "task_group_id": "tg_id",
+    }
+    fxc.web_client.submit = mock.MagicMock(return_value=error_results)
+
+    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+        fxc.run(endpoint_id="fid", function_id="fid")
+
+    assert "Unknown execution failure" in str(excinfo)
+
+
 @pytest.mark.parametrize("asynchronous", [True, False, None])
 def test_single_run_websocket_queue_depend_async(asynchronous):
     if asynchronous is None:

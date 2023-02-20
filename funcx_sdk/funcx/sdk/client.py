@@ -449,7 +449,10 @@ class FuncXClient:
 
                 # Checking for 'Failed' is how FuncxResponseError.unpack
                 # originally checked for errors.
-                raise FuncxTaskExecutionFailed(result.get("reason"))
+
+                # All errors should have 'reason' but just in case
+                error_reason = result.get("reason", "Unknown execution failure")
+                raise FuncxTaskExecutionFailed(error_reason)
 
         if self.asynchronous:
             task_group_id = r["task_group_id"]
