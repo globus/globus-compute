@@ -42,9 +42,12 @@ def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) ->
     ] = {}
 
     try:
-        task, task_buffer = unpack_messagebody(task_body)
+        task, task_buffer = _unpack_messagebody(task_body)
         log.debug("executing task task_id='%s'", task.task_id)
-        result = call_user_function(task_buffer, result_size_limit=result_size_limit)
+        result = _call_user_function(task_buffer, result_size_limit=result_size_limit)
+        log.debug("Execution completed without exception")
+        result_message = dict(task_id=task.task_id, data=result)
+
     except Exception:
         log.exception("Caught an exception while executing user function")
         code, user_message = get_result_error_details()
@@ -55,10 +58,6 @@ def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) ->
             exception=get_error_string(),
             error_details=error_details,
         )
-
-    else:
-        log.debug("Execution completed without exception")
-        result_message = dict(task_id=task.task_id, data=result)
 
     exec_end = TaskTransition(
         timestamp=time.time_ns(),
@@ -77,7 +76,7 @@ def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) ->
     return messagepack.pack(Result(**result_message))
 
 
-def unpack_messagebody(message: bytes) -> t.Tuple[Task, str]:
+def _unpack_messagebody(message: bytes) -> t.Tuple[Task, str]:
     """Unpack messagebody as a messagepack message with
     some legacy handling
 
@@ -108,7 +107,7 @@ def unpack_messagebody(message: bytes) -> t.Tuple[Task, str]:
     return task, task_buffer
 
 
-def call_user_function(
+def _call_user_function(
     task_buffer: str, result_size_limit: int, serializer=serializer
 ) -> str:
     """Deserialize the buffer and execute the task.
