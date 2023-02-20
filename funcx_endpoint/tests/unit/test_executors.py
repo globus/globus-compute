@@ -128,7 +128,6 @@ def test_executor_submit_raw(x, gc_executor, proc_pool_executor):
         ), "Expected bytes from the passthrough_q"
 
         result = messagepack.unpack(packed_result_q)
-        logger.warning(f"Got message: of type {type(result)} {result=} ")
         # Handle a sneaky EPStatusReport that popped in ahead of the result
         if isinstance(result, messagepack.message_types.EPStatusReport):
             continue
