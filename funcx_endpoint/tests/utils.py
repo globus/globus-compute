@@ -26,3 +26,10 @@ def ez_pack_function(serializer, func, args, kwargs):
 
 def double(x: int) -> int:
     return x * 2
+
+
+def slow_double(x: int, sleep_duration_s: int) -> int:
+    import time
+
+    time.sleep(sleep_duration_s)
+    return x * 2
