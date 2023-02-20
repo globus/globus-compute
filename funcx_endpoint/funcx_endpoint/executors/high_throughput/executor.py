@@ -544,13 +544,6 @@ class HighThroughputExecutor(RepresentationMixin):
                                 "Message received does not contain 'task_id' field"
                             )
 
-                        if tid == -2 and "info" in msg:
-                            log.warning(
-                                "[MTHREAD[ Received info response : {}".format(
-                                    msg["info"]
-                                )
-                            )
-
                         if tid == -1 and "exception" in msg:
                             # TODO: This could be handled better we are
                             # essentially shutting down the client with little

@@ -392,7 +392,7 @@ class Interchange:
             log.info("Scaling ...")
             self.scale_out(self.provider.init_blocks)
 
-    def migrate_tasks_to_internal(self, kill_event, status_request=None):
+    def migrate_tasks_to_internal(self, kill_event):
         """Pull tasks from the incoming tasks 0mq pipe onto the internal
         pending task queue
 
@@ -667,13 +667,9 @@ class Interchange:
         count = 0
 
         self._kill_event = threading.Event()
-        self._status_request = threading.Event()
         self._task_puller_thread = threading.Thread(
             target=self.migrate_tasks_to_internal,
-            args=(
-                self._kill_event,
-                self._status_request,
-            ),
+            args=(self._kill_event,),
             name="TASK_PULL_THREAD",
         )
         self._task_puller_thread.start()
@@ -1012,14 +1008,6 @@ class Interchange:
                 log.warning(f"Sending task failure reports of manager {manager!r}")
                 self.results_outgoing.send(dill.dumps(bad_manager_msgs))
             log.trace("ending one main loop iteration")
-
-            if self._status_request.is_set():
-                log.info("status request response")
-                result_package = self.get_status_report()
-                pkl_package = dill.dumps(result_package)
-                self.results_outgoing.send(pkl_package)
-                log.info("Sent info response")
-                self._status_request.clear()
 
         delta = time.time() - start
         log.info(f"Processed {count} tasks in {delta} seconds")
