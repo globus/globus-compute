@@ -21,7 +21,7 @@ def proc_pool_executor():
     ep_id = uuid.uuid4()
     executor = ProcessPoolExecutor(max_workers=2, heartbeat_period=HEARTBEAT_PERIOD)
     queue = multiprocessing.Queue()
-    executor.start(ep_id, run_dir="/tmp", results_passthrough=queue)
+    executor.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
 
     yield executor
     executor.shutdown()
@@ -38,7 +38,7 @@ def gc_executor():
     queue = multiprocessing.Queue()
     tempdir = "/tmp/HTEX_logs"
     os.makedirs(tempdir, exist_ok=True)
-    executor.start(ep_id, run_dir=tempdir, results_passthrough=queue)
+    executor.start(endpoint_id=ep_id, run_dir=tempdir, results_passthrough=queue)
 
     yield executor
     executor.shutdown()

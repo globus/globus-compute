@@ -1,7 +1,6 @@
 import logging
 import multiprocessing
 import os
-import threading
 import typing as t
 import uuid
 from concurrent.futures import Future
@@ -17,30 +16,31 @@ logger = logging.getLogger(__name__)
 class GCExecutor(GCExecutorBase):
     def __init__(
         self,
+        *args,
         label: str = "GCExecutor",
         address: t.Optional[str] = None,
         heartbeat_period: float = 30.0,
-        *args,
         **kwargs,
     ):
         self.address = address
         self.run_dir = os.getcwd()
         self.label = label
-        self._status_report_thread: t.Optional[threading.Thread] = None
-        super().__init__(heartbeat_period=heartbeat_period, *args, **kwargs)
-        self.executor = HighThroughputExecutor(
-            *args, heartbeat_period=round(heartbeat_period + 0.5), **kwargs
+        self._status_report_thread = ReportingThread(
+            target=self.report_status, args=[], reporting_period=heartbeat_period
         )
+        super().__init__(*args, heartbeat_period=heartbeat_period, **kwargs)
+        self.executor = HighThroughputExecutor(*args, **kwargs)
 
     def start(
         self,
-        endpoint_id: uuid.UUID,
         *args,
+        endpoint_id: t.Optional[uuid.UUID] = None,
         run_dir: t.Optional[str] = None,
         results_passthrough: t.Optional[multiprocessing.Queue] = None,
         **kwargs,
     ):
-        assert run_dir, "run_dir is required for ParslHTEX"
+        assert run_dir, "GCExecutor requires kwarg:run_dir at start"
+        assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
         self.run_dir = os.path.join(os.getcwd(), run_dir)
         self.endpoint_id = endpoint_id
         self.executor.provider.script_dir = os.path.join(self.run_dir, "submit_scripts")
@@ -50,10 +50,6 @@ class GCExecutor(GCExecutorBase):
             # a queue is passed in
             self.results_passthrough = results_passthrough
         self.executor.start()
-        self._status_report_thread = ReportingThread(
-            target=self.report_status, args=[], reporting_period=self._heartbeat_period
-        )
-
         self._status_report_thread.start()
 
     def submit(

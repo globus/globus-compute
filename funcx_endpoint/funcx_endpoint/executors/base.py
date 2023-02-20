@@ -3,6 +3,7 @@ import multiprocessing
 import threading
 import time
 import typing as t
+import uuid
 from abc import ABC, abstractmethod
 from concurrent.futures import Future
 
@@ -73,11 +74,11 @@ class GCExecutorBase(ABC):
 
     def __init__(
         self,
-        heartbeat_period: float = 30.0,
-        endpoint_id: str = None,
         *args: object,
+        heartbeat_period: float = 30.0,
+        endpoint_id: t.Optional[uuid.UUID] = None,
         **kwargs: object,
-    ) -> object:
+    ):
         self._shutdown_event = threading.Event()
         self._heartbeat_period = heartbeat_period
         self.endpoint_id = endpoint_id
