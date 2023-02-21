@@ -412,9 +412,17 @@ def list_endpoints():
 
 @app.command("delete")
 @name_arg
-@click.option("--yes", is_flag=True, help="Do not ask for confirmation to delete.")
+@click.option(
+    "--force",
+    default=False,
+    is_flag=True,
+    help="Deletes the local endpoint even if the web service returns an error.",
+)
+@click.option(
+    "--yes", default=False, is_flag=True, help="Do not ask for confirmation to delete."
+)
 @common_options
-def delete_endpoint(*, name: str, yes: bool):
+def delete_endpoint(*, name: str, force: bool, yes: bool):
     """Deletes an endpoint and its config."""
     if not yes:
         click.confirm(
@@ -422,7 +430,7 @@ def delete_endpoint(*, name: str, yes: bool):
         )
 
     ep_dir = get_config_dir() / name
-    Endpoint.delete_endpoint(ep_dir)
+    Endpoint.delete_endpoint(ep_dir, read_config(ep_dir), force)
 
 
 def cli_run():

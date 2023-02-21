@@ -3,3 +3,12 @@ New Functionality
 
 - Created `FuncxWebClient` and `FuncXClient` methods to delete endpoints
   from the web service.
+- Added a `--force` flag for the `funcx-endpoint delete` command, which 
+  ensures that the endpoint is deleted locally even if the web service
+  returns an error or is unreachable.
+
+Bug Fixes
+^^^^^^^^^
+
+- The `funcx-endpoint delete` command now deletes the endpoint both locally and 
+  from the web service.
