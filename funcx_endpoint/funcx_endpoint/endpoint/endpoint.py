@@ -320,6 +320,16 @@ class Endpoint:
         )
 
         with context:
+            # Per DaemonContext implementation, and that we _don't_ pass stdin,
+            # fd 0 is already connected to devnull.  Unfortunately, there is an
+            # as-yet unknown interaction on Polaris (ALCF) that needs this
+            # connection setup *again*.  So, repeat what daemon context already
+            # did, and dup2 stdin from devnull to ... devnull.  (!@#$%^&*)
+            # On any other system, this should make no difference (same file!)
+            with open(os.devnull) as nullf:
+                if os.dup2(nullf.fileno(), 0) != 0:
+                    raise Exception("Unable to close stdin")
+
             setup_logging(
                 logfile=logfile,
                 debug=self.debug,
