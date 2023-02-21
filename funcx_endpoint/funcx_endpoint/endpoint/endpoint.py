@@ -416,18 +416,55 @@ class Endpoint:
             exit(-1)
 
     @staticmethod
-    def delete_endpoint(endpoint_dir: pathlib.Path):
+    def delete_endpoint(
+        endpoint_dir: pathlib.Path, endpoint_config: Config | None, force: bool = False
+    ):
         ep_name = endpoint_dir.name
 
         if not endpoint_dir.exists():
             log.warning(f"Endpoint <{ep_name}> does not exist")
             exit(-1)
 
-        # stopping the endpoint should handle all of the process cleanup before
-        # deletion of the directory
+        endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
+        if endpoint_id is None:
+            log.warning(f"Endpoint <{ep_name}> could not be located")
+            if not force:
+                exit(-1)
+
+        # Delete endpoint from web service
+        try:
+            fx_client = Endpoint.get_funcx_client(endpoint_config)
+            fx_client.delete_endpoint(endpoint_id)
+            log.info(f"Endpoint <{ep_name}> has been deleted from the web service")
+        except GlobusAPIError as e:
+            log.warning(
+                f"Endpoint <{ep_name}> could not be deleted from the web service"
+                f"  [{e.message}]"
+            )
+            if not force:
+                log.critical("Exiting without deleting the endpoint")
+                exit(os.EX_UNAVAILABLE)
+        except NetworkError as e:
+            log.warning(
+                f"Endpoint <{ep_name}> could not be deleted from the web service"
+                f"  [{e}]"
+            )
+            if not force:
+                log.critical(
+                    "funcx-endpoint is unable to reach the funcX service due to a "
+                    "NetworkError \n"
+                    "Please make sure that the funcX service address you provided is "
+                    "reachable \n"
+                    "and then attempt to delete the endpoint again"
+                )
+                exit(os.EX_TEMPFAIL)
+
+        # Stop endpoint to handle process cleanup
         Endpoint.stop_endpoint(endpoint_dir, None)
 
+        # Delete endpoint directory
         shutil.rmtree(endpoint_dir)
+
         log.info(f"Endpoint <{ep_name}> has been deleted.")
 
     @staticmethod
