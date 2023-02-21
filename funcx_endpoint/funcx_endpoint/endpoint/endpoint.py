@@ -249,8 +249,8 @@ class Endpoint:
                 )
 
             except GlobusAPIError as e:
-                if e.http_status == 409 or e.http_status == 423:
-                    # RESOURCE_CONFLICT or RESOURCE_LOCKED
+                if e.http_status in (409, 410, 423):
+                    # CONFLICT, GONE or LOCKED
                     log.warning(f"Endpoint registration blocked.  [{e.message}]")
                     exit(os.EX_UNAVAILABLE)
                 raise
