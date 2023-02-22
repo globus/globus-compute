@@ -133,12 +133,10 @@ class EndpointInterchange:
     def load_config(self):
         """Load the config"""
         log.info("Loading endpoint local config")
-
         self.results_passthrough = mpQueue()
         self.executors: dict[str, funcx_endpoint.executors.HighThroughputExecutor] = {}
         for executor in self.config.executors:
             log.info(f"Initializing executor: {executor.label}")
-            executor.funcx_service_address = self.config.funcx_service_address
             if not executor.endpoint_id:
                 executor.endpoint_id = self.endpoint_id
             else:
