@@ -16,8 +16,8 @@ from funcx_common.messagepack.message_types import (
 )
 from funcx_common.tasks import ActorName, TaskState
 
+from funcx_endpoint.engines.helper import execute_task
 from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.executors.execution_helper.helper import execute_task
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +67,11 @@ class ReportingThread:
         self._thread.join(timeout=0.1)
 
 
-class GCExecutorBase(ABC):
-    """This executor base class holds shared behavior required by
-    all Globus Compute executors.
+class GlobusComputeEngineBase(ABC):
+    """Shared functionality and interfaces required by all GlobusCompute Engines.
+
+    This is designed to plug-in executors following the concurrent.futures.Executor
+    interface as execution backends to GlobusCompute
     """
 
     def __init__(

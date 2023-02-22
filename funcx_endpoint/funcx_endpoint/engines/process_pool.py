@@ -11,16 +11,16 @@ from multiprocessing.queues import Queue as mpQueue
 import psutil
 from funcx_common.messagepack.message_types import EPStatusReport, TaskTransition
 
-from funcx_endpoint.executors.base import GCExecutorBase, ReportingThread
+from funcx_endpoint.engines.base import GlobusComputeEngineBase, ReportingThread
 
 logger = logging.getLogger(__name__)
 
 
-class ProcessPoolExecutor(GCExecutorBase):
+class ProcessPoolEngine(GlobusComputeEngineBase):
     def __init__(
         self,
         *args,
-        label: str = "ProcessPoolExecutor",
+        label: str = "ProcessPoolEngine",
         heartbeat_period: float = 30.0,
         **kwargs,
     ):
