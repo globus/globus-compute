@@ -3,6 +3,15 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-endpoint
 spec:
+{{- if and .Values.useClientCredentials .Values.useUserCredentials }}
+  {{- fail "Please specify EXACTLY one of 'useClientCredentials' (boolean) or 'useUserCredentials' (boolean)"}}
+{{- else if not (or .Values.useClientCredentials .Values.useUserCredentials) }}
+  {{- fail "Please specify one of 'useClientCredentials' (boolean) or 'useUserCredentials' (boolean)"}}
+{{- end }}
+{{- if not .Values.endpointUUID }}
+  {{- fail "Must specify 'endpointUUID'" }}
+{{- end }}
+
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
@@ -19,11 +28,7 @@ spec:
       - name: {{ .Release.Name }}-endpoint
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         command: [ "/bin/bash", "-c", "--" ]
-        {{- if .Values.endpointUUID }}
-        args: [ "/home/funcx/boot.sh {{ .Release.Name }} {{ .Values.endpointUUID }}" ]
-        {{- else }}
-        args: [ "/home/funcx/boot.sh {{ .Release.Name }}" ]
-        {{- end }}
+        args: [ "/home/funcx/boot.sh {{ .Release.Name }} {{ .Values.endpointUUID }} {{ .Values.endpointCLIargs }}" ]
         tty: true
         stdin: true
         imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -31,18 +36,35 @@ spec:
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         {{- end }}
+        {{- if .Values.useClientCredentials }}
+          {{- if not .Values.secrets }}
+            {{- fail "Missing `secrets` store specification for client credentials" }}
+          {{- end }}
+        env:
+          - name: FUNCX_SDK_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secrets }}
+                key: FUNCX_SDK_CLIENT_ID
+          - name: FUNCX_SDK_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secrets }}
+                key: FUNCX_SDK_CLIENT_SECRET
+        {{- end}}
 
         volumeMounts:
           - mountPath: "/mnt"
             name: funcxmnt
+          {{- if .Values.useUserCredentials }}
           - name: funcx-sdk-tokens
             mountPath: /funcx/credentials
             readOnly: true
+          {{- end }}
           - name: endpoint-config
             mountPath: /funcx/config
           - name: endpoint-instance-config
             mountPath: /funcx/{{ .Release.Name }}
-
 
         ports:
           - containerPort: 5000
@@ -50,9 +72,11 @@ spec:
       volumes:
         - name: funcxmnt
           emptyDir: {}
+        {{- if .Values.useUserCredentials }}
         - name: funcx-sdk-tokens
           secret:
             secretName: funcx-sdk-tokens
+        {{- end }}
         - name: endpoint-config
           configMap:
             name: {{ .Release.Name }}-endpoint-config

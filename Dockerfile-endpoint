@@ -1,16 +1,35 @@
-ARG PYTHON_VERSION="3.8"
+ARG PYTHON_VERSION="3.10"
 FROM python:${PYTHON_VERSION}
+
+# Build args for speeding up development for those of us on crappy inet connections
+# i.e., $ docker build ... --build-arg ... --build-arg ...
+# something like: http://cache.fqdn:3142
+ARG apt_proxy_url
+
+# something like: [global]\nindex-url = ...
+ARG pip_conf
+
+RUN if [ -n "$apt_proxy_url" ]; then echo "Acquire::http { Proxy \"$apt_proxy_url\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+RUN apt-get update && apt-get upgrade -y
+
+RUN if [ -n "$pip_conf" ]; then echo "$pip_conf" > "/etc/pip.conf"; fi
+
 RUN mkdir /opt/funcx
-RUN pip install kubernetes
-RUN pip install --no-binary :all: --force-reinstall pyzmq
+RUN python -m pip install -U pip
+RUN python -m pip install kubernetes
+RUN python -m pip install --no-binary :all: --force-reinstall pyzmq
 
 COPY funcx_sdk /opt/funcx/funcx_sdk/
 WORKDIR /opt/funcx/funcx_sdk
-RUN pip install .
+RUN python -m pip install .
 
 COPY funcx_endpoint /opt/funcx/funcx_endpoint
 WORKDIR /opt/funcx/funcx_endpoint
-RUN pip install .
+RUN python -m pip install .
+
+# Undo local-dev ministrations
+RUN if [ -n "$pip_conf" ]; then rm -f "/etc/pip.conf"; fi
+RUN if [ -n "$apt_proxy_url" ]; then rm -f "/etc/apt/apt.conf.d/01proxy"; fi
 
 RUN useradd -m funcx
 RUN mkdir -p /home/funcx/.kube

@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
-mkdir ~/.funcx
-mkdir ~/.funcx/$1
-mkdir ~/.funcx/credentials
-cp /funcx/config/config.py ~/.funcx
-cp /funcx/$1/* ~/.funcx/$1
-cp /funcx/credentials/storage.db ~/.funcx/
-if [ -z "$2" ]; then
-  funcx-endpoint start $1
-else
-  funcx-endpoint start $1 --endpoint-uuid $2
+
+EP_NAME="$1"; shift
+EP_UUID="$1"; shift
+
+mkdir -p "$HOME/.funcx/$EP_NAME/"
+cp /funcx/"$EP_NAME"/* "$HOME/.funcx/$EP_NAME/"
+cp /funcx/config/config.py "$HOME/.funcx/"
+
+if [[ -e "/funcx/credentials/storage.db" ]]; then
+    cp /funcx/credentials/storage.db "$HOME/.funcx/"
+    chmod 600 "$HOME/.funcx/storage.db"
 fi
 
-while pgrep funcx-endpoint >/dev/null;
-    do
-        echo "funcx-endpoint process is still alive. Next check in 600s."
-        sleep 600;
-    done
-echo "funcx-endpoint process exited. Restarting endpoint"
+exec funcx-endpoint start "$EP_NAME" --endpoint-uuid "$EP_UUID" "$@"
