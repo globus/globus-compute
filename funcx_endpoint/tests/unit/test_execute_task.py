@@ -27,7 +27,6 @@ def test_execute_task():
     )
 
     packed_result = execute_task(task_message)
-    logger.warning(f"[YADU] Got {packed_result=}")
     assert isinstance(packed_result, bytes)
 
     result = messagepack.unpack(packed_result)
