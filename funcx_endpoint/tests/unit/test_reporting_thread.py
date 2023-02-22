@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from funcx_endpoint.executors.base import ReportingThread
+from funcx_endpoint.engines.base import ReportingThread
 
 logger = logging.getLogger(__name__)
 
