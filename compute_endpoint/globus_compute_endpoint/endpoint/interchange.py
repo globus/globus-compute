@@ -10,6 +10,7 @@ import signal
 import sys
 import threading
 import time
+import typing as t
 
 # multiprocessing.Event is a method, not a class
 # to annotate, we need the "real" class
@@ -40,6 +41,9 @@ from globus_compute_endpoint.exception_handling import get_result_error_details
 from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from globus_compute_sdk import __version__ as funcx_sdk_version
 from parsl.version import VERSION as PARSL_VERSION
+
+if t.TYPE_CHECKING:
+    from globus_compute_endpoint.executors import HighThroughputExecutor
 
 log = logging.getLogger(__name__)
 
@@ -130,41 +134,19 @@ class EndpointInterchange:
             "registration": self.endpoint_id,
             "dir": os.getcwd(),
         }
-
         log.info(f"Platform info: {self.current_platform}")
-        try:
-            self.load_config()
-        except Exception:
-            log.exception("Caught exception")
-            raise
 
+        self.results_passthrough = mpQueue()
+        self.executor: HighThroughputExecutor = self.config.executors[0]
         self._test_start = False
 
-    def load_config(self):
-        """Load the config"""
-        log.info("Loading endpoint local config")
-        self.results_passthrough = mpQueue()
-        self.executors: dict[
-            str, globus_compute_endpoint.executors.HighThroughputExecutor
-        ] = {}
-        for executor in self.config.executors:
-            log.info(f"Initializing executor: {executor.label}")
-            if not executor.endpoint_id:
-                executor.endpoint_id = self.endpoint_id
-            else:
-                if not executor.endpoint_id == self.endpoint_id:
-                    eep_id = f"Executor({executor.endpoint_id})"
-                    sep_id = f"Interchange({self.endpoint_id})"
-                    raise Exception(f"InconsistentEndpointId: {eep_id} != {sep_id}")
-            self.executors[executor.label] = executor
-            if executor.run_dir is None:
-                executor.run_dir = self.logdir
-
-    def start_executors(self):
-        log.info("Starting Executors")
-        for executor in self.config.executors:
-            if hasattr(executor, "passthrough") and executor.passthrough is True:
-                executor.start(results_passthrough=self.results_passthrough)
+    def start_executor(self):
+        log.info("Starting Executor")
+        self.executor.start(
+            results_passthrough=self.results_passthrough,
+            endpoint_id=self.endpoint_id,
+            run_dir=self.logdir,
+        )
 
     def migrate_tasks_to_internal(
         self,
@@ -226,8 +208,7 @@ class EndpointInterchange:
         self._quiesce_event.set()
 
     def cleanup(self):
-        for label in self.executors:
-            self.executors[label].shutdown()
+        self.executor.shutdown()
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
         log.warning("Received SIGTERM, setting termination flag.")
@@ -270,7 +251,7 @@ class EndpointInterchange:
         # NOTE: currently we only start the executors once because
         # the current behavior is to keep them running decoupled while
         # the endpoint is waiting for reconnection
-        self.start_executors()
+        self.start_executor()
 
         while not self._kill_event.is_set():
             if self._reconnect_fail_counter >= self.reconnect_attempt_limit:
@@ -350,7 +331,7 @@ class EndpointInterchange:
         results_publisher = ResultQueuePublisher(queue_info=self.result_q_info)
 
         with results_publisher:
-            executor = list(self.executors.values())[0]
+            executor = self.executor
 
             num_tasks_forwarded = 0
             num_results_forwarded = 0
