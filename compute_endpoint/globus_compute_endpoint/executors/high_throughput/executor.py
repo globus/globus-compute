@@ -14,6 +14,7 @@ import os
 import queue
 import threading
 import time
+import uuid
 from multiprocessing import Process
 
 import daemon
@@ -352,8 +353,20 @@ class HighThroughputExecutor(RepresentationMixin):
                 "--container_image={container_image} "
             )
 
-    def start(self, results_passthrough: multiprocessing.Queue = None):
+    def start(
+        self,
+        *args,
+        endpoint_id: uuid.UUID | None = None,
+        run_dir: str | None = None,
+        results_passthrough: multiprocessing.Queue | None = None,
+        **kwargs,
+    ):
         """Create the Interchange process and connect to it."""
+        assert run_dir, "GCExecutor requires kwarg:run_dir at start"
+        assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
+        self.run_dir = run_dir
+        self.endpoint_id = endpoint_id
+
         self.outgoing_q = zmq_pipes.TasksOutgoing(
             "127.0.0.1", self.interchange_port_range
         )
