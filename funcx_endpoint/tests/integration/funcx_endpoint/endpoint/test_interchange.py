@@ -40,8 +40,8 @@ def test_endpoint_id(funcx_dir):
         endpoint_id="mock_endpoint_id",
     )
 
-    for executor in ic.executors.values():
-        assert executor.endpoint_id == "mock_endpoint_id"
+    ic.start()
+    assert ic.executor.endpoint_id == "mock_endpoint_id"
 
 
 def test_start_requires_pre_registered(funcx_dir):

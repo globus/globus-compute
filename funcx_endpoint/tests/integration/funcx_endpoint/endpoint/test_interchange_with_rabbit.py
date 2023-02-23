@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import multiprocessing
 import time
 import uuid
@@ -57,6 +58,7 @@ def run_interchange_process(
         target=run_it, args=(reg_info, endpoint_uuid), kwargs={"endpoint_dir": tmp_path}
     )
     ix_proc.start()
+    logging.warning("Yadu:test: here")
 
     yield ix_proc, tmp_path, endpoint_uuid, reg_info
 
