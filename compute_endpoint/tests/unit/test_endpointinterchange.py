@@ -1,5 +1,4 @@
 import random
-from unittest.mock import MagicMock
 
 import pytest
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
@@ -22,12 +21,12 @@ def test_main_exception_always_quiesces(mocker, fs, reset_signals):
     mocker.patch(f"{_mock_base}multiprocessing")
     mocker.patch(f"{_mock_base}mpQueue")
     ei = EndpointInterchange(
-        config=Config(executors=[]),
+        config=Config(executors=[mocker.Mock()]),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=num_iterations + 10,
     )
-    ei._task_puller_proc = MagicMock()
-    ei._start_threads_and_main = MagicMock()
+    ei._task_puller_proc = mocker.MagicMock()
+    ei._start_threads_and_main = mocker.MagicMock()
     ei._start_threads_and_main.side_effect = Exception("Woot")
     ei._kill_event.is_set = false_true
     ei.start()
@@ -53,12 +52,12 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit, reset_sign
     mocker.patch(f"{_mock_base}mpQueue")
     mock_log = mocker.patch(f"{_mock_base}log")
     ei = EndpointInterchange(
-        config=Config(executors=[]),
+        config=Config(executors=[mocker.Mock()]),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=reconnect_attempt_limit,
     )
-    ei._task_puller_proc = MagicMock()
-    ei._start_threads_and_main = MagicMock()
+    ei._task_puller_proc = mocker.MagicMock()
+    ei._start_threads_and_main = mocker.MagicMock()
     ei._start_threads_and_main.side_effect = Exception("Woot")
     ei._kill_event.is_set = false_true
     ei.start()

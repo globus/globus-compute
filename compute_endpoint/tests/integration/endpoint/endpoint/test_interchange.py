@@ -36,18 +36,15 @@ def test_endpoint_id(funcx_dir):
     endpoint_config = SourceFileLoader(
         "config", str(funcx_dir / "mock_endpoint" / "config.py")
     ).load_module()
-
-    for executor in endpoint_config.config.executors:
-        executor.passthrough = False
+    endpoint_config.config.executors[0].passthrough = False
 
     ic = EndpointInterchange(
         endpoint_config.config,
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         endpoint_id="mock_endpoint_id",
     )
-
-    for executor in ic.executors.values():
-        assert executor.endpoint_id == "mock_endpoint_id"
+    ic.start()
+    assert ic.executor.endpoint_id == "mock_endpoint_id"
 
 
 def test_start_requires_pre_registered(funcx_dir):
@@ -121,7 +118,7 @@ def test_invalid_result_received(mocker, endpoint_uuid):
 
 def test_die_with_parent_refuses_to_start_if_not_parent(mocker):
     ei = EndpointInterchange(
-        config=Config(executors=[]),
+        config=Config(executors=[mocker.Mock()]),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         parent_pid=os.getpid(),  # _not_ ppid; that's the test.
     )
@@ -143,7 +140,7 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker):
     mock_ppid = mocker.patch(f"{_MOCK_BASE}os.getppid")
     mock_ppid.side_effect = (ppid, 1)
     ei = EndpointInterchange(
-        config=Config(executors=[]),
+        config=Config(executors=[mocker.Mock()]),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         parent_pid=ppid,
     )
