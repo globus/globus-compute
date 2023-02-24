@@ -48,14 +48,14 @@ to fill out the fragment.
 ## Installing Testing Requirements
 
 Testing requirements for each of the two packages in this repository
-(funcx-sdk and funcx-endpoint) are specified as installable extras.
+(sdk and endpoint) are specified as installable extras.
 
-To install the funcx-sdk test requirements
+To install the globus-compute-sdk test requirements
 
-    cd funcx_sdk
+    cd sdk
     pip install '.[test]'
 
-To install the funcx-endpoint test requirements
+To install the globus-compute-endpoint test requirements
 
-    cd funcx_endpoint
+    cd endpoint
     pip install '.[test]'

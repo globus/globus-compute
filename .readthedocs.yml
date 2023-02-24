@@ -11,8 +11,8 @@ build:
 python:
   install:
     - method: pip
-      path: ./funcx_sdk
+      path: ./sdk
       extra_requirements:
         - docs
     - method: pip
-      path: ./funcx_endpoint
+      path: ./endpoint
