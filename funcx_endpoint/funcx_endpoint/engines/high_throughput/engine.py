@@ -26,9 +26,10 @@ from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
 from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors.high_throughput import interchange, zmq_pipes
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
-from funcx_endpoint.executors.high_throughput.messages import (
+from funcx_endpoint.engines.base import GlobusComputeEngineBase
+from funcx_endpoint.engines.high_throughput import interchange, zmq_pipes
+from funcx_endpoint.engines.high_throughput.mac_safe_queue import mpQueue
+from funcx_endpoint.engines.high_throughput.messages import (
     EPStatusReport,
     Heartbeat,
     HeartbeatReq,
@@ -41,10 +42,6 @@ from funcx_endpoint.strategies.simple import SimpleStrategy
 fx_serializer = FuncXSerializer()
 
 
-# TODO: YADU There's a bug here which causes some of the log messages to write out to
-# stderr
-# "logging" python3 self.stream.flush() OSError: [Errno 9] Bad file descriptor
-
 log = logging.getLogger(__name__)
 
 
@@ -52,7 +49,7 @@ BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
 
 
-class HighThroughputExecutor(RepresentationMixin):
+class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
     """Executor designed for cluster-scale
 
     The HighThroughputExecutor system has the following components:
@@ -226,7 +223,7 @@ class HighThroughputExecutor(RepresentationMixin):
 
     def __init__(
         self,
-        label="HighThroughputExecutor",
+        label="HighThroughputEngine",
         # NEW
         strategy=SimpleStrategy(),
         max_workers_per_node=float("inf"),

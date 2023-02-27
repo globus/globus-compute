@@ -30,8 +30,9 @@ from funcx_endpoint.endpoint.messages_compat import (
 )
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.result_store import ResultStore
+from funcx_endpoint.engines.base import GlobusComputeEngineBase
+from funcx_endpoint.engines.high_throughput.mac_safe_queue import mpQueue
 from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 log = logging.getLogger(__name__)
 
@@ -126,9 +127,7 @@ class EndpointInterchange:
         assert len(self.config.executors) == 1, (
             "Endpoint config should " "only define one executor"
         )
-        self.executor: funcx_endpoint.executors.HighThroughputExecutor = (
-            self.config.executors[0]
-        )
+        self.executor: GlobusComputeEngineBase = self.config.executors[0]
         self._test_start = False
 
     def start_executor(self):
