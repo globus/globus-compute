@@ -20,6 +20,9 @@ from multiprocessing import Process
 
 import daemon
 import dill
+from funcx_common.messagepack.message_types import (
+    EPStatusReport as mpack_EPStatusReport,
+)
 from parsl.dataflow.error import ConfigurationError
 from parsl.executors.errors import BadMessage, ScalingFailed
 from parsl.providers import LocalProvider
@@ -407,6 +410,13 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
             log.debug("Starting HighThroughputExecutor with no provider")
 
         return self.outgoing_q.port, self.incoming_q.port, self.command_client.port
+
+    def get_status_report(self) -> mpack_EPStatusReport:
+        # This will behave simply as a heartbeat
+        # this is a placeholder only.
+        return mpack_EPStatusReport(
+            endpoint_id=self.endpoint_id, ep_status_report={}, task_statuses=[]
+        )
 
     def _start_local_interchange_process(self):
         """Starts the interchange process locally
