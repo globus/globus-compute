@@ -98,20 +98,20 @@ class Endpoint:
             # only an issue for totally new users (no .funcx/!), but that is also
             # precisely the interaction -- the first one -- that should go smoothly
             endpoint_dir.mkdir(parents=True, exist_ok=True)
+
+            config_target_path = Endpoint._config_file_path(endpoint_dir)
+
+            if endpoint_config is None:
+                endpoint_config = pathlib.Path(endpoint_default_config.__file__)
+
+            Endpoint.update_config_file(
+                endpoint_dir.name,
+                endpoint_config,
+                config_target_path,
+                multi_tenant,
+            )
         finally:
             os.umask(user_umask)
-
-        config_target_path = Endpoint._config_file_path(endpoint_dir)
-
-        if endpoint_config is None:
-            endpoint_config = pathlib.Path(endpoint_default_config.__file__)
-
-        Endpoint.update_config_file(
-            endpoint_dir.name,
-            endpoint_config,
-            config_target_path,
-            multi_tenant,
-        )
 
     @staticmethod
     def configure_endpoint(
