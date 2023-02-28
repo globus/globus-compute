@@ -13,6 +13,7 @@ from funcx.sdk.login_manager import LoginManager
 from funcx.sdk.login_manager.whoami import print_whoami_info
 
 from .endpoint.endpoint import Endpoint
+from .endpoint.endpoint_manager import EndpointManager
 from .endpoint.utils.config import Config
 from .logging_config import setup_logging
 
@@ -192,7 +193,6 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=Fals
     2. Get connection info from broker service
     3. Start the interchange as a daemon
 
-
     |                      Broker service       |
     |               -----2----> Forwarder       |
     |    /register <-----3----+   ^             |
@@ -205,12 +205,9 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=Fals
     |     Endpoint    |         daemon
     +-----------------+
     """
-    state = CommandState.ensure()
     _do_start_endpoint(
         name=name,
         endpoint_uuid=endpoint_uuid,
-        log_to_console=state.log_to_console,
-        no_color=state.no_color,
         die_with_parent=die_with_parent,
     )
 
@@ -336,10 +333,18 @@ def _do_start_endpoint(
     *,
     name: str,
     endpoint_uuid: str | None,
-    log_to_console: bool,
-    no_color: bool,
     die_with_parent: bool = False,
 ):
+    state = CommandState.ensure()
+    ep_dir = get_config_dir() / name
+    if ep_dir.is_dir():
+        setup_logging(
+            logfile=ep_dir / "endpoint.log",
+            debug=state.debug,
+            console_enabled=state.log_to_console,
+            no_color=state.no_color,
+        )
+
     reg_info = {}
     if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
         try:
@@ -355,17 +360,20 @@ def _do_start_endpoint(
             exc_type = e.__class__.__name__
             log.debug("Invalid registration info on stdin -- (%s) %s", exc_type, e)
 
-    ep_dir = get_config_dir() / name
     ep_config = read_config(ep_dir)
-    get_cli_endpoint().start_endpoint(
-        ep_dir,
-        endpoint_uuid,
-        ep_config,
-        log_to_console,
-        no_color,
-        reg_info,
-        die_with_parent,
-    )
+    if ep_config.multi_tenant:
+        epm = EndpointManager(ep_dir, endpoint_uuid, ep_config)
+        epm.start()
+    else:
+        get_cli_endpoint().start_endpoint(
+            ep_dir,
+            endpoint_uuid,
+            ep_config,
+            state.log_to_console,
+            state.no_color,
+            reg_info,
+            die_with_parent,
+        )
 
 
 @app.command("stop")
@@ -392,14 +400,8 @@ def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
 @common_options
 def restart_endpoint(*, name: str, endpoint_uuid: str | None):
     """Restarts an endpoint"""
-    state = CommandState.ensure()
     _do_stop_endpoint(name=name)
-    _do_start_endpoint(
-        name=name,
-        endpoint_uuid=endpoint_uuid,
-        log_to_console=state.log_to_console,
-        no_color=state.no_color,
-    )
+    _do_start_endpoint(name=name, endpoint_uuid=endpoint_uuid)
 
 
 @app.command("list")

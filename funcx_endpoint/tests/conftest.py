@@ -77,3 +77,11 @@ def randomstring():
         return "".join(random.choice(alphabet) for _ in range(length))
 
     return func
+
+
+@pytest.fixture
+def noop():
+    def _wrapped(*args, **kwargs):
+        pass
+
+    return _wrapped
