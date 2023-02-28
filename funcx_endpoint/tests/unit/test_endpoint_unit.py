@@ -209,7 +209,7 @@ def test_register_endpoint_locked_error(
 
 @pytest.mark.parametrize("multi_tenant", [None, True, False])
 @responses.activate
-def test_register_endpoint_multi_tenant(
+def test_register_endpoint_is_not_multitenant(
     mocker,
     fs,
     endpoint_uuid,
@@ -240,10 +240,7 @@ def test_register_endpoint_multi_tenant(
     assert ep_json_p.exists()
 
     request_body = json.loads(responses.calls[1].request.body)
-    if multi_tenant is True:
-        assert request_body["multi_tenant"] is True
-    else:
-        assert "multi_tenant" not in request_body
+    assert "multi_tenant" not in request_body, "endpoint.py is single-tenant logic only"
 
 
 def test_list_endpoints_none_configured(mock_ep_buf):

@@ -199,6 +199,11 @@ class Endpoint:
 
         result_store = ResultStore(endpoint_dir=endpoint_dir)
 
+        # From this point on, we don't read from stdin;
+        with open(os.devnull) as stdin:
+            if os.dup2(stdin.fileno(), 0) != 0:
+                raise Exception("Unable to close stdin")
+
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
@@ -230,8 +235,6 @@ class Endpoint:
             )
             exit(-1)
 
-        metadata = Endpoint.get_metadata(endpoint_config)
-
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
         if not reg_info:
@@ -244,8 +247,8 @@ class Endpoint:
                 reg_info = fx_client.register_endpoint(
                     endpoint_dir.name,
                     endpoint_uuid,
-                    metadata=metadata,
-                    multi_tenant=endpoint_config.multi_tenant,
+                    metadata=Endpoint.get_metadata(endpoint_config),
+                    multi_tenant=False,
                 )
 
             except GlobusAPIError as e:
