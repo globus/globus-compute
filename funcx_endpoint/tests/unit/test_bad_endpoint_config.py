@@ -1,6 +1,6 @@
 import pytest
 
-from funcx_endpoint.executors.high_throughput.executor import HighThroughputExecutor
+from funcx_endpoint.executors import HighThroughputExecutor
 
 invalid_addresses = ["localhost", "login1.theta.alcf.anl.gov", "*"]
 
