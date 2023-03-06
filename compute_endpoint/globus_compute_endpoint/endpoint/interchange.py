@@ -38,7 +38,6 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 )
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.exception_handling import get_result_error_details
-from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from globus_compute_sdk import __version__ as funcx_sdk_version
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -136,7 +135,9 @@ class EndpointInterchange:
         }
         log.info(f"Platform info: {self.current_platform}")
 
-        self.results_passthrough = mpQueue()
+        self.results_passthrough: queue.Queue[
+            dict[str, bytes | str | None]
+        ] = queue.Queue()
         self.executor: HighThroughputExecutor = self.config.executors[0]
         self._test_start = False
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 import concurrent.futures
 import ipaddress
 import logging
-import multiprocessing
 import os
 import queue
 import threading
@@ -315,7 +314,7 @@ class HighThroughputExecutor(RepresentationMixin):
         self.outgoing_q: zmq_pipes.TasksOutgoing | None = None
         self.incoming_q: zmq_pipes.ResultsIncoming | None = None
         self.command_client: zmq_pipes.CommandClient | None = None
-        self.results_passthrough: multiprocessing.Queue | None = None
+        self.results_passthrough: queue.Queue | None = None
         self._queue_management_thread: threading.Thread | None = None
 
         self.is_alive = False
@@ -358,7 +357,7 @@ class HighThroughputExecutor(RepresentationMixin):
         *args,
         endpoint_id: uuid.UUID | None = None,
         run_dir: str | None = None,
-        results_passthrough: multiprocessing.Queue | None = None,
+        results_passthrough: queue.Queue[dict[str, bytes | str | None]] | None = None,
         **kwargs,
     ):
         """Create the Interchange process and connect to it."""
