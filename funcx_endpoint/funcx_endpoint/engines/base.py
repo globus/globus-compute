@@ -1,5 +1,5 @@
 import logging
-import multiprocessing
+import queue
 import threading
 import time
 import typing as t
@@ -92,7 +92,7 @@ class GlobusComputeEngineBase(ABC):
         self.run_dir: t.Optional[str] = None
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
-        self.results_passthrough: multiprocessing.Queue = multiprocessing.Queue()
+        self.results_passthrough = queue.Queue()
 
     @abstractmethod
     def start(

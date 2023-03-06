@@ -17,21 +17,17 @@ import time
 from multiprocessing.synchronize import Event as EventType
 
 import pika.exceptions
-from funcx_common.messagepack import InvalidMessageError, pack, unpack
-from funcx_common.messagepack.message_types import Result, ResultErrorDetails, Task
+from funcx_common import messagepack
+from funcx_common.messagepack import InvalidMessageError, unpack
+from funcx_common.messagepack.message_types import Task
 from parsl.version import VERSION as PARSL_VERSION
 
 import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
 from funcx_endpoint import __version__ as funcx_endpoint_version
-from funcx_endpoint.endpoint.messages_compat import (
-    convert_to_internaltask,
-    try_convert_to_messagepack,
-)
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.result_store import ResultStore
 from funcx_endpoint.engines.base import GlobusComputeEngineBase
-from funcx_endpoint.engines.high_throughput.mac_safe_queue import mpQueue
 from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
 
 log = logging.getLogger(__name__)
@@ -123,7 +119,7 @@ class EndpointInterchange:
         }
         log.info(f"Platform info: {self.current_platform}")
 
-        self.results_passthrough = mpQueue()
+        self.results_passthrough = queue.Queue()
         assert len(self.config.executors) == 1, (
             "Endpoint config should " "only define one executor"
         )
@@ -326,7 +322,7 @@ class EndpointInterchange:
                 # funcx-manager.  In terms of shutting down (or "rebooting") gracefully,
                 # iterate once a second whether or not a task has arrived.
                 nonlocal num_tasks_forwarded
-                ctype = executor.container_type
+                # ctype = executor.container_type
                 while not self._quiesce_event.is_set():
                     if self.time_to_quit:
                         self.stop()
@@ -345,8 +341,7 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        task = convert_to_internaltask(task_msg, ctype)
-                        executor.submit_raw(task)
+                        executor.submit_raw(incoming_task)
                         num_tasks_forwarded += 1  # Safe given GIL
 
                     except Exception as exc:
@@ -368,9 +363,12 @@ class EndpointInterchange:
                 nonlocal num_results_forwarded
                 while not self._quiesce_event.is_set():
                     try:
-                        result = self.results_passthrough.get(timeout=1)
-                        task_id = result["task_id"]
-                        packed_result = result["message"]
+                        task_id = None
+                        packed_result = self.results_passthrough.get(timeout=1)
+                        result = messagepack.unpack(packed_result)
+                        if isinstance(result, messagepack.message_types.Result):
+                            task_id = result.task_id
+                        log.warning(f"GOt result message: {result}")
 
                     except queue.Empty:
                         # Empty queue!  Let's see if we have any prior results to send
@@ -383,35 +381,7 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        # This either works or it doesn't; if it doesn't, then
-                        # serialize an execption and send _that_
-                        # will be a packed EPStatusReport or Result
-                        message = try_convert_to_messagepack(packed_result)
-
-                    except Exception as exc:
-                        log.exception(
-                            f"Unable to parse result message for task {task_id}."
-                            "   Marking task as failed."
-                        )
-
-                        kwargs = {
-                            "task_id": task_id,
-                            "data": packed_result,
-                            "error_details": ResultErrorDetails(
-                                code=0,
-                                user_message=(
-                                    "Endpoint failed to serialize."
-                                    f"  Exception text: {exc}"
-                                ),
-                            ),
-                        }
-                        message = pack(Result(**kwargs))
-
-                    if task_id:
-                        log.debug(f"Forwarding result for task {task_id}")
-
-                    try:
-                        results_publisher.publish(message)
+                        results_publisher.publish(packed_result)
                         num_results_forwarded += 1  # Safe given GIL
 
                     except Exception:
