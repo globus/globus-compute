@@ -843,3 +843,19 @@ class Client:
             The response of the request
         """
         return self.web_client.stop_endpoint(endpoint_id)
+
+    @requires_login
+    def delete_endpoint(self, endpoint_id: str):
+        """Delete an endpoint
+
+        Parameters
+        ----------
+        endpoint_id : str
+            The uuid of the endpoint
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        return self.web_client.delete_endpoint(endpoint_id)

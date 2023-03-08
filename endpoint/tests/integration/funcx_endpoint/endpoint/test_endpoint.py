@@ -25,8 +25,11 @@ def test_non_configured_endpoint(mocker):
     assert "not configured" in result.stdout
 
 
+@pytest.mark.parametrize("status_code", [409, 410, 423])
 @responses.activate
-def test_start_endpoint_ep_locked(mocker, fs, randomstring, patch_funcx_client):
+def test_start_endpoint_blocked(
+    mocker, fs, randomstring, patch_funcx_client, status_code
+):
     # happy-path tested in tests/unit/test_endpoint_unit.py
 
     fx_addy = "http://api.funcx/"
@@ -51,7 +54,7 @@ def test_start_endpoint_ep_locked(mocker, fs, randomstring, patch_funcx_client):
         responses.POST,
         fx_addy + "endpoints",
         json={"reason": reason_msg},
-        status=423,
+        status=status_code,
     )
 
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")

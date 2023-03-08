@@ -68,6 +68,7 @@ class EndpointInterchange:
         endpoint_dir=".",
         result_store: ResultStore | None = None,
         reconnect_attempt_limit: int = 5,
+        parent_pid: int = 0,
     ):
         """
         Parameters
@@ -112,6 +113,7 @@ class EndpointInterchange:
         self.reconnect_attempt_limit = max(1, reconnect_attempt_limit)
         self._quiesce_event = multiprocessing.Event()
         self._kill_event = multiprocessing.Event()
+        self._parent_pid = parent_pid
 
         if result_store is None:
             result_store = ResultStore(endpoint_dir=endpoint_dir)
@@ -238,15 +240,37 @@ class EndpointInterchange:
 
     def start(self):
         """Start the Interchange"""
-        log.info("Starting EndpointInterchange")
-
-        signal.signal(signal.SIGTERM, self.handle_sigterm)
+        signal.signal(signal.SIGHUP, self.handle_sigterm)
         signal.signal(signal.SIGQUIT, self.handle_sigterm)  # hint: Ctrl+\
+        signal.signal(signal.SIGTERM, self.handle_sigterm)
         # Intentionally ignoring SIGINT for now, as we're unstable enough to
         # warrant Python's default developer-friendly Ctrl+C handling
 
         self._quiesce_event.clear()
         self._kill_event.clear()
+
+        if self._parent_pid:
+            if self._parent_pid != os.getppid():
+                # initial check to save extra noise
+                log.warning(f"Pid {self._parent_pid} not parent; refusing to start")
+                self.stop()
+                return
+
+            def _parent_watcher(ppid: int):
+                while ppid == os.getppid():
+                    if not self._quiesce_event.wait(timeout=1):
+                        return
+                log.warning(f"Parent ({ppid}) has gone away; initiating shut down")
+                self.stop()
+
+            threading.Thread(
+                target=_parent_watcher,
+                args=(self._parent_pid,),  # copy; to discourage shenanigans
+                daemon=True,
+                name="ParentPidWatcher",
+            ).start()
+
+        log.info("Starting EndpointInterchange")
 
         # NOTE: currently we only start the executors once because
         # the current behavior is to keep them running decoupled while

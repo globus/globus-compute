@@ -11,9 +11,9 @@ from click import ClickException
 
 from funcx.sdk.login_manager import LoginManager
 from funcx.sdk.login_manager.whoami import print_whoami_info
-from funcx_endpoint.endpoint.utils.config import Config
 
 from .endpoint.endpoint import Endpoint
+from .endpoint.utils.config import Config
 from .logging_config import setup_logging
 
 log = logging.getLogger(__name__)
@@ -177,8 +177,14 @@ def configure_endpoint(
 @click.option(
     "--endpoint-uuid", default=None, help="The UUID for the endpoint to register with"
 )
+@click.option(
+    "--die-with-parent",
+    is_flag=True,
+    hidden=True,
+    help="Shutdown if parent process goes away",
+)
 @common_options
-def start_endpoint(*, name: str, endpoint_uuid: str | None):
+def start_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=False):
     """Start an endpoint
 
     This function will do:
@@ -205,6 +211,7 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None):
         endpoint_uuid=endpoint_uuid,
         log_to_console=state.log_to_console,
         no_color=state.no_color,
+        die_with_parent=die_with_parent,
     )
 
 
@@ -331,6 +338,7 @@ def _do_start_endpoint(
     endpoint_uuid: str | None,
     log_to_console: bool,
     no_color: bool,
+    die_with_parent: bool = False,
 ):
     reg_info = {}
     if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
@@ -348,8 +356,15 @@ def _do_start_endpoint(
             log.debug("Invalid registration info on stdin -- (%s) %s", exc_type, e)
 
     ep_dir = get_config_dir() / name
+    ep_config = read_config(ep_dir)
     get_cli_endpoint().start_endpoint(
-        ep_dir, endpoint_uuid, read_config(ep_dir), log_to_console, no_color, reg_info
+        ep_dir,
+        endpoint_uuid,
+        ep_config,
+        log_to_console,
+        no_color,
+        reg_info,
+        die_with_parent,
     )
 
 
@@ -397,9 +412,17 @@ def list_endpoints():
 
 @app.command("delete")
 @name_arg
-@click.option("--yes", is_flag=True, help="Do not ask for confirmation to delete.")
+@click.option(
+    "--force",
+    default=False,
+    is_flag=True,
+    help="Deletes the local endpoint even if the web service returns an error.",
+)
+@click.option(
+    "--yes", default=False, is_flag=True, help="Do not ask for confirmation to delete."
+)
 @common_options
-def delete_endpoint(*, name: str, yes: bool):
+def delete_endpoint(*, name: str, force: bool, yes: bool):
     """Deletes an endpoint and its config."""
     if not yes:
         click.confirm(
@@ -407,7 +430,7 @@ def delete_endpoint(*, name: str, yes: bool):
         )
 
     ep_dir = get_config_dir() / name
-    Endpoint.delete_endpoint(ep_dir)
+    Endpoint.delete_endpoint(ep_dir, read_config(ep_dir), force)
 
 
 def cli_run():

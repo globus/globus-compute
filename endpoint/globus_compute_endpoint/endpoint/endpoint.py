@@ -98,20 +98,20 @@ class Endpoint:
             # only an issue for totally new users (no .compute/!), but that is also
             # precisely the interaction -- the first one -- that should go smoothly
             endpoint_dir.mkdir(parents=True, exist_ok=True)
+
+            config_target_path = Endpoint._config_file_path(endpoint_dir)
+
+            if endpoint_config is None:
+                endpoint_config = pathlib.Path(endpoint_default_config.__file__)
+
+            Endpoint.update_config_file(
+                endpoint_dir.name,
+                endpoint_config,
+                config_target_path,
+                multi_tenant,
+            )
         finally:
             os.umask(user_umask)
-
-        config_target_path = Endpoint._config_file_path(endpoint_dir)
-
-        if endpoint_config is None:
-            endpoint_config = pathlib.Path(endpoint_default_config.__file__)
-
-        Endpoint.update_config_file(
-            endpoint_dir.name,
-            endpoint_config,
-            config_target_path,
-            multi_tenant,
-        )
 
     @staticmethod
     def configure_endpoint(
@@ -173,6 +173,7 @@ class Endpoint:
         log_to_console: bool,
         no_color: bool,
         reg_info: dict,
+        die_with_parent: bool = False,
     ):
         # This is to ensure that at least 1 executor is defined
         if not endpoint_config.executors:
@@ -248,8 +249,8 @@ class Endpoint:
                 )
 
             except GlobusAPIError as e:
-                if e.http_status == 409 or e.http_status == 423:
-                    # RESOURCE_CONFLICT or RESOURCE_LOCKED
+                if e.http_status in (409, 410, 423):
+                    # CONFLICT, GONE or LOCKED
                     log.warning(f"Endpoint registration blocked.  [{e.message}]")
                     exit(os.EX_UNAVAILABLE)
                 raise
@@ -300,6 +301,10 @@ class Endpoint:
         ptitle += f" [{setproctitle.getproctitle()}]"
         setproctitle.setproctitle(ptitle)
 
+        parent_pid = 0
+        if die_with_parent:
+            parent_pid = os.getppid()
+
         log.info("Launching endpoint daemon process")
 
         # NOTE
@@ -314,6 +319,16 @@ class Endpoint:
         )
 
         with context:
+            # Per DaemonContext implementation, and that we _don't_ pass stdin,
+            # fd 0 is already connected to devnull.  Unfortunately, there is an
+            # as-yet unknown interaction on Polaris (ALCF) that needs this
+            # connection setup *again*.  So, repeat what daemon context already
+            # did, and dup2 stdin from devnull to ... devnull.  (!@#$%^&*)
+            # On any other system, this should make no difference (same file!)
+            with open(os.devnull) as nullf:
+                if os.dup2(nullf.fileno(), 0) != 0:
+                    raise Exception("Unable to close stdin")
+
             setup_logging(
                 logfile=logfile,
                 debug=self.debug,
@@ -327,6 +342,7 @@ class Endpoint:
                 endpoint_config,
                 reg_info,
                 result_store,
+                parent_pid,
             )
 
     @staticmethod
@@ -336,6 +352,7 @@ class Endpoint:
         endpoint_config: Config,
         reg_info,
         result_store: ResultStore,
+        parent_pid: int,
     ):
         interchange = EndpointInterchange(
             config=endpoint_config,
@@ -344,6 +361,7 @@ class Endpoint:
             endpoint_dir=endpoint_dir,
             result_store=result_store,
             logdir=endpoint_dir,
+            parent_pid=parent_pid,
         )
 
         interchange.start()
@@ -407,18 +425,55 @@ class Endpoint:
             exit(-1)
 
     @staticmethod
-    def delete_endpoint(endpoint_dir: pathlib.Path):
+    def delete_endpoint(
+        endpoint_dir: pathlib.Path, endpoint_config: Config | None, force: bool = False
+    ):
         ep_name = endpoint_dir.name
 
         if not endpoint_dir.exists():
             log.warning(f"Endpoint <{ep_name}> does not exist")
             exit(-1)
 
-        # stopping the endpoint should handle all of the process cleanup before
-        # deletion of the directory
+        endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
+        if endpoint_id is None:
+            log.warning(f"Endpoint <{ep_name}> could not be located")
+            if not force:
+                exit(-1)
+
+        # Delete endpoint from web service
+        try:
+            fx_client = Endpoint.get_funcx_client(endpoint_config)
+            fx_client.delete_endpoint(endpoint_id)
+            log.info(f"Endpoint <{ep_name}> has been deleted from the web service")
+        except GlobusAPIError as e:
+            log.warning(
+                f"Endpoint <{ep_name}> could not be deleted from the web service"
+                f"  [{e.message}]"
+            )
+            if not force:
+                log.critical("Exiting without deleting the endpoint")
+                exit(os.EX_UNAVAILABLE)
+        except NetworkError as e:
+            log.warning(
+                f"Endpoint <{ep_name}> could not be deleted from the web service"
+                f"  [{e}]"
+            )
+            if not force:
+                log.critical(
+                    "funcx-endpoint is unable to reach the funcX service due to a "
+                    "NetworkError \n"
+                    "Please make sure that the funcX service address you provided is "
+                    "reachable \n"
+                    "and then attempt to delete the endpoint again"
+                )
+                exit(os.EX_TEMPFAIL)
+
+        # Stop endpoint to handle process cleanup
         Endpoint.stop_endpoint(endpoint_dir, None)
 
+        # Delete endpoint directory
         shutil.rmtree(endpoint_dir)
+
         log.info(f"Endpoint <{ep_name}> has been deleted.")
 
     @staticmethod

@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import shutil
+import uuid
 from importlib.machinery import SourceFileLoader
 from unittest.mock import ANY
 
@@ -471,3 +472,43 @@ class TestStart:
             json.dump(mock_dict, fd)
 
         assert "abcde12345" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
+
+    @pytest.mark.parametrize("dir_exists", [True, False])
+    @pytest.mark.parametrize("web_svc_ok", [True, False])
+    @pytest.mark.parametrize("force", [True, False])
+    def test_delete_endpoint(self, mocker, dir_exists, web_svc_ok, force):
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
+        ep_uuid_str = str(uuid.uuid4())
+
+        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+        mock_stop_endpoint = mocker.patch.object(Endpoint, "stop_endpoint")
+        mock_rmtree = mocker.patch.object(shutil, "rmtree")
+        mocker.patch.object(Endpoint, "get_endpoint_id", return_value=ep_uuid_str)
+
+        # Immediately exit if the dir doesn't exist
+        if not dir_exists:
+            with pytest.raises(SystemExit):
+                manager.delete_endpoint(config_dir, None, force)
+            return
+
+        manager.configure_endpoint(config_dir, None)
+
+        # Exit if the web service call fails and we're not force deleting
+        if not web_svc_ok:
+            exc = GlobusAPIError(_fake_http_response(status=500, method="POST"))
+            mock_client.return_value.delete_endpoint.side_effect = exc
+
+            if not force:
+                with pytest.raises(SystemExit):
+                    manager.delete_endpoint(config_dir, None, force)
+
+                mock_stop_endpoint.assert_not_called()
+                mock_rmtree.assert_not_called()
+                return
+
+        manager.delete_endpoint(config_dir, None, force)
+
+        mock_client.return_value.delete_endpoint.assert_called_with(ep_uuid_str)
+        mock_stop_endpoint.assert_called_with(config_dir, None)
+        mock_rmtree.assert_called_with(config_dir)

@@ -178,19 +178,18 @@ class EPStatusReport(Message):
 
     type = MessageType.EP_STATUS_REPORT
 
-    def __init__(self, endpoint_id, ep_status_report, task_statuses):
+    def __init__(self, endpoint_id, global_state, task_statuses):
         super().__init__()
         self._header = uuid.UUID(endpoint_id).bytes
-        self.ep_status = ep_status_report
+        self.global_state = global_state
         self.task_statuses = task_statuses
-        # self._payload = task_statuses
 
     @classmethod
     def unpack(cls, msg):
         endpoint_id = str(uuid.UUID(bytes=msg[:16]))
         msg = msg[16:]
         jsonified = msg.decode("ascii")
-        ep_status, statuses = json.loads(jsonified)
+        global_state, statuses = json.loads(jsonified)
         task_statuses = defaultdict(list)
         for tid, tt in statuses.items():
             for trans in tt:
@@ -201,7 +200,7 @@ class EPStatusReport(Message):
                         state=trans["state"],
                     )
                 )
-        return cls(endpoint_id, ep_status, task_statuses)
+        return cls(endpoint_id, global_state, task_statuses)
 
     def pack(self):
         statuses = {}
@@ -209,7 +208,7 @@ class EPStatusReport(Message):
             for status in tt:
                 statuses[tid] = statuses.get(tid, [])
                 statuses[tid].append(status.to_dict())
-        jsonified = json.dumps([self.ep_status, statuses])
+        jsonified = json.dumps([self.global_state, statuses])
         return self.type.pack() + self._header + jsonified.encode("ascii")
 
 

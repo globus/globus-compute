@@ -111,7 +111,7 @@ def test_start_ep_reads_stdin(
     run_line("start foo")
     mock_ep, _ = mock_cli_state
     assert mock_ep.start_endpoint.called
-    reg_info_found = mock_ep.start_endpoint.call_args[0][-1]
+    reg_info_found = mock_ep.start_endpoint.call_args[0][5]
 
     if data_is_valid:
         assert reg_info_found == json.loads(reg_info)
@@ -158,3 +158,10 @@ def test_start_ep_incorrect(run_line, mock_cli_state, make_endpoint_dir):
     conf.write_text("asdf = 5")  # syntactically correct
     res = run_line("start foo", assert_exit_code=1)
     assert "modified incorrectly?" in res.stderr
+
+
+@mock.patch("funcx_endpoint.cli.read_config")
+def test_delete_endpoint(read_config, run_line, mock_cli_state):
+    run_line("delete foo --yes")
+    mock_ep, _ = mock_cli_state
+    mock_ep.delete_endpoint.assert_called_once()
