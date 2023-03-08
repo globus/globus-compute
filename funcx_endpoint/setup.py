@@ -75,11 +75,11 @@ setup(
         "console_scripts": [
             "funcx-endpoint=funcx_endpoint.cli:cli_run",
             "funcx-interchange"
-            "=funcx_endpoint.executors.high_throughput.interchange:cli_run",
+            "=funcx_endpoint.engines.high_throughput.interchange:cli_run",
             "funcx-manager"
-            "=funcx_endpoint.executors.high_throughput.funcx_manager:cli_run",
+            "=funcx_endpoint.engines.high_throughput.funcx_manager:cli_run",
             "funcx-worker"
-            "=funcx_endpoint.executors.high_throughput.funcx_worker:cli_run",
+            "=funcx_endpoint.engines.high_throughput.funcx_worker:cli_run",
         ]
     },
     include_package_data=True,

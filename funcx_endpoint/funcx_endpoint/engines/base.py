@@ -53,9 +53,9 @@ class ReportingThread:
             try:
                 target(*args)
             except Exception as e:
-                # log and update future before exiting
-                logger.exception("Callback failed")
-                self.status.set_exception(exception=e)
+                # log and update future before exiting, if it is not already set
+                if not self.status.exception():
+                    self.status.set_exception(exception=e)
 
             if self._shutdown_event.wait(timeout=self.reporting_period):
                 break
@@ -92,7 +92,7 @@ class GlobusComputeEngineBase(ABC):
         self.run_dir: t.Optional[str] = None
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
-        self.results_passthrough = queue.Queue()
+        self.results_passthrough: queue.Queue = queue.Queue()
 
     @abstractmethod
     def start(

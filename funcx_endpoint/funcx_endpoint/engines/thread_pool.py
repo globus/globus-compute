@@ -5,7 +5,7 @@ import multiprocessing
 import typing as t
 import uuid
 from concurrent.futures import Future
-from concurrent.futures import ProcessPoolExecutor as NativeExecutor
+from concurrent.futures import ThreadPoolExecutor as NativeExecutor
 from multiprocessing.queues import Queue as mpQueue
 
 import psutil
@@ -16,11 +16,11 @@ from funcx_endpoint.engines.base import GlobusComputeEngineBase, ReportingThread
 logger = logging.getLogger(__name__)
 
 
-class ProcessPoolEngine(GlobusComputeEngineBase):
+class ThreadPoolEngine(GlobusComputeEngineBase):
     def __init__(
         self,
         *args,
-        label: str = "ProcessPoolEngine",
+        label: str = "ThreadPoolEngine",
         heartbeat_period: float = 30.0,
         **kwargs,
     ):
@@ -50,7 +50,7 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         -------
 
         """
-        assert endpoint_id, "ProcessPoolExecutor requires kwarg:endpoint_id at start"
+        assert endpoint_id, "ThreadPoolEngine requires kwarg:endpoint_id at start"
         self.endpoint_id = endpoint_id
         if results_passthrough:
             self.results_passthrough = results_passthrough
