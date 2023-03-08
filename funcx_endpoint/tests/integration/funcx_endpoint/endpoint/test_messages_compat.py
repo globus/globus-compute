@@ -23,7 +23,7 @@ from funcx_endpoint.executors.high_throughput.messages import Task as InternalTa
 
 def test_ep_status_report_conversion():
     ep_id = uuid.uuid4()
-    ep_status_report = {"looking": "good"}
+    global_state = {"looking": "good"}
     task_statuses = {
         "1": [
             TaskTransition(
@@ -41,7 +41,7 @@ def test_ep_status_report_conversion():
         ],
     }
 
-    internal = InternalEPStatusReport(str(ep_id), ep_status_report, task_statuses)
+    internal = InternalEPStatusReport(str(ep_id), global_state, task_statuses)
     message = pickle.dumps(internal)
 
     outgoing = try_convert_to_messagepack(message)
@@ -49,7 +49,7 @@ def test_ep_status_report_conversion():
 
     assert isinstance(external, OutgoingEPStatusReport)
     assert external.endpoint_id == ep_id
-    assert external.ep_status_report == ep_status_report
+    assert external.global_state == global_state
     assert external.task_statuses == task_statuses
 
 

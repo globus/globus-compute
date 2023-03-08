@@ -36,7 +36,7 @@ def try_convert_to_messagepack(message: bytes) -> bytes:
     if isinstance(unpacked, InternalEPStatusReport):
         messagepack_msg = OutgoingEPStatusReport(
             endpoint_id=unpacked._header,
-            ep_status_report=unpacked.ep_status,
+            global_state=unpacked.global_state,
             task_statuses=unpacked.task_statuses,
         )
     elif isinstance(unpacked, dict):
