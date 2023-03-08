@@ -1,7 +1,7 @@
 Endpoint UX-Design
 ------------------
 
-Here are the basic functions we want from the `funcx-endpoint`:
+Here are the basic functions we want from the `endpoint`:
 
 * init : One time initialization that sets up the global options for the site
   at which the endpoint is being deployed

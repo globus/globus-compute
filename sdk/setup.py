@@ -19,7 +19,7 @@ REQUIRES = [
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
     "pika>=1.2",
-    "globus-compute-common==0.0.1",
+    "globus-compute-common==0.1.0",
     "tblib==1.7.0",
     "texttable>=1.6.7",
 ]

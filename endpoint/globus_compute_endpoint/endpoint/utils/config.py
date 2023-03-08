@@ -5,13 +5,13 @@ import warnings
 
 from parsl.utils import RepresentationMixin
 
-from funcx_endpoint.executors import HighThroughputExecutor
+from globus_compute_endpoint.executors import HighThroughputExecutor
 
 _DEFAULT_EXECUTORS = [HighThroughputExecutor()]
 
 
 class Config(RepresentationMixin):
-    """Specification of FuncX configuration options.
+    """Specification of Globus Compute configuration options.
 
     Parameters
     ----------
@@ -19,7 +19,7 @@ class Config(RepresentationMixin):
     executors : list of Executors
         A list of executors which serve as the backend for function execution.
         As of 0.2.2, this list should contain only one executor.
-        Default: [HighThroughtputExecutor()]
+        Default: [HighThroughputExecutor()]
 
     environment: str
         Environment the endpoint should connect to. Sets funcx_service_address and
@@ -28,11 +28,11 @@ class Config(RepresentationMixin):
         Default: None
 
     funcx_service_address: str | None
-        URL address string of the funcX service to which the Endpoint should connect.
+        URL address string of the web service to which the Endpoint should connect.
         Default: None
 
     results_ws_uri: str | None
-        URL address string of the funcX websocket service passed to the funcX client.
+        URL address string of the Globus Compute websocket service passed to the client.
         Default: None
 
     warn_about_url_mismatch: Bool
@@ -42,11 +42,11 @@ class Config(RepresentationMixin):
 
     heartbeat_period: int (seconds)
         The interval at which heartbeat messages are sent from the endpoint to the
-        funcx-web-service
+        web service
         Default: 30s
 
     heartbeat_threshold: int (seconds)
-        Seconds since the last hearbeat message from the funcx-web-service after which
+        Seconds since the last heartbeat message from the web service after which
         the connection is assumed to be disconnected.
         Default: 120s
 

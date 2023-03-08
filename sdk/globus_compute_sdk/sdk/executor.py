@@ -21,13 +21,13 @@ else:
 
 
 import pika
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import Result
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import Result
 
-from funcx.errors import FuncxTaskExecutionFailed
-from funcx.sdk.asynchronous.funcx_future import FuncXFuture
-from funcx.sdk.client import FuncXClient
-from funcx.sdk.utils import chunk_by
+from globus_compute_sdk.errors import TaskExecutionFailed
+from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
+from globus_compute_sdk.sdk.client import Client
+from globus_compute_sdk.sdk.utils import chunk_by
 
 log = logging.getLogger(__name__)
 
@@ -38,18 +38,18 @@ if t.TYPE_CHECKING:
     from pika.spec import Basic, BasicProperties
 
 
-_REGISTERED_FXEXECUTORS: dict[int, t.Any] = {}
+_REGISTERED_EXECUTORS: dict[int, t.Any] = {}
 
 
-def __funcxexecutor_atexit():
+def __executor_at_exit():
     threading.main_thread().join()
-    to_shutdown = list(_REGISTERED_FXEXECUTORS.values())
+    to_shutdown = list(_REGISTERED_EXECUTORS.values())
     while to_shutdown:
-        fxe = to_shutdown.pop()
-        fxe.shutdown()
+        gce = to_shutdown.pop()
+        gce.shutdown()
 
 
-threading.Thread(target=__funcxexecutor_atexit).start()
+threading.Thread(target=__executor_at_exit()).start()
 
 
 class TaskSubmissionInfo:
@@ -79,7 +79,7 @@ class TaskSubmissionInfo:
 
 
 class AtomicController:
-    """This is used to synchronize between the FuncXExecutor which starts
+    """This is used to synchronize between the Executor which starts
     WebSocketPollingTasks and the WebSocketPollingTask which closes itself when there
     are 0 tasks.
     """
@@ -116,11 +116,11 @@ class AtomicController:
         return f"AtomicController value:{self._value}"
 
 
-class FuncXExecutor(concurrent.futures.Executor):
+class Executor(concurrent.futures.Executor):
     """
-    Extend Python's |Executor|_ base class for funcX's purposes.
+    Extend Python's |Executor|_ base class for Globus Compute's purposes.
 
-    .. |Executor| replace:: ``FuncXExecutor``
+    .. |Executor| replace:: ``Executor``
     .. _Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
     """  # noqa
 
@@ -128,7 +128,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self,
         endpoint_id: str | None = None,
         container_id: str | None = None,
-        funcx_client: FuncXClient | None = None,
+        funcx_client: Client | None = None,
         task_group_id: str | None = None,
         label: str = "",
         batch_size: int = 128,
@@ -137,7 +137,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
         :param endpoint_id: id of the endpoint to which to submit tasks
         :param container_id: id of the container in which to execute tasks
-        :param funcx_client: instance of FuncXClient to be used by the
+        :param funcx_client: instance of Globus Compute Client to be used by the
             executor.  If not provided, the executor will instantiate one with default
             arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
@@ -162,7 +162,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             raise TypeError(msg)
 
         if not funcx_client:
-            funcx_client = FuncXClient()
+            funcx_client = Client()
         self.funcx_client = funcx_client
 
         self.endpoint_id = endpoint_id
@@ -174,7 +174,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self._task_counter: int = 0
         self._task_group_id: str = task_group_id or str(uuid.uuid4())
         self._tasks_to_send: queue.Queue[
-            tuple[FuncXFuture, TaskSubmissionInfo] | tuple[None, None]
+            tuple[ComputeFuture, TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
         self._function_registry: dict[tuple[t.Callable, str | None], str] = {}
 
@@ -188,7 +188,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             target=self._task_submitter_impl, name="TaskSubmitter"
         )
         self._task_submitter.start()
-        _REGISTERED_FXEXECUTORS[id(self)] = self
+        _REGISTERED_EXECUTORS[id(self)] = self
 
     def __repr__(self) -> str:
         name = self.__class__.__name__
@@ -207,13 +207,13 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         Must be a string.  Set by simple assignment::
 
-            fxe = FuncXExecutor(endpoint_id="...")
-            fxe.task_group_id = "Some-stored-id"
+            gce = Executor(endpoint_id="...")
+            gce.task_group_id = "Some-stored-id"
 
         This is typically used when reattaching to a previously initiated set of tasks.
         See `reload_tasks()`_ for more information.
 
-        [default: ``None``, which translates to the FuncXClient task group id]
+        [default: ``None``, which translates to the Client task group id]
         """
         return self._task_group_id
 
@@ -233,8 +233,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         All function execution submissions (i.e., ``.submit()``) communicate which
         pre-registered function to execute on the endpoint by the function's
         identifier, the ``function_id``.  This method makes the appropriate API
-        call to the funcX web services to first register the task function, and
-        then stores the returned ``function_id`` in the Executor's cache.
+        call to the Globus Compute web services to first register the task function,
+        and then stores the returned ``function_id`` in the Executor's cache.
 
         In the standard workflow, ``.submit()`` will automatically handle invoking
         this method, so the common use-case will not need to use this method.
@@ -254,7 +254,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         :param function_id: if specified, associate the ``function_id`` to the
             ``fn`` immediately, short-circuiting the upstream registration call.
         :param func_register_kwargs: all other keyword arguments are passed to
-            the ``FuncXClient.register_function()``.
+            the ``Client.register_function()``.
         :returns: the function's ``function_id`` string, as returned by
             registration upstream
         """
@@ -294,14 +294,14 @@ class FuncXExecutor(concurrent.futures.Executor):
         with the given arguments.
 
         Schedules the callable to be executed as ``fn(*args, **kwargs)`` and
-        returns a FuncXFuture instance representing the execution of the
+        returns a ComputeFuture instance representing the execution of the
         callable.
 
         Example use::
 
             >>> def add(a: int, b: int) -> int: return a + b
-            >>> fxe = FuncXExecutor(endpoint_id="some-ep-id")
-            >>> fut = fxe.submit(add, 1, 2)
+            >>> gce = Executor(endpoint_id="some-ep-id")
+            >>> fut = gce.submit(add, 1, 2)
             >>> fut.result()    # wait (block) until result is received from remote
             3
 
@@ -311,8 +311,8 @@ class FuncXExecutor(concurrent.futures.Executor):
         :param kwargs: keyword arguments (if any) as required to execute
             the function
         :returns: a future object that will receive a ``.task_id`` when the
-            funcX Web Service acknowledges receipt, and eventually will have
-            a ``.result()`` when the funcX web services receive and stream it.
+            web service acknowledges receipt, and eventually will have
+            a ``.result()`` when the web services receive and stream it.
         """
         if self._stopped:
             err_fmt = "%s is shutdown; no new functions may be executed"
@@ -336,18 +336,18 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
         Request an execution of an already registered function.
 
-        This method supports use of public functions with the FuncXExecutor, or
+        This method supports use of public functions with the Executor, or
         knowledge of an already registered function.  An example use might be::
 
             # pre_registration.py
-            from funcx import FuncXExecutor
+            from globus_compute_sdk import Executor
 
             def some_processor(*args, **kwargs):
                 # ... function logic ...
                 return ["some", "result"]
 
-            fxe = FuncXExecutor()
-            fn_id = fxe.register_function(some_processor)
+            gce = Executor()
+            fn_id = gce.register_function(some_processor)
             print(f"Function registered successfully.\\nFunction ID: {fn_id}")
 
             # Example output:
@@ -359,14 +359,14 @@ class FuncXExecutor(concurrent.futures.Executor):
         the function id is just a string.  One could substitute for a publicly
         available function.  For instance, ``b0a5d1a0-2b22-4381-b899-ba73321e41e0`` is
         a "well-known" uuid for the "Hello, World!" function (same as the example in
-        the FuncX tutorial), which is publicly available::
+        the Globus Compute tutorial), which is publicly available::
 
-            from funcx import FuncXExecutor
+            from globus_compute_sdk import Executor
 
             fn_id = "b0a5d1a0-2b22-4381-b899-ba73321e41e0"  # public; "Hello World"
-            with FuncXExecutor(endpoint_id="your-endpoint-id") as fxe:
+            with Executor(endpoint_id="your-endpoint-id") as gce:
                 futs = [
-                    fxe.submit_to_registered_function(function_id=fn_id)
+                    gce.submit_to_registered_function(function_id=fn_id)
                     for i in range(5)
                 ]
 
@@ -379,7 +379,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         :param kwargs: keyword arguments (if any) as required to execute
             the function
         :returns: a future object that (eventually) will have a ``.result()``
-            when the funcX web services receive and stream it.
+            when the Globus Compute web services receive and stream it.
         """
         if self._stopped:
             err_fmt = "%s is shutdown; no new functions may be executed"
@@ -389,8 +389,8 @@ class FuncXExecutor(concurrent.futures.Executor):
             msg = (
                 "No endpoint_id set.  Did you forget to set it at construction?\n"
                 "  Hint:\n\n"
-                "    fxe = FuncXExecutor(endpoint_id=<ep_id>)\n"
-                "    fxe.endpoint_id = <ep_id>    # alternative"
+                "    gce = Executor(endpoint_id=<ep_id>)\n"
+                "    gce.endpoint_id = <ep_id>    # alternative"
             )
             self.shutdown(wait=False, cancel_futures=True)
             raise ValueError(msg)
@@ -410,14 +410,14 @@ class FuncXExecutor(concurrent.futures.Executor):
             kwargs=kwargs,
         )
 
-        fut = FuncXFuture()
+        fut = ComputeFuture()
         self._tasks_to_send.put((fut, task))
         return fut
 
     def map(self, fn: t.Callable, *iterables, timeout=None, chunksize=1) -> t.Iterator:
         """
-        FuncX does not currently implement the `.map()`_ method of the `Executor
-        interface`_.  In a naive implementation, this method would merely be
+        Globus Compute does not currently implement the `.map()`_ method of the
+        `Executor interface`_.  In a naive implementation, this method would merely be
         syntactic sugar for bulk use of the ``.submit()`` method.  For example::
 
             def map(fxexec, fn, *fn_args_kwargs):
@@ -436,7 +436,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         """  # noqa
         raise NotImplementedError()
 
-    def reload_tasks(self) -> t.Iterable[FuncXFuture]:
+    def reload_tasks(self) -> t.Iterable[ComputeFuture]:
         """
         .. _reload_tasks():
 
@@ -473,12 +473,12 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         # step 3: create the associated set of futures
         task_ids: list[str] = [task["id"] for task in r.get("tasks", [])]
-        futures: list[FuncXFuture] = []
+        futures: list[ComputeFuture] = []
 
         if task_ids:
             # Complete the futures that already have results.
-            pending: list[FuncXFuture] = []
-            deserialize = self.funcx_client.fx_serializer.deserialize
+            pending: list[ComputeFuture] = []
+            deserialize = self.funcx_client.serializer.deserialize
             chunk_size = 1024
             num_chunks = len(task_ids) // chunk_size + 1
             for chunk_no, id_chunk in enumerate(
@@ -496,7 +496,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
                 res = self.funcx_client.web_client.get_batch_status(id_chunk)
                 for task_id, task in res.data.get("results", {}).items():
-                    fut = FuncXFuture(task_id)
+                    fut = ComputeFuture(task_id)
                     futures.append(fut)
                     completed_t = task.get("completion_t")
                     if not completed_t:
@@ -506,16 +506,16 @@ class FuncXExecutor(concurrent.futures.Executor):
                             if task.get("status") == "success":
                                 fut.set_result(deserialize(task["result"]))
                             else:
-                                exc = FuncxTaskExecutionFailed(
+                                exc = TaskExecutionFailed(
                                     task["exception"], completed_t
                                 )
                                 fut.set_exception(exc)
                         except Exception as exc:
-                            funcx_err = FuncxTaskExecutionFailed(
+                            compute_err = TaskExecutionFailed(
                                 "Failed to set result or exception"
                             )
-                            funcx_err.__cause__ = exc
-                            fut.set_exception(funcx_err)
+                            compute_err.__cause__ = exc
+                            fut.set_exception(compute_err)
 
             if pending:
                 self._result_watcher = _ResultWatcher(self)
@@ -553,7 +553,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             # interwoven in the logs.  Attempt to make debugging easier for
             # that scenario by adding a slight delay on the *main* thread.
             time.sleep(0.1)
-        _REGISTERED_FXEXECUTORS.pop(id(self), None)
+        _REGISTERED_EXECUTORS.pop(id(self), None)
         log.debug("%s: shutdown complete (thread: %s)", self, thread_id)
 
     def _task_submitter_impl(self) -> None:
@@ -572,9 +572,9 @@ class FuncXExecutor(concurrent.futures.Executor):
             "%s: task submission thread started (%s)", self, threading.get_ident()
         )
         to_send = self._tasks_to_send  # cache lookup
-        futs: list[FuncXFuture] = []  # for mypy/the exception branch
+        futs: list[ComputeFuture] = []  # for mypy/the exception branch
         try:
-            fut: FuncXFuture | None = FuncXFuture()  # just start the loop; please
+            fut: ComputeFuture | None = ComputeFuture()  # just start the loop; please
             while fut is not None:
                 futs = []
                 tasks: list[TaskSubmissionInfo] = []
@@ -597,7 +597,7 @@ class FuncXExecutor(concurrent.futures.Executor):
                 if not tasks:
                     continue
 
-                log.info(f"Submitting tasks to funcX: {len(tasks)}")
+                log.info(f"Submitting tasks to Globus Compute: {len(tasks)}")
                 self._submit_tasks(futs, tasks)
 
                 with self._shutdown_lock:
@@ -662,12 +662,12 @@ class FuncXExecutor(concurrent.futures.Executor):
                 pass
             log.debug("%s: task submission thread complete", self)
 
-    def _submit_tasks(self, futs: list[FuncXFuture], tasks: list[TaskSubmissionInfo]):
+    def _submit_tasks(self, futs: list[ComputeFuture], tasks: list[TaskSubmissionInfo]):
         """
         Submit a batch of tasks to the webservice, destined for self.endpoint_id.
         Upon success, update the futures with their associated task_id.
 
-        :param futs: a list of FuncXFutures; will have their task_id attribute
+        :param futs: a list of ComputeFutures; will have their task_id attribute
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
@@ -677,12 +677,12 @@ class FuncXExecutor(concurrent.futures.Executor):
         )
         for task in tasks:
             batch.add(task.function_id, task.endpoint_id, task.args, task.kwargs)
-            log.debug("Added task to funcX batch: %s", task)
+            log.debug("Added task to Globus Compute batch: %s", task)
 
         try:
             batch_tasks = self.funcx_client.batch_run(batch)
         except Exception:
-            log.error(f"Error submitting {len(tasks)} tasks to funcX")
+            log.error(f"Error submitting {len(tasks)} tasks to Globus Compute")
             raise
 
         self.task_count_submitted += len(batch_tasks)
@@ -699,17 +699,17 @@ class FuncXExecutor(concurrent.futures.Executor):
 class _ResultWatcher(threading.Thread):
     """
     _ResultWatcher is an internal SDK class meant for consumption by the
-    FuncXExecutor.  It is a standard async AMQP consumer implementation
+    Compute Executor.  It is a standard async AMQP consumer implementation
     using the Pika library that matches futures from the Executor against
-    results received from the funcX hosted services.
+    results received from the Globus Compute hosted services.
 
     Expected usage::
 
-        rw = _ResultWatcher(self)  # assert isinstance(self, FuncXExecutor)
+        rw = _ResultWatcher(self)  # assert isinstance(self, Executor)
         rw.start()
 
-        # rw is its own thread; it will use the FuncXClient attached to the
-        # FuncXExecutor to acquire AMQP credentials, and then will open a
+        # rw is its own thread; it will use the Client attached to the
+        # Executor to acquire AMQP credentials, and then will open a
         # connection to the AMQP service.
 
         rw.watch_for_task_results(some_list_of_futures)
@@ -718,7 +718,7 @@ class _ResultWatcher(threading.Thread):
     will opportunistically shutdown; the caller must handle this scenario
     if new futures arrive, and create a new _ResultWatcher instance.
 
-    :param funcx_executor: A FuncXExecutor instance
+    :param compute_executor: A Globus Compute Executor instance
     :param poll_period_s: [default: 0.5] how frequently to check for and
         handle events.  For example, if the thread should stop due to user
         request or if there are results to match.
@@ -754,7 +754,7 @@ class _ResultWatcher(threading.Thread):
 
         self._queue_prefix = ""
 
-        self._open_futures: dict[str, FuncXFuture] = {}
+        self._open_futures: dict[str, ComputeFuture] = {}
         self._received_results: dict[str, tuple[BasicProperties, Result]] = {}
 
         self._open_futures_empty = threading.Event()
@@ -880,13 +880,13 @@ class _ResultWatcher(threading.Thread):
             if wait:
                 join_thread.join()
 
-    def watch_for_task_results(self, futures: list[FuncXFuture]) -> int:
+    def watch_for_task_results(self, futures: list[ComputeFuture]) -> int:
         """
-        Add list of FuncXFutures to internal watch list.
+        Add list of ComputeFutures to internal watch list.
 
         Updates the thread's dictionary of futures that will be resolved when
         upstream sends associated results.  The internal dictionary is keyed
-        on the FuncXFuture.task_id attribute, but this method does not verify
+        on the ComputeFuture.task_id attribute, but this method does not verify
         that it is set -- it is up to the caller to ensure the future is
         initialized fully.  In particular, if a task_id is not set, it will
         not be added to the watch list.
@@ -928,7 +928,7 @@ class _ResultWatcher(threading.Thread):
         This method will set the _open_futures_empty event if there are no open
         futures *at the time of processing*.
         """
-        deserialize = self.funcx_executor.funcx_client.fx_serializer.deserialize
+        deserialize = self.compute_executor.funcx_client.serializer.deserialize
         with self._new_futures_lock:
             futures_to_complete = [
                 self._open_futures.pop(tid)
@@ -942,7 +942,7 @@ class _ResultWatcher(threading.Thread):
 
             if res.is_error:
                 fut.set_exception(
-                    FuncxTaskExecutionFailed(res.data, str(props.timestamp or 0))
+                    TaskExecutionFailed(res.data, str(props.timestamp or 0))
                 )
             else:
                 try:
@@ -1055,7 +1055,7 @@ class _ResultWatcher(threading.Thread):
 
     def _connect(self) -> pika.SelectConnection:
         with self._new_futures_lock:
-            res = self.funcx_executor.funcx_client.get_result_amqp_url()
+            res = self.compute_executor.funcx_client.get_result_amqp_url()
             self._queue_prefix = res["queue_prefix"]
             connection_url = res["connection_url"]
 
@@ -1139,7 +1139,7 @@ class _ResultWatcher(threading.Thread):
 
     def _start_consuming(self):
         self._consumer_tag = self._channel.basic_consume(
-            queue=f"{self._queue_prefix}{self.funcx_executor.task_group_id}",
+            queue=f"{self._queue_prefix}{self.compute_executor.task_group_id}",
             on_message_callback=self._on_message,
         )
 

@@ -1,6 +1,6 @@
 from packaging.version import Version
 
-from sdk.errors  import VersionMismatch
+from globus_compute_sdk.errors  import VersionMismatch
 
 # single source of truth for package version,
 # see https://packaging.python.org/en/latest/single_source_version/
@@ -8,7 +8,7 @@ __version__ = "1.0.10"
 
 
 def compare_versions(
-    current: str, min_version: str, *, package_name: str = "funcx"
+    current: str, min_version: str, *, package_name: str = "globus-compute-sdk"
 ) -> None:
     current_v = Version(current)
     min_v = Version(min_version)

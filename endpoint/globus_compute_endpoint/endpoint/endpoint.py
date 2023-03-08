@@ -21,13 +21,13 @@ import setproctitle
 import texttable
 from globus_sdk import GlobusAPIError, NetworkError
 
-from funcx.sdk.client import FuncXClient
-from funcx_endpoint import __version__
-from funcx_endpoint.endpoint import default_config as endpoint_default_config
-from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.result_store import ResultStore
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.logging_config import setup_logging
+from globus_compute_sdk.sdk.client import Client
+from globus_compute_endpoint import __version__
+from globus_compute_endpoint.endpoint import default_config as endpoint_default_config
+from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
+from globus_compute_endpoint.endpoint.result_store import ResultStore
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.logging_config import setup_logging
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class Endpoint:
 
         :param endpoint_dir pathlib.Path Path to the endpoint configuration dir
         :param endpoint_config str Path to a config file to be used instead
-         of the funcX default config file
+         of the default config file
         :param multi_tenant bool Whether the endpoint is a multi-user endpoint
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
@@ -95,7 +95,7 @@ class Endpoint:
         try:
             # pathlib.Path does not handle unusual umasks (e.g., 0o0111) so well
             # in the parents=True case, so temporarily change it.  This is nominally
-            # only an issue for totally new users (no .funcx/!), but that is also
+            # only an issue for totally new users (no .compute/!), but that is also
             # precisely the interaction -- the first one -- that should go smoothly
             endpoint_dir.mkdir(parents=True, exist_ok=True)
         finally:
@@ -132,7 +132,7 @@ class Endpoint:
         print(
             f"\n    Configuration file: {config_path}\n"
             "\nUse the `start` subcommand to run it:\n"
-            f"\n    $ funcx-endpoint start {ep_name}"
+            f"\n    $ globus-compute-endpoint start {ep_name}"
         )
 
     @staticmethod
@@ -154,16 +154,16 @@ class Endpoint:
         return ep_id
 
     @staticmethod
-    def get_funcx_client(config: Config | None) -> FuncXClient:
+    def get_client(config: Config | None) -> Client:
         if config:
-            funcx_client_options = {
+            client_options = {
                 "funcx_service_address": config.funcx_service_address,
                 "environment": config.environment,
             }
 
-            return FuncXClient(**funcx_client_options)
+            return Client(**client_options)
         else:
-            return FuncXClient()
+            return Client()
 
     def start_endpoint(
         self,
@@ -239,8 +239,8 @@ class Endpoint:
             )
             log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
             try:
-                fx_client = Endpoint.get_funcx_client(endpoint_config)
-                reg_info = fx_client.register_endpoint(
+                client = Endpoint.get_client(endpoint_config)
+                reg_info = client.register_endpoint(
                     endpoint_dir.name,
                     endpoint_uuid,
                     metadata=metadata,
@@ -261,11 +261,10 @@ class Endpoint:
                     f"Caught exception while attempting endpoint registration: {e}"
                 )
                 log.critical(
-                    "funcx-endpoint is unable to reach the funcX service due to a "
-                    "NetworkError \n"
-                    "Please make sure that the funcX service address you provided is "
-                    "reachable \n"
-                    "and then attempt restarting the endpoint"
+                    "The endpoint is unable to reach the Globus Compute web service"
+                    " due to a NetworkError\n"
+                    "Please make sure that the service address you provided is"
+                    " reachable \nand then restart the endpoint"
                 )
                 exit(os.EX_TEMPFAIL)
 
@@ -290,12 +289,12 @@ class Endpoint:
         json_file = endpoint_dir / "endpoint.json"
 
         # `endpoint_id` key kept for backward compatibility when
-        # funcx-endpoint list is called
+        # globus-compute-endpoint list is called
         ep_info = {"endpoint_id": endpoint_uuid}
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
 
-        ptitle = f"funcX Endpoint ({endpoint_uuid}, {endpoint_dir.name})"
+        ptitle = f"Globus Compute Endpoint ({endpoint_uuid}, {endpoint_dir.name})"
         if endpoint_config.environment:
             ptitle += f" - {endpoint_config.environment}"
         ptitle += f" [{setproctitle.getproctitle()}]"
@@ -365,8 +364,8 @@ class Endpoint:
             if not endpoint_id:
                 raise ValueError(f"Endpoint <{ep_name}> could not be located")
 
-            fx_client = Endpoint.get_funcx_client(endpoint_config)
-            fx_client.stop_endpoint(endpoint_id)
+            client = Endpoint.get_client(endpoint_config)
+            client.stop_endpoint(endpoint_id)
 
         ep_status = Endpoint.check_pidfile(endpoint_dir)
         if ep_status["exists"] and not ep_status["active"]:
@@ -460,7 +459,7 @@ class Endpoint:
         log.info(f"Endpoint <{endpoint_dir.name}> has been cleaned up.")
 
     @staticmethod
-    def get_endpoints(funcx_conf_dir: pathlib.Path | str) -> dict[str, dict]:
+    def get_endpoints(conf_dir: pathlib.Path | str) -> dict[str, dict]:
         """
         Gets a dictionary that contains information about all locally
         known endpoints.
@@ -482,8 +481,8 @@ class Endpoint:
         """
         ep_statuses = {}
 
-        funcx_conf_dir = pathlib.Path(funcx_conf_dir)
-        ep_dir_paths = (p.parent for p in funcx_conf_dir.glob("*/config.py"))
+        conf_dir_path = pathlib.Path(conf_dir)
+        ep_dir_paths = (p.parent for p in conf_dir_path.glob("*/config.py"))
         for ep_path in ep_dir_paths:
             ep_status = {
                 "status": "Initialized",
@@ -524,7 +523,7 @@ class Endpoint:
         endpoints = Endpoint.get_endpoints(conf_dir)
         if not endpoints:
             print(
-                "No endpoints configured!\n\n  (Hint: funcx-endpoint configure)",
+                "No endpoints configured!\n\n  (Hint: globus-compute-endpoint configure)",
                 file=ofile,
             )
             return

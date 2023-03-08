@@ -5,8 +5,8 @@ from setuptools import find_packages, setup
 REQUIRES = [
     "requests>=2.20.0,<3",
     "globus-sdk",  # version will be bounded by `funcx`
-    "globus-compute>=1.0.8",
-    "funcx-common==0.0.24",
+    "globus-compute-sdk>=1.1.0",
+    "globus-compute-common==0.1.0",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer

@@ -8,8 +8,8 @@ from unittest import mock
 
 import pika
 import pytest
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import Result, ResultErrorDetails
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
 from tests.utils import try_assert, try_for_timeout
 
 from globus_compute_sdk import Client, Executor
