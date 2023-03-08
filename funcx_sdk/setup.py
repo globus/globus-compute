@@ -19,7 +19,7 @@ REQUIRES = [
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
     "pika>=1.2",
-    "funcx-common==0.0.24",
+    "funcx-common==0.0.25",
     "tblib==1.7.0",
     "texttable>=1.6.7",
 ]
