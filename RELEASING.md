@@ -1,7 +1,7 @@
 # Releasing
 
-Releases of `globus-compute` and `globus-compute-endpoint` are always done with a single version
-number, even when only one package has changes.
+Releases of `globus-compute-sdk` and `globus-compute-endpoint` are always done
+with a single version number, even when only one package has changes.
 
 The process is partially automated with tools to help along the way.
 

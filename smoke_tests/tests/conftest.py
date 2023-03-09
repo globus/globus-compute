@@ -14,20 +14,20 @@ from globus_sdk import (
     SearchClient,
 )
 
-from funcx import FuncXClient
-from funcx.sdk.web_client import FuncxWebClient
+from globus_compute_sdk import Client
+from globus_compute_sdk.sdk.web_client import WebClient
 
 # the non-tutorial endpoint will be required, with the following priority order for
 # finding the ID:
 #
 #  1. `--endpoint` opt
-#  2. FUNX_LOCAL_ENDPOINT_ID (seen here)
-#  3. FUNX_LOCAL_ENDPOINT_NAME (the name of a dir in `~/.funcx/`)
+#  2. COMPUTE_LOCAL_ENDPOINT_ID (seen here)
+#  3. COMPUTE_LOCAL_ENDPOINT_NAME (the name of a dir in `~/.funcx/`)
 #  4. An endpoint ID found in ~/.funcx/default/endpoint.json
 #
 #  this var starts with the ID env var load
-_LOCAL_ENDPOINT_ID = os.getenv("FUNCX_LOCAL_ENDPOINT_ID")
-_LOCAL_FUNCTION_ID = os.getenv("FUNCX_LOCAL_KNOWN_FUNCTION_ID")
+_LOCAL_ENDPOINT_ID = os.getenv("COMPUTE_LOCAL_ENDPOINT_ID")
+_LOCAL_FUNCTION_ID = os.getenv("COMPUTE_LOCAL_KNOWN_FUNCTION_ID")
 
 _CONFIGS = {
     "dev": {
@@ -65,7 +65,7 @@ def _get_local_endpoint_id():
     # this is only called if
     #  - there is no endpoint in the config (e.g. config via env var)
     #  - `--endpoint` is not passed
-    local_endpoint_name = os.getenv("FUNCX_LOCAL_ENDPOINT_NAME", "default")
+    local_endpoint_name = os.getenv("COMPUTE_LOCAL_ENDPOINT_NAME", "default")
     data_path = os.path.join(
         os.path.expanduser("~"), ".funcx", local_endpoint_name, "endpoint.json"
     )
@@ -80,9 +80,9 @@ def _get_local_endpoint_id():
 
 
 def pytest_addoption(parser):
-    """Add funcx-specific command-line options to pytest."""
+    """Add Compute specific command-line options to pytest."""
     parser.addoption(
-        "--funcx-config", default="prod", help="Name of testing config to use"
+        "--globus-compute-config", default="prod", help="Name of testing config to use"
     )
     parser.addoption(
         "--endpoint", metavar="endpoint", help="Specify an active endpoint UUID"
@@ -90,7 +90,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--service-address",
         metavar="service-address",
-        help="Specify a funcX service address",
+        help="Specify a Globus Compute service address",
     )
     parser.addoption(
         "--ws-uri", metavar="ws-uri", help="WebSocket URI to get task results"
@@ -98,7 +98,7 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(scope="session")
-def funcx_test_config_name(pytestconfig):
+def compute_test_config_name(pytestconfig):
     return pytestconfig.getoption("--funcx-config")
 
 
@@ -113,18 +113,18 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
         requested_scopes=scopes
     ).by_resource_server
 
-    funcx_token = tokens["funcx_service"]["access_token"]
+    compute_token = tokens["funcx_service"]["access_token"]
     search_token = tokens[SearchClient.resource_server]["access_token"]
     auth_token = tokens[AuthClient.resource_server]["access_token"]
 
-    funcx_authorizer = AccessTokenAuthorizer(funcx_token)
+    compute_authorizer = AccessTokenAuthorizer(compute_token)
     search_authorizer = AccessTokenAuthorizer(search_token)
     auth_authorizer = AccessTokenAuthorizer(auth_token)
 
     try:
         from funcx.sdk.login_manager import LoginManagerProtocol
     except ImportError:
-        client_args["fx_authorizer"] = funcx_authorizer
+        client_args["fx_authorizer"] = compute_authorizer
         client_args["search_authorizer"] = search_authorizer
         client_args["openid_authorizer"] = auth_authorizer
     else:
@@ -142,10 +142,10 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
             def get_search_client(self) -> SearchClient:
                 return SearchClient(authorizer=search_authorizer)
 
-            def get_funcx_web_client(
+            def get_web_client(
                 self, *, base_url: str | None = None
-            ) -> FuncxWebClient:
-                return FuncxWebClient(base_url=base_url, authorizer=funcx_authorizer)
+            ) -> WebClient:
+                return WebClient(base_url=base_url, authorizer=compute_authorizer)
 
         login_manager = TestsuiteLoginManager()
 
@@ -157,9 +157,9 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
 
 
 @pytest.fixture(scope="session")
-def funcx_test_config(pytestconfig, funcx_test_config_name):
+def compute_test_config(pytestconfig, compute_test_config_name):
     # start with basic config load
-    config = _CONFIGS[funcx_test_config_name]
+    config = _CONFIGS[compute_test_config_name]
 
     # if `--endpoint` was passed or `endpoint_uuid` is present in config,
     # handle those cases
@@ -178,8 +178,8 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
     api_uri = pytestconfig.getoption("--service-address")
 
     # env vars to allow use of client creds in GitHub Actions
-    api_client_id = os.getenv("FUNCX_SMOKE_CLIENT_ID")
-    api_client_secret = os.getenv("FUNCX_SMOKE_CLIENT_SECRET")
+    api_client_id = os.getenv("COMPUTE_SMOKE_CLIENT_ID")
+    api_client_secret = os.getenv("COMPUTE_SMOKE_CLIENT_SECRET")
     if ws_uri:
         client_args["results_ws_uri"] = ws_uri
     if api_uri:
@@ -192,20 +192,20 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
 
 
 @pytest.fixture(scope="session")
-def fxc(funcx_test_config):
-    client_args = funcx_test_config["client_args"]
-    fxc = FuncXClient(**client_args)
+def fxc(compute_test_config):
+    client_args = compute_test_config["client_args"]
+    fxc = Client(**client_args)
     return fxc
 
 
 @pytest.fixture
-def endpoint(funcx_test_config):
-    return funcx_test_config["endpoint_uuid"]
+def endpoint(compute_test_config):
+    return compute_test_config["endpoint_uuid"]
 
 
 @pytest.fixture
-def tutorial_function_id(funcx_test_config):
-    funcid = funcx_test_config.get("public_hello_fn_uuid")
+def tutorial_function_id(compute_test_config):
+    funcid = compute_test_config.get("public_hello_fn_uuid")
     if not funcid:
         pytest.skip("test requires a pre-defined public hello function")
     return funcid
