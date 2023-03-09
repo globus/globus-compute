@@ -1,5 +1,5 @@
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.addresses import address_by_hostname
 from parsl.launchers import AprunLauncher
 from parsl.providers import TorqueProvider

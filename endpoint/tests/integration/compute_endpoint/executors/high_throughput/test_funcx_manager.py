@@ -18,7 +18,7 @@ class TestManager:
     def test_remove_worker_init(self, mocker):
         # zmq is being mocked here because it was making tests hang
         mocker.patch(
-            "globus_compute_endpoint.executors.high_throughput.compute_manager.zmq.Context"
+            "globus_compute_endpoint.executors.high_throughput.compute_manager.zmq.Context"  # noqa: E501
         )
 
         manager = Manager(logdir="./", uid="mock_uid")

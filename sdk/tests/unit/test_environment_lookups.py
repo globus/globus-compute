@@ -1,5 +1,5 @@
 import pytest
-from funcx.sdk._environments import (
+from globus_compute_sdk.sdk._environments import (
     get_web_service_url,
     get_web_socket_url,
     urls_might_mismatch,

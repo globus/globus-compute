@@ -1,7 +1,7 @@
 # fmt: off
 
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 
 config = Config(

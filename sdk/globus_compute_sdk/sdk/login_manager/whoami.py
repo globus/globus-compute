@@ -1,9 +1,8 @@
 import logging
 
+from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_compute_sdk.sdk.utils.printing import print_table
 from globus_sdk import AuthAPIError
-
-from sdk.sdk.login_manager import LoginManager
-from sdk.sdk.utils.printing import print_table
 
 NOT_LOGGED_IN_MSG = "Unable to retrieve user information. Please log in again."
 

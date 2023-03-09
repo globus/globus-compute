@@ -374,8 +374,6 @@ class TestStart:
             "config", os.path.join(config_dir, "config.py")
         ).load_module()
 
-        client_options = None
-
         manager.daemon_launch(
             endpoint_uuid="mock_endpoint_uuid",
             endpoint_dir=config_dir,

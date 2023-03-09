@@ -453,7 +453,7 @@ def test_reload_sets_failed_tasks(fxexecutor):
 
 def test_reload_handles_deseralization_error_gracefully(fxexecutor):
     fxc, fxe = fxexecutor
-    fxc.fx_serializer = ComputeSerializer()
+    fxc.serializer = ComputeSerializer()
 
     mock_data = {
         "taskgroup_id": fxe.task_group_id,
@@ -667,13 +667,13 @@ def test_resultwatcher_repr():
 
 def test_resultwatcher_match_sets_exception(randomstring):
     payload = randomstring()
-    fxs = ComputeSerializer()
+    cser = ComputeSerializer()
     fut = ComputeFuture(task_id=uuid.uuid4())
     err_details = ResultErrorDetails(code="1234", user_message="some_user_message")
     res = Result(task_id=fut.task_id, error_details=err_details, data=payload)
 
     mrw = MockedResultWatcher(mock.Mock())
-    mrw.compute_executor.funcx_client.serializer.deserialize = fxs.deserialize
+    mrw.compute_executor.funcx_client.serializer.deserialize = cser.deserialize
     mrw._received_results[fut.task_id] = (mock.Mock(timestamp=5), res)
     mrw.watch_for_task_results([fut])
     mrw.start()
@@ -686,12 +686,12 @@ def test_resultwatcher_match_sets_exception(randomstring):
 
 def test_resultwatcher_match_sets_result(randomstring):
     payload = randomstring()
-    fxs = ComputeSerializer()
+    cser = ComputeSerializer()
     fut = ComputeFuture(task_id=uuid.uuid4())
-    res = Result(task_id=fut.task_id, data=fxs.serialize(payload))
+    res = Result(task_id=fut.task_id, data=cser.serialize(payload))
 
     mrw = MockedResultWatcher(mock.Mock())
-    mrw.compute_executor.funcx_client.fx_serializer.deserialize = fxs.deserialize
+    mrw.compute_executor.funcx_client.serializer.deserialize = cser.deserialize
     mrw._received_results[fut.task_id] = (None, res)
     mrw.watch_for_task_results([fut])
     mrw.start()
@@ -703,12 +703,12 @@ def test_resultwatcher_match_sets_result(randomstring):
 
 def test_resultwatcher_match_handles_deserialization_error():
     invalid_payload = "invalidly serialized"
-    fxs = ComputeSerializer()
+    cser = ComputeSerializer()
     fut = ComputeFuture(task_id=uuid.uuid4())
     res = Result(task_id=fut.task_id, data=invalid_payload)
 
     mrw = MockedResultWatcher(mock.Mock())
-    mrw.funcx_executor.funcx_client.fx_serializer.deserialize = fxs.deserialize
+    mrw.funcx_executor.funcx_client.serializer.deserialize = cser.deserialize
     mrw._received_results[fut.task_id] = (None, res)
     mrw.watch_for_task_results([fut])
     mrw.start()

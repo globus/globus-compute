@@ -22,7 +22,7 @@ from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
-from globus_compute_endpoint.executors.high_throughput.interchange_task_dispatch import (
+from globus_compute_endpoint.executors.high_throughput.interchange_task_dispatch import (  # noqa: E501
     naive_interchange_task_dispatch,
 )
 from globus_compute_endpoint.executors.high_throughput.messages import (

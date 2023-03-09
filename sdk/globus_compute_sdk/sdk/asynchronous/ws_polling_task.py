@@ -9,15 +9,14 @@ from asyncio import AbstractEventLoop
 # import from `websockets.client`, see:
 #   https://github.com/aaugustin/websockets/issues/940
 import websockets.client
+from globus_compute_sdk.errors import TaskExecutionFailed
+from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
+from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from websockets.exceptions import (
     ConnectionClosedOK,
     InvalidHandshake,
     InvalidStatusCode,
 )
-
-from sdk.errors import TaskExecutionFailed
-from sdk.sdk.asynchronous.compute_future import ComputeFuture
-from sdk.sdk.asynchronous.compute_task import ComputeTask
 
 log = logging.getLogger(__name__)
 
@@ -223,7 +222,7 @@ class WebSocketPollingTask:
             status = str(task_data.get("status")).lower()
             if status == "success" and "result" in task_data:
                 task_fut.set_result(
-                    self.compute_client.fx_serializer.deserialize(task_data["result"])
+                    self.compute_client.serializer.deserialize(task_data["result"])
                 )
             elif "exception" in task_data:
                 task_fut.set_exception(

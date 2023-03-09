@@ -577,7 +577,10 @@ class Endpoint:
         endpoints = Endpoint.get_endpoints(conf_dir)
         if not endpoints:
             print(
-                "No endpoints configured!\n\n  (Hint: globus-compute-endpoint configure)",
+                (
+                    "No endpoints configured!\n\n"
+                    + "  (Hint: globus-compute-endpoint configure)"
+                ),
                 file=ofile,
             )
             return

@@ -380,8 +380,8 @@ class EndpointInterchange:
 
             def process_pending_tasks():
                 # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
-                # compute-manager.  In terms of shutting down (or "rebooting") gracefully,
-                # iterate once a second whether or not a task has arrived.
+                # compute-manager.  In terms of shutting down (or "rebooting")
+                # gracefully, iterate once a second whether or not a task has arrived.
                 nonlocal num_tasks_forwarded
                 ctype = executor.container_type
                 while not self._quiesce_event.is_set():

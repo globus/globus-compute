@@ -103,7 +103,7 @@ class Client:
             Currently only impacts the run method.
 
             DEPRECATED - this was an early attempt at asynchronous result gathering.
-                Use the globus_compute_sdk.FuncXExecutor instead.
+                Use the globus_compute_sdk.Executor instead.
 
             Default: False
 
@@ -112,7 +112,7 @@ class Client:
             event loop instance. If None, then we will access asyncio.get_event_loop()
 
             DEPRECATED - part of an early attempt at asynchronous result gathering.
-                Use the globus_compute_sdk.FuncXExecutor instead.
+                Use the globus_compute_sdk.Executor instead.
 
             Default: None
 

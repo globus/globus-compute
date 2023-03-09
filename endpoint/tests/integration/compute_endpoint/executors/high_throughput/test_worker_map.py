@@ -7,7 +7,7 @@ from globus_compute_endpoint.executors.high_throughput.worker_map import WorkerM
 class TestWorkerMap:
     def test_add_worker(self, mocker):
         mock_popen = mocker.patch(
-            "globus_compute_endpoint.executors.high_throughput.worker_map.subprocess.Popen"
+            "globus_compute_endpoint.executors.high_throughput.worker_map.subprocess.Popen"  # noqa E501
         )
         mock_popen.return_value = "proc"
 

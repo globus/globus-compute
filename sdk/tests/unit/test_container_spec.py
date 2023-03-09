@@ -1,5 +1,5 @@
 import pytest as pytest
-from funcx.sdk.container_spec import ContainerSpec
+from globus_compute_sdk.sdk.container_spec import ContainerSpec
 
 
 def test_constructor():

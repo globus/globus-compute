@@ -1,6 +1,6 @@
 import random
 
-from funcx.sdk.executor import AtomicController
+from globus_compute_sdk.sdk.executor import AtomicController
 
 
 class DummyTarget:

@@ -1,7 +1,7 @@
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
-from funcx_endpoint.providers.kubernetes.kube import KubernetesProvider
-from funcx_endpoint.strategies import KubeSimpleStrategy
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
+from globus_compute_endpoint.providers.kubernetes.kube import KubernetesProvider
+from globus_compute_endpoint.strategies import KubeSimpleStrategy
 from parsl.addresses import address_by_route
 
 # fmt: off
@@ -9,7 +9,7 @@ from parsl.addresses import address_by_route
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'kube': {
-        'worker_init': 'pip install --force-reinstall funcx_endpoint>=0.2.0',
+        'worker_init': 'pip install --force-reinstall globus_compute_endpoint>=0.0.1',
         'image': 'python:3.8-buster',
         'namespace': 'default',
     }

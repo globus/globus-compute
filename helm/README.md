@@ -11,17 +11,17 @@ namespace. If you've used the funcX client, these will already be available
 in your home directory's `.funcx/credentials` folder. If not, they can easily
 be created with:
 ```shell
-pip install funcx
-python -c "from funcx.sdk.client import FuncXClient; FuncXClient()"
+pip install globus-compute-sdk
+python -c "from globus_compute_sdk import Client; Client()"
 ````
 It will prompt you with an authentication URL to visit and ask you to paste the
 resulting token.
 
-Now that you have a valid funcX token, cd to your `~/.funcx/credentials`
+Now that you have a valid Globus Compute token, cd to your `~/.funcx/credentials`
 directory and install the keys file as a kubernetes secret.
 
 ```shell script
-kubectl create secret generic compute-sdk-tokens --from-file=compute_sdk_tokens.json
+kubectl create secret generic funcx-sdk-tokens --from-file=funcx_sdk_tokens.json
 ```
 
 ### Install the helm chart

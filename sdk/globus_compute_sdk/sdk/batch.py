@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing as t
 
-from funcx.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import ComputeSerializer
 
 
 class Batch:
@@ -17,7 +17,7 @@ class Batch:
             UUID indicating the task group that this batch belongs to
         """
         self.tasks: list[tuple[str, str, str]] = []
-        self.fx_serializer = FuncXSerializer()
+        self.serializer = ComputeSerializer()
         self.task_group_id = task_group_id
         self.create_websocket_queue = create_websocket_queue
 
@@ -49,9 +49,9 @@ class Batch:
             args = ()
         if kwargs is None:
             kwargs = {}
-        ser_args = self.fx_serializer.serialize(args)
-        ser_kwargs = self.fx_serializer.serialize(kwargs)
-        payload = self.fx_serializer.pack_buffers([ser_args, ser_kwargs])
+        ser_args = self.serializer.serialize(args)
+        ser_kwargs = self.serializer.serialize(kwargs)
+        payload = self.serializer.pack_buffers([ser_args, ser_kwargs])
 
         self.tasks.append((function_id, endpoint_id, payload))
 

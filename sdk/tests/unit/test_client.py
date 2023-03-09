@@ -45,7 +45,7 @@ def test_client_init_sets_addresses_by_env(
     # create the client, either with just the input env or with explicit parameters
     # for explicit params, alter the expected URI(s)
     if not explicit_params:
-        client = globus_compute_sdk.FuncXClient(**kwargs)
+        client = globus_compute_sdk.Client(**kwargs)
     elif explicit_params == "web":
         web_uri = f"http://{randomstring()}.fqdn:1234/{randomstring()}"
         client = globus_compute_sdk.Client(funcx_service_address=web_uri, **kwargs)

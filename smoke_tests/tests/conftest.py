@@ -121,7 +121,7 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
     auth_authorizer = AccessTokenAuthorizer(auth_token)
 
     try:
-        from funcx.sdk.login_manager import LoginManagerProtocol
+        from globus_compute_sdk.sdk.login_manager import LoginManagerProtocol
     except ImportError:
         client_args["fx_authorizer"] = compute_authorizer
         client_args["search_authorizer"] = search_authorizer

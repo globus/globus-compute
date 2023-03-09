@@ -1,7 +1,7 @@
 import inspect
 import sys
 
-import funcx.serialize.concretes as concretes
+import globus_compute_sdk.serialize.concretes as concretes
 import pytest
 
 
@@ -233,10 +233,10 @@ def test_code_dill_source():
 
 
 def test_overall():
-    from funcx.serialize.facade import FuncXSerializer
+    from globus_compute_sdk.serialize.facade import ComputeSerializer
 
-    check_serialize_deserialize_foo(FuncXSerializer())
-    check_serialize_deserialize_bar(FuncXSerializer())
+    check_serialize_deserialize_foo(ComputeSerializer())
+    check_serialize_deserialize_bar(ComputeSerializer())
 
 
 def test_serialize_deserialize_combined():

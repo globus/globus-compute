@@ -42,7 +42,7 @@ def wrap_error(
     def wrapper(*args: object, **kwargs: object) -> Any:
         import sys
 
-        from funcx.serialize.errors import RemoteExceptionWrapper
+        from globus_compute_sdk.serialize.errors import RemoteExceptionWrapper
 
         try:
             return func(*args, **kwargs)  # type: ignore

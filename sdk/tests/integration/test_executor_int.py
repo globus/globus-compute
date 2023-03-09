@@ -5,8 +5,8 @@ import textwrap
 from unittest import mock
 
 import pytest
-from funcx import FuncXClient
-from funcx.sdk.executor import FuncXExecutor, _ResultWatcher
+from globus_compute_sdk import Client
+from globus_compute_sdk.sdk.executor import Executor, _ResultWatcher
 from tests.utils import try_assert
 
 
@@ -15,9 +15,9 @@ from tests.utils import try_assert
 )
 def test_resultwatcher_graceful_shutdown():
     service_url = os.environ["COMPUTE_INTEGRATION_TEST_WEB_URL"]
-    fxc = FuncXClient(funcx_service_address=service_url)
-    fxe = FuncXExecutor(funcx_client=fxc)
-    rw = _ResultWatcher(fxe)
+    gcc = Client(funcx_service_address=service_url)
+    gce = Executor(funcx_client=gcc)
+    rw = _ResultWatcher(gce)
     rw._start_consuming = mock.Mock()
     rw.start()
 
@@ -27,7 +27,7 @@ def test_resultwatcher_graceful_shutdown():
     try_assert(lambda: rw._channel is None)
     try_assert(lambda: not rw._connection or rw._connection.is_closed)
     try_assert(lambda: not rw.is_alive())
-    fxe.shutdown()
+    gce.shutdown()
 
 
 def test_executor_atexit_handler_catches_all_instances(tmp_path):
@@ -35,21 +35,21 @@ def test_executor_atexit_handler_catches_all_instances(tmp_path):
     script_content = textwrap.dedent(
         """
         import random
-        from funcx import FuncXExecutor
-        from funcx.sdk.executor import _REGISTERED_FXEXECUTORS
+        from globus_compute_sdk import Executor
+        from globus_compute_sdk.sdk.executor import _REGISTERED_FXEXECUTORS
 
-        fxc = " a fake funcx_client"
+        gcc = " a fake compute_client"
         num_executors = random.randrange(1, 10)
         for i in range(num_executors):
-            FuncXExecutor(funcx_client=fxc)  # start N threads, none shutdown
-        fxe = FuncXExecutor(funcx_client=fxc)  # intentionally overwritten
-        fxe = FuncXExecutor(funcx_client=fxc)
+            Executor(funcx_client=gcc)  # start N threads, none shutdown
+        gce = Executor(funcx_client=gcc)  # intentionally overwritten
+        gce = Executor(funcx_client=gcc)
 
         num_executors += 2
         assert len(_REGISTERED_FXEXECUTORS) == num_executors, (
             f"Verify test setup: {len(_REGISTERED_FXEXECUTORS)} != {num_executors}"
         )
-        fxe.shutdown()  # only shutting down _last_ instance.  Should still exit cleanly
+        gce.shutdown()  # only shutting down _last_ instance.  Should still exit cleanly
         """
     )
     test_script.write_text(script_content)

@@ -26,7 +26,7 @@ FUNCX_DIR = ".funcx"
 
 
 def invalidate_old_config() -> None:
-    token_file = _home() / COMPUTE_DIR / "credentials" / COMPUTE_TOKEN_FILE
+    token_file = _home() / FUNCX_DIR / "credentials" / COMPUTE_TOKEN_FILE
 
     if token_file.exists():
         try:
