@@ -94,8 +94,8 @@ class Endpoint:
         try:
             # pathlib.Path does not handle unusual umasks (e.g., 0o0111) so well
             # in the parents=True case, so temporarily change it.  This is nominally
-            # only an issue for totally new users (no .compute/!), but that is also
-            # precisely the interaction -- the first one -- that should go smoothly
+            # only an issue for totally new users (no .globus_compute/!), but that is
+            # also precisely the interaction -- the first -- that should go smoothly
             endpoint_dir.mkdir(parents=True, exist_ok=True)
 
             config_target_path = Endpoint._config_file_path(endpoint_dir)

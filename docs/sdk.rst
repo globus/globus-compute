@@ -17,8 +17,8 @@ You can instantiate a Globus Compute client as follows:
 
 .. code-block:: python
 
-  from globus_compute import GlobusComputeClient
-  gcc = GlobusComputeClient()
+  from globus_compute_sdk import Client
+  gcc = Client()
 
 Instantiating a client will start an authentication process where you will be asked to authenticate via Globus Auth.
 We require every interaction with Globus Compute to be authenticated, as this enables enforced
@@ -202,8 +202,8 @@ and a result if it is available.
 
 .. _client credentials with globus compute clients:
 
-Client Credentials with GlobusComputeClient
-------------------------------------
+Client Credentials with globus_compute_sdk.Client
+-------------------------------------------------
 
 Client credentials can be useful if you need an endpoint to run in a service account or to be started automatically with a process manager.
 
@@ -211,7 +211,7 @@ The Globus Compute SDK supports use of Globus Auth client credentials for login,
 
 To use client credentials, you must set the envrionment variables **FUNCX_SDK_CLIENT_ID** to your client ID, and **FUNCX_SDK_CLIENT_SECRET** to your client secret.
 
-When these envrionment variables are set they will take priority over any other credentials on the system and the GlobusComputeClient will assume the identity of the client app.
+When these envrionment variables are set they will take priority over any other credentials on the system and the Client will assume the identity of the client app.
 This also applies when starting a Globus Compute endpoint.
 
 .. code:: bash
@@ -227,21 +227,21 @@ This also applies when starting a Globus Compute endpoint.
 Using a Custom LoginManager
 ---------------------------
 
-To programmatically create a GlobusComputeClient from tokens and remove the need to perform a Native App login flow you can use a custom *LoginManager*.
-The LoginManager is responsible for serving tokens to the GlobusComputeClient as needed. Typically, this would perform a Native App login flow, store tokens, and return them as needed.
+To programmatically create a Client from tokens and remove the need to perform a Native App login flow you can use a custom *LoginManager*.
+The LoginManager is responsible for serving tokens to the Client as needed. Typically, this would perform a Native App login flow, store tokens, and return them as needed.
 
-A custom LoginManager can be used to simply return static tokens and enable programmatic use of the GlobusComputeClient.
+A custom LoginManager can be used to simply return static tokens and enable programmatic use of the Client.
 
-More details on the Globus Compute login manager prototcol are available `here. <https://github.com/funcx-faas/funcX/blob/main/funcx_sdk/funcx/sdk/login_manager/protocol.py>`_
+More details on the Globus Compute login manager prototcol are available `here. <https://github.com/funcx-faas/funcX/blob/main/sdk/globus_compute_sdk/sdk/login_manager/protocol.py>`_
 
 
 .. code:: python
 
   import globus_sdk
   from globus_sdk.scopes import AuthScopes, SearchScopes
-  from globus_compute.sdk.login_manager import LoginManager
-  from globus_compute.sdk.web_client import FuncxWebClient
-  from globus_compute import GlobusComputeClient
+  from globus_compute_sdk.sdk.login_manager import LoginManager
+  from globus_compute_sdk.sdk.web_client import WebClient
+  from globus_compute_sdk import Client
 
   class GlobusComputeLoginManager:
     """
@@ -261,10 +261,10 @@ More details on the Globus Compute login manager prototcol are available `here. 
             authorizer=self.authorizers[SearchScopes.all]
         )
 
-    def get_funcx_web_client(self, *, base_url: str) -> GlobusComputeWebClient:
-        return GlobusComputeWebClient(
+    def get_funcx_web_client(self, *, base_url: str) -> WebClient:
+        return WebClient(
             base_url=base_url,
-            authorizer=self.authorizers[GlobusComputeClient.FUNCX_SCOPE],
+            authorizer=self.authorizers[Client.FUNCX_SCOPE],
         )
 
     def ensure_logged_in(self):
@@ -280,9 +280,9 @@ More details on the Globus Compute login manager prototcol are available `here. 
 
   # Create a new login manager and use it to create a client
   gc_login_manager = GlobusComputeLoginManager(
-      authorizers={GlobusComputeClient.FUNCX_SCOPE: gc_auth,
+      authorizers={Client.FUNCX_SCOPE: gc_auth,
                    SearchScopes.all: search_auth,
                    AuthScopes.openid: openid_auth}
   )
 
-  gcc = GlobusComputeClient(login_manager=gc_login_manager)
+  gcc = Client(login_manager=gc_login_manager)

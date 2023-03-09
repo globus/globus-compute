@@ -287,13 +287,13 @@ futures.  Consider the following (contrived) example:
     print("Results:\n ", "\n  ".join(results))
 
 For a slightly more advanced usage, one could manually submit a batch of tasks
-with the |GlobusComputeClient|_, and wait for the results at a future time.  Submitting
+with the |globus_compute_sdk.Client|_, and wait for the results at a future time.  Submitting
 the results might look like:
 
 .. code-block:: python
     :caption: globus_compute_client_submit_batch.py
 
-    from globus_compute_sdk import GlobusComputeClient
+    from globus_compute_sdk import Client
 
     def expensive_task(task_arg):
         import time
@@ -301,7 +301,7 @@ the results might look like:
         return "All done!"
 
     ep_id = "<endpoint_id>"
-    gcc = GlobusComputeClient()
+    gcc = Client()
 
     print(f"Task Group ID for later reloading: {gcc.session_task_group_id}")
     fn_id = gcc.register_function(expensive_task)
@@ -326,8 +326,10 @@ processing:
             print("Received:", f.result())
 
 
-.. |GlobusComputeClient| replace:: ``GlobusComputeClient``
-.. _GlobusComputeClient: reference/client.html
+.. |Client| replace:: ``Client``
+.. _Client: reference/client.html
+.. |globus_compute_sdk.Client| replace:: ``globus_compute_sdk.Client``
+.. _globus_compute_sdk.Client: reference/client.html
 .. |globus_compute_sdk.Executor| replace:: ``globus_compute_sdk.Executor``
 .. _globus_compute_sdk.Executor: reference/executor.html
 .. |Executor| replace:: ``Executor``
@@ -337,9 +339,9 @@ processing:
 .. |futures.Executor| replace:: ``futures.Executor``
 .. _futures.Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
 .. |.shutdown()| replace:: ``.shutdown()``
-.. _.shutdown(): reference/executor.html#funcx.GlobusComputeExecutor.shutdown
+.. _.shutdown(): reference/executor.html#Executor.shutdown
 .. |.submit()| replace:: ``.submit()``
-.. _.submit(): reference/executor.html#funcx.GlobusComputeExecutor.submit
+.. _.submit(): reference/executor.html#Executor.submit
 .. |.result()| replace:: ``.result()``
 .. _.result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.result
 .. |.done()| replace:: ``.done()``
@@ -347,8 +349,8 @@ processing:
 .. |.set_result()| replace:: ``.set_result()``
 .. _.set_result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.set_result
 .. |.reload_tasks()| replace:: ``.reload_tasks()``
-.. _.reload_tasks(): reference/executor.html#funcx.GlobusComputeExecutor.reload_tasks
+.. _.reload_tasks(): reference/executor.html#Executor.reload_tasks
 .. |.task_group_id| replace:: ``.task_group_id``
-.. _.task_group_id: reference/executor.html#funcx.GlobusComputeExecutor.task_group_id
+.. _.task_group_id: reference/executor.html#Executor.task_group_id
 .. _Collatz conjecture: https://en.wikipedia.org/wiki/Collatz_conjecture
 .. _concurrent.futures.as_completed: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.as_completed

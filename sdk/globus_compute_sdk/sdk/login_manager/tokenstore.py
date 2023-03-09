@@ -22,7 +22,7 @@ FUNCX_TOKEN_FILE = "funcx_sdk_tokens.json"
 COMPUTE_TOKEN_FILE = "compute_sdk_tokens.json"
 
 FUNCX_DIR = ".funcx"
-COMPUTE_DIR = ".compute"
+# COMPUTE_DIR = ".globus_compute"
 
 
 def invalidate_old_config() -> None:
@@ -44,7 +44,7 @@ def invalidate_old_config() -> None:
 
 def _ensure_token_dir() -> pathlib.Path:
     funcx_dirname = _home() / FUNCX_DIR
-    compute_dirname = _home() / COMPUTE_DIR
+    # compute_dirname = _home() / COMPUTE_DIR
     # TODO symlink to .funcx directory and token file
     if "Not" in "NotImplemented":
         raise NotImplementedError("Implement link to token directory!!")
@@ -52,7 +52,7 @@ def _ensure_token_dir() -> pathlib.Path:
         os.makedirs(funcx_dirname)
     except FileExistsError:
         pass
-    return compute_dirname
+    return funcx_dirname
 
 
 def _get_storage_filename():

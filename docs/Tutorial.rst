@@ -17,16 +17,16 @@ The Globus Compute Python SDK provides programming abstractions for interacting 
     $ source path/to/globus_compute_venv/bin/activate
     (globus_compute_venv) $ python3 -m pip install globus_compute
 
-The Globus Compute SDK exposes a ``GlobusComputeClient`` object for all interactions with the Globus Compute web service.
+The Globus Compute SDK exposes a ``Client`` object for all interactions with the Globus Compute web service.
 In order to use the Globus Compute web service you must first authenticate using one of hundreds of supported identity provides (e.g., your institution, ORCID, Google).
 
 As part of the authenticaiton process you must grant permission for Globus Compute to access your identity information (to retrieve your email address), Globus Groups management access (to share functions and endpoints), and Globus Search (to discover functions and endpoints).
 
 .. code-block:: python
 
-    from globus_compute import GlobusComputeClient
+    from globus_compute_sdk import Client
 
-    gcc = GlobusComputeClient()
+    gcc = Client()
 
 Basic Usage
 -----------

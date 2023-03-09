@@ -19,8 +19,8 @@ Globus Compute is composed of two core components:
 * Globus Compute endpoints transform existing laptops, clouds, clusters, and supercomputers into function serving systems.  Endpoints are registered by installing the globus_compute_endpoint software and configuring it for the target system.
 
 
-Globus Compute model
-^^^^^^^^^^^^^^^^^^^^
+The Globus Compute Model
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 Globus Compute works like other FaaS platforms: users first register a function with
 Globus Compute by specifying the function body (in Python), they may then execute that
@@ -53,13 +53,13 @@ world" function on a remote endpoint.
 
 .. code-block:: python
 
-    from globus_compute_sdk import GlobusComputeExecutor
+    from globus_compute_sdk import Executor
 
     def hello_world():
         return "Hello World!"
 
     tutorial_endpoint_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
-    with GlobusComputeExecutor(endpoint_id=tutorial_endpoint_id) as gce:
+    with Executor(endpoint_id=tutorial_endpoint_id) as gce:
         future = gce.submit(hello_world)
         print(future.result())
 

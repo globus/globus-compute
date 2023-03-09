@@ -39,7 +39,7 @@ class WebSocketPollingTask:
         loop: AbstractEventLoop,
         atomic_controller=None,
         init_task_group_id: str | None = None,
-        results_ws_uri: str = "wss://api.compute.globus.org/ws/v2/",
+        results_ws_uri: str = "wss://api2.funcx.org/ws/v2/",
         auto_start: bool = True,
     ):
         """
@@ -64,11 +64,11 @@ class WebSocketPollingTask:
 
         results_ws_uri : str
             Web sockets URI for the results.
-            Default: wss://api.compute.globus.org/ws/v2
+            Default: wss://api2.funcx.org/ws/v2
 
         auto_start : Bool
-            Set this to start the WebSocket client immediately.
-            Otherwise init_ws must be called.
+            Set this to start the WebSocket client immediately, otherwise
+            init_ws must be called.
             Default: True
         """
         self.compute_client = compute_client
