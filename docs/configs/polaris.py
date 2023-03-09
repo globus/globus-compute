@@ -1,10 +1,9 @@
-from parsl.addresses import address_by_interface
-from parsl.launchers import SingleNodeLauncher
-from parsl.providers import PBSProProvider
-
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.executors import HighThroughputExecutor
 from funcx_endpoint.strategies import SimpleStrategy
+from parsl.addresses import address_by_interface
+from parsl.launchers import SingleNodeLauncher
+from parsl.providers import PBSProProvider
 
 # fmt: off
 

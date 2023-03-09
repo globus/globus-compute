@@ -1,8 +1,8 @@
 from .error_types import (
     ComputeError,
-    TaskExecutionFailed,
     MaxResultSizeExceeded,
     SerializationError,
+    TaskExecutionFailed,
     TaskPending,
     VersionMismatch,
 )

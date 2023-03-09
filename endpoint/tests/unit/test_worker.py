@@ -4,9 +4,8 @@ from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
-
-from globus_compute_endpoint.executors.high_throughput.worker import Worker
 from globus_compute_endpoint.executors.high_throughput.messages import Task
+from globus_compute_endpoint.executors.high_throughput.worker import Worker
 
 
 def hello_world():

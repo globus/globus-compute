@@ -1,5 +1,4 @@
 import pytest
-
 from funcx import FuncXClient
 
 config = {

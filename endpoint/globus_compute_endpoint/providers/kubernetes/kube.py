@@ -4,11 +4,10 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import typeguard
+from globus_compute_endpoint.providers.kubernetes.template import template_string
 from parsl.errors import OptionalModuleMissing
 from parsl.providers.base import ExecutionProvider
 from parsl.utils import RepresentationMixin
-
-from globus_compute_endpoint.providers.kubernetes.template import template_string
 
 try:
     from kubernetes import client, config
@@ -143,11 +142,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         self.resources_by_task_type: Dict[str, Any] = {}
 
     def submit(
-            self,
-            cmd_string,
-            tasks_per_node,
-            task_type,
-            job_name="globus-compute-worker"
+        self, cmd_string, tasks_per_node, task_type, job_name="globus-compute-worker"
     ):
         """Submit a job
         Args:

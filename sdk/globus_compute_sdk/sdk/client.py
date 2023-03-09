@@ -9,8 +9,8 @@ import uuid
 import warnings
 
 from globus_compute_sdk.errors import (
-    TaskExecutionFailed,
     SerializationError,
+    TaskExecutionFailed,
     TaskPending,
 )
 from globus_compute_sdk.sdk._environments import (

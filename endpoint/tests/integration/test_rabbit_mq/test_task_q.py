@@ -6,7 +6,6 @@ import time
 import uuid
 
 import pytest
-
 from globus_compute_endpoint.endpoint.rabbit_mq import TaskQueueSubscriber
 
 

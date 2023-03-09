@@ -4,7 +4,6 @@ from unittest import mock
 
 import pytest
 from globus_compute_common.tasks import TaskState
-
 from globus_compute_endpoint.executors.high_throughput.interchange import (
     Interchange,
     starter,

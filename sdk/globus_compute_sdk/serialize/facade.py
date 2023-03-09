@@ -1,9 +1,6 @@
 import logging
 
-from sdk.serialize.concretes import (
-    METHODS_MAP_CODE,
-    METHODS_MAP_DATA,
-)
+from sdk.serialize.concretes import METHODS_MAP_CODE, METHODS_MAP_DATA
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,4 @@
 import pytest
-
 from globus_compute_sdk.errors import VersionMismatch
 from globus_compute_sdk.version import compare_versions
 

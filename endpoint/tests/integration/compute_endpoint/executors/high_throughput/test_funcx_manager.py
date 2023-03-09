@@ -4,7 +4,6 @@ import queue
 import shutil
 
 import pytest
-
 from globus_compute_endpoint.executors.high_throughput.manager import Manager
 from globus_compute_endpoint.executors.high_throughput.messages import Task
 

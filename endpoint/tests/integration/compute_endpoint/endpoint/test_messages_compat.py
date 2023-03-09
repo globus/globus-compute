@@ -9,7 +9,6 @@ from globus_compute_common.messagepack.message_types import (
 from globus_compute_common.messagepack.message_types import Task as OutgoingTask
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks.constants import ActorName, TaskState
-
 from globus_compute_endpoint.endpoint.messages_compat import (
     convert_to_internaltask,
     try_convert_to_messagepack,
@@ -20,7 +19,6 @@ from globus_compute_endpoint.executors.high_throughput.messages import (
 from globus_compute_endpoint.executors.high_throughput.messages import (
     Message as InternalMessage,
 )
-
 from globus_compute_endpoint.executors.high_throughput.messages import (
     Task as InternalTask,
 )

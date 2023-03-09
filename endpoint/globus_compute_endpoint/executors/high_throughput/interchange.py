@@ -18,8 +18,6 @@ import dill
 import zmq
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from parsl.version import VERSION as PARSL_VERSION
-
 from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
@@ -36,6 +34,7 @@ from globus_compute_endpoint.executors.high_throughput.messages import (
 )
 from globus_compute_endpoint.logging_config import ComputeLogger
 from globus_compute_sdk.serialize import ComputeSerializer
+from parsl.version import VERSION as PARSL_VERSION
 
 if t.TYPE_CHECKING:
     import multiprocessing as mp

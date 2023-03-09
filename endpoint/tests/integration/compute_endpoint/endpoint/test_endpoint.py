@@ -2,15 +2,14 @@ import pathlib
 import uuid
 from unittest.mock import Mock, patch
 
+import globus_compute_sdk.sdk.client
+import globus_compute_sdk.sdk.login_manager
 import pytest
 import responses
 from click.testing import CliRunner
-
 from globus_compute_endpoint.cli import _do_logout_endpoints, _do_stop_endpoint, app
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.utils.config import Config
-import globus_compute_sdk.sdk.client
-import globus_compute_sdk.sdk.login_manager
 from globus_compute_sdk.sdk.web_client import WebClient
 
 
@@ -78,9 +77,7 @@ def test_endpoint_logout(monkeypatch):
     logout_true = Mock(return_value=True)
     logout_false = Mock(return_value=False)
     monkeypatch.setattr(
-        globus_compute_sdk.sdk.login_manager.LoginManager,
-        "logout",
-        logout_true
+        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
     )
     success, msg = _do_logout_endpoints(
         False,
@@ -104,9 +101,7 @@ def test_endpoint_logout(monkeypatch):
     }
 
     monkeypatch.setattr(
-        globus_compute_sdk.sdk.login_manager.LoginManager,
-        "logout",
-        logout_false
+        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_false
     )
     # not forced, with running endpoint
     success, msg = _do_logout_endpoints(False, running_endpoints=one_running)
@@ -116,9 +111,7 @@ def test_endpoint_logout(monkeypatch):
     logout_true.reset_mock()
 
     monkeypatch.setattr(
-        globus_compute_sdk.sdk.login_manager.LoginManager,
-        "logout",
-        logout_true
+        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
     )
     # forced, with running endpoint
     success, msg = _do_logout_endpoints(True, running_endpoints=one_running)
@@ -132,7 +125,7 @@ def test_endpoint_logout(monkeypatch):
 )
 @patch(
     "globus_compute_endpoint.cli.get_config_dir",
-    return_value=pathlib.Path("some_ep_dir")
+    return_value=pathlib.Path("some_ep_dir"),
 )
 @patch("globus_compute_endpoint.cli.read_config")
 @patch("globus_compute_endpoint.endpoint.endpoint.Client.stop_endpoint")

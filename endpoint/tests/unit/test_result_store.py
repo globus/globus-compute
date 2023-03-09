@@ -1,7 +1,6 @@
 import random
 
 import pytest
-
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 
 

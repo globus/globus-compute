@@ -13,7 +13,6 @@ from unittest import mock
 
 import pytest
 import responses
-
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.default_config import config as default_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
@@ -124,7 +123,7 @@ def test_start_endpoint(
     mocker,
     fs,
     randomstring,
-        get_standard_compute_client,
+    get_standard_compute_client,
     register_endpoint_response,
     mock_ep_data,
 ):
@@ -165,7 +164,7 @@ def test_register_endpoint_invalid_response(
     endpoint_uuid,
     other_endpoint_id,
     register_endpoint_response,
-        get_standard_compute_client,
+    get_standard_compute_client,
     mock_ep_data,
 ):
     mock_fxc = get_standard_compute_client()
@@ -192,7 +191,7 @@ def test_register_endpoint_locked_error(
     mocker,
     fs,
     register_endpoint_failure_response,
-        get_standard_compute_client,
+    get_standard_compute_client,
     mock_ep_data,
 ):
     """
@@ -216,7 +215,7 @@ def test_register_endpoint_multi_tenant(
     fs,
     endpoint_uuid,
     register_endpoint_response,
-        get_standard_compute_client,
+    get_standard_compute_client,
     randomstring,
     multi_tenant,
     mock_ep_data,

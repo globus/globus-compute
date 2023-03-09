@@ -17,6 +17,7 @@ def _home() -> pathlib.Path:
     # replace this with a mock to return some test directory
     return pathlib.Path.home()
 
+
 FUNCX_TOKEN_FILE = "funcx_sdk_tokens.json"
 COMPUTE_TOKEN_FILE = "compute_sdk_tokens.json"
 

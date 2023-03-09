@@ -13,17 +13,16 @@ from multiprocessing.synchronize import Event as EventType
 import pika
 import pika.exceptions
 import pytest
-from pika.exchange_type import ExchangeType
-from tests.integration.test_rabbit_mq.result_queue_subscriber import (
-    ResultQueueSubscriber,
-)
-from tests.integration.test_rabbit_mq.task_queue_publisher import TaskQueuePublisher
-
 from compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultQueuePublisher,
     TaskQueueSubscriber,
 )
+from pika.exchange_type import ExchangeType
+from tests.integration.test_rabbit_mq.result_queue_subscriber import (
+    ResultQueueSubscriber,
+)
+from tests.integration.test_rabbit_mq.task_queue_publisher import TaskQueuePublisher
 
 
 @pytest.fixture(scope="session")

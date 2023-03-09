@@ -2,7 +2,6 @@ import io
 from contextlib import redirect_stdout
 
 import pytest
-
 from globus_compute_sdk.sdk.utils.printing import print_table
 
 

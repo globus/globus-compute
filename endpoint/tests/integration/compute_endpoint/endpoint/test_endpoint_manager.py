@@ -9,10 +9,9 @@ from unittest.mock import ANY
 
 import pytest
 import requests
-from globus_sdk import GlobusAPIError
-
 from globus_compute_endpoint.endpoint import default_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_sdk import GlobusAPIError
 
 logger = logging.getLogger("mock_globus_compute")
 

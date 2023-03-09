@@ -1,6 +1,5 @@
+from globus_compute_sdk.errors import VersionMismatch
 from packaging.version import Version
-
-from globus_compute_sdk.errors  import VersionMismatch
 
 # single source of truth for package version,
 # see https://packaging.python.org/en/latest/single_source_version/

@@ -10,16 +10,15 @@ import pika
 import pytest
 from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import Result, Task
-from tests.integration.compute_endpoint.executors.mock_executors import MockExecutor
-from tests.utils import try_for_timeout
-
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.utils.config import Config
+from tests.integration.compute_endpoint.executors.mock_executors import MockExecutor
+from tests.utils import try_for_timeout
 
 
 @pytest.fixture
 def run_interchange_process(
-        get_standard_compute_client, setup_register_endpoint_response, tmp_path
+    get_standard_compute_client, setup_register_endpoint_response, tmp_path
 ):
     """
     Start and stop a subprocess that executes the EndpointInterchange class.

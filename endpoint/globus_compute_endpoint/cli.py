@@ -8,7 +8,6 @@ import sys
 
 import click
 from click import ClickException
-
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
@@ -34,9 +33,7 @@ class CommandState:
 
 def init_endpoint_configuration_dir(conf_dir: pathlib.Path):
     if not conf_dir.exists():
-        log.info(
-            "No existing configuration found at %s. Initializing...", conf_dir
-        )
+        log.info("No existing configuration found at %s. Initializing...", conf_dir)
         try:
             conf_dir.mkdir(mode=0o700, exist_ok=True)
         except Exception as exc:
@@ -143,7 +140,9 @@ def version_command():
     """Show the version of globus-compute-endpoint"""
     import globus_compute_endpoint
 
-    click.echo(f"Globus Compute endpoint version: {globus_compute_endpoint.__version__}")
+    click.echo(
+        f"Globus Compute endpoint version: {globus_compute_endpoint.__version__}"
+    )
 
 
 @app.command(name="configure", help="Configure an endpoint")

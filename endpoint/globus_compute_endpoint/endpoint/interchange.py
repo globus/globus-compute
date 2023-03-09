@@ -16,6 +16,7 @@ import time
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
 
+import globus_compute_endpoint.endpoint.utils.config
 import pika.exceptions
 from globus_compute_common.messagepack import InvalidMessageError, pack, unpack
 from globus_compute_common.messagepack.message_types import (
@@ -23,10 +24,6 @@ from globus_compute_common.messagepack.message_types import (
     ResultErrorDetails,
     Task,
 )
-from parsl.version import VERSION as PARSL_VERSION
-
-from globus_compute_sdk import __version__ as sdk_version
-import globus_compute_endpoint.endpoint.utils.config
 from globus_compute_endpoint import __version__ as endpoint_version
 from globus_compute_endpoint.endpoint.messages_compat import (
     convert_to_internaltask,
@@ -41,8 +38,12 @@ from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
-from globus_compute_endpoint.executors.high_throughput.executor import HighThroughputExecutor
+from globus_compute_endpoint.executors.high_throughput.executor import (
+    HighThroughputExecutor,
+)
 from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_sdk import __version__ as sdk_version
+from parsl.version import VERSION as PARSL_VERSION
 
 log = logging.getLogger(__name__)
 

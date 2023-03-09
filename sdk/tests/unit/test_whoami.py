@@ -1,6 +1,5 @@
-import pytest
-
 import globus_compute_sdk.sdk.login_manager
+import pytest
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
 MOCK_BASE = "globus_compute_sdk.sdk.login_manager.whoami"

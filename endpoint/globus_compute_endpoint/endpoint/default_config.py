@@ -1,7 +1,6 @@
-from parsl.providers import LocalProvider
-
 from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_compute_endpoint.executors import HighThroughputExecutor
+from parsl.providers import LocalProvider
 
 config = Config(
     executors=[

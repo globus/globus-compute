@@ -2,7 +2,6 @@ import random
 from unittest.mock import MagicMock
 
 import pytest
-
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.utils.config import Config
 

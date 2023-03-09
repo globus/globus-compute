@@ -5,11 +5,10 @@ import string
 import time
 import uuid
 
+import globus_compute_sdk
 import globus_sdk
 import pytest
 import responses
-
-import globus_compute_sdk
 from globus_compute_sdk.sdk.web_client import WebClient
 
 

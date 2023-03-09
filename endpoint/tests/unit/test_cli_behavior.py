@@ -6,7 +6,6 @@ from unittest import mock
 
 import pytest
 from click.testing import CliRunner
-
 from globus_compute_endpoint.cli import app
 
 

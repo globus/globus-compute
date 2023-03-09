@@ -10,13 +10,12 @@ import pika
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
-from tests.utils import try_assert, try_for_timeout
-
 from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.funcx_future import ComputeFuture
 from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
 from globus_compute_sdk.serialize.facade import ComputeSerializer
+from tests.utils import try_assert, try_for_timeout
 
 
 def _is_stopped(thread: threading.Thread | None) -> bool:
@@ -74,8 +73,7 @@ def fxexecutor(mocker):
     fxc.session_task_group_id = str(uuid.uuid4())
     fxe = Executor(funcx_client=fxc)
     watcher = mocker.patch(
-        "globus_compute_sdk.sdk.executor._ResultWatcher",
-        autospec=True
+        "globus_compute_sdk.sdk.executor._ResultWatcher", autospec=True
     )
 
     def create_mock_watcher(*args, **kwargs):

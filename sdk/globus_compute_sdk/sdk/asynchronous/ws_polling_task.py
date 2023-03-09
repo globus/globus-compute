@@ -285,6 +285,8 @@ class WebSocketPollingTask:
         # FIXME: this model, in which we inspect the client in order to get
         # authorization information, is very bad. We should instead use an authorizer or
         # other object here, if that is what's appropriate
-        authz_value = self.compute_client.web_client.authorizer.get_authorization_header()
+        authz_value = (
+            self.compute_client.web_client.authorizer.get_authorization_header()
+        )
         header_name = "Authorization"
         return header_name, authz_value

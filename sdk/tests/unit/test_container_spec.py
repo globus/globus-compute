@@ -1,5 +1,4 @@
 import pytest as pytest
-
 from funcx.sdk.container_spec import ContainerSpec
 
 

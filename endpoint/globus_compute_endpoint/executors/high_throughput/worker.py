@@ -12,7 +12,6 @@ import zmq
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-
 from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,

@@ -4,7 +4,6 @@ import logging
 
 import pika
 import pika.channel
-
 from globus_compute_endpoint.endpoint.rabbit_mq.base import RabbitPublisherStatus
 
 logger = logging.getLogger(__name__)

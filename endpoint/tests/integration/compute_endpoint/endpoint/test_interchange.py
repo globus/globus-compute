@@ -7,11 +7,10 @@ from importlib.machinery import SourceFileLoader
 import pytest
 from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import Result, Task
-from tests.utils import try_for_timeout
-
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
 from globus_compute_endpoint.endpoint.utils.config import Config
+from tests.utils import try_for_timeout
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
 

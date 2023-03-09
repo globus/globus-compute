@@ -5,10 +5,9 @@ import textwrap
 from unittest import mock
 
 import pytest
-from tests.utils import try_assert
-
 from funcx import FuncXClient
 from funcx.sdk.executor import FuncXExecutor, _ResultWatcher
+from tests.utils import try_assert
 
 
 @pytest.mark.skipif(

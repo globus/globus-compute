@@ -3,7 +3,6 @@ import random
 from unittest.mock import MagicMock
 
 import pika
-
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultQueuePublisher,

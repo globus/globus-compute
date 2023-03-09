@@ -1,5 +1,4 @@
 import pytest
-
 from funcx.sdk._environments import (
     get_web_service_url,
     get_web_socket_url,

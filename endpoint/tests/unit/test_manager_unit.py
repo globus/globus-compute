@@ -3,8 +3,9 @@ import uuid
 from unittest import mock
 
 from globus_compute_common.tasks import TaskState
-
-from globus_compute_endpoint.executors.high_throughput.funcx_manager import Manager as FXManager
+from globus_compute_endpoint.executors.high_throughput.funcx_manager import (
+    Manager as FXManager,
+)
 from globus_compute_endpoint.executors.high_throughput.messages import Task
 
 

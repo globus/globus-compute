@@ -14,7 +14,7 @@ def test_web_service(gcc, endpoint, compute_test_config):
     )
 
     service_version = response.json()
-    api_min_version = funcx_test_config.get("api_min_version")
+    api_min_version = compute_test_config.get("api_min_version")
     if api_min_version is not None:
         parsed_min = Version(api_min_version)
         parsed_service = Version(service_version)

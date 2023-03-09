@@ -12,11 +12,10 @@ import uuid
 
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
-from globus_sdk.exc.api import GlobusAPIError
-
 from globus_compute_sdk.sdk._environments import get_web_service_url
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
+from globus_sdk.exc.api import GlobusAPIError
 
 ID_PARAM_T = t.Union[uuid.UUID, str]
 

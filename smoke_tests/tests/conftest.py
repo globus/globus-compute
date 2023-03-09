@@ -7,15 +7,14 @@ import sys
 import time
 
 import pytest
+from globus_compute_sdk import Client
+from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import (
     AccessTokenAuthorizer,
     AuthClient,
     ConfidentialAppAuthClient,
     SearchClient,
 )
-
-from globus_compute_sdk import Client
-from globus_compute_sdk.sdk.web_client import WebClient
 
 # the non-tutorial endpoint will be required, with the following priority order for
 # finding the ID:
@@ -142,9 +141,7 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
             def get_search_client(self) -> SearchClient:
                 return SearchClient(authorizer=search_authorizer)
 
-            def get_web_client(
-                self, *, base_url: str | None = None
-            ) -> WebClient:
+            def get_web_client(self, *, base_url: str | None = None) -> WebClient:
                 return WebClient(base_url=base_url, authorizer=compute_authorizer)
 
         login_manager = TestsuiteLoginManager()

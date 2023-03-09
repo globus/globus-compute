@@ -2,7 +2,6 @@ import json
 
 import pytest
 import responses
-
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.version import __version__
 
@@ -24,9 +23,7 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return WebClient(
-        base_url="https://api.funcx", transport_params={"max_retries": 0}
-    )
+    return WebClient(base_url="https://api.funcx", transport_params={"max_retries": 0})
 
 
 def test_web_client_can_set_explicit_base_url():

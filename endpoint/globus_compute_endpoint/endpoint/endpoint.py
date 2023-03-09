@@ -19,15 +19,14 @@ import daemon.pidfile
 import psutil
 import setproctitle
 import texttable
-from globus_sdk import GlobusAPIError, NetworkError
-
-from globus_compute_sdk.sdk.client import Client
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint import default_config as endpoint_default_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_sdk.sdk.client import Client
+from globus_sdk import GlobusAPIError, NetworkError
 
 log = logging.getLogger(__name__)
 

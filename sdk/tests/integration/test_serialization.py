@@ -1,9 +1,8 @@
 import inspect
 import sys
 
-import pytest
-
 import funcx.serialize.concretes as concretes
+import pytest
 
 
 def foo(x, y=3):

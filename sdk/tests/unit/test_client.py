@@ -1,12 +1,11 @@
 import uuid
 from unittest import mock
 
+import globus_compute_sdk
 import pytest
-
-import funcx
-from sdk import ContainerSpec
-from sdk.errors import TaskExecutionFailed
-from sdk.serialize import FuncXSerializer
+from globus_compute_sdk import ContainerSpec
+from globus_compute_sdk.errors import TaskExecutionFailed
+from globus_compute_sdk.serialize import ComputeSerializer
 
 
 @pytest.fixture(autouse=True)
@@ -46,10 +45,10 @@ def test_client_init_sets_addresses_by_env(
     # create the client, either with just the input env or with explicit parameters
     # for explicit params, alter the expected URI(s)
     if not explicit_params:
-        client = funcx.FuncXClient(**kwargs)
+        client = globus_compute_sdk.FuncXClient(**kwargs)
     elif explicit_params == "web":
         web_uri = f"http://{randomstring()}.fqdn:1234/{randomstring()}"
-        client = funcx.FuncXClient(funcx_service_address=web_uri, **kwargs)
+        client = globus_compute_sdk.Client(funcx_service_address=web_uri, **kwargs)
     else:
         raise NotImplementedError
 
@@ -59,12 +58,12 @@ def test_client_init_sets_addresses_by_env(
 
 def test_client_init_accepts_specified_taskgroup():
     tg_uuid = uuid.uuid4()
-    fxc = funcx.FuncXClient(
+    gcc = globus_compute_sdk.Client(
         task_group_id=tg_uuid,
         do_version_check=False,
         login_manager=mock.Mock(),
     )
-    assert fxc.session_task_group_id == str(tg_uuid)
+    assert gcc.session_task_group_id == str(tg_uuid)
 
 
 @pytest.mark.parametrize(
@@ -76,31 +75,31 @@ def test_client_init_accepts_specified_taskgroup():
     ],
 )
 def test_update_task_table_on_invalid_data(api_data):
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(ValueError):
-        fxc._update_task_table(api_data, "task-id-foo")
+        gcc._update_task_table(api_data, "task-id-foo")
 
 
 def test_update_task_table_on_exception():
     api_data = {"status": "success", "exception": "foo-bar-baz", "completion_t": "1.1"}
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=mock.Mock())
 
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
-        fxc._update_task_table(api_data, "task-id-foo")
+    with pytest.raises(TaskExecutionFailed) as excinfo:
+        gcc._update_task_table(api_data, "task-id-foo")
     assert "foo-bar-baz" in str(excinfo.value)
 
 
 def test_update_task_table_simple_object(randomstring):
-    serde = FuncXSerializer()
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    serde = ComputeSerializer()
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=mock.Mock())
     task_id = "some_task_id"
 
     payload = randomstring()
     data = {"status": "success", "completion_t": "1.1"}
     data["result"] = serde.serialize(payload)
 
-    st = fxc._update_task_table(data, task_id)
+    st = gcc._update_task_table(data, task_id)
     assert not st["pending"]
     assert st["result"] == payload
     assert "exception" not in st
@@ -111,17 +110,17 @@ def test_pending_tasks_always_fetched():
     should_fetch_02 = str(uuid.uuid4())
     no_fetch = str(uuid.uuid4())
 
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
-    fxc._task_status_table.update(
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
+    gcc._task_status_table.update(
         {should_fetch_01: {"pending": True}, no_fetch: {"pending": False}}
     )
     task_id_list = [no_fetch, should_fetch_01, should_fetch_02]
 
     # bulk avenue
-    fxc.get_batch_result(task_id_list)
+    gcc.get_batch_result(task_id_list)
 
-    args, _ = fxc.web_client.get_batch_status.call_args
+    args, _ = gcc.web_client.get_batch_status.call_args
     assert should_fetch_01 in args[0]
     assert should_fetch_02 in args[0]
     assert no_fetch not in args[0]
@@ -132,11 +131,11 @@ def test_pending_tasks_always_fetched():
         (True, should_fetch_02),
         (False, no_fetch),
     ):
-        fxc.web_client.get_task.reset_mock()
-        fxc.get_task(sf)
-        assert should_fetch is fxc.web_client.get_task.called
+        gcc.web_client.get_task.reset_mock()
+        gcc.get_task(sf)
+        assert should_fetch is gcc.web_client.get_task.called
         if should_fetch:
-            args, _ = fxc.web_client.get_task.call_args
+            args, _ = gcc.web_client.get_task.call_args
             assert sf == args[0]
 
 
@@ -145,20 +144,20 @@ def test_batch_created_websocket_queue(create_ws_queue):
     eid = str(uuid.uuid4())
     fid = str(uuid.uuid4())
 
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
     if create_ws_queue is None:
-        batch = fxc.create_batch()
+        batch = gcc.create_batch()
     else:
-        batch = fxc.create_batch(create_websocket_queue=create_ws_queue)
+        batch = gcc.create_batch(create_websocket_queue=create_ws_queue)
 
     batch.add(fid, eid, (1,))
     batch.add(fid, eid, (2,))
 
-    fxc.batch_run(batch)
+    gcc.batch_run(batch)
 
-    assert fxc.web_client.submit.called
-    submit_data = fxc.web_client.submit.call_args[0][0]
+    assert gcc.web_client.submit.called
+    submit_data = gcc.web_client.submit.call_args[0][0]
     assert "create_websocket_queue" in submit_data
     if create_ws_queue:
         assert submit_data["create_websocket_queue"] is True
@@ -167,8 +166,8 @@ def test_batch_created_websocket_queue(create_ws_queue):
 
 
 def test_batch_error():
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
 
     error_reason = "reason 1 2 3"
     error_results = {
@@ -188,20 +187,20 @@ def test_batch_error():
         ],
         "task_group_id": "tg_id",
     }
-    fxc.web_client.submit = mock.MagicMock(return_value=error_results)
+    gcc.web_client.submit = mock.MagicMock(return_value=error_results)
 
-    batch = fxc.create_batch()
+    batch = gcc.create_batch()
     batch.add("fid1", "eid1", "arg1")
     batch.add("fid2", "eid2", "arg2")
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
-        fxc.batch_run(batch)
+    with pytest.raises(TaskExecutionFailed) as excinfo:
+        gcc.batch_run(batch)
 
     assert error_reason in str(excinfo)
 
 
 def test_batch_no_reason():
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
 
     error_results = {
         "response": "batch",
@@ -214,10 +213,10 @@ def test_batch_no_reason():
         ],
         "task_group_id": "tg_id",
     }
-    fxc.web_client.submit = mock.MagicMock(return_value=error_results)
+    gcc.web_client.submit = mock.MagicMock(return_value=error_results)
 
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
-        fxc.run(endpoint_id="fid", function_id="fid")
+    with pytest.raises(TaskExecutionFailed) as excinfo:
+        gcc.run(endpoint_id="fid", function_id="fid")
 
     assert "Unknown execution failure" in str(excinfo)
 
@@ -225,13 +224,15 @@ def test_batch_no_reason():
 @pytest.mark.parametrize("asynchronous", [True, False, None])
 def test_single_run_websocket_queue_depend_async(asynchronous):
     if asynchronous is None:
-        fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+        gcc = globus_compute_sdk.Client(
+            do_version_check=False, login_manager=mock.Mock()
+        )
     else:
-        fxc = funcx.FuncXClient(
+        gcc = globus_compute_sdk.Client(
             asynchronous=asynchronous, do_version_check=False, login_manager=mock.Mock()
         )
 
-    fxc.web_client = mock.MagicMock()
+    gcc.web_client = mock.MagicMock()
 
     fake_results = {
         "results": [
@@ -242,11 +243,11 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
         ],
         "task_group_id": str(uuid.uuid4()),
     }
-    fxc.web_client.submit = mock.MagicMock(return_value=fake_results)
-    fxc.run(endpoint_id=str(uuid.uuid4()), function_id=str(uuid.uuid4()))
+    gcc.web_client.submit = mock.MagicMock(return_value=fake_results)
+    gcc.run(endpoint_id=str(uuid.uuid4()), function_id=str(uuid.uuid4()))
 
-    assert fxc.web_client.submit.called
-    submit_data = fxc.web_client.submit.call_args[0][0]
+    assert gcc.web_client.submit.called
+    submit_data = gcc.web_client.submit.call_args[0][0]
     assert "create_websocket_queue" in submit_data
     if asynchronous:
         assert submit_data["create_websocket_queue"] is True
@@ -257,8 +258,8 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
 def test_build_container(mocker, login_manager):
     mock_data = mocker.Mock()
     mock_data.data = {"container_id": "123-456"}
-    login_manager.get_funcx_web_client.post = mocker.Mock(return_value=mock_data)
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    login_manager.get_web_client.post = mocker.Mock(return_value=mock_data)
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=login_manager)
     spec = ContainerSpec(
         name="MyContainer",
         pip=[
@@ -269,10 +270,10 @@ def test_build_container(mocker, login_manager):
         payload_url="https://github.com/funcx-faas/funcx-container-service.git",
     )
 
-    container_id = fxc.build_container(spec)
+    container_id = gcc.build_container(spec)
     assert container_id == "123-456"
-    login_manager.get_funcx_web_client.post.assert_called()
-    calls = login_manager.get_funcx_web_client.post.call_args
+    login_manager.get_web_client.post.assert_called()
+    calls = login_manager.get_web_client.post.call_args
     assert calls[0][0] == "containers/build"
     assert calls[1] == {"data": spec.to_json()}
 
@@ -285,9 +286,9 @@ def test_container_build_status(mocker, login_manager, randomstring):
             self["status"] = expected_status
             self.http_status = 200
 
-    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
-    status = fxc.get_container_build_status("123-434")
+    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=login_manager)
+    status = gcc.get_container_build_status("123-434")
     assert status == expected_status
 
 
@@ -296,11 +297,11 @@ def test_container_build_status_not_found(mocker, login_manager):
         def __init__(self):
             self.http_status = 404
 
-    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(ValueError) as excinfo:
-        fxc.get_container_build_status("123-434")
+        gcc.get_container_build_status("123-434")
 
     assert excinfo.value.args[0] == "Container ID 123-434 not found"
 
@@ -311,10 +312,10 @@ def test_container_build_status_failure(mocker, login_manager):
             self.http_status = 500
             self.http_reason = "This is a reason"
 
-    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
+    gcc = globus_compute_sdk.Client(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(SystemError) as excinfo:
-        fxc.get_container_build_status("123-434")
+        gcc.get_container_build_status("123-434")
 
     assert type(excinfo.value) == SystemError

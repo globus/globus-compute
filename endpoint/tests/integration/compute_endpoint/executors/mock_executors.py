@@ -5,9 +5,8 @@ import unittest.mock
 
 import dill
 from globus_compute_common.messagepack.message_types import Result, Task
-
-from globus_compute_sdk import Client
 from globus_compute_endpoint.executors.high_throughput.messages import Message
+from globus_compute_sdk import Client
 
 
 class MockExecutor(unittest.mock.Mock):

@@ -6,7 +6,6 @@ from unittest import mock
 import globus_sdk
 import pytest
 import requests
-
 from globus_compute_sdk.sdk._environments import _get_envname
 from globus_compute_sdk.sdk.login_manager import LoginManager, requires_login
 from globus_compute_sdk.sdk.login_manager.client_login import (

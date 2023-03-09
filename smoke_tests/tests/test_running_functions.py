@@ -1,12 +1,11 @@
 import concurrent.futures
 import time
 
+import globus_compute_sdk
 import pytest
 import requests
-from packaging.version import Version
-
-import globus_compute_sdk
 from globus_compute_sdk import Executor
+from packaging.version import Version
 
 try:
     from globus_compute_sdk.errors import TaskPending
