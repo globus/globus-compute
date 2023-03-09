@@ -6,11 +6,11 @@ replicaCount: 1
 funcXServiceAddress: https://api2.funcx.org
 image:
   repository: funcx/kube-endpoint
-  tag: main
+  tag: main-3.10
   pullPolicy: Always
 
 workerDebug: false
-workerImage: python:3.6-buster
+workerImage: python:3.10
 workerInit: pip install globus-compute-endpoint>=0.2.0
 workerNamespace: default
 logDir: /tmp/worker_logs
@@ -18,8 +18,8 @@ logDir: /tmp/worker_logs
 rbacEnabled: true
 nameOverride: globus-compute-endpoint
 
-initMem: 2000Mi
-maxMem: 16000Mi
+initMem: 500Mi
+maxMem: 1600Mi
 initCPU: 1
 maxCPU: 2
 
@@ -29,6 +29,12 @@ maxBlocks: 100
 maxWorkersPerPod: 1
 maxIdleTime: 3600
 
-detachEndpoint: true
-
+# endpoint is required
 endpointUUID:
+
+# any additional desired CLI args
+endpointCLIargs: --log-to-console
+
+# Will fail until user specifies one of these in their values.yaml
+useClientCredentials: false
+useUserCredentials: false

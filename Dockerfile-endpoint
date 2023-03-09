@@ -1,16 +1,35 @@
-ARG PYTHON_VERSION="3.8"
+ARG PYTHON_VERSION="3.10"
 FROM python:${PYTHON_VERSION}
+
+# Build args for speeding up development for those of us on crappy inet connections
+# i.e., $ docker build ... --build-arg ... --build-arg ...
+# something like: http://cache.fqdn:3142
+ARG apt_proxy_url
+
+# something like: [global]\nindex-url = ...
+ARG pip_conf
+
+RUN if [ -n "$apt_proxy_url" ]; then echo "Acquire::http { Proxy \"$apt_proxy_url\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+RUN apt-get update && apt-get upgrade -y
+
+RUN if [ -n "$pip_conf" ]; then echo "$pip_conf" > "/etc/pip.conf"; fi
+
 RUN mkdir /opt/compute
-RUN pip install kubernetes
-RUN pip install --no-binary :all: --force-reinstall pyzmq
+RUN python -m pip install -U pip
+RUN python -m pip install kubernetes
+RUN python -m pip install --no-binary :all: --force-reinstall pyzmq
 
-COPY sdk /opt/compute/sdk/
-WORKDIR /opt/compute/sdk
-RUN pip install .
+COPY globus_compute_sdk /opt/compute/globus_compute_sdk/
+WORKDIR /opt/compute/globus_compute_sdk
+RUN python -m pip install .
 
-COPY endpoint /opt/compute/endpoint
-WORKDIR /opt/compute/endpoint
-RUN pip install .
+COPY globus_compute_endpoint /opt/compute/globus_compute_endpoint
+WORKDIR /opt/compute/globus_compute_endpoint
+RUN python -m pip install .
+
+# Undo local-dev ministrations
+RUN if [ -n "$pip_conf" ]; then rm -f "/etc/pip.conf"; fi
+RUN if [ -n "$apt_proxy_url" ]; then rm -f "/etc/apt/apt.conf.d/01proxy"; fi
 
 RUN useradd -m compute
 RUN mkdir -p /home/compute/.kube
