@@ -1014,56 +1014,22 @@ class Interchange:
         log.warning("Exiting")
 
     def get_status_report(self):
-        """Get utilization numbers"""
-        total_cores = 0
-        total_mem = 0
-        core_hrs = 0
-        active_managers = 0
-        free_capacity = 0
         outstanding_tasks = self.get_total_tasks_outstanding()
         pending_tasks = self.total_pending_task_count
         num_managers = len(self._ready_manager_queue)
         live_workers = self.get_total_live_workers()
+        free_capacity = sum(
+            m["free_capacity"]["total_workers"]
+            for m in self._ready_manager_queue.values()
+        )
 
-        for manager in self._ready_manager_queue:
-            total_cores += self._ready_manager_queue[manager]["cores"]
-            total_mem += self._ready_manager_queue[manager]["mem"]
-            active_dur = abs(
-                time.time() - self._ready_manager_queue[manager]["reg_time"]
-            )
-            core_hrs += (active_dur * total_cores) / 3600
-            if self._ready_manager_queue[manager]["active"]:
-                active_managers += 1
-            free_capacity += self._ready_manager_queue[manager]["free_capacity"][
-                "total_workers"
-            ]
-
-        result_package = {
-            "total_cores": total_cores,
-            "total_mem": total_mem,
-            "new_core_hrs": core_hrs - self.last_core_hr_counter,
-            "total_core_hrs": round(core_hrs, 2),
+        return {
             "managers": num_managers,
-            "active_managers": active_managers,
             "total_workers": live_workers,
             "idle_workers": free_capacity,
             "pending_tasks": pending_tasks,
             "outstanding_tasks": outstanding_tasks,
-            "worker_mode": self.worker_mode,
-            "scheduler_mode": self.scheduler_mode,
-            "scaling_enabled": self.scaling_enabled,
-            "mem_per_worker": self.mem_per_worker,
-            "cores_per_worker": self.cores_per_worker,
-            "prefetch_capacity": self.prefetch_capacity,
-            "max_blocks": self.provider.max_blocks,
-            "min_blocks": self.provider.min_blocks,
-            "max_workers_per_node": self.max_workers_per_node,
-            "nodes_per_block": self.provider.nodes_per_block,
-            "heartbeat_period": self.heartbeat_period,
         }
-
-        self.last_core_hr_counter = core_hrs
-        return result_package
 
     def scale_out(self, blocks=1, task_type=None):
         """Scales out the number of blocks by "blocks"
