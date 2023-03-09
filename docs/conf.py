@@ -1,4 +1,4 @@
-import sdk  # noqa:E402
+import globus_compute_sdk  # noqa:E402
 
 # -- Project information -----------------------------------------------------
 
@@ -11,9 +11,9 @@ author = "The Globus Compute Team"
 # built documents.
 #
 # The short X.Y version.
-version = sdk.__version__.rsplit(".", 1)[0]
+version = globus_compute_sdk.__version__.rsplit(".", 1)[0]
 # The full version, including alpha/beta/rc tags.
-release = sdk.__version__
+release = globus_compute_sdk.__version__
 
 
 # -- General configuration ---------------------------------------------------

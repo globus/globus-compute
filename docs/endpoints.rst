@@ -7,9 +7,9 @@ an endpoint to be deployed on a laptop, the login node of a campus cluster, a cl
 or a Kubernetes cluster, for example.
 
 The endpoint requires outbound network connectivity. That is, it must be able to connect to
-Globus Compute at `compute.globus.org <https://api.compute.globus.org/v2>`_.
+the Globus Compute web service at `api2.funcx.org <https://api2.funcx.org/v2>`_.
 
-The Globus Compute Endpoint is available on pypi.org (and thus available via ``pip``).
+The Globus Compute endpoint is available on pypi.org (and thus available via ``pip``).
 However, *we strongly recommend installing the Globus Compute Endpoint into an isolated virtual environment*.
 `Pipx <https://pypa.github.io/pipx/installation/>`_ automatically manages
 package-specific virtual environments for command line applications, so install the endpoint via::
@@ -39,7 +39,7 @@ To get started, you will first want to configure a new endpoint.  ::
 
   $ globus-compute-endpoint configure
 
-Once you've run this command, a directory will be created at ``$HOME/.compute`` and a set of default configuration files will be generated.
+Once you've run this command, a directory will be created at ``$HOME/.funcx`` and a set of default configuration files will be generated.
 
 You can also set up auto-completion for the ``globus-compute-endpoint`` commands in your shell, by using the command ::
 
@@ -61,7 +61,7 @@ To generate the appropriate directories and default configuration template, run 
 
   $ globus-compute-endpoint configure <ENDPOINT_NAME>
 
-This command will create a profile for your endpoint in ``$HOME/.compute/<ENDPOINT_NAME>/`` and will instantiate a
+This command will create a profile for your endpoint in ``$HOME/.funcx/<ENDPOINT_NAME>/`` and will instantiate a
 ``config.py`` file. This file should be updated with the appropriate configurations for the computational system you are
 targeting before you start the endpoint.
 Globus Compute is configured using a :class:`~compute_endpoint.endpoint.utils.config.Config` object.
@@ -79,7 +79,7 @@ To start a new endpoint run the following command::
 
   $ globus-compute-endpoint start <ENDPOINT_NAME>
 
-.. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is started.
+.. note:: If <ENDPOINT_NAME> is not specified, a default endpoint named "default" is started.
 
 Starting an endpoint will perform a registration process with Globus Compute services.
 The registration process provides Globus Compute with information regarding the endpoint.

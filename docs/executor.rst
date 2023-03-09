@@ -1,36 +1,36 @@
-funcX Executor
-==============
+Globus Compute Executor
+=======================
 
-The |GlobusComputeExecutor|_ class, a subclass of Python's |Executor|_, is the
+The |globus_compute_sdk.Executor|_ class, a subclass of Python's |futures.Executor|_, is the
 preferred approach to collecting results from the Globus Compute web services.  Over
 polling (the historical approach) where the web service must be repeatedly
 queried for the status of tasks and results eventually collected in bulk, the
-|GlobusComputeExecutor|_ class instantiates an AMQPS connection that streams results
+|Executor|_ class instantiates an AMQPS connection that streams results
 directly -- and immediately -- as they arrive at the server.  This is a far
 more efficient paradigm, simultaneously in terms of bytes over the wire, time
 spent waiting for results, and boilerplate code to check for results.
 
-For most "simple" interactions with funcX, this class will likely be the
+For most "simple" interactions with Globus Compute, this class will likely be the
 quickest and easiest avenue to submit tasks and acquire results.  An
 example interaction:
 
 .. code-block:: python
     :caption: globus_compute_executor_basic_example.py
 
-    from globus_compute_sdk import GlobusComputeExecutor
+    from globus_compute_sdk import Executor
 
     def double(x):
         return x * 2
 
     tutorial_endpoint_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
-    with GlobusComputeExecutor(endpoint_id=tutorial_endpoint_id) as gce:
+    with Executor(endpoint_id=tutorial_endpoint_id) as gce:
         fut = gce.submit(double, 7)
 
         print(fut.result())
 
 This example is only a quick-reference, showing the basic mechanics of how to
-use the |GlobusComputeExecutor|_ class and submitting a single task.  However, there
-are a number of details to observe.  The first is that a |GlobusComputeExecutor|_
+use the |Executor|_ class and submitting a single task.  However, there
+are a number of details to observe.  The first is that a |Executor|_
 instance is associated with a specific endpoint.  We use the "well-known"
 tutorial endpoint in this example, but that can point to any endpoint to which
 you have access.
@@ -49,10 +49,10 @@ been executed (remotely), much less a result received.  The |.result()|_ call
 blocks ("waits") until all of that has completed, and the result has been
 received from the upstream services.
 
-Third, |GlobusComputeExecutor|_ objects can be used as context managers (the ``with``
-statement).  Underneath the hood, the |GlobusComputeExecutor|_ class uses threads to
+Third, |Executor|_ objects can be used as context managers (the ``with``
+statement).  Underneath the hood, the |Executor|_ class uses threads to
 implement the asynchronous interface -- a thread to coalesce and submit tasks,
-and a thread to watch for incoming results.  The |GlobusComputeExecutor|_ logic cannot
+and a thread to watch for incoming results.  The |Executor|_ logic cannot
 determine when it will no longer receive tasks (i.e., no more |.submit()|_
 calls) and so cannot prematurely shutdown.  Thus, it must be told, either
 explicitly with a call to |.shutdown()|_, or implicitly when used as a context
@@ -76,7 +76,7 @@ To verify all of the sequences through 100, one brute-force approach is:
 .. code-block:: python
     :caption: globus_compute_executor_collatz.py
 
-    from globus_compute_sdk import GlobusComputeExecutor
+    from globus_compute_sdk import Executor
 
     def generate_collatz_sequence(N: int, sequence_limit = 10_000):
         seq = [N]
@@ -93,7 +93,7 @@ To verify all of the sequences through 100, one brute-force approach is:
     generate_from = 1
     generate_through = 100
     futs, results, disproof_candidates = [], [], []
-    with GlobusComputeExecutor(endpoint_id=ep_id) as gce:
+    with Executor(endpoint_id=ep_id) as gce:
         for n in range(generate_from, generate_through + 1):
             futs.append(gce.submit(generate_collatz_sequence, n))
         print("Tasks all submitted; waiting for results")
@@ -144,7 +144,7 @@ takes more than 100 steps to complete.
 .. code-block:: python
     :caption: globus_compute_executor_handle_result_exceptions.py
 
-    from globus_compute_sdk import GlobusComputeExecutor
+    from globus_compute_sdk import Executor
 
     def generate_collatz_sequence(N: int, sequence_limit=100):
         seq = [N]
@@ -158,7 +158,7 @@ takes more than 100 steps to complete.
             raise ValueError(f"Sequence not terminated in {sequence_limit} steps")
         return seq
 
-    with GlobusComputeExecutor(endpoint_id=ep_id) as gce:
+    with Executor(endpoint_id=ep_id) as gce:
         future = gce.submit(generate_collatz_sequence, 1234567890)
 
     try:
@@ -192,7 +192,7 @@ example uses `concurrent.futures.as_completed`_:
         time.sleep(x * random.random())
         return f"{x} -> {x * 2}"
 
-    with GlobusComputeExecutor(endpoint_id=endpoint_id) as gce:
+    with Executor(endpoint_id=endpoint_id) as gce:
         futs = [gce.submit(double, i) for i in range(10)]
 
         # The futures were appended to the `futs` list in order, so one could
@@ -215,10 +215,10 @@ example uses `concurrent.futures.as_completed`_:
 
 Reloading Tasks
 ---------------
-Waiting for incoming results with the |GlobusComputeExecutor|_ requires an active
+Waiting for incoming results with the |Executor|_ requires an active
 connection -- which is often at odds with closing a laptop clamshell (e.g.,
 heading home for the weekend).  For longer running jobs like this, the
-|GlobusComputeExecutor|_ offers the |.reload_tasks()|_ method.  This method will reach
+|Executor|_ offers the |.reload_tasks()|_ method.  This method will reach
 out to the Globus Compute web-services to collect all of the tasks associated with the
 |.task_group_id|_, create a list of associated futures, finish
 (call |.set_result()|_) any previously finished tasks, and watch the unfinished
@@ -235,7 +235,7 @@ futures.  Consider the following (contrived) example:
     # $ python globus_compute_executor_reload_tasks.py <TG_UUID_STR>
 
     import os, signal, sys, time, typing as t
-    from globus_compute_sdk import GlobusComputeExecutor
+    from globus_compute_sdk import Executor
     from globus_compute_sdk.sdk.executor import GlobusComputeFuture
 
     task_group_id = sys.argv[1] if len(sys.argv) > 1 else None
@@ -244,7 +244,7 @@ futures.  Consider the following (contrived) example:
         return f"your globus compute logic result, from task: {num}"
 
     ep_id = "<YOUR_ENDPOINT_UUID>"
-    with GlobusComputeExecutor(endpoint_id=ep_id) as gce:
+    with Executor(endpoint_id=ep_id) as gce:
         futures: t.Iterable[GlobusComputeFuture]
         if task_group_id:
             print(f"Reloading tasks from Task Group ID: {task_group_id}")
@@ -316,11 +316,11 @@ processing:
 .. code-block:: python
     :caption: globus_compute_executor_reload_batch.py
 
-    from globus_compute_sdk import GlobusComputeExecutor
+    from globus_compute_sdk import Executor
 
     ep_id = "<endpoint_id>"
     tg_id = "Saved task group id from 'yesterday'"
-    with GlobusComputeExecutor(endpoint_id=ep_id, task_group_id=tg_id) as gce:
+    with Executor(endpoint_id=ep_id, task_group_id=tg_id) as gce:
         futures = gce.reload_tasks())
         for f in concurrent.futures.as_completed(futs):
             print("Received:", f.result())
@@ -328,12 +328,14 @@ processing:
 
 .. |GlobusComputeClient| replace:: ``GlobusComputeClient``
 .. _GlobusComputeClient: reference/client.html
-.. |GlobusComputeExecutor| replace:: ``GlobusComputeExecutor``
-.. _GlobusComputeExecutor: reference/executor.html
+.. |globus_compute_sdk.Executor| replace:: ``globus_compute_sdk.Executor``
+.. _globus_compute_sdk.Executor: reference/executor.html
+.. |Executor| replace:: ``Executor``
+.. _Executor: reference/executor.html
 .. |Future| replace:: ``Future``
 .. _Future: https://docs.python.org/3/library/concurrent.futures.html#future-objects
-.. |Executor| replace:: ``Executor``
-.. _Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
+.. |futures.Executor| replace:: ``futures.Executor``
+.. _futures.Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
 .. |.shutdown()| replace:: ``.shutdown()``
 .. _.shutdown(): reference/executor.html#funcx.GlobusComputeExecutor.shutdown
 .. |.submit()| replace:: ``.submit()``

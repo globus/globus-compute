@@ -20,7 +20,7 @@ Globus Compute is composed of two core components:
 
 
 Globus Compute model
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 Globus Compute works like other FaaS platforms: users first register a function with
 Globus Compute by specifying the function body (in Python), they may then execute that
