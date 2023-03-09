@@ -26,6 +26,7 @@ from funcx_endpoint import __version__
 from funcx_endpoint.endpoint import default_config as endpoint_default_config
 from funcx_endpoint.endpoint.interchange import EndpointInterchange
 from funcx_endpoint.endpoint.result_store import ResultStore
+from funcx_endpoint.endpoint.utils import _redact_url_creds
 from funcx_endpoint.endpoint.utils.config import Config
 from funcx_endpoint.logging_config import setup_logging
 
@@ -288,7 +289,7 @@ class Endpoint:
             exit(os.EX_DATAERR)
 
         # sanitize passwords in logs
-        log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
+        log_reg_info = _redact_url_creds(repr(reg_info))
         log.debug(f"Registration information: {log_reg_info}")
 
         json_file = endpoint_dir / "endpoint.json"

@@ -25,6 +25,7 @@ from funcx_endpoint.endpoint.endpoint import Endpoint
 from funcx_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
     CommandQueueSubscriber,
 )
+from funcx_endpoint.endpoint.utils import _redact_url_creds
 from funcx_endpoint.endpoint.utils.config import Config
 
 if t.TYPE_CHECKING:
@@ -194,7 +195,7 @@ class EndpointManager:
         signal.signal(signal.SIGCHLD, self.set_child_died)
 
     def start(self):
-        log.info("\n\n========== Endpoint Manager begins ==========")
+        log.info(f"\n\n========== Endpoint Manager begins: {self._endpoint_uuid_str}")
 
         msg_out = None
         if sys.stdout.isatty():
@@ -206,7 +207,6 @@ class EndpointManager:
             hl, r = "\033[104m", "\033[m"
             pld = f"{hl}{self._endpoint_uuid_str}{r}"
             print(f"        >>> Multi-Tenant Endpoint ID: {pld} <<<", file=msg_out)
-        log.info(f">>> Multi-Tenant Endpoint ID: {self._endpoint_uuid_str} <<<")
 
         self._install_signal_handlers()
 
@@ -248,7 +248,10 @@ class EndpointManager:
                 self.wait_for_children()
 
         self._command.join(5)
-        log.info("Shutdown complete.\n---------- Endpoint Manager ends ----------\n\n")
+        log.info(
+            "Shutdown complete."
+            f"\n---------- Endpoint Manager ends: {self._endpoint_uuid_str}\n\n"
+        )
 
     def _event_loop(self):
         self._command.start()
@@ -276,7 +279,7 @@ class EndpointManager:
                 _command = self._command_queue.get(timeout=1.0)
                 d_tag, props, body = _command
                 if props.headers and props.headers.get("debug", False):
-                    body_log_b = re.sub(rb"://([^:]+):[^@]+@", rb"://\1:***@", body)
+                    body_log_b = _redact_url_creds(body, redact_user=False)
                     log.warning(
                         "Command debug requested:"
                         f"\n  Delivery Tag: {d_tag}"
@@ -369,33 +372,35 @@ class EndpointManager:
         args: list[str] | None,
         kwargs: dict | None,
     ):
-        try:
-            pid = os.fork()
-        except Exception as err:
-            log.error(f"Unable to fork child process: {err}")
-            return
-
         if not args:
             args = []
         if not kwargs:
             kwargs = {}
 
-        ep_name = kwargs.get("name", "")  # error check is later
+        ep_name = kwargs.get("name", "")
+        if not ep_name:
+            raise InvalidCommandError("Missing endpoint name")
+
         proc_args = ["funcx-endpoint", "start", ep_name, "--die-with-parent", *args]
 
         pw_rec = pwd.getpwnam(local_username)
         udir, uid, gid = pw_rec.pw_dir, pw_rec.pw_uid, pw_rec.pw_gid
         uname = pw_rec.pw_name
 
+        try:
+            pid = os.fork()
+        except Exception as e:
+            log.error(f"Unable to fork child process: ({e.__class__.__name__}) {e}")
+            raise
+
         if pid > 0:
             proc_args_s = f"({uname}, {ep_name}) {' '.join(proc_args)}"
             child_args[pid] = (uid, gid, local_username, proc_args_s)
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
-        pid = os.getpid()
 
-        if not ep_name:
-            exit(os.EX_DATAERR)
+        # Reminder: from this point on, we are now the *child* process.
+        pid = os.getpid()
 
         exit_code = 70
         try:
@@ -451,18 +456,20 @@ class EndpointManager:
 
             amqp_creds = json.dumps(kwargs.get("amqp_creds"))
 
+            # Reminder: this is *os*.open, not *open*.  Descriptors will not be closed
+            # unless we explicitly do so, so `null_fd =` in loop will work.
+            null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
+            while null_fd < 3:  # reminder 0/1/2 == std in/out/err, so ...
+                # ... overkill, but "just in case": don't step on them
+                null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
+            exit_code += 1
+
             log.debug("Setting up process stdin")
             read_handle, write_handle = os.pipe()
             exit_code += 1
             if os.dup2(read_handle, 0) != 0:  # close old stdin, use read_handle
                 raise OSError("Unable to close stdin")
             os.close(read_handle)
-            exit_code += 1
-
-            null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
-            while null_fd < 3:
-                # overkill, but "just in case": don't step on std in/out/err
-                null_fd = os.open(os.devnull, os.O_WRONLY, mode=0o200)
             exit_code += 1
 
             log.debug("Redirecting stdout and stderr (%s)", os.devnull)
@@ -472,6 +479,10 @@ class EndpointManager:
                 exit_code += 1
                 if os.dup2(null_f.fileno(), 2) != 2:
                     raise OSError("Unable to close stderr")
+
+            # After the last os.dup2(), we are unable to get logs at *all*; hence the
+            # exit_code as a last-ditch attempt at sharing "what went wrong where" to
+            # the parent process.
             exit_code += 1
             log.debug("Writing credentials")
             with os.fdopen(write_handle, "w") as cred_pipe:
