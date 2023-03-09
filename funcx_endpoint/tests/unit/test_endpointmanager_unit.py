@@ -17,6 +17,7 @@ import responses
 from globus_sdk import GlobusAPIError, NetworkError
 
 from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
+from funcx_endpoint.endpoint.utils import _redact_url_creds
 from funcx_endpoint.endpoint.utils.config import Config
 
 _MOCK_BASE = "funcx_endpoint.endpoint.endpoint_manager."
@@ -285,13 +286,18 @@ def test_log_contains_sentinel_lines(mocker, epmanager, noop):
     em._event_loop = noop
     em.start()
 
-    beg_re = re.compile(r"\n\n=+ Endpoint Manager begins =+\n")
-    end_re = re.compile(r"\n-+ Endpoint Manager ends -+\n\n")
+    uuid_pat = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    beg_re_sentinel = re.compile(r"\n\n=+ Endpoint Manager begins: ")
+    beg_re_uuid = re.compile(rf"\n\n=+ Endpoint Manager begins: {uuid_pat}\n")
+    end_re_sentinel = re.compile(r"\n-+ Endpoint Manager ends: ")
+    end_re_uuid = re.compile(rf"\n-+ Endpoint Manager ends: {uuid_pat}\n\n")
     log_str = "\n".join(a[0] for a, _ in mock_log.info.call_args_list)
     assert log_str.startswith("\n\n"), "Expect visual separation for log trawlers"
-    assert beg_re.search(log_str) is not None, "Expected visual sentinel of begin"
+    assert beg_re_sentinel.search(log_str) is not None, "Expected visual begin sentinel"
+    assert beg_re_uuid.search(log_str) is not None, "Expected begin sentinel has EP id"
     assert "\nShutdown complete.\n" in log_str
-    assert end_re.search(log_str) is not None, "Expected visual sentinel of end"
+    assert end_re_sentinel.search(log_str) is not None, "Expected visual end sentinel"
+    assert end_re_uuid.search(log_str) is not None, "Expected end sentinel has EP id"
 
 
 def test_title_changes_for_shutdown(mocker, epmanager, noop, mock_setproctitle):
@@ -504,7 +510,7 @@ def test_emitted_debug_command_credentials_removed(mocker, epmanager, randomstri
     em._event_loop()
     assert mock_log.warning.called
 
-    expected = re.sub(rf"{pword}@", "***@", pld["creds"])
+    expected = _redact_url_creds(pld["creds"], redact_user=False)
     a = mock_log.warning.call_args[0][0]
     assert "Body bytes:" in a, "Verify test setup"
     assert pld["creds"] not in a
