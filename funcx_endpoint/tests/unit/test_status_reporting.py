@@ -9,7 +9,7 @@ from funcx_common import messagepack
 from funcx_common.messagepack.message_types import EPStatusReport
 from pytest import fixture
 
-from funcx_endpoint.executors import GCExecutor, ProcessPoolExecutor
+from funcx_endpoint.engines import GlobusComputeEngine, ProcessPoolEngine
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,9 @@ HEARTBEAT_PERIOD = 0.1
 
 
 @fixture
-def proc_pool_executor():
+def proc_pool_engine():
     ep_id = uuid.uuid4()
-    executor = ProcessPoolExecutor(max_workers=2, heartbeat_period=HEARTBEAT_PERIOD)
+    executor = ProcessPoolEngine(max_workers=2, heartbeat_period=HEARTBEAT_PERIOD)
     queue = multiprocessing.Queue()
     executor.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
 
@@ -28,9 +28,9 @@ def proc_pool_executor():
 
 
 @fixture
-def gc_executor():
+def gc_engine():
     ep_id = uuid.uuid4()
-    executor = GCExecutor(
+    executor = GlobusComputeEngine(
         address="127.0.0.1",
         heartbeat_period=HEARTBEAT_PERIOD,
         heartbeat_threshold=1,
@@ -45,12 +45,12 @@ def gc_executor():
     shutil.rmtree(tempdir, ignore_errors=True)
 
 
-@pytest.mark.parametrize("x", ["gc_executor", "proc_pool_executor"])
-def test_status_reporting(x, gc_executor, proc_pool_executor):
-    if x == "gc_executor":
-        executor = gc_executor
-    elif x == "proc_pool_executor":
-        executor = proc_pool_executor
+@pytest.mark.parametrize("x", ["gc_engine", "proc_pool_engine"])
+def test_status_reporting(x, gc_engine, proc_pool_engine):
+    if x == "gc_engine":
+        executor = gc_engine
+    elif x == "proc_pool_engine":
+        executor = proc_pool_engine
 
     report = executor.get_status_report()
     assert isinstance(report, EPStatusReport)

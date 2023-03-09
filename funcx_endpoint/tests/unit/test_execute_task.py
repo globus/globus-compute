@@ -5,7 +5,7 @@ from funcx_common import messagepack
 from tests.utils import ez_pack_function
 
 from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors.execution_helper.helper import execute_task
+from funcx_endpoint.engines.helper import execute_task
 
 logger = logging.getLogger(__name__)
 

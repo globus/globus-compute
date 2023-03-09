@@ -8,16 +8,16 @@ from concurrent.futures import Future
 from funcx_common.messagepack.message_types import EPStatusReport, TaskTransition
 from parsl.executors.high_throughput.executor import HighThroughputExecutor
 
-from funcx_endpoint.executors.base import GCExecutorBase, ReportingThread
+from funcx_endpoint.engines.base import GlobusComputeEngineBase, ReportingThread
 
 logger = logging.getLogger(__name__)
 
 
-class GCExecutor(GCExecutorBase):
+class GlobusComputeEngine(GlobusComputeEngineBase):
     def __init__(
         self,
         *args,
-        label: str = "GCExecutor",
+        label: str = "GlobusComputeEngine",
         address: t.Optional[str] = None,
         heartbeat_period: float = 30.0,
         **kwargs,

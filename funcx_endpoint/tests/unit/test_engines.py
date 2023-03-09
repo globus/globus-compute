@@ -15,37 +15,37 @@ from parsl.executors.high_throughput.interchange import ManagerLost
 from tests.utils import double, ez_pack_function, slow_double
 
 from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors import GCExecutor, ProcessPoolExecutor
+from funcx_endpoint.engines import GlobusComputeEngine, ProcessPoolEngine
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def proc_pool_executor():
+def proc_pool_engine():
     ep_id = uuid.uuid4()
-    executor = ProcessPoolExecutor(
-        label="ProcessPoolExecutor", heartbeat_period=1, max_workers=2
+    engine = ProcessPoolEngine(
+        label="ProcessPoolEngine", heartbeat_period=1, max_workers=2
     )
     queue = multiprocessing.Queue()
-    executor.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
+    engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
 
-    yield executor
-    executor.shutdown()
+    yield engine
+    engine.shutdown()
 
 
 @pytest.fixture
-def gc_executor():
+def gc_engine():
     ep_id = uuid.uuid4()
-    executor = GCExecutor(
+    engine = GlobusComputeEngine(
         address="127.0.0.1", heartbeat_period=1, heartbeat_threshold=1
     )
     queue = multiprocessing.Queue()
     tempdir = "/tmp/HTEX_logs"
     os.makedirs(tempdir, exist_ok=True)
-    executor.start(endpoint_id=ep_id, run_dir=tempdir, results_passthrough=queue)
+    engine.start(endpoint_id=ep_id, run_dir=tempdir, results_passthrough=queue)
 
-    yield executor
-    executor.shutdown()
+    yield engine
+    engine.shutdown()
     shutil.rmtree(tempdir, ignore_errors=True)
 
 
@@ -80,29 +80,29 @@ def test_result_message_packing():
     assert serializer.deserialize(unpacked.data) == result
 
 
-@pytest.mark.parametrize("x", ["gc_executor", "proc_pool_executor"])
-def test_executor_submit(x, gc_executor, proc_pool_executor):
-    "Test executor.submit with multiple executors"
-    if x == "gc_executor":
-        executor = gc_executor
+@pytest.mark.parametrize("x", ["gc_engine", "proc_pool_engine"])
+def test_engine_submit(x, gc_engine, proc_pool_engine):
+    "Test engine.submit with multiple engines"
+    if x == "gc_engine":
+        engine = gc_engine
     else:
-        executor = proc_pool_executor
+        engine = proc_pool_engine
 
     param = random.randint(1, 100)
-    future = executor.submit(double, param)
+    future = engine.submit(double, param)
     assert isinstance(future, concurrent.futures.Future)
     logger.warning(f"Got result: {future.result()}")
     assert future.result() == param * 2
 
 
-@pytest.mark.parametrize("x", ["gc_executor", "proc_pool_executor"])
-def test_executor_submit_raw(x, gc_executor, proc_pool_executor):
-    if x == "gc_executor":
-        executor = gc_executor
+@pytest.mark.parametrize("x", ["gc_engine", "proc_pool_engine"])
+def test_engine_submit_raw(x, gc_engine, proc_pool_engine):
+    if x == "gc_engine":
+        engine = gc_engine
     else:
-        executor = proc_pool_executor
+        engine = proc_pool_engine
 
-    q = executor.results_passthrough
+    q = engine.results_passthrough
     task_id = uuid.uuid1()
     serializer = FuncXSerializer()
     task_body = ez_pack_function(serializer, double, (3,), {})
@@ -111,7 +111,7 @@ def test_executor_submit_raw(x, gc_executor, proc_pool_executor):
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = executor.submit_raw(task_message)
+    future = engine.submit_raw(task_message)
     packed_result = future.result()
 
     # Confirm that the future got the right answer
@@ -143,10 +143,10 @@ def test_executor_submit_raw(x, gc_executor, proc_pool_executor):
         break
 
 
-def test_gc_executor_system_failure(gc_executor):
-    """Test behavior of executor failure killing task"""
+def test_gc_engine_system_failure(gc_engine):
+    """Test behavior of engine failure killing task"""
     param = random.randint(1, 100)
-    q = gc_executor.results_passthrough
+    q = gc_engine.results_passthrough
     task_id = uuid.uuid1()
     serializer = FuncXSerializer()
     # We want the task to be running when we kill the manager
@@ -164,13 +164,13 @@ def test_gc_executor_system_failure(gc_executor):
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = gc_executor.submit_raw(task_message)
+    future = gc_engine.submit_raw(task_message)
 
     assert isinstance(future, concurrent.futures.Future)
     # Trigger a failure from managers scaling in.
-    gc_executor.executor.scale_in(blocks=1)
+    gc_engine.executor.scale_in(blocks=1)
     # We need to scale out to make sure following tests will not be affected
-    gc_executor.executor.scale_out(blocks=1)
+    gc_engine.executor.scale_out(blocks=1)
     with pytest.raises(ManagerLost):
         future.result()
 
