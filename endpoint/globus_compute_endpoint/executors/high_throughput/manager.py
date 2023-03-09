@@ -20,27 +20,30 @@ from typing import Any
 import dill
 import psutil
 import zmq
-from funcx_common.messagepack.message_types import TaskTransition
-from funcx_common.tasks import ActorName, TaskState
+from globus_compute_common.messagepack.message_types import TaskTransition
+from globus_compute_common.tasks import ActorName, TaskState
 from parsl.version import VERSION as PARSL_VERSION
 
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
-from funcx_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
+)
+from globus_compute_endpoint.executors.high_throughput.container_sched import naive_scheduler
+from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_endpoint.executors.high_throughput.messages import (
     ManagerStatusReport,
     Message,
     Task,
 )
-from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
-from funcx_endpoint.logging_config import FXLogger, setup_logging
+from globus_compute_endpoint.executors.high_throughput.worker_map import WorkerMap
+from globus_compute_endpoint.logging_config import ComputeLogger, setup_logging
+from globus_compute_sdk.serialize import ComputeSerializer
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11
 HEARTBEAT_CODE = (2**32) - 1
 
-log: FXLogger = logging.getLogger(__name__)  # type: ignore
+log: ComputeLogger = logging.getLogger(__name__)  # type: ignore
 
 
 class TaskCancelled(Exception):
@@ -208,10 +211,10 @@ class Manager:
 
         self.internal_worker_port_range = internal_worker_port_range
 
-        self.funcx_task_socket = self.context.socket(zmq.ROUTER)
-        self.funcx_task_socket.set_hwm(0)
+        self.task_socket = self.context.socket(zmq.ROUTER)
+        self.task_socket.set_hwm(0)
         self.address = "127.0.0.1"
-        self.worker_port = self.funcx_task_socket.bind_to_random_port(
+        self.worker_port = self.task_socket.bind_to_random_port(
             "tcp://*",
             min_port=self.internal_worker_port_range[0],
             max_port=self.internal_worker_port_range[1],
@@ -237,7 +240,7 @@ class Manager:
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
-        self.serializer = FuncXSerializer()
+        self.serializer = ComputeSerializer()
         self.next_worker_q: list[str] = []  # FIFO queue for spinning up workers.
         self.worker_procs: dict[str, subprocess.Popen] = {}
 
@@ -256,7 +259,7 @@ class Manager:
 
         self.poller = zmq.Poller()
         self.poller.register(self.task_incoming, zmq.POLLIN)
-        self.poller.register(self.funcx_task_socket, zmq.POLLIN)
+        self.poller.register(self.task_socket, zmq.POLLIN)
         self.task_worker_map: dict[str, Any] = {}
 
         self.task_done_counter = 0
@@ -333,10 +336,10 @@ class Manager:
             socks = dict(self.poller.poll(timeout=poll_timer))
 
             if (
-                self.funcx_task_socket in socks
-                and socks[self.funcx_task_socket] == zmq.POLLIN
+                self.task_socket in socks
+                and socks[self.task_socket] == zmq.POLLIN
             ):
-                self.poll_funcx_task_socket()
+                self.poll_task_socket()
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
@@ -566,9 +569,9 @@ class Manager:
 
                             self.send_task_to_worker(task_type)
 
-    def poll_funcx_task_socket(self, test=False):
+    def poll_task_socket(self, test=False):
         try:
-            w_id, m_type, message = self.funcx_task_socket.recv_multipart()
+            w_id, m_type, message = self.task_socket.recv_multipart()
             if m_type == b"REGISTER":
                 reg_info = dill.loads(message)
                 log.debug(f"Registration received from worker:{w_id} {reg_info}")
@@ -637,7 +640,7 @@ class Manager:
             dill.dumps(task.container_id),
             task.pack(),
         ]
-        self.funcx_task_socket.send_multipart(to_send)
+        self.task_socket.send_multipart(to_send)
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
             log.debug(f"Set task {task.task_id} to RUNNING")

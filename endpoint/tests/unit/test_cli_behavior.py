@@ -7,21 +7,21 @@ from unittest import mock
 import pytest
 from click.testing import CliRunner
 
-from funcx_endpoint.cli import app
+from globus_compute_endpoint.cli import app
 
 
 @pytest.fixture
-def funcx_dir_path(tmp_path):
-    yield tmp_path / "funcx-dir"
+def compute_dir_path(tmp_path):
+    yield tmp_path / "compute-dir"
 
 
 @pytest.fixture(autouse=True)
-def mock_cli_state(funcx_dir_path):
-    with mock.patch("funcx_endpoint.cli.Endpoint") as mock_ep:
+def mock_cli_state(compute_dir_path):
+    with mock.patch("globus_compute_endpoint.cli.Endpoint") as mock_ep:
         mock_ep.return_value = mock_ep
-        with mock.patch("funcx_endpoint.cli.CommandState.ensure") as m_state:
+        with mock.patch("globus_compute_endpoint.cli.CommandState.ensure") as m_state:
             mock_state = mock.Mock()
-            mock_state.endpoint_config_dir = funcx_dir_path
+            mock_state.endpoint_config_dir = compute_dir_path
             m_state.return_value = mock_state
 
             yield mock_ep, mock_state
@@ -36,7 +36,7 @@ def make_endpoint_dir(mock_cli_state):
         ep_dir.mkdir(parents=True, exist_ok=True)
         ep_config = ep_dir / "config.py"
         ep_config.write_text(  # minimal setup to make loading work
-            "from funcx_endpoint.endpoint.utils.config import Config\n"
+            "from globus_compute_endpoint.endpoint.utils.config import Config\n"
             "config = Config(multi_tenant=False)"
         )
 
@@ -100,8 +100,8 @@ def test_start_ep_reads_stdin(
 ):
     data_is_valid, reg_info = reg_data
 
-    mock_log = mocker.patch("funcx_endpoint.cli.log")
-    mock_sys = mocker.patch("funcx_endpoint.cli.sys")
+    mock_log = mocker.patch("globus_compute_endpoint.cli.log")
+    mock_sys = mocker.patch("globus_compute_endpoint.cli.sys")
     mock_sys.stdin.closed = False
     mock_sys.stdin.isatty.return_value = False
     mock_sys.stdin.read.return_value = reg_info
@@ -123,7 +123,7 @@ def test_start_ep_reads_stdin(
         assert reg_info_found == {}
 
 
-@mock.patch("funcx_endpoint.cli.read_config")
+@mock.patch("globus_compute_endpoint.cli.read_config")
 def test_stop_endpoint(read_config, run_line, mock_cli_state, make_endpoint_dir):
     run_line("stop foo")
     mock_ep, _ = mock_cli_state
@@ -147,7 +147,7 @@ def test_start_ep_incorrect(run_line, mock_cli_state, make_endpoint_dir):
     conf = mock_state.endpoint_config_dir / "foo" / "config.py"
 
     conf.write_text("asa asd df = 5")  # fail the import
-    with mock.patch("funcx_endpoint.cli.log") as mock_log:
+    with mock.patch("globus_compute_endpoint.cli.log") as mock_log:
         res = run_line("start foo", assert_exit_code=1)
         assert "might be out of date" in mock_log.exception.call_args[0][0]
     assert isinstance(res.exception, SyntaxError)
@@ -160,7 +160,7 @@ def test_start_ep_incorrect(run_line, mock_cli_state, make_endpoint_dir):
     assert "modified incorrectly?" in res.stderr
 
 
-@mock.patch("funcx_endpoint.cli.read_config")
+@mock.patch("globus_compute_endpoint.cli.read_config")
 def test_delete_endpoint(read_config, run_line, mock_cli_state):
     run_line("delete foo --yes")
     mock_ep, _ = mock_cli_state

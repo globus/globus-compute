@@ -8,7 +8,7 @@ from parsl.errors import OptionalModuleMissing
 from parsl.providers.base import ExecutionProvider
 from parsl.utils import RepresentationMixin
 
-from funcx_endpoint.providers.kubernetes.template import template_string
+from globus_compute_endpoint.providers.kubernetes.template import template_string
 
 try:
     from kubernetes import client, config
@@ -142,7 +142,13 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         # Dictionary that keeps track of jobs, keyed on task_type
         self.resources_by_task_type: Dict[str, Any] = {}
 
-    def submit(self, cmd_string, tasks_per_node, task_type, job_name="funcx-worker"):
+    def submit(
+            self,
+            cmd_string,
+            tasks_per_node,
+            task_type,
+            job_name="globus-compute-worker"
+    ):
         """Submit a job
         Args:
              - cmd_string  :(String) - Name of the container to initiate

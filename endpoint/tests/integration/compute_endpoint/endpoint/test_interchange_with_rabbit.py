@@ -8,18 +8,18 @@ import warnings
 import dill
 import pika
 import pytest
-from funcx_common.messagepack import pack
-from funcx_common.messagepack.message_types import Result, Task
-from tests.integration.funcx_endpoint.executors.mock_executors import MockExecutor
+from globus_compute_common.messagepack import pack
+from globus_compute_common.messagepack.message_types import Result, Task
+from tests.integration.compute_endpoint.executors.mock_executors import MockExecutor
 from tests.utils import try_for_timeout
 
-from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
+from globus_compute_endpoint.endpoint.utils.config import Config
 
 
 @pytest.fixture
 def run_interchange_process(
-    get_standard_funcx_client, setup_register_endpoint_response, tmp_path
+        get_standard_compute_client, setup_register_endpoint_response, tmp_path
 ):
     """
     Start and stop a subprocess that executes the EndpointInterchange class.
@@ -45,7 +45,7 @@ def run_interchange_process(
 
     endpoint_uuid = str(uuid.uuid4())
     endpoint_name = "endpoint_foo"
-    fxc = get_standard_funcx_client()
+    fxc = get_standard_compute_client()
     setup_register_endpoint_response(endpoint_uuid)
     reg_info = fxc.register_endpoint(endpoint_name, endpoint_uuid)
     assert isinstance(reg_info, dict), "Test setup verification"

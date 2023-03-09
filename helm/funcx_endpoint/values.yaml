@@ -11,12 +11,12 @@ image:
 
 workerDebug: false
 workerImage: python:3.6-buster
-workerInit: pip install funcx-endpoint>=0.2.0
+workerInit: pip install globus-compute-endpoint>=0.2.0
 workerNamespace: default
 logDir: /tmp/worker_logs
 
 rbacEnabled: true
-nameOverride: funcx-endpoint
+nameOverride: globus-compute-endpoint
 
 initMem: 2000Mi
 maxMem: 16000Mi

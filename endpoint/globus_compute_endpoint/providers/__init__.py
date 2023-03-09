@@ -1,3 +1,3 @@
-from funcx_endpoint.providers.kubernetes.kube import KubernetesProvider
+from globus_compute_endpoint.providers.kubernetes.kube import KubernetesProvider
 
 __all__ = ["KubernetesProvider"]

@@ -442,7 +442,7 @@ class Endpoint:
 
         # Delete endpoint from web service
         try:
-            fx_client = Endpoint.get_funcx_client(endpoint_config)
+            fx_client = Endpoint.get_client(endpoint_config)
             fx_client.delete_endpoint(endpoint_id)
             log.info(f"Endpoint <{ep_name}> has been deleted from the web service")
         except GlobusAPIError as e:
@@ -460,9 +460,9 @@ class Endpoint:
             )
             if not force:
                 log.critical(
-                    "funcx-endpoint is unable to reach the funcX service due to a "
-                    "NetworkError \n"
-                    "Please make sure that the funcX service address you provided is "
+                    "The endpoint is unable to reach the Globus Compute service "
+                    "due to a NetworkError \n"
+                    "Please make sure that the service address you provided is "
                     "reachable \n"
                     "and then attempt to delete the endpoint again"
                 )

@@ -3,10 +3,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
+from globus_compute_endpoint.endpoint.utils.config import Config
 
-_mock_base = "funcx_endpoint.endpoint.interchange."
+_mock_base = "globus_compute_endpoint.endpoint.interchange."
 
 
 def test_main_exception_always_quiesces(mocker, fs):

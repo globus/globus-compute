@@ -9,8 +9,8 @@ import sys
 import click
 from click import ClickException
 
-from funcx.sdk.login_manager import LoginManager
-from funcx.sdk.login_manager.whoami import print_whoami_info
+from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
 from .endpoint.endpoint import Endpoint
 from .endpoint.utils.config import Config
@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 
 class CommandState:
     def __init__(self):
+        # TODO .funcx to .compute
         self.endpoint_config_dir: str = str(pathlib.Path.home() / ".funcx")
         self.debug = False
         self.no_color = False
@@ -31,23 +32,23 @@ class CommandState:
         return click.get_current_context().ensure_object(CommandState)
 
 
-def init_endpoint_configuration_dir(funcx_conf_dir: pathlib.Path):
-    if not funcx_conf_dir.exists():
+def init_endpoint_configuration_dir(conf_dir: pathlib.Path):
+    if not conf_dir.exists():
         log.info(
-            "No existing configuration found at %s. Initializing...", funcx_conf_dir
+            "No existing configuration found at %s. Initializing...", conf_dir
         )
         try:
-            funcx_conf_dir.mkdir(mode=0o700, exist_ok=True)
+            conf_dir.mkdir(mode=0o700, exist_ok=True)
         except Exception as exc:
             e = click.ClickException(
                 f"{exc}\n\nUnable to create configuration directory"
             )
             raise e from exc
 
-    elif not funcx_conf_dir.is_dir():
+    elif not conf_dir.is_dir():
         raise click.ClickException(
-            f"File already exists: {funcx_conf_dir}\n\n"
-            "Refusing to initialize funcX configuration directory: path already exists"
+            f"File already exists: {conf_dir}\n\n"
+            "Refusing to initialize configuration directory: path already exists"
         )
 
 
@@ -62,8 +63,8 @@ def get_cli_endpoint() -> Endpoint:
     # as a result, any number of CLI options may be used to tweak the CommandState
     # via callbacks, and the Endpoint will only be constructed within commands which
     # access the Endpoint via this getter
-    funcx_dir = get_config_dir()
-    init_endpoint_configuration_dir(funcx_dir)
+    config_dir = get_config_dir()
+    init_endpoint_configuration_dir(config_dir)
 
     state = CommandState.ensure()
     endpoint = Endpoint(debug=state.debug)
@@ -121,7 +122,7 @@ def config_dir_callback(ctx, param, value):
     state.endpoint_config_dir = value
 
 
-@click.group("funcx-endpoint")
+@click.group("globus-compute-endpoint")
 @click.option(
     "-c",
     "--config-dir",
@@ -139,10 +140,10 @@ def app():
 @app.command("version")
 @common_options
 def version_command():
-    """Show the version of funcx-endpoint"""
-    import funcx_endpoint
+    """Show the version of globus-compute-endpoint"""
+    import globus_compute_endpoint
 
-    click.echo(f"FuncX endpoint version: {funcx_endpoint.__version__}")
+    click.echo(f"Globus Compute endpoint version: {globus_compute_endpoint.__version__}")
 
 
 @app.command(name="configure", help="Configure an endpoint")
@@ -164,11 +165,11 @@ def configure_endpoint(
 ):
     """Configure an endpoint
 
-    Drops a config.py template into the funcx configs directory.
-    The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
+    Drops a config.py template into the config directory.
+    The template usually goes to ~/.compute/<ENDPOINT_NAME>/config.py
     """
-    funcx_dir = get_config_dir()
-    ep_dir = funcx_dir / name
+    config_dir = get_config_dir()
+    ep_dir = config_dir / name
     Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant)
 
 
@@ -257,8 +258,8 @@ def _do_logout_endpoints(
     Returns False, error_msg if token revocation was not done
     """
     if running_endpoints is None:
-        funcx_dir = get_config_dir()
-        running_endpoints = Endpoint.get_running_endpoints(funcx_dir)
+        config_dir = get_config_dir()
+        running_endpoints = Endpoint.get_running_endpoints(config_dir)
     tokens_revoked = False
     error_msg = None
     if running_endpoints and not force:
@@ -295,7 +296,7 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
 
     except FileNotFoundError as err:
         if not endpoint_dir.exists():
-            configure_command = "funcx-endpoint configure"
+            configure_command = "globus-compute-endpoint configure"
             if endpoint_name != "default":
                 configure_command += f" {endpoint_name}"
             msg = (
@@ -324,7 +325,7 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
 
     except Exception:
         log.exception(
-            "funcX v0.2.0 made several non-backwards compatible changes to the config. "
+            "v0.2.0 made several non-backwards compatible changes to the config. "
             "Your config might be out of date. "
             "Refer to "
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
@@ -406,8 +407,8 @@ def restart_endpoint(*, name: str, endpoint_uuid: str | None):
 @common_options
 def list_endpoints():
     """List all available endpoints"""
-    funcx_dir = get_config_dir()
-    Endpoint.print_endpoint_table(funcx_dir)
+    config_dir = get_config_dir()
+    Endpoint.print_endpoint_table(config_dir)
 
 
 @app.command("delete")

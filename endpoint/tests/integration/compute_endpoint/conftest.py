@@ -24,7 +24,7 @@ def _mock_logging_config(monkeypatch):
         pass
 
     monkeypatch.setattr(
-        "funcx_endpoint.logging_config.setup_logging", fake_setup_logging
+        "globus_compute_endpoint.logging_config.setup_logging", fake_setup_logging
     )
 
 

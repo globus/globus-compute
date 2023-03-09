@@ -1,24 +1,29 @@
 import pickle
 import uuid
 
-from funcx_common.messagepack import unpack
-from funcx_common.messagepack.message_types import Container, ContainerImage
-from funcx_common.messagepack.message_types import (
+from globus_compute_common.messagepack import unpack
+from globus_compute_common.messagepack.message_types import Container, ContainerImage
+from globus_compute_common.messagepack.message_types import (
     EPStatusReport as OutgoingEPStatusReport,
 )
-from funcx_common.messagepack.message_types import Task as OutgoingTask
-from funcx_common.messagepack.message_types import TaskTransition
-from funcx_common.tasks.constants import ActorName, TaskState
+from globus_compute_common.messagepack.message_types import Task as OutgoingTask
+from globus_compute_common.messagepack.message_types import TaskTransition
+from globus_compute_common.tasks.constants import ActorName, TaskState
 
-from funcx_endpoint.endpoint.messages_compat import (
+from globus_compute_endpoint.endpoint.messages_compat import (
     convert_to_internaltask,
     try_convert_to_messagepack,
 )
-from funcx_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.executors.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
 )
-from funcx_endpoint.executors.high_throughput.messages import Message as InternalMessage
-from funcx_endpoint.executors.high_throughput.messages import Task as InternalTask
+from globus_compute_endpoint.executors.high_throughput.messages import (
+    Message as InternalMessage,
+)
+
+from globus_compute_endpoint.executors.high_throughput.messages import (
+    Task as InternalTask,
+)
 
 
 def test_ep_status_report_conversion():

@@ -8,9 +8,9 @@ import time
 from queue import Empty, Queue
 from typing import Any
 
-from funcx_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import ComputeLogger
 
-log: FXLogger = logging.getLogger(__name__)  # type: ignore
+log: ComputeLogger = logging.getLogger(__name__)  # type: ignore
 
 
 class WorkerMap:
@@ -321,7 +321,7 @@ class WorkerMap:
         self.worker_id_counter += 1
 
         cmd = (
-            f"funcx-worker {debug}{worker_id} "
+            f"globus-compute-worker {debug}{worker_id} "
             f"-a {address} "
             f"-p {worker_port} "
             f"-t {worker_type} "

@@ -7,7 +7,7 @@ from collections import defaultdict
 from enum import Enum, auto
 from struct import Struct
 
-from funcx_common.messagepack.message_types import TaskTransition
+from globus_compute_common.messagepack.message_types import TaskTransition
 
 MESSAGE_TYPE_FORMATTER = Struct("b")
 
@@ -97,13 +97,13 @@ class Task(Message):
     def pack(self) -> bytes:
         if self.raw_buffer is None:
             # a type:ignore is needed here
-            # task_buffer might be a str  or it might be a bytes (see `unpack`)
+            # task_buffer might be a str or a bytes (see `unpack`)
             # and we can't tell which is correct
             #
             # rather than thinking hard, preserve the exact current runtime behavior
             #
             # all of this code is going to be eliminated soonish by
-            # funcx_common.messagepack in part because of issues like this
+            # globus_compute_common.messagepack in part because of issues like this
             add_ons = (
                 f"TID={self.task_id};CID={self.container_id};"  # type: ignore
                 f"{self.task_buffer}"

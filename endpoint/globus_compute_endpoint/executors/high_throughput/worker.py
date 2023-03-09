@@ -9,16 +9,19 @@ import time
 
 import dill
 import zmq
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import TaskTransition
-from funcx_common.tasks import ActorName, TaskState
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import TaskTransition
+from globus_compute_common.tasks import ActorName, TaskState
 
-from funcx.errors import MaxResultSizeExceeded
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.exceptions import CouldNotExecuteUserTaskError
-from funcx_endpoint.executors.high_throughput.messages import Message
-from funcx_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
+)
+from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
+from globus_compute_endpoint.executors.high_throughput.messages import Message
+from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_sdk.errors import MaxResultSizeExceeded
+from globus_compute_sdk.serialize import ComputeSerializer
 
 log = logging.getLogger(__name__)
 
@@ -26,8 +29,8 @@ DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
 
 
-class FuncXWorker:
-    """The FuncX worker
+class Worker:
+    """The Globus Compute worker
     Parameters
     ----------
 
@@ -44,7 +47,7 @@ class FuncXWorker:
      Maximum result size allowed in Bytes
      Default = 10 MB
 
-    Funcx worker will use the REP sockets to:
+    The worker will use the REP sockets to:
          task = recv ()
          result = execute(task)
          send(result)
@@ -62,7 +65,7 @@ class FuncXWorker:
         self.address = address
         self.port = port
         self.worker_type = worker_type
-        self.serializer = FuncXSerializer()
+        self.serializer = ComputeSerializer()
         self.serialize = self.serializer.serialize
         self.deserialize = self.serializer.deserialize
         self.result_size_limit = result_size_limit
@@ -216,13 +219,13 @@ def cli_run():
     args = parser.parse_args()
 
     setup_logging(
-        logfile=os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.log"),
+        logfile=os.path.join(args.logdir, f"worker_{args.worker_id}.log"),
         debug=args.debug,
     )
 
     # Redirect the stdout and stderr
-    stdout_path = os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.stdout")
-    stderr_path = os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.stderr")
+    stdout_path = os.path.join(args.logdir, f"worker_{args.worker_id}.stdout")
+    stderr_path = os.path.join(args.logdir, f"worker_{args.worker_id}.stderr")
     with open(stdout_path, "w") as fo, open(stderr_path, "w") as fe:
         # Redirect the stdout
         old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -230,7 +233,7 @@ def cli_run():
         sys.stderr = fe
 
         try:
-            worker = FuncXWorker(
+            worker = Worker(
                 args.worker_id,
                 args.address,
                 int(args.port),

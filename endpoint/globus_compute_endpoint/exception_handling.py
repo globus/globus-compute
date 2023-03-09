@@ -1,6 +1,6 @@
 """
 This module provides helpers for constructing the internal dict objects which get passed
-around and ultimately converted into funcx_common.messagepack.Result objects
+around and ultimately converted into globus_compute_common.messagepack.Result objects
 
 IDEALLY this would be refactored to produce and return Result objects directly, which
 could then be passed around internally instead of raw dicts
@@ -14,8 +14,8 @@ import traceback
 import types
 import typing as t
 
-from funcx.errors import MaxResultSizeExceeded
-from funcx_endpoint.exceptions import CouldNotExecuteUserTaskError
+from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
+from globus_compute_sdk.errors import MaxResultSizeExceeded
 
 INTERNAL_ERROR_CLASSES: tuple[type[Exception], ...] = (
     CouldNotExecuteUserTaskError,

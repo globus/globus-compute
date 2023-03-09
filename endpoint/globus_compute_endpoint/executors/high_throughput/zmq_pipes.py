@@ -6,7 +6,7 @@ import time
 import dill
 import zmq
 
-from funcx_endpoint.executors.high_throughput.messages import Message
+from globus_compute_endpoint.executors.high_throughput.messages import Message
 
 log = logging.getLogger(__name__)
 

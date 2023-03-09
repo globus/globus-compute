@@ -11,14 +11,14 @@ import pytest
 import requests
 from globus_sdk import GlobusAPIError
 
-from funcx_endpoint.endpoint import default_config
-from funcx_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint import default_config
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
 
-logger = logging.getLogger("mock_funcx")
+logger = logging.getLogger("mock_globus_compute")
 
 
 def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.Response:
-    req = requests.Request(method, "https://funcx.example.org/")
+    req = requests.Request(method, "https://compute.example.org/")
     p_req = req.prepare()
     res = requests.Response()
     res.request = p_req
@@ -29,8 +29,8 @@ def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.R
 class TestStart:
     @pytest.fixture(autouse=True)
     def test_setup_teardown(self, fs):
-        funcx_dir = f"{os.getcwd()}"
-        config_dir = pathlib.Path(funcx_dir) / "mock_endpoint"
+        compute_dir = f"{os.getcwd()}"
+        config_dir = pathlib.Path(compute_dir) / "mock_endpoint"
         assert not config_dir.exists()
 
         # pyfakefs will take care of newly created files, not existing config
@@ -96,7 +96,7 @@ class TestStart:
         "This test needs to be re-written after endpoint_register is updated"
     )
     def test_start(self, mocker):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
         reg_info = {
             "endpoint_id": "abcde12345",
             "address": "localhost",
@@ -122,20 +122,20 @@ class TestStart:
 
         mock_daemon = mocker.patch.object(Endpoint, "daemon_launch", return_value=None)
 
-        mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
         mock_uuid.return_value = 123456
 
         mock_pidfile = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
+            "globus_compute_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
         )
         mock_pidfile.return_value = None
 
         mock_results_ack_handler = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.ResultsAckHandler"
+            "globus_compute_endpoint.endpoint.endpoint.ResultsAckHandler"
         )
 
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        manager = Endpoint()
+        config_dir = os.path.join(os.getcwd(), "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
@@ -148,7 +148,7 @@ class TestStart:
         )
         mock_zmq_load.assert_called_with("public/key/file")
 
-        funcx_client_options = {
+        compute_client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
         }
 
@@ -158,7 +158,7 @@ class TestStart:
             os.path.join(config_dir, "certificates"),
             endpoint_config,
             reg_info,
-            funcx_client_options,
+            compute_client_options,
             mock_results_ack_handler.return_value,
         )
 
@@ -181,10 +181,10 @@ class TestStart:
         being asserted against because this zmq setup happens before registration
         occurs.
         """
-        mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+        mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
 
         mock_register_endpoint = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.register_endpoint"
+            "globus_compute_endpoint.endpoint.endpoint.register_endpoint"
         )
         mock_register_endpoint.side_effect = GlobusAPIError(
             _fake_http_response(status=400, method="POST")
@@ -198,18 +198,18 @@ class TestStart:
             return_value=(b"12345abcde", b"12345abcde"),
         )
 
-        mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
         mock_uuid.return_value = 123456
 
         mock_pidfile = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
+            "globus_compute_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
         )
         mock_pidfile.return_value = None
 
-        mocker.patch("funcx_endpoint.endpoint.endpoint.ResultsAckHandler")
+        mocker.patch("globus_compute_endpoint.endpoint.endpoint.ResultsAckHandler")
 
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        manager = Endpoint()
+        config_dir = os.path.join(os.getcwd(), "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
@@ -239,10 +239,10 @@ class TestStart:
         own. mock_zmq_create and mock_zmq_load are being asserted against because this
         zmq setup happens before registration occurs.
         """
-        mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+        mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
 
         mock_register_endpoint = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.register_endpoint"
+            "globus_compute_endpoint.endpoint.endpoint.register_endpoint"
         )
         mock_register_endpoint.side_effect = GlobusAPIError(
             _fake_http_response(status=500, method="POST")
@@ -266,20 +266,20 @@ class TestStart:
 
         mock_daemon = mocker.patch.object(Endpoint, "daemon_launch", return_value=None)
 
-        mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
         mock_uuid.return_value = 123456
 
         mock_pidfile = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
+            "globus_compute_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
         )
         mock_pidfile.return_value = None
 
         mock_results_ack_handler = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.ResultsAckHandler"
+            "globus_compute_endpoint.endpoint.endpoint.ResultsAckHandler"
         )
 
-        manager = Endpoint(funcx_dir=os.getcwd())
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        manager = Endpoint()
+        config_dir = os.path.join(os.getcwd(), "mock_endpoint")
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
@@ -293,7 +293,7 @@ class TestStart:
         )
         mock_zmq_load.assert_called_with("public/key/file")
 
-        funcx_client_options = {
+        client_options = {
             "funcx_service_address": endpoint_config.config.funcx_service_address,
         }
 
@@ -306,7 +306,7 @@ class TestStart:
             os.path.join(config_dir, "certificates"),
             endpoint_config,
             reg_info,
-            funcx_client_options,
+            client_options,
             mock_results_ack_handler.return_value,
         )
 
@@ -320,7 +320,7 @@ class TestStart:
         )
 
     def test_start_without_executors(self, mocker):
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
         mock_client.return_value.register_endpoint.return_value = {
             "endpoint_id": "abcde12345",
             "address": "localhost",
@@ -358,14 +358,14 @@ class TestStart:
     @pytest.mark.skip("This test doesn't make much sense")
     def test_daemon_launch(self, mocker):
         mock_interchange = mocker.patch(
-            "funcx_endpoint.endpoint.endpoint.EndpointInterchange"
+            "globus_compute_endpoint.endpoint.endpoint.EndpointInterchange"
         )
         mock_interchange.return_value.start.return_value = None
         mock_interchange.return_value.stop.return_value = None
 
-        manager = Endpoint(funcx_dir=os.getcwd())
+        manager = Endpoint()
         manager.name = "test"
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_dir = os.path.join(os.getcwd(), "mock_endpoint")
 
         mock_optionals = {}
         mock_optionals["logdir"] = config_dir
@@ -375,14 +375,13 @@ class TestStart:
             "config", os.path.join(config_dir, "config.py")
         ).load_module()
 
-        funcx_client_options = None
+        client_options = None
 
         manager.daemon_launch(
             endpoint_uuid="mock_endpoint_uuid",
             endpoint_dir=config_dir,
             endpoint_config=endpoint_config,
             reg_info=None,
-            funcx_client_options=funcx_client_options,
             results_ack_handler=None,
         )
 
@@ -391,7 +390,6 @@ class TestStart:
             reg_info=None,
             endpoint_uuid="mock_endpoint_uuid",
             endpoint_dir=config_dir,
-            funcx_client_options=funcx_client_options,
             results_ack_handler=None,
             **mock_optionals,
         )
@@ -399,9 +397,9 @@ class TestStart:
     @pytest.mark.skip(
         "This test needs to be re-written after endpoint_register is updated"
     )
-    def test_with_funcx_config(self, mocker):
+    def test_with_config(self, mocker):
         mock_interchange = mocker.patch(
-            "funcx_endpoint.endpoint.interchange.EndpointInterchange"
+            "globus_compute_endpoint.endpoint.interchange.EndpointInterchange"
         )
         mock_interchange.return_value.start.return_value = None
         mock_interchange.return_value.stop.return_value = None
@@ -409,21 +407,20 @@ class TestStart:
         mock_optionals = {}
         mock_optionals["interchange_address"] = "127.0.0.1"
 
-        mock_funcx_config = {}
-        mock_funcx_config["endpoint_address"] = "127.0.0.1"
+        mock_config = {}
+        mock_config["endpoint_address"] = "127.0.0.1"
 
-        manager = Endpoint(funcx_dir=os.getcwd())
+        manager = Endpoint()
         manager.name = "test"
-        config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
+        config_dir = os.path.join(os.getcwd(), "mock_endpoint")
         mock_optionals["logdir"] = config_dir
-        manager.funcx_config = mock_funcx_config
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
             "config", os.path.join(config_dir, "config.py")
         ).load_module()
 
-        funcx_client_options = {}
+        client_options = {}
 
         manager.daemon_launch(
             "mock_endpoint_uuid",
@@ -431,10 +428,9 @@ class TestStart:
             "mock_keys_dir",
             endpoint_config,
             None,
-            funcx_client_options,
+            client_options,
             None,
         )
-
         mock_interchange.assert_called_with(
             endpoint_config.config,
             endpoint_id="mock_endpoint_uuid",
@@ -442,13 +438,12 @@ class TestStart:
             endpoint_dir=config_dir,
             endpoint_name=manager.name,
             reg_info=None,
-            funcx_client_options=funcx_client_options,
             results_ack_handler=None,
             **mock_optionals,
         )
 
     def test_get_or_create_endpoint_uuid_no_json_no_uuid(self, mocker):
-        mock_uuid = mocker.patch("funcx_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
         mock_uuid.return_value = 123456
 
         config_dir = pathlib.Path("/some/path/mock_endpoint")
@@ -481,7 +476,7 @@ class TestStart:
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         ep_uuid_str = str(uuid.uuid4())
 
-        mock_client = mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
         mock_stop_endpoint = mocker.patch.object(Endpoint, "stop_endpoint")
         mock_rmtree = mocker.patch.object(shutil, "rmtree")
         mocker.patch.object(Endpoint, "get_endpoint_id", return_value=ep_uuid_str)

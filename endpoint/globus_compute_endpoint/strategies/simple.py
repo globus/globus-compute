@@ -6,7 +6,7 @@ import time
 
 from parsl.providers.base import JobState
 
-from funcx_endpoint.strategies.base import BaseStrategy
+from globus_compute_endpoint.strategies.base import BaseStrategy
 
 log = logging.getLogger(__name__)
 

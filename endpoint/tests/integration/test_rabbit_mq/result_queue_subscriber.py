@@ -11,7 +11,7 @@ from multiprocessing.synchronize import Event as EventType
 
 import pika
 
-from funcx_endpoint.endpoint.rabbit_mq.base import SubscriberProcessStatus
+from globus_compute_endpoint.endpoint.rabbit_mq.base import SubscriberProcessStatus
 
 logger = logging.getLogger(__name__)
 

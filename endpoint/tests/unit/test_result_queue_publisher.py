@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pika
 
-from funcx_endpoint.endpoint.rabbit_mq import (
+from globus_compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultQueuePublisher,
 )
@@ -14,7 +14,7 @@ def test_rqp_verifies_provided_queue_info(mocker, randomstring):
     mock_conn = MagicMock()
     mock_channel = MagicMock()
     mock_pika = mocker.patch(
-        "funcx_endpoint.endpoint.rabbit_mq.result_queue_publisher.pika"
+        "globus_compute_endpoint.endpoint.rabbit_mq.result_queue_publisher.pika"
     )
     mock_pika.BlockingConnection.return_value = mock_conn
     mock_conn.channel.return_value = mock_channel

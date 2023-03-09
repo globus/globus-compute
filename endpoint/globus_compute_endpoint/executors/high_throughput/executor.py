@@ -23,20 +23,20 @@ from parsl.executors.errors import BadMessage, ScalingFailed
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors.high_throughput import interchange, zmq_pipes
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
-from funcx_endpoint.executors.high_throughput.messages import (
+from globus_compute_sdk.serialize import ComputeSerializer
+from globus_compute_endpoint.executors.high_throughput import interchange, zmq_pipes
+from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_endpoint.executors.high_throughput.messages import (
     EPStatusReport,
     Heartbeat,
     HeartbeatReq,
     Task,
     TaskCancel,
 )
-from funcx_endpoint.logging_config import setup_logging
-from funcx_endpoint.strategies.simple import SimpleStrategy
+from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.strategies.simple import SimpleStrategy
 
-fx_serializer = FuncXSerializer()
+compute_serializer = ComputeSerializer()
 
 
 # TODO: YADU There's a bug here which causes some of the log messages to write out to
@@ -335,7 +335,7 @@ class HighThroughputExecutor(RepresentationMixin):
                 f"to accelerators: {self.available_accelerators}"
             )
 
-        # FuncX specific options
+        # Globus Compute specific options
         self.container_image = container_image
         self.worker_mode = worker_mode
 
@@ -552,7 +552,7 @@ class HighThroughputExecutor(RepresentationMixin):
                                 "Executor shutting down due to fatal "
                                 "exception from interchange"
                             )
-                            self._executor_exception = fx_serializer.deserialize(
+                            self._executor_exception = compute_serializer.deserialize(
                                 msg["exception"]
                             )
                             log.exception(f"Exception: {self._executor_exception}")
@@ -603,7 +603,7 @@ class HighThroughputExecutor(RepresentationMixin):
                             continue
 
                         if "result" in msg:
-                            result = fx_serializer.deserialize(msg["result"])
+                            result = compute_serializer.deserialize(msg["result"])
                             try:
                                 task_fut.set_result(result)
                             except concurrent.futures.InvalidStateError:
@@ -612,7 +612,7 @@ class HighThroughputExecutor(RepresentationMixin):
                                     "Already in terminal state"
                                 )
                         elif "exception" in msg:
-                            exception = fx_serializer.deserialize(msg["exception"])
+                            exception = compute_serializer.deserialize(msg["exception"])
                             try:
                                 task_fut.set_result(exception)
                             except concurrent.futures.InvalidStateError:
@@ -698,10 +698,10 @@ class HighThroughputExecutor(RepresentationMixin):
             task_id = self._task_counter
         task_id = str(task_id)
 
-        fn_code = fx_serializer.serialize(func)
-        ser_code = fx_serializer.pack_buffers([fn_code])
-        ser_params = fx_serializer.pack_buffers(
-            [fx_serializer.serialize(args), fx_serializer.serialize(kwargs)]
+        fn_code = compute_serializer.serialize(func)
+        ser_code = compute_serializer.pack_buffers([fn_code])
+        ser_params = compute_serializer.pack_buffers(
+            [compute_serializer.serialize(args), compute_serializer.serialize(kwargs)]
         )
         payload = Task(task_id, container_id, ser_code + ser_params)
 

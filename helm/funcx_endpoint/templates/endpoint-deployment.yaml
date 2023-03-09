@@ -12,7 +12,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-endpoint
     spec:
-      serviceAccountName: {{ template "funcx_endpoint.fullname" . }}
+      serviceAccountName: {{ template "globus_compute_endpoint.fullname" . }}
       securityContext:
         fsGroup: 1000
       containers:
@@ -20,9 +20,9 @@ spec:
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         command: [ "/bin/bash", "-c", "--" ]
         {{- if .Values.endpointUUID }}
-        args: [ "/home/funcx/boot.sh {{ .Release.Name }} {{ .Values.endpointUUID }}" ]
+        args: [ "/home/compute/boot.sh {{ .Release.Name }} {{ .Values.endpointUUID }}" ]
         {{- else }}
-        args: [ "/home/funcx/boot.sh {{ .Release.Name }}" ]
+        args: [ "/home/compute/boot.sh {{ .Release.Name }}" ]
         {{- end }}
         tty: true
         stdin: true
@@ -34,25 +34,25 @@ spec:
 
         volumeMounts:
           - mountPath: "/mnt"
-            name: funcxmnt
-          - name: funcx-sdk-tokens
-            mountPath: /funcx/credentials
+            name: computemnt
+          - name: compute-sdk-tokens
+            mountPath: /compute/credentials
             readOnly: true
           - name: endpoint-config
-            mountPath: /funcx/config
+            mountPath: /compute/config
           - name: endpoint-instance-config
-            mountPath: /funcx/{{ .Release.Name }}
+            mountPath: /compute/{{ .Release.Name }}
 
 
         ports:
           - containerPort: 5000
 
       volumes:
-        - name: funcxmnt
+        - name: computemnt
           emptyDir: {}
-        - name: funcx-sdk-tokens
+        - name: compute-sdk-tokens
           secret:
-            secretName: funcx-sdk-tokens
+            secretName: compute-sdk-tokens
         - name: endpoint-config
           configMap:
             name: {{ .Release.Name }}-endpoint-config

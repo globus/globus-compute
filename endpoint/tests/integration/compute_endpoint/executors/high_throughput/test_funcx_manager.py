@@ -5,8 +5,8 @@ import shutil
 
 import pytest
 
-from funcx_endpoint.executors.high_throughput.funcx_manager import Manager
-from funcx_endpoint.executors.high_throughput.messages import Task
+from globus_compute_endpoint.executors.high_throughput.manager import Manager
+from globus_compute_endpoint.executors.high_throughput.messages import Task
 
 
 class TestManager:
@@ -19,7 +19,7 @@ class TestManager:
     def test_remove_worker_init(self, mocker):
         # zmq is being mocked here because it was making tests hang
         mocker.patch(
-            "funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context"
+            "globus_compute_endpoint.executors.high_throughput.compute_manager.zmq.Context"
         )
 
         manager = Manager(logdir="./", uid="mock_uid")
@@ -32,14 +32,14 @@ class TestManager:
         assert task.task_id == "KILL"
         assert task.task_buffer == "KILL"
 
-    def test_poll_funcx_task_socket(self, mocker):
+    def test_poll_task_socket(self, mocker):
         # zmq is being mocked here because it was making tests hang
         mocker.patch(
-            "funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context"
+            "globus_compute_endpoint.executors.high_throughput.manager.zmq.Context"
         )
 
         mock_worker_map = mocker.patch(
-            "funcx_endpoint.executors.high_throughput.funcx_manager.WorkerMap"
+            "globus_compute_endpoint.executors.high_throughput.manager.WorkerMap"
         )
 
         manager = Manager(logdir="./", uid="mock_uid")
@@ -48,19 +48,19 @@ class TestManager:
         manager.worker_type = "RAW"
         manager.worker_procs["0"] = "proc"
 
-        manager.funcx_task_socket.recv_multipart.return_value = (
+        manager.task_socket.recv_multipart.return_value = (
             b"0",
             b"REGISTER",
             pickle.dumps({"worker_type": "RAW"}),
         )
-        manager.poll_funcx_task_socket(test=True)
+        manager.poll_task_socket(test=True)
         mock_worker_map.return_value.register_worker.assert_called_with(b"0", "RAW")
 
-        manager.funcx_task_socket.recv_multipart.return_value = (
+        manager.task_socket.recv_multipart.return_value = (
             b"0",
             b"WRKR_DIE",
             pickle.dumps(None),
         )
-        manager.poll_funcx_task_socket(test=True)
+        manager.poll_task_socket(test=True)
         mock_worker_map.return_value.remove_worker.assert_called_with(b"0")
         assert len(manager.worker_procs) == 0

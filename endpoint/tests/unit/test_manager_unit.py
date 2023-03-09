@@ -2,14 +2,14 @@ import time
 import uuid
 from unittest import mock
 
-from funcx_common.tasks import TaskState
+from globus_compute_common.tasks import TaskState
 
-from funcx_endpoint.executors.high_throughput.funcx_manager import Manager as FXManager
-from funcx_endpoint.executors.high_throughput.messages import Task
+from globus_compute_endpoint.executors.high_throughput.funcx_manager import Manager as FXManager
+from globus_compute_endpoint.executors.high_throughput.messages import Task
 
 
-@mock.patch("funcx_endpoint.executors.high_throughput.funcx_manager.zmq")
-class TestFuncxManager:
+@mock.patch("globus_compute_endpoint.executors.high_throughput.manager.zmq")
+class TestManager:
     def test_task_to_worker_status_change(self, randomstring):
         task_type = randomstring()
         task_id = str(uuid.uuid4())

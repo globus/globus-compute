@@ -1,7 +1,7 @@
 import queue
 import time
 
-from funcx_endpoint.strategies import SimpleStrategy
+from globus_compute_endpoint.strategies import SimpleStrategy
 
 
 class MockInterchange:

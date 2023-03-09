@@ -14,12 +14,12 @@ from unittest import mock
 import pytest
 import responses
 
-from funcx_endpoint.endpoint import endpoint
-from funcx_endpoint.endpoint.default_config import config as default_config
-from funcx_endpoint.endpoint.endpoint import Endpoint
-from funcx_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint import endpoint
+from globus_compute_endpoint.endpoint.default_config import config as default_config
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.utils.config import Config
 
-_mock_base = "funcx_endpoint.endpoint.endpoint."
+_mock_base = "globus_compute_endpoint.endpoint.endpoint."
 
 
 @pytest.fixture
@@ -92,7 +92,9 @@ def mock_ep_data(fs):
 def mock_ep_buf():
     buf = io.StringIO()
     # Endpoint.get_endpoint
-    # ep = mocker.patch("funcx_endpoint.endpoint.endpoint.Endpoint.get_endpoints")
+    # ep = mocker.patch(
+    # "globus_compute_endpoint.endpoint.endpoint.Endpoint.get_endpoints"
+    # )
     Endpoint.get_endpoints = mock.Mock()
     Endpoint.get_endpoints.return_value = {}
 
@@ -122,11 +124,11 @@ def test_start_endpoint(
     mocker,
     fs,
     randomstring,
-    get_standard_funcx_client,
+        get_standard_compute_client,
     register_endpoint_response,
     mock_ep_data,
 ):
-    mock_fxc = get_standard_funcx_client()
+    mock_fxc = get_standard_compute_client()
     mock_log = mocker.patch(f"{_mock_base}log")
     mock_daemon = mocker.patch(f"{_mock_base}daemon")
     mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
@@ -163,10 +165,10 @@ def test_register_endpoint_invalid_response(
     endpoint_uuid,
     other_endpoint_id,
     register_endpoint_response,
-    get_standard_funcx_client,
+        get_standard_compute_client,
     mock_ep_data,
 ):
-    mock_fxc = get_standard_funcx_client()
+    mock_fxc = get_standard_compute_client()
     mock_log = mocker.patch(f"{_mock_base}log")
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
 
@@ -190,13 +192,13 @@ def test_register_endpoint_locked_error(
     mocker,
     fs,
     register_endpoint_failure_response,
-    get_standard_funcx_client,
+        get_standard_compute_client,
     mock_ep_data,
 ):
     """
     Check to ensure endpoint registration escalates up with API error
     """
-    mock_fxc = get_standard_funcx_client()
+    mock_fxc = get_standard_compute_client()
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
@@ -214,12 +216,12 @@ def test_register_endpoint_multi_tenant(
     fs,
     endpoint_uuid,
     register_endpoint_response,
-    get_standard_funcx_client,
+        get_standard_compute_client,
     randomstring,
     multi_tenant,
     mock_ep_data,
 ):
-    mock_fxc = get_standard_funcx_client()
+    mock_fxc = get_standard_compute_client()
     mock_daemon = mocker.patch(f"{_mock_base}daemon")
     mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
@@ -271,7 +273,7 @@ def test_list_endpoints_long_names_wrapped(
 ):
     buf = mock_ep_buf
     tsize = namedtuple("terminal_size", ["columns", "lines"])(*term_size)
-    mock_shutil = mocker.patch("funcx_endpoint.endpoint.endpoint.shutil")
+    mock_shutil = mocker.patch("globus_compute_endpoint.endpoint.endpoint.shutil")
     mock_shutil.get_terminal_size.return_value = tsize
 
     def rand_length_str(min_=2, max_=30):
@@ -322,13 +324,14 @@ def test_endpoint_get_metadata(mocker):
     }
 
     mocker.patch(
-        "funcx_endpoint.endpoint.endpoint.__version__", mock_data["endpoint_version"]
+        "globus_compute_endpoint.endpoint.endpoint.__version__",
+        mock_data["endpoint_version"],
     )
 
-    mock_fqdn = mocker.patch("funcx_endpoint.endpoint.endpoint.socket.getfqdn")
+    mock_fqdn = mocker.patch("globus_compute_endpoint.endpoint.endpoint.socket.getfqdn")
     mock_fqdn.return_value = mock_data["hostname"]
 
-    mock_pwuid = mocker.patch("funcx_endpoint.endpoint.endpoint.pwd.getpwuid")
+    mock_pwuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.pwd.getpwuid")
     mock_pwuid.return_value = SimpleNamespace(pw_name=mock_data["local_user"])
 
     meta = Endpoint.get_metadata(default_config)

@@ -5,31 +5,31 @@ import uuid
 from importlib.machinery import SourceFileLoader
 
 import pytest
-from funcx_common.messagepack import pack, unpack
-from funcx_common.messagepack.message_types import Result, Task
+from globus_compute_common.messagepack import pack, unpack
+from globus_compute_common.messagepack.message_types import Result, Task
 from tests.utils import try_for_timeout
 
-from funcx_endpoint.endpoint.endpoint import Endpoint
-from funcx_endpoint.endpoint.interchange import EndpointInterchange, log
-from funcx_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
+from globus_compute_endpoint.endpoint.utils.config import Config
 
-_MOCK_BASE = "funcx_endpoint.endpoint.interchange."
+_MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
 
 
 @pytest.fixture
-def funcx_dir(tmp_path):
-    fxdir = tmp_path / pathlib.Path("funcx")
-    fxdir.mkdir()
-    yield fxdir
+def compute_dir(tmp_path):
+    base_dir = tmp_path / pathlib.Path("compute")
+    base_dir.mkdir()
+    yield base_dir
 
 
-def test_endpoint_id(funcx_dir):
+def test_endpoint_id(compute_dir):
     manager = Endpoint()
-    config_dir = funcx_dir / "mock_endpoint"
+    config_dir = compute_dir / "mock_endpoint"
 
     manager.configure_endpoint(config_dir, None)
     endpoint_config = SourceFileLoader(
-        "config", str(funcx_dir / "mock_endpoint" / "config.py")
+        "config", str(compute_dir / "mock_endpoint" / "config.py")
     ).load_module()
 
     for executor in endpoint_config.config.executors:
@@ -45,7 +45,7 @@ def test_endpoint_id(funcx_dir):
         assert executor.endpoint_id == "mock_endpoint_id"
 
 
-def test_start_requires_pre_registered(funcx_dir):
+def test_start_requires_pre_registered(compute_dir):
     with pytest.raises(TypeError):
         EndpointInterchange(
             config=Config(),

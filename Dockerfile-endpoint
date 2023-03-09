@@ -1,6 +1,6 @@
 ARG PYTHON_VERSION="3.8"
 FROM python:${PYTHON_VERSION}
-RUN mkdir /opt/funcx
+RUN mkdir /opt/compute
 RUN pip install kubernetes
 RUN pip install --no-binary :all: --force-reinstall pyzmq
 

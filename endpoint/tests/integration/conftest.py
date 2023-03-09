@@ -19,7 +19,7 @@ from tests.integration.test_rabbit_mq.result_queue_subscriber import (
 )
 from tests.integration.test_rabbit_mq.task_queue_publisher import TaskQueuePublisher
 
-from funcx_endpoint.endpoint.rabbit_mq import (
+from compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultQueuePublisher,
     TaskQueueSubscriber,

@@ -3,10 +3,10 @@ import uuid
 from unittest import mock
 
 import pytest
-from funcx_common import messagepack
+from globus_compute_common import messagepack
 
-from funcx_endpoint.executors.high_throughput.funcx_worker import FuncXWorker
-from funcx_endpoint.executors.high_throughput.messages import Task
+from globus_compute_endpoint.executors.high_throughput.worker import Worker
+from globus_compute_endpoint.executors.high_throughput.messages import Task
 
 
 def hello_world():
@@ -30,12 +30,12 @@ def ez_pack_function(serializer, func, args, kwargs):
 @pytest.fixture
 def test_worker():
     with mock.patch(
-        "funcx_endpoint.executors.high_throughput.funcx_worker.zmq.Context"
+        "globus_compute_endpoint.executors.high_throughput.worker.zmq.Context"
     ) as mock_context:
         # the worker will receive tasks and send messages on this mock socket
         mock_socket = mock.Mock()
         mock_context.return_value.socket.return_value = mock_socket
-        yield FuncXWorker("0", "127.0.0.1", 50001)
+        yield Worker("0", "127.0.0.1", 50001)
 
 
 def test_register_and_kill(test_worker):
@@ -105,7 +105,7 @@ def test_execute_failing_function(test_worker):
 
     # error string contains the KeyError which failed
     assert "KeyError" in result["exception"]
-    # but it does not contain some of the funcx-constructed calling context
+    # but it does not contain some of the calling context
     # a result of traceback traversal done when formatting
     assert "call_user_function" not in result["exception"]
 
@@ -135,7 +135,7 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
 
     # error string contains the error
     assert "MaxResultSizeExceeded" in result["exception"]
-    # but it does not contain some of the funcx-constructed calling context
+    # but it does not contain some of the calling context
     # a result of traceback traversal done when formatting
     assert "call_user_function" not in result["exception"]
 

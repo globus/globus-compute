@@ -1,5 +1,5 @@
 """
-This module contains logging configuration for the funcx-endpoint application.
+This module contains logging configuration for the endpoint application.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ C_INFO_FMT = _C_BASE + f" {COLOR_INFO}%(message)s{_r}"
 C_DEBUG_FMT = _C_BASE + f" {COLOR_DEBUG}%(message)s{_r}"
 
 
-class FuncxConsoleFormatter(logging.Formatter):
+class ConsoleFormatter(logging.Formatter):
     """
     For internal use only.
     This formatter handles output to standard streams in the following way:
@@ -150,7 +150,7 @@ def _get_file_dict_config(
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "funcx_endpoint.logging_config.FuncxConsoleFormatter",
+                "()": "globus_compute_endpoint.logging_config.ConsoleFormatter",
                 "debug": debug,
                 "no_color": no_color,
             },
@@ -175,12 +175,12 @@ def _get_file_dict_config(
             },
         },
         "loggers": {
-            "funcx_endpoint": {
+            "globus_compute_endpoint": {
                 "level": "DEBUG" if debug else "INFO",
                 "handlers": log_handlers,
             },
-            # configure for the funcx SDK as well
-            "funcx": {
+            # configure for the SDK as well
+            "globus_compute_sdk": {
                 "level": "DEBUG" if debug else "WARNING",
                 "handlers": log_handlers,
             },
@@ -193,7 +193,7 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "funcx_endpoint.logging_config.FuncxConsoleFormatter",
+                "()": "globus_compute_endpoint.logging_config.ConsoleFormatter",
                 "debug": debug,
                 "no_color": no_color,
             },
@@ -206,12 +206,12 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
             }
         },
         "loggers": {
-            "funcx_endpoint": {
+            "globus_compute_endpoint": {
                 "level": "DEBUG",
                 "handlers": ["console"],
             },
-            # configure for the funcx SDK as well
-            "funcx": {
+            # configure for the SDK as well
+            "globus_compute_sdk": {
                 "level": "DEBUG" if debug else "WARNING",
                 "handlers": ["console"],
             },
@@ -219,14 +219,14 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
     }
 
 
-class FXLogger(logging.Logger):
+class ComputeLogger(logging.Logger):
     TRACE = logging.DEBUG - 5
 
     def trace(self, msg, *args, **kwargs):
-        self.log(FXLogger.TRACE, msg, args, **kwargs)
+        self.log(ComputeLogger.TRACE, msg, args, **kwargs)
 
 
-logging.setLoggerClass(FXLogger)
+logging.setLoggerClass(ComputeLogger)
 logger = logging.getLogger(__name__)
 
 

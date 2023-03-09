@@ -9,8 +9,8 @@ import globus_sdk
 import pytest
 import responses
 
-import funcx
-from funcx.sdk.web_client import FuncxWebClient
+import globus_compute_sdk
+from globus_compute_sdk.sdk.web_client import WebClient
 
 
 @pytest.fixture(scope="session")
@@ -46,15 +46,15 @@ class FakeLoginManager:
     def get_search_client(self) -> globus_sdk.SearchClient:
         return globus_sdk.SearchClient(authorizer=globus_sdk.NullAuthorizer())
 
-    def get_funcx_web_client(self, *, base_url: str | None = None) -> FuncxWebClient:
-        return FuncxWebClient(
+    def get_web_client(self, *, base_url: str | None = None) -> WebClient:
+        return WebClient(
             base_url="https://api2.funcx.org/v2/",
             authorizer=globus_sdk.NullAuthorizer(),
         )
 
 
 @pytest.fixture
-def get_standard_funcx_client():
+def get_standard_compute_client():
     responses.add(
         method=responses.GET,
         url="https://api2.funcx.org/v2/version",
@@ -63,7 +63,7 @@ def get_standard_funcx_client():
     )
 
     def func():
-        return funcx.FuncXClient(
+        return globus_compute_sdk.Client(
             login_manager=FakeLoginManager(),
             do_version_check=False,
         )

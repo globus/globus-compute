@@ -21,7 +21,7 @@ Now that you have a valid funcX token, cd to your `~/.funcx/credentials`
 directory and install the keys file as a kubernetes secret.
 
 ```shell script
-kubectl create secret generic funcx-sdk-tokens --from-file=funcx_sdk_tokens.json
+kubectl create secret generic compute-sdk-tokens --from-file=compute_sdk_tokens.json
 ```
 
 ### Install the helm chart
