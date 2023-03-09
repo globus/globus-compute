@@ -554,7 +554,9 @@ class Interchange:
         while True:
             log.trace("Endpoint id : %s, %s", self.endpoint_id, type(self.endpoint_id))
             msg = EPStatusReport(
-                self.endpoint_id, self.get_status_report(), self.task_status_deltas
+                self.endpoint_id,
+                self.get_global_state_for_status_report(),
+                self.task_status_deltas,
             )
             log.debug("Sending status report to executor, and clearing task deltas.")
             status_report_queue.put(msg.pack())
@@ -1013,7 +1015,7 @@ class Interchange:
         log.info(f"Processed {count} tasks in {delta} seconds")
         log.warning("Exiting")
 
-    def get_status_report(self):
+    def get_global_state_for_status_report(self):
         outstanding_tasks = self.get_total_tasks_outstanding()
         pending_tasks = self.total_pending_task_count
         num_managers = len(self._ready_manager_queue)
