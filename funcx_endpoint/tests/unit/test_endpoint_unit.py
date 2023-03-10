@@ -416,3 +416,4 @@ def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
     Endpoint.init_endpoint_dir(ep_dir)
 
     assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
+    ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
