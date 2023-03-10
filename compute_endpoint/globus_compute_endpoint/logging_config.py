@@ -1,5 +1,5 @@
 """
-This module contains logging configuration for the funcx-endpoint application.
+This module contains logging configuration for the globus-compute-endpoint application.
 """
 from __future__ import annotations
 
@@ -183,12 +183,12 @@ def _get_file_dict_config(
             },
         },
         "loggers": {
-            "funcx_endpoint": {
+            "globus_compute_endpoint": {
                 "level": "DEBUG" if debug else "INFO",
                 "handlers": log_handlers,
             },
-            # configure for the funcx SDK as well
-            "funcx": {
+            # configure for the Globus Compute SDK as well
+            "globus_compute_sdk": {
                 "level": "DEBUG" if debug else "WARNING",
                 "handlers": log_handlers,
             },
@@ -214,12 +214,12 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
             }
         },
         "loggers": {
-            "funcx_endpoint": {
+            "globus_compute_endpoint": {
                 "level": "DEBUG",
                 "handlers": ["console"],
             },
-            # configure for the funcx SDK as well
-            "funcx": {
+            # configure for the Globus Compute SDK as well
+            "globus_compute_sdk": {
                 "level": "DEBUG" if debug else "WARNING",
                 "handlers": ["console"],
             },
