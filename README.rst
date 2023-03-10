@@ -1,10 +1,10 @@
-funcX - Fast Function Serving
+Globus Compute - Fast Function Serving
 =============================
 |licence| |build-status| |docs| |launch| |NSF-2004894| |NSF-2004932|
 
-funcX is a high-performance function-as-a-service (FaaS) platform that enables
-intuitive, flexible, efficient, scalable, and performant remote function execution
-on existing infrastructure including clouds, clusters, and supercomputers.
+Globus Compute (formerly funcX) is a high-performance function-as-a-service (FaaS)
+platform that enables intuitive, flexible, efficient, scalable, and performant remote
+function execution on existing infrastructure including clouds, clusters, and supercomputers.
 
 .. |licence| image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
    :target: https://github.com/funcx-faas/funcX/blob/master/LICENSE
@@ -37,25 +37,25 @@ Documentation: https://funcx.readthedocs.io/en/latest/
 Quickstart
 ==========
 
-funcX is in a beta state with version `0.3.7` currently available on PyPI.
+Globus Compute is currently available on PyPI.
 
-To install funcX, please ensure you have python3.6+.::
+To install Globus Compute, please ensure you have python3.7+.::
 
    $ python3 --version
 
 Install using Pip::
 
-   $ pip install funcx
+   $ pip install globus-compute-sdk
 
 To use our example notebooks you will need Jupyter.::
 
    $ pip install jupyter
 
-.. note:: The funcX client is supported on MacOS, Linux and Windows.
-          The funcx-endpoint is only supported on Linux.
+.. note:: The Globus Compute client is supported on MacOS, Linux and Windows.
+          The Globus Compute endpoint is only supported on Linux.
 
 Documentation
 =============
 
-Complete documentation for funcX is available `here <https://funcx.readthedocs.io>`_
+Complete documentation for Globus Compute is available `here <https://funcx.readthedocs.io>`_
 

@@ -32,13 +32,13 @@ UUID('ea0cab7e-b3eb-11ed-ae8b-719a5541eacb')
 ```
 
 Getting the authentication setup is slightly more involved.  Under the hood,
-the funcX Endpoint uses the funcX SDK for communication with the web services,
-which requires an authenticated user for most API routes.  The funcX SDK can
+the Globus Compute Endpoint uses the Globus Compute SDK for communication with the web services,
+which requires an authenticated user for most API routes.  The Globus Compute SDK can
 use either client credentials or user credentials, both of which this chart
 implements.  The next two sections describe how to implement each.
 
 #### Client Credentials
-The funcX SDK supports use of Globus Auth Client Credentials.  In practice,
+The Globus Compute SDK supports use of Globus Auth Client Credentials.  In practice,
 that means exporting two variables into the endpoint's environment:
 
 * `FUNCX_SDK_CLIENT_ID`
@@ -50,7 +50,7 @@ section on the [Globus Auth Developer's
 Guide](https://docs.globus.org/api/auth/developer-guide/).
 
 Outside of this chart, use of client credentials is also documented for [normal
-funcX SDK
+Globus Compute SDK
 usage](https://funcx.readthedocs.io/en/latest/sdk.html#client-credentials-with-funcxclients).
 
 Add these variables to a secret object in Kubernetes.  For example, to put them
@@ -74,26 +74,26 @@ useClientCredentials: true
 ```
 
 #### User Credentials
-If you have previously utilized the funcX client, then jump to step 2 as you
+If you have previously utilized the Globus Compute client, then jump to step 2 as you
 will already have generated the credential file.
 
 1. Instantiate a client with these two commands:
     ```shell
-    $ pip install funcx
-    $ python -c "from funcx import FuncXClient; FuncXClient()"
+    $ pip install globus-compute-sdk
+    $ python -c "from globus_compute_sdk import Client; Client()"
     ```
     A prompt beginning "Please authenticate with Globus here:" and with a long
     URL to a Globus authentication workflow will print to the terminal; follow
     the URL and paste the resulting token back into the terminal.  This will
     create the credential file at `$HOME/.funcx/storage.db`.
-1. Create a Kubernetes secret named `funcx-sdk-tokens` with this file:
+1. Create a Kubernetes secret named `compute-sdk-tokens` with this file:
     ```shell
-    $ kubectl create secret generic funcx-sdk-tokens --from-file=$HOME/.funcx/storage.db
+    $ kubectl create secret generic compute-sdk-tokens --from-file=$HOME/.funcx/storage.db
     ```
-    It is important to name the secret `funcx-sdk-tokens` as this chart looks
+    It is important to name the secret `compute-sdk-tokens` as this chart looks
     for that secret name, specifically.
 
-With the `funcx-sdk-tokens` Kubernetes secret object created, tell the chart to
+With the `compute-sdk-tokens` Kubernetes secret object created, tell the chart to
 use the user credentials:
 
 ```
@@ -101,7 +101,7 @@ useUserCredentials: true
 ```
 
 ### Install the helm chart
-You need to add the funcx helm chart repo to your helm
+You need to add the Globus Compute helm chart repo to your helm
 
 ```shell script
 helm repo add funcx http://funcx.org/funcx-helm-charts/ && helm repo update
@@ -109,7 +109,7 @@ helm repo add funcx http://funcx.org/funcx-helm-charts/ && helm repo update
 
 Create a local values.yaml file to set any specific values you wish to
 override. Then invoke the chart installation by specifying your custom values,
-the funcx helm repo to install from, and the funcx-endpoint chart:
+the Globus Compute helm repo to install from, and the globus-compute-endpoint chart:
 
 ```shell script
 helm install -f your-values.yaml funcx funcx/funcx_endpoint
@@ -120,7 +120,7 @@ logs for the endpoint to see the UID. For example, to retrieve the pod name use
 the following command:
 
 ```shell script
-export EP_POD_NAME=$(kubectl get pods --namespace default -l "app=funcx-endpoint" -o jsonpath="{.items[0].metadata.name}")
+export EP_POD_NAME=$(kubectl get pods --namespace default -l "app=globus-compute-endpoint" -o jsonpath="{.items[0].metadata.name}")
 ```
 
 ---
@@ -148,13 +148,13 @@ The deployment is configured via values.yaml file.
 
 | Value | Description | Default |
 |-------| ----------- | ------- |
-| funcXServiceAddress | URL for the FuncX Webservice. | https://api.funcx.org |
+| Globus ComputeServiceAddress | URL for the FuncX Webservice. | https://api.funcx.org |
 | image.repository | Docker image repository |  funcx/kube-endpoint |
 | image.tag | Tag name for the endpoint image | endpoint_helm |
 | image.pullPolicy | Pod pull policy for the endpoint image |  Always |
 | workerDebug | Log additional information in the worker logs | False |
 | workerImage | Docker image to run in the worker pods |  python:3.6-buster |
-| workerInit | Command to execute on worker before strating uip | pip install parsl==0.9.0;pip install --force-reinstall funcx>=0.0.2a0 |
+| workerInit | Command to execute on worker before strating uip | pip install parsl==0.9.0;pip install --force-reinstall globus-compute-sdk>=2.0.0 |
 | workerNamespace | Kubernetes namespace to launch worker pods into | default |
 | workingDir | Directory inside the container where log files are to be stored | /tmp/worker_logs |
 | rbacEnabled | Create service account and roles? | true |
@@ -166,7 +166,7 @@ The deployment is configured via values.yaml file.
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
 | detachEndpoint | Run the endpoint as a daemon inside the pod? | true |
 | endpointUUID   | (Required) Specify a UUID for this endpoint. | |
-| endpointCLIargs | Any additional command line arguments to give to the `funcx-endpoint` executable | |
+| endpointCLIargs | Any additional command line arguments to give to the `globus-compute-endpoint` executable | |
 | maxIdleTime  | The maximum time to maintain an idle worker. After this time the SimpleStrategy will terminate the idle worker. | 3600 |
 | imagePullSecret | The K8s secret to use to deploy worker images. This can refer to an ECR secret. | |
 | secrets | Kubernetes secret object in which to find client credential environment variables | |

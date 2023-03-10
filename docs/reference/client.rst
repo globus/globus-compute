@@ -1,10 +1,10 @@
-The FuncX Client
+The Globus Compute Client
 ================
 
-.. autoclass:: funcx.FuncXClient
+.. autoclass:: globus_compute_sdk.Client
     :members:
     :member-order: bysource
 
-.. autoclass:: funcx.sdk.container_spec.ContainerSpec
+.. autoclass:: globus_compute_sdk.sdk.container_spec.ContainerSpec
     :members:
     :member-order: bysource

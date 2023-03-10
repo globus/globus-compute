@@ -1,19 +1,19 @@
-import funcx  # noqa:E402
+import globus_compute_sdk  # noqa:E402
 
 # -- Project information -----------------------------------------------------
 
-project = "funcX"
+project = "Globus Compute"
 copyright = "2019, The University of Chicago"
-author = "The funcX Team"
+author = "The Globus Compute Team"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = funcx.__version__.rsplit(".", 1)[0]
+version = globus_compute_sdk.__version__.rsplit(".", 1)[0]
 # The full version, including alpha/beta/rc tags.
-release = funcx.__version__
+release = globus_compute_sdk.__version__
 
 
 # -- General configuration ---------------------------------------------------

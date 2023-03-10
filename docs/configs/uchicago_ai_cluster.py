@@ -1,9 +1,8 @@
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.addresses import address_by_interface
 from parsl.launchers import SrunLauncher
 from parsl.providers import SlurmProvider
-
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
 
 # fmt: off
 
