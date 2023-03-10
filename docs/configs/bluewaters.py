@@ -1,9 +1,8 @@
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.addresses import address_by_hostname
 from parsl.launchers import AprunLauncher
 from parsl.providers import TorqueProvider
-
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
 
 # fmt: off
 
@@ -29,7 +28,7 @@ config = Config(
                 scheduler_options=user_opts['bluewaters']['scheduler_options'],
 
                 # Command to be run before starting a worker, such as:
-                # 'module load bwpy; source activate funcx env'.
+                # 'module load bwpy; source activate compute env'.
                 worker_init=user_opts['bluewaters']['worker_init'],
 
                 # Scale between 0-1 blocks with 2 nodes per block

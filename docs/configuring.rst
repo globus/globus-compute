@@ -1,8 +1,8 @@
 .. _configuration-section:
 
-funcX has been used on various systems around the world. Below are example configurations
+Globus Compute has been used on various systems around the world. Below are example configurations
 for commonly used systems. If you would like to add your system to this list please
-contact the funcX team via Slack.
+contact the Globus Compute Team via Slack.
 
 .. note::
    All configuration examples below must be customized for the user's
@@ -92,7 +92,7 @@ using the ``CobaltProvider``. This configuration assumes that the script is bein
 Polaris (ALCF)
 ^^^^^^^^^^^^^^
 
-.. image:: images/ALCF_Polaris.jpeg
+.. image:: _static/images/ALCF_Polaris.jpeg
 
 The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
 **Polaris** cluster. This example uses the ``HighThroughputExecutor`` and connects to Polaris's PBS scheduler
@@ -120,7 +120,7 @@ Perlmutter (NERSC)
 The following snippet shows an example configuration for accessing NERSC's **Perlmutter** supercomputer. This example uses the ``HighThroughputExecutor`` and connects to Perlmutters's Slurm scheduler.
 It is configured to request 2 nodes configured with 1 TaskBlock per node. Finally, it includes override information to request a particular node type (Haswell) and to configure a specific Python environment on the worker nodes using Anaconda.
 
-.. note:: Please run ``module load cgpu`` prior to executing ``funcx-endpoint start <endpoint_name>``
+.. note:: Please run ``module load cgpu`` prior to executing ``globus-compute-endpoint start <endpoint_name>``
           on the Cori login nodes to access the Perlmutter queues.
 
 .. literalinclude:: configs/perlmutter.py
@@ -152,9 +152,9 @@ Pinning Workers to devices
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Many modern clusters provide multiple accelerators per compute note, yet many applications are best suited to using a
-single accelerator per task. funcX supports pinning each worker to different accelerators using the ``available_accelerators``
-option of the ``HighThroughputExecutor``. Provide either the number of accelerators (funcX will assume they are named
-in integers starting from zero) or a list of the names of the accelerators available on the node. Each funcX worker
+single accelerator per task. Globus Compute supports pinning each worker to different accelerators using the ``available_accelerators``
+option of the ``HighThroughputExecutor``. Provide either the number of accelerators (Globus Compute will assume they are named
+in integers starting from zero) or a list of the names of the accelerators available on the node. Each Globus Compute worker
 will have the following environment variables set to the worker specific identity assigned:
 ``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``, ``SYCL_DEVICE_FILTER``.
 

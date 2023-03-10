@@ -12,7 +12,7 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior, for e.g:
-1. Install funcx==0.2.2 and funcx-endpoint==0.2.2 with Python 3.7 on cluster
+1. Install globus-compute-sdk==2.0.0 and globus-compute-endpoint==2.0.0 with Python 3.7 on cluster
 2. Run a test script
 3. Wait 5 mins
 4. See error
@@ -25,8 +25,8 @@ A clear and concise description of what you expected to happen.
  - OS & Container technology: [e.g. ubuntu, centos & singularity, docker] @ endpoint
  - Python version @ client
  - Python version @ endpoint
- - funcx version @ client
- - funcx-endpoint version @ endpoint
+ - globus-compute-sdk version @ client
+ - globus-compute-endpoint version @ endpoint
 
 **Distributed Environment**
 - Where are you running the funcX script from? [e.g. Laptop/Workstation, Login node, Compute node]

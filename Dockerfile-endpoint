@@ -14,26 +14,26 @@ RUN apt-get update && apt-get upgrade -y
 
 RUN if [ -n "$pip_conf" ]; then echo "$pip_conf" > "/etc/pip.conf"; fi
 
-RUN mkdir /opt/funcx
+RUN mkdir /opt/compute
 RUN python -m pip install -U pip
 RUN python -m pip install kubernetes
 RUN python -m pip install --no-binary :all: --force-reinstall pyzmq
 
-COPY funcx_sdk /opt/funcx/funcx_sdk/
-WORKDIR /opt/funcx/funcx_sdk
+COPY compute_sdk /opt/compute/compute_sdk/
+WORKDIR /opt/compute/compute_sdk
 RUN python -m pip install .
 
-COPY funcx_endpoint /opt/funcx/funcx_endpoint
-WORKDIR /opt/funcx/funcx_endpoint
+COPY compute_endpoint /opt/compute/compute_endpoint
+WORKDIR /opt/compute/compute_endpoint
 RUN python -m pip install .
 
 # Undo local-dev ministrations
 RUN if [ -n "$pip_conf" ]; then rm -f "/etc/pip.conf"; fi
 RUN if [ -n "$apt_proxy_url" ]; then rm -f "/etc/apt/apt.conf.d/01proxy"; fi
 
-RUN useradd -m funcx
-RUN mkdir -p /home/funcx/.kube
-USER funcx
-WORKDIR /home/funcx
+RUN useradd -m compute
+RUN mkdir -p /home/compute/.kube
+USER compute
+WORKDIR /home/compute
 COPY helm/boot.sh .
-ENV HOME /home/funcx
+ENV HOME /home/compute

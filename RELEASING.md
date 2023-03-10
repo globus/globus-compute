@@ -1,6 +1,6 @@
 # Releasing
 
-Releases of `funcx` and `funcx-endpoint` are always done with a single version
+Releases of `globus-compute-sdk` and `globus-compute-endpoint` are always done with a single version
 number, even when only one package has changes.
 
 The process is partially automated with tools to help along the way.
@@ -17,7 +17,7 @@ You will also need the following credentials:
 
 - a configured GPG key in `git` in order to create signed tags
 - pypi credentials for use with `twine` (e.g. a token in `~/.pypirc`) valid for
-    publishing `funcx` and `funcx-endpoint`
+    publishing `globus-compute-sdk` and `globus-compute-endpoint`
 
 ## Procedure
 
@@ -25,7 +25,7 @@ You will also need the following credentials:
    the `-dev` suffix
 
 ```bash
-$EDITOR funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
+$EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
 ```
 
 2. Update the changelog by running `scriv collect --edit`
@@ -35,7 +35,7 @@ $EDITOR funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
 
 ```bash
 git add changelog.d/ docs/changelog.rst
-git add funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
+git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
 git commit -m 'Bump versions and changelog for release'
 git push
 ```
@@ -50,8 +50,8 @@ git push
    then commit and push, e.g.
 
 ```bash
-$EDITOR funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
-git add funcx_sdk/funcx/version.py funcx_endpoint/funcx_endpoint/version.py
+$EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
+git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
 git commit -m 'Bump versions for dev'
 git push
 ```

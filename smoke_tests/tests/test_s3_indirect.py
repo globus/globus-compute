@@ -1,7 +1,7 @@
 import pytest
 
 try:
-    from funcx.errors import FuncxTaskExecutionFailed
+    from globus_compute_sdk.errors import TaskExecutionFailed
 
     has_task_exec_error_type = True
 except ImportError:
@@ -18,7 +18,7 @@ def large_arg_consumer(data: str) -> int:
 
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
 def test_allowed_result_sizes(submit_function_and_get_result, endpoint, size):
-    """funcX should allow all listed result sizes which are under 512KB limit"""
+    """Globus Compute should allow all listed result sizes under 512KB limit"""
     r = submit_function_and_get_result(
         endpoint, func=large_result_producer, func_args=(size,)
     )
@@ -30,11 +30,11 @@ def test_allowed_result_sizes(submit_function_and_get_result, endpoint, size):
 )
 def test_result_size_too_large(submit_function_and_get_result, endpoint):
     """
-    funcX should raise a MaxResultSizeExceeded exception when results exceeds 10MB
-    limit
+    Globus Compute should raise a MaxResultSizeExceeded exception when results exceeds
+    10MB limit
     """
-    # SDK wraps remote execution failures in FuncxTaskExecutionFailed exceptions...
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+    # SDK wraps remote execution failures in TaskExecutionFailed exceptions...
+    with pytest.raises(TaskExecutionFailed) as excinfo:
         submit_function_and_get_result(
             endpoint, func=large_result_producer, func_args=(11 * 1024 * 1024,)
         )
@@ -44,7 +44,7 @@ def test_result_size_too_large(submit_function_and_get_result, endpoint):
 
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
 def test_allowed_arg_sizes(submit_function_and_get_result, endpoint, size):
-    """funcX should allow all listed result sizes which are under 512KB limit"""
+    """Globus Compute should allow all listed result sizes under 512KB limit"""
     r = submit_function_and_get_result(
         endpoint, func=large_arg_consumer, func_args=(bytearray(size),)
     )
@@ -53,7 +53,7 @@ def test_allowed_arg_sizes(submit_function_and_get_result, endpoint, size):
 
 @pytest.mark.skip(reason="As of 0.3.4, an arg size limit is not being enforced")
 def test_arg_size_too_large(submit_function_and_get_result, endpoint, size=55000000):
-    """funcX should raise an exception for objects larger than some limit,
+    """Globus Compute should raise an exception for objects larger than some limit,
     which we are yet to define. This does not work right now.
     """
 
