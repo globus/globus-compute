@@ -14,7 +14,7 @@ def test_main_exception_always_quiesces(mocker, fs):
 
     # [False, False] * num because _kill_event and _quiesce_event are the same mock;
     #  .is_set() is called twice per loop
-    is_set_returns = [False, False] * num_iterations + [True]
+    is_set_returns = [False, False, False] * num_iterations + [True]
     false_true_g = iter(is_set_returns)
 
     def false_true():
