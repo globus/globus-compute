@@ -55,16 +55,10 @@ spec:
 
         volumeMounts:
           - mountPath: "/mnt"
-<<<<<<< HEAD
             name: computemnt
+          {{- if .Values.useUserCredentials }}
           - name: compute-sdk-tokens
             mountPath: /compute/credentials
-=======
-            name: funcxmnt
-          {{- if .Values.useUserCredentials }}
-          - name: funcx-sdk-tokens
-            mountPath: /funcx/credentials
->>>>>>> origin/main
             readOnly: true
           {{- end }}
           - name: endpoint-config
@@ -78,17 +72,11 @@ spec:
       volumes:
         - name: computemnt
           emptyDir: {}
-<<<<<<< HEAD
+        {{- if .Values.useUserCredentials }}
         - name: compute-sdk-tokens
           secret:
             secretName: compute-sdk-tokens
-=======
-        {{- if .Values.useUserCredentials }}
-        - name: funcx-sdk-tokens
-          secret:
-            secretName: funcx-sdk-tokens
         {{- end }}
->>>>>>> origin/main
         - name: endpoint-config
           configMap:
             name: {{ .Release.Name }}-endpoint-config
