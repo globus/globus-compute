@@ -47,7 +47,8 @@ def init_endpoint_configuration_dir(funcx_conf_dir: pathlib.Path):
     elif not funcx_conf_dir.is_dir():
         raise click.ClickException(
             f"File already exists: {funcx_conf_dir}\n\n"
-            "Refusing to initialize Globus Compute configuration directory: path already exists"
+            "Refusing to initialize Globus Compute configuration directory: "
+            "path already exists"
         )
 
 

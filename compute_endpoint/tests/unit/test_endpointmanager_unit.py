@@ -125,7 +125,9 @@ def test_sets_process_title(
     assert mock_spt.setproctitle.called, "Sanity check"
 
     a, *_ = mock_spt.setproctitle.call_args
-    assert a[0].startswith("Globus Compute Endpoint"), "Expect easily identifiable process name"
+    assert a[0].startswith(
+        "Globus Compute Endpoint"
+    ), "Expect easily identifiable process name"
     assert "*(" in a[0], "Expected asterisk as subtle clue of 'multi-tenant'"
     assert f"{ep_uuid}, {conf_dir.name}" in a[0], "Can find process by conf"
 

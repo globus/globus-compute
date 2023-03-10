@@ -12,9 +12,7 @@ from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.utils.config import Config
-from tests.integration.endpoint.executors.mock_executors import (
-    MockExecutor,
-)
+from tests.integration.endpoint.executors.mock_executors import MockExecutor
 from tests.utils import try_for_timeout
 
 

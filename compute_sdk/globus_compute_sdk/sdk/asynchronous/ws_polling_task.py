@@ -267,6 +267,7 @@ class WebSocketPollingTask:
     def add_task(self, task: ComputeTask):
         """
         Add a Globus Compute task
+
         :param task: ComputeTask
             Task to be added
         """
