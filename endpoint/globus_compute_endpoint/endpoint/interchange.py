@@ -303,17 +303,21 @@ class EndpointInterchange:
 
             try:
                 self._start_threads_and_main()
+            except pika.exceptions.ConnectionClosedByBroker as e:
+                log.warning(f"AMQP service closed connection: {e}")
             except pika.exceptions.ProbableAuthenticationError as e:
                 log.error(f"Unable to connect to AMQP service: {e}")
                 self._kill_event.set()
             except Exception:
-                self._reconnect_fail_counter += 1
-                log.exception("Unhandled exception in main kernel.")
-                log.info(
-                    "Reconnection count: %s (of %s)",
-                    self._reconnect_fail_counter,
-                    self.reconnect_attempt_limit,
-                )
+                log.error("Unhandled exception in main kernel.")
+            finally:
+                if not self._kill_event.is_set():
+                    self._reconnect_fail_counter += 1
+                    log.info(
+                        "Reconnection count: %s (of %s)",
+                        self._reconnect_fail_counter,
+                        self.reconnect_attempt_limit,
+                    )
 
             self.quiesce()
 

@@ -3,6 +3,7 @@ This module contains logging configuration for the endpoint application.
 """
 from __future__ import annotations
 
+import copy
 import logging
 import logging.config
 import logging.handlers
@@ -10,6 +11,7 @@ import os
 import pathlib
 import re
 import sys
+import uuid
 
 log = logging.getLogger(__name__)
 
@@ -118,10 +120,16 @@ class ConsoleFormatter(logging.Formatter):
             try:
                 record.msg = self.uuid_re.sub(repl, record.msg)
                 if isinstance(record.args, dict):
+                    record.args = copy.deepcopy(record.args)
                     for k, v in record.args.items():
-                        record.args[k] = self.uuid_re.sub(repl, str(v))
+                        if isinstance(v, (str, uuid.UUID)):
+                            record.args[k] = self.uuid_re.sub(repl, str(v))
                 elif record.args:
-                    args = tuple(self.uuid_re.sub(repl, str(a)) for a in record.args)
+                    uu_sub = self.uuid_re.sub
+                    args = tuple(
+                        uu_sub(repl, str(a)) if isinstance(a, (str, uuid.UUID)) else a
+                        for a in record.args
+                    )
                     record.args = args
             except Exception as exc:
                 # Basically, inform, but ignore
