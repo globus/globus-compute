@@ -20,15 +20,22 @@ from multiprocessing import Process
 
 import daemon
 import dill
+from funcx_common import messagepack
 from funcx_common.messagepack.message_types import (
     EPStatusReport as mpack_EPStatusReport,
 )
+from funcx_common.messagepack.message_types import Result as OutgoingResult
+from funcx_common.messagepack.message_types import (
+    ResultErrorDetails as OutgoingResultErrorDetails,
+)
+from funcx_common.messagepack.message_types import TaskTransition
 from parsl.dataflow.error import ConfigurationError
 from parsl.executors.errors import BadMessage, ScalingFailed
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
 from funcx.serialize import FuncXSerializer
+from funcx_endpoint.endpoint.messages_compat import convert_to_internaltask
 from funcx_endpoint.engines.base import GlobusComputeEngineBase
 from funcx_endpoint.engines.high_throughput import interchange, zmq_pipes
 from funcx_endpoint.engines.high_throughput.mac_safe_queue import mpQueue
@@ -390,7 +397,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
             log.debug(f"Executor:{self.label} starting in results_passthrough mode")
 
         self._executor_bad_state = threading.Event()
-        self._executor_exception = None
+        self._executor_exception: t.Optional[Exception] = None
         self._start_queue_management_thread()
 
         log.info("Attempting local interchange start")
@@ -546,9 +553,11 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                 elif isinstance(msgs, EPStatusReport):
                     log.debug(f"Received EPStatusReport {msgs}")
                     if self.passthrough:
-                        self.results_passthrough.put(
-                            {"task_id": None, "message": dill.dumps(msgs)}
+                        mpack_report = mpack_EPStatusReport(
+                            msgs._header, msgs.ep_status, msgs.task_statuses
                         )
+                        packed = messagepack.pack(mpack_report)
+                        self.results_passthrough.put(packed)
 
                 else:
                     log.debug("Unpacking results")
@@ -605,11 +614,9 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                             log.debug(f"Pushing results for task:{tid}")
                             # we are only interested in actual task ids here, not
                             # identifiers for other message types
-                            sent_task_id = tid if isinstance(tid, str) else None
-                            x = self.results_passthrough.put(
-                                {"task_id": sent_task_id, "message": serialized_msg}
-                            )
-                            log.debug(f"task:{tid} ret value: {x}")
+                            m_result = self.convert_result_to_outgoing(msg)
+                            self.results_passthrough.put(messagepack.pack(m_result))
+
                             log.debug(
                                 "task:%s items in queue: %s",
                                 tid,
@@ -653,6 +660,26 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                             )
 
         log.info("queue management worker finished")
+
+    def convert_result_to_outgoing(self, msg: dict):
+        kwargs: dict[
+            str, str | uuid.UUID | OutgoingResultErrorDetails | list[TaskTransition]
+        ] = {
+            "task_id": uuid.UUID(msg["task_id"]),
+        }
+        if "task_statuses" in msg:
+            kwargs["task_statuses"] = msg["task_statuses"]
+
+        if "exception" in msg:
+            kwargs["data"] = msg["exception"]
+            code, user_message = msg.get("error_details", ("Unknown", "Unknown"))
+            kwargs["error_details"] = OutgoingResultErrorDetails(
+                code=code, user_message=user_message
+            )
+        else:
+            kwargs["data"] = msg["data"]
+
+        return OutgoingResult(**kwargs)
 
     # When the executor gets lost, the weakref callback will wake up
     # the queue management thread.
@@ -738,8 +765,8 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
         return self.tasks[task_id]
 
-    def submit_raw(self, packed_task):
-        """Submits work to the the outgoing_q.
+    def submit_raw(self, packed_task: bytes):
+        """Submits work to the outgoing_q.
 
         The outgoing_q is an external process listens on this
         queue for new work. This method behaves like a
@@ -754,12 +781,21 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         Returns:
               Submit status
         """
-        log.debug(f"Submitting raw task : {packed_task}")
         if self._executor_bad_state.is_set():
-            raise self._executor_exception
+            if self._executor_exception:
+                raise self._executor_exception
+            else:
+                raise Exception("Executor in critical condition")
 
-        # Submit task to queue
-        return self.outgoing_q.put(packed_task)
+        # Unpack bytes to messagepack.Task and then convert to internal
+        # task object
+        unpacked_task = messagepack.unpack(packed_task)
+        assert isinstance(
+            unpacked_task, messagepack.message_types.Task
+        ), "submit_raw accepts only packed Tasks"
+        internal_task = convert_to_internaltask(unpacked_task, None)
+        assert self.outgoing_q
+        return self.outgoing_q.put(internal_task)
 
     def _get_block_and_job_ids(self):
         # Not using self.blocks.keys() and self.blocks.values() simultaneously
