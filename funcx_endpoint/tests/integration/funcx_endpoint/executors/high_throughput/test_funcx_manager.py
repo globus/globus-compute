@@ -5,8 +5,8 @@ import shutil
 
 import pytest
 
-from funcx_endpoint.executors.high_throughput.funcx_manager import Manager
-from funcx_endpoint.executors.high_throughput.messages import Task
+from funcx_endpoint.engines.high_throughput.funcx_manager import Manager
+from funcx_endpoint.engines.high_throughput.messages import Task
 
 
 class TestManager:
@@ -18,9 +18,7 @@ class TestManager:
 
     def test_remove_worker_init(self, mocker):
         # zmq is being mocked here because it was making tests hang
-        mocker.patch(
-            "funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context"
-        )
+        mocker.patch("funcx_endpoint.engines.high_throughput.funcx_manager.zmq.Context")
 
         manager = Manager(logdir="./", uid="mock_uid")
         manager.worker_map.to_die_count["RAW"] = 0
@@ -34,12 +32,10 @@ class TestManager:
 
     def test_poll_funcx_task_socket(self, mocker):
         # zmq is being mocked here because it was making tests hang
-        mocker.patch(
-            "funcx_endpoint.executors.high_throughput.funcx_manager.zmq.Context"
-        )
+        mocker.patch("funcx_endpoint.engines.high_throughput.funcx_manager.zmq.Context")
 
         mock_worker_map = mocker.patch(
-            "funcx_endpoint.executors.high_throughput.funcx_manager.WorkerMap"
+            "funcx_endpoint.engines.high_throughput.funcx_manager.WorkerMap"
         )
 
         manager = Manager(logdir="./", uid="mock_uid")

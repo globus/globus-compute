@@ -119,7 +119,7 @@ class EndpointInterchange:
         }
         log.info(f"Platform info: {self.current_platform}")
 
-        self.results_passthrough = queue.Queue()
+        self.results_passthrough: queue.Queue = queue.Queue()
         assert len(self.config.executors) == 1, (
             "Endpoint config should " "only define one executor"
         )
@@ -351,8 +351,10 @@ class EndpointInterchange:
                             "exception": f"Failed to start task: {get_error_string()}",
                             "error_details": get_result_error_details(),
                             "message": f"Failed to start task.  Exception text: {exc}",
+                            "task_statuses": [],
                         }
-                        self.results_passthrough.put(result)
+                        m_result = messagepack.message_types.Result(**result)
+                        self.results_passthrough.put(messagepack.pack(m_result))
 
                 log.debug("Exit process-pending-tasks thread.")
 
@@ -368,7 +370,6 @@ class EndpointInterchange:
                         result = messagepack.unpack(packed_result)
                         if isinstance(result, messagepack.message_types.Result):
                             task_id = result.task_id
-                        log.warning(f"GOt result message: {result}")
 
                     except queue.Empty:
                         # Empty queue!  Let's see if we have any prior results to send

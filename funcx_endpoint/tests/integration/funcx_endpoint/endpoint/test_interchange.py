@@ -53,6 +53,7 @@ def test_start_requires_pre_registered(funcx_dir):
         )
 
 
+@pytest.mark.skip(reason="Obsolete. Executors are expected to return packed messages")
 def test_invalid_message_result_returned(mocker):
     ei = EndpointInterchange(
         config=Config(executors=[mocker.Mock(endpoint_id=None)]),

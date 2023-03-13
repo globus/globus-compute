@@ -21,7 +21,7 @@ def test_main_exception_always_quiesces(mocker, fs):
         return next(false_true_g)
 
     mocker.patch(f"{_mock_base}multiprocessing")
-    mocker.patch(f"{_mock_base}mpQueue")
+    mocker.patch(f"{_mock_base}queue")
     mock_executor = MagicMock()
     ei = EndpointInterchange(
         config=Config(executors=[mock_executor]),
@@ -52,7 +52,7 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit):
         return next(false_true_g)
 
     mocker.patch(f"{_mock_base}multiprocessing")
-    mocker.patch(f"{_mock_base}mpQueue")
+    mocker.patch(f"{_mock_base}queue")
     mock_log = mocker.patch(f"{_mock_base}log")
     mock_executor = MagicMock()
     ei = EndpointInterchange(

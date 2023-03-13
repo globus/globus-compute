@@ -129,7 +129,6 @@ class GlobusComputeEngineBase(ABC):
         future: Future for which the callback is triggerd
 
         """
-        logger.warning(f"[YADU] : Future done: {future}")
 
         if future.exception():
             code, user_message = get_result_error_details()

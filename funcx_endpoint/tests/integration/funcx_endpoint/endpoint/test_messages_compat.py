@@ -14,11 +14,11 @@ from funcx_endpoint.endpoint.messages_compat import (
     convert_to_internaltask,
     try_convert_to_messagepack,
 )
-from funcx_endpoint.executors.high_throughput.messages import (
+from funcx_endpoint.engines.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
 )
-from funcx_endpoint.executors.high_throughput.messages import Message as InternalMessage
-from funcx_endpoint.executors.high_throughput.messages import Task as InternalTask
+from funcx_endpoint.engines.high_throughput.messages import Message as InternalMessage
+from funcx_endpoint.engines.high_throughput.messages import Task as InternalTask
 
 
 def test_ep_status_report_conversion():
