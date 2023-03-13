@@ -29,7 +29,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             target=self.report_status, args=[], reporting_period=heartbeat_period
         )
         super().__init__(*args, heartbeat_period=heartbeat_period, **kwargs)
-        self.executor = HighThroughputExecutor(*args, **kwargs)
+        self.executor = HighThroughputExecutor(*args, address=address, **kwargs)
 
     def start(
         self,
