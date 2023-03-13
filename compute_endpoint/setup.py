@@ -4,9 +4,9 @@ from setuptools import find_packages, setup
 
 REQUIRES = [
     "requests>=2.20.0,<3",
-    "globus-sdk",  # version will be bounded by `funcx`
-    "funcx>=1.0.8",
-    "funcx-common==0.0.25",
+    "globus-sdk",  # version will be bounded by `globus-compute-sdk`
+    "globus-compute-sdk>=2.0.0",
+    "globus-compute-common==0.1.0",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer
@@ -29,7 +29,7 @@ REQUIRES = [
     # further investigation may be needed if the issue persists in the next pyzmq
     # release
     "pyzmq>=22.0.0,!=22.3.0,<=23.2.0",
-    # 'parsl' is a core requirement of the funcx-endpoint, essential to a range
+    # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
     "parsl==2023.1.23",
@@ -47,15 +47,15 @@ TEST_REQUIRES = [
 
 
 version_ns = {}
-with open(os.path.join("funcx_endpoint", "version.py")) as f:
+with open(os.path.join("globus_compute_endpoint", "version.py")) as f:
     exec(f.read(), version_ns)
 version = version_ns["__version__"]
 
 setup(
-    name="funcx-endpoint",
+    name="globus-compute-endpoint",
     version=version,
     packages=find_packages(),
-    description="funcX: High Performance Function Serving for Science",
+    description="Globus Compute: High Performance Function Serving for Science",
     install_requires=REQUIRES,
     extras_require={
         "test": TEST_REQUIRES,
@@ -70,21 +70,21 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering",
     ],
-    keywords=["funcX", "FaaS", "Function Serving"],
+    keywords=["Globus Compute", "FaaS", "Function Serving"],
     entry_points={
         "console_scripts": [
-            "funcx-endpoint=funcx_endpoint.cli:cli_run",
-            "funcx-interchange"
-            "=funcx_endpoint.executors.high_throughput.interchange:cli_run",
-            "funcx-manager"
-            "=funcx_endpoint.executors.high_throughput.funcx_manager:cli_run",
-            "funcx-worker"
-            "=funcx_endpoint.executors.high_throughput.funcx_worker:cli_run",
+            "globus-compute-endpoint=globus_compute_endpoint.cli:cli_run",
+            "globus-compute-interchange"
+            "=globus_compute_endpoint.executors.high_throughput.interchange:cli_run",
+            "globus-compute-manager"
+            "=globus_compute_endpoint.executors.high_throughput.manager:cli_run",
+            "globus-compute-worker"
+            "=globus_compute_endpoint.executors.high_throughput.worker:cli_run",
         ]
     },
     include_package_data=True,
-    author="funcX team",
-    author_email="labs@globus.org",
+    author="Globus Compute Team",
+    author_email="support@globus.org",
     license="Apache License, Version 2.0",
     url="https://github.com/funcx-faas/funcx",
 )

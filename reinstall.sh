@@ -1,5 +1,5 @@
-pip uninstall -y funcx-sdk funcx-endpoint
-cd funcx_sdk
+pip uninstall -y globus-compute-sdk globus-compute-endpoint
+cd compute_sdk
 pip install .
-cd ../funcx_endpoint
+cd ../compute_endpoint
 pip install .

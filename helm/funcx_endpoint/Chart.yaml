@@ -1,6 +1,6 @@
 apiVersion: v2
-name: funcx_endpoint
-description: Deploy a funcX endpoint into a cluster
+name: globus_compute_endpoint
+description: Deploy a Globus Compute endpoint into a cluster
 
 type: application
 

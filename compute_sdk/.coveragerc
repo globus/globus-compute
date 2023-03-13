@@ -1,5 +1,5 @@
 [run]
-include = funcx/*
+include = globus_compute_sdk/*
 
 [report]
 show_missing = True

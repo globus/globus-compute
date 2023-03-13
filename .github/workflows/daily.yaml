@@ -35,7 +35,7 @@ jobs:
     - name: install requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        python -m pip install './funcx_sdk'
+        python -m pip install './compute_sdk'
         python -m pip install safety
     - name: run safety check
       run: safety check
@@ -50,7 +50,7 @@ jobs:
     - name: install requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        python -m pip install './funcx_endpoint'
+        python -m pip install './compute_endpoint'
         python -m pip install safety
     - name: run safety check
       run: safety check

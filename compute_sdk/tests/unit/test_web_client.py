@@ -70,7 +70,7 @@ def test_app_name_from_constructor(user_app_name):
 
     assert client.user_app_name == user_app_name
     assert __version__ in client.app_name
-    assert "funcx" in client.app_name
+    assert "globus-compute-sdk" in client.app_name
     if user_app_name:
         assert user_app_name in client.app_name
 
@@ -81,7 +81,7 @@ def test_user_app_name_property(client, user_app_name):
 
     assert client.user_app_name == user_app_name
     assert __version__ in client.app_name
-    assert "funcx" in client.app_name
+    assert "globus-compute-sdk" in client.app_name
     if user_app_name:
         assert user_app_name in client.app_name
 

@@ -7,6 +7,7 @@ REQUIRES = [
     # request sending and authorization tools
     "requests>=2.20.0",
     "globus-sdk>=3.14.0,<4",
+    "globus-compute-common==0.1.0",
     # 'websockets' is used for the client-side websocket listener
     "websockets==10.3",
     # dill is an extension of `pickle` to a wider array of native python types
@@ -19,7 +20,6 @@ REQUIRES = [
     # set a version floor but no ceiling as the library offers a stable API under CalVer
     "packaging>=21.1",
     "pika>=1.2",
-    "funcx-common==0.0.25",
     "tblib==1.7.0",
     "texttable>=1.6.7",
 ]
@@ -45,7 +45,7 @@ def parse_version():
     # single source of truth for package version
     version_string = ""
     version_pattern = re.compile(r'__version__ = "([^"]*)"')
-    with open(os.path.join("funcx", "version.py")) as f:
+    with open(os.path.join("globus_compute_sdk", "version.py")) as f:
         for line in f:
             match = version_pattern.match(line)
             if match:
@@ -57,10 +57,12 @@ def parse_version():
 
 
 setup(
-    name="funcx",
+    name="globus-compute-sdk",
     version=parse_version(),
-    packages=find_namespace_packages(include=["funcx", "funcx.*"]),
-    description="funcX: High Performance Function Serving for Science",
+    packages=find_namespace_packages(
+        include=["globus-compute-sdk", "globus-compute-sdk.*"]
+    ),
+    description="Globus Compute: High Performance Function Serving for Science",
     install_requires=REQUIRES,
     extras_require={
         "dev": DEV_REQUIRES,
@@ -77,9 +79,9 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering",
     ],
-    keywords=["funcX", "FaaS", "Function Serving"],
-    author="funcX team",
-    author_email="labs@globus.org",
+    keywords=["Globus Compute", "FaaS", "Function Serving"],
+    author="Globus Compute Team",
+    author_email="support@globus.org",
     license="Apache License, Version 2.0",
     url="https://github.com/funcx-faas/funcx",
 )

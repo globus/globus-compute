@@ -1,5 +1,5 @@
 Ready to use your new endpoint
 
 To find your Endpoint UID
-export EP_POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app=funcx-endpoint" -o jsonpath="{.items[0].metadata.name}")
+export EP_POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app=globus-compute-endpoint" -o jsonpath="{.items[0].metadata.name}")
 kubectl logs $EP_POD_NAME

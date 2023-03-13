@@ -22,11 +22,11 @@ jobs:
         run: pre-commit run -a
       - name: mypy (sdk)
         run: |
-          cd funcx_sdk
+          cd compute_sdk
           tox -e mypy
       - name: mypy (endpoint)
         run: |
-          cd funcx_endpoint
+          cd compute_endpoint
           tox -e mypy
 
   # ensure docs can build, imitating the RTD build as best we can
@@ -50,8 +50,8 @@ jobs:
       - name: install requirements
         run: |
           python -m pip install --upgrade setuptools
-          python -m pip install './funcx_sdk'
-          python -m pip install './funcx_endpoint'
+          python -m pip install './compute_sdk'
+          python -m pip install './compute_endpoint'
           python -m pip install safety
       - name: run safety check
         run: safety check
@@ -72,7 +72,7 @@ jobs:
       - run: python -m pip install tox
       - name: run tests
         run: |
-          cd funcx_sdk
+          cd compute_sdk
           tox -e py
 
   test-endpoint:
@@ -97,7 +97,7 @@ jobs:
       - run: python -m pip install tox
       - name: run tests
         run: |
-          cd funcx_endpoint
+          cd compute_endpoint
           tox -e py -- --log-cli-level=ERROR
       - name: Collect Docker Logs
         if: failure()
@@ -122,7 +122,7 @@ jobs:
       run: echo "##[set-output name=imagetag;]$(echo ${GITHUB_REF##*/})"
       id: extract_tag_name
 
-    - name: Build funcX-endpoint Image for selected python version
+    - name: Build globus-compute-endpoint Image for selected python version
       uses: elgohr/Publish-Docker-Github-Action@master
       env:
         PYTHON_VERSION: ${{ matrix.python }}

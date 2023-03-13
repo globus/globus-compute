@@ -9,7 +9,7 @@ from parsl.addresses import address_by_route
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'kube': {
-        'worker_init': 'pip install --force-reinstall globus_compute_endpoint>=0.1.0',
+        'worker_init': 'pip install --force-reinstall globus_compute_endpoint>=2.0.0',
         'image': 'python:3.8-buster',
         'namespace': 'default',
     }
