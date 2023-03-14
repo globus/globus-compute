@@ -85,13 +85,13 @@ class Client:
         results_ws_uri: str
             For internal use only. The address of the websocket service.
 
-            DEPRECATED - use FuncXExecutor instead.
+            DEPRECATED - use Executor instead.
 
         warn_about_url_mismatch: bool
             For internal use only. If true, a warning is logged if funcx_service_address
             and results_ws_uri appear to point to different environments.
 
-            DEPRECATED - use FuncXExecutor instead.
+            DEPRECATED - use Executor instead.
 
         do_version_check: bool
             Set to ``False`` to skip the version compatibility check on client
@@ -103,7 +103,7 @@ class Client:
             Currently only impacts the run method.
 
             DEPRECATED - this was an early attempt at asynchronous result gathering.
-                Use the FuncXExecutor instead.
+                Use the Executor instead.
 
             Default: False
 
@@ -112,14 +112,14 @@ class Client:
             event loop instance. If None, then we will access asyncio.get_event_loop()
 
             DEPRECATED - part of an early attempt at asynchronous result gathering.
-                Use the FuncXExecutor instead.
+                Use the Executor instead.
 
             Default: None
 
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this Client instance.
             Typically, one uses this to submit new tasks to an existing
-            session or to reestablish FuncXExecutor futures.
+            session or to reestablish Executor futures.
             Default: None (will be auto generated)
 
         Keyword arguments are the same as for BaseClient.

@@ -40,7 +40,7 @@ if t.TYPE_CHECKING:
 _REGISTERED_FXEXECUTORS: dict[int, t.Any] = {}
 
 
-def __funcxexecutor_atexit():
+def __executor_atexit():
     threading.main_thread().join()
     to_shutdown = list(_REGISTERED_FXEXECUTORS.values())
     while to_shutdown:
@@ -48,7 +48,7 @@ def __funcxexecutor_atexit():
         fxe.shutdown()
 
 
-threading.Thread(target=__funcxexecutor_atexit).start()
+threading.Thread(target=__executor_atexit).start()
 
 
 class TaskSubmissionInfo:
@@ -78,7 +78,7 @@ class TaskSubmissionInfo:
 
 
 class AtomicController:
-    """This is used to synchronize between the FuncXExecutor which starts
+    """This is used to synchronize between the Executor which starts
     WebSocketPollingTasks and the WebSocketPollingTask which closes itself when there
     are 0 tasks.
     """
@@ -115,11 +115,11 @@ class AtomicController:
         return f"AtomicController value:{self._value}"
 
 
-class FuncXExecutor(concurrent.futures.Executor):
+class Executor(concurrent.futures.Executor):
     """
     Extend Python's |Executor|_ base class for funcX's purposes.
 
-    .. |Executor| replace:: ``FuncXExecutor``
+    .. |Executor| replace:: ``Executor``
     .. _Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
     """  # noqa
 
@@ -206,7 +206,7 @@ class FuncXExecutor(concurrent.futures.Executor):
 
         Must be a string.  Set by simple assignment::
 
-            fxe = FuncXExecutor(endpoint_id="...")
+            fxe = Executor(endpoint_id="...")
             fxe.task_group_id = "Some-stored-id"
 
         This is typically used when reattaching to a previously initiated set of tasks.
@@ -299,7 +299,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         Example use::
 
             >>> def add(a: int, b: int) -> int: return a + b
-            >>> fxe = FuncXExecutor(endpoint_id="some-ep-id")
+            >>> fxe = Executor(endpoint_id="some-ep-id")
             >>> fut = fxe.submit(add, 1, 2)
             >>> fut.result()    # wait (block) until result is received from remote
             3
@@ -335,17 +335,17 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
         Request an execution of an already registered function.
 
-        This method supports use of public functions with the FuncXExecutor, or
+        This method supports use of public functions with the Executor, or
         knowledge of an already registered function.  An example use might be::
 
             # pre_registration.py
-            from globus_compute_sdk import FuncXExecutor
+            from globus_compute_sdk import Executor
 
             def some_processor(*args, **kwargs):
                 # ... function logic ...
                 return ["some", "result"]
 
-            fxe = FuncXExecutor()
+            fxe = Executor()
             fn_id = fxe.register_function(some_processor)
             print(f"Function registered successfully.\\nFunction ID: {fn_id}")
 
@@ -360,10 +360,10 @@ class FuncXExecutor(concurrent.futures.Executor):
         a "well-known" uuid for the "Hello, World!" function (same as the example in
         the FuncX tutorial), which is publicly available::
 
-            from globus_compute_sdk import FuncXExecutor
+            from globus_compute_sdk import Executor
 
             fn_id = "b0a5d1a0-2b22-4381-b899-ba73321e41e0"  # public; "Hello World"
-            with FuncXExecutor(endpoint_id="your-endpoint-id") as fxe:
+            with Executor(endpoint_id="your-endpoint-id") as fxe:
                 futs = [
                     fxe.submit_to_registered_function(function_id=fn_id)
                     for i in range(5)
@@ -388,7 +388,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             msg = (
                 "No endpoint_id set.  Did you forget to set it at construction?\n"
                 "  Hint:\n\n"
-                "    fxe = FuncXExecutor(endpoint_id=<ep_id>)\n"
+                "    fxe = Executor(endpoint_id=<ep_id>)\n"
                 "    fxe.endpoint_id = <ep_id>    # alternative"
             )
             self.shutdown(wait=False, cancel_futures=True)
@@ -698,17 +698,17 @@ class FuncXExecutor(concurrent.futures.Executor):
 class _ResultWatcher(threading.Thread):
     """
     _ResultWatcher is an internal SDK class meant for consumption by the
-    FuncXExecutor.  It is a standard async AMQP consumer implementation
+    Executor.  It is a standard async AMQP consumer implementation
     using the Pika library that matches futures from the Executor against
     results received from the funcX hosted services.
 
     Expected usage::
 
-        rw = _ResultWatcher(self)  # assert isinstance(self, FuncXExecutor)
+        rw = _ResultWatcher(self)  # assert isinstance(self, Executor)
         rw.start()
 
         # rw is its own thread; it will use the Client attached to the
-        # FuncXExecutor to acquire AMQP credentials, and then will open a
+        # Executor to acquire AMQP credentials, and then will open a
         # connection to the AMQP service.
 
         rw.watch_for_task_results(some_list_of_futures)
@@ -717,7 +717,7 @@ class _ResultWatcher(threading.Thread):
     will opportunistically shutdown; the caller must handle this scenario
     if new futures arrive, and create a new _ResultWatcher instance.
 
-    :param funcx_executor: A FuncXExecutor instance
+    :param funcx_executor: A Executor instance
     :param poll_period_s: [default: 0.5] how frequently to check for and
         handle events.  For example, if the thread should stop due to user
         request or if there are results to match.
@@ -735,7 +735,7 @@ class _ResultWatcher(threading.Thread):
 
     def __init__(
         self,
-        funcx_executor: FuncXExecutor,
+        funcx_executor: Executor,
         poll_period_s=0.5,
         connect_attempt_limit=5,
         channel_close_window_s=10,

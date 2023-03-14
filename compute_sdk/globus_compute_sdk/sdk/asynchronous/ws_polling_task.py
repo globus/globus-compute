@@ -26,7 +26,7 @@ DEFAULT_RESULT_SIZE_LIMIT_B = (DEFAULT_RESULT_SIZE_LIMIT_MB + 1) * 1024 * 1024
 
 
 class WebSocketPollingTask:
-    """The WebSocketPollingTask is used by the FuncXExecutor and the Client
+    """The WebSocketPollingTask is used by the Executor and the Client
     to asynchronously listen to a stream of results. It uses a synchronized counter
     to identify when there are no more tasks and exit to avoid blocking the main thread
     from exiting.

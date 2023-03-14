@@ -4,7 +4,7 @@ import time
 import globus_compute_sdk as gc
 import pytest
 import requests
-from globus_compute_sdk import FuncXExecutor
+from globus_compute_sdk import Executor
 from packaging.version import Version
 
 try:
@@ -79,7 +79,7 @@ def test_wait_on_new_hello_world_func(fxc, endpoint):
 
 
 def test_executor(fxc, endpoint, tutorial_function_id):
-    """Test using FuncXExecutor to retrieve results."""
+    """Test using Executor to retrieve results."""
 
     url = f"{fxc.funcx_service_address}/version"
     res = requests.get(url)
@@ -97,7 +97,7 @@ def test_executor(fxc, endpoint, tutorial_function_id):
     num_tasks = 10
     submit_count = 2  # we've had at least one bug that prevented executor re-use
 
-    with FuncXExecutor(endpoint_id=endpoint, funcx_client=fxc) as fxe:
+    with Executor(endpoint_id=endpoint, funcx_client=fxc) as fxe:
         for _ in range(submit_count):
             futures = [
                 fxe.submit_to_registered_function(tutorial_function_id)

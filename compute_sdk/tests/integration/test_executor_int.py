@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 from globus_compute_sdk import Client
-from globus_compute_sdk.sdk.executor import FuncXExecutor, _ResultWatcher
+from globus_compute_sdk.sdk.executor import Executor, _ResultWatcher
 from tests.utils import try_assert
 
 
@@ -16,7 +16,7 @@ from tests.utils import try_assert
 def test_resultwatcher_graceful_shutdown():
     service_url = os.environ["FUNCX_INTEGRATION_TEST_WEB_URL"]
     fxc = Client(funcx_service_address=service_url)
-    fxe = FuncXExecutor(funcx_client=fxc)
+    fxe = Executor(funcx_client=fxc)
     rw = _ResultWatcher(fxe)
     rw._start_consuming = mock.Mock()
     rw.start()
@@ -35,15 +35,15 @@ def test_executor_atexit_handler_catches_all_instances(tmp_path):
     script_content = textwrap.dedent(
         """
         import random
-        from globus_compute_sdk import FuncXExecutor
+        from globus_compute_sdk import Executor
         from globus_compute_sdk.sdk.executor import _REGISTERED_FXEXECUTORS
 
         fxc = " a fake funcx_client"
         num_executors = random.randrange(1, 10)
         for i in range(num_executors):
-            FuncXExecutor(funcx_client=fxc)  # start N threads, none shutdown
-        fxe = FuncXExecutor(funcx_client=fxc)  # intentionally overwritten
-        fxe = FuncXExecutor(funcx_client=fxc)
+            Executor(funcx_client=fxc)  # start N threads, none shutdown
+        fxe = Executor(funcx_client=fxc)  # intentionally overwritten
+        fxe = Executor(funcx_client=fxc)
 
         num_executors += 2
         assert len(_REGISTERED_FXEXECUTORS) == num_executors, (

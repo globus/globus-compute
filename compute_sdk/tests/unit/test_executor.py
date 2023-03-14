@@ -10,7 +10,7 @@ import pika
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
-from globus_compute_sdk import Client, FuncXExecutor
+from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
 from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
@@ -29,7 +29,7 @@ def noop():
     return 1
 
 
-class MockedFuncXExecutor(FuncXExecutor):
+class MockedExecutor(Executor):
     def __init__(self, *args, **kwargs):
         kwargs.update({"funcx_client": mock.Mock(spec=Client)})
         super().__init__(*args, **kwargs)
@@ -71,7 +71,7 @@ class MockedResultWatcher(_ResultWatcher):
 def fxexecutor(mocker):
     fxc = mock.MagicMock()
     fxc.session_task_group_id = str(uuid.uuid4())
-    fxe = FuncXExecutor(funcx_client=fxc)
+    fxe = Executor(funcx_client=fxc)
     watcher = mocker.patch(
         "globus_compute_sdk.sdk.executor._ResultWatcher", autospec=True
     )
@@ -90,12 +90,12 @@ def fxexecutor(mocker):
     if not _is_stopped(fxe._task_submitter)():
         trepr = repr(fxe._task_submitter)
         raise RuntimeError(
-            "FuncXExecutor still running: _task_submitter thread alive: %s" % trepr
+            "Executor still running: _task_submitter thread alive: %s" % trepr
         )
     if not _is_stopped(fxe._result_watcher)():
         trepr = repr(fxe._result_watcher)
         raise RuntimeError(
-            "FuncXExecutor still running: _result_watcher thread alive: %r" % trepr
+            "Executor still running: _result_watcher thread alive: %r" % trepr
         )
 
 
@@ -119,17 +119,17 @@ def test_task_submission_info_stringification():
 def test_deprecated_args_warned(argname, mocker):
     mock_warn = mocker.patch("globus_compute_sdk.sdk.executor.warnings")
     fxc = mock.Mock(spec=Client)
-    FuncXExecutor(funcx_client=fxc).shutdown()
+    Executor(funcx_client=fxc).shutdown()
     mock_warn.warn.assert_not_called()
 
-    FuncXExecutor(funcx_client=fxc, **{argname: 1}).shutdown()
+    Executor(funcx_client=fxc, **{argname: 1}).shutdown()
     mock_warn.warn.assert_called()
 
 
 def test_invalid_args_raise(randomstring):
     invalid_arg = f"abc_{randomstring()}"
     with pytest.raises(TypeError) as wrapped_err:
-        FuncXExecutor(**{invalid_arg: 1}).shutdown()
+        Executor(**{invalid_arg: 1}).shutdown()
 
     err = wrapped_err.value
     assert "invalid argument" in str(err)
@@ -138,7 +138,7 @@ def test_invalid_args_raise(randomstring):
 
 def test_creates_default_client_if_none_provided(mocker):
     mock_fxc_klass = mocker.patch("globus_compute_sdk.sdk.executor.Client")
-    FuncXExecutor().shutdown()
+    Executor().shutdown()
 
     mock_fxc_klass.assert_called()
 
@@ -240,7 +240,7 @@ def test_submit_value_error_if_no_endpoint(fxexecutor):
 
     err = pytest_exc.value
     assert "No endpoint_id set" in str(err)
-    assert "    fxe = FuncXExecutor(endpoint_id=" in str(err), "Expected hint"
+    assert "    fxe = Executor(endpoint_id=" in str(err), "Expected hint"
     try_assert(_is_stopped(fxe._task_submitter), "Expected graceful shutdown on error")
 
 
@@ -495,7 +495,7 @@ def test_task_submitter_respects_batch_size(fxexecutor, batch_size: int):
 
 
 def test_task_submitter_stops_executor_on_exception():
-    fxe = MockedFuncXExecutor()
+    fxe = MockedExecutor()
     fxe._tasks_to_send.put(("too", "much", "destructuring", "!!"))
 
     try_assert(lambda: fxe._stopped)
@@ -503,7 +503,7 @@ def test_task_submitter_stops_executor_on_exception():
 
 
 def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
-    fxe = MockedFuncXExecutor()
+    fxe = MockedExecutor()
 
     upstream_error = Exception(f"Upstream error {randomstring}!!")
     fxe.funcx_client.batch_run.side_effect = upstream_error
@@ -549,7 +549,7 @@ def test_task_submitter_sets_future_task_ids(fxexecutor):
 
 def test_resultwatcher_stops_if_unable_to_connect(mocker):
     mock_time = mocker.patch("globus_compute_sdk.sdk.executor.time")
-    fxe = mock.Mock(spec=FuncXExecutor)
+    fxe = mock.Mock(spec=Executor)
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
@@ -559,7 +559,7 @@ def test_resultwatcher_stops_if_unable_to_connect(mocker):
 
 
 def test_resultwatcher_ignores_invalid_tasks(mocker):
-    fxe = mock.Mock(spec=FuncXExecutor)
+    fxe = mock.Mock(spec=Executor)
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
@@ -571,7 +571,7 @@ def test_resultwatcher_ignores_invalid_tasks(mocker):
 
 def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
     mocker.patch("globus_compute_sdk.sdk.executor.time")
-    fxe = mock.Mock(spec=FuncXExecutor)
+    fxe = mock.Mock(spec=Executor)
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
@@ -585,7 +585,7 @@ def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
 def test_resultwatcher_gracefully_handles_unexpected_exception(mocker):
     mocker.patch("globus_compute_sdk.sdk.executor.time")
     mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
-    fxe = mock.Mock(spec=FuncXExecutor)
+    fxe = mock.Mock(spec=Executor)
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
     rw._event_watcher = mock.Mock(side_effect=Exception)
