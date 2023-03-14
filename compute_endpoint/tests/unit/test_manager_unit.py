@@ -3,20 +3,18 @@ import uuid
 from unittest import mock
 
 from globus_compute_common.tasks import TaskState
-from globus_compute_endpoint.executors.high_throughput.funcx_manager import (
-    Manager as FXManager,
-)
+from globus_compute_endpoint.executors.high_throughput.manager import Manager
 from globus_compute_endpoint.executors.high_throughput.messages import Task
 
 
-@mock.patch("globus_compute_endpoint.executors.high_throughput.funcx_manager.zmq")
-class TestFuncxManager:
+@mock.patch("globus_compute_endpoint.executors.high_throughput.manager.zmq")
+class TestManager:
     def test_task_to_worker_status_change(self, randomstring):
         task_type = randomstring()
         task_id = str(uuid.uuid4())
         task = Task(task_id, "RAW", b"")
 
-        mgr = FXManager(uid="some_uid", worker_type=task_type)
+        mgr = Manager(uid="some_uid", worker_type=task_type)
         mgr.worker_map = mock.Mock()
         mgr.worker_map.get_worker.return_value = "some_work_id"
         mgr.task_queues[task_type].put(task)

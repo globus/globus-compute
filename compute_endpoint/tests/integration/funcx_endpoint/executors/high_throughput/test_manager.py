@@ -4,7 +4,7 @@ import queue
 import shutil
 
 import pytest
-from globus_compute_endpoint.executors.high_throughput.funcx_manager import Manager
+from globus_compute_endpoint.executors.high_throughput.manager import Manager
 from globus_compute_endpoint.executors.high_throughput.messages import Task
 
 
@@ -18,7 +18,7 @@ class TestManager:
     def test_remove_worker_init(self, mocker):
         # zmq is being mocked here because it was making tests hang
         mocker.patch(
-            "globus_compute_endpoint.executors.high_throughput.funcx_manager.zmq.Context"  # noqa: E501
+            "globus_compute_endpoint.executors.high_throughput.manager.zmq.Context"  # noqa: E501
         )
 
         manager = Manager(logdir="./", uid="mock_uid")
@@ -34,11 +34,11 @@ class TestManager:
     def test_poll_funcx_task_socket(self, mocker):
         # zmq is being mocked here because it was making tests hang
         mocker.patch(
-            "globus_compute_endpoint.executors.high_throughput.funcx_manager.zmq.Context"  # noqa: E501
+            "globus_compute_endpoint.executors.high_throughput.manager.zmq.Context"  # noqa: E501
         )
 
         mock_worker_map = mocker.patch(
-            "globus_compute_endpoint.executors.high_throughput.funcx_manager.WorkerMap"
+            "globus_compute_endpoint.executors.high_throughput.manager.WorkerMap"
         )
 
         manager = Manager(logdir="./", uid="mock_uid")
