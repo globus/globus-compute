@@ -28,8 +28,8 @@ DEFAULT_RESULT_SIZE_LIMIT_MB = 10
 DEFAULT_RESULT_SIZE_LIMIT_B = DEFAULT_RESULT_SIZE_LIMIT_MB * 1024 * 1024
 
 
-class FuncXWorker:
-    """The FuncX worker
+class Worker:
+    """The Globus Compute worker
     Parameters
     ----------
 
@@ -232,7 +232,7 @@ def cli_run():
         sys.stderr = fe
 
         try:
-            worker = FuncXWorker(
+            worker = Worker(
                 args.worker_id,
                 args.address,
                 int(args.port),
