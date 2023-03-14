@@ -1,10 +1,10 @@
 from .decorators import requires_login
-from .manager import FuncxScopes, LoginManager
+from .manager import ComputeScopes, LoginManager
 from .protocol import LoginManagerProtocol
 
 __all__ = (
     "LoginManager",
-    "FuncxScopes",
+    "ComputeScopes",
     "LoginManagerProtocol",
     "requires_login",
 )

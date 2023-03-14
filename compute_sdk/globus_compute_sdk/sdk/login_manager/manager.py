@@ -38,8 +38,8 @@ class FuncxScopeBuilder(ScopeBuilder):
 
 
 #: a ScopeBuilder in the style of globus_sdk.scopes for the FuncX service
-#: it supports one scope named 'all', as in ``FuncxScopes.all``
-FuncxScopes = FuncxScopeBuilder()
+#: it supports one scope named 'all', as in ``ComputeScopes.all``
+ComputeScopes = FuncxScopeBuilder()
 
 
 class LoginManager:
@@ -57,7 +57,7 @@ class LoginManager:
     """
 
     SCOPES: dict[str, list[str]] = {
-        FuncxScopes.resource_server: [FuncxScopes.all],
+        ComputeScopes.resource_server: [ComputeScopes.all],
         AuthScopes.resource_server: [AuthScopes.openid],
         SearchScopes.resource_server: [SearchScopes.all],
     }
@@ -196,5 +196,5 @@ class LoginManager:
         return WebClient(
             base_url=base_url,
             app_name=app_name,
-            authorizer=self._get_authorizer(FuncxScopes.resource_server),
+            authorizer=self._get_authorizer(ComputeScopes.resource_server),
         )
