@@ -2,7 +2,7 @@ import json
 
 import pytest
 import responses
-from globus_compute_sdk.sdk.web_client import FuncxWebClient
+from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.version import __version__
 
 
@@ -23,14 +23,12 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return FuncxWebClient(
-        base_url="https://api.funcx", transport_params={"max_retries": 0}
-    )
+    return WebClient(base_url="https://api.funcx", transport_params={"max_retries": 0})
 
 
 def test_web_client_can_set_explicit_base_url():
-    c1 = FuncxWebClient(base_url="https://foo.example.com/")
-    c2 = FuncxWebClient(base_url="https://bar.example.com/")
+    c1 = WebClient(base_url="https://foo.example.com/")
+    c2 = WebClient(base_url="https://bar.example.com/")
     assert c1.base_url == "https://foo.example.com/"
     assert c2.base_url == "https://bar.example.com/"
 
@@ -59,7 +57,7 @@ def test_get_version_service_param(client, service_param):
 
 @pytest.mark.parametrize("user_app_name", [None, "bar"])
 def test_app_name_from_constructor(user_app_name):
-    client = FuncxWebClient(
+    client = WebClient(
         # use the same fake URL and disable retries as in the default test case
         base_url="https://api.funcx",
         transport_params={"max_retries": 0},

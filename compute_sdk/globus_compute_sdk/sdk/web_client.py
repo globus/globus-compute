@@ -92,7 +92,7 @@ class FunctionRegistrationData:
         return "FunctionRegistrationData(" + json.dumps(self.to_dict()) + ")"
 
 
-class FuncxWebClient(globus_sdk.BaseClient):
+class WebClient(globus_sdk.BaseClient):
     # the `service_name` is used in the Globus SDK to lookup the service URL from
     # config. However, FuncX has its own logic for determining the base URL.
     # set `service_name` to allow the check which ensures this is set to pass

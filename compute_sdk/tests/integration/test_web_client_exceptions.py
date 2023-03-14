@@ -1,6 +1,6 @@
 import pytest
 import responses
-from globus_compute_sdk.sdk.web_client import FuncxWebClient
+from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk.exc.api import GlobusAPIError
 
 
@@ -21,9 +21,7 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return FuncxWebClient(
-        base_url="https://api.funcx", transport_params={"max_retries": 0}
-    )
+    return WebClient(base_url="https://api.funcx", transport_params={"max_retries": 0})
 
 
 @pytest.mark.parametrize("http_status", [400, 500])

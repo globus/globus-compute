@@ -9,7 +9,7 @@ import typing as t
 import globus_sdk
 from globus_sdk.scopes import AuthScopes, ScopeBuilder, SearchScopes
 
-from ..web_client import FuncxWebClient
+from ..web_client import WebClient
 from .client_login import get_client_login, is_client_login
 from .globus_auth import internal_auth_client
 from .login_flow import do_link_auth_flow
@@ -192,8 +192,8 @@ class LoginManager:
 
     def get_funcx_web_client(
         self, *, base_url: str | None = None, app_name: str | None = None
-    ) -> FuncxWebClient:
-        return FuncxWebClient(
+    ) -> WebClient:
+        return WebClient(
             base_url=base_url,
             app_name=app_name,
             authorizer=self._get_authorizer(FuncxScopes.resource_server),

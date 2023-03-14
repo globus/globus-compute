@@ -10,7 +10,7 @@ from click.testing import CliRunner
 from globus_compute_endpoint.cli import _do_logout_endpoints, _do_stop_endpoint, app
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.utils.config import Config
-from globus_compute_sdk.sdk.web_client import FuncxWebClient
+from globus_compute_sdk.sdk.web_client import WebClient
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +37,7 @@ def test_start_endpoint_blocked(
         do_version_check=False,
         login_manager=mocker.Mock(),
     )
-    fxwc = FuncxWebClient(base_url=fx_addy)
+    fxwc = WebClient(base_url=fx_addy)
     fxc.web_client = fxwc
     patch_funcx_client.return_value = fxc
 

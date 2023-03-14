@@ -4,7 +4,7 @@ import sys
 
 import globus_sdk
 
-from ..web_client import FuncxWebClient
+from ..web_client import WebClient
 
 # these were added to stdlib typing in 3.8, so the import must be conditional
 # mypy and other tools expect and document a sys.version_info check
@@ -28,5 +28,5 @@ class LoginManagerProtocol(Protocol):
     def get_search_client(self) -> globus_sdk.SearchClient:
         ...
 
-    def get_funcx_web_client(self, *, base_url: str | None = None) -> FuncxWebClient:
+    def get_funcx_web_client(self, *, base_url: str | None = None) -> WebClient:
         ...
