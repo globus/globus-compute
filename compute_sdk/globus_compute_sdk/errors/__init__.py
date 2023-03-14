@@ -1,15 +1,15 @@
 from .error_types import (
-    FuncxError,
-    FuncxTaskExecutionFailed,
+    ComputeError,
     MaxResultSizeExceeded,
     SerializationError,
+    TaskExecutionFailed,
     TaskPending,
     VersionMismatch,
 )
 
 __all__ = (
-    "FuncxError",
-    "FuncxTaskExecutionFailed",
+    "ComputeError",
+    "TaskExecutionFailed",
     "MaxResultSizeExceeded",
     "SerializationError",
     "TaskPending",

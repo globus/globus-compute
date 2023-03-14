@@ -11,7 +11,7 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
 from globus_compute_sdk import Client, Executor
-from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
 from globus_compute_sdk.serialize.facade import ComputeSerializer
@@ -680,7 +680,7 @@ def test_resultwatcher_match_sets_exception(randomstring):
     mrw._event_watcher()
 
     assert payload in str(fut.exception())
-    assert isinstance(fut.exception(), FuncxTaskExecutionFailed)
+    assert isinstance(fut.exception(), TaskExecutionFailed)
     mrw.shutdown()
 
 

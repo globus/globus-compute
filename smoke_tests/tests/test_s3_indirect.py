@@ -1,7 +1,7 @@
 import pytest
 
 try:
-    from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+    from globus_compute_sdk.errors import TaskExecutionFailed
 
     has_task_exec_error_type = True
 except ImportError:
@@ -33,8 +33,8 @@ def test_result_size_too_large(submit_function_and_get_result, endpoint):
     funcX should raise a MaxResultSizeExceeded exception when results exceeds 10MB
     limit
     """
-    # SDK wraps remote execution failures in FuncxTaskExecutionFailed exceptions...
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+    # SDK wraps remote execution failures in TaskExecutionFailed exceptions...
+    with pytest.raises(TaskExecutionFailed) as excinfo:
         submit_function_and_get_result(
             endpoint, func=large_result_producer, func_args=(11 * 1024 * 1024,)
         )

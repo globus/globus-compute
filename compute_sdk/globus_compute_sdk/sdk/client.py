@@ -9,8 +9,8 @@ import uuid
 import warnings
 
 from globus_compute_sdk.errors import (
-    FuncxTaskExecutionFailed,
     SerializationError,
+    TaskExecutionFailed,
     TaskPending,
 )
 from globus_compute_sdk.sdk._environments import (
@@ -263,7 +263,7 @@ class Client:
                 else:
                     status.update({"result": r_obj, "completion_t": completion_t})
             elif "exception" in r_dict:
-                raise FuncxTaskExecutionFailed(r_dict["exception"], completion_t)
+                raise TaskExecutionFailed(r_dict["exception"], completion_t)
             else:
                 raise NotImplementedError("unreachable")
 
@@ -456,7 +456,7 @@ class Client:
 
                 # All errors should have 'reason' but just in case
                 error_reason = result.get("reason", "Unknown execution failure")
-                raise FuncxTaskExecutionFailed(error_reason)
+                raise TaskExecutionFailed(error_reason)
 
         if self.asynchronous:
             task_group_id = r["task_group_id"]

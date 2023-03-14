@@ -9,7 +9,7 @@ from asyncio import AbstractEventLoop
 # import from `websockets.client`, see:
 #   https://github.com/aaugustin/websockets/issues/940
 import websockets.client
-from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from websockets.exceptions import (
@@ -226,7 +226,7 @@ class WebSocketPollingTask:
                 )
             elif "exception" in task_data:
                 task_fut.set_exception(
-                    FuncxTaskExecutionFailed(
+                    TaskExecutionFailed(
                         task_data["exception"], task_data["completion_t"]
                     )
                 )

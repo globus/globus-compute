@@ -23,7 +23,7 @@ else:
 import pika
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
-from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.utils import chunk_by
@@ -505,12 +505,12 @@ class Executor(concurrent.futures.Executor):
                             if task.get("status") == "success":
                                 fut.set_result(deserialize(task["result"]))
                             else:
-                                exc = FuncxTaskExecutionFailed(
+                                exc = TaskExecutionFailed(
                                     task["exception"], completed_t
                                 )
                                 fut.set_exception(exc)
                         except Exception as exc:
-                            funcx_err = FuncxTaskExecutionFailed(
+                            funcx_err = TaskExecutionFailed(
                                 "Failed to set result or exception"
                             )
                             funcx_err.__cause__ = exc
@@ -941,7 +941,7 @@ class _ResultWatcher(threading.Thread):
 
             if res.is_error:
                 fut.set_exception(
-                    FuncxTaskExecutionFailed(res.data, str(props.timestamp or 0))
+                    TaskExecutionFailed(res.data, str(props.timestamp or 0))
                 )
             else:
                 try:

@@ -4,14 +4,14 @@ import textwrap
 import time
 
 
-class FuncxError(Exception):
+class ComputeError(Exception):
     """Base class for all funcx exceptions"""
 
     def __str__(self):
         return self.__repr__()
 
 
-class VersionMismatch(FuncxError):
+class VersionMismatch(ComputeError):
     """Either client and endpoint version mismatch, or version cannot be retrieved."""
 
     def __init__(self, version_message):
@@ -21,7 +21,7 @@ class VersionMismatch(FuncxError):
         return f"FuncX Versioning Issue: {self.version_message}"
 
 
-class SerializationError(FuncxError):
+class SerializationError(ComputeError):
     """Something failed during serialization or deserialization."""
 
     def __init__(self, message):
@@ -31,7 +31,7 @@ class SerializationError(FuncxError):
         return f"Serialization Error during: {self.message}"
 
 
-class TaskPending(FuncxError):
+class TaskPending(ComputeError):
     """Task is pending and no result is available yet"""
 
     def __init__(self, reason):
@@ -56,7 +56,7 @@ class MaxResultSizeExceeded(Exception):
         )
 
 
-class FuncxTaskExecutionFailed(Exception):
+class TaskExecutionFailed(Exception):
     """
     Error result from the remote end, wrapped as an exception object
     """

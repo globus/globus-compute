@@ -4,7 +4,7 @@ from unittest import mock
 import globus_compute_sdk as gc
 import pytest
 from globus_compute_sdk import ContainerSpec
-from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.serialize import ComputeSerializer
 
 
@@ -85,7 +85,7 @@ def test_update_task_table_on_exception():
     api_data = {"status": "success", "exception": "foo-bar-baz", "completion_t": "1.1"}
     fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
 
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+    with pytest.raises(TaskExecutionFailed) as excinfo:
         fxc._update_task_table(api_data, "task-id-foo")
     assert "foo-bar-baz" in str(excinfo.value)
 
@@ -192,7 +192,7 @@ def test_batch_error():
     batch = fxc.create_batch()
     batch.add("fid1", "eid1", "arg1")
     batch.add("fid2", "eid2", "arg2")
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+    with pytest.raises(TaskExecutionFailed) as excinfo:
         fxc.batch_run(batch)
 
     assert error_reason in str(excinfo)
@@ -215,7 +215,7 @@ def test_batch_no_reason():
     }
     fxc.web_client.submit = mock.MagicMock(return_value=error_results)
 
-    with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
+    with pytest.raises(TaskExecutionFailed) as excinfo:
         fxc.run(endpoint_id="fid", function_id="fid")
 
     assert "Unknown execution failure" in str(excinfo)
