@@ -3,7 +3,7 @@ import json
 import random
 import uuid
 
-from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from globus_compute_sdk.sdk.executor import AtomicController
 
@@ -44,7 +44,7 @@ def test_polling_task_cancels_futures_upon_upstream_failure(mocker):
     )
     mock_data_iter = iter(mock_data)
     tids = (md.get("task_id", uuid.uuid4()) for md in mock_data)
-    pending_futures = {tid: FuncXFuture(tid) for tid in tids}
+    pending_futures = {tid: ComputeFuture(tid) for tid in tids}
     futures = list(pending_futures.values())
 
     async def mock_recv():
@@ -81,7 +81,7 @@ def test_malformed_response_handled_gracefully(mocker):
         atomic_controller=AtomicController(_start, _stop),
         auto_start=False,
     )
-    task_fut = FuncXFuture()
+    task_fut = ComputeFuture()
     data = {"reason": "Jim bob Bonita Mae"}
     eventloop.run_until_complete(wspt.set_result(task_fut, data))
     eventloop.close()

@@ -24,7 +24,7 @@ import pika
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
-from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.utils import chunk_by
 
@@ -173,7 +173,7 @@ class Executor(concurrent.futures.Executor):
         self._task_counter: int = 0
         self._task_group_id: str = task_group_id or str(uuid.uuid4())
         self._tasks_to_send: queue.Queue[
-            tuple[FuncXFuture, TaskSubmissionInfo] | tuple[None, None]
+            tuple[ComputeFuture, TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
         self._function_registry: dict[tuple[t.Callable, str | None], str] = {}
 
@@ -293,7 +293,7 @@ class Executor(concurrent.futures.Executor):
         with the given arguments.
 
         Schedules the callable to be executed as ``fn(*args, **kwargs)`` and
-        returns a FuncXFuture instance representing the execution of the
+        returns a ComputeFuture instance representing the execution of the
         callable.
 
         Example use::
@@ -409,7 +409,7 @@ class Executor(concurrent.futures.Executor):
             kwargs=kwargs,
         )
 
-        fut = FuncXFuture()
+        fut = ComputeFuture()
         self._tasks_to_send.put((fut, task))
         return fut
 
@@ -435,7 +435,7 @@ class Executor(concurrent.futures.Executor):
         """  # noqa
         raise NotImplementedError()
 
-    def reload_tasks(self) -> t.Iterable[FuncXFuture]:
+    def reload_tasks(self) -> t.Iterable[ComputeFuture]:
         """
         .. _reload_tasks():
 
@@ -472,11 +472,11 @@ class Executor(concurrent.futures.Executor):
 
         # step 3: create the associated set of futures
         task_ids: list[str] = [task["id"] for task in r.get("tasks", [])]
-        futures: list[FuncXFuture] = []
+        futures: list[ComputeFuture] = []
 
         if task_ids:
             # Complete the futures that already have results.
-            pending: list[FuncXFuture] = []
+            pending: list[ComputeFuture] = []
             deserialize = self.funcx_client.fx_serializer.deserialize
             chunk_size = 1024
             num_chunks = len(task_ids) // chunk_size + 1
@@ -495,7 +495,7 @@ class Executor(concurrent.futures.Executor):
 
                 res = self.funcx_client.web_client.get_batch_status(id_chunk)
                 for task_id, task in res.data.get("results", {}).items():
-                    fut = FuncXFuture(task_id)
+                    fut = ComputeFuture(task_id)
                     futures.append(fut)
                     completed_t = task.get("completion_t")
                     if not completed_t:
@@ -571,9 +571,9 @@ class Executor(concurrent.futures.Executor):
             "%s: task submission thread started (%s)", self, threading.get_ident()
         )
         to_send = self._tasks_to_send  # cache lookup
-        futs: list[FuncXFuture] = []  # for mypy/the exception branch
+        futs: list[ComputeFuture] = []  # for mypy/the exception branch
         try:
-            fut: FuncXFuture | None = FuncXFuture()  # just start the loop; please
+            fut: ComputeFuture | None = ComputeFuture()  # just start the loop; please
             while fut is not None:
                 futs = []
                 tasks: list[TaskSubmissionInfo] = []
@@ -661,12 +661,12 @@ class Executor(concurrent.futures.Executor):
                 pass
             log.debug("%s: task submission thread complete", self)
 
-    def _submit_tasks(self, futs: list[FuncXFuture], tasks: list[TaskSubmissionInfo]):
+    def _submit_tasks(self, futs: list[ComputeFuture], tasks: list[TaskSubmissionInfo]):
         """
         Submit a batch of tasks to the webservice, destined for self.endpoint_id.
         Upon success, update the futures with their associated task_id.
 
-        :param futs: a list of FuncXFutures; will have their task_id attribute
+        :param futs: a list of ComputeFutures; will have their task_id attribute
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
@@ -753,7 +753,7 @@ class _ResultWatcher(threading.Thread):
 
         self._queue_prefix = ""
 
-        self._open_futures: dict[str, FuncXFuture] = {}
+        self._open_futures: dict[str, ComputeFuture] = {}
         self._received_results: dict[str, tuple[BasicProperties, Result]] = {}
 
         self._open_futures_empty = threading.Event()
@@ -879,13 +879,13 @@ class _ResultWatcher(threading.Thread):
             if wait:
                 join_thread.join()
 
-    def watch_for_task_results(self, futures: list[FuncXFuture]) -> int:
+    def watch_for_task_results(self, futures: list[ComputeFuture]) -> int:
         """
-        Add list of FuncXFutures to internal watch list.
+        Add list of ComputeFutures to internal watch list.
 
         Updates the thread's dictionary of futures that will be resolved when
         upstream sends associated results.  The internal dictionary is keyed
-        on the FuncXFuture.task_id attribute, but this method does not verify
+        on the ComputeFuture.task_id attribute, but this method does not verify
         that it is set -- it is up to the caller to ensure the future is
         initialized fully.  In particular, if a task_id is not set, it will
         not be added to the watch list.

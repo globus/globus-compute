@@ -10,7 +10,7 @@ from asyncio import AbstractEventLoop
 #   https://github.com/aaugustin/websockets/issues/940
 import websockets.client
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
-from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from websockets.exceptions import (
     ConnectionClosedOK,
@@ -199,13 +199,13 @@ class WebSocketPollingTask:
         log.info("WebSocket connection closed by main thread")
         return True
 
-    async def set_result(self, task_fut: FuncXFuture, task_data: t.Dict):
+    async def set_result(self, task_fut: ComputeFuture, task_data: t.Dict):
         """Sets the result of a future with given task_id in the pending_futures map,
         then decrement the atomic counter and close the WebSocket connection if needed
 
         Parameters
         ----------
-        task_fut : FuncXFuture
+        task_fut : ComputeFuture
             Task future for which to parse and set task_data
 
 

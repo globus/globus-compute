@@ -2,7 +2,7 @@ import typing as t
 from concurrent.futures import Future
 
 
-class FuncXFuture(Future):
+class ComputeFuture(Future):
     """
     Extend `concurrent.futures.Future`_ to include an optional task UUID.
 

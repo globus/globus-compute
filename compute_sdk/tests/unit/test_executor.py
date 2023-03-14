@@ -12,7 +12,7 @@ from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
 from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
-from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 from tests.utils import try_assert, try_for_timeout
@@ -511,7 +511,7 @@ def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
     tsi = TaskSubmissionInfo(
         task_num=12345, function_id="abc", endpoint_id="abc", args=(), kwargs={}
     )
-    fxe._tasks_to_send.put((FuncXFuture(), tsi))
+    fxe._tasks_to_send.put((ComputeFuture(), tsi))
 
     try_assert(lambda: fxe._stopped)
     try_assert(lambda: str(upstream_error) == str(fxe._task_submitter_exception))
@@ -538,7 +538,7 @@ def test_task_submitter_sets_future_task_ids(fxexecutor):
     fxc, fxe = fxexecutor
 
     num_tasks = random.randint(2, 20)
-    futs = [FuncXFuture() for _ in range(num_tasks)]
+    futs = [ComputeFuture() for _ in range(num_tasks)]
     batch_ids = [uuid.uuid4() for _ in range(num_tasks)]
 
     fxc.batch_run.return_value = batch_ids
@@ -563,7 +563,7 @@ def test_resultwatcher_ignores_invalid_tasks(mocker):
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
-    futs = [FuncXFuture() for i in range(random.randint(1, 10))]
+    futs = [ComputeFuture() for i in range(random.randint(1, 10))]
     futs[0].task_id = uuid.uuid4()
     num_added = rw.watch_for_task_results(futs)
     assert 1 == num_added
@@ -575,7 +575,7 @@ def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
-    fut = FuncXFuture(task_id=uuid.uuid4())
+    fut = ComputeFuture(task_id=uuid.uuid4())
     rw.watch_for_task_results([fut])
     rw.run()
 
@@ -598,7 +598,7 @@ def test_resultwatcher_gracefully_handles_unexpected_exception(mocker):
 
 
 def test_resultwatcher_blocks_until_tasks_done():
-    fut = FuncXFuture(task_id=uuid.uuid4())
+    fut = ComputeFuture(task_id=uuid.uuid4())
     mrw = MockedResultWatcher(mock.Mock())
     mrw.watch_for_task_results([fut])
     mrw.start()
@@ -613,7 +613,7 @@ def test_resultwatcher_blocks_until_tasks_done():
 
 
 def test_resultwatcher_does_not_check_if_no_results():
-    fut = FuncXFuture(task_id=uuid.uuid4())
+    fut = ComputeFuture(task_id=uuid.uuid4())
     mrw = MockedResultWatcher(mock.Mock())
     mrw._match_results_to_futures = mock.Mock()
     mrw.watch_for_task_results([fut])
@@ -625,7 +625,7 @@ def test_resultwatcher_does_not_check_if_no_results():
 
 
 def test_resultwatcher_checks_match_if_results():
-    fut = FuncXFuture(task_id=uuid.uuid4())
+    fut = ComputeFuture(task_id=uuid.uuid4())
     res = Result(task_id=fut.task_id, data="abc123")
 
     mrw = MockedResultWatcher(mock.Mock())
@@ -668,7 +668,7 @@ def test_resultwatcher_repr():
 def test_resultwatcher_match_sets_exception(randomstring):
     payload = randomstring()
     fxs = ComputeSerializer()
-    fut = FuncXFuture(task_id=uuid.uuid4())
+    fut = ComputeFuture(task_id=uuid.uuid4())
     err_details = ResultErrorDetails(code="1234", user_message="some_user_message")
     res = Result(task_id=fut.task_id, error_details=err_details, data=payload)
 
@@ -687,7 +687,7 @@ def test_resultwatcher_match_sets_exception(randomstring):
 def test_resultwatcher_match_sets_result(randomstring):
     payload = randomstring()
     fxs = ComputeSerializer()
-    fut = FuncXFuture(task_id=uuid.uuid4())
+    fut = ComputeFuture(task_id=uuid.uuid4())
     res = Result(task_id=fut.task_id, data=fxs.serialize(payload))
 
     mrw = MockedResultWatcher(mock.Mock())
@@ -704,7 +704,7 @@ def test_resultwatcher_match_sets_result(randomstring):
 def test_resultwatcher_match_handles_deserialization_error():
     invalid_payload = "invalidly serialized"
     fxs = ComputeSerializer()
-    fut = FuncXFuture(task_id=uuid.uuid4())
+    fut = ComputeFuture(task_id=uuid.uuid4())
     res = Result(task_id=fut.task_id, data=invalid_payload)
 
     mrw = MockedResultWatcher(mock.Mock())
