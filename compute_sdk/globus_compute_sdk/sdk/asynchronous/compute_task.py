@@ -1,7 +1,7 @@
 import asyncio
 
 
-class FuncXTask(asyncio.Future):
+class ComputeTask(asyncio.Future):
     """
     Represents a submitted funcX task with an asychio wrapper
     """

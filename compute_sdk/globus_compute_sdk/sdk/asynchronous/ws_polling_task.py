@@ -11,7 +11,7 @@ from asyncio import AbstractEventLoop
 import websockets.client
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
-from globus_compute_sdk.sdk.asynchronous.funcx_task import FuncXTask
+from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from websockets.exceptions import (
     ConnectionClosedOK,
     InvalidHandshake,
@@ -86,7 +86,7 @@ class WebSocketPollingTask:
         # new thread
         asyncio.set_event_loop(self.loop)
         self.task_group_ids_queue: asyncio.Queue[str] = asyncio.Queue()
-        self.pending_tasks: t.Dict[str, FuncXTask] = {}
+        self.pending_tasks: t.Dict[str, ComputeTask] = {}
         self.unknown_results: t.Dict[str, t.Any] = {}
 
         self.closed_by_main_thread = False
@@ -264,10 +264,10 @@ class WebSocketPollingTask:
             self.running_task_group_ids.add(task_group_id)
             self.task_group_ids_queue.put_nowait(task_group_id)
 
-    def add_task(self, task: FuncXTask):
+    def add_task(self, task: ComputeTask):
         """
         Add a funcX task
-        :param task: FuncXTask
+        :param task: ComputeTask
             Task to be added
         """
         self.pending_tasks[task.task_id] = task

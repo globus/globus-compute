@@ -18,7 +18,7 @@ from globus_compute_sdk.sdk._environments import (
     get_web_socket_url,
     urls_might_mismatch,
 )
-from globus_compute_sdk.sdk.asynchronous.funcx_task import FuncXTask
+from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from globus_compute_sdk.sdk.search import SearchHelper
 from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
@@ -462,7 +462,7 @@ class Client:
             task_group_id = r["task_group_id"]
             asyncio_tasks = []
             for task_id in task_uuids:
-                funcx_task = FuncXTask(task_id)
+                funcx_task = ComputeTask(task_id)
                 asyncio_task = self.loop.create_task(funcx_task.get_result())
                 asyncio_tasks.append(asyncio_task)
 
