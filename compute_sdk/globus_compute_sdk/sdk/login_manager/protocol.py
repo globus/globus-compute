@@ -28,5 +28,5 @@ class LoginManagerProtocol(Protocol):
     def get_search_client(self) -> globus_sdk.SearchClient:
         ...
 
-    def get_funcx_web_client(self, *, base_url: str | None = None) -> WebClient:
+    def get_web_client(self, *, base_url: str | None = None) -> WebClient:
         ...

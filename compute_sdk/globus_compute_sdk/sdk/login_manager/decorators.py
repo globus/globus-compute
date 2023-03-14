@@ -23,7 +23,7 @@ def requires_login(func):
             )
             self.login_manager.run_login_flow()
             # Initiate a new web client with updated authorizer
-            self.web_client = self.login_manager.get_funcx_web_client(
+            self.web_client = self.login_manager.get_web_client(
                 base_url=self.funcx_service_address
             )
             return func(self, *args, **kwargs)

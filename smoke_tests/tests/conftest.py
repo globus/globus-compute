@@ -141,7 +141,7 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
             def get_search_client(self) -> SearchClient:
                 return SearchClient(authorizer=search_authorizer)
 
-            def get_funcx_web_client(self, *, base_url: str | None = None) -> WebClient:
+            def get_web_client(self, *, base_url: str | None = None) -> WebClient:
                 return WebClient(base_url=base_url, authorizer=funcx_authorizer)
 
         login_manager = TestsuiteLoginManager()

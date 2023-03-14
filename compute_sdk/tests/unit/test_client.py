@@ -256,7 +256,7 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
 def test_build_container(mocker, login_manager):
     mock_data = mocker.Mock()
     mock_data.data = {"container_id": "123-456"}
-    login_manager.get_funcx_web_client.post = mocker.Mock(return_value=mock_data)
+    login_manager.get_web_client.post = mocker.Mock(return_value=mock_data)
     fxc = gc.Client(do_version_check=False, login_manager=login_manager)
     spec = ContainerSpec(
         name="MyContainer",
@@ -270,8 +270,8 @@ def test_build_container(mocker, login_manager):
 
     container_id = fxc.build_container(spec)
     assert container_id == "123-456"
-    login_manager.get_funcx_web_client.post.assert_called()
-    calls = login_manager.get_funcx_web_client.post.call_args
+    login_manager.get_web_client.post.assert_called()
+    calls = login_manager.get_web_client.post.call_args
     assert calls[0][0] == "containers/build"
     assert calls[1] == {"data": spec.to_json()}
 
@@ -284,7 +284,7 @@ def test_container_build_status(mocker, login_manager, randomstring):
             self["status"] = expected_status
             self.http_status = 200
 
-    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
     fxc = gc.Client(do_version_check=False, login_manager=login_manager)
     status = fxc.get_container_build_status("123-434")
     assert status == expected_status
@@ -295,7 +295,7 @@ def test_container_build_status_not_found(mocker, login_manager):
         def __init__(self):
             self.http_status = 404
 
-    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
     fxc = gc.Client(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(ValueError) as excinfo:
@@ -310,7 +310,7 @@ def test_container_build_status_failure(mocker, login_manager):
             self.http_status = 500
             self.http_reason = "This is a reason"
 
-    login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
+    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
     fxc = gc.Client(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(SystemError) as excinfo:

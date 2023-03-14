@@ -190,7 +190,7 @@ class LoginManager:
             authorizer=self._get_authorizer(SearchScopes.resource_server)
         )
 
-    def get_funcx_web_client(
+    def get_web_client(
         self, *, base_url: str | None = None, app_name: str | None = None
     ) -> WebClient:
         return WebClient(

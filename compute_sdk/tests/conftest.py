@@ -68,5 +68,5 @@ def fxc(fxc_args):
 @pytest.fixture
 def login_manager(mocker):
     mock_login_manager = mocker.Mock()
-    mock_login_manager.get_funcx_web_client = mocker.Mock
+    mock_login_manager.get_web_client = mocker.Mock
     return mock_login_manager

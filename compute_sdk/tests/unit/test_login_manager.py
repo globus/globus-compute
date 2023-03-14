@@ -206,8 +206,8 @@ def test_requires_login_decorator(mocker, logman):
     mocked_run_login_flow = mocker.patch(
         f"{MOCK_BASE}.manager.LoginManager.run_login_flow"
     )
-    mocked_get_funcx_web_client = mocker.patch(
-        f"{MOCK_BASE}.manager.LoginManager.get_funcx_web_client"
+    mocked_get_web_client = mocker.patch(
+        f"{MOCK_BASE}.manager.LoginManager.get_web_client"
     )
 
     expected = "expected result"
@@ -229,9 +229,9 @@ def test_requires_login_decorator(mocker, logman):
     res = mock_client.upstream_call(None)  # case: no need to reauth
     assert res == expected
     assert not mocked_run_login_flow.called
-    assert not mocked_get_funcx_web_client.called
+    assert not mocked_get_web_client.called
 
     res = mock_client.upstream_call(None)  # case: now must reauth
     assert res == expected
     assert mocked_run_login_flow.called
-    assert mocked_get_funcx_web_client.called
+    assert mocked_get_web_client.called

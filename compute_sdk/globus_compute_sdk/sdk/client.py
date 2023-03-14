@@ -160,7 +160,7 @@ class Client:
             self.login_manager = LoginManager(environment=environment)
             self.login_manager.ensure_logged_in()
 
-        self.web_client = self.login_manager.get_funcx_web_client(
+        self.web_client = self.login_manager.get_web_client(
             base_url=funcx_service_address
         )
         self.fx_serializer = ComputeSerializer()
