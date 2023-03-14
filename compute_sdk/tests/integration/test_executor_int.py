@@ -5,7 +5,7 @@ import textwrap
 from unittest import mock
 
 import pytest
-from globus_compute_sdk import FuncXClient
+from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.executor import FuncXExecutor, _ResultWatcher
 from tests.utils import try_assert
 
@@ -15,7 +15,7 @@ from tests.utils import try_assert
 )
 def test_resultwatcher_graceful_shutdown():
     service_url = os.environ["FUNCX_INTEGRATION_TEST_WEB_URL"]
-    fxc = FuncXClient(funcx_service_address=service_url)
+    fxc = Client(funcx_service_address=service_url)
     fxe = FuncXExecutor(funcx_client=fxc)
     rw = _ResultWatcher(fxe)
     rw._start_consuming = mock.Mock()

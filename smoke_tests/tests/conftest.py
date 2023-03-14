@@ -7,7 +7,7 @@ import sys
 import time
 
 import pytest
-from globus_compute_sdk import FuncXClient
+from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.web_client import FuncxWebClient
 from globus_sdk import (
     AccessTokenAuthorizer,
@@ -193,7 +193,7 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
 @pytest.fixture(scope="session")
 def fxc(funcx_test_config):
     client_args = funcx_test_config["client_args"]
-    fxc = FuncXClient(**client_args)
+    fxc = Client(**client_args)
     return fxc
 
 

@@ -6,7 +6,7 @@ import unittest.mock
 import dill
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_endpoint.executors.high_throughput.messages import Message
-from globus_compute_sdk import FuncXClient
+from globus_compute_sdk import Client
 
 
 class MockExecutor(unittest.mock.Mock):
@@ -18,7 +18,7 @@ class MockExecutor(unittest.mock.Mock):
     def start(
         self,
         results_passthrough: multiprocessing.Queue = None,
-        funcx_client: FuncXClient = None,
+        funcx_client: Client = None,
     ):
         self.results_passthrough = results_passthrough
         self.funcx_client = funcx_client

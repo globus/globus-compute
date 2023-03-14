@@ -10,7 +10,7 @@ import pika
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
-from globus_compute_sdk import FuncXClient, FuncXExecutor
+from globus_compute_sdk import Client, FuncXExecutor
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
 from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
@@ -31,7 +31,7 @@ def noop():
 
 class MockedFuncXExecutor(FuncXExecutor):
     def __init__(self, *args, **kwargs):
-        kwargs.update({"funcx_client": mock.Mock(spec=FuncXClient)})
+        kwargs.update({"funcx_client": mock.Mock(spec=Client)})
         super().__init__(*args, **kwargs)
         self._time_to_stop_mock = threading.Event()
         self._task_submitter_exception: t.Type[Exception] | None = None
@@ -118,7 +118,7 @@ def test_task_submission_info_stringification():
 @pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
 def test_deprecated_args_warned(argname, mocker):
     mock_warn = mocker.patch("globus_compute_sdk.sdk.executor.warnings")
-    fxc = mock.Mock(spec=FuncXClient)
+    fxc = mock.Mock(spec=Client)
     FuncXExecutor(funcx_client=fxc).shutdown()
     mock_warn.warn.assert_not_called()
 
@@ -137,7 +137,7 @@ def test_invalid_args_raise(randomstring):
 
 
 def test_creates_default_client_if_none_provided(mocker):
-    mock_fxc_klass = mocker.patch("globus_compute_sdk.sdk.executor.FuncXClient")
+    mock_fxc_klass = mocker.patch("globus_compute_sdk.sdk.executor.Client")
     FuncXExecutor().shutdown()
 
     mock_fxc_klass.assert_called()

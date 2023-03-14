@@ -50,7 +50,7 @@ def mock_client(mocker):
         "endpoint_id": ep_uuid,
         "command_queue_info": {"connection_url": "", "queue": ""},
     }
-    mocker.patch(f"{_MOCK_BASE}globus_compute_sdk.FuncXClient", return_value=mock_fxc)
+    mocker.patch(f"{_MOCK_BASE}globus_compute_sdk.Client", return_value=mock_fxc)
     yield ep_uuid, mock_fxc
 
 
@@ -150,7 +150,7 @@ def test_gracefully_exits_if_in_conflict_or_locked(
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_fxc = get_standard_funcx_client()
-    mocker.patch(f"{_MOCK_BASE}globus_compute_sdk.FuncXClient", return_value=mock_fxc)
+    mocker.patch(f"{_MOCK_BASE}globus_compute_sdk.Client", return_value=mock_fxc)
 
     some_err = randomstring()
     register_endpoint_failure_response(status_code, some_err)
@@ -201,7 +201,7 @@ def test_handles_network_error_scriptably(
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     some_err = randomstring()
     mocker.patch(
-        f"{_MOCK_BASE}globus_compute_sdk.FuncXClient",
+        f"{_MOCK_BASE}globus_compute_sdk.Client",
         side_effect=NetworkError(some_err, Exception()),
     )
 

@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 _FUNCX_HOME = os.path.join("~", ".funcx")
 
 
-class FuncXClient:
+class Client:
     """Main class for interacting with the funcX service
 
     Holds helper operations for performing common tasks with the funcX service.
@@ -117,7 +117,7 @@ class FuncXClient:
             Default: None
 
         task_group_id: str|uuid.UUID
-            Set the TaskGroup ID (a UUID) for this FuncXClient instance.
+            Set the TaskGroup ID (a UUID) for this Client instance.
             Typically, one uses this to submit new tasks to an existing
             session or to reestablish FuncXExecutor futures.
             Default: None (will be auto generated)

@@ -78,7 +78,7 @@ class EndpointInterchange:
              Dictionary containing connection information for both the task and
              result queues.  The required data structure is returned from the
              Endpoint registration API call, encapsulated in the SDK by
-             `FuncXClient.register_endpoint()`.
+             `Client.register_endpoint()`.
 
         logdir : str
              Parsl log directory paths. Logs and temp files go here. Default: '.'

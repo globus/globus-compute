@@ -139,7 +139,7 @@ class FuncxWebClient(globus_sdk.BaseClient):
             data.update(additional_fields)
         return self.post("/batch_status", data=data)
 
-    # the FuncXClient needs to send version information through BaseClient.app_name,
+    # the Client needs to send version information through BaseClient.app_name,
     # so that's overridden here to prevent direct manipulation. use user_app_name
     # instead to send any custom metadata through the User Agent request header
     @property

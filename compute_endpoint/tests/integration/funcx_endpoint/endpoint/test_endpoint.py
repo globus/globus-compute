@@ -15,7 +15,7 @@ from globus_compute_sdk.sdk.web_client import FuncxWebClient
 
 @pytest.fixture(autouse=True)
 def patch_funcx_client(mocker):
-    return mocker.patch("globus_compute_endpoint.endpoint.endpoint.FuncXClient")
+    return mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
 
 
 def test_non_configured_endpoint(mocker):
@@ -32,7 +32,7 @@ def test_start_endpoint_blocked(
     # happy-path tested in tests/unit/test_endpoint_unit.py
 
     fx_addy = "http://api.funcx/"
-    fxc = globus_compute_sdk.FuncXClient(
+    fxc = globus_compute_sdk.Client(
         funcx_service_address=fx_addy,
         do_version_check=False,
         login_manager=mocker.Mock(),
@@ -128,7 +128,7 @@ def test_endpoint_logout(monkeypatch):
     return_value=pathlib.Path("some_ep_dir"),
 )
 @patch("globus_compute_endpoint.cli.read_config")
-@patch("globus_compute_endpoint.endpoint.endpoint.FuncXClient.stop_endpoint")
+@patch("globus_compute_endpoint.endpoint.endpoint.Client.stop_endpoint")
 def test_stop_remote_endpoint(
     mock_get_id, mock_get_conf, mock_get_fxc, mock_stop_endpoint
 ):

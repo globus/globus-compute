@@ -67,7 +67,7 @@ class EndpointManager:
                 "environment": config.environment,
             }
 
-            fxc = gc.FuncXClient(**funcx_client_options)
+            fxc = gc.Client(**funcx_client_options)
             reg_info = fxc.register_endpoint(
                 conf_dir.name,
                 endpoint_uuid,

@@ -62,7 +62,7 @@ def get_standard_funcx_client():
     )
 
     def func():
-        return gc.FuncXClient(
+        return gc.Client(
             login_manager=FakeLoginManager(),
             do_version_check=False,
         )

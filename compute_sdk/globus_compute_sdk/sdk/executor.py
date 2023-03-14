@@ -25,7 +25,7 @@ from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
-from globus_compute_sdk.sdk.client import FuncXClient
+from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.utils import chunk_by
 
 log = logging.getLogger(__name__)
@@ -127,7 +127,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         self,
         endpoint_id: str | None = None,
         container_id: str | None = None,
-        funcx_client: FuncXClient | None = None,
+        funcx_client: Client | None = None,
         task_group_id: str | None = None,
         label: str = "",
         batch_size: int = 128,
@@ -136,7 +136,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         """
         :param endpoint_id: id of the endpoint to which to submit tasks
         :param container_id: id of the container in which to execute tasks
-        :param funcx_client: instance of FuncXClient to be used by the
+        :param funcx_client: instance of Client to be used by the
             executor.  If not provided, the executor will instantiate one with default
             arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
@@ -161,7 +161,7 @@ class FuncXExecutor(concurrent.futures.Executor):
             raise TypeError(msg)
 
         if not funcx_client:
-            funcx_client = FuncXClient()
+            funcx_client = Client()
         self.funcx_client = funcx_client
 
         self.endpoint_id = endpoint_id
@@ -212,7 +212,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         This is typically used when reattaching to a previously initiated set of tasks.
         See `reload_tasks()`_ for more information.
 
-        [default: ``None``, which translates to the FuncXClient task group id]
+        [default: ``None``, which translates to the Client task group id]
         """
         return self._task_group_id
 
@@ -253,7 +253,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         :param function_id: if specified, associate the ``function_id`` to the
             ``fn`` immediately, short-circuiting the upstream registration call.
         :param func_register_kwargs: all other keyword arguments are passed to
-            the ``FuncXClient.register_function()``.
+            the ``Client.register_function()``.
         :returns: the function's ``function_id`` string, as returned by
             registration upstream
         """
@@ -707,7 +707,7 @@ class _ResultWatcher(threading.Thread):
         rw = _ResultWatcher(self)  # assert isinstance(self, FuncXExecutor)
         rw.start()
 
-        # rw is its own thread; it will use the FuncXClient attached to the
+        # rw is its own thread; it will use the Client attached to the
         # FuncXExecutor to acquire AMQP credentials, and then will open a
         # connection to the AMQP service.
 

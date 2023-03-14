@@ -95,9 +95,7 @@ class TestStart:
         "This test needs to be re-written after endpoint_register is updated"
     )
     def test_start(self, mocker):
-        mock_client = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.FuncXClient"
-        )
+        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
         reg_info = {
             "endpoint_id": "abcde12345",
             "address": "localhost",
@@ -182,7 +180,7 @@ class TestStart:
         being asserted against because this zmq setup happens before registration
         occurs.
         """
-        mocker.patch("globus_compute_endpoint.endpoint.endpoint.FuncXClient")
+        mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
 
         mock_register_endpoint = mocker.patch(
             "globus_compute_endpoint.endpoint.endpoint.register_endpoint"
@@ -240,7 +238,7 @@ class TestStart:
         own. mock_zmq_create and mock_zmq_load are being asserted against because this
         zmq setup happens before registration occurs.
         """
-        mocker.patch("globus_compute_endpoint.endpoint.endpoint.FuncXClient")
+        mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
 
         mock_register_endpoint = mocker.patch(
             "globus_compute_endpoint.endpoint.endpoint.register_endpoint"
@@ -321,9 +319,7 @@ class TestStart:
         )
 
     def test_start_without_executors(self, mocker):
-        mock_client = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.FuncXClient"
-        )
+        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
         mock_client.return_value.register_endpoint.return_value = {
             "endpoint_id": "abcde12345",
             "address": "localhost",
@@ -484,9 +480,7 @@ class TestStart:
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         ep_uuid_str = str(uuid.uuid4())
 
-        mock_client = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.FuncXClient"
-        )
+        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
         mock_stop_endpoint = mocker.patch.object(Endpoint, "stop_endpoint")
         mock_rmtree = mocker.patch.object(shutil, "rmtree")
         mocker.patch.object(Endpoint, "get_endpoint_id", return_value=ep_uuid_str)

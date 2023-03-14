@@ -1,5 +1,5 @@
 import pytest
-from globus_compute_sdk import FuncXClient
+from globus_compute_sdk import Client
 
 config = {
     "funcx_service_address": "https://api2.funcx.org/v2",
@@ -61,7 +61,7 @@ def fxc_args(pytestconfig):
 
 @pytest.fixture
 def fxc(fxc_args):
-    fxc = FuncXClient(**fxc_args)
+    fxc = Client(**fxc_args)
     return fxc
 
 

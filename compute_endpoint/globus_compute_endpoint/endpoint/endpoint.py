@@ -26,7 +26,7 @@ from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_compute_endpoint.logging_config import setup_logging
-from globus_compute_sdk.sdk.client import FuncXClient
+from globus_compute_sdk.sdk.client import Client
 from globus_sdk import GlobusAPIError, NetworkError
 
 log = logging.getLogger(__name__)
@@ -154,16 +154,16 @@ class Endpoint:
         return ep_id
 
     @staticmethod
-    def get_funcx_client(config: Config | None) -> FuncXClient:
+    def get_funcx_client(config: Config | None) -> Client:
         if config:
             funcx_client_options = {
                 "funcx_service_address": config.funcx_service_address,
                 "environment": config.environment,
             }
 
-            return FuncXClient(**funcx_client_options)
+            return Client(**funcx_client_options)
         else:
-            return FuncXClient()
+            return Client()
 
     def start_endpoint(
         self,
