@@ -8,9 +8,8 @@ import sys
 
 import click
 from click import ClickException
-
-from funcx.sdk.login_manager import LoginManager
-from funcx.sdk.login_manager.whoami import print_whoami_info
+from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
 from .endpoint.endpoint import Endpoint
 from .endpoint.endpoint_manager import EndpointManager
@@ -141,9 +140,9 @@ def app():
 @common_options
 def version_command():
     """Show the version of funcx-endpoint"""
-    import funcx_endpoint
+    import globus_compute_endpoint as gce
 
-    click.echo(f"FuncX endpoint version: {funcx_endpoint.__version__}")
+    click.echo(f"FuncX endpoint version: {gce.__version__}")
 
 
 @app.command(name="configure", help="Configure an endpoint")

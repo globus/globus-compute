@@ -16,17 +16,16 @@ import time
 import typing as t
 from datetime import datetime
 
+import globus_compute_sdk as gc
 import setproctitle
-from globus_sdk import GlobusAPIError, NetworkError
-
-import funcx
-from funcx_endpoint import __version__
-from funcx_endpoint.endpoint.endpoint import Endpoint
-from funcx_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
+from globus_compute_endpoint import __version__
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
     CommandQueueSubscriber,
 )
-from funcx_endpoint.endpoint.utils import _redact_url_creds
-from funcx_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:
     from pika.spec import BasicProperties
@@ -68,7 +67,7 @@ class EndpointManager:
                 "environment": config.environment,
             }
 
-            fxc = funcx.FuncXClient(**funcx_client_options)
+            fxc = gc.FuncXClient(**funcx_client_options)
             reg_info = fxc.register_endpoint(
                 conf_dir.name,
                 endpoint_uuid,

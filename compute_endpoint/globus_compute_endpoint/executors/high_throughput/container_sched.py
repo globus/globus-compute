@@ -2,7 +2,7 @@ import logging
 import math
 import random
 
-from funcx_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import FXLogger
 
 log: FXLogger = logging.getLogger(__name__)  # type: ignore
 

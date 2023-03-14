@@ -6,13 +6,12 @@ import random
 import threading
 from unittest import mock
 
+import globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber as cqs
 import pytest as pytest
 from pika.spec import Basic, BasicProperties
 from tests.utils import try_assert
 
-import funcx_endpoint.endpoint.rabbit_mq.command_queue_subscriber as cqs
-
-_MOCK_BASE = "funcx_endpoint.endpoint.rabbit_mq.command_queue_subscriber."
+_MOCK_BASE = "globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber."
 
 
 class MockedCommandQueueSubscriber(cqs.CommandQueueSubscriber):

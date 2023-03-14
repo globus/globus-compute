@@ -8,15 +8,14 @@ from unittest import mock
 
 import pika
 import pytest
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import Result, ResultErrorDetails
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
+from globus_compute_sdk import FuncXClient, FuncXExecutor
+from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
+from globus_compute_sdk.serialize.facade import FuncXSerializer
 from tests.utils import try_assert, try_for_timeout
-
-from funcx import FuncXClient, FuncXExecutor
-from funcx.errors import FuncxTaskExecutionFailed
-from funcx.sdk.asynchronous.funcx_future import FuncXFuture
-from funcx.sdk.executor import TaskSubmissionInfo, _ResultWatcher
-from funcx.serialize.facade import FuncXSerializer
 
 
 def _is_stopped(thread: threading.Thread | None) -> bool:
@@ -73,7 +72,9 @@ def fxexecutor(mocker):
     fxc = mock.MagicMock()
     fxc.session_task_group_id = str(uuid.uuid4())
     fxe = FuncXExecutor(funcx_client=fxc)
-    watcher = mocker.patch("funcx.sdk.executor._ResultWatcher", autospec=True)
+    watcher = mocker.patch(
+        "globus_compute_sdk.sdk.executor._ResultWatcher", autospec=True
+    )
 
     def create_mock_watcher(*args, **kwargs):
         return MockedResultWatcher(fxe)
@@ -116,7 +117,7 @@ def test_task_submission_info_stringification():
 
 @pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
 def test_deprecated_args_warned(argname, mocker):
-    mock_warn = mocker.patch("funcx.sdk.executor.warnings")
+    mock_warn = mocker.patch("globus_compute_sdk.sdk.executor.warnings")
     fxc = mock.Mock(spec=FuncXClient)
     FuncXExecutor(funcx_client=fxc).shutdown()
     mock_warn.warn.assert_not_called()
@@ -136,7 +137,7 @@ def test_invalid_args_raise(randomstring):
 
 
 def test_creates_default_client_if_none_provided(mocker):
-    mock_fxc_klass = mocker.patch("funcx.sdk.executor.FuncXClient")
+    mock_fxc_klass = mocker.patch("globus_compute_sdk.sdk.executor.FuncXClient")
     FuncXExecutor().shutdown()
 
     mock_fxc_klass.assert_called()
@@ -266,7 +267,7 @@ def test_map_raises(fxexecutor):
 def test_reload_tasks_none_completed(fxexecutor, mocker, num_tasks):
     fxc, fxe = fxexecutor
 
-    mock_log = mocker.patch("funcx.sdk.executor.log")
+    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
 
     mock_data = {
         "taskgroup_id": fxe.task_group_id,
@@ -294,7 +295,7 @@ def test_reload_tasks_none_completed(fxexecutor, mocker, num_tasks):
 def test_reload_tasks_some_completed(fxexecutor, mocker, num_tasks):
     fxc, fxe = fxexecutor
 
-    mock_log = mocker.patch("funcx.sdk.executor.log")
+    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
 
     mock_data = {
         "taskgroup_id": fxe.task_group_id,
@@ -547,7 +548,7 @@ def test_task_submitter_sets_future_task_ids(fxexecutor):
 
 
 def test_resultwatcher_stops_if_unable_to_connect(mocker):
-    mock_time = mocker.patch("funcx.sdk.executor.time")
+    mock_time = mocker.patch("globus_compute_sdk.sdk.executor.time")
     fxe = mock.Mock(spec=FuncXExecutor)
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
@@ -569,7 +570,7 @@ def test_resultwatcher_ignores_invalid_tasks(mocker):
 
 
 def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
-    mocker.patch("funcx.sdk.executor.time")
+    mocker.patch("globus_compute_sdk.sdk.executor.time")
     fxe = mock.Mock(spec=FuncXExecutor)
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
@@ -582,8 +583,8 @@ def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
 
 
 def test_resultwatcher_gracefully_handles_unexpected_exception(mocker):
-    mocker.patch("funcx.sdk.executor.time")
-    mock_log = mocker.patch("funcx.sdk.executor.log")
+    mocker.patch("globus_compute_sdk.sdk.executor.time")
+    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
     fxe = mock.Mock(spec=FuncXExecutor)
     rw = _ResultWatcher(fxe)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
@@ -721,7 +722,7 @@ def test_resultwatcher_match_handles_deserialization_error():
 
 @pytest.mark.parametrize("unpacked", ("not_a_Result", Exception))
 def test_resultwatcher_onmessage_verifies_result_type(mocker, unpacked):
-    mock_unpack = mocker.patch("funcx.sdk.executor.messagepack.unpack")
+    mock_unpack = mocker.patch("globus_compute_sdk.sdk.executor.messagepack.unpack")
 
     mock_unpack.side_effect = unpacked
     mock_channel = mock.Mock()
@@ -748,7 +749,7 @@ def test_resultwatcher_onmessage_sets_check_results_flag():
 
 @pytest.mark.parametrize("exc", (MemoryError("some description"), "some description"))
 def test_resultwatcher_stops_loop_on_open_failure(mocker, exc):
-    mock_log = mocker.patch("funcx.sdk.executor.log", autospec=True)
+    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log", autospec=True)
 
     mrw = MockedResultWatcher(mock.Mock())
     mrw.start()

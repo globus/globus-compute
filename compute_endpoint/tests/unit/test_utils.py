@@ -1,4 +1,4 @@
-from funcx_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 
 
 def test_url_redaction(randomstring):

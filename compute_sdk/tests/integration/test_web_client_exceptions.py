@@ -1,8 +1,7 @@
 import pytest
 import responses
+from globus_compute_sdk.sdk.web_client import FuncxWebClient
 from globus_sdk.exc.api import GlobusAPIError
-
-from funcx.sdk.web_client import FuncxWebClient
 
 
 @pytest.fixture(autouse=True)

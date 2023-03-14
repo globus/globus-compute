@@ -1,20 +1,19 @@
 import concurrent.futures
 import time
 
+import globus_compute_sdk as gc
 import pytest
 import requests
+from globus_compute_sdk import FuncXExecutor
 from packaging.version import Version
 
-import funcx
-from funcx import FuncXExecutor
-
 try:
-    from funcx.errors import TaskPending
+    from globus_compute_sdk.errors import TaskPending
 except ImportError:
-    from funcx.utils.errors import TaskPending
+    from globus_compute_sdk.utils.errors import TaskPending
 
 
-sdk_version = Version(funcx.version.__version__)
+sdk_version = Version(gc.version.__version__)
 
 
 def test_run_pre_registered_function(

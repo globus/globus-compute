@@ -4,9 +4,8 @@ import logging
 import math
 import time
 
+from globus_compute_endpoint.strategies.base import BaseStrategy
 from parsl.providers.base import JobState
-
-from funcx_endpoint.strategies.base import BaseStrategy
 
 log = logging.getLogger(__name__)
 

@@ -16,22 +16,31 @@ import time
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
 
+import globus_compute_endpoint.endpoint.utils.config
 import pika.exceptions
-from funcx_common.messagepack import InvalidMessageError, pack, unpack
-from funcx_common.messagepack.message_types import Result, ResultErrorDetails, Task
-from parsl.version import VERSION as PARSL_VERSION
-
-import funcx_endpoint.endpoint.utils.config
-from funcx import __version__ as funcx_sdk_version
-from funcx_endpoint import __version__ as funcx_endpoint_version
-from funcx_endpoint.endpoint.messages_compat import (
+from globus_compute_common.messagepack import InvalidMessageError, pack, unpack
+from globus_compute_common.messagepack.message_types import (
+    Result,
+    ResultErrorDetails,
+    Task,
+)
+from globus_compute_endpoint import __version__ as funcx_endpoint_version
+from globus_compute_endpoint.endpoint.messages_compat import (
     convert_to_internaltask,
     try_convert_to_messagepack,
 )
-from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
-from funcx_endpoint.endpoint.result_store import ResultStore
-from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_endpoint.endpoint.rabbit_mq import (
+    ResultQueuePublisher,
+    TaskQueueSubscriber,
+)
+from globus_compute_endpoint.endpoint.result_store import ResultStore
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
+)
+from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_sdk import __version__ as funcx_sdk_version
+from parsl.version import VERSION as PARSL_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +59,7 @@ class EndpointInterchange:
 
     def __init__(
         self,
-        config: funcx_endpoint.endpoint.utils.config.Config,
+        config: globus_compute_endpoint.endpoint.utils.config.Config,
         reg_info: dict[str, dict],
         logdir=".",
         endpoint_id=None,
@@ -62,7 +71,7 @@ class EndpointInterchange:
         """
         Parameters
         ----------
-        config : funcx.Config object
+        config : globus_compute_sdk.Config object
              Funcx config object that describes how compute should be provisioned
 
         reg_info : dict[str, dict]
@@ -137,7 +146,9 @@ class EndpointInterchange:
         log.info("Loading endpoint local config")
 
         self.results_passthrough = mpQueue()
-        self.executors: dict[str, funcx_endpoint.executors.HighThroughputExecutor] = {}
+        self.executors: dict[
+            str, globus_compute_endpoint.executors.HighThroughputExecutor
+        ] = {}
         for executor in self.config.executors:
             log.info(f"Initializing executor: {executor.label}")
             executor.funcx_service_address = self.config.funcx_service_address

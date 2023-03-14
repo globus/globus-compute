@@ -5,10 +5,9 @@ import textwrap
 from unittest import mock
 
 import pytest
+from globus_compute_sdk import FuncXClient
+from globus_compute_sdk.sdk.executor import FuncXExecutor, _ResultWatcher
 from tests.utils import try_assert
-
-from funcx import FuncXClient
-from funcx.sdk.executor import FuncXExecutor, _ResultWatcher
 
 
 @pytest.mark.skipif(
@@ -36,8 +35,8 @@ def test_executor_atexit_handler_catches_all_instances(tmp_path):
     script_content = textwrap.dedent(
         """
         import random
-        from funcx import FuncXExecutor
-        from funcx.sdk.executor import _REGISTERED_FXEXECUTORS
+        from globus_compute_sdk import FuncXExecutor
+        from globus_compute_sdk.sdk.executor import _REGISTERED_FXEXECUTORS
 
         fxc = " a fake funcx_client"
         num_executors = random.randrange(1, 10)

@@ -1,7 +1,7 @@
 import pytest
 
 try:
-    from funcx.errors import FuncxTaskExecutionFailed
+    from globus_compute_sdk.errors import FuncxTaskExecutionFailed
 
     has_task_exec_error_type = True
 except ImportError:

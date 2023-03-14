@@ -5,7 +5,7 @@ import logging
 import queue
 import random
 
-from funcx_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import FXLogger
 
 log: FXLogger = logging.getLogger(__name__)  # type: ignore
 log.info("Interchange task dispatch started")

@@ -6,19 +6,18 @@ from unittest import mock
 import globus_sdk
 import pytest
 import requests
-
-from funcx.sdk._environments import _get_envname
-from funcx.sdk.login_manager import LoginManager, requires_login
-from funcx.sdk.login_manager.client_login import (
+from globus_compute_sdk.sdk._environments import _get_envname
+from globus_compute_sdk.sdk.login_manager import LoginManager, requires_login
+from globus_compute_sdk.sdk.login_manager.client_login import (
     _get_client_creds_from_env,
     get_client_login,
     is_client_login,
 )
-from funcx.sdk.login_manager.tokenstore import _resolve_namespace
+from globus_compute_sdk.sdk.login_manager.tokenstore import _resolve_namespace
 
 CID_KEY = "FUNCX_SDK_CLIENT_ID"
 CSC_KEY = "FUNCX_SDK_CLIENT_SECRET"
-MOCK_BASE = "funcx.sdk.login_manager"
+MOCK_BASE = "globus_compute_sdk.sdk.login_manager"
 
 
 def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.Response:

@@ -21,13 +21,12 @@ else:
 
 
 import pika
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import Result
-
-from funcx.errors import FuncxTaskExecutionFailed
-from funcx.sdk.asynchronous.funcx_future import FuncXFuture
-from funcx.sdk.client import FuncXClient
-from funcx.sdk.utils import chunk_by
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import Result
+from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.client import FuncXClient
+from globus_compute_sdk.sdk.utils import chunk_by
 
 log = logging.getLogger(__name__)
 
@@ -340,7 +339,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         knowledge of an already registered function.  An example use might be::
 
             # pre_registration.py
-            from funcx import FuncXExecutor
+            from globus_compute_sdk import FuncXExecutor
 
             def some_processor(*args, **kwargs):
                 # ... function logic ...
@@ -361,7 +360,7 @@ class FuncXExecutor(concurrent.futures.Executor):
         a "well-known" uuid for the "Hello, World!" function (same as the example in
         the FuncX tutorial), which is publicly available::
 
-            from funcx import FuncXExecutor
+            from globus_compute_sdk import FuncXExecutor
 
             fn_id = "b0a5d1a0-2b22-4381-b899-ba73321e41e0"  # public; "Hello World"
             with FuncXExecutor(endpoint_id="your-endpoint-id") as fxe:

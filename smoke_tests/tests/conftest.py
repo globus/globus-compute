@@ -7,15 +7,14 @@ import sys
 import time
 
 import pytest
+from globus_compute_sdk import FuncXClient
+from globus_compute_sdk.sdk.web_client import FuncxWebClient
 from globus_sdk import (
     AccessTokenAuthorizer,
     AuthClient,
     ConfidentialAppAuthClient,
     SearchClient,
 )
-
-from funcx import FuncXClient
-from funcx.sdk.web_client import FuncxWebClient
 
 # the non-tutorial endpoint will be required, with the following priority order for
 # finding the ID:
@@ -122,7 +121,7 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
     auth_authorizer = AccessTokenAuthorizer(auth_token)
 
     try:
-        from funcx.sdk.login_manager import LoginManagerProtocol
+        from globus_compute_sdk.sdk.login_manager import LoginManagerProtocol
     except ImportError:
         client_args["fx_authorizer"] = funcx_authorizer
         client_args["search_authorizer"] = search_authorizer

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing as t
 
-from funcx.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import FuncXSerializer
 
 
 class Batch:

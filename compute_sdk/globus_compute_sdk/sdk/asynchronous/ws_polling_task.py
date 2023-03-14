@@ -9,15 +9,14 @@ from asyncio import AbstractEventLoop
 # import from `websockets.client`, see:
 #   https://github.com/aaugustin/websockets/issues/940
 import websockets.client
+from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.asynchronous.funcx_task import FuncXTask
 from websockets.exceptions import (
     ConnectionClosedOK,
     InvalidHandshake,
     InvalidStatusCode,
 )
-
-from funcx.errors import FuncxTaskExecutionFailed
-from funcx.sdk.asynchronous.funcx_future import FuncXFuture
-from funcx.sdk.asynchronous.funcx_task import FuncXTask
 
 log = logging.getLogger(__name__)
 

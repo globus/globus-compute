@@ -7,8 +7,7 @@ import pickle
 from collections import OrderedDict
 
 import dill
-
-from funcx.serialize.base import DeserializationError, SerializeBase
+from globus_compute_sdk.serialize.base import DeserializationError, SerializeBase
 
 logger = logging.getLogger(__name__)
 

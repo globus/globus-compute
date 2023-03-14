@@ -2,9 +2,8 @@ import json
 
 import pytest
 import responses
-
-from funcx.sdk.web_client import FuncxWebClient
-from funcx.version import __version__
+from globus_compute_sdk.sdk.web_client import FuncxWebClient
+from globus_compute_sdk.version import __version__
 
 
 @pytest.fixture(autouse=True)

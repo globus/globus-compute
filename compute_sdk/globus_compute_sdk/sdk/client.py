@@ -8,18 +8,22 @@ import typing as t
 import uuid
 import warnings
 
-from funcx.errors import FuncxTaskExecutionFailed, SerializationError, TaskPending
-from funcx.sdk._environments import (
+from globus_compute_sdk.errors import (
+    FuncxTaskExecutionFailed,
+    SerializationError,
+    TaskPending,
+)
+from globus_compute_sdk.sdk._environments import (
     get_web_service_url,
     get_web_socket_url,
     urls_might_mismatch,
 )
-from funcx.sdk.asynchronous.funcx_task import FuncXTask
-from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
-from funcx.sdk.search import SearchHelper
-from funcx.sdk.web_client import FunctionRegistrationData
-from funcx.serialize import FuncXSerializer
-from funcx.version import __version__, compare_versions
+from globus_compute_sdk.sdk.asynchronous.funcx_task import FuncXTask
+from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
+from globus_compute_sdk.sdk.search import SearchHelper
+from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
+from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.version import __version__, compare_versions
 
 from .batch import Batch
 from .login_manager import LoginManager, LoginManagerProtocol, requires_login
@@ -445,7 +449,7 @@ class FuncXClient:
                 # ideal, as it will raise any error in the multi-response,
                 # but it will do until batch_run is deprecated in favor of Executer
                 # Note that some errors may already be caught and raised
-                # by funcx.sdk.client.request as GlobusAPIError
+                # by globus_compute_sdk.sdk.client.request as GlobusAPIError
 
                 # Checking for 'Failed' is how FuncxResponseError.unpack
                 # originally checked for errors.
@@ -736,7 +740,7 @@ class FuncXClient:
 
         Parameters
         ----------
-        container_spec : funcx.sdk.container_spec.ContainerSpec
+        container_spec : globus_compute_sdk.sdk.container_spec.ContainerSpec
             Complete specification of what goes into the container
 
         Returns

@@ -3,10 +3,9 @@ import uuid
 from unittest import mock
 
 import pytest
-from funcx_common import messagepack
-
-from funcx_endpoint.executors.high_throughput.funcx_worker import FuncXWorker
-from funcx_endpoint.executors.high_throughput.messages import Task
+from globus_compute_common import messagepack
+from globus_compute_endpoint.executors.high_throughput.funcx_worker import FuncXWorker
+from globus_compute_endpoint.executors.high_throughput.messages import Task
 
 
 def hello_world():
@@ -30,7 +29,7 @@ def ez_pack_function(serializer, func, args, kwargs):
 @pytest.fixture
 def test_worker():
     with mock.patch(
-        "funcx_endpoint.executors.high_throughput.funcx_worker.zmq.Context"
+        "globus_compute_endpoint.executors.high_throughput.funcx_worker.zmq.Context"
     ) as mock_context:
         # the worker will receive tasks and send messages on this mock socket
         mock_socket = mock.Mock()

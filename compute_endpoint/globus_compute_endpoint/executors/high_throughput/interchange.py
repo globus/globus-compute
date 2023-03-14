@@ -16,23 +16,25 @@ import typing as t
 import daemon
 import dill
 import zmq
-from funcx_common.messagepack.message_types import TaskTransition
-from funcx_common.tasks import ActorName, TaskState
-from parsl.version import VERSION as PARSL_VERSION
-
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.executors.high_throughput.interchange_task_dispatch import (
+from globus_compute_common.messagepack.message_types import TaskTransition
+from globus_compute_common.tasks import ActorName, TaskState
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
+)
+from globus_compute_endpoint.executors.high_throughput.interchange_task_dispatch import (  # noqa: E501
     naive_interchange_task_dispatch,
 )
-from funcx_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.executors.high_throughput.messages import (
     BadCommand,
     EPStatusReport,
     Heartbeat,
     Message,
     MessageType,
 )
-from funcx_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import FXLogger
+from globus_compute_sdk.serialize import FuncXSerializer
+from parsl.version import VERSION as PARSL_VERSION
 
 if t.TYPE_CHECKING:
     import multiprocessing as mp
@@ -123,7 +125,7 @@ class Interchange:
         """
         Parameters
         ----------
-        config : funcx.Config object
+        config : globus_compute_sdk.Config object
              Funcx config object that describes how compute should be provisioned
 
         client_address : str
@@ -1159,7 +1161,7 @@ def starter(comm_q: mp.Queue, *args, **kwargs) -> None:
 
 
 def cli_run():
-    from funcx_endpoint.logging_config import setup_logging
+    from globus_compute_endpoint.logging_config import setup_logging
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--client_address", required=True, help="Client address")

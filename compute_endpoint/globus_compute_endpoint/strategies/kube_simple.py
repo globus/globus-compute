@@ -2,8 +2,8 @@ import logging
 import math
 import time
 
-from funcx_endpoint.logging_config import FXLogger
-from funcx_endpoint.strategies.base import BaseStrategy
+from globus_compute_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.strategies.base import BaseStrategy
 
 log: FXLogger = logging.getLogger(__name__)  # type: ignore
 

@@ -20,21 +20,25 @@ from typing import Any
 import dill
 import psutil
 import zmq
-from funcx_common.messagepack.message_types import TaskTransition
-from funcx_common.tasks import ActorName, TaskState
-from parsl.version import VERSION as PARSL_VERSION
-
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.executors.high_throughput.container_sched import naive_scheduler
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
-from funcx_endpoint.executors.high_throughput.messages import (
+from globus_compute_common.messagepack.message_types import TaskTransition
+from globus_compute_common.tasks import ActorName, TaskState
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
+)
+from globus_compute_endpoint.executors.high_throughput.container_sched import (
+    naive_scheduler,
+)
+from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_endpoint.executors.high_throughput.messages import (
     ManagerStatusReport,
     Message,
     Task,
 )
-from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
-from funcx_endpoint.logging_config import FXLogger, setup_logging
+from globus_compute_endpoint.executors.high_throughput.worker_map import WorkerMap
+from globus_compute_endpoint.logging_config import FXLogger, setup_logging
+from globus_compute_sdk.serialize import FuncXSerializer
+from parsl.version import VERSION as PARSL_VERSION
 
 RESULT_TAG = 10
 TASK_REQUEST_TAG = 11

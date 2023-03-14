@@ -1,8 +1,7 @@
 import random
 
 import pytest
-
-from funcx_endpoint.endpoint.result_store import ResultStore
+from globus_compute_endpoint.endpoint.result_store import ResultStore
 
 
 @pytest.fixture()

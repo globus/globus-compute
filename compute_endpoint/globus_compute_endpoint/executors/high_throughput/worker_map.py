@@ -8,7 +8,7 @@ import time
 from queue import Empty, Queue
 from typing import Any
 
-from funcx_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import FXLogger
 
 log: FXLogger = logging.getLogger(__name__)  # type: ignore
 

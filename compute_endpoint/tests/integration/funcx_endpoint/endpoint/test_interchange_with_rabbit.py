@@ -8,13 +8,14 @@ import warnings
 import dill
 import pika
 import pytest
-from funcx_common.messagepack import pack
-from funcx_common.messagepack.message_types import Result, Task
-from tests.integration.funcx_endpoint.executors.mock_executors import MockExecutor
+from globus_compute_common.messagepack import pack
+from globus_compute_common.messagepack.message_types import Result, Task
+from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
+from globus_compute_endpoint.endpoint.utils.config import Config
+from tests.integration.endpoint.executors.mock_executors import (
+    MockExecutor,
+)
 from tests.utils import try_for_timeout
-
-from funcx_endpoint.endpoint.interchange import EndpointInterchange
-from funcx_endpoint.endpoint.utils.config import Config
 
 
 @pytest.fixture

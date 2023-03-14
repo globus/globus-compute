@@ -2,8 +2,7 @@ import io
 from contextlib import redirect_stdout
 
 import pytest
-
-from funcx.sdk.utils.printing import print_table
+from globus_compute_sdk.sdk.utils.printing import print_table
 
 
 @pytest.mark.parametrize(

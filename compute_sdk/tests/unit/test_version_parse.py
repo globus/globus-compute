@@ -1,7 +1,6 @@
 import pytest
-
-from funcx.errors import VersionMismatch
-from funcx.version import compare_versions
+from globus_compute_sdk.errors import VersionMismatch
+from globus_compute_sdk.version import compare_versions
 
 
 @pytest.mark.parametrize(

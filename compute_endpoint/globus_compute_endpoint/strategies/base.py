@@ -69,7 +69,7 @@ class BaseStrategy:
         """Actually start the strategy
         Parameters
         ----------
-        interchange: funcx.executors.high_throughput.interchange.Interchange
+        interchange: gce.executors.high_throughput.interchange.Interchange
             Interchange to bind the strategy to
         """
         self.interchange = interchange

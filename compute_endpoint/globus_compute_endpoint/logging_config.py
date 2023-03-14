@@ -158,7 +158,7 @@ def _get_file_dict_config(
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "funcx_endpoint.logging_config.FuncxConsoleFormatter",
+                "()": "globus_compute_endpoint.logging_config.FuncxConsoleFormatter",
                 "debug": debug,
                 "no_color": no_color,
             },
@@ -201,7 +201,7 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "funcx_endpoint.logging_config.FuncxConsoleFormatter",
+                "()": "globus_compute_endpoint.logging_config.FuncxConsoleFormatter",
                 "debug": debug,
                 "no_color": no_color,
             },

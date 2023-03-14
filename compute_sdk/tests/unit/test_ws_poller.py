@@ -3,9 +3,9 @@ import json
 import random
 import uuid
 
-from funcx.sdk.asynchronous.funcx_future import FuncXFuture
-from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
-from funcx.sdk.executor import AtomicController
+from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
+from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
+from globus_compute_sdk.sdk.executor import AtomicController
 
 
 def _start():

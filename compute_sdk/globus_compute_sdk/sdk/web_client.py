@@ -11,12 +11,11 @@ import typing as t
 import uuid
 
 import globus_sdk
-from funcx_common.sdk_version_sharing import user_agent_substring
+from globus_compute_common.sdk_version_sharing import user_agent_substring
+from globus_compute_sdk.sdk._environments import get_web_service_url
+from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.version import __version__
 from globus_sdk.exc.api import GlobusAPIError
-
-from funcx.sdk._environments import get_web_service_url
-from funcx.serialize import FuncXSerializer
-from funcx.version import __version__
 
 ID_PARAM_T = t.Union[uuid.UUID, str]
 

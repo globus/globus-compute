@@ -7,7 +7,7 @@ from collections import defaultdict
 from enum import Enum, auto
 from struct import Struct
 
-from funcx_common.messagepack.message_types import TaskTransition
+from globus_compute_common.messagepack.message_types import TaskTransition
 
 MESSAGE_TYPE_FORMATTER = Struct("b")
 

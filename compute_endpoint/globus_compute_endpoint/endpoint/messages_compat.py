@@ -4,22 +4,23 @@ import logging
 import pickle
 import uuid
 
-from funcx_common.messagepack import Message as OutgoingMessage
-from funcx_common.messagepack import pack
-from funcx_common.messagepack.message_types import (
+from globus_compute_common.messagepack import Message as OutgoingMessage
+from globus_compute_common.messagepack import pack
+from globus_compute_common.messagepack.message_types import (
     EPStatusReport as OutgoingEPStatusReport,
 )
-from funcx_common.messagepack.message_types import Result as OutgoingResult
-from funcx_common.messagepack.message_types import (
+from globus_compute_common.messagepack.message_types import Result as OutgoingResult
+from globus_compute_common.messagepack.message_types import (
     ResultErrorDetails as OutgoingResultErrorDetails,
 )
-from funcx_common.messagepack.message_types import Task as OutgoingTask
-from funcx_common.messagepack.message_types import TaskTransition
-
-from funcx_endpoint.executors.high_throughput.messages import (
+from globus_compute_common.messagepack.message_types import Task as OutgoingTask
+from globus_compute_common.messagepack.message_types import TaskTransition
+from globus_compute_endpoint.executors.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
 )
-from funcx_endpoint.executors.high_throughput.messages import Task as InternalTask
+from globus_compute_endpoint.executors.high_throughput.messages import (
+    Task as InternalTask,
+)
 
 logger = logging.getLogger(__name__)
 

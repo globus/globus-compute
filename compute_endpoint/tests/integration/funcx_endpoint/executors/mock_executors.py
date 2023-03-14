@@ -4,10 +4,9 @@ import multiprocessing
 import unittest.mock
 
 import dill
-from funcx_common.messagepack.message_types import Result, Task
-
-from funcx import FuncXClient
-from funcx_endpoint.executors.high_throughput.messages import Message
+from globus_compute_common.messagepack.message_types import Result, Task
+from globus_compute_endpoint.executors.high_throughput.messages import Message
+from globus_compute_sdk import FuncXClient
 
 
 class MockExecutor(unittest.mock.Mock):

@@ -18,23 +18,22 @@ from multiprocessing import Process
 
 import daemon
 import dill
-from parsl.dataflow.error import ConfigurationError
-from parsl.executors.errors import BadMessage, ScalingFailed
-from parsl.providers import LocalProvider
-from parsl.utils import RepresentationMixin
-
-from funcx.serialize import FuncXSerializer
-from funcx_endpoint.executors.high_throughput import interchange, zmq_pipes
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
-from funcx_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.executors.high_throughput import interchange, zmq_pipes
+from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_endpoint.executors.high_throughput.messages import (
     EPStatusReport,
     Heartbeat,
     HeartbeatReq,
     Task,
     TaskCancel,
 )
-from funcx_endpoint.logging_config import setup_logging
-from funcx_endpoint.strategies.simple import SimpleStrategy
+from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.strategies.simple import SimpleStrategy
+from globus_compute_sdk.serialize import FuncXSerializer
+from parsl.dataflow.error import ConfigurationError
+from parsl.executors.errors import BadMessage, ScalingFailed
+from parsl.providers import LocalProvider
+from parsl.utils import RepresentationMixin
 
 fx_serializer = FuncXSerializer()
 

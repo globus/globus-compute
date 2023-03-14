@@ -2,21 +2,20 @@ import pathlib
 import uuid
 from unittest.mock import Mock, patch
 
+import globus_compute_sdk.sdk.client
+import globus_compute_sdk.sdk.login_manager
 import pytest
 import responses
 from click.testing import CliRunner
-
-import funcx.sdk.client
-import funcx.sdk.login_manager
-from funcx.sdk.web_client import FuncxWebClient
-from funcx_endpoint.cli import _do_logout_endpoints, _do_stop_endpoint, app
-from funcx_endpoint.endpoint import endpoint
-from funcx_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.cli import _do_logout_endpoints, _do_stop_endpoint, app
+from globus_compute_endpoint.endpoint import endpoint
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_sdk.sdk.web_client import FuncxWebClient
 
 
 @pytest.fixture(autouse=True)
 def patch_funcx_client(mocker):
-    return mocker.patch("funcx_endpoint.endpoint.endpoint.FuncXClient")
+    return mocker.patch("globus_compute_endpoint.endpoint.endpoint.FuncXClient")
 
 
 def test_non_configured_endpoint(mocker):
@@ -33,7 +32,7 @@ def test_start_endpoint_blocked(
     # happy-path tested in tests/unit/test_endpoint_unit.py
 
     fx_addy = "http://api.funcx/"
-    fxc = funcx.FuncXClient(
+    fxc = globus_compute_sdk.FuncXClient(
         funcx_service_address=fx_addy,
         do_version_check=False,
         login_manager=mocker.Mock(),
@@ -42,7 +41,7 @@ def test_start_endpoint_blocked(
     fxc.web_client = fxwc
     patch_funcx_client.return_value = fxc
 
-    mock_log = mocker.patch("funcx_endpoint.endpoint.endpoint.log")
+    mock_log = mocker.patch("globus_compute_endpoint.endpoint.endpoint.log")
     reason_msg = randomstring()
     responses.add(
         responses.GET,
@@ -77,7 +76,9 @@ def test_endpoint_logout(monkeypatch):
     # not forced, and no running endpoints
     logout_true = Mock(return_value=True)
     logout_false = Mock(return_value=False)
-    monkeypatch.setattr(funcx.sdk.login_manager.LoginManager, "logout", logout_true)
+    monkeypatch.setattr(
+        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
+    )
     success, msg = _do_logout_endpoints(
         False,
         running_endpoints={},
@@ -99,7 +100,9 @@ def test_endpoint_logout(monkeypatch):
         "default": {"status": "Running", "id": "123abcde-a393-4456-8de5-123456789abc"}
     }
 
-    monkeypatch.setattr(funcx.sdk.login_manager.LoginManager, "logout", logout_false)
+    monkeypatch.setattr(
+        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_false
+    )
     # not forced, with running endpoint
     success, msg = _do_logout_endpoints(False, running_endpoints=one_running)
     logout_false.assert_not_called()
@@ -107,7 +110,9 @@ def test_endpoint_logout(monkeypatch):
 
     logout_true.reset_mock()
 
-    monkeypatch.setattr(funcx.sdk.login_manager.LoginManager, "logout", logout_true)
+    monkeypatch.setattr(
+        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
+    )
     # forced, with running endpoint
     success, msg = _do_logout_endpoints(True, running_endpoints=one_running)
     logout_true.assert_called_once()
@@ -115,12 +120,15 @@ def test_endpoint_logout(monkeypatch):
 
 
 @patch(
-    "funcx_endpoint.endpoint.endpoint.Endpoint.get_endpoint_id",
+    "globus_compute_endpoint.endpoint.endpoint.Endpoint.get_endpoint_id",
     return_value="abc-uuid",
 )
-@patch("funcx_endpoint.cli.get_config_dir", return_value=pathlib.Path("some_ep_dir"))
-@patch("funcx_endpoint.cli.read_config")
-@patch("funcx_endpoint.endpoint.endpoint.FuncXClient.stop_endpoint")
+@patch(
+    "globus_compute_endpoint.cli.get_config_dir",
+    return_value=pathlib.Path("some_ep_dir"),
+)
+@patch("globus_compute_endpoint.cli.read_config")
+@patch("globus_compute_endpoint.endpoint.endpoint.FuncXClient.stop_endpoint")
 def test_stop_remote_endpoint(
     mock_get_id, mock_get_conf, mock_get_fxc, mock_stop_endpoint
 ):

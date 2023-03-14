@@ -4,11 +4,10 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import typeguard
+from globus_compute_endpoint.providers.kubernetes.template import template_string
 from parsl.errors import OptionalModuleMissing
 from parsl.providers.base import ExecutionProvider
 from parsl.utils import RepresentationMixin
-
-from funcx_endpoint.providers.kubernetes.template import template_string
 
 try:
     from kubernetes import client, config

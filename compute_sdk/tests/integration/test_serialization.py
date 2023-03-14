@@ -1,9 +1,8 @@
 import inspect
 import sys
 
+import globus_compute_sdk.serialize.concretes as concretes
 import pytest
-
-import funcx.serialize.concretes as concretes
 
 
 def foo(x, y=3):
@@ -234,7 +233,7 @@ def test_code_dill_source():
 
 
 def test_overall():
-    from funcx.serialize.facade import FuncXSerializer
+    from globus_compute_sdk.serialize.facade import FuncXSerializer
 
     check_serialize_deserialize_foo(FuncXSerializer())
     check_serialize_deserialize_bar(FuncXSerializer())

@@ -1,6 +1,6 @@
 import logging
 
-from funcx.serialize.concretes import METHODS_MAP_CODE, METHODS_MAP_DATA
+from globus_compute_sdk.serialize.concretes import METHODS_MAP_CODE, METHODS_MAP_DATA
 
 logger = logging.getLogger(__name__)
 

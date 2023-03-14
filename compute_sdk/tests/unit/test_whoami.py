@@ -1,9 +1,8 @@
+import globus_compute_sdk.sdk.login_manager
 import pytest
+from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
-import funcx.sdk.login_manager
-from funcx.sdk.login_manager.whoami import print_whoami_info
-
-MOCK_BASE = "funcx.sdk.login_manager.whoami"
+MOCK_BASE = "globus_compute_sdk.sdk.login_manager.whoami"
 
 
 @pytest.mark.parametrize(
@@ -87,7 +86,7 @@ def test_whoami(response_output, mocker, monkeypatch):
     oa_mock.return_value.oauth2_userinfo.return_value = resp
     oa_mock.return_value.get_identities.return_value = profile
     monkeypatch.setattr(
-        funcx.sdk.login_manager.LoginManager, "get_auth_client", oa_mock
+        globus_compute_sdk.sdk.login_manager.LoginManager, "get_auth_client", oa_mock
     )
 
     if has_err:

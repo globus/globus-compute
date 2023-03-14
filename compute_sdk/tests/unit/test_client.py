@@ -1,12 +1,11 @@
 import uuid
 from unittest import mock
 
+import globus_compute_sdk as gc
 import pytest
-
-import funcx
-from funcx import ContainerSpec
-from funcx.errors import FuncxTaskExecutionFailed
-from funcx.serialize import FuncXSerializer
+from globus_compute_sdk import ContainerSpec
+from globus_compute_sdk.errors import FuncxTaskExecutionFailed
+from globus_compute_sdk.serialize import FuncXSerializer
 
 
 @pytest.fixture(autouse=True)
@@ -46,10 +45,10 @@ def test_client_init_sets_addresses_by_env(
     # create the client, either with just the input env or with explicit parameters
     # for explicit params, alter the expected URI(s)
     if not explicit_params:
-        client = funcx.FuncXClient(**kwargs)
+        client = gc.FuncXClient(**kwargs)
     elif explicit_params == "web":
         web_uri = f"http://{randomstring()}.fqdn:1234/{randomstring()}"
-        client = funcx.FuncXClient(funcx_service_address=web_uri, **kwargs)
+        client = gc.FuncXClient(funcx_service_address=web_uri, **kwargs)
     else:
         raise NotImplementedError
 
@@ -59,7 +58,7 @@ def test_client_init_sets_addresses_by_env(
 
 def test_client_init_accepts_specified_taskgroup():
     tg_uuid = uuid.uuid4()
-    fxc = funcx.FuncXClient(
+    fxc = gc.FuncXClient(
         task_group_id=tg_uuid,
         do_version_check=False,
         login_manager=mock.Mock(),
@@ -76,7 +75,7 @@ def test_client_init_accepts_specified_taskgroup():
     ],
 )
 def test_update_task_table_on_invalid_data(api_data):
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(ValueError):
         fxc._update_task_table(api_data, "task-id-foo")
@@ -84,7 +83,7 @@ def test_update_task_table_on_invalid_data(api_data):
 
 def test_update_task_table_on_exception():
     api_data = {"status": "success", "exception": "foo-bar-baz", "completion_t": "1.1"}
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(FuncxTaskExecutionFailed) as excinfo:
         fxc._update_task_table(api_data, "task-id-foo")
@@ -93,7 +92,7 @@ def test_update_task_table_on_exception():
 
 def test_update_task_table_simple_object(randomstring):
     serde = FuncXSerializer()
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     task_id = "some_task_id"
 
     payload = randomstring()
@@ -111,7 +110,7 @@ def test_pending_tasks_always_fetched():
     should_fetch_02 = str(uuid.uuid4())
     no_fetch = str(uuid.uuid4())
 
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     fxc.web_client = mock.MagicMock()
     fxc._task_status_table.update(
         {should_fetch_01: {"pending": True}, no_fetch: {"pending": False}}
@@ -145,7 +144,7 @@ def test_batch_created_websocket_queue(create_ws_queue):
     eid = str(uuid.uuid4())
     fid = str(uuid.uuid4())
 
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     fxc.web_client = mock.MagicMock()
     if create_ws_queue is None:
         batch = fxc.create_batch()
@@ -167,7 +166,7 @@ def test_batch_created_websocket_queue(create_ws_queue):
 
 
 def test_batch_error():
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     fxc.web_client = mock.MagicMock()
 
     error_reason = "reason 1 2 3"
@@ -200,7 +199,7 @@ def test_batch_error():
 
 
 def test_batch_no_reason():
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     fxc.web_client = mock.MagicMock()
 
     error_results = {
@@ -225,9 +224,9 @@ def test_batch_no_reason():
 @pytest.mark.parametrize("asynchronous", [True, False, None])
 def test_single_run_websocket_queue_depend_async(asynchronous):
     if asynchronous is None:
-        fxc = funcx.FuncXClient(do_version_check=False, login_manager=mock.Mock())
+        fxc = gc.FuncXClient(do_version_check=False, login_manager=mock.Mock())
     else:
-        fxc = funcx.FuncXClient(
+        fxc = gc.FuncXClient(
             asynchronous=asynchronous, do_version_check=False, login_manager=mock.Mock()
         )
 
@@ -258,7 +257,7 @@ def test_build_container(mocker, login_manager):
     mock_data = mocker.Mock()
     mock_data.data = {"container_id": "123-456"}
     login_manager.get_funcx_web_client.post = mocker.Mock(return_value=mock_data)
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=login_manager)
     spec = ContainerSpec(
         name="MyContainer",
         pip=[
@@ -286,7 +285,7 @@ def test_container_build_status(mocker, login_manager, randomstring):
             self.http_status = 200
 
     login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=login_manager)
     status = fxc.get_container_build_status("123-434")
     assert status == expected_status
 
@@ -297,7 +296,7 @@ def test_container_build_status_not_found(mocker, login_manager):
             self.http_status = 404
 
     login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(ValueError) as excinfo:
         fxc.get_container_build_status("123-434")
@@ -312,7 +311,7 @@ def test_container_build_status_failure(mocker, login_manager):
             self.http_reason = "This is a reason"
 
     login_manager.get_funcx_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = funcx.FuncXClient(do_version_check=False, login_manager=login_manager)
+    fxc = gc.FuncXClient(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(SystemError) as excinfo:
         fxc.get_container_build_status("123-434")

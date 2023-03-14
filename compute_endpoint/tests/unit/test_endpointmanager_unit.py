@@ -14,13 +14,12 @@ from unittest import mock
 import pika
 import pytest as pytest
 import responses
+from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
+from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_sdk import GlobusAPIError, NetworkError
 
-from funcx_endpoint.endpoint.endpoint_manager import EndpointManager
-from funcx_endpoint.endpoint.utils import _redact_url_creds
-from funcx_endpoint.endpoint.utils.config import Config
-
-_MOCK_BASE = "funcx_endpoint.endpoint.endpoint_manager."
+_MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
 
 
 @pytest.fixture
@@ -51,7 +50,7 @@ def mock_client(mocker):
         "endpoint_id": ep_uuid,
         "command_queue_info": {"connection_url": "", "queue": ""},
     }
-    mocker.patch(f"{_MOCK_BASE}funcx.FuncXClient", return_value=mock_fxc)
+    mocker.patch(f"{_MOCK_BASE}globus_compute_sdk.FuncXClient", return_value=mock_fxc)
     yield ep_uuid, mock_fxc
 
 
@@ -151,7 +150,7 @@ def test_gracefully_exits_if_in_conflict_or_locked(
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_fxc = get_standard_funcx_client()
-    mocker.patch(f"{_MOCK_BASE}funcx.FuncXClient", return_value=mock_fxc)
+    mocker.patch(f"{_MOCK_BASE}globus_compute_sdk.FuncXClient", return_value=mock_fxc)
 
     some_err = randomstring()
     register_endpoint_failure_response(status_code, some_err)
@@ -202,7 +201,7 @@ def test_handles_network_error_scriptably(
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     some_err = randomstring()
     mocker.patch(
-        f"{_MOCK_BASE}funcx.FuncXClient",
+        f"{_MOCK_BASE}globus_compute_sdk.FuncXClient",
         side_effect=NetworkError(some_err, Exception()),
     )
 

@@ -5,12 +5,11 @@ import string
 import time
 import uuid
 
+import globus_compute_sdk as gc
 import globus_sdk
 import pytest
 import responses
-
-import funcx
-from funcx.sdk.web_client import FuncxWebClient
+from globus_compute_sdk.sdk.web_client import FuncxWebClient
 
 
 @pytest.fixture(scope="session")
@@ -63,7 +62,7 @@ def get_standard_funcx_client():
     )
 
     def func():
-        return funcx.FuncXClient(
+        return gc.FuncXClient(
             login_manager=FakeLoginManager(),
             do_version_check=False,
         )

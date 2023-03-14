@@ -3,9 +3,8 @@ from __future__ import annotations
 import inspect
 import warnings
 
+from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.utils import RepresentationMixin
-
-from funcx_endpoint.executors import HighThroughputExecutor
 
 _DEFAULT_EXECUTORS = [HighThroughputExecutor()]
 

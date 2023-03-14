@@ -1,3 +1,3 @@
-from funcx.serialize.facade import FuncXSerializer
+from globus_compute_sdk.serialize.facade import FuncXSerializer
 
 __all__ = ("FuncXSerializer",)

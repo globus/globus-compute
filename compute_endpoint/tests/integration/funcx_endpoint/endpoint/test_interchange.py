@@ -5,15 +5,14 @@ import uuid
 from importlib.machinery import SourceFileLoader
 
 import pytest
-from funcx_common.messagepack import pack, unpack
-from funcx_common.messagepack.message_types import Result, Task
+from globus_compute_common.messagepack import pack, unpack
+from globus_compute_common.messagepack.message_types import Result, Task
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
+from globus_compute_endpoint.endpoint.utils.config import Config
 from tests.utils import try_for_timeout
 
-from funcx_endpoint.endpoint.endpoint import Endpoint
-from funcx_endpoint.endpoint.interchange import EndpointInterchange, log
-from funcx_endpoint.endpoint.utils.config import Config
-
-_MOCK_BASE = "funcx_endpoint.endpoint.interchange."
+_MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
 
 
 @pytest.fixture

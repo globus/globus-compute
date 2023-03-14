@@ -1,6 +1,5 @@
 import pytest
-
-from funcx import FuncXClient
+from globus_compute_sdk import FuncXClient
 
 config = {
     "funcx_service_address": "https://api2.funcx.org/v2",
