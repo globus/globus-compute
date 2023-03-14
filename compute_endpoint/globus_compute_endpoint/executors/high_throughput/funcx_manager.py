@@ -37,7 +37,7 @@ from globus_compute_endpoint.executors.high_throughput.messages import (
 )
 from globus_compute_endpoint.executors.high_throughput.worker_map import WorkerMap
 from globus_compute_endpoint.logging_config import FXLogger, setup_logging
-from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.version import VERSION as PARSL_VERSION
 
 RESULT_TAG = 10
@@ -241,7 +241,7 @@ class Manager:
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.poll_period = poll_period
-        self.serializer = FuncXSerializer()
+        self.serializer = ComputeSerializer()
         self.next_worker_q: list[str] = []  # FIFO queue for spinning up workers.
         self.worker_procs: dict[str, subprocess.Popen] = {}
 

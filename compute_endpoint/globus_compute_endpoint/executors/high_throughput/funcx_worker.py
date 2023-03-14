@@ -20,7 +20,7 @@ from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
 from globus_compute_endpoint.executors.high_throughput.messages import Message
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.errors import MaxResultSizeExceeded
-from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import ComputeSerializer
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class FuncXWorker:
         self.address = address
         self.port = port
         self.worker_type = worker_type
-        self.serializer = FuncXSerializer()
+        self.serializer = ComputeSerializer()
         self.serialize = self.serializer.serialize
         self.deserialize = self.serializer.deserialize
         self.result_size_limit = result_size_limit

@@ -13,7 +13,7 @@ import uuid
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
 from globus_compute_sdk.sdk._environments import get_web_service_url
-from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
 from globus_sdk.exc.api import GlobusAPIError
 
@@ -21,9 +21,9 @@ ID_PARAM_T = t.Union[uuid.UUID, str]
 
 
 def _get_packed_code(
-    func: t.Callable, serializer: t.Optional[FuncXSerializer] = None
+    func: t.Callable, serializer: t.Optional[ComputeSerializer] = None
 ) -> str:
-    serializer = serializer if serializer else FuncXSerializer()
+    serializer = serializer if serializer else ComputeSerializer()
     return serializer.pack_buffers([serializer.serialize(func)])
 
 
@@ -42,7 +42,7 @@ class FunctionRegistrationData:
         public: bool = False,
         group: t.Optional[str] = None,
         searchable: bool = True,
-        serializer: t.Optional[FuncXSerializer] = None,
+        serializer: t.Optional[ComputeSerializer] = None,
     ):
         if function is not None:
             function_name = function.__name__

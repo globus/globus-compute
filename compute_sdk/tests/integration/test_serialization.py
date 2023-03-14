@@ -233,10 +233,10 @@ def test_code_dill_source():
 
 
 def test_overall():
-    from globus_compute_sdk.serialize.facade import FuncXSerializer
+    from globus_compute_sdk.serialize.facade import ComputeSerializer
 
-    check_serialize_deserialize_foo(FuncXSerializer())
-    check_serialize_deserialize_bar(FuncXSerializer())
+    check_serialize_deserialize_foo(ComputeSerializer())
+    check_serialize_deserialize_bar(ComputeSerializer())
 
 
 def test_serialize_deserialize_combined():

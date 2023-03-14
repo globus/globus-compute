@@ -5,7 +5,7 @@ from globus_compute_sdk.serialize.concretes import METHODS_MAP_CODE, METHODS_MAP
 logger = logging.getLogger(__name__)
 
 
-class FuncXSerializer:
+class ComputeSerializer:
     """Wraps several serializers for one uniform interface"""
 
     def __init__(self):

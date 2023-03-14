@@ -14,7 +14,7 @@ from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.funcx_future import FuncXFuture
 from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
-from globus_compute_sdk.serialize.facade import FuncXSerializer
+from globus_compute_sdk.serialize.facade import ComputeSerializer
 from tests.utils import try_assert, try_for_timeout
 
 
@@ -304,7 +304,7 @@ def test_reload_tasks_some_completed(fxexecutor, mocker, num_tasks):
     num_completed = random.randint(1, num_tasks)
     num_i = 0
 
-    serialize = FuncXSerializer().serialize
+    serialize = ComputeSerializer().serialize
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     for t_id in mock_batch_result:
         if num_i >= num_completed:
@@ -333,7 +333,7 @@ def test_reload_tasks_some_completed(fxexecutor, mocker, num_tasks):
 def test_reload_tasks_all_completed(fxexecutor):
     fxc, fxe = fxexecutor
 
-    serialize = FuncXSerializer().serialize
+    serialize = ComputeSerializer().serialize
     num_tasks = 5
 
     mock_data = {
@@ -453,7 +453,7 @@ def test_reload_sets_failed_tasks(fxexecutor):
 
 def test_reload_handles_deseralization_error_gracefully(fxexecutor):
     fxc, fxe = fxexecutor
-    fxc.fx_serializer = FuncXSerializer()
+    fxc.fx_serializer = ComputeSerializer()
 
     mock_data = {
         "taskgroup_id": fxe.task_group_id,
@@ -667,7 +667,7 @@ def test_resultwatcher_repr():
 
 def test_resultwatcher_match_sets_exception(randomstring):
     payload = randomstring()
-    fxs = FuncXSerializer()
+    fxs = ComputeSerializer()
     fut = FuncXFuture(task_id=uuid.uuid4())
     err_details = ResultErrorDetails(code="1234", user_message="some_user_message")
     res = Result(task_id=fut.task_id, error_details=err_details, data=payload)
@@ -686,7 +686,7 @@ def test_resultwatcher_match_sets_exception(randomstring):
 
 def test_resultwatcher_match_sets_result(randomstring):
     payload = randomstring()
-    fxs = FuncXSerializer()
+    fxs = ComputeSerializer()
     fut = FuncXFuture(task_id=uuid.uuid4())
     res = Result(task_id=fut.task_id, data=fxs.serialize(payload))
 
@@ -703,7 +703,7 @@ def test_resultwatcher_match_sets_result(randomstring):
 
 def test_resultwatcher_match_handles_deserialization_error():
     invalid_payload = "invalidly serialized"
-    fxs = FuncXSerializer()
+    fxs = ComputeSerializer()
     fut = FuncXFuture(task_id=uuid.uuid4())
     res = Result(task_id=fut.task_id, data=invalid_payload)
 

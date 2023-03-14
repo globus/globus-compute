@@ -22,7 +22,7 @@ from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from globus_compute_sdk.sdk.search import SearchHelper
 from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
-from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__, compare_versions
 
 from .batch import Batch
@@ -163,7 +163,7 @@ class Client:
         self.web_client = self.login_manager.get_funcx_web_client(
             base_url=funcx_service_address
         )
-        self.fx_serializer = FuncXSerializer()
+        self.fx_serializer = ComputeSerializer()
 
         self.funcx_service_address = funcx_service_address
 

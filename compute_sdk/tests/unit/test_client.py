@@ -5,7 +5,7 @@ import globus_compute_sdk as gc
 import pytest
 from globus_compute_sdk import ContainerSpec
 from globus_compute_sdk.errors import FuncxTaskExecutionFailed
-from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import ComputeSerializer
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +91,7 @@ def test_update_task_table_on_exception():
 
 
 def test_update_task_table_simple_object(randomstring):
-    serde = FuncXSerializer()
+    serde = ComputeSerializer()
     fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     task_id = "some_task_id"
 

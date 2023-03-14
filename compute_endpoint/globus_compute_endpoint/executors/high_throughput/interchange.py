@@ -33,7 +33,7 @@ from globus_compute_endpoint.executors.high_throughput.messages import (
     MessageType,
 )
 from globus_compute_endpoint.logging_config import FXLogger
-from globus_compute_sdk.serialize import FuncXSerializer
+from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.version import VERSION as PARSL_VERSION
 
 if t.TYPE_CHECKING:
@@ -219,7 +219,7 @@ class Interchange:
         # initialize the last heartbeat time to start the loop
         self.last_heartbeat = time.time()
 
-        self.serializer = FuncXSerializer()
+        self.serializer = ComputeSerializer()
         log.info(
             "Attempting connection to forwarder at {} on ports: {},{},{}".format(
                 client_address, client_ports[0], client_ports[1], client_ports[2]
