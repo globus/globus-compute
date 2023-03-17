@@ -25,7 +25,7 @@ def _get_funcx_all_scope() -> str:
     )
 
 
-class FuncxScopeBuilder(ScopeBuilder):
+class ComputeScopeBuilder(ScopeBuilder):
     # FIXME:
     # for some reason, the funcx resource server name on the production scope is
     # "funcx_service" even though this doesn't match the resource server ID and the
@@ -39,7 +39,7 @@ class FuncxScopeBuilder(ScopeBuilder):
 
 #: a ScopeBuilder in the style of globus_sdk.scopes for the Globus Compute service
 #: it supports one scope named 'all', as in ``ComputeScopes.all``
-ComputeScopes = FuncxScopeBuilder()
+ComputeScopes = ComputeScopeBuilder()
 
 
 class LoginManager:
