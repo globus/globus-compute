@@ -381,8 +381,8 @@ class EndpointInterchange:
 
             def process_pending_tasks():
                 # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
-                # funcx-manager.  In terms of shutting down (or "rebooting") gracefully,
-                # iterate once a second whether or not a task has arrived.
+                # globus-compute-manager.  In terms of shutting down (or "rebooting")
+                # gracefully, iterate once a second whether or not a task has arrived.
                 nonlocal num_tasks_forwarded
                 ctype = executor.container_type
                 while not self._quiesce_event.is_set():
@@ -420,9 +420,10 @@ class EndpointInterchange:
                 log.debug("Exit process-pending-tasks thread.")
 
             def process_pending_results():
-                # Forward incoming results from the funcx-manager to the funcx-services.
-                # For graceful handling of shutdown (or "reboot"), wait up to a second
-                # for incoming results before iterating the loop regardless.
+                # Forward incoming results from the globus-compute-manager to the
+                # funcx-services. For graceful handling of shutdown (or "reboot"),
+                # wait up to a second or incoming results before iterating the loop
+                # regardless.
                 nonlocal num_results_forwarded
                 while not self._quiesce_event.is_set():
                     try:
