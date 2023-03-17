@@ -222,7 +222,7 @@ class Client:
         compare_versions(__version__, min_sdk_version)
         if endpoint_version is not None:
             compare_versions(
-                endpoint_version, min_ep_version, package_name="funcx-endpoint"
+                endpoint_version, min_ep_version, package_name="globus-compute-endpoint"
             )
 
     def logout(self):

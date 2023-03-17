@@ -247,7 +247,7 @@ def test_list_endpoints_none_configured(mock_ep_buf):
     Endpoint.print_endpoint_table()
     assert "No endpoints configured" in buf.getvalue()
     assert "Hint:" in buf.getvalue()
-    assert "funcx-endpoint configure" in buf.getvalue()
+    assert "globus-compute-endpoint configure" in buf.getvalue()
 
 
 def test_list_endpoints_no_id_yet(mock_ep_buf, randomstring):

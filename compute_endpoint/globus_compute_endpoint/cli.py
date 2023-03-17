@@ -121,7 +121,7 @@ def config_dir_callback(ctx, param, value):
     state.endpoint_config_dir = value
 
 
-@click.group("funcx-endpoint")
+@click.group("globus-compute-endpoint")
 @click.option(
     "-c",
     "--config-dir",
@@ -139,7 +139,7 @@ def app():
 @app.command("version")
 @common_options
 def version_command():
-    """Show the version of funcx-endpoint"""
+    """Show the version of globus-compute-endpoint"""
     import globus_compute_endpoint as gce
 
     click.echo(f"FuncX endpoint version: {gce.__version__}")
@@ -291,7 +291,7 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
 
     except FileNotFoundError as err:
         if not endpoint_dir.exists():
-            configure_command = "funcx-endpoint configure"
+            configure_command = "globus-compute-endpoint configure"
             if endpoint_name != "default":
                 configure_command += f" {endpoint_name}"
             msg = (

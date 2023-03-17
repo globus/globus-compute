@@ -132,7 +132,7 @@ class Endpoint:
         print(
             f"\n    Configuration file: {config_path}\n"
             "\nUse the `start` subcommand to run it:\n"
-            f"\n    $ funcx-endpoint start {ep_name}"
+            f"\n    $ globus-compute-endpoint start {ep_name}"
         )
 
     @staticmethod
@@ -265,8 +265,8 @@ class Endpoint:
                     f"Caught exception while attempting endpoint registration: {e}"
                 )
                 log.critical(
-                    "funcx-endpoint is unable to reach the funcX service due to a "
-                    "NetworkError \n"
+                    "globus-compute-endpoint is unable to reach the funcX service due "
+                    "to a NetworkError \n"
                     "Please make sure that the funcX service address you provided is "
                     "reachable \n"
                     "and then attempt restarting the endpoint"
@@ -294,7 +294,7 @@ class Endpoint:
         json_file = endpoint_dir / "endpoint.json"
 
         # `endpoint_id` key kept for backward compatibility when
-        # funcx-endpoint list is called
+        # globus-compute-endpoint list is called
         ep_info = {"endpoint_id": endpoint_uuid}
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
@@ -476,8 +476,8 @@ class Endpoint:
             )
             if not force:
                 log.critical(
-                    "funcx-endpoint is unable to reach the funcX service due to a "
-                    "NetworkError \n"
+                    "globus-compute-endpoint is unable to reach the funcX service due "
+                    "to a NetworkError \n"
                     "Please make sure that the funcX service address you provided is "
                     "reachable \n"
                     "and then attempt to delete the endpoint again"
@@ -594,7 +594,8 @@ class Endpoint:
         endpoints = Endpoint.get_endpoints(conf_dir)
         if not endpoints:
             print(
-                "No endpoints configured!\n\n  (Hint: funcx-endpoint configure)",
+                "No endpoints configured!\n\n "
+                "(Hint: globus-compute-endpoint configure)",
                 file=ofile,
             )
             return

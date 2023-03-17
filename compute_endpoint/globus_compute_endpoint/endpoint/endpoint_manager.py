@@ -113,7 +113,7 @@ class EndpointManager:
         json_file = conf_dir / "endpoint.json"
 
         # `endpoint_id` key kept for backward compatibility when
-        # funcx-endpoint list is called
+        # globus-compute-endpoint list is called
         ep_info = {"endpoint_id": endpoint_uuid}
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
@@ -380,7 +380,13 @@ class EndpointManager:
         if not ep_name:
             raise InvalidCommandError("Missing endpoint name")
 
-        proc_args = ["funcx-endpoint", "start", ep_name, "--die-with-parent", *args]
+        proc_args = [
+            "globus-compute-endpoint",
+            "start",
+            ep_name,
+            "--die-with-parent",
+            *args,
+        ]
 
         pw_rec = pwd.getpwnam(local_username)
         udir, uid, gid = pw_rec.pw_dir, pw_rec.pw_uid, pw_rec.pw_gid

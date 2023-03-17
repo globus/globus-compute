@@ -702,7 +702,7 @@ def test_start_endpoint_children_die_with_parent(successful_exec):
 
     assert pyexc.value.code == 85, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_os.execvpe.call_args
-    assert a[0] == "funcx-endpoint", "Sanity check"
+    assert a[0] == "globus-compute-endpoint", "Sanity check"
     assert k["args"][0] == a[0], "Expect transparency for admin"
     assert k["args"][-1] == "--die-with-parent"  # trust flag to do the hard work
 
