@@ -79,9 +79,9 @@ def _get_local_endpoint_id():
 
 
 def pytest_addoption(parser):
-    """Add funcx-specific command-line options to pytest."""
+    """Add command-line options to pytest."""
     parser.addoption(
-        "--funcx-config", default="prod", help="Name of testing config to use"
+        "--compute-config", default="prod", help="Name of testing config to use"
     )
     parser.addoption(
         "--endpoint", metavar="endpoint", help="Specify an active endpoint UUID"
@@ -98,7 +98,7 @@ def pytest_addoption(parser):
 
 @pytest.fixture(scope="session")
 def funcx_test_config_name(pytestconfig):
-    return pytestconfig.getoption("--funcx-config")
+    return pytestconfig.getoption("--compute-config")
 
 
 def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_args):

@@ -8,10 +8,10 @@
 prod:
 	tox
 dev:
-	tox -e localdeps -- --funcx-config dev
+	tox -e localdeps -- --compute-config dev
 local_with_dev_sdk:
 	@if [ -z "${FUNCX_LOCAL_ENDPOINT_ID}" ]; then echo "Missing exported FUNCX_LOCAL_ENDPOINT_ID"; exit 1; fi
-	tox -e localdeps -- --funcx-config local
+	tox -e localdeps -- --compute-config local
 local_with_published_sdk:
 	@if [ -z "${FUNCX_LOCAL_ENDPOINT_ID}" ]; then echo "Missing exported FUNCX_LOCAL_ENDPOINT_ID"; exit 1; fi
-	tox -- --funcx-config local
+	tox -- --compute-config local

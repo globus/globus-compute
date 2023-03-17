@@ -25,7 +25,7 @@ repo):
 
 You can also run `localdeps` against dev with
 
-    tox -e localdeps -- --funcx-config dev
+    tox -e localdeps -- --compute-config dev
 
 One can also run tests against a local webservice setup.  Use the make targets
 `local_with_published_sdk` and `local_with_dev_sdk` to run tests with published
@@ -36,5 +36,5 @@ One can also run tests against a local webservice setup.  Use the make targets
 
 As with the above make targets, these are just wrappers around tox; can do the above by invoking tox direcly:
 
-    tox -- --funcx-config local
-    tox -e localdeps -- --funcx-config local
+    tox -- --compute-config local
+    tox -e localdeps -- --compute-config local
