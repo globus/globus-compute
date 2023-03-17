@@ -47,7 +47,7 @@ C_INFO_FMT = _C_BASE + f" {COLOR_INFO}%(message)s{_r}"
 C_DEBUG_FMT = _C_BASE + f" {COLOR_DEBUG}%(message)s{_r}"
 
 
-class FuncxConsoleFormatter(logging.Formatter):
+class ComputeConsoleFormatter(logging.Formatter):
     """
     For internal use only.
     This formatter handles output to standard streams in the following way:
@@ -158,7 +158,7 @@ def _get_file_dict_config(
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "globus_compute_endpoint.logging_config.FuncxConsoleFormatter",
+                "()": "globus_compute_endpoint.logging_config.ComputeConsoleFormatter",
                 "debug": debug,
                 "no_color": no_color,
             },
@@ -201,7 +201,7 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "globus_compute_endpoint.logging_config.FuncxConsoleFormatter",
+                "()": "globus_compute_endpoint.logging_config.ComputeConsoleFormatter",
                 "debug": debug,
                 "no_color": no_color,
             },
