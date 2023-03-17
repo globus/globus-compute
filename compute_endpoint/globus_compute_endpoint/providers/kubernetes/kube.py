@@ -141,7 +141,9 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         # Dictionary that keeps track of jobs, keyed on task_type
         self.resources_by_task_type: Dict[str, Any] = {}
 
-    def submit(self, cmd_string, tasks_per_node, task_type, job_name="funcx-worker"):
+    def submit(
+        self, cmd_string, tasks_per_node, task_type, job_name="globus-compute-worker"
+    ):
         """Submit a job
         Args:
              - cmd_string  :(String) - Name of the container to initiate

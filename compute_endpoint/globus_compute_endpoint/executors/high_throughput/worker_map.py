@@ -321,7 +321,7 @@ class WorkerMap:
         self.worker_id_counter += 1
 
         cmd = (
-            f"funcx-worker {debug}{worker_id} "
+            f"globus-compute-worker {debug}{worker_id} "
             f"-a {address} "
             f"-p {worker_port} "
             f"-t {worker_type} "
