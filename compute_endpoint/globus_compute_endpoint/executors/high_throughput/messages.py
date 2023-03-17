@@ -103,7 +103,7 @@ class Task(Message):
             # rather than thinking hard, preserve the exact current runtime behavior
             #
             # all of this code is going to be eliminated soonish by
-            # funcx_common.messagepack in part because of issues like this
+            # globus_compute_common.messagepack in part because of issues like this
             add_ons = (
                 f"TID={self.task_id};CID={self.container_id};"  # type: ignore
                 f"{self.task_buffer}"

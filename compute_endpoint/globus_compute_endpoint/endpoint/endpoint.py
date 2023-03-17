@@ -86,7 +86,7 @@ class Endpoint:
 
         :param endpoint_dir pathlib.Path Path to the endpoint configuration dir
         :param endpoint_config str Path to a config file to be used instead
-         of the funcX default config file
+         of the Globus Compute default config file
         :param multi_tenant bool Whether the endpoint is a multi-user endpoint
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
@@ -265,10 +265,10 @@ class Endpoint:
                     f"Caught exception while attempting endpoint registration: {e}"
                 )
                 log.critical(
-                    "globus-compute-endpoint is unable to reach the funcX service due "
-                    "to a NetworkError \n"
-                    "Please make sure that the funcX service address you provided is "
-                    "reachable \n"
+                    "globus-compute-endpoint is unable to reach the Globus Compute "
+                    "service due to a NetworkError \n"
+                    "Please make sure that the Globus Compute service address you "
+                    "provided is reachable \n"
                     "and then attempt restarting the endpoint"
                 )
                 exit(os.EX_TEMPFAIL)
@@ -299,7 +299,7 @@ class Endpoint:
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
 
-        ptitle = f"funcX Endpoint ({endpoint_uuid}, {endpoint_dir.name})"
+        ptitle = f"Globus Compute Endpoint ({endpoint_uuid}, {endpoint_dir.name})"
         if endpoint_config.environment:
             ptitle += f" - {endpoint_config.environment}"
         ptitle += f" [{setproctitle.getproctitle()}]"
@@ -476,10 +476,10 @@ class Endpoint:
             )
             if not force:
                 log.critical(
-                    "globus-compute-endpoint is unable to reach the funcX service due "
-                    "to a NetworkError \n"
-                    "Please make sure that the funcX service address you provided is "
-                    "reachable \n"
+                    "globus-compute-endpoint is unable to reach the Globus Compute "
+                    "service due to a NetworkError \n"
+                    "Please make sure that the Globus Compute service address you "
+                    "provided is reachable \n"
                     "and then attempt to delete the endpoint again"
                 )
                 exit(os.EX_TEMPFAIL)

@@ -3,7 +3,7 @@ import asyncio
 
 class ComputeTask(asyncio.Future):
     """
-    Represents a submitted funcX task with an asychio wrapper
+    Represents a submitted Globus Compute task with an asychio wrapper
     """
 
     def __init__(self, task_id):
@@ -11,17 +11,19 @@ class ComputeTask(asyncio.Future):
         Parameters
         ----------
         task_id : uuid str
-            The uuid of the funcX task this instance is shadowing
+            The uuid of the Globus Compute task this instance is shadowing
         """
         super().__init__()
         self.task_id = task_id
 
     def __str__(self):
-        return "FuncX Task ID " + self.task_id
+        return "Globus Compute Task ID " + self.task_id
 
     async def get_result(self):
         """
-        Coroutine to wait on the funcX task to complete and then return the result
+        Coroutine to wait on the Globus Compute task to complete and then
+        return the result
+
         :return:
             result : Any
         """

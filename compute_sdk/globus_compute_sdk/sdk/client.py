@@ -34,9 +34,9 @@ _FUNCX_HOME = os.path.join("~", ".funcx")
 
 
 class Client:
-    """Main class for interacting with the funcX service
+    """Main class for interacting with the Globus Compute service
 
-    Holds helper operations for performing common tasks with the funcX service.
+    Holds helper operations for performing common tasks with the Globus Compute service.
     """
 
     FUNCX_SDK_CLIENT_ID = os.environ.get(
@@ -238,7 +238,7 @@ class Client:
         ----------
 
         return_msg : str | t.Dict
-           Return message received from the funcx service
+           Return message received from the Globus Compute service
         task_id : str
            task id string
         """
@@ -272,7 +272,7 @@ class Client:
 
     @requires_login
     def get_task(self, task_id):
-        """Get a funcX task.
+        """Get a Globus Compute task.
 
         Parameters
         ----------
@@ -295,7 +295,7 @@ class Client:
 
     @requires_login
     def get_result(self, task_id):
-        """Get the result of a funcX task
+        """Get the result of a Globus Compute task
 
         Parameters
         ----------
@@ -378,7 +378,7 @@ class Client:
         task_id : str
         UUID string that identifies the task if asynchronous is False
 
-        funcX Task: asyncio.Task
+        Globus Compute Task: asyncio.Task
         A future that will eventually resolve into the function's result if
         asynchronous is True
         """
@@ -393,7 +393,7 @@ class Client:
 
     def create_batch(self, task_group_id=None, create_websocket_queue=False) -> Batch:
         """
-        Create a Batch instance to handle batch submission in funcX
+        Create a Batch instance to handle batch submission in Globus Compute
 
         Parameters
         ----------
@@ -422,7 +422,7 @@ class Client:
 
     @requires_login
     def batch_run(self, batch) -> t.List[str]:
-        """Initiate a batch of tasks to funcX
+        """Initiate a batch of tasks to Globus Compute
 
         Parameters
         ----------
@@ -437,7 +437,7 @@ class Client:
 
         data = batch.prepare()
 
-        # Send the data to funcX
+        # Send the data to Globus Compute
         r = self.web_client.submit(data)
 
         task_uuids: t.List[str] = []
@@ -480,7 +480,7 @@ class Client:
         metadata=None,
         multi_tenant=False,
     ):
-        """Register an endpoint with the funcX service.
+        """Register an endpoint with the Globus Compute service.
 
         Parameters
         ----------
@@ -514,8 +514,8 @@ class Client:
     @requires_login
     def get_containers(self, name, description=None):
         """
-        Register a DLHub endpoint with the funcX service and get the containers to
-        launch.
+        Register a DLHub endpoint with the Globus Compute service and get
+        the containers to launch.
 
         Parameters
         ----------
@@ -614,7 +614,7 @@ class Client:
         group=None,
         searchable=True,
     ) -> str:
-        """Register a function code with the funcX service.
+        """Register a function code with the Globus Compute service.
 
         Parameters
         ----------
@@ -623,7 +623,7 @@ class Client:
         function_name : str
             The entry point (function name) of the function. Default: None
         container_uuid : str
-            Container UUID from registration with funcX
+            Container UUID from registration with Globus Compute
         description : str
             Description of the file
         public : bool
@@ -656,7 +656,7 @@ class Client:
 
     @requires_login
     def search_function(self, q, offset=0, limit=10, advanced=False):
-        """Search for function via the funcX service
+        """Search for function via the Globus Compute service
 
         Parameters
         ----------
@@ -697,7 +697,7 @@ class Client:
 
     @requires_login
     def register_container(self, location, container_type, name="", description=""):
-        """Register a container with the funcX service.
+        """Register a container with the Globus Compute service.
 
         Parameters
         ----------

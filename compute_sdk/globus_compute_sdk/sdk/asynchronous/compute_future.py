@@ -12,7 +12,7 @@ class ComputeFuture(Future):
     task_id: t.Optional[str]
     """The UUID for the task behind this Future. In batch mode, this will
     not be populated immediately, but will appear later when the task is
-    submitted to the FuncX services."""
+    submitted to the Globus Compute services."""
 
     def __init__(self, task_id: t.Optional[str] = None):
         super().__init__()

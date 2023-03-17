@@ -6,7 +6,7 @@ from globus_compute_sdk.serialize import ComputeSerializer
 
 
 class Batch:
-    """Utility class for creating batch submission in funcX"""
+    """Utility class for creating batch submission in Globus Compute"""
 
     def __init__(self, task_group_id: str | None = None, create_websocket_queue=False):
         """

@@ -89,7 +89,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--service-address",
         metavar="service-address",
-        help="Specify a funcX service address",
+        help="Specify a Globus Compute service address",
     )
     parser.addoption(
         "--ws-uri", metavar="ws-uri", help="WebSocket URI to get task results"

@@ -1,5 +1,5 @@
 """
-Logic for using client identities with the funcX SDK.
+Logic for using client identities with the Globus Compute SDK.
 
 This is based on the Globus CLI client login:
 https://github.com/globus/globus-cli/blob/main/src/globus_cli/login_manager/client_login.py
@@ -24,7 +24,7 @@ def _get_client_creds_from_env() -> tuple[str | None, str | None]:
 def is_client_login() -> bool:
     """
     Return True if the correct env variables have been set to use a
-    client identity with the funcX SDK
+    client identity with the Globus Compute SDK
     """
     client_id, client_secret = _get_client_creds_from_env()
 

@@ -47,7 +47,7 @@ def init_endpoint_configuration_dir(funcx_conf_dir: pathlib.Path):
     elif not funcx_conf_dir.is_dir():
         raise click.ClickException(
             f"File already exists: {funcx_conf_dir}\n\n"
-            "Refusing to initialize funcX configuration directory: path already exists"
+            "Refusing to initialize Globus Compute configuration directory: path already exists"
         )
 
 
@@ -142,7 +142,7 @@ def version_command():
     """Show the version of globus-compute-endpoint"""
     import globus_compute_endpoint as gce
 
-    click.echo(f"FuncX endpoint version: {gce.__version__}")
+    click.echo(f"Globus Compute endpoint version: {gce.__version__}")
 
 
 @app.command(name="configure", help="Configure an endpoint")
@@ -320,8 +320,8 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
 
     except Exception:
         log.exception(
-            "funcX v0.2.0 made several non-backwards compatible changes to the config. "
-            "Your config might be out of date. "
+            "Globus Compute v0.2.0 made several non-backwards compatible changes to "
+            "the config. Your config might be out of date. "
             "Refer to "
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
         )

@@ -25,9 +25,9 @@ class ContainerSpec:
         Parameters
         ----------
         name : str
-            Name of this container to be used inside funcx
+            Name of this container to be used inside Globus Compute
         description : str
-            Description of the container inside funcx
+            Description of the container inside Globus Compute
         apt : List[str]
             List of Ubuntu library packages to install in container
         pip : List[str]

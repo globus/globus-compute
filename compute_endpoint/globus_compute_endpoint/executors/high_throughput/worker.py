@@ -46,7 +46,7 @@ class Worker:
      Maximum result size allowed in Bytes
      Default = 10 MB
 
-    Funcx worker will use the REP sockets to:
+    Globus Compute worker will use the REP sockets to:
          task = recv ()
          result = execute(task)
          send(result)

@@ -10,7 +10,7 @@ config = {
 
 @pytest.fixture(autouse=True, scope="session")
 def load_funcx_session(request, pytestconfig):
-    """Load funcX sdk client for the entire test suite,
+    """Load Globus Compute sdk client for the entire test suite,
 
     The special path `local` indicates that configuration will not come
     from a pytest managed configuration file; in that case, see
@@ -37,7 +37,7 @@ def pytest_addoption(parser):
         metavar="service-address",
         nargs=1,
         default=[config["funcx_service_address"]],
-        help="Specify a funcX service address",
+        help="Specify a Globus Compute service address",
     )
 
     parser.addoption(

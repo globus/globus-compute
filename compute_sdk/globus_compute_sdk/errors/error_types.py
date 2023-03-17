@@ -18,7 +18,7 @@ class VersionMismatch(ComputeError):
         self.version_message = version_message
 
     def __repr__(self):
-        return f"FuncX Versioning Issue: {self.version_message}"
+        return f"Globus Compute Versioning Issue: {self.version_message}"
 
 
 class SerializationError(ComputeError):

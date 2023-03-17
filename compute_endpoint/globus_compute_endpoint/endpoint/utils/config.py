@@ -10,7 +10,7 @@ _DEFAULT_EXECUTORS = [HighThroughputExecutor()]
 
 
 class Config(RepresentationMixin):
-    """Specification of FuncX configuration options.
+    """Specification of Globus Compute configuration options.
 
     Parameters
     ----------
@@ -27,11 +27,13 @@ class Config(RepresentationMixin):
         Default: None
 
     funcx_service_address: str | None
-        URL address string of the funcX service to which the Endpoint should connect.
+        URL address string of the Globus Compute service to which the Endpoint
+        should connect.
         Default: None
 
     results_ws_uri: str | None
-        URL address string of the funcX websocket service passed to the funcX client.
+        URL address string of the Globus Compute websocket service passed to the
+        Globus Compute client.
         Default: None
 
     warn_about_url_mismatch: Bool
@@ -41,12 +43,12 @@ class Config(RepresentationMixin):
 
     heartbeat_period: int (seconds)
         The interval at which heartbeat messages are sent from the endpoint to the
-        funcx-web-service
+        Globus Compute web service
         Default: 30s
 
     heartbeat_threshold: int (seconds)
-        Seconds since the last hearbeat message from the funcx-web-service after which
-        the connection is assumed to be disconnected.
+        Seconds since the last hearbeat message from the Globus Compute web service
+        after which the connection is assumed to be disconnected.
         Default: 120s
 
     stdout : str

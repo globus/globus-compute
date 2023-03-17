@@ -72,7 +72,7 @@ class EndpointInterchange:
         Parameters
         ----------
         config : globus_compute_sdk.Config object
-             Funcx config object that describes how compute should be provisioned
+             Globus Compute config object describing how compute should be provisioned
 
         reg_info : dict[str, dict]
              Dictionary containing connection information for both the task and
@@ -335,9 +335,9 @@ class EndpointInterchange:
         """
         This is the "kernel" of the endpoint interchange process.  Conceptually, there
         are three actions of consequence: forward task messages to the executors,
-        forward results from the executors back to the funcx web services (RMQ), and
-        forward any previous results that may have failed to send previously (e.g., if
-        a RMQ connection was dropped).
+        forward results from the executors back to the Globus Compute web services
+        (RMQ), and forward any previous results that may have failed to send previously
+        (e.g., if a RMQ connection was dropped).
 
         We accomplish this via three threads, one each for each task.
 
@@ -421,9 +421,9 @@ class EndpointInterchange:
 
             def process_pending_results():
                 # Forward incoming results from the globus-compute-manager to the
-                # funcx-services. For graceful handling of shutdown (or "reboot"),
-                # wait up to a second or incoming results before iterating the loop
-                # regardless.
+                # Globus Compute services. For graceful handling of shutdown
+                # (or "reboot"), wait up to a second or incoming results before
+                # iterating the loop regardless.
                 nonlocal num_results_forwarded
                 while not self._quiesce_event.is_set():
                     try:

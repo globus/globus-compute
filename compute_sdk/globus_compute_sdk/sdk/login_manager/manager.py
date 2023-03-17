@@ -37,7 +37,7 @@ class FuncxScopeBuilder(ScopeBuilder):
         self.all = _get_funcx_all_scope()
 
 
-#: a ScopeBuilder in the style of globus_sdk.scopes for the FuncX service
+#: a ScopeBuilder in the style of globus_sdk.scopes for the Globus Compute service
 #: it supports one scope named 'all', as in ``ComputeScopes.all``
 ComputeScopes = FuncxScopeBuilder()
 

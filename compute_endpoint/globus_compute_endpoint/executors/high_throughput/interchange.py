@@ -126,7 +126,8 @@ class Interchange:
         Parameters
         ----------
         config : globus_compute_sdk.Config object
-             Funcx config object that describes how compute should be provisioned
+             Globus Compute config object that describes how compute should
+             be provisioned
 
         client_address : str
              The ip address at which the parsl client can be reached.

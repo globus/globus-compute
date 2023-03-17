@@ -334,7 +334,7 @@ class HighThroughputExecutor(RepresentationMixin):
                 f"to accelerators: {self.available_accelerators}"
             )
 
-        # FuncX specific options
+        # Globus Compute specific options
         self.container_image = container_image
         self.worker_mode = worker_mode
 

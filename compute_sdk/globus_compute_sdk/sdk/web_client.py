@@ -1,6 +1,6 @@
 """
-This module implements a Globus SDK client class suitable for use with the FuncX web
-service.
+This module implements a Globus SDK client class suitable for use with the
+Globus Compute web service.
 
 It also implements data helpers for building complex payloads. Most notably,
 `FunctionRegistrationData` which can be constructed from an arbitrary callable.
@@ -94,11 +94,11 @@ class FunctionRegistrationData:
 
 class WebClient(globus_sdk.BaseClient):
     # the `service_name` is used in the Globus SDK to lookup the service URL from
-    # config. However, FuncX has its own logic for determining the base URL.
+    # config. However, Globus Compute has its own logic for determining the base URL.
     # set `service_name` to allow the check which ensures this is set to pass
     # it does not have any other effects
     service_name: str = "funcx"
-    # use the FuncX-specific error class
+    # use the Globus Compute-specific error class
     error_class = GlobusAPIError
 
     def __init__(

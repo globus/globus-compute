@@ -117,7 +117,7 @@ class AtomicController:
 
 class Executor(concurrent.futures.Executor):
     """
-    Extend Python's |Executor|_ base class for funcX's purposes.
+    Extend Python's |Executor|_ base class for Globus Compute's purposes.
 
     .. |Executor| replace:: ``Executor``
     .. _Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
@@ -232,7 +232,7 @@ class Executor(concurrent.futures.Executor):
         All function execution submissions (i.e., ``.submit()``) communicate which
         pre-registered function to execute on the endpoint by the function's
         identifier, the ``function_id``.  This method makes the appropriate API
-        call to the funcX web services to first register the task function, and
+        call to the Globus Compute web services to first register the task function, and
         then stores the returned ``function_id`` in the Executor's cache.
 
         In the standard workflow, ``.submit()`` will automatically handle invoking
@@ -310,8 +310,8 @@ class Executor(concurrent.futures.Executor):
         :param kwargs: keyword arguments (if any) as required to execute
             the function
         :returns: a future object that will receive a ``.task_id`` when the
-            funcX Web Service acknowledges receipt, and eventually will have
-            a ``.result()`` when the funcX web services receive and stream it.
+            Globus Compute Web Service acknowledges receipt, and eventually will have
+            a ``.result()`` when the Globus Compute web services receive and stream it.
         """
         if self._stopped:
             err_fmt = "%s is shutdown; no new functions may be executed"
@@ -358,7 +358,7 @@ class Executor(concurrent.futures.Executor):
         the function id is just a string.  One could substitute for a publicly
         available function.  For instance, ``b0a5d1a0-2b22-4381-b899-ba73321e41e0`` is
         a "well-known" uuid for the "Hello, World!" function (same as the example in
-        the FuncX tutorial), which is publicly available::
+        the Globus Compute tutorial), which is publicly available::
 
             from globus_compute_sdk import Executor
 
@@ -378,7 +378,7 @@ class Executor(concurrent.futures.Executor):
         :param kwargs: keyword arguments (if any) as required to execute
             the function
         :returns: a future object that (eventually) will have a ``.result()``
-            when the funcX web services receive and stream it.
+            when the Globus Compute web services receive and stream it.
         """
         if self._stopped:
             err_fmt = "%s is shutdown; no new functions may be executed"
@@ -415,7 +415,7 @@ class Executor(concurrent.futures.Executor):
 
     def map(self, fn: t.Callable, *iterables, timeout=None, chunksize=1) -> t.Iterator:
         """
-        FuncX does not currently implement the `.map()`_ method of the `Executor
+        Globus Compute does not currently implement the `.map()`_ method of the `Executor
         interface`_.  In a naive implementation, this method would merely be
         syntactic sugar for bulk use of the ``.submit()`` method.  For example::
 
@@ -596,7 +596,7 @@ class Executor(concurrent.futures.Executor):
                 if not tasks:
                     continue
 
-                log.info(f"Submitting tasks to funcX: {len(tasks)}")
+                log.info(f"Submitting tasks to Globus Compute: {len(tasks)}")
                 self._submit_tasks(futs, tasks)
 
                 with self._shutdown_lock:
@@ -676,12 +676,12 @@ class Executor(concurrent.futures.Executor):
         )
         for task in tasks:
             batch.add(task.function_id, task.endpoint_id, task.args, task.kwargs)
-            log.debug("Added task to funcX batch: %s", task)
+            log.debug("Added task to Globus Compute batch: %s", task)
 
         try:
             batch_tasks = self.funcx_client.batch_run(batch)
         except Exception:
-            log.error(f"Error submitting {len(tasks)} tasks to funcX")
+            log.error(f"Error submitting {len(tasks)} tasks to Globus Compute")
             raise
 
         self.task_count_submitted += len(batch_tasks)
@@ -700,7 +700,7 @@ class _ResultWatcher(threading.Thread):
     _ResultWatcher is an internal SDK class meant for consumption by the
     Executor.  It is a standard async AMQP consumer implementation
     using the Pika library that matches futures from the Executor against
-    results received from the funcX hosted services.
+    results received from the Globus Compute hosted services.
 
     Expected usage::
 

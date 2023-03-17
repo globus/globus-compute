@@ -119,7 +119,7 @@ class EndpointManager:
         log.debug(f"Registration info written to {json_file}")
 
         # * == "multi-tenant"; not important until it is, so let it be subtle
-        ptitle = f"funcX Endpoint *({endpoint_uuid}, {conf_dir.name})"
+        ptitle = f"Globus Compute Endpoint *({endpoint_uuid}, {conf_dir.name})"
         if config.environment:
             ptitle += f" - {config.environment}"
         ptitle += f" [{setproctitle.getproctitle()}]"
