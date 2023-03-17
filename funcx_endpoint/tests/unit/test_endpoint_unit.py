@@ -414,3 +414,40 @@ def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
 
     assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
     ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
+
+
+def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_id = str(uuid.uuid4())
+
+    mocker.patch(f"{_mock_base}daemon")
+    mocker.patch(f"{_mock_base}EndpointInterchange")
+    mock_dup2 = mocker.patch(f"{_mock_base}os.dup2")
+    mock_dup2.return_value = 0
+    mock_sys = mocker.patch(f"{_mock_base}sys")
+
+    expected_text = f"Starting local interchange with endpoint id: {ep_id}"
+
+    reg_info = {"endpoint_id": ep_id}
+
+    mock_sys.stdout.isatty.return_value = True
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+
+    assert mock_sys.stdout.write.called
+    assert not mock_sys.stderr.write.called
+    assert any(expected_text == a[0] for a, _ in mock_sys.stdout.write.call_args_list)
+
+    mock_sys.reset_mock()
+    mock_sys.stdout.isatty.return_value = False
+    mock_sys.stderr.isatty.return_value = True
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+
+    assert not mock_sys.stdout.write.called
+    assert mock_sys.stderr.write.called
+    assert any(expected_text == a[0] for a, _ in mock_sys.stderr.write.call_args_list)
+    mock_sys.reset_mock()
+    mock_sys.stderr.isatty.return_value = False
+    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+
+    assert not mock_sys.stdout.write.called
+    assert not mock_sys.stderr.write.called

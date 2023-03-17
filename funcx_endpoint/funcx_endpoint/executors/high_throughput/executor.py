@@ -405,7 +405,6 @@ class HighThroughputExecutor(RepresentationMixin):
         get the worker task and result ports that the interchange has bound to.
         """
         comm_q = mpQueue(maxsize=10)
-        print(f"Starting local interchange with endpoint id: {self.endpoint_id}")
         self.queue_proc = Process(
             target=interchange.starter,
             name="Executor-Interchange",
