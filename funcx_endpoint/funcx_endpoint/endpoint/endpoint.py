@@ -329,7 +329,7 @@ class Endpoint:
         elif sys.stderr.isatty():
             ostream = sys.stderr
         if ostream:
-            msg = f"Starting local interchange with endpoint id: {endpoint_uuid}"
+            msg = f"Starting endpoint; registered ID: {endpoint_uuid}"
             if log_to_console:
                 # make more prominent against other drab gray text ...
                 msg = f"\n    {msg}\n"

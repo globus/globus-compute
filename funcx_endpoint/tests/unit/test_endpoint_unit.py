@@ -426,7 +426,7 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data):
     mock_dup2.return_value = 0
     mock_sys = mocker.patch(f"{_mock_base}sys")
 
-    expected_text = f"Starting local interchange with endpoint id: {ep_id}"
+    expected_text = f"Starting endpoint; registered ID: {ep_id}"
 
     reg_info = {"endpoint_id": ep_id}
 
