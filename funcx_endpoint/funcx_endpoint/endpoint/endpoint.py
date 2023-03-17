@@ -323,6 +323,18 @@ class Endpoint:
             self.debug,
         )
 
+        ostream = None
+        if sys.stdout.isatty():
+            ostream = sys.stdout
+        elif sys.stderr.isatty():
+            ostream = sys.stderr
+        if ostream:
+            msg = f"Starting local interchange with endpoint id: {endpoint_uuid}"
+            if log_to_console:
+                # make more prominent against other drab gray text ...
+                msg = f"\n    {msg}\n"
+            print(msg, file=ostream)
+
         with context:
             # Per DaemonContext implementation, and that we _don't_ pass stdin,
             # fd 0 is already connected to devnull.  Unfortunately, there is an
