@@ -58,12 +58,12 @@ def test_client_init_sets_addresses_by_env(
 
 def test_client_init_accepts_specified_taskgroup():
     tg_uuid = uuid.uuid4()
-    fxc = gc.Client(
+    gcc = gc.Client(
         task_group_id=tg_uuid,
         do_version_check=False,
         login_manager=mock.Mock(),
     )
-    assert fxc.session_task_group_id == str(tg_uuid)
+    assert gcc.session_task_group_id == str(tg_uuid)
 
 
 @pytest.mark.parametrize(
@@ -75,31 +75,31 @@ def test_client_init_accepts_specified_taskgroup():
     ],
 )
 def test_update_task_table_on_invalid_data(api_data):
-    fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(ValueError):
-        fxc._update_task_table(api_data, "task-id-foo")
+        gcc._update_task_table(api_data, "task-id-foo")
 
 
 def test_update_task_table_on_exception():
     api_data = {"status": "success", "exception": "foo-bar-baz", "completion_t": "1.1"}
-    fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(TaskExecutionFailed) as excinfo:
-        fxc._update_task_table(api_data, "task-id-foo")
+        gcc._update_task_table(api_data, "task-id-foo")
     assert "foo-bar-baz" in str(excinfo.value)
 
 
 def test_update_task_table_simple_object(randomstring):
     serde = ComputeSerializer()
-    fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     task_id = "some_task_id"
 
     payload = randomstring()
     data = {"status": "success", "completion_t": "1.1"}
     data["result"] = serde.serialize(payload)
 
-    st = fxc._update_task_table(data, task_id)
+    st = gcc._update_task_table(data, task_id)
     assert not st["pending"]
     assert st["result"] == payload
     assert "exception" not in st
@@ -110,17 +110,17 @@ def test_pending_tasks_always_fetched():
     should_fetch_02 = str(uuid.uuid4())
     no_fetch = str(uuid.uuid4())
 
-    fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
-    fxc._task_status_table.update(
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
+    gcc._task_status_table.update(
         {should_fetch_01: {"pending": True}, no_fetch: {"pending": False}}
     )
     task_id_list = [no_fetch, should_fetch_01, should_fetch_02]
 
     # bulk avenue
-    fxc.get_batch_result(task_id_list)
+    gcc.get_batch_result(task_id_list)
 
-    args, _ = fxc.web_client.get_batch_status.call_args
+    args, _ = gcc.web_client.get_batch_status.call_args
     assert should_fetch_01 in args[0]
     assert should_fetch_02 in args[0]
     assert no_fetch not in args[0]
@@ -131,11 +131,11 @@ def test_pending_tasks_always_fetched():
         (True, should_fetch_02),
         (False, no_fetch),
     ):
-        fxc.web_client.get_task.reset_mock()
-        fxc.get_task(sf)
-        assert should_fetch is fxc.web_client.get_task.called
+        gcc.web_client.get_task.reset_mock()
+        gcc.get_task(sf)
+        assert should_fetch is gcc.web_client.get_task.called
         if should_fetch:
-            args, _ = fxc.web_client.get_task.call_args
+            args, _ = gcc.web_client.get_task.call_args
             assert sf == args[0]
 
 
@@ -144,20 +144,20 @@ def test_batch_created_websocket_queue(create_ws_queue):
     eid = str(uuid.uuid4())
     fid = str(uuid.uuid4())
 
-    fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
     if create_ws_queue is None:
-        batch = fxc.create_batch()
+        batch = gcc.create_batch()
     else:
-        batch = fxc.create_batch(create_websocket_queue=create_ws_queue)
+        batch = gcc.create_batch(create_websocket_queue=create_ws_queue)
 
     batch.add(fid, eid, (1,))
     batch.add(fid, eid, (2,))
 
-    fxc.batch_run(batch)
+    gcc.batch_run(batch)
 
-    assert fxc.web_client.submit.called
-    submit_data = fxc.web_client.submit.call_args[0][0]
+    assert gcc.web_client.submit.called
+    submit_data = gcc.web_client.submit.call_args[0][0]
     assert "create_websocket_queue" in submit_data
     if create_ws_queue:
         assert submit_data["create_websocket_queue"] is True
@@ -166,8 +166,8 @@ def test_batch_created_websocket_queue(create_ws_queue):
 
 
 def test_batch_error():
-    fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
 
     error_reason = "reason 1 2 3"
     error_results = {
@@ -187,20 +187,20 @@ def test_batch_error():
         ],
         "task_group_id": "tg_id",
     }
-    fxc.web_client.submit = mock.MagicMock(return_value=error_results)
+    gcc.web_client.submit = mock.MagicMock(return_value=error_results)
 
-    batch = fxc.create_batch()
+    batch = gcc.create_batch()
     batch.add("fid1", "eid1", "arg1")
     batch.add("fid2", "eid2", "arg2")
     with pytest.raises(TaskExecutionFailed) as excinfo:
-        fxc.batch_run(batch)
+        gcc.batch_run(batch)
 
     assert error_reason in str(excinfo)
 
 
 def test_batch_no_reason():
-    fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    fxc.web_client = mock.MagicMock()
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
 
     error_results = {
         "response": "batch",
@@ -213,10 +213,10 @@ def test_batch_no_reason():
         ],
         "task_group_id": "tg_id",
     }
-    fxc.web_client.submit = mock.MagicMock(return_value=error_results)
+    gcc.web_client.submit = mock.MagicMock(return_value=error_results)
 
     with pytest.raises(TaskExecutionFailed) as excinfo:
-        fxc.run(endpoint_id="fid", function_id="fid")
+        gcc.run(endpoint_id="fid", function_id="fid")
 
     assert "Unknown execution failure" in str(excinfo)
 
@@ -224,13 +224,13 @@ def test_batch_no_reason():
 @pytest.mark.parametrize("asynchronous", [True, False, None])
 def test_single_run_websocket_queue_depend_async(asynchronous):
     if asynchronous is None:
-        fxc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+        gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     else:
-        fxc = gc.Client(
+        gcc = gc.Client(
             asynchronous=asynchronous, do_version_check=False, login_manager=mock.Mock()
         )
 
-    fxc.web_client = mock.MagicMock()
+    gcc.web_client = mock.MagicMock()
 
     fake_results = {
         "results": [
@@ -241,11 +241,11 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
         ],
         "task_group_id": str(uuid.uuid4()),
     }
-    fxc.web_client.submit = mock.MagicMock(return_value=fake_results)
-    fxc.run(endpoint_id=str(uuid.uuid4()), function_id=str(uuid.uuid4()))
+    gcc.web_client.submit = mock.MagicMock(return_value=fake_results)
+    gcc.run(endpoint_id=str(uuid.uuid4()), function_id=str(uuid.uuid4()))
 
-    assert fxc.web_client.submit.called
-    submit_data = fxc.web_client.submit.call_args[0][0]
+    assert gcc.web_client.submit.called
+    submit_data = gcc.web_client.submit.call_args[0][0]
     assert "create_websocket_queue" in submit_data
     if asynchronous:
         assert submit_data["create_websocket_queue"] is True
@@ -257,7 +257,7 @@ def test_build_container(mocker, login_manager):
     mock_data = mocker.Mock()
     mock_data.data = {"container_id": "123-456"}
     login_manager.get_web_client.post = mocker.Mock(return_value=mock_data)
-    fxc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
     spec = ContainerSpec(
         name="MyContainer",
         pip=[
@@ -268,7 +268,7 @@ def test_build_container(mocker, login_manager):
         payload_url="https://github.com/funcx-faas/funcx-container-service.git",
     )
 
-    container_id = fxc.build_container(spec)
+    container_id = gcc.build_container(spec)
     assert container_id == "123-456"
     login_manager.get_web_client.post.assert_called()
     calls = login_manager.get_web_client.post.call_args
@@ -285,8 +285,8 @@ def test_container_build_status(mocker, login_manager, randomstring):
             self.http_status = 200
 
     login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = gc.Client(do_version_check=False, login_manager=login_manager)
-    status = fxc.get_container_build_status("123-434")
+    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+    status = gcc.get_container_build_status("123-434")
     assert status == expected_status
 
 
@@ -296,10 +296,10 @@ def test_container_build_status_not_found(mocker, login_manager):
             self.http_status = 404
 
     login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(ValueError) as excinfo:
-        fxc.get_container_build_status("123-434")
+        gcc.get_container_build_status("123-434")
 
     assert excinfo.value.args[0] == "Container ID 123-434 not found"
 
@@ -311,9 +311,9 @@ def test_container_build_status_failure(mocker, login_manager):
             self.http_reason = "This is a reason"
 
     login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
-    fxc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
 
     with pytest.raises(SystemError) as excinfo:
-        fxc.get_container_build_status("123-434")
+        gcc.get_container_build_status("123-434")
 
     assert type(excinfo.value) == SystemError

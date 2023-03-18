@@ -121,15 +121,15 @@ def test_start_endpoint(
     mocker,
     fs,
     randomstring,
-    get_standard_funcx_client,
+    get_standard_compute_client,
     register_endpoint_response,
     mock_ep_data,
 ):
-    mock_fxc = get_standard_funcx_client()
+    mock_gcc = get_standard_compute_client()
     mock_log = mocker.patch(f"{_mock_base}log")
     mock_daemon = mocker.patch(f"{_mock_base}daemon")
     mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
-    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
@@ -162,12 +162,12 @@ def test_register_endpoint_invalid_response(
     endpoint_uuid,
     other_endpoint_id,
     register_endpoint_response,
-    get_standard_funcx_client,
+    get_standard_compute_client,
     mock_ep_data,
 ):
-    mock_fxc = get_standard_funcx_client()
+    mock_gcc = get_standard_compute_client()
     mock_log = mocker.patch(f"{_mock_base}log")
-    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
 
@@ -189,14 +189,14 @@ def test_register_endpoint_locked_error(
     mocker,
     fs,
     register_endpoint_failure_response,
-    get_standard_funcx_client,
+    get_standard_compute_client,
     mock_ep_data,
 ):
     """
     Check to ensure endpoint registration escalates up with API error
     """
-    mock_fxc = get_standard_funcx_client()
-    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
+    mock_gcc = get_standard_compute_client()
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
@@ -213,15 +213,15 @@ def test_register_endpoint_is_not_multitenant(
     fs,
     endpoint_uuid,
     register_endpoint_response,
-    get_standard_funcx_client,
+    get_standard_compute_client,
     randomstring,
     multi_tenant,
     mock_ep_data,
 ):
-    mock_fxc = get_standard_funcx_client()
+    mock_gcc = get_standard_compute_client()
     mock_daemon = mocker.patch(f"{_mock_base}daemon")
     mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
-    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_fxc
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
@@ -351,9 +351,9 @@ def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env
 
     orig_proc_title = randomstring()
 
-    mock_fxc = mocker.Mock()
-    mock_fxc.register_endpoint.return_value = {"endpoint_id": ep_id}
-    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_fxc)
+    mock_gcc = mocker.Mock()
+    mock_gcc.register_endpoint.return_value = {"endpoint_id": ep_id}
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_gcc)
 
     mock_spt = mocker.patch(f"{_mock_base}setproctitle")
     mock_spt.getproctitle.return_value = orig_proc_title
@@ -363,7 +363,9 @@ def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env
         ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
 
     a, _k = mock_spt.setproctitle.call_args
-    assert a[0].startswith("Globus Compute Endpoint"), "Expect easily identifiable process name"
+    assert a[0].startswith(
+        "Globus Compute Endpoint"
+    ), "Expect easily identifiable process name"
     assert f"{ep_id}, {ep_dir.name}" in a[0], "Expect easily match process to ep conf"
     if not env:
         assert " - " not in a[0], "Default is not 'do not show env' for prod"
@@ -372,14 +374,14 @@ def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env
     assert a[0].endswith(f"[{orig_proc_title}]"), "Save original cmdline for debugging"
 
 
-def test_endpoint_needs_no_fxclient_if_reg_info(mocker, fs, randomstring, mock_ep_data):
+def test_endpoint_needs_no_client_if_reg_info(mocker, fs, randomstring, mock_ep_data):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
 
-    mock_fxc = mocker.Mock()
-    mock_fxc.register_endpoint.return_value = {"endpoint_id": ep_id}
-    mock_get_funcx_client = mocker.patch(
-        f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_fxc
+    mock_gcc = mocker.Mock()
+    mock_gcc.register_endpoint.return_value = {"endpoint_id": ep_id}
+    mock_get_compute_client = mocker.patch(
+        f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_gcc
     )
     mock_daemon = mocker.patch(f"{_mock_base}daemon")
     mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
@@ -389,13 +391,13 @@ def test_endpoint_needs_no_fxclient_if_reg_info(mocker, fs, randomstring, mock_e
 
     assert mock_epinterchange.called, "Has registration, should start."
     assert mock_daemon.DaemonContext.called
-    assert not mock_get_funcx_client.called, "No need for FXClient!"
+    assert not mock_get_compute_client.called, "No need for FXClient!"
 
     reg_info.clear()
     ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
     assert mock_epinterchange.called, "Has registration, should start."
     assert mock_daemon.DaemonContext.called
-    assert mock_get_funcx_client.called, "Need registration info, need FXClient"
+    assert mock_get_compute_client.called, "Need registration info, need FXClient"
 
 
 def test_endpoint_sets_owner_only_access(tmp_path, umask):

@@ -68,32 +68,32 @@ class MockedResultWatcher(_ResultWatcher):
 
 
 @pytest.fixture
-def fxexecutor(mocker):
-    fxc = mock.MagicMock()
-    fxc.session_task_group_id = str(uuid.uuid4())
-    fxe = Executor(funcx_client=fxc)
+def gc_executor(mocker):
+    gcc = mock.MagicMock()
+    gcc.session_task_group_id = str(uuid.uuid4())
+    gce = Executor(funcx_client=gcc)
     watcher = mocker.patch(
         "globus_compute_sdk.sdk.executor._ResultWatcher", autospec=True
     )
 
     def create_mock_watcher(*args, **kwargs):
-        return MockedResultWatcher(fxe)
+        return MockedResultWatcher(gce)
 
     watcher.side_effect = create_mock_watcher
 
-    yield fxc, fxe
+    yield gcc, gce
 
-    fxe.shutdown(wait=False, cancel_futures=True)
-    try_for_timeout(_is_stopped(fxe._task_submitter))
-    try_for_timeout(_is_stopped(fxe._result_watcher))
+    gce.shutdown(wait=False, cancel_futures=True)
+    try_for_timeout(_is_stopped(gce._task_submitter))
+    try_for_timeout(_is_stopped(gce._result_watcher))
 
-    if not _is_stopped(fxe._task_submitter)():
-        trepr = repr(fxe._task_submitter)
+    if not _is_stopped(gce._task_submitter)():
+        trepr = repr(gce._task_submitter)
         raise RuntimeError(
             "Executor still running: _task_submitter thread alive: %s" % trepr
         )
-    if not _is_stopped(fxe._result_watcher)():
-        trepr = repr(fxe._result_watcher)
+    if not _is_stopped(gce._result_watcher)():
+        trepr = repr(gce._result_watcher)
         raise RuntimeError(
             "Executor still running: _result_watcher thread alive: %r" % trepr
         )
@@ -118,11 +118,11 @@ def test_task_submission_info_stringification():
 @pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
 def test_deprecated_args_warned(argname, mocker):
     mock_warn = mocker.patch("globus_compute_sdk.sdk.executor.warnings")
-    fxc = mock.Mock(spec=Client)
-    Executor(funcx_client=fxc).shutdown()
+    gcc = mock.Mock(spec=Client)
+    Executor(funcx_client=gcc).shutdown()
     mock_warn.warn.assert_not_called()
 
-    Executor(funcx_client=fxc, **{argname: 1}).shutdown()
+    Executor(funcx_client=gcc, **{argname: 1}).shutdown()
     mock_warn.warn.assert_called()
 
 
@@ -137,153 +137,153 @@ def test_invalid_args_raise(randomstring):
 
 
 def test_creates_default_client_if_none_provided(mocker):
-    mock_fxc_klass = mocker.patch("globus_compute_sdk.sdk.executor.Client")
+    mock_gcc_klass = mocker.patch("globus_compute_sdk.sdk.executor.Client")
     Executor().shutdown()
 
-    mock_fxc_klass.assert_called()
+    mock_gcc_klass.assert_called()
 
 
-def test_executor_shutdown(fxexecutor):
-    fxc, fxe = fxexecutor
-    fxe.shutdown()
+def test_executor_shutdown(gc_executor):
+    gcc, gce = gc_executor
+    gce.shutdown()
 
-    try_assert(_is_stopped(fxe._task_submitter))
-    try_assert(_is_stopped(fxe._result_watcher))
+    try_assert(_is_stopped(gce._task_submitter))
+    try_assert(_is_stopped(gce._result_watcher))
 
 
-def test_executor_context_manager(fxexecutor):
-    fxc, fxe = fxexecutor
-    with fxe:
+def test_executor_context_manager(gc_executor):
+    gcc, gce = gc_executor
+    with gce:
         pass
-    assert _is_stopped(fxe._task_submitter)
-    assert _is_stopped(fxe._result_watcher)
+    assert _is_stopped(gce._task_submitter)
+    assert _is_stopped(gce._result_watcher)
 
 
-def test_property_task_group_id_is_isolated(fxexecutor):
-    fxc, fxe = fxexecutor
-    assert fxe.task_group_id != fxc.session_task_group_id
+def test_property_task_group_id_is_isolated(gc_executor):
+    gcc, gce = gc_executor
+    assert gce.task_group_id != gcc.session_task_group_id
 
-    fxe.task_group_id = uuid.uuid4()
-    assert fxe.task_group_id != fxc.session_task_group_id
+    gce.task_group_id = uuid.uuid4()
+    assert gce.task_group_id != gcc.session_task_group_id
 
 
-def test_multiple_register_function_fails(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_multiple_register_function_fails(gc_executor):
+    gcc, gce = gc_executor
 
-    fxc.register_function.return_value = "abc"
+    gcc.register_function.return_value = "abc"
 
-    fxe.register_function(noop)
+    gce.register_function(noop)
 
     with pytest.raises(ValueError):
-        fxe.register_function(noop)
+        gce.register_function(noop)
 
-    try_assert(lambda: fxe._stopped)
+    try_assert(lambda: gce._stopped)
 
     with pytest.raises(RuntimeError):
-        fxe.register_function(noop)
+        gce.register_function(noop)
 
 
-def test_shortcut_register_function(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_shortcut_register_function(gc_executor):
+    gcc, gce = gc_executor
 
     fn_id = str(uuid.uuid4())
-    fxe.register_function(noop, function_id=fn_id)
+    gce.register_function(noop, function_id=fn_id)
 
     with pytest.raises(ValueError):
-        fxe.register_function(noop, function_id=fn_id)
+        gce.register_function(noop, function_id=fn_id)
 
-    fxc.register_function.assert_not_called()
+    gcc.register_function.assert_not_called()
 
 
-def test_failed_registration_shuts_down_executor(fxexecutor, randomstring):
-    fxc, fxe = fxexecutor
+def test_failed_registration_shuts_down_executor(gc_executor, randomstring):
+    gcc, gce = gc_executor
 
     exc_text = randomstring()
-    fxc.register_function.side_effect = Exception(exc_text)
+    gcc.register_function.side_effect = Exception(exc_text)
 
     with pytest.raises(Exception) as wrapped_exc:
-        fxe.register_function(noop)
+        gce.register_function(noop)
 
     exc = wrapped_exc.value
     assert exc_text in str(exc)
-    try_assert(lambda: fxe._stopped)
+    try_assert(lambda: gce._stopped)
 
 
-def test_submit_raises_if_thread_stopped(fxexecutor):
-    fxc, fxe = fxexecutor
-    fxe.shutdown()
+def test_submit_raises_if_thread_stopped(gc_executor):
+    gcc, gce = gc_executor
+    gce.shutdown()
 
-    try_assert(_is_stopped(fxe._task_submitter), "Test prerequisite")
+    try_assert(_is_stopped(gce._task_submitter), "Test prerequisite")
 
     with pytest.raises(RuntimeError) as wrapped_exc:
-        fxe.submit(noop)
+        gce.submit(noop)
 
     err = wrapped_exc.value
     assert " is shutdown;" in str(err)
 
 
-def test_submit_auto_registers_function(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_submit_auto_registers_function(gc_executor):
+    gcc, gce = gc_executor
 
-    fxc.register_function.return_value = "abc"
-    fxe.endpoint_id = "some_ep_id"
-    fxe.submit(noop)
+    gcc.register_function.return_value = "abc"
+    gce.endpoint_id = "some_ep_id"
+    gce.submit(noop)
 
-    assert fxc.register_function.called
+    assert gcc.register_function.called
 
 
-def test_submit_value_error_if_no_endpoint(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_submit_value_error_if_no_endpoint(gc_executor):
+    gcc, gce = gc_executor
 
     with pytest.raises(ValueError) as pytest_exc:
-        fxe.submit(noop)
+        gce.submit(noop)
 
     err = pytest_exc.value
     assert "No endpoint_id set" in str(err)
-    assert "    fxe = Executor(endpoint_id=" in str(err), "Expected hint"
-    try_assert(_is_stopped(fxe._task_submitter), "Expected graceful shutdown on error")
+    assert "    gce = Executor(endpoint_id=" in str(err), "Expected hint"
+    try_assert(_is_stopped(gce._task_submitter), "Expected graceful shutdown on error")
 
 
-def test_same_function_different_containers_allowed(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_same_function_different_containers_allowed(gc_executor):
+    gcc, gce = gc_executor
     c1_id, c2_id = str(uuid.uuid4()), str(uuid.uuid4())
 
-    fxe.container_id = c1_id
-    fxe.register_function(noop)
-    fxe.container_id = c2_id
-    fxe.register_function(noop)
+    gce.container_id = c1_id
+    gce.register_function(noop)
+    gce.container_id = c2_id
+    gce.register_function(noop)
     with pytest.raises(ValueError, match="already registered"):
-        fxe.register_function(noop)
+        gce.register_function(noop)
 
 
-def test_map_raises(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_map_raises(gc_executor):
+    gcc, gce = gc_executor
 
     with pytest.raises(NotImplementedError):
-        fxe.map(noop)
+        gce.map(noop)
 
 
 @pytest.mark.parametrize("num_tasks", [0, 1, 2, 10])
-def test_reload_tasks_none_completed(fxexecutor, mocker, num_tasks):
-    fxc, fxe = fxexecutor
+def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
+    gcc, gce = gc_executor
 
     mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
 
     mock_data = {
-        "taskgroup_id": fxe.task_group_id,
+        "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
     }
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    fxc.web_client.get_taskgroup_tasks.return_value = mock_data
-    fxc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gcc.web_client.get_batch_status.return_value = mock_batch_result
 
-    client_futures = list(fxe.reload_tasks())
+    client_futures = list(gce.reload_tasks())
     if num_tasks == 0:
         log_args, log_kwargs = mock_log.warning.call_args
         assert "Received no tasks" in log_args[0]
-        assert fxe.task_group_id in log_args[0]
+        assert gce.task_group_id in log_args[0]
     else:
         assert not mock_log.warning.called
 
@@ -292,13 +292,13 @@ def test_reload_tasks_none_completed(fxexecutor, mocker, num_tasks):
 
 
 @pytest.mark.parametrize("num_tasks", [1, 2, 10])
-def test_reload_tasks_some_completed(fxexecutor, mocker, num_tasks):
-    fxc, fxe = fxexecutor
+def test_reload_tasks_some_completed(gc_executor, mocker, num_tasks):
+    gcc, gce = gc_executor
 
     mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
 
     mock_data = {
-        "taskgroup_id": fxe.task_group_id,
+        "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
     }
     num_completed = random.randint(1, num_tasks)
@@ -315,14 +315,14 @@ def test_reload_tasks_some_completed(fxexecutor, mocker, num_tasks):
         mock_batch_result[t_id]["result"] = serialize("abc")
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    fxc.web_client.get_taskgroup_tasks.return_value = mock_data
-    fxc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gcc.web_client.get_batch_status.return_value = mock_batch_result
 
-    client_futures = list(fxe.reload_tasks())
+    client_futures = list(gce.reload_tasks())
     if num_tasks == 0:
         log_args, log_kwargs = mock_log.warning.call_args
         assert "Received no tasks" in log_args[0]
-        assert fxe.task_group_id in log_args[0]
+        assert gce.task_group_id in log_args[0]
     else:
         assert not mock_log.warning.called
 
@@ -330,14 +330,14 @@ def test_reload_tasks_some_completed(fxexecutor, mocker, num_tasks):
     assert sum(1 for fut in client_futures if fut.done()) == num_completed
 
 
-def test_reload_tasks_all_completed(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_reload_tasks_all_completed(gc_executor):
+    gcc, gce = gc_executor
 
     serialize = ComputeSerializer().serialize
     num_tasks = 5
 
     mock_data = {
-        "taskgroup_id": fxe.task_group_id,
+        "taskgroup_id": gce.task_group_id,
         "tasks": [
             {
                 "id": uuid.uuid4(),
@@ -352,87 +352,87 @@ def test_reload_tasks_all_completed(fxexecutor):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    fxc.web_client.get_taskgroup_tasks.return_value = mock_data
-    fxc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gcc.web_client.get_batch_status.return_value = mock_batch_result
 
-    client_futures = list(fxe.reload_tasks())
+    client_futures = list(gce.reload_tasks())
 
     assert len(client_futures) == num_tasks
     assert sum(1 for fut in client_futures if fut.done()) == num_tasks
-    assert fxe._result_watcher is None, "Should NOT start watcher: all tasks done!"
+    assert gce._result_watcher is None, "Should NOT start watcher: all tasks done!"
 
 
-def test_reload_starts_new_watcher(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_reload_starts_new_watcher(gc_executor):
+    gcc, gce = gc_executor
 
     num_tasks = 3
 
     mock_data = {
-        "taskgroup_id": fxe.task_group_id,
+        "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
     }
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    fxc.web_client.get_taskgroup_tasks.return_value = mock_data
-    fxc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gcc.web_client.get_batch_status.return_value = mock_batch_result
 
-    client_futures = list(fxe.reload_tasks())
+    client_futures = list(gce.reload_tasks())
 
     assert len(client_futures) == num_tasks
-    try_assert(lambda: fxe._result_watcher.is_alive())
-    watcher_1 = fxe._result_watcher
+    try_assert(lambda: gce._result_watcher.is_alive())
+    watcher_1 = gce._result_watcher
 
-    client_futures = list(fxe.reload_tasks())
-    try_assert(lambda: fxe._result_watcher.is_alive())
-    watcher_2 = fxe._result_watcher
+    client_futures = list(gce.reload_tasks())
+    try_assert(lambda: gce._result_watcher.is_alive())
+    watcher_2 = gce._result_watcher
 
     assert watcher_1 is not watcher_2
 
 
-def test_reload_tasks_cancels_existing_futures(fxexecutor, randomstring):
-    fxc, fxe = fxexecutor
+def test_reload_tasks_cancels_existing_futures(gc_executor, randomstring):
+    gcc, gce = gc_executor
 
     def mock_data():
         return {
-            "taskgroup_id": fxe.task_group_id,
+            "taskgroup_id": gce.task_group_id,
             "tasks": [{"id": uuid.uuid4()} for i in range(random.randint(0, 20))],
         }
 
-    fxc.web_client.get_taskgroup_tasks.return_value = mock_data()
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data()
 
-    client_futures_1 = list(fxe.reload_tasks())
-    fxc.get_taskgroup_tasks.return_value = mock_data()
-    client_futures_2 = list(fxe.reload_tasks())
+    client_futures_1 = list(gce.reload_tasks())
+    gcc.get_taskgroup_tasks.return_value = mock_data()
+    client_futures_2 = list(gce.reload_tasks())
 
     assert all(fut.done() for fut in client_futures_1)
     assert all(fut.cancelled() for fut in client_futures_1)
     assert not any(fut.done() for fut in client_futures_2)
 
 
-def test_reload_client_taskgroup_tasks_fails_gracefully(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
+    gcc, gce = gc_executor
 
     mock_datum = (
-        (KeyError, {"mispeleed": fxe.task_group_id}),
+        (KeyError, {"mispeleed": gce.task_group_id}),
         (ValueError, {"taskgroup_id": "abcd"}),
-        (None, {"taskgroup_id": fxe.task_group_id}),
+        (None, {"taskgroup_id": gce.task_group_id}),
     )
 
     for expected_exc_class, md in mock_datum:
-        fxc.web_client.get_taskgroup_tasks.return_value = md
+        gcc.web_client.get_taskgroup_tasks.return_value = md
         if expected_exc_class:
             with pytest.raises(expected_exc_class):
-                fxe.reload_tasks()
+                gce.reload_tasks()
         else:
-            fxe.reload_tasks()
+            gce.reload_tasks()
 
 
-def test_reload_sets_failed_tasks(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_reload_sets_failed_tasks(gc_executor):
+    gcc, gce = gc_executor
 
     mock_data = {
-        "taskgroup_id": fxe.task_group_id,
+        "taskgroup_id": gce.task_group_id,
         "tasks": [
             {"id": uuid.uuid4(), "completion_t": 1, "exception": "doh!"}
             for i in range(random.randint(0, 10))
@@ -442,21 +442,21 @@ def test_reload_sets_failed_tasks(fxexecutor):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    fxc.web_client.get_taskgroup_tasks.return_value = mock_data
-    fxc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gcc.web_client.get_batch_status.return_value = mock_batch_result
 
-    futs = list(fxe.reload_tasks())
+    futs = list(gce.reload_tasks())
 
     assert all(fut.done() for fut in futs)
     assert all("doh!" in str(fut.exception()) for fut in futs)
 
 
-def test_reload_handles_deseralization_error_gracefully(fxexecutor):
-    fxc, fxe = fxexecutor
-    fxc.fx_serializer = ComputeSerializer()
+def test_reload_handles_deseralization_error_gracefully(gc_executor):
+    gcc, gce = gc_executor
+    gcc.fx_serializer = ComputeSerializer()
 
     mock_data = {
-        "taskgroup_id": fxe.task_group_id,
+        "taskgroup_id": gce.task_group_id,
         "tasks": [
             {"id": uuid.uuid4(), "completion_t": 1, "result": "a", "status": "success"}
             for i in range(random.randint(0, 10))
@@ -466,91 +466,91 @@ def test_reload_handles_deseralization_error_gracefully(fxexecutor):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    fxc.web_client.get_taskgroup_tasks.return_value = mock_data
-    fxc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gcc.web_client.get_batch_status.return_value = mock_batch_result
 
-    futs = list(fxe.reload_tasks())
+    futs = list(gce.reload_tasks())
 
     assert all(fut.done() for fut in futs)
     assert all("Failed to set " in str(fut.exception()) for fut in futs)
 
 
 @pytest.mark.parametrize("batch_size", tuple(range(1, 11)))
-def test_task_submitter_respects_batch_size(fxexecutor, batch_size: int):
-    fxc, fxe = fxexecutor
+def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
+    gcc, gce = gc_executor
 
-    fxc.create_batch.side_effect = mock.MagicMock
-    fxc.register_function.return_value = "abc"
+    gcc.create_batch.side_effect = mock.MagicMock
+    gcc.register_function.return_value = "abc"
     num_batches = 50
 
-    fxe.endpoint_id = "some_ep_id"
-    fxe.batch_size = batch_size
+    gce.endpoint_id = "some_ep_id"
+    gce.batch_size = batch_size
     for _ in range(num_batches * batch_size):
-        fxe.submit(noop)
-    fxe.shutdown(cancel_futures=True)
+        gce.submit(noop)
+    gce.shutdown(cancel_futures=True)
 
-    for args, _kwargs in fxc.batch_run.call_args_list:
+    for args, _kwargs in gcc.batch_run.call_args_list:
         batch, *_ = args
         assert batch.add.call_count <= batch_size
 
 
 def test_task_submitter_stops_executor_on_exception():
-    fxe = MockedExecutor()
-    fxe._tasks_to_send.put(("too", "much", "destructuring", "!!"))
+    gce = MockedExecutor()
+    gce._tasks_to_send.put(("too", "much", "destructuring", "!!"))
 
-    try_assert(lambda: fxe._stopped)
-    try_assert(lambda: isinstance(fxe._task_submitter_exception, ValueError))
+    try_assert(lambda: gce._stopped)
+    try_assert(lambda: isinstance(gce._task_submitter_exception, ValueError))
 
 
 def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
-    fxe = MockedExecutor()
+    gce = MockedExecutor()
 
     upstream_error = Exception(f"Upstream error {randomstring}!!")
-    fxe.funcx_client.batch_run.side_effect = upstream_error
-    fxe.task_group_id = "abc"
+    gce.funcx_client.batch_run.side_effect = upstream_error
+    gce.task_group_id = "abc"
     tsi = TaskSubmissionInfo(
         task_num=12345, function_id="abc", endpoint_id="abc", args=(), kwargs={}
     )
-    fxe._tasks_to_send.put((ComputeFuture(), tsi))
+    gce._tasks_to_send.put((ComputeFuture(), tsi))
 
-    try_assert(lambda: fxe._stopped)
-    try_assert(lambda: str(upstream_error) == str(fxe._task_submitter_exception))
+    try_assert(lambda: gce._stopped)
+    try_assert(lambda: str(upstream_error) == str(gce._task_submitter_exception))
 
 
-def test_task_submitter_handles_stale_result_watcher_gracefully(fxexecutor, mocker):
-    fxc, fxe = fxexecutor
-    fxe.endpoint_id = "blah"
+def test_task_submitter_handles_stale_result_watcher_gracefully(gc_executor, mocker):
+    gcc, gce = gc_executor
+    gce.endpoint_id = "blah"
 
     task_id = str(uuid.uuid4())
-    fxc.batch_run.return_value = [task_id]
-    fxe.submit(noop)
-    try_assert(lambda: bool(fxe._result_watcher), "Test prerequisite")
-    try_assert(lambda: bool(fxe._result_watcher._open_futures), "Test prerequisite")
-    watcher_1 = fxe._result_watcher
+    gcc.batch_run.return_value = [task_id]
+    gce.submit(noop)
+    try_assert(lambda: bool(gce._result_watcher), "Test prerequisite")
+    try_assert(lambda: bool(gce._result_watcher._open_futures), "Test prerequisite")
+    watcher_1 = gce._result_watcher
     watcher_1._closed = True  # simulate shutting down, but not yet stopped
     watcher_1._time_to_stop = True
 
-    fxe.submit(noop)
-    try_assert(lambda: fxe._result_watcher is not watcher_1, "Test prerequisite")
+    gce.submit(noop)
+    try_assert(lambda: gce._result_watcher is not watcher_1, "Test prerequisite")
 
 
-def test_task_submitter_sets_future_task_ids(fxexecutor):
-    fxc, fxe = fxexecutor
+def test_task_submitter_sets_future_task_ids(gc_executor):
+    gcc, gce = gc_executor
 
     num_tasks = random.randint(2, 20)
     futs = [ComputeFuture() for _ in range(num_tasks)]
     batch_ids = [uuid.uuid4() for _ in range(num_tasks)]
 
-    fxc.batch_run.return_value = batch_ids
-    fxe._submit_tasks(futs, [])
+    gcc.batch_run.return_value = batch_ids
+    gce._submit_tasks(futs, [])
 
     assert all(f.task_id == task_id for f, task_id in zip(futs, batch_ids))
 
 
 def test_resultwatcher_stops_if_unable_to_connect(mocker):
     mock_time = mocker.patch("globus_compute_sdk.sdk.executor.time")
-    fxe = mock.Mock(spec=Executor)
-    rw = _ResultWatcher(fxe)
+    gce = mock.Mock(spec=Executor)
+    rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
     rw.run()
@@ -559,8 +559,8 @@ def test_resultwatcher_stops_if_unable_to_connect(mocker):
 
 
 def test_resultwatcher_ignores_invalid_tasks(mocker):
-    fxe = mock.Mock(spec=Executor)
-    rw = _ResultWatcher(fxe)
+    gce = mock.Mock(spec=Executor)
+    rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
     futs = [ComputeFuture() for i in range(random.randint(1, 10))]
@@ -571,8 +571,8 @@ def test_resultwatcher_ignores_invalid_tasks(mocker):
 
 def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
     mocker.patch("globus_compute_sdk.sdk.executor.time")
-    fxe = mock.Mock(spec=Executor)
-    rw = _ResultWatcher(fxe)
+    gce = mock.Mock(spec=Executor)
+    rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
 
     fut = ComputeFuture(task_id=uuid.uuid4())
@@ -585,8 +585,8 @@ def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
 def test_resultwatcher_gracefully_handles_unexpected_exception(mocker):
     mocker.patch("globus_compute_sdk.sdk.executor.time")
     mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
-    fxe = mock.Mock(spec=Executor)
-    rw = _ResultWatcher(fxe)
+    gce = mock.Mock(spec=Executor)
+    rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
     rw._event_watcher = mock.Mock(side_effect=Exception)
 

@@ -20,13 +20,13 @@ from globus_sdk import (
 # finding the ID:
 #
 #  1. `--endpoint` opt
-#  2. FUNX_LOCAL_ENDPOINT_ID (seen here)
-#  3. FUNX_LOCAL_ENDPOINT_NAME (the name of a dir in `~/.funcx/`)
+#  2. COMPUTE_LOCAL_ENDPOINT_ID (seen here)
+#  3. COMPUTE_LOCAL_ENDPOINT_NAME (the name of a dir in `~/.funcx/`)
 #  4. An endpoint ID found in ~/.funcx/default/endpoint.json
 #
 #  this var starts with the ID env var load
-_LOCAL_ENDPOINT_ID = os.getenv("FUNCX_LOCAL_ENDPOINT_ID")
-_LOCAL_FUNCTION_ID = os.getenv("FUNCX_LOCAL_KNOWN_FUNCTION_ID")
+_LOCAL_ENDPOINT_ID = os.getenv("COMPUTE_LOCAL_ENDPOINT_ID")
+_LOCAL_FUNCTION_ID = os.getenv("COMPUTE_LOCAL_KNOWN_FUNCTION_ID")
 
 _CONFIGS = {
     "dev": {
@@ -64,7 +64,7 @@ def _get_local_endpoint_id():
     # this is only called if
     #  - there is no endpoint in the config (e.g. config via env var)
     #  - `--endpoint` is not passed
-    local_endpoint_name = os.getenv("FUNCX_LOCAL_ENDPOINT_NAME", "default")
+    local_endpoint_name = os.getenv("COMPUTE_LOCAL_ENDPOINT_NAME", "default")
     data_path = os.path.join(
         os.path.expanduser("~"), ".funcx", local_endpoint_name, "endpoint.json"
     )
@@ -97,7 +97,7 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(scope="session")
-def funcx_test_config_name(pytestconfig):
+def compute_test_config_name(pytestconfig):
     return pytestconfig.getoption("--compute-config")
 
 
@@ -154,9 +154,9 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
 
 
 @pytest.fixture(scope="session")
-def funcx_test_config(pytestconfig, funcx_test_config_name):
+def compute_test_config(pytestconfig, compute_test_config_name):
     # start with basic config load
-    config = _CONFIGS[funcx_test_config_name]
+    config = _CONFIGS[compute_test_config_name]
 
     # if `--endpoint` was passed or `endpoint_uuid` is present in config,
     # handle those cases
@@ -175,8 +175,8 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
     api_uri = pytestconfig.getoption("--service-address")
 
     # env vars to allow use of client creds in GitHub Actions
-    api_client_id = os.getenv("FUNCX_SMOKE_CLIENT_ID")
-    api_client_secret = os.getenv("FUNCX_SMOKE_CLIENT_SECRET")
+    api_client_id = os.getenv("COMPUTE_SMOKE_CLIENT_ID")
+    api_client_secret = os.getenv("COMPUTE_SMOKE_CLIENT_SECRET")
     if ws_uri:
         client_args["results_ws_uri"] = ws_uri
     if api_uri:
@@ -189,20 +189,20 @@ def funcx_test_config(pytestconfig, funcx_test_config_name):
 
 
 @pytest.fixture(scope="session")
-def fxc(funcx_test_config):
-    client_args = funcx_test_config["client_args"]
-    fxc = Client(**client_args)
-    return fxc
+def compute_client(compute_test_config):
+    client_args = compute_test_config["client_args"]
+    gcc = Client(**client_args)
+    return gcc
 
 
 @pytest.fixture
-def endpoint(funcx_test_config):
-    return funcx_test_config["endpoint_uuid"]
+def endpoint(compute_test_config):
+    return compute_test_config["endpoint_uuid"]
 
 
 @pytest.fixture
-def tutorial_function_id(funcx_test_config):
-    funcid = funcx_test_config.get("public_hello_fn_uuid")
+def tutorial_function_id(compute_test_config):
+    funcid = compute_test_config.get("public_hello_fn_uuid")
     if not funcid:
         pytest.skip("test requires a pre-defined public hello function")
     return funcid
@@ -214,12 +214,12 @@ FuncResult = collections.namedtuple(
 
 
 @pytest.fixture
-def submit_function_and_get_result(fxc):
+def submit_function_and_get_result(compute_client):
     def submit_fn(
         endpoint_id, func=None, func_args=None, func_kwargs=None, initial_sleep=0
     ):
         if callable(func):
-            func_id = fxc.register_function(func)
+            func_id = compute_client.register_function(func)
         else:
             func_id = func
 
@@ -228,7 +228,7 @@ def submit_function_and_get_result(fxc):
         if func_kwargs is None:
             func_kwargs = {}
 
-        task_id = fxc.run(
+        task_id = compute_client.run(
             *func_args, endpoint_id=endpoint_id, function_id=func_id, **func_kwargs
         )
 
@@ -238,7 +238,7 @@ def submit_function_and_get_result(fxc):
         result = None
         response = None
         for attempt in range(10):
-            response = fxc.get_task(task_id)
+            response = compute_client.get_task(task_id)
             if response.get("pending") is False:
                 result = response.get("result")
             else:

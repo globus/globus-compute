@@ -227,14 +227,14 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
     }
 
 
-class FXLogger(logging.Logger):
+class ComputeLogger(logging.Logger):
     TRACE = logging.DEBUG - 5
 
     def trace(self, msg, *args, **kwargs):
-        self.log(FXLogger.TRACE, msg, args, **kwargs)
+        self.log(ComputeLogger.TRACE, msg, args, **kwargs)
 
 
-logging.setLoggerClass(FXLogger)
+logging.setLoggerClass(ComputeLogger)
 logger = logging.getLogger(__name__)
 
 

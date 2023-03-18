@@ -9,7 +9,7 @@ from parsl.providers import SlurmProvider
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'frontera': {
-        'worker_init': 'source ~/setup_funcx_test_env.sh',
+        'worker_init': 'source ~/setup_compute_test_env.sh',
         'account': 'EAR22001',
         'partition': 'development',
         'scheduler_options': '',

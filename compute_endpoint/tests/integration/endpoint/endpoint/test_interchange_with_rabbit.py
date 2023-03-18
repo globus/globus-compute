@@ -12,15 +12,13 @@ from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.utils.config import Config
-from tests.integration.endpoint.executors.mock_executors import (
-    MockExecutor,
-)
+from tests.integration.endpoint.executors.mock_executors import MockExecutor
 from tests.utils import try_for_timeout
 
 
 @pytest.fixture
 def run_interchange_process(
-    get_standard_funcx_client, setup_register_endpoint_response, tmp_path
+    get_standard_compute_client, setup_register_endpoint_response, tmp_path
 ):
     """
     Start and stop a subprocess that executes the EndpointInterchange class.
@@ -46,9 +44,9 @@ def run_interchange_process(
 
     endpoint_uuid = str(uuid.uuid4())
     endpoint_name = "endpoint_foo"
-    fxc = get_standard_funcx_client()
+    gcc = get_standard_compute_client()
     setup_register_endpoint_response(endpoint_uuid)
-    reg_info = fxc.register_endpoint(endpoint_name, endpoint_uuid)
+    reg_info = gcc.register_endpoint(endpoint_name, endpoint_uuid)
     assert isinstance(reg_info, dict), "Test setup verification"
     assert reg_info["endpoint_id"] == endpoint_uuid, "Test setup verification"
     assert "task_queue_info" in reg_info

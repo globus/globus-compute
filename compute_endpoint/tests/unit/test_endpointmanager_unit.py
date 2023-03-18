@@ -45,18 +45,18 @@ def mock_setproctitle(mocker, randomstring):
 @pytest.fixture
 def mock_client(mocker):
     ep_uuid = str(uuid.uuid1())
-    mock_fxc = mocker.Mock()
-    mock_fxc.register_endpoint.return_value = {
+    mock_gcc = mocker.Mock()
+    mock_gcc.register_endpoint.return_value = {
         "endpoint_id": ep_uuid,
         "command_queue_info": {"connection_url": "", "queue": ""},
     }
-    mocker.patch("globus_compute_sdk.Client", return_value=mock_fxc)
-    yield ep_uuid, mock_fxc
+    mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
+    yield ep_uuid, mock_gcc
 
 
 @pytest.fixture
 def epmanager(mocker, conf_dir, mock_conf, mock_client):
-    ep_uuid, mock_fxc = mock_client
+    ep_uuid, mock_gcc = mock_client
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     em._command = mocker.Mock()
 
@@ -118,14 +118,16 @@ def test_sets_process_title(
 ):
     mock_spt, orig_proc_title = mock_setproctitle
 
-    ep_uuid, mock_fxc = mock_client
+    ep_uuid, mock_gcc = mock_client
     mock_conf.environment = env
 
     EndpointManager(conf_dir, ep_uuid, mock_conf)
     assert mock_spt.setproctitle.called, "Sanity check"
 
     a, *_ = mock_spt.setproctitle.call_args
-    assert a[0].startswith("Globus Compute Endpoint"), "Expect easily identifiable process name"
+    assert a[0].startswith(
+        "Globus Compute Endpoint"
+    ), "Expect easily identifiable process name"
     assert "*(" in a[0], "Expected asterisk as subtle clue of 'multi-tenant'"
     assert f"{ep_uuid}, {conf_dir.name}" in a[0], "Can find process by conf"
 
@@ -145,12 +147,12 @@ def test_gracefully_exits_if_in_conflict_or_locked(
     mock_conf,
     endpoint_uuid,
     randomstring,
-    get_standard_funcx_client,
+    get_standard_compute_client,
     status_code,
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mock_fxc = get_standard_funcx_client()
-    mocker.patch("globus_compute_sdk.Client", return_value=mock_fxc)
+    mock_gcc = get_standard_compute_client()
+    mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
 
     some_err = randomstring()
     register_endpoint_failure_response(status_code, some_err)
@@ -170,11 +172,11 @@ def test_gracefully_exits_if_in_conflict_or_locked(
 
 
 def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
-    ep_uuid, mock_fxc = mock_client
+    ep_uuid, mock_gcc = mock_client
     EndpointManager(conf_dir, ep_uuid, mock_conf)
 
-    assert mock_fxc.register_endpoint.called
-    _a, k = mock_fxc.register_endpoint.call_args
+    assert mock_gcc.register_endpoint.called
+    _a, k = mock_gcc.register_endpoint.call_args
     for key in ("endpoint_version", "hostname", "local_user", "config"):
         assert key in k["metadata"], "Expected minimal metadata"
 
@@ -220,7 +222,7 @@ def test_mismatched_id_gracefully_exits(
     mocker, randomstring, conf_dir, mock_conf, mock_client
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    wrong_uuid, mock_fxc = mock_client
+    wrong_uuid, mock_gcc = mock_client
     ep_uuid = str(uuid.uuid4())
     assert wrong_uuid != ep_uuid, "Verify test setup"
 
@@ -248,9 +250,9 @@ def test_handles_invalid_reg_info(
     mocker, randomstring, conf_dir, mock_conf, mock_client, received_data
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    ep_uuid, mock_fxc = mock_client
+    ep_uuid, mock_gcc = mock_client
     received_data[1]["endpoint_id"] = ep_uuid
-    should_succeed, mock_fxc.register_endpoint.return_value = received_data
+    should_succeed, mock_gcc.register_endpoint.return_value = received_data
 
     if not should_succeed:
         with pytest.raises(SystemExit) as pyexc:
@@ -266,9 +268,9 @@ def test_handles_invalid_reg_info(
 
 def test_writes_endpoint_uuid(epmanager):
     conf_dir, _mock_conf, mock_client, _em = epmanager
-    _ep_uuid, mock_fxc = mock_client
+    _ep_uuid, mock_gcc = mock_client
 
-    returned_uuid = mock_fxc.register_endpoint.return_value["endpoint_id"]
+    returned_uuid = mock_gcc.register_endpoint.return_value["endpoint_id"]
 
     ep_json_path = conf_dir / "endpoint.json"
     assert ep_json_path.exists()

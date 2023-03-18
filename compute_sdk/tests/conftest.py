@@ -51,18 +51,18 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture
-def fxc_args(pytestconfig):
-    fxc_args = {
+def compute_client_args(pytestconfig):
+    gcc_args = {
         "funcx_service_address": pytestconfig.getoption("--service-address")[0],
         "results_ws_uri": pytestconfig.getoption("--ws-uri")[0],
     }
-    return fxc_args
+    return gcc_args
 
 
 @pytest.fixture
-def fxc(fxc_args):
-    fxc = Client(**fxc_args)
-    return fxc
+def compute_client(compute_client_args):
+    gcc = Client(**compute_client_args)
+    return gcc
 
 
 @pytest.fixture

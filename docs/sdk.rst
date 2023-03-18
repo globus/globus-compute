@@ -203,7 +203,7 @@ and a result if it is available.
 .. _client credentials with globus compute clients:
 
 Client Credentials with Clients
-------------------------------------
+-------------------------------
 
 Client credentials can be useful if you need an endpoint to run in a service account or to be started automatically with a process manager.
 

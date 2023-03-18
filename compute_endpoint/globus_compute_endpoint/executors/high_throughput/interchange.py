@@ -32,14 +32,14 @@ from globus_compute_endpoint.executors.high_throughput.messages import (
     Message,
     MessageType,
 )
-from globus_compute_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import ComputeLogger
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.version import VERSION as PARSL_VERSION
 
 if t.TYPE_CHECKING:
     import multiprocessing as mp
 
-log: FXLogger = logging.getLogger(__name__)  # type: ignore
+log: ComputeLogger = logging.getLogger(__name__)  # type: ignore
 
 HEARTBEAT_CODE = (2**32) - 1
 PKL_HEARTBEAT_CODE = dill.dumps(HEARTBEAT_CODE)

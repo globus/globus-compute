@@ -32,14 +32,14 @@ def test_start_endpoint_blocked(
     # happy-path tested in tests/unit/test_endpoint_unit.py
 
     fx_addy = "http://api.funcx/"
-    fxc = globus_compute_sdk.Client(
+    gcc = globus_compute_sdk.Client(
         funcx_service_address=fx_addy,
         do_version_check=False,
         login_manager=mocker.Mock(),
     )
     fxwc = WebClient(base_url=fx_addy)
-    fxc.web_client = fxwc
-    patch_funcx_client.return_value = fxc
+    gcc.web_client = fxwc
+    patch_funcx_client.return_value = gcc
 
     mock_log = mocker.patch("globus_compute_endpoint.endpoint.endpoint.log")
     reason_msg = randomstring()
@@ -130,7 +130,7 @@ def test_endpoint_logout(monkeypatch):
 @patch("globus_compute_endpoint.cli.read_config")
 @patch("globus_compute_endpoint.endpoint.endpoint.Client.stop_endpoint")
 def test_stop_remote_endpoint(
-    mock_get_id, mock_get_conf, mock_get_fxc, mock_stop_endpoint
+    mock_get_id, mock_get_conf, mock_get_gcc, mock_stop_endpoint
 ):
     _do_stop_endpoint(name="abc-endpoint", remote=False)
     assert not mock_stop_endpoint.called

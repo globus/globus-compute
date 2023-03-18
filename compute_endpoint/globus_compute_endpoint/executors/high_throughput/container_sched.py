@@ -2,9 +2,9 @@ import logging
 import math
 import random
 
-from globus_compute_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import ComputeLogger
 
-log: FXLogger = logging.getLogger(__name__)  # type: ignore
+log: ComputeLogger = logging.getLogger(__name__)  # type: ignore
 
 
 def naive_scheduler(

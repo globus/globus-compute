@@ -53,7 +53,7 @@ class FakeLoginManager:
 
 
 @pytest.fixture
-def get_standard_funcx_client():
+def get_standard_compute_client():
     responses.add(
         method=responses.GET,
         url="https://api2.funcx.org/v2/version",

@@ -9,7 +9,7 @@ from parsl.providers import SlurmProvider
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'perlmutter': {
-        'worker_init': 'source ~/setup_funcx_test_env.sh',
+        'worker_init': 'source ~/setup_compute_test_env.sh',
         'scheduler_options': '#SBATCH -C gpu'
     }
 }

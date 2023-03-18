@@ -2,9 +2,9 @@ import requests
 from packaging.version import Version
 
 
-def test_web_service(fxc, endpoint, funcx_test_config):
-    """This test checks 1) web-service is online, 2) version of the funcx-web-service"""
-    service_address = fxc.funcx_service_address
+def test_web_service(gcc, endpoint, compute_test_config):
+    """This test checks 1) web-service is online, 2) version of the web-service"""
+    service_address = gcc.funcx_service_address
 
     response = requests.get(f"{service_address}/version")
 
@@ -14,7 +14,7 @@ def test_web_service(fxc, endpoint, funcx_test_config):
     )
 
     service_version = response.json()
-    api_min_version = funcx_test_config.get("api_min_version")
+    api_min_version = compute_test_config.get("api_min_version")
     if api_min_version is not None:
         parsed_min = Version(api_min_version)
         parsed_service = Version(service_version)
@@ -27,15 +27,15 @@ def say_hello():
     return "Hello World!"
 
 
-def test_simple_function(fxc):
+def test_simple_function(gcc):
     """Test whether we can register a function"""
-    func_uuid = fxc.register_function(say_hello)
+    func_uuid = gcc.register_function(say_hello)
     assert func_uuid is not None, "Invalid function uuid returned"
 
 
-def test_ep_status(fxc, endpoint):
+def test_ep_status(gcc, endpoint):
     """Test whether the tutorial EP is online and reporting status"""
-    response = fxc.get_endpoint_status(endpoint)
+    response = gcc.get_endpoint_status(endpoint)
 
     assert (
         response["status"] == "online"

@@ -18,8 +18,8 @@ The endpoint and function arguments are UUIDs and the payload is a dictionary of
 
 .. code-block::
 
-  'tasks': [{'endpoint.$': '<FUNCX ENDPOINT UUID>',
-             'function': '<FUNCX FUNCTION UUID>',
+  'tasks': [{'endpoint.$': '<COMPUTE ENDPOINT UUID>',
+             'function': '<COMPUTE FUNCTION UUID>',
              'payload.$': '<DICT OF INPUT ARGS>'}],
 
 

@@ -31,23 +31,22 @@ class CommandState:
         return click.get_current_context().ensure_object(CommandState)
 
 
-def init_endpoint_configuration_dir(funcx_conf_dir: pathlib.Path):
-    if not funcx_conf_dir.exists():
-        log.info(
-            "No existing configuration found at %s. Initializing...", funcx_conf_dir
-        )
+def init_endpoint_configuration_dir(conf_dir: pathlib.Path):
+    if not conf_dir.exists():
+        log.info("No existing configuration found at %s. Initializing...", conf_dir)
         try:
-            funcx_conf_dir.mkdir(mode=0o700, exist_ok=True)
+            conf_dir.mkdir(mode=0o700, exist_ok=True)
         except Exception as exc:
             e = click.ClickException(
                 f"{exc}\n\nUnable to create configuration directory"
             )
             raise e from exc
 
-    elif not funcx_conf_dir.is_dir():
+    elif not conf_dir.is_dir():
         raise click.ClickException(
-            f"File already exists: {funcx_conf_dir}\n\n"
-            "Refusing to initialize Globus Compute configuration directory: path already exists"
+            f"File already exists: {conf_dir}\n\n"
+            "Refusing to initialize Globus Compute configuration directory: "
+            "path already exists"
         )
 
 
@@ -62,8 +61,8 @@ def get_cli_endpoint() -> Endpoint:
     # as a result, any number of CLI options may be used to tweak the CommandState
     # via callbacks, and the Endpoint will only be constructed within commands which
     # access the Endpoint via this getter
-    funcx_dir = get_config_dir()
-    init_endpoint_configuration_dir(funcx_dir)
+    conf_dir = get_config_dir()
+    init_endpoint_configuration_dir(conf_dir)
 
     state = CommandState.ensure()
     endpoint = Endpoint(debug=state.debug)

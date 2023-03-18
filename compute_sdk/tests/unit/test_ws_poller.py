@@ -17,10 +17,10 @@ def _stop():
 
 
 def test_close_with_null_ws_state(mocker):
-    fxclient = mocker.MagicMock()
+    client = mocker.MagicMock()
     eventloop = asyncio.new_event_loop()
     wspt = WebSocketPollingTask(
-        funcx_client=fxclient,
+        funcx_client=client,
         loop=eventloop,
         atomic_controller=AtomicController(_start, _stop),
         auto_start=False,
@@ -50,10 +50,10 @@ def test_polling_task_cancels_futures_upon_upstream_failure(mocker):
     async def mock_recv():
         return json.dumps(next(mock_data_iter))
 
-    fxclient = mocker.MagicMock()
+    client = mocker.MagicMock()
     eventloop = asyncio.new_event_loop()
     wspt = WebSocketPollingTask(
-        funcx_client=fxclient,
+        funcx_client=client,
         loop=eventloop,
         atomic_controller=AtomicController(_start, _stop),
         auto_start=False,
@@ -73,10 +73,10 @@ def test_polling_task_cancels_futures_upon_upstream_failure(mocker):
 
 
 def test_malformed_response_handled_gracefully(mocker):
-    fxclient = mocker.MagicMock()
+    client = mocker.MagicMock()
     eventloop = asyncio.new_event_loop()
     wspt = WebSocketPollingTask(
-        funcx_client=fxclient,
+        funcx_client=client,
         loop=eventloop,
         atomic_controller=AtomicController(_start, _stop),
         auto_start=False,

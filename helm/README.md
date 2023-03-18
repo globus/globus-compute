@@ -51,7 +51,7 @@ Guide](https://docs.globus.org/api/auth/developer-guide/).
 
 Outside of this chart, use of client credentials is also documented for [normal
 Globus Compute SDK
-usage](https://funcx.readthedocs.io/en/latest/sdk.html#client-credentials-with-funcxclients).
+usage](https://funcx.readthedocs.io/en/latest/sdk.html#client-credentials-with-globus-compute-clients).
 
 Add these variables to a secret object in Kubernetes.  For example, to put them
 into a Kubernetes store named `my-secrets`, you could create a temporary env file

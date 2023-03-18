@@ -2,10 +2,10 @@ import logging
 import math
 import time
 
-from globus_compute_endpoint.logging_config import FXLogger
+from globus_compute_endpoint.logging_config import ComputeLogger
 from globus_compute_endpoint.strategies.base import BaseStrategy
 
-log: FXLogger = logging.getLogger(__name__)  # type: ignore
+log: ComputeLogger = logging.getLogger(__name__)  # type: ignore
 
 
 class KubeSimpleStrategy(BaseStrategy):

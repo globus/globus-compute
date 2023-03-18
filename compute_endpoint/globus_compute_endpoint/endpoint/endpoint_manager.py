@@ -62,13 +62,13 @@ class EndpointManager:
         endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(conf_dir, endpoint_uuid)
 
         try:
-            funcx_client_options = {
+            client_options = {
                 "funcx_service_address": config.funcx_service_address,
                 "environment": config.environment,
             }
 
-            fxc = gc.Client(**funcx_client_options)
-            reg_info = fxc.register_endpoint(
+            gcc = gc.Client(**client_options)
+            reg_info = gcc.register_endpoint(
                 conf_dir.name,
                 endpoint_uuid,
                 metadata=EndpointManager.get_metadata(config),

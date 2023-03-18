@@ -9,7 +9,7 @@ from parsl.providers import CobaltProvider
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'cooley': {
-        'worker_init': 'source ~/setup_funcx_test_env.sh',
+        'worker_init': 'source ~/setup_compute_test_env.sh',
         'scheduler_options': '',
         # Specify the account/allocation to which jobs should be charged
         'account': '<YOUR_COOLEY_ALLOCATION>'
