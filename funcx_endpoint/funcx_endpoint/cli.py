@@ -111,6 +111,21 @@ def common_options(f):
     return f
 
 
+def start_options(f):
+    f = click.option(
+        "--endpoint-uuid",
+        default=None,
+        help="The UUID to register with the Globus Compute services",
+    )(f)
+    f = click.option(
+        "--die-with-parent",
+        is_flag=True,
+        hidden=True,
+        help="Shutdown if parent process goes away",
+    )(f)
+    return f
+
+
 def name_arg(f):
     return click.argument("name", required=False, default="default")(f)
 
@@ -175,15 +190,7 @@ def configure_endpoint(
 
 @app.command(name="start", help="Start an endpoint by name")
 @name_arg
-@click.option(
-    "--endpoint-uuid", default=None, help="The UUID for the endpoint to register with"
-)
-@click.option(
-    "--die-with-parent",
-    is_flag=True,
-    hidden=True,
-    help="Shutdown if parent process goes away",
-)
+@start_options
 @common_options
 def start_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=False):
     """Start an endpoint
@@ -396,12 +403,16 @@ def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
 
 @app.command("restart")
 @name_arg
-@click.option("--endpoint-uuid", default=None, hidden=True)
 @common_options
-def restart_endpoint(*, name: str, endpoint_uuid: str | None):
+@start_options
+def restart_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=False):
     """Restarts an endpoint"""
     _do_stop_endpoint(name=name)
-    _do_start_endpoint(name=name, endpoint_uuid=endpoint_uuid)
+    _do_start_endpoint(
+        name=name,
+        endpoint_uuid=endpoint_uuid,
+        die_with_parent=die_with_parent,
+    )
 
 
 @app.command("list")
