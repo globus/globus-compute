@@ -26,6 +26,8 @@ class CommandState:
         self.debug = False
         self.no_color = False
         self.log_to_console = False
+        self.endpoint_uuid = None
+        self.die_with_parent = False
 
     @classmethod
     def ensure(cls) -> CommandState:
@@ -72,12 +74,17 @@ def get_cli_endpoint() -> Endpoint:
     return endpoint
 
 
+def set_param_to_config(ctx, param, value):
+    state = CommandState.ensure()
+    setattr(state, param.name, value)
+    return state
+
+
 def log_flag_callback(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
 
-    state = CommandState.ensure()
-    setattr(state, param.name, value)
+    state = set_param_to_config(ctx, param, value)
     setup_logging(debug=state.debug, no_color=state.no_color)
 
 
@@ -104,7 +111,7 @@ def common_options(f):
         expose_value=False,
         is_eager=True,
         callback=log_flag_callback,
-        help="Colorize the (console) log lines",
+        help="Do not colorize the (console) log lines",
     )(f)
 
     f = click.help_option("-h", "--help")(f)
@@ -115,12 +122,14 @@ def start_options(f):
     f = click.option(
         "--endpoint-uuid",
         default=None,
+        callback=set_param_to_config,
         help="The UUID to register with the Globus Compute services",
     )(f)
     f = click.option(
         "--die-with-parent",
         is_flag=True,
         hidden=True,
+        callback=set_param_to_config,
         help="Shutdown if parent process goes away",
     )(f)
     return f
@@ -192,7 +201,7 @@ def configure_endpoint(
 @name_arg
 @start_options
 @common_options
-def start_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=False):
+def start_endpoint(*, name: str, **_kwargs):
     """Start an endpoint
 
     This function will do:
@@ -212,10 +221,11 @@ def start_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=Fals
     |     Endpoint    |         daemon
     +-----------------+
     """
+    state = CommandState.ensure()
     _do_start_endpoint(
         name=name,
-        endpoint_uuid=endpoint_uuid,
-        die_with_parent=die_with_parent,
+        endpoint_uuid=state.endpoint_uuid,
+        die_with_parent=state.die_with_parent,
     )
 
 
@@ -405,13 +415,14 @@ def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
 @name_arg
 @common_options
 @start_options
-def restart_endpoint(*, name: str, endpoint_uuid: str | None, die_with_parent=False):
+def restart_endpoint(*, name: str, **_kwargs):
     """Restarts an endpoint"""
+    state = CommandState.ensure()
     _do_stop_endpoint(name=name)
     _do_start_endpoint(
         name=name,
-        endpoint_uuid=endpoint_uuid,
-        die_with_parent=die_with_parent,
+        endpoint_uuid=state.endpoint_uuid,
+        die_with_parent=state.die_with_parent,
     )
 
 
