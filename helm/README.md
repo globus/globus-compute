@@ -164,7 +164,6 @@ The deployment is configured via values.yaml file.
 | maxCPU | Maximum CPUs to allocate to worker pod | 2 |
 | maxBlocks | Maximum number of worker pods to spawn | 100 |
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
-| detachEndpoint | Run the endpoint as a daemon inside the pod? | true |
 | endpointUUID   | (Required) Specify a UUID for this endpoint. | |
 | endpointCLIargs | Any additional command line arguments to give to the `funcx-endpoint` executable | |
 | maxIdleTime  | The maximum time to maintain an idle worker. After this time the SimpleStrategy will terminate the idle worker. | 3600 |
