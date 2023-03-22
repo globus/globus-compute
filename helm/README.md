@@ -164,7 +164,8 @@ The deployment is configured via values.yaml file.
 | maxCPU | Maximum CPUs to allocate to worker pod | 2 |
 | maxBlocks | Maximum number of worker pods to spawn | 100 |
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
-| endpointUUID   | (Required) Specify a UUID for this endpoint. | |
+| endpointName | (Optional) Specify a name for registration with the funcX web services | The release name (Release.Name) |
+| endpointUUID | (Required) Specify a UUID for this endpoint | |
 | endpointCLIargs | Any additional command line arguments to give to the `funcx-endpoint` executable | |
 | maxIdleTime  | The maximum time to maintain an idle worker. After this time the SimpleStrategy will terminate the idle worker. | 3600 |
 | imagePullSecret | The K8s secret to use to deploy worker images. This can refer to an ECR secret. | |
