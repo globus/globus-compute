@@ -3,10 +3,10 @@
 EP_NAME="$1"; shift
 EP_UUID="$1"; shift
 
-echo -e "\n  Preparing to start kubelet Endpoint: $EP_NAME ($EP_UUID)\n"
+echo -e "\n  Preparing to start kubelet Endpoint: $EP_UUID ($EP_NAME)\n"
 
 mkdir -p "$HOME/.funcx/$EP_NAME/"
-cp /funcx/"$EP_NAME"/* "$HOME/.funcx/$EP_NAME/"
+cp /funcx/ep_instance/* "$HOME/.funcx/$EP_NAME/"
 cp /funcx/config/config.py "$HOME/.funcx/"
 
 if [[ -e "/funcx/credentials/storage.db" ]]; then
