@@ -269,7 +269,7 @@ class EndpointManager:
             )
             log.error(msg)
 
-        valid_method_name_re = re.compile(r"^[A-Za-z][0-9A-Za-z_]{0,99}$")
+        valid_method_name_re = re.compile(r"^cmd_[A-Za-z][0-9A-Za-z_]{0,99}$")
         max_skew_s = 180  # 3 minutes; ignore commands with out-of-date timestamp
         while not self._time_to_stop:
             if self._wait_for_child:
@@ -344,7 +344,7 @@ class EndpointManager:
                 if not (command and valid_method_name_re.match(command)):
                     raise InvalidCommandError(f"Unknown or invalid command: {command}")
 
-                command_func = getattr(EndpointManager, command, None)
+                command_func = getattr(self.__class__, command, None)
                 if not command_func:
                     raise InvalidCommandError(f"Unknown or invalid command: {command}")
 
@@ -366,7 +366,7 @@ class EndpointManager:
                 self._command.ack(d_tag)
 
     @staticmethod
-    def start_endpoint(
+    def cmd_start_endpoint(
         child_args: dict[int, tuple[int, int, str, str]],
         local_username: str,
         args: list[str] | None,
