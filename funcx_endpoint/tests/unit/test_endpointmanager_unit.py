@@ -101,7 +101,7 @@ def successful_exec(mocker, epmanager):
     pld = {
         "globus_uuid": "a",
         "globus_username": "a",
-        "command": "start_endpoint",
+        "command": "cmd_start_endpoint",
         "kwargs": {"name": "some_ep_name"},
     }
     queue_item = (1, props, json.dumps(pld).encode())
@@ -649,7 +649,9 @@ def test_handles_invalid_command_gracefully(mocker, epmanager, cmd_name):
 
 def test_handles_failed_command(mocker, epmanager):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mocker.patch(f"{_MOCK_BASE}EndpointManager.start_endpoint", side_effect=Exception())
+    mocker.patch(
+        f"{_MOCK_BASE}EndpointManager.cmd_start_endpoint", side_effect=Exception()
+    )
     conf_dir, mock_conf, mock_client, em = epmanager
 
     with open("local_user_lookup.json", "w") as f:
@@ -662,7 +664,7 @@ def test_handles_failed_command(mocker, epmanager):
         expiration="10000",
     )
 
-    pld = {"globus_uuid": "a", "globus_username": "a", "command": "start_endpoint"}
+    pld = {"globus_uuid": "a", "globus_username": "a", "command": "cmd_start_endpoint"}
     queue_item = (1, props, json.dumps(pld).encode())
 
     em._command_queue = mocker.Mock()
