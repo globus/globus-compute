@@ -637,7 +637,6 @@ class FuncXClient:
         """
         data = FunctionRegistrationData(
             function=function,
-            failover_source="",
             container_uuid=container_uuid,
             entry_point=function_name,
             description=description,
