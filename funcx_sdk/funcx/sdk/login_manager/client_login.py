@@ -52,7 +52,8 @@ def get_client_login() -> globus_sdk.ConfidentialAppAuthClient:
         uuid.UUID(client_id)
     except ValueError:
         log.warning(
-            "VERY LIKELY INVALID CLIENT ID (did you copy the username and not the id?"
+            "VERY LIKELY INVALID CLIENT ID (did you copy the username and not the id?)"
+            f"\n  Received: '{client_id}'"
         )
     return globus_sdk.ConfidentialAppAuthClient(
         client_id=str(client_id),
