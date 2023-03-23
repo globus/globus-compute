@@ -5,7 +5,6 @@ service.
 It also implements data helpers for building complex payloads. Most notably,
 `FunctionRegistrationData` which can be constructed from an arbitrary callable.
 """
-import inspect
 import json
 import typing as t
 import uuid
@@ -35,8 +34,6 @@ class FunctionRegistrationData:
         function: t.Optional[t.Callable] = None,
         function_name: t.Optional[str] = None,
         function_code: t.Optional[str] = None,
-        function_source: t.Optional[str] = None,
-        failover_source: t.Optional[str] = None,
         container_uuid: t.Optional[ID_PARAM_T] = None,
         entry_point: t.Optional[str] = None,
         description: t.Optional[str] = None,
@@ -49,15 +46,6 @@ class FunctionRegistrationData:
             function_name = function.__name__
             function_code = _get_packed_code(function, serializer=serializer)
 
-            if function_source is None:
-                try:
-                    function_source = inspect.getsource(function)
-                except OSError:
-                    if failover_source is not None:
-                        function_source = failover_source
-                    else:
-                        raise
-
         if function_name is None or function_code is None:
             raise ValueError(
                 "Either 'function' must be provided, or "
@@ -66,7 +54,6 @@ class FunctionRegistrationData:
 
         self.function_name = function_name
         self.function_code = function_code
-        self.function_source = function_source
         self.container_uuid = (
             str(container_uuid) if container_uuid is not None else container_uuid
         )
@@ -80,7 +67,6 @@ class FunctionRegistrationData:
         return {
             "function_name": self.function_name,
             "function_code": self.function_code,
-            "function_source": self.function_source,
             "container_uuid": self.container_uuid,
             "entry_point": self.entry_point,
             "description": self.description,
