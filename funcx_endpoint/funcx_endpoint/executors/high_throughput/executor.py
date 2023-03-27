@@ -502,8 +502,10 @@ class HighThroughputExecutor(RepresentationMixin):
         log.debug("queue management worker starting")
 
         while self.is_alive and not self._executor_bad_state.is_set():
-            try:
+            try: 
+                log.info("BENC: 00400 receiving a value (or nothing) from result incoming queue")
                 msgs = self.incoming_q.get(timeout=1)
+                log.info("BENC: 00400 received a value from result incoming queue")
 
             except queue.Empty:
                 log.debug("queue empty")
@@ -534,7 +536,9 @@ class HighThroughputExecutor(RepresentationMixin):
                     log.debug("Unpacking results")
                     for serialized_msg in msgs:
                         try:
+                            log.info("BENC: 00401 deserializing a message")
                             msg = dill.loads(serialized_msg)
+                            log.info("BENC: 00402 deserialized a message")
                             tid = msg["task_id"]
                         except dill.UnpicklingError:
                             raise BadMessage("Message received could not be unpickled")

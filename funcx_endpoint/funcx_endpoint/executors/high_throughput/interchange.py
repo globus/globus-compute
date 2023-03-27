@@ -884,7 +884,10 @@ class Interchange:
                 and self.socks[self.results_incoming] == zmq.POLLIN
             ):
                 log.debug("entering results_incoming section")
+                log.info("BENC: 00300 waiting for multipart receive")
+
                 manager, *b_messages = self.results_incoming.recv_multipart()
+                log.info("BENC: 00301 received multipart")
                 mdata = self._ready_manager_queue.get(manager)
                 if not mdata:
                     log.warning(
@@ -927,7 +930,9 @@ class Interchange:
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
                     for idx, b_message in enumerate(b_messages):
+                        log.info("BENC: 00302 about to un-dill a result")
                         r = dill.loads(b_message)
+                        log.info("BENC: 00303 undilled a result")
 
                         log.debug(
                             "Received task result %s (from %s)", r["task_id"], manager
@@ -944,7 +949,9 @@ class Interchange:
                         # Transfer any outstanding task statuses to the result message
                         if r["task_id"] in self.task_status_deltas:
                             r["task_statuses"] += self.task_status_deltas[r["task_id"]]
+                            log.info("BENC: 00304 reserialising result")
                             b_messages[idx] = dill.dumps(r)
+                            log.info("BENC: 00304 reserialised result")
                             log.debug(
                                 "Transferring statuses for %s: %s",
                                 r["task_id"],
@@ -957,7 +964,9 @@ class Interchange:
                     # TODO: handle this with a Task message or something?
                     # previously used this; switched to mono-message,
                     # self.results_outgoing.send_multipart(b_messages)
+                    log.info("BENC: 00305 serialising entire collection and sending to results_outgoing in interchange")
                     self.results_outgoing.send(dill.dumps(b_messages))
+                    log.info("BENC: 00306 sent to results_outgoing in interchange")
                     interesting_managers.add(manager)
 
                     log.debug(f"Current tasks: {mdata['tasks']}")
