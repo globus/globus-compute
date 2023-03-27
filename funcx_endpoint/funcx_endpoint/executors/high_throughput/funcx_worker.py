@@ -112,10 +112,12 @@ class FuncXWorker:
                 sys.exit()
             else:
                 result = self.execute_task(task_id, msg)
+                log.info("BENC: 00120 returned from execute task")
                 result["container_id"] = container_id
                 log.debug("Sending result")
                 # send bytes over the socket back to the manager
                 self.task_socket.send_multipart([b"TASK_RET", dill.dumps(result)])
+                log.info("BENC: 00121 send result over task_socket")
 
         log.warning("Broke out of the loop... dying")
 
@@ -127,6 +129,7 @@ class FuncXWorker:
 
         try:
             result = self.call_user_function(task_body)
+            log.info("BENC: 00110 returned from call user function")
         except Exception:
             log.exception("Caught an exception while executing user function")
             result_message: dict[
@@ -154,6 +157,7 @@ class FuncXWorker:
             task_id,
             (exec_end.timestamp - exec_start.timestamp),
         )
+        log.info("BENC: 00111 returning result_message from execute task")
         return result_message
 
     def call_user_function(self, message: bytes) -> str:
@@ -179,11 +183,14 @@ class FuncXWorker:
 
         f, args, kwargs = self.serializer.unpack_and_deserialize(task_data)
         result_data = f(*args, **kwargs)
+        log.info("BENC: 00100 serializing data on worker")
         serialized_data = self.serialize(result_data)
+        log.info("BENC: 00101 serialized data on worker")
 
         if len(serialized_data) > self.result_size_limit:
             raise MaxResultSizeExceeded(len(serialized_data), self.result_size_limit)
 
+        log.info("BENC: 00102 returning serialized data")
         return serialized_data
 
 

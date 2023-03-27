@@ -584,7 +584,9 @@ class Manager:
                     except KeyError:
                         log.exception(f"Task:{task_id} missing in task structure")
                     else:
+                        log.info("BENC: 00200 in funcx-manager putting result to pending_result_queue")
                         self.pending_result_queue.put(message)
+                        log.info("BENC: 00201 in funcx-manager after putting result to pending_result_queue")
                         self.worker_map.put_worker(w_id)
 
             elif m_type == b"WRKR_DIE":
@@ -688,6 +690,7 @@ class Manager:
         while not kill_event.is_set():
             try:
                 r = self.pending_result_queue.get(block=True, timeout=push_poll_period)
+                log.info("BENC: 00210 recevied a value on pending_Result_queue (might not be a result)")
                 # This avoids the interchange searching and attempting to unpack every
                 # message in case it's a status report.
                 # (It would be better to use Task Messages eventually to make this more
@@ -696,6 +699,7 @@ class Manager:
                 if isinstance(r, ManagerStatusReport):
                     items.insert(0, r.pack())
                 else:
+                    log.info("BENC: 00211 it is a result - adding to items")
                     items.append(r)
             except queue.Empty:
                 pass
@@ -710,7 +714,9 @@ class Manager:
             ):
                 last_beat = time.time()
                 if items:
+                    log.info("BENC: 00212 sending items multipart to result_outgoing in funcx-manager")
                     self.result_outgoing.send_multipart(items)
+                    log.info("BENC: 00213 sent items multipart to result_outgoing in funcx-manager")
                     items = []
 
         log.critical("Exiting")
