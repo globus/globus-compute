@@ -951,7 +951,7 @@ class Interchange:
                             r["task_statuses"] += self.task_status_deltas[r["task_id"]]
                             log.info("BENC: 00304 reserialising result")
                             b_messages[idx] = dill.dumps(r)
-                            log.info("BENC: 00304 reserialised result")
+                            log.info("BENC: 00305 reserialised result")
                             log.debug(
                                 "Transferring statuses for %s: %s",
                                 r["task_id"],
@@ -964,9 +964,9 @@ class Interchange:
                     # TODO: handle this with a Task message or something?
                     # previously used this; switched to mono-message,
                     # self.results_outgoing.send_multipart(b_messages)
-                    log.info("BENC: 00305 serialising entire collection and sending to results_outgoing in interchange")
+                    log.info("BENC: 00306 serialising entire collection and sending to results_outgoing in interchange")
                     self.results_outgoing.send(dill.dumps(b_messages))
-                    log.info("BENC: 00306 sent to results_outgoing in interchange")
+                    log.info("BENC: 00307 sent to results_outgoing in interchange")
                     interesting_managers.add(manager)
 
                     log.debug(f"Current tasks: {mdata['tasks']}")
