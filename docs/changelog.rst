@@ -3,6 +3,23 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-1.0.12:
+
+funcx & funcx-endpoint v1.0.12
+------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Implement client credentials for Kubernetes Endpoint Helm chart
+
+Changed
+^^^^^^^
+
+- Updated package dependencies.
+- Simplified format of endpoint status reports.
+- Streamlined API function registration
+
 .. _changelog-1.0.11:
 
 funcx & funcx-endpoint v1.0.11
