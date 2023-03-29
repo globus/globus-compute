@@ -39,7 +39,6 @@ class FunctionRegistrationData:
         description: t.Optional[str] = None,
         public: bool = False,
         group: t.Optional[str] = None,
-        searchable: bool = True,
         serializer: t.Optional[FuncXSerializer] = None,
     ):
         if function is not None:
@@ -61,7 +60,6 @@ class FunctionRegistrationData:
         self.description = description
         self.public = public
         self.group = group
-        self.searchable = searchable
 
     def to_dict(self):
         return {
@@ -72,7 +70,6 @@ class FunctionRegistrationData:
             "description": self.description,
             "public": self.public,
             "group": self.group,
-            "searchable": self.searchable,
         }
 
     def __str__(self):

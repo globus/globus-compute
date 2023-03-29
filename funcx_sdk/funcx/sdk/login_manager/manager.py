@@ -7,7 +7,7 @@ import threading
 import typing as t
 
 import globus_sdk
-from globus_sdk.scopes import AuthScopes, ScopeBuilder, SearchScopes
+from globus_sdk.scopes import AuthScopes, ScopeBuilder
 
 from ..web_client import FuncxWebClient
 from .client_login import get_client_login, is_client_login
@@ -59,7 +59,6 @@ class LoginManager:
     SCOPES: dict[str, list[str]] = {
         FuncxScopes.resource_server: [FuncxScopes.all],
         AuthScopes.resource_server: [AuthScopes.openid],
-        SearchScopes.resource_server: [SearchScopes.all],
     }
 
     def __init__(self, *, environment: str | None = None) -> None:
@@ -183,11 +182,6 @@ class LoginManager:
     def get_auth_client(self) -> globus_sdk.AuthClient:
         return globus_sdk.AuthClient(
             authorizer=self._get_authorizer(AuthScopes.resource_server)
-        )
-
-    def get_search_client(self) -> globus_sdk.SearchClient:
-        return globus_sdk.SearchClient(
-            authorizer=self._get_authorizer(SearchScopes.resource_server)
         )
 
     def get_funcx_web_client(

@@ -139,19 +139,6 @@ You can also set a function to be publicly accessible by setting ``public=True``
   fxc.register_function(funcx, description="My function", public=True)
 
 
-Discovering Functions
-----------------------
-
-funcX maintains an access controlled search index of registered functions.
-You can look up your own functions, functions that have been shared with you,
-or publicly accessible functions via the ``search_function()`` function.
-
-.. code-block:: python
-
-  search_results = fxc.search_function("my function", offset=0, limit=5)
-  print(search_results)
-
-
 .. _batching:
 
 Batching
@@ -247,7 +234,7 @@ More details on the funcX login manager prototcol are available `here. <https://
 .. code:: python
 
   import globus_sdk
-  from globus_sdk.scopes import AuthScopes, SearchScopes
+  from globus_sdk.scopes import AuthScopes
   from funcx.sdk.login_manager import LoginManager
   from funcx.sdk.web_client import FuncxWebClient
   from funcx import FuncXClient
@@ -265,11 +252,6 @@ More details on the funcX login manager prototcol are available `here. <https://
             authorizer=self.authorizers[AuthScopes.openid]
         )
 
-    def get_search_client(self) -> globus_sdk.SearchClient:
-        return globus_sdk.SearchClient(
-            authorizer=self.authorizers[SearchScopes.all]
-        )
-
     def get_funcx_web_client(self, *, base_url: str) -> FuncxWebClient:
         return FuncxWebClient(
             base_url=base_url,
@@ -284,13 +266,11 @@ More details on the funcX login manager prototcol are available `here. <https://
 
   # Create authorizers from existing tokens
   funcx_auth = globus_sdk.AccessTokenAuthorizer(funcx_token)
-  search_auth = globus_sdk.AccessTokenAuthorizer(search_token)
   openid_auth = globus_sdk.AccessTokenAuthorizer(openid_token)
 
   # Create a new login manager and use it to create a client
   funcx_login_manager = FuncXLoginManager(
       authorizers={FuncXClient.FUNCX_SCOPE: funcx_auth,
-                   SearchScopes.all: search_auth,
                    AuthScopes.openid: openid_auth}
   )
 

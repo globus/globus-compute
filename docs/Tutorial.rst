@@ -20,7 +20,7 @@ The funcX Python SDK provides programming abstractions for interacting with the 
 The funcX SDK exposes a ``FuncXClient`` object for all interactions with the funcX service.
 In order to use the funcX service you must first authenticate using one of hundreds of supported identity provides (e.g., your institution, ORCID, Google).
 
-As part of the authenticaiton process you must grant permission for funcX to access your identity information (to retrieve your email address), Globus Groups management access (to share functions and endpoints), and Globus Search (to discover functions and endpoints).
+As part of the authentication process you must grant permission for funcX to access your identity information (to retrieve your email address) and Globus Groups management access (to share endpoints).
 
 .. code-block:: python
 
@@ -208,32 +208,6 @@ Thus, if N uniformly-distributed random points are dropped within the square, ap
     # print the results
     print("Estimates: %s" % results)
     print("Average: {:.5f}".format(total/len(results)))
-
-Describing and Discovering Functions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-funcX manages a registry of functions that can be shared, discovered and reused.
-
-When registering a function, you may choose to set a description to support discovery, as well as making it ``public`` (so that others can run it) and/or ``searchable`` (so that others can discover it).
-
-.. code-block:: python
-
-    def hello_world():
-        return "Hello World!"
-
-    func_uuid = fxc.register_function(hello_world, description="hello world function", public=True, searchable=True)
-    print(func_uuid)
-
-You can search previously registered functions to which you have access using ``search_function``.
-The first parameter ``q`` is searched against all the fields, such as author, description, function name, and function source.
-You can navigate through pages of results with the ``offset`` and ``limit`` keyword args.
-
-The object returned is simple wrapper on a list, so you can index into it, but also can have a pretty-printed table.
-
-.. code-block:: python
-
-    search_results = fxc.search_function("hello", offset=0, limit=5)
-    print(search_results)
 
 Managing Endpoints
 ~~~~~~~~~~~~~~~~~~

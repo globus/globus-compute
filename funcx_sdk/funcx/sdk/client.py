@@ -16,7 +16,6 @@ from funcx.sdk._environments import (
 )
 from funcx.sdk.asynchronous.funcx_task import FuncXTask
 from funcx.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
-from funcx.sdk.search import SearchHelper
 from funcx.sdk.web_client import FunctionRegistrationData
 from funcx.serialize import FuncXSerializer
 from funcx.version import __version__, compare_versions
@@ -194,16 +193,6 @@ class FuncXClient:
             )
         else:
             self.loop = None
-
-        # TODO: remove this
-        self._searcher = None
-
-    @property
-    def searcher(self):
-        # TODO: remove this
-        if self._searcher is None:
-            self._searcher = SearchHelper(self.login_manager.get_search_client())
-        return self._searcher
 
     def version_check(self, endpoint_version: str | None = None) -> None:
         """Check this client version meets the service's minimum supported version.
@@ -608,7 +597,7 @@ class FuncXClient:
         description=None,
         public=False,
         group=None,
-        searchable=True,
+        searchable=None,
     ) -> str:
         """Register a function code with the funcX service.
 
@@ -630,11 +619,19 @@ class FuncXClient:
             If true, the function will be indexed into globus search with the
             appropriate permissions
 
+            DEPRECATED - ingesting functions to Globus Search is not currently supported
+
         Returns
         -------
         function uuid : str
             UUID identifier for the registered function
         """
+        if searchable is not None:
+            warnings.warn(
+                "The 'searchable' argument is deprecated and no longer functional. "
+                "It will be removed in a future release."
+            )
+
         data = FunctionRegistrationData(
             function=function,
             container_uuid=container_uuid,
@@ -642,53 +639,11 @@ class FuncXClient:
             description=description,
             public=public,
             group=group,
-            searchable=searchable,
             serializer=self.fx_serializer,
         )
         logger.info(f"Registering function : {data}")
         r = self.web_client.register_function(data)
         return r.data["function_uuid"]
-
-    @requires_login
-    def search_function(self, q, offset=0, limit=10, advanced=False):
-        """Search for function via the funcX service
-
-        Parameters
-        ----------
-        q : str
-            free-form query string
-        offset : int
-            offset into total results
-        limit : int
-            max number of results to return
-        advanced : bool
-            allows elastic-search like syntax in query string
-
-        Returns
-        -------
-        FunctionSearchResults
-        """
-        return self.searcher.search_function(
-            q, offset=offset, limit=limit, advanced=advanced
-        )
-
-    @requires_login
-    def search_endpoint(self, q, scope="all", owner_id=None):
-        """
-
-        Parameters
-        ----------
-        q
-        scope : str
-            Can be one of {'all', 'my-endpoints', 'shared-with-me'}
-        owner_id
-            should be urn like f"urn:globus:auth:identity:{owner_uuid}"
-
-        Returns
-        -------
-
-        """
-        return self.searcher.search_endpoint(q, scope=scope, owner_id=owner_id)
 
     @requires_login
     def register_container(self, location, container_type, name="", description=""):
