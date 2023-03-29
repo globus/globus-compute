@@ -43,9 +43,6 @@ class FakeLoginManager:
     def get_auth_client(self) -> globus_sdk.AuthClient:
         return globus_sdk.AuthClient(authorizer=globus_sdk.NullAuthorizer())
 
-    def get_search_client(self) -> globus_sdk.SearchClient:
-        return globus_sdk.SearchClient(authorizer=globus_sdk.NullAuthorizer())
-
     def get_funcx_web_client(self, *, base_url: str | None = None) -> FuncxWebClient:
         return FuncxWebClient(
             base_url="https://api2.funcx.org/v2/",
