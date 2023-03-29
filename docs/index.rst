@@ -78,22 +78,7 @@ how to download and configure an endpoint for local (multi-process) execution. :
 
 
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   quickstart
-   executor
-   sdk
-   endpoints
-   Tutorial
-   actionprovider
-   reference/index
-   limits
-   changelog
-
-Indices and tables
-==================
+Links
+^^^^^
 
 * :ref:`genindex`
-* :ref:`search`
