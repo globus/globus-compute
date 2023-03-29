@@ -156,12 +156,19 @@ class WebClient(globus_sdk.BaseClient):
         *,
         metadata: t.Optional[dict] = None,
         multi_tenant: t.Optional[bool] = None,
+        display_name: t.Optional[str] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
         data: t.Dict[str, t.Any] = {
             "endpoint_name": endpoint_name,
             "endpoint_uuid": str(endpoint_id),
         }
+
+        # Only populate if not None.  "" is valid and will be included
+        # No value or a 'None' on an existing endpoint will leave
+        # the old display_name unchanged
+        if display_name is not None:
+            data["display_name"] = display_name
 
         # Only send this param if True.  Will have to change to
         # `if multi_tenant is not None` if we want to always pass it

@@ -16,29 +16,57 @@ def funcx_dir_path(tmp_path):
     yield tmp_path / "funcx-dir"
 
 
-@pytest.fixture(autouse=True)
-def mock_cli_state(funcx_dir_path):
-    with mock.patch("globus_compute_endpoint.cli.Endpoint") as mock_ep:
-        mock_ep.return_value = mock_ep
-        with mock.patch("globus_compute_endpoint.cli.CommandState.ensure") as m_state:
-            mock_state = mock.Mock()
-            mock_state.endpoint_config_dir = funcx_dir_path
-            m_state.return_value = mock_state
+@pytest.fixture
+def mock_command_ensure(funcx_dir_path):
+    with mock.patch("globus_compute_endpoint.cli.CommandState.ensure") as m_state:
+        mock_state = mock.Mock()
+        mock_state.endpoint_config_dir = funcx_dir_path
+        m_state.return_value = mock_state
 
-            yield mock_ep, mock_state
+        yield mock_state
 
 
 @pytest.fixture
-def make_endpoint_dir(mock_cli_state):
-    mock_cli, mock_state = mock_cli_state
+def mock_cli_state(funcx_dir_path, mock_command_ensure):
+    with mock.patch("globus_compute_endpoint.cli.Endpoint") as mock_ep:
+        mock_ep.return_value = mock_ep
+        yield mock_ep, mock_command_ensure
 
+
+@pytest.fixture
+def make_endpoint_dir(mock_command_ensure):
     def func(name):
-        ep_dir = mock_state.endpoint_config_dir / name
+        ep_dir = mock_command_ensure.endpoint_config_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
         ep_config = ep_dir / "config.py"
-        ep_config.write_text(  # minimal setup to make loading work
-            "from globus_compute_endpoint.endpoint.utils.config import Config\n"
-            "config = Config(multi_tenant=False)"
+        ep_config.write_text(  # Default config for testing
+            """
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
+from parsl.providers import LocalProvider
+
+config = Config(
+    display_name=None,
+    executors=[
+        HighThroughputExecutor(
+            provider=LocalProvider(
+                init_blocks=1,
+                min_blocks=0,
+                max_blocks=1,
+            ),
+        )
+    ],
+)
+
+meta = {
+    "name": "$name",
+    "description": "",
+    "organization": "",
+    "department": "",
+    "public": False,
+    "visible_to": [],
+}
+            """
         )
 
     return func
@@ -155,6 +183,30 @@ def test_restart_endpoint_does_start_and_stop(
     mock_ep, _ = mock_cli_state
     mock_ep.stop_endpoint.assert_called_once()
     mock_ep.start_endpoint.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "display_test",
+    [
+        ["ep0", None],
+        ["ep1", "ep/ .1"],
+        ["ep2", "abc 😎 /.great"],
+    ],
+)
+def test_start_ep_display_name_in_config(
+    run_line, mock_command_ensure, make_endpoint_dir, display_test
+):
+    ep_name, display_name = display_test
+
+    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.py"
+    configure_arg = ""
+    if display_name is not None:
+        configure_arg = f" --display-name '{display_name}'"
+    run_line(f"configure {ep_name}{configure_arg}")
+
+    dn_str = f'"{display_name}"' if display_name is not None else "None"
+
+    assert f"display_name={dn_str}," in conf.read_text()
 
 
 def test_start_ep_incorrect(run_line, mock_cli_state, make_endpoint_dir):

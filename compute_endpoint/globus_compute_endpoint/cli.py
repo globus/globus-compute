@@ -11,15 +11,14 @@ import uuid
 
 import click
 from click import ClickException
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
-
-from .endpoint.endpoint import Endpoint
-from .endpoint.endpoint_manager import EndpointManager
-from .endpoint.utils.config import Config
-from .logging_config import setup_logging
-from .version import DEPRECATION_FUNCX_ENDPOINT
 
 log = logging.getLogger(__name__)
 
@@ -167,6 +166,10 @@ def version_command():
     hidden=True,
     help="Configure endpoint as multi-tenant capable",
 )
+@click.option(
+    "--display-name",
+    help="A human readable display name for the endpoint, if desired",
+)
 @name_arg
 @common_options
 def configure_endpoint(
@@ -174,6 +177,7 @@ def configure_endpoint(
     name: str,
     endpoint_config: str | None,
     multi_tenant: bool,
+    display_name: str | None,
 ):
     """Configure an endpoint
 
@@ -182,7 +186,7 @@ def configure_endpoint(
     """
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
-    Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant)
+    Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant, display_name)
 
 
 @app.command(name="start", help="Start an endpoint by name")

@@ -468,6 +468,7 @@ class Client:
         endpoint_id,
         metadata=None,
         multi_tenant=False,
+        display_name=None,
     ):
         """Register an endpoint with the Globus Compute service.
 
@@ -492,6 +493,7 @@ class Client:
             endpoint_id=endpoint_id,
             metadata=metadata,
             multi_tenant=multi_tenant,
+            display_name=display_name,
         )
         return r.data
 

@@ -3,6 +3,7 @@ from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 
 config = Config(
+    display_name=None,  # If None, defaults to the endpoint name
     executors=[
         HighThroughputExecutor(
             provider=LocalProvider(
