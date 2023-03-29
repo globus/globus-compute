@@ -50,6 +50,26 @@ class Config(RepresentationMixin):
         the connection is assumed to be disconnected.
         Default: 120s
 
+    idle_heartbeats_soft: int (count)
+        Number of heartbeats after an endpoint is idle (no outstanding tasks or
+        results, and at least 1 task or result has been forwarded) before the
+        endpoint shuts down.  If 0, then the endpoint must be manually triggered
+        to shut down (e.g., SIGINT or SIGTERM).
+        Default: 0
+
+    idle_heartbeats_hard: int (count)
+        Number of heartbeats after no task or result has moved before the endpoint
+        shuts down.  Unlike `idle_heartbeats_soft`, this idle timer does not require
+        that there are no outstanding tasks or results.  If no task or result has
+        moved in this many heartbeats, then the endpoint will shut down.  In
+        particular, this is intended to catch the error condition that a worker
+        has gone missing, and will thus _never_ return the task it was sent.
+        Note that this setting is only enabled if the `idle_heartbeats_soft` is a
+        value greater than 0.  Suggested value: a multiplier of heartbeat_period
+        equivalent to two days.  For example, if `heartbeat_period` is 30s, then
+        suggest 5760.
+        Default: 5760
+
     stdout : str
         Path where the endpoint's stdout should be written
         Default: ./interchange.stdout
@@ -83,6 +103,8 @@ class Config(RepresentationMixin):
         # Tuning info
         heartbeat_period=30,
         heartbeat_threshold=120,
+        idle_heartbeats_soft=0,
+        idle_heartbeats_hard=5760,  # Two days, divided by `heartbeat_period`
         detach_endpoint=True,
         # Logging info
         log_dir=None,
@@ -123,6 +145,8 @@ class Config(RepresentationMixin):
         # Tuning info
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
+        self.idle_heartbeats_soft = int(max(0, idle_heartbeats_soft))
+        self.idle_heartbeats_hard = int(max(0, idle_heartbeats_hard))
         self.detach_endpoint = detach_endpoint
 
         # Logging info
