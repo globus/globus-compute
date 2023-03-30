@@ -79,6 +79,7 @@ how to download and configure an endpoint for local (multi-process) execution. :
 
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Contents:
 
@@ -96,4 +97,3 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`search`
