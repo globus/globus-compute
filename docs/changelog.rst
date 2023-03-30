@@ -79,8 +79,8 @@ New Functionality
 
 - 'whoami' has been added to the cli to show the current logged in
   identity and linked identities.
-    * A --linked-identities optional argument shows all linked identities
-    * ie. `funcx-endpoint whoami` or `funcx-endpoint whoami --linked-identities`
+  - A --linked-identities optional argument shows all linked identities
+  - ie. `funcx-endpoint whoami` or `funcx-endpoint whoami --linked-identities`
 
 Bug Fixes
 ^^^^^^^^^
@@ -88,18 +88,19 @@ Bug Fixes
 - FuncXExecutor no longer ignores the specified ``container_id``.  The same
   function may now be utilized in containers via the normal workflow:
 
-    .. code-block:: python
-        import funcx
+  .. code-block:: python
 
-        def some_func():
-            return 1
-        with funcx.FuncXExecutor() as fxe:
-            fxe.endpoint_id = "some-endpoint-uuid"
-            fxe.container_id = "some-container_uuid"
-            fxe.submit(some_func)
-            fxe.container_id = "some-other-container-uuid"
-            fxe.submit(some_func)  # same function, different container!
-            # ...
+      import funcx
+
+      def some_func():
+          return 1
+      with funcx.FuncXExecutor() as fxe:
+          fxe.endpoint_id = "some-endpoint-uuid"
+          fxe.container_id = "some-container_uuid"
+          fxe.submit(some_func)
+          fxe.container_id = "some-other-container-uuid"
+          fxe.submit(some_func)  # same function, different container!
+          # ...
 
 Changed
 ^^^^^^^
@@ -245,8 +246,8 @@ Bug Fixes
 
 - General and specific attention to the ``FuncXExecutor``, especially around
   non-happy path interactions
-    - Addressed the often-hanging end-of-script problem
-    - Address web-socket race condition (GH#591)
+  - Addressed the often-hanging end-of-script problem
+  - Address web-socket race condition (GH#591)
 
 Deprecated
 ^^^^^^^^^^
