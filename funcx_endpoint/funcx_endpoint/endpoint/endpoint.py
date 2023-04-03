@@ -200,11 +200,6 @@ class Endpoint:
 
         result_store = ResultStore(endpoint_dir=endpoint_dir)
 
-        # From this point on, we don't read from stdin;
-        with open(os.devnull) as stdin:
-            if os.dup2(stdin.fileno(), 0) != 0:
-                raise Exception("Unable to close stdin")
-
         # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
