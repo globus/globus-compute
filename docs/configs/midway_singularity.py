@@ -1,6 +1,6 @@
 from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_compute_endpoint.executors import HighThroughputExecutor
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_interface
 from parsl.launchers import SrunLauncher
 from parsl.providers import SlurmProvider
 
@@ -18,7 +18,7 @@ config = Config(
     executors=[
         HighThroughputExecutor(
             max_workers_per_node=10,
-            address=address_by_hostname(),
+            address=address_by_interface('bond0'),
             scheduler_mode='soft',
             worker_mode='singularity_reuse',
             container_type='singularity',
