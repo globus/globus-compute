@@ -213,7 +213,7 @@ Note that of the 3 categories of failures:
   We have agreed that we can only assist with 1) and 2)
 """
 COMBINED_SERIALIZE_METHODS = [
-    DillCodeSource.identifier,
+    # DillCodeSource.identifier,
     DillCode.identifier,
 ]
 
@@ -223,9 +223,9 @@ COMBINED_SEPARATOR = ":"
 
 METHODS_MAP_CODE = OrderedDict(
     [
-        (DillCodeSource.identifier, DillCodeSource),
+        # (DillCodeSource.identifier, DillCodeSource),
         (DillCode.identifier, DillCode),
-        (DillCodeTextInspect.identifier, DillCodeTextInspect),
+        # (DillCodeTextInspect.identifier, DillCodeTextInspect),
         (PickleCode.identifier, PickleCode),
         (CombinedCode.identifier, CombinedCode),
     ]
