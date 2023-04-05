@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 import dill
 
-from funcx.serialize.base import DeserializationError, SerializeBase
+from funcx.serialize.base import DeserializationError, SerializeBase, SerializerError
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,8 @@ class DillCodeSource(SerializeBase):
         super().__init__()
 
     def serialize(self, data) -> str:
+        if data.__closure__ is not None:
+            raise SerializerError("Payload non-local variables ignored by `getsource`.")
         name = data.__name__
         body = dill.source.getsource(data, lstrip=True)
         x = codecs.encode(dill.dumps((name, body)), "base64").decode()
@@ -76,6 +78,8 @@ class DillCodeTextInspect(SerializeBase):
         super().__init__()
 
     def serialize(self, data) -> str:
+        if data.__closure__ is not None:
+            raise SerializerError("Payload non-local variables ignored by `getsource`.")
         name = data.__name__
         body = inspect.getsource(data)
         x = codecs.encode(dill.dumps((name, body)), "base64").decode()
