@@ -1,16 +1,15 @@
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.addresses import address_by_hostname
 from parsl.launchers import SrunLauncher
 from parsl.providers import SlurmProvider
-
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
 
 # fmt: off
 
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'midway': {
-        'worker_init': 'source ~/setup_funcx_test_env.sh',
+        'worker_init': 'source ~/setup_compute_test_env.sh',
         'scheduler_options': '',
     }
 }

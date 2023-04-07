@@ -1,16 +1,15 @@
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.addresses import address_by_interface
 from parsl.launchers import MpiExecLauncher
 from parsl.providers import CobaltProvider
-
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
 
 # fmt: off
 
 # PLEASE UPDATE user_opts BEFORE USE
 user_opts = {
     'cooley': {
-        'worker_init': 'source ~/setup_funcx_test_env.sh',
+        'worker_init': 'source ~/setup_compute_test_env.sh',
         'scheduler_options': '',
         # Specify the account/allocation to which jobs should be charged
         'account': '<YOUR_COOLEY_ALLOCATION>'
@@ -32,7 +31,7 @@ config = Config(
                 scheduler_options=user_opts['cooley']['scheduler_options'],
 
                 # Command to be run before starting a worker, such as:
-                # 'module load Anaconda; source activate funcx_env'.
+                # 'module load Anaconda; source activate compute_env'.
                 worker_init=user_opts['cooley']['worker_init'],
 
                 # Scale between 0-1 blocks with 2 nodes per block
@@ -48,4 +47,4 @@ config = Config(
     ],
 )
 
-# fmt: onrom funcx_endpoint.endpoint.utils.config import Config
+# fmt: onrom compute_endpoint.endpoint.utils.config import Config

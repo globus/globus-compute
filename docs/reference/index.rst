@@ -1,6 +1,6 @@
-.. module:: funcx
+.. module:: globus_compute_sdk
 
-funcX SDK
+Globus Compute SDK
 =========
 
 .. toctree::

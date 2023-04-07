@@ -1,19 +1,19 @@
-import funcx  # noqa:E402
+import globus_compute_sdk  # noqa:E402
 
 # -- Project information -----------------------------------------------------
 
-project = "funcX"
+project = "Globus Compute"
 copyright = "2019, The University of Chicago"
-author = "The funcX Team"
+author = "The Globus Compute Team"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = funcx.__version__.rsplit(".", 1)[0]
+version = globus_compute_sdk.__version__.rsplit(".", 1)[0]
 # The full version, including alpha/beta/rc tags.
-release = funcx.__version__
+release = globus_compute_sdk.__version__
 
 
 # -- General configuration ---------------------------------------------------
@@ -44,7 +44,9 @@ pygments_dark_style = "monokai"  # this is a furo-specific option
 html_show_sourcelink = True
 html_theme = "furo"
 html_static_path = ["_static"]
+
+# Potentially different pngs for light/dark in the future
 html_theme_options = {
-    "light_logo": "images/funcX-light-cropped.png",
-    "dark_logo": "images/funcX-dark-cropped.png",
+    "light_logo": "images/globus-300x300-blue.png",
+    "dark_logo": "images/globus-300x300-blue.png",
 }

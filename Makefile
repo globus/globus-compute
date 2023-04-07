@@ -1,13 +1,13 @@
 .venv-docs:
 	python -m venv .venv-docs
 	.venv-docs/bin/pip install -U pip setuptools
-	.venv-docs/bin/pip install './funcx_sdk[docs]' './funcx_endpoint'
+	.venv-docs/bin/pip install './compute_sdk[docs]' './compute_endpoint'
 
 .PHONY: lint docs
 lint:
 	pre-commit run -a
-	cd funcx_sdk; tox -e mypy; cd ..
-	cd funcx_endpoint; tox -e mypy; cd ..
+	cd compute_sdk; tox -e mypy; cd ..
+	cd compute_endpoint; tox -e mypy; cd ..
 
 docs: .venv-docs
 	# clean the build dir before rebuilding

@@ -1,36 +1,36 @@
-funcX Executor
+Globus Compute Executor
 ==============
 
-The |FuncXExecutor|_ class, a subclass of Python's |Executor|_, is the
-preferred approach to collecting results from the funcX web services.  Over
+The |Executor|_ class, a subclass of Python's |Executor|_, is the
+preferred approach to collecting results from the Globus Compute web services.  Over
 polling (the historical approach) where the web service must be repeatedly
 queried for the status of tasks and results eventually collected in bulk, the
-|FuncXExecutor|_ class instantiates an AMQPS connection that streams results
+|Executor|_ class instantiates an AMQPS connection that streams results
 directly -- and immediately -- as they arrive at the server.  This is a far
 more efficient paradigm, simultaneously in terms of bytes over the wire, time
 spent waiting for results, and boilerplate code to check for results.
 
-For most "simple" interactions with funcX, this class will likely be the
+For most "simple" interactions with Globus Compute, this class will likely be the
 quickest and easiest avenue to submit tasks and acquire results.  An
 example interaction:
 
 .. code-block:: python
-    :caption: funcxexecutor_basic_example.py
+    :caption: globus_compute_executor_basic_example.py
 
-    from funcx import FuncXExecutor
+    from globus_compute_sdk import Executor
 
     def double(x):
         return x * 2
 
     tutorial_endpoint_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
-    with FuncXExecutor(endpoint_id=tutorial_endpoint_id) as fxe:
-        fut = fxe.submit(double, 7)
+    with Executor(endpoint_id=tutorial_endpoint_id) as gce:
+        fut = gce.submit(double, 7)
 
         print(fut.result())
 
 This example is only a quick-reference, showing the basic mechanics of how to
-use the |FuncXExecutor|_ class and submitting a single task.  However, there
-are a number of details to observe.  The first is that a |FuncXExecutor|_
+use the |Executor|_ class and submitting a single task.  However, there
+are a number of details to observe.  The first is that a |Executor|_
 instance is associated with a specific endpoint.  We use the "well-known"
 tutorial endpoint in this example, but that can point to any endpoint to which
 you have access.
@@ -40,19 +40,19 @@ you have access.
     (authenticated) user.  You are welcome to use it, but please limit the size
     and number of functions you send to this endpoint as it is a shared
     resource that is (intentionally) not very powerful.  It's primary intended
-    purpose is for an introduction to the funcX toolset.
+    purpose is for an introduction to the Globus Compute toolset.
 
 Second, the waiting -- or "blocking" -- for a result is automatic.  The
 |.submit()|_ call returns a |Future|_ immediately; the actual HTTP call to the
-funcX web-services will not have occurred yet, and neither will the task even
+Globus Compute web-services will not have occurred yet, and neither will the task even
 been executed (remotely), much less a result received.  The |.result()|_ call
 blocks ("waits") until all of that has completed, and the result has been
 received from the upstream services.
 
-Third, |FuncXExecutor|_ objects can be used as context managers (the ``with``
-statement).  Underneath the hood, the |FuncXExecutor|_ class uses threads to
+Third, |Executor|_ objects can be used as context managers (the ``with``
+statement).  Underneath the hood, the |Executor|_ class uses threads to
 implement the asynchronous interface -- a thread to coalesce and submit tasks,
-and a thread to watch for incoming results.  The |FuncXExecutor|_ logic cannot
+and a thread to watch for incoming results.  The |Executor|_ logic cannot
 determine when it will no longer receive tasks (i.e., no more |.submit()|_
 calls) and so cannot prematurely shutdown.  Thus, it must be told, either
 explicitly with a call to |.shutdown()|_, or implicitly when used as a context
@@ -74,9 +74,9 @@ always end with 1.  The rules are:
 To verify all of the sequences through 100, one brute-force approach is:
 
 .. code-block:: python
-    :caption: funcxexecutor_collatz.py
+    :caption: globus_compute_executor_collatz.py
 
-    from funcx import FuncXExecutor
+    from globus_compute_sdk import Executor
 
     def generate_collatz_sequence(N: int, sequence_limit = 10_000):
         seq = [N]
@@ -93,9 +93,9 @@ To verify all of the sequences through 100, one brute-force approach is:
     generate_from = 1
     generate_through = 100
     futs, results, disproof_candidates = [], [], []
-    with FuncXExecutor(endpoint_id=ep_id) as fxe:
+    with Executor(endpoint_id=ep_id) as gce:
         for n in range(generate_from, generate_through + 1):
-            futs.append(fxe.submit(generate_collatz_sequence, n))
+            futs.append(gce.submit(generate_collatz_sequence, n))
         print("Tasks all submitted; waiting for results")
 
     # The futures were appended to the `futs` list in order, so one could wait
@@ -123,7 +123,7 @@ status.  Futures make this simple with the |.done()|_ method:
 .. code-block:: python
 
     ...
-    future = fxe.submit(generate_collatz_sequence, 1234567890)
+    future = gce.submit(generate_collatz_sequence, 1234567890)
 
     # Use the .done() method to check the status of the function without
     # blocking; this will return a Bool indicating whether the result is ready
@@ -142,9 +142,9 @@ than summarily return, and the specific number chosen starts a sequence that
 takes more than 100 steps to complete.
 
 .. code-block:: python
-    :caption: funcxexecutor_handle_result_exceptions.py
+    :caption: globus_compute_executor_handle_result_exceptions.py
 
-    from funcx import FuncXExecutor
+    from globus_compute_sdk import Executor
 
     def generate_collatz_sequence(N: int, sequence_limit=100):
         seq = [N]
@@ -158,8 +158,8 @@ takes more than 100 steps to complete.
             raise ValueError(f"Sequence not terminated in {sequence_limit} steps")
         return seq
 
-    with FuncXExecutor(endpoint_id=ep_id) as fxe:
-        future = fxe.submit(generate_collatz_sequence, 1234567890)
+    with Executor(endpoint_id=ep_id) as gce:
+        future = gce.submit(generate_collatz_sequence, 1234567890)
 
     try:
         print(future.result())
@@ -180,7 +180,7 @@ finish.)  There are a number of ways to work with results as they arrive; this
 example uses `concurrent.futures.as_completed`_:
 
 .. code-block:: python
-    :caption: funcxexecutor_results_as_arrived.py
+    :caption: globus_compute_executor_results_as_arrived.py
 
     import concurrent.futures
 
@@ -192,8 +192,8 @@ example uses `concurrent.futures.as_completed`_:
         time.sleep(x * random.random())
         return f"{x} -> {x * 2}"
 
-    with FuncXExecutor(endpoint_id=endpoint_id) as fxe:
-        futs = [fxe.submit(double, i) for i in range(10)]
+    with Executor(endpoint_id=endpoint_id) as gce:
+        futs = [gce.submit(double, i) for i in range(10)]
 
         # The futures were appended to the `futs` list in order, so one could
         # wait for each result in turn to get an ordered set:
@@ -215,56 +215,56 @@ example uses `concurrent.futures.as_completed`_:
 
 Reloading Tasks
 ---------------
-Waiting for incoming results with the |FuncXExecutor|_ requires an active
+Waiting for incoming results with the |Executor|_ requires an active
 connection -- which is often at odds with closing a laptop clamshell (e.g.,
 heading home for the weekend).  For longer running jobs like this, the
-|FuncXExecutor|_ offers the |.reload_tasks()|_ method.  This method will reach
-out to the funcX web-services to collect all of the tasks associated with the
+|Executor|_ offers the |.reload_tasks()|_ method.  This method will reach
+out to the Globus Compute web-services to collect all of the tasks associated with the
 |.task_group_id|_, create a list of associated futures, finish
 (call |.set_result()|_) any previously finished tasks, and watch the unfinished
 futures.  Consider the following (contrived) example:
 
 .. code-block:: python
-    :caption: funcxexecutor_reload_tasks.py
+    :caption: globus_compute_executor_reload_tasks.py
 
     # execute initially as:
-    # $ python funcxexecutor_reload_tasks.py
+    # $ python globus_compute_executor_reload_tasks.py
     #  ... this Task Group ID: <TG_UUID_STR>
     #  ...
     # Then run with the Task Group ID as an argument:
-    # $ python funcxexecutor_reload_tasks.py <TG_UUID_STR>
+    # $ python globus_compute_executor_reload_tasks.py <TG_UUID_STR>
 
     import os, signal, sys, time, typing as t
-    from funcx import FuncXExecutor
-    from funcx.sdk.executor import FuncXFuture
+    from globus_compute_sdk import Executor
+    from globus_compute_sdk.sdk.executor import ComputeFuture
 
     task_group_id = sys.argv[1] if len(sys.argv) > 1 else None
 
     def task_kernel(num):
-        return f"your funcx logic result, from task: {num}"
+        return f"your Globus Compute logic result, from task: {num}"
 
     ep_id = "<YOUR_ENDPOINT_UUID>"
-    with FuncXExecutor(endpoint_id=ep_id) as fxe:
-        futures: t.Iterable[FuncXFuture]
+    with Executor(endpoint_id=ep_id) as gce:
+        futures: t.Iterable[ComputeFuture]
         if task_group_id:
             print(f"Reloading tasks from Task Group ID: {task_group_id}")
-            fxe.task_group_id = task_group_id
-            futures = fxe.reload_tasks()
+            gce.task_group_id = task_group_id
+            futures = gce.reload_tasks()
 
         else:
             # Save the task_group_id somewhere.  Perhaps in a file, or less
             # robustly "as mere text" on your console:
             print(
-                "New session; creating funcX tasks; if this script dies, rehydrate"
-                f" futures with this Task Group ID: {fxe.task_group_id}"
+                "New session; creating Globus Compute tasks; if this script dies, rehydrate"
+                f" futures with this Task Group ID: {gce.task_group_id}"
             )
             num_tasks = 5
-            futures = [fxe.submit(task_kernel, i + 1) for i in range(num_tasks)]
+            futures = [gce.submit(task_kernel, i + 1) for i in range(num_tasks)]
 
             # Ensure all tasks have been sent upstream ...
-            while fxe.task_count_submitted < num_tasks:
+            while gce.task_count_submitted < num_tasks:
                 time.sleep(1)
-                print(f"Tasks submitted upstream: {fxe.task_count_submitted}")
+                print(f"Tasks submitted upstream: {gce.task_count_submitted}")
 
             # ... before script death for [silly reason; did you lose power!?]
             bname = sys.argv[0]
@@ -273,7 +273,7 @@ futures.  Consider the following (contrived) example:
 
             print("Simulating unexpected process death!  Now reload the session")
             print("by rerunning this script with the task_group_id:\n")
-            print(f"  {bname} {fxe.task_group_id}\n")
+            print(f"  {bname} {gce.task_group_id}\n")
             os.kill(os.getpid(), signal.SIGKILL)
             exit(1)  # In case KILL takes split-second to process
 
@@ -287,13 +287,13 @@ futures.  Consider the following (contrived) example:
     print("Results:\n ", "\n  ".join(results))
 
 For a slightly more advanced usage, one could manually submit a batch of tasks
-with the |FuncXClient|_, and wait for the results at a future time.  Submitting
+with the |Client|_, and wait for the results at a future time.  Submitting
 the results might look like:
 
 .. code-block:: python
-    :caption: funcxclient_submit_batch.py
+    :caption: globus_compute_client_submit_batch.py
 
-    from funcx import FuncXClient
+    from globus_compute_sdk import Client
 
     def expensive_task(task_arg):
         import time
@@ -301,43 +301,43 @@ the results might look like:
         return "All done!"
 
     ep_id = "<endpoint_id>"
-    fxc = FuncXClient()
+    gcc = Client()
 
-    print(f"Task Group ID for later reloading: {fxc.session_task_group_id}")
-    fn_id = fxc.register_function(expensive_task)
-    batch = fxc.create_batch()
+    print(f"Task Group ID for later reloading: {gcc.session_task_group_id}")
+    fn_id = gcc.register_function(expensive_task)
+    batch = gcc.create_batch()
     for task_i in range(10):
         batch.add(fn_id, ep_id, args=(task_i,))
-    self.funcx_client.batch_run(batch)
+    gcc.batch_run(batch)
 
 And ~24 hours later, could reload the tasks with the executor to continue
 processing:
 
 .. code-block:: python
-    :caption: funcxexecutor_reload_batch.py
+    :caption: globus_compute_executor_reload_batch.py
 
-    from funcx import FuncXExecutor
+    from globus_compute_sdk import Executor
 
     ep_id = "<endpoint_id>"
     tg_id = "Saved task group id from 'yesterday'"
-    with FuncxExecutor(endpoint_id=ep_id, task_group_id=tg_id) as fxe:
-        futures = fxe.reload_tasks())
+    with Executor(endpoint_id=ep_id, task_group_id=tg_id) as gce:
+        futures = gce.reload_tasks()
         for f in concurrent.futures.as_completed(futs):
             print("Received:", f.result())
 
 
-.. |FuncXClient| replace:: ``FuncXClient``
-.. _FuncXClient: reference/client.html
-.. |FuncXExecutor| replace:: ``FuncXExecutor``
-.. _FuncXExecutor: reference/executor.html
+.. |Client| replace:: ``Client``
+.. _Client: reference/client.html
+.. |Executor| replace:: ``Executor``
+.. _Executor: reference/executor.html
 .. |Future| replace:: ``Future``
 .. _Future: https://docs.python.org/3/library/concurrent.futures.html#future-objects
 .. |Executor| replace:: ``Executor``
 .. _Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
 .. |.shutdown()| replace:: ``.shutdown()``
-.. _.shutdown(): reference/executor.html#funcx.FuncXExecutor.shutdown
+.. _.shutdown(): reference/executor.html#globus_compute_sdk.Executor.shutdown
 .. |.submit()| replace:: ``.submit()``
-.. _.submit(): reference/executor.html#funcx.FuncXExecutor.submit
+.. _.submit(): reference/executor.html#globus_compute_sdk.Executor.submit
 .. |.result()| replace:: ``.result()``
 .. _.result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.result
 .. |.done()| replace:: ``.done()``
@@ -345,8 +345,8 @@ processing:
 .. |.set_result()| replace:: ``.set_result()``
 .. _.set_result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.set_result
 .. |.reload_tasks()| replace:: ``.reload_tasks()``
-.. _.reload_tasks(): reference/executor.html#funcx.FuncXExecutor.reload_tasks
+.. _.reload_tasks(): reference/executor.html#globus_compute_sdk.Executor.reload_tasks
 .. |.task_group_id| replace:: ``.task_group_id``
-.. _.task_group_id: reference/executor.html#funcx.FuncXExecutor.task_group_id
+.. _.task_group_id: reference/executor.html#globus_compute_sdk.Executor.task_group_id
 .. _Collatz conjecture: https://en.wikipedia.org/wiki/Collatz_conjecture
 .. _concurrent.futures.as_completed: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.as_completed

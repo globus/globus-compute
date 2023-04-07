@@ -1,10 +1,10 @@
-The FuncX Executor
+The Globus Compute Executor
 ==================
 
-.. autoclass:: funcx.FuncXExecutor
+.. autoclass:: globus_compute_sdk.Executor
     :members:
     :member-order: bysource
 
-.. autoclass:: funcx.sdk.executor.FuncXFuture
+.. autoclass:: globus_compute_sdk.sdk.executor.ComputeFuture
     :members:
     :member-order: bysource
