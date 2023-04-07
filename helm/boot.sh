@@ -5,13 +5,13 @@ EP_UUID="$1"; shift
 
 echo -e "\n  Preparing to start kubelet Endpoint: $EP_UUID ($EP_NAME)\n"
 
-mkdir -p "$HOME/.funcx/$EP_NAME/"
-cp /compute/"$EP_NAME"/* "$HOME/.funcx/$EP_NAME/"
-cp /compute/config/config.py "$HOME/.funcx/"
+mkdir -p "$HOME/.globus_compute/$EP_NAME/"
+cp /compute/"$EP_NAME"/* "$HOME/.globus_compute/$EP_NAME/"
+cp /compute/config/config.py "$HOME/.globus_compute/"
 
 if [[ -e "/compute/credentials/storage.db" ]]; then
-    cp /compute/credentials/storage.db "$HOME/.funcx/"
-    chmod 600 "$HOME/.funcx/storage.db"
+    cp /compute/credentials/storage.db "$HOME/.globus_compute/"
+    chmod 600 "$HOME/.globus_compute/storage.db"
 fi
 
 exec globus-compute-endpoint start "$EP_NAME" --endpoint-uuid "$EP_UUID" "$@"

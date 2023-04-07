@@ -85,10 +85,10 @@ will already have generated the credential file.
     A prompt beginning "Please authenticate with Globus here:" and with a long
     URL to a Globus authentication workflow will print to the terminal; follow
     the URL and paste the resulting token back into the terminal.  This will
-    create the credential file at `$HOME/.funcx/storage.db`.
+    create the credential file at `$HOME/.globus_compute/storage.db`.
 1. Create a Kubernetes secret named `compute-sdk-tokens` with this file:
     ```shell
-    $ kubectl create secret generic compute-sdk-tokens --from-file=$HOME/.funcx/storage.db
+    $ kubectl create secret generic compute-sdk-tokens --from-file=$HOME/.globus_compute/storage.db
     ```
     It is important to name the secret `compute-sdk-tokens` as this chart looks
     for that secret name, specifically.

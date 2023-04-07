@@ -4,7 +4,7 @@ set -e
 
 env="smoke_test_environment"
 
-conf_dir="$(eval echo ~"/.funcx/smoke_test")"
+conf_dir="$(eval echo ~"/.globus_compute/smoke_test")"
 
 cleanup(){
     [[ -d $conf_dir ]] && rm -rf "$conf_dir"

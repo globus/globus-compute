@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 class CommandState:
     def __init__(self):
-        self.endpoint_config_dir: str = str(pathlib.Path.home() / ".funcx")
+        self.endpoint_config_dir: str = str(pathlib.Path.home() / ".globus_compute")
         self.debug = False
         self.no_color = False
         self.log_to_console = False
@@ -191,8 +191,8 @@ def configure_endpoint(
 ):
     """Configure an endpoint
 
-    Drops a config.py template into the funcx configs directory.
-    The template usually goes to ~/.funcx/<ENDPOINT_NAME>/config.py
+    Drops a config.py template into the Globus Compute configs directory.
+    The template usually goes to ~/.globus_compute/<ENDPOINT_NAME>/config.py
     """
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
