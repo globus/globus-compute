@@ -22,7 +22,7 @@ if [[ "$VERSION" != "$ENDPOINT_VERSION" ]]; then
   exit 1
 fi
 
-if ! grep '^compute\-sdk \& compute\-endpoint v'"$VERSION"'$' docs/changelog.rst; then
+if ! grep '^globus\-compute\-sdk \& globus\-compute\-endpoint v'"$VERSION"'$' docs/changelog.rst; then
   echo "package version v$VERSION not noted in docs/changelog.rst"
   exit 1
 fi
@@ -30,9 +30,9 @@ fi
 echo "releasing v$VERSION"
 git tag -s "$VERSION" -m "v$VERSION"
 
-pushd globus_compute_sdk
+pushd compute_sdk
 tox -e publish-release
 popd
 
-cd globus_compute_endpoint
+cd compute_endpoint
 tox -e publish-release
