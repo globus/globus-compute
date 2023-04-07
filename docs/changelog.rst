@@ -3,6 +3,20 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.0.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.0.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Renamed the funcx package to globus-compute-sdk
+  Includes renaming of classes with FuncX in the name
+- Renamed the funcx-endpoint package to globus-compute-endpoint
+  Includes renaming of classes with FuncX in the name
+
+
 .. _changelog-1.0.13:
 
 funcx & funcx-endpoint v1.0.13
