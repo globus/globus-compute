@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Globus Compute - Federated Function as a Service
-#########################################
+################################################
 
 Globus Compute is a distributed Function as a Service (FaaS) platform
 that enables flexible, scalable, and high performance remote function execution.
@@ -20,7 +20,7 @@ Globus Compute is composed of two core components:
 
 
 Globus Compute model
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 Globus Compute works like other FaaS platforms: users first register a function with
 Globus Compute by specifying the function body (in Python), they may then execute that
@@ -44,7 +44,7 @@ errors) in the cloud-hosted service until they are retrieved by the user.
 
 
 Using Globus Compute
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 Globus Compute offers a Python SDK for registering, sharing, and executing functions.
 The following code block examples how Globus Compute can be used to execute a "hello
@@ -64,7 +64,7 @@ world" function on a remote endpoint.
 
 
 Deploying an endpoint
-^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 
 A Globus Compute endpoint can be created by installing the Globus Compute endpoint software
 and configuring it for the target resources. The following steps show
