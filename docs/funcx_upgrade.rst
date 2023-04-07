@@ -23,7 +23,7 @@ If you currently have funcX installed, we recommend these steps to upgrade to
 Globus Compute:
 
   | $ pip uninstall funcx
-  | $ mv ~/.funcx ~/.compute   # Optional
+  | $ mv ~/.funcx ~/.globus_compute   # Optional
   | $ Install Globus Compute SDK in its own venv `as detailed here <quickstart.rst#_install_gc_sdk>`__
 
 The `funcx` package is still available on PyPI but will merely be a wrapper
@@ -38,7 +38,7 @@ the `Globus Compute Endpoint` and is
 `available on PyPI <https://pypi.org/project/globus-compute-client/>`_.
 
   | $ pip uninstall funcx-endpoint
-  | $ mv ~/.funcx ~/.compute   # Optional
+  | $ mv ~/.funcx ~/.globus_compute   # Optional
   | $ Install Globus Compute Endpoint `using pipx <quickstart.rst#_install_gc_endpoint>`__
 
 The `funcx-endpoint` package is still available on PyPI but will merely be a wrapper

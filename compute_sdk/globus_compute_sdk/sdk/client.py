@@ -29,7 +29,7 @@ from .login_manager import LoginManager, LoginManagerProtocol, requires_login
 
 logger = logging.getLogger(__name__)
 
-_FUNCX_HOME = os.path.join("~", ".funcx")
+_FUNCX_HOME = os.path.join("~", ".globus_compute")
 
 
 class Client:

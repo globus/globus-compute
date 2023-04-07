@@ -36,11 +36,25 @@ def invalidate_old_config() -> None:
 
 
 def _ensure_funcx_dir() -> pathlib.Path:
-    dirname = _home() / ".funcx"
-    try:
-        os.makedirs(dirname)
-    except FileExistsError:
+    legacy_dirname = _home() / ".funcx"
+    dirname = _home() / ".globus_compute"
+
+    if dirname.is_dir():
         pass
+
+    elif dirname.is_file():
+        raise FileExistsError(
+            f"Error creating directory {dirname}, "
+            "please remove or rename the conflicting file"
+        )
+
+    elif legacy_dirname.is_dir():
+        legacy_dirname.replace(dirname)
+        legacy_dirname.symlink_to(dirname, target_is_directory=True)
+
+    else:
+        dirname.mkdir(parents=True, exist_ok=True)
+
     return dirname
 
 
