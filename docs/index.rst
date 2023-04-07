@@ -92,6 +92,7 @@ how to download and configure an endpoint for local (multi-process) execution. :
    reference/index
    limits
    changelog
+   api_docs/index
 
 Indices and tables
 ==================
