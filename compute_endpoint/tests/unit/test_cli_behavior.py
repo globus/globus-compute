@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import pathlib
 import shlex
 from unittest import mock
 
 import pytest
+from click import ClickException
 from click.testing import CliRunner
-from globus_compute_endpoint.cli import app
+from globus_compute_endpoint.cli import app, init_config_dir
 
 
 @pytest.fixture
@@ -58,6 +60,21 @@ def run_line(cli_runner):
         return result
 
     return func
+
+
+def test_init_config_dir(fs):
+    home_dir = pathlib.Path.home()
+    config_dir = init_config_dir()
+    assert config_dir == home_dir / ".globus_compute"
+
+
+def test_init_config_dir_file_conflict(fs):
+    filename = pathlib.Path.home() / ".globus_compute"
+    fs.create_file(filename)
+
+    with pytest.raises(ClickException) as exc:
+        init_config_dir()
+    assert "Error creating directory" in str(exc)
 
 
 def test_start_ep_corrupt(run_line, mock_cli_state, make_endpoint_dir):

@@ -12,6 +12,7 @@ import uuid
 import click
 from click import ClickException
 from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
 from .endpoint.endpoint import Endpoint
@@ -25,7 +26,7 @@ log = logging.getLogger(__name__)
 
 class CommandState:
     def __init__(self):
-        self.endpoint_config_dir: str = str(pathlib.Path.home() / ".globus_compute")
+        self.endpoint_config_dir: pathlib.Path = init_config_dir()
         self.debug = False
         self.no_color = False
         self.log_to_console = False
@@ -37,28 +38,16 @@ class CommandState:
         return click.get_current_context().ensure_object(CommandState)
 
 
-def init_endpoint_configuration_dir(conf_dir: pathlib.Path):
-    if not conf_dir.exists():
-        log.info("No existing configuration found at %s. Initializing...", conf_dir)
-        try:
-            conf_dir.mkdir(mode=0o700, exist_ok=True)
-        except Exception as exc:
-            e = click.ClickException(
-                f"{exc}\n\nUnable to create configuration directory"
-            )
-            raise e from exc
-
-    elif not conf_dir.is_dir():
-        raise click.ClickException(
-            f"File already exists: {conf_dir}\n\n"
-            "Refusing to initialize Globus Compute configuration directory: "
-            "path already exists"
-        )
+def init_config_dir() -> pathlib.Path:
+    try:
+        return ensure_compute_dir()
+    except FileExistsError as e:
+        raise ClickException(str(e))
 
 
 def get_config_dir() -> pathlib.Path:
     state = CommandState.ensure()
-    return pathlib.Path(state.endpoint_config_dir)
+    return state.endpoint_config_dir
 
 
 def get_cli_endpoint() -> Endpoint:
@@ -67,9 +56,6 @@ def get_cli_endpoint() -> Endpoint:
     # as a result, any number of CLI options may be used to tweak the CommandState
     # via callbacks, and the Endpoint will only be constructed within commands which
     # access the Endpoint via this getter
-    conf_dir = get_config_dir()
-    init_endpoint_configuration_dir(conf_dir)
-
     state = CommandState.ensure()
     endpoint = Endpoint(debug=state.debug)
 
@@ -145,7 +131,7 @@ def config_dir_callback(ctx, param, value):
     if value is None or ctx.resilient_parsing:
         return
     state = CommandState.ensure()
-    state.endpoint_config_dir = value
+    state.endpoint_config_dir = pathlib.Path(value)
 
 
 @click.group("globus-compute-endpoint")
