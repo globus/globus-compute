@@ -35,7 +35,7 @@ def invalidate_old_config() -> None:
             os.remove(token_file)
 
 
-def _ensure_funcx_dir() -> pathlib.Path:
+def ensure_compute_dir() -> pathlib.Path:
     legacy_dirname = _home() / ".funcx"
     dirname = _home() / ".globus_compute"
 
@@ -59,7 +59,7 @@ def _ensure_funcx_dir() -> pathlib.Path:
 
 
 def _get_storage_filename():
-    datadir = _ensure_funcx_dir()
+    datadir = ensure_compute_dir()
     return os.path.join(datadir, "storage.db")
 
 
