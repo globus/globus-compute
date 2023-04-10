@@ -15,8 +15,8 @@ from globus_compute_sdk.sdk.login_manager.client_login import (
     is_client_login,
 )
 from globus_compute_sdk.sdk.login_manager.tokenstore import (
-    _ensure_funcx_dir,
     _resolve_namespace,
+    ensure_compute_dir,
 )
 
 CID_KEY = "FUNCX_SDK_CLIENT_ID"
@@ -71,7 +71,7 @@ def test_ensure_compute_dir(fs, legacy_dir_exists, dir_exists):
     if dir_exists:
         fs.create_dir(dirname)
 
-    compute_dirname = _ensure_funcx_dir()
+    compute_dirname = ensure_compute_dir()
 
     assert compute_dirname.is_dir()
     assert compute_dirname == dirname
@@ -84,7 +84,7 @@ def test_conflicting_compute_file(fs):
     fs.create_file(filename)
 
     with pytest.raises(FileExistsError) as exc:
-        _ensure_funcx_dir()
+        ensure_compute_dir()
     assert "Error creating directory" in str(exc)
 
 
