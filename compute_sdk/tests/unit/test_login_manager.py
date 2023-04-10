@@ -1,4 +1,5 @@
 import os
+import pathlib
 import uuid
 from itertools import chain, combinations
 from unittest import mock
@@ -13,7 +14,10 @@ from globus_compute_sdk.sdk.login_manager.client_login import (
     get_client_login,
     is_client_login,
 )
-from globus_compute_sdk.sdk.login_manager.tokenstore import _resolve_namespace
+from globus_compute_sdk.sdk.login_manager.tokenstore import (
+    _ensure_funcx_dir,
+    _resolve_namespace,
+)
 
 CID_KEY = "FUNCX_SDK_CLIENT_ID"
 CSC_KEY = "FUNCX_SDK_CLIENT_SECRET"
@@ -53,6 +57,35 @@ def test_get_client_creds_from_env(randomstring):
 
         assert expected_cid == found_cid
         assert expected_csc == found_csc
+
+
+@pytest.mark.parametrize("legacy_dir_exists", [True, False])
+@pytest.mark.parametrize("dir_exists", [True, False])
+def test_ensure_compute_dir(fs, legacy_dir_exists, dir_exists):
+    home_dirname = pathlib.Path.home()
+    legacy_dirname = home_dirname / ".funcx"
+    dirname = home_dirname / ".globus_compute"
+
+    if legacy_dir_exists:
+        fs.create_dir(legacy_dirname)
+    if dir_exists:
+        fs.create_dir(dirname)
+
+    compute_dirname = _ensure_funcx_dir()
+
+    assert compute_dirname.is_dir()
+    assert compute_dirname == dirname
+    if legacy_dir_exists and not dir_exists:
+        assert legacy_dirname.is_symlink()
+
+
+def test_conflicting_compute_file(fs):
+    filename = pathlib.Path.home() / ".globus_compute"
+    fs.create_file(filename)
+
+    with pytest.raises(FileExistsError) as exc:
+        _ensure_funcx_dir()
+    assert "Error creating directory" in str(exc)
 
 
 def test_is_client_login():
