@@ -53,7 +53,7 @@ def ensure_compute_dir() -> pathlib.Path:
         legacy_dirname.symlink_to(dirname, target_is_directory=True)
 
     else:
-        dirname.mkdir(parents=True, exist_ok=True)
+        dirname.mkdir(mode=0o700, parents=True, exist_ok=True)
 
     return dirname
 
