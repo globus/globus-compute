@@ -279,7 +279,7 @@ def test_writes_endpoint_uuid(epmanager):
     assert ep_data["endpoint_id"] == returned_uuid
 
 
-def test_log_contains_sentinel_lines(mocker, epmanager, noop):
+def test_log_contains_sentinel_lines(mocker, epmanager, noop, reset_signals):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     conf_dir, mock_conf, mock_client, em = epmanager
 
@@ -301,7 +301,9 @@ def test_log_contains_sentinel_lines(mocker, epmanager, noop):
     assert end_re_uuid.search(log_str) is not None, "Expected end sentinel has EP id"
 
 
-def test_title_changes_for_shutdown(mocker, epmanager, noop, mock_setproctitle):
+def test_title_changes_for_shutdown(
+    mocker, epmanager, noop, mock_setproctitle, reset_signals
+):
     conf_dir, mock_conf, mock_client, em = epmanager
     mock_spt, orig_proc_title = mock_setproctitle
 
@@ -318,7 +320,9 @@ def test_title_changes_for_shutdown(mocker, epmanager, noop, mock_setproctitle):
     assert a.endswith(orig_proc_title)
 
 
-def test_children_signaled_at_shutdown(mocker, epmanager, randomstring, noop):
+def test_children_signaled_at_shutdown(
+    mocker, epmanager, randomstring, noop, reset_signals
+):
     conf_dir, mock_conf, mock_client, em = epmanager
 
     em._event_loop = mocker.Mock()
@@ -681,7 +685,7 @@ def test_handles_failed_command(mocker, epmanager):
 
 
 @pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGINT, signal.SIGQUIT])
-def test_handles_shutdown_signal(successful_exec, sig):
+def test_handles_shutdown_signal(successful_exec, sig, reset_signals):
     mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
 
     with mock.patch.object(em, "_install_signal_handlers") as mock_install:

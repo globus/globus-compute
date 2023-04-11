@@ -8,7 +8,7 @@ from globus_compute_endpoint.endpoint.utils.config import Config
 _mock_base = "globus_compute_endpoint.endpoint.interchange."
 
 
-def test_main_exception_always_quiesces(mocker, fs):
+def test_main_exception_always_quiesces(mocker, fs, reset_signals):
     num_iterations = random.randint(1, 10)
 
     # [False, False] * num because _kill_event and _quiesce_event are the same mock;
@@ -38,7 +38,7 @@ def test_main_exception_always_quiesces(mocker, fs):
 
 
 @pytest.mark.parametrize("reconnect_attempt_limit", [-1, 0, 1, 2, 3, 5, 10])
-def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit):
+def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit, reset_signals):
     num_iterations = reconnect_attempt_limit * 2 + 5  # overkill "just to be sure"
 
     # [False, False] * num because _kill_event and _quiesce_event are the same mock;
