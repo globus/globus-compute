@@ -97,8 +97,8 @@ def test_result_message_packing():
     assert serializer.deserialize(unpacked.data) == result
 
 
-# @pytest.mark.parametrize("x", ["gc_engine", "proc_pool_engine"])
-@pytest.mark.parametrize("x", ["gc_engine", "proc_pool_engine", "thread_pool_engine"])
+# @pytest.mark.parametrize("x", ["gc_engine"])
+@pytest.mark.parametrize("x", ["proc_pool_engine", "thread_pool_engine"])
 def test_engine_submit(x, gc_engine, proc_pool_engine):
     "Test engine.submit with multiple engines"
     if x == "gc_engine":

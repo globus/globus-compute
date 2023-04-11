@@ -56,7 +56,6 @@ class ReportingThread:
                 # log and update future before exiting, if it is not already set
                 self.status.set_exception(exception=e)
                 self._shutdown_event.set()
-
             if self._shutdown_event.wait(timeout=self.reporting_period):
                 break
 
