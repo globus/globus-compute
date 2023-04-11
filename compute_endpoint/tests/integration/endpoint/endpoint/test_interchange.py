@@ -22,6 +22,11 @@ def funcx_dir(tmp_path):
     yield fxdir
 
 
+@pytest.fixture(autouse=True)
+def reset_signals_auto(reset_signals):
+    yield
+
+
 def test_endpoint_id(funcx_dir):
     manager = Endpoint()
     config_dir = funcx_dir / "mock_endpoint"

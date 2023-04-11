@@ -26,6 +26,11 @@ def ez_pack_function(serializer, func, args, kwargs):
     )
 
 
+@pytest.fixture(autouse=True)
+def reset_signals_auto(reset_signals):
+    yield
+
+
 @pytest.fixture
 def test_worker():
     with mock.patch(

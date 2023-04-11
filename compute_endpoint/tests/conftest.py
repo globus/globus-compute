@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import signal
 import string
 import time
 import uuid
@@ -10,6 +11,34 @@ import globus_sdk
 import pytest
 import responses
 from globus_compute_sdk.sdk.web_client import WebClient
+
+
+@pytest.fixture(autouse=True)
+def verify_all_tests_reset_signals():
+    orig_sig_handlers = [
+        (sig, signal.getsignal(sig))
+        for sig in range(1, 21)
+        if sig not in (signal.SIGKILL, signal.SIGSTOP)  # the uncatchables
+    ]
+    yield
+    handlers = [(sig, sigh, signal.getsignal(sig)) for sig, sigh in orig_sig_handlers]
+    for sig, bef, aft in handlers:
+        assert bef == aft, f"Signal {sig} not reset"
+
+
+@pytest.fixture
+def reset_signals():
+    # As identified by an interaction with Parsl during our UTs, ensure that we
+    # return the signals after each test.  Interprocess play is fun ...
+    orig_sig_handlers = [
+        (sig, signal.getsignal(sig))
+        for sig in range(1, 21)
+        if sig not in (signal.SIGKILL, signal.SIGSTOP)  # the uncatchables
+    ]
+
+    yield
+    for sig, sigh in orig_sig_handlers:
+        signal.signal(sig, sigh)
 
 
 @pytest.fixture(scope="session")

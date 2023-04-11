@@ -33,7 +33,7 @@ class TestHighThroughputInterchange:
         assert 0 <= time.time_ns() - tt.timestamp < 2000000000, "Expecting a timestamp"
         assert tt.state == TaskState.WAITING_FOR_NODES
 
-    def test_start_task_status(self, _mzmq, _mfn_conf, tmp_path, mocker):
+    def test_start_task_status(self, _mzmq, _mfn_conf, tmp_path, mocker, reset_signals):
         mock_evt = mock.Mock()
         mock_evt.is_set.side_effect = [False, False, True]  # run once, please
         task_id = str(uuid.uuid4())
