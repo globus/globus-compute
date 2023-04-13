@@ -21,6 +21,7 @@ from globus_compute_endpoint.executors.high_throughput.messages import Message
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.errors import MaxResultSizeExceeded
 from globus_compute_sdk.serialize import ComputeSerializer
+from parsl.app.python import timeout
 
 log = logging.getLogger(__name__)
 
@@ -180,6 +181,10 @@ class Worker:
             task_data = task.task_buffer.decode("utf-8")  # type: ignore[attr-defined]
 
         f, args, kwargs = self.serializer.unpack_and_deserialize(task_data)
+        GC_TASK_TIMEOUT = int(os.environ.get("GC_TASK_TIMEOUT", 0))
+        log.warning(f"GC_TASK_TIMEOUT: {GC_TASK_TIMEOUT}")
+        if GC_TASK_TIMEOUT > 0:
+            f = timeout(f, GC_TASK_TIMEOUT)
         result_data = f(*args, **kwargs)
         serialized_data = self.serialize(result_data)
 
