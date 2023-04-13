@@ -1,5 +1,5 @@
 Globus Compute Tutorial
-==============
+=======================
 
 Globus Compute is a Function-as-a-Service (FaaS) platform for science that enables you to register functions in a cloud-hosted service and then reliably execute those functions on a remote Globus Compute endpoint.
 This tutorial is configured to use a tutorial endpoint hosted by the Globus Compute Team.
