@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from setuptools import find_packages, setup
 
@@ -51,11 +52,16 @@ with open(os.path.join("globus_compute_endpoint", "version.py")) as f:
     exec(f.read(), version_ns)
 version = version_ns["__version__"]
 
+directory = Path(__file__).parent
+long_description = (directory / "PyPI.md").read_text()
+
 setup(
     name="globus-compute-endpoint",
     version=version,
     packages=find_packages(),
     description="Globus Compute: High Performance Function Serving for Science",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     install_requires=REQUIRES,
     extras_require={
         "test": TEST_REQUIRES,
