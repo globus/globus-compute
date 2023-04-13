@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 from setuptools import find_packages, setup
 
@@ -23,11 +24,17 @@ def parse_version():
     return version_string
 
 
+directory = Path(__file__).parent
+long_description = (directory / "PyPI.md").read_text()
+
+
 setup(
     name="funcx",
     version=parse_version(),
     packages=find_packages(),
     description="Globus Compute: High Performance Function Serving for Science",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     install_requires=REQUIRES,
     extras_require={},
     python_requires=">=3.7",

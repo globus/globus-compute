@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 from setuptools import find_namespace_packages, setup
 
@@ -57,6 +58,10 @@ def parse_version():
     return version_string
 
 
+directory = Path(__file__).parent
+long_description = (directory / "PyPI.md").read_text()
+
+
 setup(
     name="globus-compute-sdk",
     version=parse_version(),
@@ -64,6 +69,8 @@ setup(
         include=["globus_compute_sdk", "globus_compute_sdk.*"]
     ),
     description="Globus Compute: High Performance Function Serving for Science",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     install_requires=REQUIRES,
     extras_require={
         "dev": DEV_REQUIRES,
