@@ -717,7 +717,7 @@ class _ResultWatcher(threading.Thread):
     will opportunistically shutdown; the caller must handle this scenario
     if new futures arrive, and create a new _ResultWatcher instance.
 
-    :param funcx_executor: A Executor instance
+    :param funcx_executor: An Executor instance
     :param poll_period_s: [default: 0.5] how frequently to check for and
         handle events.  For example, if the thread should stop due to user
         request or if there are results to match.

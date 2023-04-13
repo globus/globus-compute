@@ -44,7 +44,7 @@ git push
    `tox` and your pypi credentials and will create a signed release tag. At the
    end of this step, new packages will be published to pypi.
 
-5. Push the release tag, e.g. `git push upstream 0.3.9`
+5. Push the release tag, e.g. `git push upstream 2.0.2`
 
 6. Update the version numbers to the next point version and re-add the `-dev` suffix,
    then commit and push, e.g.

@@ -1,7 +1,7 @@
-Endpoints
-=========
+Globus Compute Endpoints
+========================
 
-An endpoint is a persistent service launched by the user on a compute system to serve as a conduit for
+A Globus Compute Endpoint is a persistent service launched by the user on a compute system to serve as a conduit for
 executing functions on that computer. Globus Compute supports a range of target systems, enabling
 an endpoint to be deployed on a laptop, the login node of a campus cluster, a cloud instance,
 or a Kubernetes cluster, for example.
@@ -9,8 +9,9 @@ or a Kubernetes cluster, for example.
 The endpoint requires outbound network connectivity. That is, it must be able to connect to
 Globus Compute at `funcx.org <https://api2.funcx.org/v2>`_.
 
-The Globus Compute endpoint is available on pypi.org (and thus available via ``pip``).
-However, *we strongly recommend installing the Globus Compute endpoint into an isolated virtual environment*.
+The Globus Compute Endpoint package `is available on PyPI <https://pypi.org/project/globus-compute-endpoint/>`_
+(and thus available via ``pip``). However, *we strongly recommend installing the
+Globus Compute endpoint into an isolated virtual environment*.
 `Pipx <https://pypa.github.io/pipx/installation/>`_ automatically manages
 package-specific virtual environments for command line applications, so install Globus Compute endpoint via::
 
