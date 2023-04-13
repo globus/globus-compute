@@ -58,8 +58,32 @@ class Endpoint:
         original_path: pathlib.Path,
         target_path: pathlib.Path,
         multi_tenant: bool,
+        display_name: str | None,
     ):
         endpoint_config = Template(original_path.read_text()).substitute(name=ep_name)
+
+        # Note that this logic does NOT support replacing arbitrary
+        # display_name="abc xyz" entries, as str quote parsing is beyond the
+        # current use case of calling this method only at endpoint creation
+        display_str = "None" if display_name is None else f'"{display_name}"'
+        display_text = f"display_name={display_str},"
+
+        d_index = endpoint_config.find("display_name")
+        if d_index != -1:
+            if endpoint_config[d_index + 13 : d_index + 18] == "None,":
+                if display_name is not None:
+                    endpoint_config = endpoint_config.replace(
+                        "display_name=None,", display_text
+                    )
+            else:
+                raise Exception(
+                    "Modifying existing display_name not supported "
+                    f"at this time. Please edit {original_path} manually."
+                )
+        else:
+            endpoint_config = endpoint_config.replace(
+                "\nconfig = Config(\n", f"\nconfig = Config(\n    {display_text}\n"
+            )
 
         if endpoint_config.find("multi_tenant=") != -1:
             # If the option is already in the config, merely update the value
@@ -81,6 +105,7 @@ class Endpoint:
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
         multi_tenant=False,
+        display_name: str | None = None,
     ):
         """Initialize a clean endpoint dir
 
@@ -88,6 +113,7 @@ class Endpoint:
         :param endpoint_config str Path to a config file to be used instead
          of the Globus Compute default config file
         :param multi_tenant bool Whether the endpoint is a multi-user endpoint
+        :param display_name str A display name to use, if desired
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
         user_umask = os.umask(0o0077)
@@ -109,21 +135,28 @@ class Endpoint:
                 endpoint_config,
                 config_target_path,
                 multi_tenant,
+                display_name,
             )
         finally:
             os.umask(user_umask)
 
     @staticmethod
     def configure_endpoint(
-        conf_dir: pathlib.Path, endpoint_config: str | None, multi_tenant: bool = False
+        conf_dir: pathlib.Path,
+        endpoint_config: str | None,
+        multi_tenant: bool = False,
+        display_name: str | None = None,
     ):
         ep_name = conf_dir.name
         if conf_dir.exists():
+            print(conf_dir)
             print(f"config dir <{ep_name}> already exists")
             raise Exception("ConfigExists")
 
         templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
-        Endpoint.init_endpoint_dir(conf_dir, templ_conf_path, multi_tenant)
+        Endpoint.init_endpoint_dir(
+            conf_dir, templ_conf_path, multi_tenant, display_name
+        )
         config_path = Endpoint._config_file_path(conf_dir)
         if multi_tenant:
             print(f"Created multi-tenant profile for <{ep_name}>")
@@ -244,6 +277,7 @@ class Endpoint:
                     endpoint_uuid,
                     metadata=Endpoint.get_metadata(endpoint_config),
                     multi_tenant=False,
+                    display_name=endpoint_config.display_name,
                 )
 
             except GlobusAPIError as e:

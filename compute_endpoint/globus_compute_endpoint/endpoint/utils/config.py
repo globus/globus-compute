@@ -91,6 +91,10 @@ class Config(RepresentationMixin):
     multi_tenant : bool | None
         Designates the endpoint as a multi-tenant endpoint
         Default: None
+
+    display_name : str | None
+        The display name for the endpoint.  If None, defaults to name
+        Default: None
     """
 
     def __init__(
@@ -107,6 +111,8 @@ class Config(RepresentationMixin):
         idle_heartbeats_soft=0,
         idle_heartbeats_hard=5760,  # Two days, divided by `heartbeat_period`
         detach_endpoint=True,
+        # Misc info
+        display_name: str | None = None,
         # Logging info
         log_dir=None,
         stdout="./endpoint.log",
@@ -154,3 +160,6 @@ class Config(RepresentationMixin):
         self.log_dir = log_dir
         self.stdout = stdout
         self.stderr = stderr
+
+        # Misc info
+        self.display_name = display_name
