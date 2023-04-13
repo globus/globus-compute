@@ -1,5 +1,5 @@
 Globus Compute Executor
-==============
+=======================
 
 The |Executor|_ class, a subclass of Python's |Executor|_, is the
 preferred approach to collecting results from the Globus Compute web services.  Over
