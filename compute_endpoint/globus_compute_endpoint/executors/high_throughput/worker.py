@@ -182,8 +182,8 @@ class Worker:
 
         f, args, kwargs = self.serializer.unpack_and_deserialize(task_data)
         GC_TASK_TIMEOUT = int(os.environ.get("GC_TASK_TIMEOUT", 0))
-        log.warning(f"GC_TASK_TIMEOUT: {GC_TASK_TIMEOUT}")
         if GC_TASK_TIMEOUT > 0:
+            log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
             f = timeout(f, GC_TASK_TIMEOUT)
         result_data = f(*args, **kwargs)
         serialized_data = self.serialize(result_data)
