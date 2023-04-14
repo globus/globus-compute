@@ -104,7 +104,6 @@ class Worker:
             container_id: str = dill.loads(p_container_id)
             log.debug(f"Received task with task_id='{task_id}' and msg='{msg}'")
 
-            result = None
             if task_id == "KILL":
                 log.info("[KILL] -- Worker KILL message received! ")
                 # send a "worker die" message back to the manager
