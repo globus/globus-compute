@@ -62,7 +62,7 @@ All other module and classes that had ``"FuncX"`` in their names have been renam
 to ``Compute*``.  These changes `are detailed below <#SDK-Module-and-Class-Changes>`_.
 
 The directory used for local cache storage is now ``~/.globus_compute`` instead of
-``~/.funcx``.  We recommend renaming ~/.funcx to ``~/.globus_compute`` after
+``~/.funcx``.  We recommend renaming ``~/.funcx`` to ``~/.globus_compute`` after
 installing the new package.  Otherwise, first usage of the new SDK will
 automatically rename it and create a symlink from the old to the new.
 
@@ -71,8 +71,8 @@ For other, less relevant changes, `also see below <#SDK-Module-and-Class-Changes
 funcX Endpoint
 ^^^^^^^^^^^^^^
 
-`funcx-endpoint` on PyPI was the former funcX endpoint package.  This is now
-`Globus Compute Endpoint` and is available on
+``funcx-endpoint`` on PyPI was the former funcX endpoint package.  This is now
+``Globus Compute Endpoint`` and is available on
 `PyPI here <https://pypi.org/project/globus-compute-endpoint/>`_.
 
 If you currently have ``funcx-endpoint`` installed, we recommend these steps for
@@ -165,14 +165,14 @@ respect to Globus Auth.
 Using the new funcx wrapper package
 ...................................
 
-* The `funcx` package is still available for a limited time on PyPI but
-  will merely be a wrapper around the ``Globus Compute SDK``.  The wrapper can
-  serve as an easier migration path for some users looking for minimal
-  migration effort in the short term.
+* To ease the migration timeline for those who are not able to update all
+  existing usage immediately, the ``funcx`` package will remain on PyPI
+  for a limited time. Note, however, that as of v2.0.0, it is only a shim over
+  ``globus-compute-sdk``.
 
 
 The updated `funcx <https://pypi.org/project/funcx/>`_ package
-begins with version 2.0.0, built on top of ``Globus Compute SDK`` 2.0.0.
+begins with version 2.0.0, and is built on top of ``Globus Compute SDK`` 2.0.0.
 
 These frequently used classes maintain their module hierarchy by linking to their
 ``Globus Compute SDK`` counterparts and do not require modification of scripts
@@ -221,10 +221,11 @@ Other endpoint notes
 Using the new funcx-endpoint wrapper package
 ............................................
 
-* The `funcx-endpoint` package is still available for a limited time on
-  PyPI but will merely be a wrapper around the ``Globus Compute Endpoint``.  The
-  wrapper can serve as an easier migration path for some users looking for
-  minimal interruptions of service in the short term.
+* To ease the migration timeline for those who are not able to update all
+  existing usage immediately, the ``funcx-endpoint`` package will remain on PyPI
+  for a limited time. Note, however, that as of v2.0.0, it is only a shim over
+  ``globus-compute-endpoint``.
+
 
 The updated `funcx-endpoint <https://pypi.org/project/funcx-endpoint/>`_ package
 begins with version 2.0.0, built on top of ``Globus Compute Endpoint`` 2.0.0.
