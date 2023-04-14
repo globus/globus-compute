@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.0.1a0:
+
+globus-compute-sdk & globus-compute-endpoint v2.0.1a0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add a ``--display-name`` option to endpoint configure to use as a human
+  readable name for the endpoint. If not specified, the ``display_name``
+  defaults to the endpoint name.
+
 .. _changelog-1.0.13:
 
 funcx & funcx-endpoint v1.0.13
