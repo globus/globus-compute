@@ -181,8 +181,8 @@ class Worker:
             task_data = task.task_buffer.decode("utf-8")  # type: ignore[attr-defined]
 
         f, args, kwargs = self.serializer.unpack_and_deserialize(task_data)
-        GC_TASK_TIMEOUT = int(os.environ.get("GC_TASK_TIMEOUT", 0))
-        if GC_TASK_TIMEOUT > 0:
+        GC_TASK_TIMEOUT = max(0.0, float(os.environ.get("GC_TASK_TIMEOUT", 0.0)))
+        if GC_TASK_TIMEOUT > 0.0:
             log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
             f = timeout(f, GC_TASK_TIMEOUT)
         result_data = f(*args, **kwargs)

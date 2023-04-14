@@ -160,15 +160,13 @@ def sleeper(t):
 
 def test_app_timeout(test_worker):
     task_id = uuid.uuid1()
-    task_body = ez_pack_function(test_worker.serializer, sleeper, (2,), {})
+    task_body = ez_pack_function(test_worker.serializer, sleeper, (1,), {})
     task_message = messagepack.pack(
         messagepack.message_types.Task(
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
 
-    os.environ["GC_TASK_TIMEOUT"] = "1"
-
-    with pytest.raises(AppTimeout):
-        x = test_worker.call_user_function(task_message)
-        print(x)
+    with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.1"}):
+        with pytest.raises(AppTimeout):
+            test_worker.call_user_function(task_message)
