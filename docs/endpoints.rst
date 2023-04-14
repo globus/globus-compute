@@ -1,7 +1,7 @@
 Globus Compute Endpoints
 ========================
 
-An Globus Compute Endpoint is a persistent service launched by the user on a compute system to serve as a conduit for
+A Globus Compute Endpoint is a persistent service launched by the user on a compute system to serve as a conduit for
 executing functions on that computer. Globus Compute supports a range of target systems, enabling
 an endpoint to be deployed on a laptop, the login node of a campus cluster, a cloud instance,
 or a Kubernetes cluster, for example.
