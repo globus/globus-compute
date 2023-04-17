@@ -5,14 +5,18 @@ Changelog
 
 .. _changelog-2.0.1:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.1
----------------------------------------------------
+funcx & funcx-endpoint v2.0.1
+-----------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
  - Support for timing out tasks that exceed a walltime limit on the globus-compute-endpoint.
    Use global variable ``GC_TASK_TIMEOUT`` which accepts a float to set the limit.
+
+- Add a ``--display-name`` option to endpoint configure to use as a human
+  readable name for the endpoint. If not specified, the ``display_name``
+  defaults to the endpoint name.
 
 Bug Fixes
 ^^^^^^^^^
@@ -21,22 +25,10 @@ Bug Fixes
   is sent when an endpoint is gracefully shutting down, causing issues when
   getting the status of an endpoint.
 
-.. _changelog-2.0.1a4:
-
-globus-compute-sdk & globus-compute-endpoint v2.0.1a4
------------------------------------------------------
-
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- Add a ``--display-name`` option to endpoint configure to use as a human
-  readable name for the endpoint. If not specified, the ``display_name``
-  defaults to the endpoint name.
-
 .. _changelog-2.0.0:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.0
----------------------------------------------------
+funcx & funcx-endpoint v2.0.0
+-----------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -1215,7 +1207,7 @@ New Functionality
                ),
            )],
            detach_endpoint=True,
-           funcx_service_address='https://compute.api.globus.org/v2'
+           funcx_service_address='https://api2.funcx.org/v2'
        )
 
 * The endpoint will now log to `~/.funcx/<ENDPOINT_NAME>/EndpointInterchange.log`.

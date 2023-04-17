@@ -11,7 +11,7 @@ author = "The Globus Compute Team"
 # built documents.
 #
 # The short X.Y version.
-version = globus_compute_sdk.__version__.rsplit(".", 1)[0]
+# version = globus_compute_sdk.__version__.rsplit(".", 1)[0]
 # The full version, including alpha/beta/rc tags.
 release = globus_compute_sdk.__version__
 
