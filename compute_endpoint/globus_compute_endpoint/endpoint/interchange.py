@@ -36,10 +36,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     TaskQueueSubscriber,
 )
 from globus_compute_endpoint.endpoint.result_store import ResultStore
-from globus_compute_endpoint.exception_handling import (
-    get_error_string,
-    get_result_error_details,
-)
+from globus_compute_endpoint.exception_handling import get_result_error_details
 from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 from globus_compute_sdk import __version__ as funcx_sdk_version
 from parsl.version import VERSION as PARSL_VERSION
@@ -408,13 +405,19 @@ class EndpointInterchange:
 
                     except Exception as exc:
                         log.exception(f"Failed to process {task_msg.task_id}")
-                        result = {
+                        code, msg = get_result_error_details()
+                        failed_result = Result(
+                            task_id=task_msg.task_id,
+                            data=f"Failed to start task: {exc}",
+                            error_details=ResultErrorDetails(
+                                code=code, user_message=msg
+                            ),
+                        )
+                        res = {
                             "task_id": task_msg.task_id,
-                            "exception": f"Failed to start task: {get_error_string()}",
-                            "error_details": get_result_error_details(),
-                            "message": f"Failed to start task.  Exception text: {exc}",
+                            "message": pack(failed_result),
                         }
-                        self.results_passthrough.put(result)
+                        self.results_passthrough.put(res)
 
                 log.debug("Exit process-pending-tasks thread.")
 
@@ -427,8 +430,11 @@ class EndpointInterchange:
                 while not self._quiesce_event.is_set():
                     try:
                         result = self.results_passthrough.get(timeout=1)
-                        task_id = result["task_id"]
-                        packed_result = result["message"]
+                        task_id: str | None = result["task_id"]
+                        packed_result: bytes = result["message"]
+
+                        if not task_id:
+                            raise AssertionError("task_id: empty or None")
 
                     except queue.Empty:
                         # Empty queue!  Let's see if we have any prior results to send
@@ -452,9 +458,11 @@ class EndpointInterchange:
                             "   Marking task as failed."
                         )
 
+                        err = f"[Task ID: {task_id}] ({exc.__class__.__name__}) {exc}"
+
                         kwargs = {
                             "task_id": task_id,
-                            "data": packed_result,
+                            "data": err,
                             "error_details": ResultErrorDetails(
                                 code=0,
                                 user_message=(
