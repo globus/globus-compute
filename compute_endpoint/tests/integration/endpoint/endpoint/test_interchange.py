@@ -1,5 +1,6 @@
 import os
 import pathlib
+import pickle
 import threading
 import uuid
 from importlib.machinery import SourceFileLoader
@@ -58,7 +59,7 @@ def test_start_requires_pre_registered(funcx_dir):
         )
 
 
-def test_invalid_message_result_returned(mocker, endpoint_uuid):
+def test_invalid_task_received(mocker, endpoint_uuid):
     ei = EndpointInterchange(
         endpoint_id=endpoint_uuid,
         config=Config(executors=[mocker.Mock(endpoint_id=endpoint_uuid)]),
@@ -82,6 +83,40 @@ def test_invalid_message_result_returned(mocker, endpoint_uuid):
     result: Result = unpack(msg)
     assert result.task_id == task.task_id
     assert "Failed to start task" in result.data
+
+
+def test_invalid_result_received(mocker, endpoint_uuid):
+    mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
+    mock_rqp = mocker.MagicMock()
+    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_rqp)
+
+    conf = Config(
+        executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
+    )
+    ei = EndpointInterchange(
+        endpoint_id=endpoint_uuid,
+        config=conf,
+        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+    )
+    res = {
+        "task_id": endpoint_uuid,
+        "not_data_field": bytes(i for i in range(20)),  # invalid utf8; not a string
+    }
+    task_id = str(uuid.uuid4())
+    result_bytes = pickle.dumps(res)
+    ei.results_passthrough.put({"task_id": task_id, "message": result_bytes})
+    t = threading.Thread(target=ei._main_loop, daemon=True)
+    t.start()
+
+    try_for_timeout(lambda: mock_rqp.publish.call_count > 1, timeout_ms=1000)
+    ei.time_to_quit = True
+    t.join()
+
+    a = next(a[0] for a, _ in mock_rqp.publish.call_args_list if b"Task ID:" in a[0])
+    res = unpack(a)
+
+    assert "(KeyError)" in res.data, "Expect user-facing data contains exception type"
+    assert task_id in res.data, "Expect user-facing data contains task id"
 
 
 def test_die_with_parent_refuses_to_start_if_not_parent(mocker):
@@ -162,7 +197,7 @@ def test_soft_idle_honored(mocker, endpoint_uuid):
         config=conf,
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
     )
-    ei.results_passthrough.put({"task_id": uuid.uuid1(), "message": ""})
+    ei.results_passthrough.put({"task_id": uuid.uuid1(), "message": b""})
 
     ei._main_loop()
 
@@ -239,7 +274,7 @@ def test_unidle_updates_proc_title(mocker, endpoint_uuid):
     )
 
     def insert_msg():
-        ei.results_passthrough.put({"task_id": uuid.uuid1(), "message": ""})
+        ei.results_passthrough.put({"task_id": uuid.uuid1(), "message": b""})
         while True:
             yield
 
