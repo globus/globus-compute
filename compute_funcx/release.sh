@@ -21,11 +21,6 @@ if [[ "$VERSION" != "$ENDPOINT_VERSION" ]]; then
   exit 1
 fi
 
-if ! grep '^funcx \& funcx\-endpoint v'"$VERSION"'$' docs/changelog.rst; then
-  echo "package version v$VERSION not noted in docs/changelog.rst"
-  exit 1
-fi
-
 echo "releasing v$VERSION"
 git tag -s "$VERSION" -m "v$VERSION"
 
