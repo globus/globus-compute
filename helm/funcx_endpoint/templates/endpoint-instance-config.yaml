@@ -17,6 +17,7 @@ data:
 
     config = Config(
         executors=[
+            display_name={{ coalesce .Values.endpointDisplayName .Values.endpointName .Release.Name }}
             HighThroughputExecutor(
                 max_workers_per_node={{ .Values.maxWorkersPerPod }},
                 address=address_by_route(),
