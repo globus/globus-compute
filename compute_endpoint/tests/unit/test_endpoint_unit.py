@@ -114,6 +114,7 @@ def umask():
     os.umask(orig_umask)
 
 
+@pytest.mark.parametrize("display_name_defined", [True, False])
 @responses.activate
 def test_start_endpoint(
     mocker,
@@ -122,6 +123,7 @@ def test_start_endpoint(
     get_standard_compute_client,
     register_endpoint_response,
     mock_ep_data,
+    display_name_defined,
 ):
     mock_gcc = get_standard_compute_client()
     mock_log = mocker.patch(f"{_mock_base}log")
@@ -131,6 +133,10 @@ def test_start_endpoint(
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
+
+    # Ensure we support old config objects without display_name attr
+    if not display_name_defined:
+        del ep_conf.display_name
 
     uname, pword = randomstring(), randomstring()
     register_endpoint_response(endpoint_id=ep_id, username=uname, password=pword)
