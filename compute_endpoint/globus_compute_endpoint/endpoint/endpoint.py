@@ -277,7 +277,7 @@ class Endpoint:
                     endpoint_uuid,
                     metadata=Endpoint.get_metadata(endpoint_config),
                     multi_tenant=False,
-                    display_name=endpoint_config.display_name,
+                    display_name=getattr(endpoint_config, "display_name", None),
                 )
 
             except GlobusAPIError as e:
