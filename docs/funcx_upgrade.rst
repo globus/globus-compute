@@ -147,7 +147,7 @@ Other SDK notes
 * ``LoginManager.get_funcx_web_client()`` has been renamed to ``.get_web_client()``
 
 Most constants and variable names with ``FuncX`` in their names have **not**
-changed in order to simply the migration process:
+changed in order to simplify the migration process:
 
 * Client.FUNCX_SCOPE
 * Client.FUNCX_SDK_CLIENT_ID
