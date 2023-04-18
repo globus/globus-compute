@@ -55,3 +55,6 @@ git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_comput
 git commit -m 'Bump versions for dev'
 git push
 ```
+
+7. Release updated wrapper versions of funcx and funcx-endpoint (as long as we keep supporting these packages)
+   See compute_funcx/RELEASING.md for details.  ie. cd compute_funcx; ./release.sh
