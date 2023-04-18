@@ -52,9 +52,9 @@ setup(
     author_email="support@globus.org",
     license="Apache License, Version 2.0",
     url="https://github.com/funcx-faas/funcx",
-    project_urls = {
-      'Source': 'https://github.com/funcx-faas/funcX',
-      'Changelog': 'https://globus-compute.readthedocs.io/en/latest/changelog_funcx.html',
-      'Upgrade to globus-compute-sdk': 'https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html',
+    project_urls={
+        "Source": "https://github.com/funcx-faas/funcX",
+        "Changelog": "https://globus-compute.readthedocs.io/en/latest/changelog_funcx.html",  # noqa: E501
+        "Upgrade to globus-compute-sdk": "https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html",  # noqa: E501
     },
 )
