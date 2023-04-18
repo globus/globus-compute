@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 from setuptools import find_packages, setup
 
@@ -23,11 +24,17 @@ def parse_version():
     return version_string
 
 
+directory = Path(__file__).parent
+long_description = (directory / "PyPI.md").read_text()
+
+
 setup(
     name="funcx",
     version=parse_version(),
     packages=find_packages(),
     description="Globus Compute: High Performance Function Serving for Science",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     install_requires=REQUIRES,
     extras_require={},
     python_requires=">=3.7",
@@ -45,4 +52,9 @@ setup(
     author_email="support@globus.org",
     license="Apache License, Version 2.0",
     url="https://github.com/funcx-faas/funcx",
+    project_urls = {
+      'Source': 'https://github.com/funcx-faas/funcX',
+      'Changelog': 'https://globus-compute.readthedocs.io/en/latest/changelog_funcx.html',
+      'Upgrade to globus-compute-sdk': 'https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html',
+    },
 )

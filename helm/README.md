@@ -165,6 +165,7 @@ The deployment is configured via values.yaml file.
 | maxBlocks | Maximum number of worker pods to spawn | 100 |
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
 | endpointName | (Optional) Specify a name for registration with the funcX web services | The release name (Release.Name) |
+| endpointDisplayName | (Optional) Specify a display name for registration with the funcX web services | The endpoint name (endpointName) or the release name (Release.Name) |
 | endpointUUID | (Required) Specify a UUID for this endpoint. | |
 | endpointCLIargs | Any additional command line arguments to give to the `globus-compute-endpoint` executable | |
 | maxIdleTime  | The maximum time to maintain an idle worker. After this time the SimpleStrategy will terminate the idle worker. | 3600 |

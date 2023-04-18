@@ -5,8 +5,8 @@ Changelog
 
 .. _changelog-2.0.1:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.1
----------------------------------------------------
+funcx-sdk & funcx-endpoint v2.0.1
+---------------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -17,8 +17,8 @@ New Functionality
 
 .. _changelog-2.0.0:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.0
----------------------------------------------------
+funcx-sdk & funcx-endpoint v2.0.0
+---------------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^

@@ -21,17 +21,27 @@ if [[ "$VERSION" != "$ENDPOINT_VERSION" ]]; then
   exit 1
 fi
 
-if ! grep '^funcx \& funcx\-endpoint v'"$VERSION"'$' docs/changelog.rst; then
-  echo "package version v$VERSION not noted in docs/changelog.rst"
+if ! grep '^funcx \& funcx\-endpoint v'"$VERSION"'$' ../docs/changelog_funcx.rst; then
+  echo "package version v$VERSION not noted in changelog_funcx.rst"
   exit 1
 fi
 
 echo "releasing v$VERSION"
-git tag -s "$VERSION" -m "v$VERSION"
+if [ git tag -s "$VERSION" -m "v$VERSION" ]; then
+  echo "Git tagged $VERSION"
+else
+  read -p "Tag $VERSION already exists.  Release packages with this VERSION anyway? [y/n] " -n 1 -r
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
+  fi
+fi
 
 pushd sdk
-tox -e publish-release
+echo "Releasing SDK $VERSION"
+#tox -e publish-release
 popd
 
-cd endpoint
-tox -e publish-release
+pushd endpoint
+echo "Releasing Endpoint $VERSION"
+#tox -e publish-release
+popd
