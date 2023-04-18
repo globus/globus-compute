@@ -27,18 +27,25 @@ You will also need the following credentials:
 $EDITOR sdk/funcx/version.py endpoint/funcx_endpoint/version.py
 ```
 
+2. Update the globus-compute-sdk and globus-compute-endpoint dependency versions in setup.py [REQUIRES=].
+
+```bash
+$EDITOR sdk/setup.py endpoint/setup.py
+```
+
 2. Update the changelog by copying the new fragments from the Globus Compute ../docs/changelog.rst
    (Presumably we want to release a new wrapper each time we update Globus Compute SDK/Endpoint)
 
 3. Add and commit the changes to version numbers and changelog files e.g. as follows
 
 ```bash
-git add changelog.rst sdk/funcx/version.py endpoint/funcx_endpoint/version.py
-git commit -m 'Bump versions and changelog for release'
+git add sdk/funcx/version.py endpoint/funcx_endpoint/version.py
+git add sdk/setup.py endpoint/setup.py changelog.rst
+git commit -m 'Bump versions and changelog for releasing funcx and funcx-endpoint wrappers'
 git push
 ```
 
-4. Run the release script `./release_funcx.sh` from the wrapper root /compute_funcx. This will use
+4. Run the release script `./release_funcx.sh` from the wrapper root repo/compute_funcx. This will use
    `tox` and your pypi credentials and will create a signed release tag. At the end of this step,
    new wrapper funcx and funcx-endpoint packages will be published to pypi.
 
