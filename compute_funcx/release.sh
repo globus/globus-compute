@@ -21,8 +21,8 @@ if [[ "$VERSION" != "$ENDPOINT_VERSION" ]]; then
   exit 1
 fi
 
-if ! grep '^funcx \& funcx\-endpoint v'"$VERSION"'$' changelog.rst; then
-  echo "package version v$VERSION not noted in changelog.rst"
+if ! grep '^funcx \& funcx\-endpoint v'"$VERSION"'$' ../docs/changelog_funcx.rst; then
+  echo "package version v$VERSION not noted in changelog_funcx.rst"
   exit 1
 fi
 
@@ -37,9 +37,11 @@ else
 fi
 
 pushd sdk
-tox -e publish-release
+echo "Releasing SDK $VERSION"
+#tox -e publish-release
 popd
 
 pushd endpoint
-tox -e publish-release
+echo "Releasing Endpoint $VERSION"
+#tox -e publish-release
 popd

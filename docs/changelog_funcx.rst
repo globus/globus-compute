@@ -6,18 +6,38 @@ Changelog
 .. _changelog-2.0.1:
 
 funcx-sdk & funcx-endpoint v2.0.1
------------------------------------------------------
+---------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add a ``--display-name`` option to endpoint configure to use as a human
+  readable name for the endpoint. If not specified, the ``display_name``
+  defaults to the endpoint name.
+
+.. _changelog-2.0.0:
+
+funcx-sdk & funcx-endpoint v2.0.0
+---------------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
 - funcx and funcx-endpoint have been rebranded as globus-compute-sdk and globus-compute-endpoint.
-  Please see https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html for
-  information on how to upgrade.
 
-- Add a ``--display-name`` option to endpoint configure to use as a human
-  readable name for the endpoint. If not specified, the ``display_name``
-  defaults to the endpoint name.
+- For the SDK, ``funcx.FuncXClient`` and ``funcx.FuncXExecutor`` have been renamed to ``globus_compute_sdk.Client``
+  and ``globus_compute_sdk.Executor``
+
+- For the Endpoint, merely use the command ``globus-compute-endpoint`` instead of ``funcx-endpoint``.
+
+- The above should be sufficient for many users.  If other classes from the old packages were
+  in use, please see https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html for more
+  detailed change information and for additional upgrade requirements, if any.
+
+Deprecated
+^^^^^^^^^^
+
+- The funcx and funcx-endpoint packages have been deprecated.
 
 .. _changelog-1.0.13:
 
