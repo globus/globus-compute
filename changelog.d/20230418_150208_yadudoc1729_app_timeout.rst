@@ -5,7 +5,7 @@
 New Functionality
 ^^^^^^^^^^^^^^^^^
  - Support for timing out tasks that exceed a walltime limit on the globus-compute-endpoint.
-   Use global variable `GC_TASK_TIMEOUT` which accepts a float to set the limit.
+   Use global variable ``GC_TASK_TIMEOUT`` which accepts a float to set the limit.
 ..
 .. Bug Fixes
 .. ^^^^^^^^^
