@@ -428,7 +428,7 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
 
     except Exception:
         log.exception(
-            "Globus Compute v0.2.0 made several non-backwards compatible changes to "
+            "Globus Compute v2.0.0 made several non-backwards compatible changes to "
             "the config. Your config might be out of date. "
             "Refer to "
             "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
