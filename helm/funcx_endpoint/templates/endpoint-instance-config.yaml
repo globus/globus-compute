@@ -16,8 +16,8 @@ data:
     from parsl.addresses import address_by_route
 
     config = Config(
+        display_name="{{ coalesce .Values.endpointDisplayName .Values.endpointName .Release.Name }}",
         executors=[
-            display_name={{ coalesce .Values.endpointDisplayName .Values.endpointName .Release.Name }}
             HighThroughputExecutor(
                 max_workers_per_node={{ .Values.maxWorkersPerPod }},
                 address=address_by_route(),
