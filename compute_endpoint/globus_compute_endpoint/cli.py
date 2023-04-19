@@ -19,6 +19,7 @@ from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
+from packaging.version import Version
 
 log = logging.getLogger(__name__)
 
@@ -363,6 +364,18 @@ def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
 
 def read_config(endpoint_dir: pathlib.Path) -> Config:
     endpoint_name = endpoint_dir.name
+
+    try:
+        import funcx_endpoint
+
+        if Version(funcx_endpoint.__version__) < Version("2.0.0"):
+            msg = (
+                "To avoid compatibility issues with Globus Compute, please uninstall "
+                "the funcx-endpoint package"
+            )
+            raise ClickException(msg)
+    except ModuleNotFoundError:
+        pass
 
     try:
         conf_path = endpoint_dir / "config.py"
