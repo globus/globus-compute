@@ -371,7 +371,8 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
         if Version(funcx_endpoint.__version__) < Version("2.0.0"):
             msg = (
                 "To avoid compatibility issues with Globus Compute, please uninstall "
-                "the funcx-endpoint package"
+                "funcx-endpoint or upgrade funcx-endpoint to >=2.0.0. Note that the "
+                "funcx-endpoint package is now deprecated."
             )
             raise ClickException(msg)
     except ModuleNotFoundError:
