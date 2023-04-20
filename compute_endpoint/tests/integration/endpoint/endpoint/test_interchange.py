@@ -28,6 +28,11 @@ def reset_signals_auto(reset_signals):
     yield
 
 
+@pytest.fixture(autouse=True)
+def mock_spt(mocker):
+    yield mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
+
+
 def test_endpoint_id(funcx_dir):
     manager = Endpoint()
     config_dir = funcx_dir / "mock_endpoint"
@@ -83,7 +88,6 @@ def test_invalid_task_received(mocker, endpoint_uuid):
 
 
 def test_invalid_result_received(mocker, endpoint_uuid):
-    mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
     mock_rqp = mocker.MagicMock()
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_rqp)
 
@@ -155,8 +159,7 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker):
     assert f"Parent ({ppid}) has gone away" in warn_msg
 
 
-def test_no_idle_if_not_configured(mocker, endpoint_uuid):
-    mock_spt = mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
+def test_no_idle_if_not_configured(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
 
@@ -179,8 +182,7 @@ def test_no_idle_if_not_configured(mocker, endpoint_uuid):
     assert not mock_spt.called
 
 
-def test_soft_idle_honored(mocker, endpoint_uuid):
-    mock_spt = mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
+def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
 
@@ -216,8 +218,7 @@ def test_soft_idle_honored(mocker, endpoint_uuid):
     assert num_updates > 1, "expect process title reflects idle status and is updated"
 
 
-def test_hard_idle_honored(mocker, endpoint_uuid):
-    mock_spt = mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
+def test_hard_idle_honored(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
 
@@ -253,8 +254,7 @@ def test_hard_idle_honored(mocker, endpoint_uuid):
     assert num_updates > 1, "expect process title reflects idle status and is updated"
 
 
-def test_unidle_updates_proc_title(mocker, endpoint_uuid):
-    mock_spt = mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
+def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
 
@@ -290,7 +290,6 @@ def test_unidle_updates_proc_title(mocker, endpoint_uuid):
 
 
 def test_sends_final_status_message_on_shutdown(mocker, endpoint_uuid):
-    mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
     mock_rqp = mocker.MagicMock()
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_rqp)
 
