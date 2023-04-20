@@ -5,11 +5,11 @@ from unittest import mock
 import pytest
 from funcx_common.tasks import TaskState
 
-from funcx_endpoint.executors.high_throughput.interchange import Interchange, starter
-from funcx_endpoint.executors.high_throughput.messages import Task
+from funcx_endpoint.engines.high_throughput.interchange import Interchange, starter
+from funcx_endpoint.engines.high_throughput.messages import Task
 
 # Work with linter's 88 char limit, and be uniform in this file how we do it
-mod_dot_path = "funcx_endpoint.executors.high_throughput.interchange"
+mod_dot_path = "funcx_endpoint.engines.high_throughput.interchange"
 
 
 @mock.patch(f"{mod_dot_path}.zmq")

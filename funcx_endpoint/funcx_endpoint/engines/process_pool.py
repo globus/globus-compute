@@ -5,7 +5,7 @@ import multiprocessing
 import typing as t
 import uuid
 from concurrent.futures import Future
-from concurrent.futures import ProcessPoolExecutor as NativeProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor as NativeExecutor
 from multiprocessing.queues import Queue as mpQueue
 
 import psutil
@@ -25,7 +25,7 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         **kwargs,
     ):
         self.label = label
-        self.executor = NativeProcessPoolExecutor(*args, **kwargs)
+        self.executor = NativeExecutor(*args, **kwargs)
         self._status_report_thread = ReportingThread(
             target=self.report_status, args=[], reporting_period=heartbeat_period
         )

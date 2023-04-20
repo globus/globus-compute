@@ -1,13 +1,13 @@
 import logging
 import os
 
-from funcx_endpoint.executors.high_throughput.worker_map import WorkerMap
+from funcx_endpoint.engines.high_throughput.worker_map import WorkerMap
 
 
 class TestWorkerMap:
     def test_add_worker(self, mocker):
         mock_popen = mocker.patch(
-            "funcx_endpoint.executors.high_throughput.worker_map.subprocess.Popen"
+            "funcx_endpoint.engines.high_throughput.worker_map.subprocess.Popen"
         )
         mock_popen.return_value = "proc"
 

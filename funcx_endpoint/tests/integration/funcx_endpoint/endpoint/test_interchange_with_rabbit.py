@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import logging
 import multiprocessing
 import time
 import uuid
 import warnings
 
-import dill
 import pika
 import pytest
-from funcx_common.messagepack import pack
+from funcx_common.messagepack import pack, unpack
 from funcx_common.messagepack.message_types import Result, Task
 from tests.integration.funcx_endpoint.executors.mock_executors import MockExecutor
 from tests.utils import try_for_timeout
@@ -57,6 +57,7 @@ def run_interchange_process(
         target=run_it, args=(reg_info, endpoint_uuid), kwargs={"endpoint_dir": tmp_path}
     )
     ix_proc.start()
+    logging.warning("Yadu:test: here")
 
     yield ix_proc, tmp_path, endpoint_uuid, reg_info
 
@@ -125,7 +126,9 @@ def test_epi_forwards_tasks_and_results(
                 queue=res_q_name, inactivity_timeout=5
             ):
                 assert (mframe, mprops, mbody) != (None, None, None), "no timely result"
-                result = dill.loads(mbody)
+                result = unpack(mbody)
+                assert isinstance(result, Result)
+                assert result.task_id == task_uuid
                 break
     assert result is not None
     assert result.task_id == task_uuid

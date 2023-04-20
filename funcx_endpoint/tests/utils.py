@@ -33,3 +33,15 @@ def slow_double(x: int, sleep_duration_s: int) -> int:
 
     time.sleep(sleep_duration_s)
     return x * 2
+
+
+def kill_manager():
+    import os
+    import signal
+
+    manager_pid = os.getppid()
+    os.kill(manager_pid, signal.SIGKILL)
+
+
+def div_zero(x: int):
+    return x / 0

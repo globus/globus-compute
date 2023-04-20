@@ -32,7 +32,7 @@ REQUIRES = [
     # 'parsl' is a core requirement of the funcx-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
-    "parsl==2023.1.23",
+    "parsl==2023.03.27",
     "pika>=1.2.0",
     "setproctitle>=1.3.2,<1.4",
 ]
@@ -75,11 +75,11 @@ setup(
         "console_scripts": [
             "funcx-endpoint=funcx_endpoint.cli:cli_run",
             "funcx-interchange"
-            "=funcx_endpoint.executors.high_throughput.interchange:cli_run",
+            "=funcx_endpoint.engines.high_throughput.interchange:cli_run",
             "funcx-manager"
-            "=funcx_endpoint.executors.high_throughput.funcx_manager:cli_run",
+            "=funcx_endpoint.engines.high_throughput.funcx_manager:cli_run",
             "funcx-worker"
-            "=funcx_endpoint.executors.high_throughput.funcx_worker:cli_run",
+            "=funcx_endpoint.engines.high_throughput.funcx_worker:cli_run",
         ]
     },
     include_package_data=True,

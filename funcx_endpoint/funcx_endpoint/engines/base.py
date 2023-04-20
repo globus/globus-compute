@@ -1,5 +1,5 @@
 import logging
-import multiprocessing
+import queue
 import threading
 import time
 import typing as t
@@ -53,10 +53,9 @@ class ReportingThread:
             try:
                 target(*args)
             except Exception as e:
-                # log and update future before exiting
-                logger.exception("Callback failed")
+                # log and update future before exiting, if it is not already set
                 self.status.set_exception(exception=e)
-
+                self._shutdown_event.set()
             if self._shutdown_event.wait(timeout=self.reporting_period):
                 break
 
@@ -92,7 +91,7 @@ class GlobusComputeEngineBase(ABC):
         self.run_dir: t.Optional[str] = None
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
-        self.results_passthrough: multiprocessing.Queue = multiprocessing.Queue()
+        self.results_passthrough: queue.Queue = queue.Queue()
 
     @abstractmethod
     def start(
@@ -129,7 +128,6 @@ class GlobusComputeEngineBase(ABC):
         future: Future for which the callback is triggerd
 
         """
-        logger.warning(f"[YADU] : Future done: {future}")
 
         if future.exception():
             code, user_message = get_result_error_details()

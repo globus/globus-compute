@@ -6,6 +6,7 @@ import random
 import shutil
 import time
 import uuid
+from queue import Queue
 
 import pytest
 from funcx_common import messagepack
@@ -15,7 +16,11 @@ from parsl.executors.high_throughput.interchange import ManagerLost
 from tests.utils import double, ez_pack_function, slow_double
 
 from funcx.serialize import FuncXSerializer
-from funcx_endpoint.engines import GlobusComputeEngine, ProcessPoolEngine
+from funcx_endpoint.engines import (
+    GlobusComputeEngine,
+    ProcessPoolEngine,
+    ThreadPoolEngine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,18 @@ def proc_pool_engine():
         label="ProcessPoolEngine", heartbeat_period=1, max_workers=2
     )
     queue = multiprocessing.Queue()
+    engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
+
+    yield engine
+    engine.shutdown()
+
+
+@pytest.fixture
+def thread_pool_engine():
+    ep_id = uuid.uuid4()
+    engine = ThreadPoolEngine(heartbeat_period=1, max_workers=2)
+
+    queue = Queue()
     engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
 
     yield engine
@@ -82,6 +99,7 @@ def test_result_message_packing():
 
 # Skipping "gc_engine" since parsl.htex.submit has an
 # unreliable serialization method.
+# @pytest.mark.parametrize("x", ["gc_engine"])
 @pytest.mark.parametrize("x", ["proc_pool_engine"])
 def test_engine_submit(x, gc_engine, proc_pool_engine):
     "Test engine.submit with multiple engines"

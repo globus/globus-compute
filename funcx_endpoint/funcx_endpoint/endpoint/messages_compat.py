@@ -16,10 +16,10 @@ from funcx_common.messagepack.message_types import (
 from funcx_common.messagepack.message_types import Task as OutgoingTask
 from funcx_common.messagepack.message_types import TaskTransition
 
-from funcx_endpoint.executors.high_throughput.messages import (
+from funcx_endpoint.engines.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
 )
-from funcx_endpoint.executors.high_throughput.messages import Task as InternalTask
+from funcx_endpoint.engines.high_throughput.messages import Task as InternalTask
 
 logger = logging.getLogger(__name__)
 

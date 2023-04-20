@@ -17,21 +17,18 @@ import time
 from multiprocessing.synchronize import Event as EventType
 
 import pika.exceptions
-from funcx_common.messagepack import InvalidMessageError, pack, unpack
-from funcx_common.messagepack.message_types import Result, ResultErrorDetails, Task
+from funcx_common import messagepack
+from funcx_common.messagepack import InvalidMessageError, unpack
+from funcx_common.messagepack.message_types import Task
 from parsl.version import VERSION as PARSL_VERSION
 
 import funcx_endpoint.endpoint.utils.config
 from funcx import __version__ as funcx_sdk_version
 from funcx_endpoint import __version__ as funcx_endpoint_version
-from funcx_endpoint.endpoint.messages_compat import (
-    convert_to_internaltask,
-    try_convert_to_messagepack,
-)
 from funcx_endpoint.endpoint.rabbit_mq import ResultQueuePublisher, TaskQueueSubscriber
 from funcx_endpoint.endpoint.result_store import ResultStore
+from funcx_endpoint.engines.base import GlobusComputeEngineBase
 from funcx_endpoint.exception_handling import get_error_string, get_result_error_details
-from funcx_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
 
 log = logging.getLogger(__name__)
 
@@ -120,41 +117,22 @@ class EndpointInterchange:
             "registration": self.endpoint_id,
             "dir": os.getcwd(),
         }
-
         log.info(f"Platform info: {self.current_platform}")
-        try:
-            self.load_config()
-        except Exception:
-            log.exception("Caught exception")
-            raise
 
+        self.results_passthrough: queue.Queue = queue.Queue()
+        assert len(self.config.executors) == 1, (
+            "Endpoint config should " "only define one executor"
+        )
+        self.executor: GlobusComputeEngineBase = self.config.executors[0]
         self._test_start = False
 
-    def load_config(self):
-        """Load the config"""
-        log.info("Loading endpoint local config")
-
-        self.results_passthrough = mpQueue()
-        self.executors: dict[str, funcx_endpoint.executors.HighThroughputExecutor] = {}
-        for executor in self.config.executors:
-            log.info(f"Initializing executor: {executor.label}")
-            executor.funcx_service_address = self.config.funcx_service_address
-            if not executor.endpoint_id:
-                executor.endpoint_id = self.endpoint_id
-            else:
-                if not executor.endpoint_id == self.endpoint_id:
-                    eep_id = f"Executor({executor.endpoint_id})"
-                    sep_id = f"Interchange({self.endpoint_id})"
-                    raise Exception(f"InconsistentEndpointId: {eep_id} != {sep_id}")
-            self.executors[executor.label] = executor
-            if executor.run_dir is None:
-                executor.run_dir = self.logdir
-
-    def start_executors(self):
+    def start_executor(self):
         log.info("Starting Executors")
-        for executor in self.config.executors:
-            if hasattr(executor, "passthrough") and executor.passthrough is True:
-                executor.start(results_passthrough=self.results_passthrough)
+        self.executor.start(
+            results_passthrough=self.results_passthrough,
+            endpoint_id=self.endpoint_id,
+            run_dir=self.logdir,
+        )
 
     def migrate_tasks_to_internal(
         self,
@@ -216,8 +194,7 @@ class EndpointInterchange:
         self._quiesce_event.set()
 
     def cleanup(self):
-        for label in self.executors:
-            self.executors[label].shutdown()
+        self.executor.shutdown()
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
         log.warning("Received SIGTERM, setting termination flag.")
@@ -238,7 +215,7 @@ class EndpointInterchange:
         # NOTE: currently we only start the executors once because
         # the current behavior is to keep them running decoupled while
         # the endpoint is waiting for reconnection
-        self.start_executors()
+        self.start_executor()
 
         while not self._kill_event.is_set():
             if self._reconnect_fail_counter >= self.reconnect_attempt_limit:
@@ -315,7 +292,7 @@ class EndpointInterchange:
         )
 
         with results_publisher:
-            executor = list(self.executors.values())[0]
+            executor = self.executor
 
             num_tasks_forwarded = 0
             num_results_forwarded = 0
@@ -345,7 +322,7 @@ class EndpointInterchange:
                 # funcx-manager.  In terms of shutting down (or "rebooting") gracefully,
                 # iterate once a second whether or not a task has arrived.
                 nonlocal num_tasks_forwarded
-                ctype = executor.container_type
+                # ctype = executor.container_type
                 while not self._quiesce_event.is_set():
                     if self.time_to_quit:
                         self.stop()
@@ -364,8 +341,7 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        task = convert_to_internaltask(task_msg, ctype)
-                        executor.submit_raw(task)
+                        executor.submit_raw(incoming_task)
                         num_tasks_forwarded += 1  # Safe given GIL
 
                     except Exception as exc:
@@ -375,8 +351,10 @@ class EndpointInterchange:
                             "exception": f"Failed to start task: {get_error_string()}",
                             "error_details": get_result_error_details(),
                             "message": f"Failed to start task.  Exception text: {exc}",
+                            "task_statuses": [],
                         }
-                        self.results_passthrough.put(result)
+                        m_result = messagepack.message_types.Result(**result)
+                        self.results_passthrough.put(messagepack.pack(m_result))
 
                 log.debug("Exit process-pending-tasks thread.")
 
@@ -387,9 +365,11 @@ class EndpointInterchange:
                 nonlocal num_results_forwarded
                 while not self._quiesce_event.is_set():
                     try:
-                        result = self.results_passthrough.get(timeout=1)
-                        task_id = result["task_id"]
-                        packed_result = result["message"]
+                        task_id = None
+                        packed_result = self.results_passthrough.get(timeout=1)
+                        result = messagepack.unpack(packed_result)
+                        if isinstance(result, messagepack.message_types.Result):
+                            task_id = result.task_id
 
                     except queue.Empty:
                         # Empty queue!  Let's see if we have any prior results to send
@@ -402,35 +382,7 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        # This either works or it doesn't; if it doesn't, then
-                        # serialize an execption and send _that_
-                        # will be a packed EPStatusReport or Result
-                        message = try_convert_to_messagepack(packed_result)
-
-                    except Exception as exc:
-                        log.exception(
-                            f"Unable to parse result message for task {task_id}."
-                            "   Marking task as failed."
-                        )
-
-                        kwargs = {
-                            "task_id": task_id,
-                            "data": packed_result,
-                            "error_details": ResultErrorDetails(
-                                code=0,
-                                user_message=(
-                                    "Endpoint failed to serialize."
-                                    f"  Exception text: {exc}"
-                                ),
-                            ),
-                        }
-                        message = pack(Result(**kwargs))
-
-                    if task_id:
-                        log.debug(f"Forwarding result for task {task_id}")
-
-                    try:
-                        results_publisher.publish(message)
+                        results_publisher.publish(packed_result)
                         num_results_forwarded += 1  # Safe given GIL
 
                     except Exception:
