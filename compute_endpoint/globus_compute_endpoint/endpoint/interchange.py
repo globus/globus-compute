@@ -585,7 +585,14 @@ class EndpointInterchange:
             message = EPStatusReport(
                 endpoint_id=self.endpoint_id,
                 # 0 == "no more heartbeats coming"
-                global_state={"heartbeat_period": 0},
+                global_state={
+                    "managers": 0,
+                    "total_workers": 0,
+                    "idle_workers": 0,
+                    "pending_tasks": 0,
+                    "outstanding_tasks": {},
+                    "heartbeat_period": 0,
+                },
                 task_statuses={},
             )
             results_publisher.publish(pack(message))
