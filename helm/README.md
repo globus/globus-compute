@@ -164,6 +164,7 @@ The deployment is configured via values.yaml file.
 | maxCPU | Maximum CPUs to allocate to worker pod | 2 |
 | maxBlocks | Maximum number of worker pods to spawn | 100 |
 | maxWorkersPerPod | How many workers will be scheduled in each pod | 1 |
+| taskTTLSeconds | (Optional) If set, will stop tasks that run longer than this value, in (fractional) seconds.  Example: 1.5 | |
 | endpointName | (Optional) Specify a name for registration with the funcX web services | The release name (Release.Name) |
 | endpointDisplayName | (Optional) Specify a display name for registration with the funcX web services | The endpoint name (endpointName) or the release name (Release.Name) |
 | endpointUUID | (Required) Specify a UUID for this endpoint. | |
