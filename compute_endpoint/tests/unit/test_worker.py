@@ -1,3 +1,4 @@
+import os
 import pickle
 import uuid
 from unittest import mock
@@ -6,6 +7,7 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.executors.high_throughput.messages import Task
 from globus_compute_endpoint.executors.high_throughput.worker import Worker
+from parsl.app.errors import AppTimeout
 
 
 def hello_world():
@@ -147,3 +149,24 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
     assert len(result["error_details"]) == 2
     assert result["error_details"][0] == "MaxResultSizeExceeded"
     assert result["error_details"][1].startswith("remote error: ")
+
+
+def sleeper(t):
+    import time
+
+    time.sleep(t)
+    return True
+
+
+def test_app_timeout(test_worker):
+    task_id = uuid.uuid1()
+    task_body = ez_pack_function(test_worker.serializer, sleeper, (1,), {})
+    task_message = messagepack.pack(
+        messagepack.message_types.Task(
+            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
+        )
+    )
+
+    with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.1"}):
+        with pytest.raises(AppTimeout):
+            test_worker.call_user_function(task_message)
