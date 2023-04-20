@@ -37,8 +37,7 @@ else
 fi
 
 pushd sdk
-echo "Releasing SDK $VERSION"
-#tox -e publish-release
+tox -e publish-release
 popd
 
 pushd endpoint
