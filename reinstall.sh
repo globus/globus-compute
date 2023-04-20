@@ -3,3 +3,4 @@ cd compute_sdk
 pip install .
 cd ../compute_endpoint
 pip install .
+
