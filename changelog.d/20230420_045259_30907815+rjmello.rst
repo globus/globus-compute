@@ -1,0 +1,7 @@
+Bug Fixes
+^^^^^^^^^
+
+- Required fields were missing from the final endpoint status update that
+  is sent when an endpoint is gracefully shutting down, causing issues when
+  getting the status of an endpoint.
+
