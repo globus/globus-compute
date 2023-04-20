@@ -19,6 +19,14 @@ You will also need the following credentials:
 - pypi credentials for use with `twine` (e.g. a token in `~/.pypirc`) valid for
     publishing `globus-compute-sdk` and `globus-compute-endpoint`
 
+##
+
+Easy copy for editing all the version files:
+
+```bash
+$EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py compute_funcx/sdk/setup.py compute_funcx/endpoint/setup.py compute_funcx/sdk/funcx/version.py compute_funcx/endpoint/funcx_endpoint/version.py
+```
+
 ## Procedure
 
 1. Bump versions of both packages to a new latest version number by removing
@@ -59,9 +67,3 @@ git push
 7. Release updated wrapper versions of funcx and funcx-endpoint (as long as we keep supporting these packages)
    See compute_funcx/RELEASING.md for details.  ie. cd compute_funcx; ./release.sh
 
-
-# All version files:
-
-```bash
-$EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py compute_funcx/sdk/setup.py compute_funcx/endpoint/setup.py compute_funcx/sdk/funcx/version.py compute_funcx/endpoint/funcx_endpoint/version.py
-```
