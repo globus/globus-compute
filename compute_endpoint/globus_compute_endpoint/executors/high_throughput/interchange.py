@@ -1034,6 +1034,7 @@ class Interchange:
             "idle_workers": free_capacity,
             "pending_tasks": pending_tasks,
             "outstanding_tasks": outstanding_tasks,
+            "heartbeat_period": self.heartbeat_period,
         }
 
     def scale_out(self, blocks=1, task_type=None):
