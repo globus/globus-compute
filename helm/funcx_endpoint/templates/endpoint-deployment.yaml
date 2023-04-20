@@ -36,11 +36,11 @@ spec:
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         {{- end }}
+        env:
         {{- if .Values.useClientCredentials }}
           {{- if not .Values.secrets }}
             {{- fail "Missing `secrets` store specification for client credentials" }}
           {{- end }}
-        env:
           - name: FUNCX_SDK_CLIENT_ID
             valueFrom:
               secretKeyRef:
@@ -51,7 +51,11 @@ spec:
               secretKeyRef:
                 name: {{ .Values.secrets }}
                 key: FUNCX_SDK_CLIENT_SECRET
-        {{- end}}
+        {{- end }}
+        {{- if .Values.taskTTLSeconds }}
+          - name: GC_TASK_TIMEOUT
+            value: "{{ .Values.taskTTLSeconds }}"
+        {{- end }}
 
         volumeMounts:
           - mountPath: "/mnt"
