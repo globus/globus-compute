@@ -366,9 +366,9 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
     endpoint_name = endpoint_dir.name
 
     try:
-        import funcx_endpoint
+        from funcx_endpoint.version import VERSION
 
-        if Version(funcx_endpoint.__version__) < Version("2.0.0"):
+        if Version(VERSION) < Version("2.0.0"):
             msg = (
                 "To avoid compatibility issues with Globus Compute, please uninstall "
                 "funcx-endpoint or upgrade funcx-endpoint to >=2.0.0. Note that the "
