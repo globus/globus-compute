@@ -3,6 +3,24 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.0.1:
+
+globus-compute-sdk & globus-compute-endpoint v2.0.1
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+ - Support for timing out tasks that exceed a walltime limit on the globus-compute-endpoint.
+   Use global variable ``GC_TASK_TIMEOUT`` which accepts a float to set the limit.
+
+Bug Fixes
+^^^^^^^^^
+
+- Required fields were missing from the final endpoint status update that
+  is sent when an endpoint is gracefully shutting down, causing issues when
+  getting the status of an endpoint.
+
 .. _changelog-2.0.1a4:
 
 globus-compute-sdk & globus-compute-endpoint v2.0.1a4
