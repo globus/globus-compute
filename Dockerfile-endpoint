@@ -37,3 +37,4 @@ USER compute
 WORKDIR /home/compute
 COPY helm/boot.sh .
 ENV HOME /home/compute
+ENV GC_TASK_TIMEOUT 10
