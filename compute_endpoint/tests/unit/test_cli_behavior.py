@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shlex
 from unittest import mock
@@ -90,10 +91,24 @@ def run_line(cli_runner):
     return func
 
 
-def test_init_config_dir(fs):
-    home_dir = pathlib.Path.home()
-    config_dir = init_config_dir()
-    assert config_dir == home_dir / ".globus_compute"
+@pytest.mark.parametrize("dir_exists", [True, False])
+@pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
+def test_init_config_dir(fs, dir_exists, user_dir):
+    config_dirname = pathlib.Path.home() / ".globus_compute"
+
+    if dir_exists:
+        fs.create_dir(config_dirname)
+
+    if user_dir is not None:
+        config_dirname = pathlib.Path(user_dir)
+        with mock.patch.dict(
+            os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
+        ):
+            dirname = init_config_dir()
+    else:
+        dirname = init_config_dir()
+
+    assert dirname == config_dirname
 
 
 def test_init_config_dir_file_conflict(fs):
@@ -102,7 +117,24 @@ def test_init_config_dir_file_conflict(fs):
 
     with pytest.raises(ClickException) as exc:
         init_config_dir()
+
     assert "Error creating directory" in str(exc)
+
+
+def test_init_config_dir_permission_error(fs):
+    parent_dirname = pathlib.Path("/parent/dir/")
+    config_dirname = parent_dirname / "config"
+
+    fs.create_dir(parent_dirname)
+    os.chmod(parent_dirname, 0o000)
+
+    with pytest.raises(ClickException) as exc:
+        with mock.patch.dict(
+            os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
+        ):
+            init_config_dir()
+
+    assert "Permission denied" in str(exc)
 
 
 def test_start_ep_corrupt(run_line, mock_cli_state, make_endpoint_dir):

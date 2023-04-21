@@ -61,7 +61,8 @@ def test_get_client_creds_from_env(randomstring):
 
 @pytest.mark.parametrize("legacy_dir_exists", [True, False])
 @pytest.mark.parametrize("dir_exists", [True, False])
-def test_ensure_compute_dir(fs, legacy_dir_exists, dir_exists):
+@pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
+def test_ensure_compute_dir(fs, legacy_dir_exists, dir_exists, user_dir):
     home_dirname = pathlib.Path.home()
     legacy_dirname = home_dirname / ".funcx"
     dirname = home_dirname / ".globus_compute"
@@ -71,21 +72,50 @@ def test_ensure_compute_dir(fs, legacy_dir_exists, dir_exists):
     if dir_exists:
         fs.create_dir(dirname)
 
-    compute_dirname = ensure_compute_dir()
+    if user_dir is not None:
+        dirname = pathlib.Path(user_dir)
+        with mock.patch.dict(os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(dirname)}):
+            compute_dirname = ensure_compute_dir()
+    else:
+        compute_dirname = ensure_compute_dir()
 
     assert compute_dirname.is_dir()
     assert compute_dirname == dirname
-    if legacy_dir_exists and not dir_exists:
+    if legacy_dir_exists and not dir_exists and user_dir is None:
         assert legacy_dirname.is_symlink()
 
 
-def test_conflicting_compute_file(fs):
+@pytest.mark.parametrize("user_dir_defined", [True, False])
+def test_conflicting_compute_file(fs, user_dir_defined):
     filename = pathlib.Path.home() / ".globus_compute"
     fs.create_file(filename)
 
     with pytest.raises(FileExistsError) as exc:
-        ensure_compute_dir()
+        if user_dir_defined:
+            with mock.patch.dict(
+                os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(filename)}
+            ):
+                ensure_compute_dir()
+        else:
+            ensure_compute_dir()
+
     assert "Error creating directory" in str(exc)
+
+
+def test_restricted_user_dir(fs):
+    parent_dirname = pathlib.Path("/parent/dir/")
+    config_dirname = parent_dirname / "config"
+
+    fs.create_dir(parent_dirname)
+    os.chmod(parent_dirname, 0o000)
+
+    with pytest.raises(PermissionError) as exc:
+        with mock.patch.dict(
+            os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
+        ):
+            ensure_compute_dir()
+
+    assert "Permission denied" in str(exc)
 
 
 def test_is_client_login():
