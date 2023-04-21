@@ -73,7 +73,7 @@ class FakeLoginManager:
 
     def get_web_client(self, *, base_url: str | None = None) -> WebClient:
         return WebClient(
-            base_url="https://api2.funcx.org/v2/",
+            base_url="https://compute.api.globus.org/v2/",
             authorizer=globus_sdk.NullAuthorizer(),
         )
 
@@ -82,7 +82,7 @@ class FakeLoginManager:
 def get_standard_compute_client():
     responses.add(
         method=responses.GET,
-        url="https://api2.funcx.org/v2/version",
+        url="https://compute.api.globus.org/v2/version",
         headers={"Content-Type": "application/json"},
         json={"api": "0.4.0", "min_ep_version": "0.0.0", "min_sdk_version": "0.0.0"},
     )

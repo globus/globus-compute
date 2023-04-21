@@ -41,7 +41,7 @@ def register_endpoint_response(endpoint_uuid):
             creds = f"{username}:{password}@"
         responses.add(
             method=responses.POST,
-            url="https://api2.funcx.org/v2/endpoints",
+            url="https://compute.api.globus.org/v2/endpoints",
             headers={"Content-Type": "application/json"},
             json={
                 "endpoint_id": endpoint_id,
@@ -67,7 +67,7 @@ def register_endpoint_failure_response(endpoint_uuid):
     def create_response(endpoint_id=endpoint_uuid, status_code=200):
         responses.add(
             method=responses.POST,
-            url="https://api2.funcx.org/v2/endpoints",
+            url="https://compute.api.globus.org/v2/endpoints",
             headers={"Content-Type": "application/json"},
             json={"error": "error msg"},
             status=status_code,

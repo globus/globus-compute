@@ -7,7 +7,7 @@ an endpoint to be deployed on a laptop, the login node of a campus cluster, a cl
 or a Kubernetes cluster, for example.
 
 The endpoint requires outbound network connectivity. That is, it must be able to connect to
-Globus Compute at `funcx.org <https://api2.funcx.org/v2>`_.
+Globus Compute at `funcx.org <https://compute.api.globus.org/v2>`_.
 
 The Globus Compute Endpoint package `is available on PyPI <https://pypi.org/project/globus-compute-endpoint/>`_
 (and thus available via ``pip``). However, *we strongly recommend installing the

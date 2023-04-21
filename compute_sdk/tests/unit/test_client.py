@@ -20,7 +20,7 @@ def test_client_init_sets_addresses_by_env(
     monkeypatch, env, usage_method, explicit_params, randomstring
 ):
     if env in (None, "production"):
-        web_uri = "https://api2.funcx.org/v2"
+        web_uri = "https://compute.api.globus.org/v2"
     elif env == "dev":
         web_uri = "https://api.dev.funcx.org/v2"
     elif env == "local":

@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 replicaCount: 1
-funcXServiceAddress: https://api2.funcx.org
+funcXServiceAddress:  curl https://compute.api.globus.org
 image:
   repository: compute/kube-endpoint
   tag: main-3.10
