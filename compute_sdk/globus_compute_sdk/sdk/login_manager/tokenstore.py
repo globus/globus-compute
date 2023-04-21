@@ -39,19 +39,20 @@ def ensure_compute_dir() -> pathlib.Path:
     legacy_dirname = _home() / ".funcx"
     dirname = _home() / ".globus_compute"
 
+    user_dir = os.getenv("GLOBUS_COMPUTE_USER_DIR")
+    if user_dir:
+        dirname = pathlib.Path(user_dir)
+
     if dirname.is_dir():
         pass
-
     elif dirname.is_file():
         raise FileExistsError(
             f"Error creating directory {dirname}, "
             "please remove or rename the conflicting file"
         )
-
-    elif legacy_dirname.is_dir():
+    elif legacy_dirname.is_dir() and not user_dir:
         legacy_dirname.replace(dirname)
         legacy_dirname.symlink_to(dirname, target_is_directory=True)
-
     else:
         dirname.mkdir(mode=0o700, parents=True, exist_ok=True)
 

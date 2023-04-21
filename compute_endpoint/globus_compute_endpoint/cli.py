@@ -41,7 +41,7 @@ class CommandState:
 def init_config_dir() -> pathlib.Path:
     try:
         return ensure_compute_dir()
-    except FileExistsError as e:
+    except (FileExistsError, PermissionError) as e:
         raise ClickException(str(e))
 
 
