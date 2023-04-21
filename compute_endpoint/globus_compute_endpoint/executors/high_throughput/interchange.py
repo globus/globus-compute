@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 import typing as t
+from collections import defaultdict
 
 import daemon
 import dill
@@ -336,7 +337,8 @@ class Interchange:
 
         self.task_cancel_running_queue: queue.Queue = queue.Queue()
         self.task_cancel_pending_trap: dict[str, str] = {}
-        self.task_status_deltas: dict[str, list[TaskTransition]] = {}
+        self.task_status_deltas: dict[str, list[TaskTransition]] = defaultdict(list)
+        self._task_status_delta_lock = threading.Lock()
         self.container_switch_count: dict[bytes, int] = {}
 
     def load_config(self):
@@ -460,10 +462,8 @@ class Interchange:
                     actor=ActorName.INTERCHANGE,
                 )
 
-                self.task_status_deltas[msg.task_id] = self.task_status_deltas.get(
-                    msg.task_id, []
-                )
-                self.task_status_deltas[msg.task_id].append(tt)
+                with self._task_status_delta_lock:
+                    self.task_status_deltas[msg.task_id].append(tt)
 
                 log.debug(
                     f"[TASK_PULL_THREAD] task {msg.task_id} is now WAITING_FOR_NODES"
@@ -556,14 +556,15 @@ class Interchange:
 
         while True:
             log.trace("Endpoint id : %s, %s", self.endpoint_id, type(self.endpoint_id))
-            msg = EPStatusReport(
-                self.endpoint_id,
-                self.get_global_state_for_status_report(),
-                self.task_status_deltas,
-            )
+            with self._task_status_delta_lock:
+                msg = EPStatusReport(
+                    self.endpoint_id,
+                    self.get_global_state_for_status_report(),
+                    self.task_status_deltas,
+                )
+                status_report_queue.put(msg.pack())
+                self.task_status_deltas.clear()
             log.debug("Sending status report to executor, and clearing task deltas.")
-            status_report_queue.put(msg.pack())
-            self.task_status_deltas.clear()
 
             if kill_event.wait(self.heartbeat_period):
                 break
@@ -718,6 +719,8 @@ class Interchange:
         # on interchange
         last_cold_routing_time = time.time()
         prev_manager_stat = None
+
+        task_deltas_to_merge: dict[str, list[TaskTransition]] = defaultdict(list)
 
         while not self._kill_event.is_set():
             self.socks = dict(poller.poll(timeout=poll_period))
@@ -880,8 +883,13 @@ class Interchange:
                                 state=TaskState.WAITING_FOR_LAUNCH,
                                 actor=ActorName.INTERCHANGE,
                             )
-                            self.task_status_deltas.setdefault(task_id, [])
-                            self.task_status_deltas[task_id].append(tt)
+                            task_deltas_to_merge[task_id].append(tt)
+
+            if task_deltas_to_merge:
+                with self._task_status_delta_lock:
+                    for task_id, deltas in task_deltas_to_merge.items():
+                        self.task_status_deltas[task_id].extend(deltas)
+                task_deltas_to_merge.clear()
 
             # Receive any results and forward to client
             if (
@@ -908,12 +916,8 @@ class Interchange:
                                 manager_report.task_statuses,
                             )
 
-                        # merge the two dicts of statuses
-                        for tid, statuses in manager_report.task_statuses.items():
-                            if tid in self.task_status_deltas.keys():
-                                self.task_status_deltas[tid] += statuses
-                            else:
-                                self.task_status_deltas[tid] = statuses
+                            for tid, statuses in manager_report.task_statuses.items():
+                                task_deltas_to_merge[tid].extend(statuses)
 
                         self.task_outgoing.send_multipart(
                             [manager, b"", PKL_HEARTBEAT_CODE]
@@ -931,33 +935,36 @@ class Interchange:
                         pass
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
-                    for idx, b_message in enumerate(b_messages):
-                        r = dill.loads(b_message)
+                        with self._task_status_delta_lock:
+                            for idx, b_message in enumerate(b_messages):
+                                r = dill.loads(b_message)
+                                tid = r["task_id"]
 
-                        log.debug(
-                            "Received task result %s (from %s)", r["task_id"], manager
-                        )
-                        task_container = self.containers[r["container_id"]]
-                        log.debug(
-                            "Removing for manager: %s from %s",
-                            manager,
-                            self._ready_manager_queue,
-                        )
+                                log.debug(
+                                    "Received task result %s (from %s)", tid, manager
+                                )
+                                task_container = self.containers[r["container_id"]]
+                                log.debug(
+                                    "Removing for manager: %s from %s",
+                                    manager,
+                                    self._ready_manager_queue,
+                                )
 
-                        mdata["tasks"][task_container].remove(r["task_id"])
+                                mdata["tasks"][task_container].remove(tid)
 
-                        # Transfer any outstanding task statuses to the result message
-                        if r["task_id"] in self.task_status_deltas:
-                            r["task_statuses"] += self.task_status_deltas[r["task_id"]]
-                            b_messages[idx] = dill.dumps(r)
-                            log.debug(
-                                "Transferring statuses for %s: %s",
-                                r["task_id"],
-                                r["task_statuses"],
-                            )
-                            del self.task_status_deltas[r["task_id"]]
+                                # Transfer any outstanding task statuses to the
+                                # result message
+                                if tid in self.task_status_deltas:
+                                    r["task_statuses"] += self.task_status_deltas[tid]
+                                    del self.task_status_deltas[tid]
+                                    b_messages[idx] = dill.dumps(r)
+                                    log.debug(
+                                        "Transferring statuses for %s: %s",
+                                        tid,
+                                        r["task_statuses"],
+                                    )
 
-                    mdata["total_tasks"] -= len(b_messages)
+                        mdata["total_tasks"] -= len(b_messages)
 
                     # TODO: handle this with a Task message or something?
                     # previously used this; switched to mono-message,
