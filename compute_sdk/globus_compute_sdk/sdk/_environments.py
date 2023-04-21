@@ -11,7 +11,7 @@ def _get_envname():
 def get_web_service_url(envname: str | None) -> str:
     env = envname or _get_envname()
     urls = {
-        "production": "https://api2.funcx.org/v2",
+        "production": "https://compute.api.globus.org/v2",
         "dev": "https://api.dev.funcx.org/v2",
         "local": "http://localhost:5000/v2",
     }
@@ -21,7 +21,7 @@ def get_web_service_url(envname: str | None) -> str:
 def get_web_socket_url(envname: str | None) -> str:
     env = envname or _get_envname()
     urls = {
-        "production": "wss://api2.funcx.org/ws/v2/",
+        "production": "wss://compute.api.globus.org/ws/v2/",
         "dev": "wss://api.dev.funcx.org/ws/v2/",
         "local": "ws://localhost:6000/v2",
     }

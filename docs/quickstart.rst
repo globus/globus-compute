@@ -24,7 +24,7 @@ This should return the Python version, for example: ``Python 3.8.10``.
 
 To check if your endpoint/client has network access and can connect to the Globus Compute service, run::
 
-  >>> curl https://api2.funcx.org/v2/version
+  >>> curl https://compute.api.globus.org/v2/version
 
 This should return a version string, for example: ``"1.0.5"``
 

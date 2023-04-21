@@ -1173,7 +1173,7 @@ New Functionality
                ),
            )],
            detach_endpoint=True,
-           funcx_service_address='https://api2.funcx.org/v2'
+           funcx_service_address='https://compute.api.globus.org/v2'
        )
 
 * The endpoint will now log to `~/.funcx/<ENDPOINT_NAME>/EndpointInterchange.log`.

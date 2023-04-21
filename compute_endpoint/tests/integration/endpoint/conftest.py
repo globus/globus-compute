@@ -51,7 +51,7 @@ def setup_register_endpoint_response(
 
         responses.add(
             method=responses.POST,
-            url="https://api2.funcx.org/v2/endpoints",
+            url="https://compute.api.globus.org/v2/endpoints",
             headers={"Content-Type": "application/json"},
             json={
                 "endpoint_id": endpoint_uuid,

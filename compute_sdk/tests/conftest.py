@@ -2,9 +2,9 @@ import pytest
 from globus_compute_sdk import Client
 
 config = {
-    "funcx_service_address": "https://api2.funcx.org/v2",
+    "funcx_service_address": "https://compute.api.globus.org/v2",
     "endpoint_uuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    "results_ws_uri": "wss://api2.funcx.org/ws/v2/",
+    "results_ws_uri": "wss://compute.api.globus.org/ws/v2/",
 }
 
 

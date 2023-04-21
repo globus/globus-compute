@@ -68,7 +68,7 @@ def register_endpoint_failure_response():
     def create_response(status_code: int = 200, err_msg: str = "some error msg"):
         responses.add(
             method=responses.POST,
-            url="https://api2.funcx.org/v2/endpoints",
+            url="https://compute.api.globus.org/v2/endpoints",
             headers={"Content-Type": "application/json"},
             json={"error": err_msg},
             status=status_code,
