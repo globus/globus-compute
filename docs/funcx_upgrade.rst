@@ -19,6 +19,9 @@ For the SDK, ``FuncXClient`` and ``FuncXExecutor`` have been renamed to ``Client
 and ``Executor``.  For the Endpoint, merely using the command
 ``globus-compute-endpoint`` instead of ``funcx-endpoint`` should work.
 
+If interacting with ``https://api2.funcx.org`` directly or the FuncX
+Action Provider, please `see below for URL updates  <#URL-Changes>`_.
+
 .. note::
   An alternate upgrade path is to install the latest ``funcx / funcx-endpoint``
   packages which are a wrapper around ``globus-compute-sdk`` and
@@ -240,3 +243,16 @@ that reference them:
   from funcx_endpoint.executors import HighThroughputExecutor
   from funcx_endpoint.executors.high_throughput import Manager
   from funcx_endpoint.executors.high_throughput import FuncXWorker
+
+URL Changes
+-----------
+
+* The Globus Compute API URL has changed from ``https://api2.funcx.org`` to
+  ``https://compute.api.globus.org``
+* The Action Provider URL has changed from ``https://automate.funcx.org``
+  to ``https://compute.actions.globus.org``.  Please update any flows and
+  remove the ActionScope in the definition, if present.
+
+Note that while the old URLs are deprecated, they will continue to be available
+while current users have a chance to migrate.
+
