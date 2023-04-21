@@ -203,7 +203,6 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
                For example: {"RAW": 16}
         """
         # This is a hack
-        log.debug("Getting Kubernetes provider status")
         status = {}
         for jid in job_ids:
             if jid in self.resources_by_pod_name:

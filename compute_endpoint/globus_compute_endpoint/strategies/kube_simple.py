@@ -1,6 +1,7 @@
 import logging
 import math
 import time
+from collections import defaultdict
 
 from globus_compute_endpoint.logging_config import ComputeLogger
 from globus_compute_endpoint.strategies.base import BaseStrategy
@@ -30,10 +31,11 @@ class KubeSimpleStrategy(BaseStrategy):
           default: 60s
 
         """
-        log.info("KubeSimpleStrategy Initialized")
         super().__init__(*args, threshold=threshold, interval=interval)
         self.max_idletime = max_idletime
         self.executors_idle_since = {}
+        self._task_type_status_msg = defaultdict(str)
+        log.info(f"KubeSimpleStrategy Initialized; max idle time: {max_idletime}s")
 
     def strategize(self, *args, **kwargs):
         try:
@@ -60,20 +62,27 @@ class KubeSimpleStrategy(BaseStrategy):
         status = self.interchange.provider_status()
         log.trace("Provider status : %s", status)
 
+        task_dbg_msg = (
+            "Endpoint has %s active tasks of %s, %s active blocks, "
+            "%s connected workers for %s"
+        )
+
         for task_type in active_tasks.keys():
             active_pods = status.get(task_type, 0)
             active_slots = active_pods * workers_per_pod * managers_per_pod
             active_tasks_per_type = active_tasks[task_type]
 
-            log.debug(
-                "Endpoint has %s active tasks of %s, %s active blocks, "
-                "%s connected workers for %s",
+            _tmp = task_dbg_msg % (
                 active_tasks_per_type,
                 task_type,
                 active_pods,
                 self.interchange.get_total_live_workers(),
                 task_type,
             )
+            if _tmp != self._task_type_status_msg[task_type]:
+                # Quiet some not-helpful logs
+                self._task_type_status_msg[task_type] = _tmp
+                log.debug(_tmp)
 
             # Reset the idle time if we are currently running tasks
             if active_tasks_per_type > 0:

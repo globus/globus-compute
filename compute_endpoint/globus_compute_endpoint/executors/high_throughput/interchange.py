@@ -1132,8 +1132,9 @@ class Interchange:
         """
         status = []
         if self.provider:
-            log.trace("Getting the status of %s blocks.", list(self.blocks.values()))
-            status = self.provider.status(list(self.blocks.values()))
+            job_ids: list[str] = list(self.blocks.values())
+            log.trace("Getting the status of %s blocks.", job_ids)
+            status = self.provider.status(job_ids)
             log.trace("The status is %s", status)
 
         return status
