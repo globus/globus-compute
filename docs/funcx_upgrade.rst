@@ -20,7 +20,7 @@ and ``Executor``.  For the Endpoint, merely using the command
 ``globus-compute-endpoint`` instead of ``funcx-endpoint`` should work.
 
 If interacting with ``https://api2.funcx.org`` directly or the FuncX
-Action Provider, please `see below for URL updates  <#URL-Changes>`_.
+Action Provider, please `see below for URL updates  <#url-changes>`_.
 
 .. note::
   An alternate upgrade path is to install the latest ``funcx / funcx-endpoint``
