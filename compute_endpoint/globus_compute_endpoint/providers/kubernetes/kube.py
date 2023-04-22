@@ -1,4 +1,5 @@
 import logging
+import os
 import queue
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -288,7 +289,10 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             )
 
         # Create the enviornment variables and command to initiate IPP
-        environment_vars = client.V1EnvVar(name="TEST", value="SOME DATA")
+        env = []
+        for var_name in ("GC_TASK_TIMEOUT",):
+            if var_name in os.environ:
+                env.append(client.V1EnvVar(name=var_name, value=os.getenv(var_name)))
 
         launch_args = ["-c", f"{cmd_string}"]
 
@@ -311,7 +315,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
             volume_mounts=volume_mounts,
             command=["/bin/bash"],
             args=launch_args,
-            env=[environment_vars],
+            env=env,
             security_context=security_context,
         )
 
