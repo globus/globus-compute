@@ -776,9 +776,11 @@ class Interchange:
                     }
                     if reg_flag is True:
                         interesting_managers.add(manager)
-                        log.info(f"Adding manager: {manager!r} to ready queue")
+                        log.info(
+                            f"Add manager to ready queue: {manager!r}"
+                            f"\n  Registration info: {msg})"
+                        )
                         mdata.update(msg)
-                        log.info(f"Registration info for manager {manager!r}: {msg}")
                         self._ready_manager_queue[manager] = mdata
 
                         if (
@@ -999,13 +1001,12 @@ class Interchange:
             except queue.Empty:
                 pass
 
-            log.trace("entering bad_managers section")
             now = time.time()
             hbt_window_start = now - self.heartbeat_threshold
             bad_managers = [
                 manager
-                for manager in self._ready_manager_queue
-                if hbt_window_start > self._ready_manager_queue[manager]["last"]
+                for manager, mdata in self._ready_manager_queue.items()
+                if hbt_window_start > mdata["last"]
             ]
             bad_manager_msgs = []
             for manager in bad_managers:
@@ -1034,7 +1035,6 @@ class Interchange:
             if bad_manager_msgs:
                 log.warning(f"Sending task failure reports of manager {manager!r}")
                 self.results_outgoing.send(dill.dumps(bad_manager_msgs))
-            log.trace("ending one main loop iteration")
 
         delta = time.time() - start
         log.info(f"Processed {count} tasks in {delta} seconds")

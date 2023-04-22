@@ -316,16 +316,23 @@ class Manager:
         poll_timer = self.poll_period
 
         new_worker_map = None
+        last_count_pending = -1
+        last_count_worker = -1
         while not kill_event.is_set():
             # Disabling the check on ready_worker_queue disables batching
-            log.trace("Loop start")
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
-            log.trace(
-                "pending_task_count: %s, Ready_worker_count: %s",
+            if (last_count_pending, last_count_worker) != (
                 pending_task_count,
                 ready_worker_count,
-            )
+            ):
+                log.trace(
+                    "pending_task_count: %s, Ready_worker_count: %s",
+                    pending_task_count,
+                    ready_worker_count,
+                )
+                last_count_pending = pending_task_count
+                last_count_worker = ready_worker_count
 
             if pending_task_count < self.max_queue_size and ready_worker_count > 0:
                 ads = self.worker_map.advertisement()
@@ -667,8 +674,9 @@ class Manager:
             )
             log.info(f"Sending status report to interchange: {msg.task_statuses}")
             self.pending_result_queue.put(msg)
-            log.info("Clearing task deltas")
-            self.task_status_deltas.clear()
+            if self.task_status_deltas:
+                log.info("Clearing task deltas")
+                self.task_status_deltas.clear()
 
     def push_results(self, kill_event, max_result_batch_size=1):
         """Listens on the pending_result_queue and sends out results via 0mq
@@ -860,22 +868,25 @@ def cli_run():
 
     try:
         log.info(f"Python version: {sys.version}")
-        log.info(f"Debug logging: {args.debug}")
-        log.info(f"Log dir: {args.logdir}")
-        log.info(f"Manager ID: {args.uid}")
-        log.info(f"Block ID: {args.block_id}")
-        log.info(f"cores_per_worker: {args.cores_per_worker}")
-        log.info(f"available_accelerators: {args.available_accelerators}")
-        log.info(f"task_url: {args.task_url}")
-        log.info(f"result_url: {args.result_url}")
-        log.info(f"hb_period: {args.hb_period}")
-        log.info(f"hb_threshold: {args.hb_threshold}")
-        log.info(f"max_workers: {args.max_workers}")
-        log.info(f"poll_period: {args.poll}")
-        log.info(f"worker_mode: {args.worker_mode}")
-        log.info(f"container_cmd_options: {args.container_cmd_options}")
-        log.info(f"scheduler_mode: {args.scheduler_mode}")
-        log.info(f"worker_type: {args.worker_type}")
+        log.info(
+            "Arguments:"
+            f"\n  Debug logging: {args.debug}"
+            f"\n  Log dir: {args.logdir}"
+            f"\n  Manager ID: {args.uid}"
+            f"\n  Block ID: {args.block_id}"
+            f"\n  cores_per_worker: {args.cores_per_worker}"
+            f"\n  available_accelerators: {args.available_accelerators}"
+            f"\n  task_url: {args.task_url}"
+            f"\n  result_url: {args.result_url}"
+            f"\n  hb_period: {args.hb_period}"
+            f"\n  hb_threshold: {args.hb_threshold}"
+            f"\n  max_workers: {args.max_workers}"
+            f"\n  poll_period: {args.poll}"
+            f"\n  worker_mode: {args.worker_mode}"
+            f"\n  container_cmd_options: {args.container_cmd_options}"
+            f"\n  scheduler_mode: {args.scheduler_mode}"
+            f"\n  worker_type: {args.worker_type}"
+        )
 
         manager = Manager(
             task_q_url=args.task_url,
