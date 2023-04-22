@@ -14,18 +14,16 @@ RUN apt-get update && apt-get upgrade -y
 
 RUN if [ -n "$pip_conf" ]; then echo "$pip_conf" > "/etc/pip.conf"; fi
 
-RUN mkdir /opt/compute
 RUN python -m pip install -U pip
 RUN python -m pip install kubernetes
 RUN python -m pip install --no-binary :all: --force-reinstall pyzmq
 
+RUN mkdir /opt/compute
 COPY compute_sdk /opt/compute/compute_sdk/
-WORKDIR /opt/compute/compute_sdk
-RUN python -m pip install .
-
-COPY compute_endpoint /opt/compute/compute_endpoint
-WORKDIR /opt/compute/compute_endpoint
-RUN python -m pip install .
+COPY compute_endpoint /opt/compute/compute_endpoint/
+WORKDIR /opt/compute/
+RUN python -m pip install compute_endpoint/ compute_sdk/
+RUN rm -rf /opt/compute/
 
 # Undo local-dev ministrations
 RUN if [ -n "$pip_conf" ]; then rm -f "/etc/pip.conf"; fi
@@ -36,4 +34,5 @@ RUN mkdir -p /home/compute/.kube
 USER compute
 WORKDIR /home/compute
 COPY helm/boot.sh .
+COPY helm/bashrc ./.bashrc
 ENV HOME /home/compute
