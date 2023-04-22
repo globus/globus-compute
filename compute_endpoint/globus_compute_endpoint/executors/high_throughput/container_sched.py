@@ -42,9 +42,6 @@ def naive_scheduler(
                 int(math.floor(ratio * max_workers)), q_sizes[q_type]
             )
 
-        # CLEANUP: Assign the difference here to any random worker. Should be small.
-        # log.debug("Temporary new worker map: {}".format(new_worker_map))
-
         # Check the difference
         tmp_sum_q_size = sum(new_worker_map.values())
         difference = 0

@@ -5,6 +5,7 @@ import os
 import random
 import subprocess
 import time
+from collections import defaultdict
 from queue import Empty, Queue
 from typing import Any
 
@@ -61,6 +62,8 @@ class WorkerMap:
             for device in available_accelerators:
                 self.available_accelerators.put(device)
         self.assigned_accelerators: dict[str, str] = {}  # Map worker ID -> accelerator
+
+        self._noisy_log: dict[str, Any] = defaultdict(dict)
 
     def register_worker(self, worker_id, worker_type):
         """Add a new worker"""
@@ -418,16 +421,22 @@ class WorkerMap:
         Queue containing the next workers the system should spin-up.
         """
 
-        # next_worker_q = []
-        new_worker_list = []
-        log.debug(
-            "total_worker_type_counts: %s",
+        _log_data = self._noisy_log["get_next_worker_q"]
+        _l_total = _log_data.get("total_worker_type_counts")
+        _l_pending = _log_data.get("pending_worker_type_counts")
+        if (_l_total, _l_pending) != (
             self.total_worker_type_counts,
-        )
-        log.debug(
-            "pending_worker_type_counts: %s",
             self.pending_worker_type_counts,
-        )
+        ):
+            log.debug(
+                "total_worker_type_counts: %s; pending_worker_type_counts: %s",
+                self.total_worker_type_counts,
+                self.pending_worker_type_counts,
+            )
+            _log_data["total_worker_type_counts"] = self.total_worker_type_counts
+            _log_data["pending_worker_type_counts"] = self.pending_worker_type_counts
+
+        new_worker_list = []
         for worker_type in new_worker_map:
             cur_workers = self.total_worker_type_counts.get(
                 worker_type, 0
@@ -441,9 +450,7 @@ class WorkerMap:
         # unused slots
         # If yes, that means the manager needs to turn off some warm workers to serve
         # the requests
-        need_more = False
-        if len(new_worker_list) > self.total_worker_type_counts["unused"]:
-            need_more = True
+        need_more = len(new_worker_list) > self.total_worker_type_counts["unused"]
         # Randomly assign order of newly needed containers... add to spin-up queue.
         if len(new_worker_list) > 0:
             random.shuffle(new_worker_list)
