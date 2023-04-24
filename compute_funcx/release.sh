@@ -32,7 +32,7 @@ if git tag -s -m "v$VERSION" "$VERSION" ; then
 else
   read -p "Tag $VERSION already exists.  Release packages with this tag anyway? [y/n] " -n 1 -r
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
+    [[ $0 = $BASH_SOURCE ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
   fi
 fi
 

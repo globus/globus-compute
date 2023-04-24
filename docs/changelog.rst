@@ -13,6 +13,9 @@ New Functionality
 
  - Support for timing out tasks that exceed a walltime limit on the globus-compute-endpoint.
    Use global variable ``GC_TASK_TIMEOUT`` which accepts a float to set the limit.
+ - Add a ``--display-name`` option to endpoint configure to use as a human
+   readable name for the endpoint. If not specified, the ``display_name``
+   defaults to the endpoint name.
 
 Bug Fixes
 ^^^^^^^^^
@@ -20,18 +23,6 @@ Bug Fixes
 - Required fields were missing from the final endpoint status update that
   is sent when an endpoint is gracefully shutting down, causing issues when
   getting the status of an endpoint.
-
-.. _changelog-2.0.1a4:
-
-globus-compute-sdk & globus-compute-endpoint v2.0.1a4
------------------------------------------------------
-
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- Add a ``--display-name`` option to endpoint configure to use as a human
-  readable name for the endpoint. If not specified, the ``display_name``
-  defaults to the endpoint name.
 
 .. _changelog-2.0.0:
 
@@ -46,8 +37,7 @@ New Functionality
 - For the SDK, ``funcx.FuncXClient`` and ``funcx.FuncXExecutor`` have been renamed to ``globus_compute_sdk.Client``
   and ``globus_compute_sdk.Executor``
 
-- For the Endpoint, merely use the command ``globus-compute-endpoint`` instead of ``funcx-endpoint``.
-
+- The endpoint agent command is now ``globus-compute-endpoint`` instead of ``funcx-endpoint``.
 - The above should be sufficient for many users.  If other classes from the old packages were
   in use, please see https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html for more
   detailed change information and for additional upgrade requirements, if any.
