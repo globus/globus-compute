@@ -18,9 +18,9 @@ from multiprocessing import Process
 
 import daemon
 import dill
-from globus_compute_endpoint.executors.high_throughput import interchange, zmq_pipes
-from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput import interchange, zmq_pipes
+from globus_compute_endpoint.engines.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_endpoint.engines.high_throughput.messages import (
     EPStatusReport,
     Heartbeat,
     HeartbeatReq,
@@ -49,7 +49,7 @@ BUFFER_THRESHOLD = 1024 * 1024
 ITEM_THRESHOLD = 1024
 
 
-class HighThroughputExecutor(RepresentationMixin):
+class HighThroughputEngine(RepresentationMixin):
     """Executor designed for cluster-scale
 
     The HighThroughputExecutor system has the following components:

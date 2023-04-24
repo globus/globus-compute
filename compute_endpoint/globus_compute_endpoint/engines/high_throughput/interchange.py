@@ -18,19 +18,19 @@ import dill
 import zmq
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.exception_handling import (
-    get_error_string,
-    get_result_error_details,
-)
-from globus_compute_endpoint.executors.high_throughput.interchange_task_dispatch import (  # noqa: E501
+from globus_compute_endpoint.engines.high_throughput.interchange_task_dispatch import (  # noqa: E501
     naive_interchange_task_dispatch,
 )
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     BadCommand,
     EPStatusReport,
     Heartbeat,
     Message,
     MessageType,
+)
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
 )
 from globus_compute_endpoint.logging_config import ComputeLogger
 from globus_compute_sdk.serialize import ComputeSerializer
