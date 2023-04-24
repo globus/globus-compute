@@ -3,6 +3,8 @@ import time
 import typing as t
 import uuid
 
+from funcx.errors import MaxResultSizeExceeded
+from funcx.serialize import FuncXSerializer
 from funcx_common import messagepack
 from funcx_common.messagepack.message_types import Result, Task, TaskTransition
 from funcx_common.tasks import ActorName, TaskState
@@ -12,9 +14,6 @@ from globus_compute_endpoint.exception_handling import (
 )
 from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
 from globus_compute_endpoint.executors.high_throughput.messages import Message
-
-from funcx.errors import MaxResultSizeExceeded
-from funcx.serialize import FuncXSerializer
 
 log = logging.getLogger(__name__)
 
