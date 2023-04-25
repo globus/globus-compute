@@ -15,10 +15,10 @@ from globus_compute_common.messagepack.message_types import (
 )
 from globus_compute_common.messagepack.message_types import Task as OutgoingTask
 from globus_compute_common.messagepack.message_types import TaskTransition
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
 )
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     Task as InternalTask,
 )
 
