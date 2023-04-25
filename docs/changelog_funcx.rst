@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.0.2a0:
+
+funcx & funcx-endpoint v2.0.2a0
+-----------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+ - Add convenience package path import aliases for ``FuncXClient`` and ``FuncXExecutor``
+ - ``from funcx.sdk.client import FuncXClient`` and ``from funcx.sdk.executor import FuncXExecutor``
+   will both work if used in old scripts, in addition to ``from funcx import FuncXClient/FuncXExecutor``
+
 .. _changelog-2.0.1:
 
 funcx & funcx-endpoint v2.0.1
