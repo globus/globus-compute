@@ -5,8 +5,8 @@ from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_endpoint.executors.high_throughput.messages import Task
-from globus_compute_endpoint.executors.high_throughput.worker import Worker
+from globus_compute_endpoint.engines.high_throughput.messages import Task
+from globus_compute_endpoint.engines.high_throughput.worker import Worker
 from parsl.app.errors import AppTimeout
 
 
@@ -36,7 +36,7 @@ def reset_signals_auto(reset_signals):
 @pytest.fixture
 def test_worker():
     with mock.patch(
-        "globus_compute_endpoint.executors.high_throughput.worker.zmq.Context"
+        "globus_compute_endpoint.engines.high_throughput.worker.zmq.Context"
     ) as mock_context:
         # the worker will receive tasks and send messages on this mock socket
         mock_socket = mock.Mock()
