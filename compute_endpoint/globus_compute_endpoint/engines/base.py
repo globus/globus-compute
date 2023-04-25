@@ -7,14 +7,14 @@ import uuid
 from abc import ABC, abstractmethod
 from concurrent.futures import Future
 
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import (
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     Result,
     Task,
     TaskTransition,
 )
-from funcx_common.tasks import ActorName, TaskState
+from globus_compute_common.tasks import ActorName, TaskState
 from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_endpoint.exception_handling import (
     get_error_string,

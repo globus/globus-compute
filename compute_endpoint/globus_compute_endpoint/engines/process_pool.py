@@ -9,7 +9,10 @@ from concurrent.futures import ProcessPoolExecutor as NativeExecutor
 from multiprocessing.queues import Queue as mpQueue
 
 import psutil
-from funcx_common.messagepack.message_types import EPStatusReport, TaskTransition
+from globus_compute_common.messagepack.message_types import (
+    EPStatusReport,
+    TaskTransition,
+)
 from globus_compute_endpoint.engines.base import (
     GlobusComputeEngineBase,
     ReportingThread,

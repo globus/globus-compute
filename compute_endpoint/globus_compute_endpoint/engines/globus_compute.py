@@ -5,7 +5,10 @@ import typing as t
 import uuid
 from concurrent.futures import Future
 
-from funcx_common.messagepack.message_types import EPStatusReport, TaskTransition
+from globus_compute_common.messagepack.message_types import (
+    EPStatusReport,
+    TaskTransition,
+)
 from globus_compute_endpoint.engines.base import (
     GlobusComputeEngineBase,
     ReportingThread,
