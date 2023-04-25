@@ -5,7 +5,7 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 REQUIRES = [
-    "globus-compute-sdk>=2.0.0",
+    "globus-compute-sdk>=2.0.1",
 ]
 
 
@@ -52,4 +52,8 @@ setup(
     author_email="support@globus.org",
     license="Apache License, Version 2.0",
     url="https://github.com/funcx-faas/funcx",
+    project_urls={
+        "Changelog": "https://globus-compute.readthedocs.io/en/latest/changelog_funcx.html",  # noqa: E501
+        "Upgrade to Globus Compute": "https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html",  # noqa: E501
+    },
 )

@@ -5,8 +5,8 @@ Changelog
 
 .. _changelog-2.0.1:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.1
----------------------------------------------------
+funcx & funcx-endpoint v2.0.1
+-----------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -26,8 +26,8 @@ Bug Fixes
 
 .. _changelog-2.0.0:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.0
----------------------------------------------------
+funcx & funcx-endpoint v2.0.0
+-----------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -36,7 +36,6 @@ New Functionality
 
 - For the SDK, ``funcx.FuncXClient`` and ``funcx.FuncXExecutor`` have been renamed to ``globus_compute_sdk.Client``
   and ``globus_compute_sdk.Executor``
-
 - The endpoint agent command is now ``globus-compute-endpoint`` instead of ``funcx-endpoint``.
 - The above should be sufficient for many users.  If other classes from the old packages were
   in use, please see https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html for more
@@ -1205,7 +1204,7 @@ New Functionality
                ),
            )],
            detach_endpoint=True,
-           funcx_service_address='https://compute.api.globus.org/v2'
+           funcx_service_address='https://api2.funcx.org/v2'
        )
 
 * The endpoint will now log to `~/.funcx/<ENDPOINT_NAME>/EndpointInterchange.log`.

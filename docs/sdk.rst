@@ -1,5 +1,5 @@
 Globus Compute SDK User Guide
-====================
+=============================
 
 The **Globus Compute SDK** provides a programmatic interface to Globus Compute from Python.
 The SDK provides a convenient Pythonic interface to:
