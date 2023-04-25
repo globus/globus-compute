@@ -26,7 +26,7 @@ function execution on existing infrastructure including clouds, clusters, and su
    :alt: NSF award info
 
 
-.. image:: docs/_static/images/globus-300x300-blue.png
+.. image:: docs/_static/images/globus-compute-orange.png
   :target: https://www.funcx.org
   :width: 200
 
