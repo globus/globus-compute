@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import copy
 import json
 import logging
 import os
@@ -34,6 +35,7 @@ from globus_compute_endpoint.executors.high_throughput.messages import (
     MessageType,
 )
 from globus_compute_endpoint.logging_config import ComputeLogger
+from globus_compute_sdk.sdk.utils import chunk_by
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -551,20 +553,33 @@ class Interchange:
             self._ready_manager_queue[manager]["active"] = False
 
     def _status_report_loop(self, kill_event, status_report_queue: queue.Queue):
-        log.debug("Status reporting loop starting")
         log.info(f"Endpoint id: {self.endpoint_id}")
 
         while True:
-            log.trace("Endpoint id : %s, %s", self.endpoint_id, type(self.endpoint_id))
             with self._task_status_delta_lock:
-                msg = EPStatusReport(
-                    self.endpoint_id,
-                    self.get_global_state_for_status_report(),
-                    self.task_status_deltas,
-                )
-                status_report_queue.put(msg.pack())
+                task_status_deltas = copy.deepcopy(self.task_status_deltas)
                 self.task_status_deltas.clear()
-            log.debug("Sending status report to executor, and clearing task deltas.")
+
+            log.debug(
+                "Cleared task deltas (%s); sending status report to executor.",
+                len(task_status_deltas),
+            )
+
+            # The result processor will gracefully handle any size message, but
+            # courtesy says to chunk work; 4,096 is empirically chosen to be plenty
+            # "bulk enough," but not rude.
+            for tsd_chunk in chunk_by(task_status_deltas.items(), 4_096):
+                try:
+                    msg = EPStatusReport(
+                        self.endpoint_id,
+                        self.get_global_state_for_status_report(),
+                        dict(tsd_chunk),
+                    )
+                    status_report_queue.put(msg.pack())
+                except Exception:
+                    log.exception("Unable to create or send EP status report.")
+                    log.debug("Attempted to send chunk: %s", tsd_chunk)
+                    # ignoring so that the thread continues; "it's just a status"
 
             if kill_event.wait(self.heartbeat_period):
                 break
