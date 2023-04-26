@@ -46,7 +46,7 @@ class ReportingThread:
         )
 
     def start(self):
-        logger.warning("Start called")
+        logger.info("Start called")
         self._thread.start()
 
     def run_in_loop(self, target: t.Callable, *args) -> None:
@@ -76,12 +76,12 @@ class GlobusComputeEngineBase(ABC):
     def __init__(
         self,
         *args: object,
-        heartbeat_period: float = 30.0,
+        heartbeat_period_s: float = 30.0,
         endpoint_id: t.Optional[uuid.UUID] = None,
         **kwargs: object,
     ):
         self._shutdown_event = threading.Event()
-        self._heartbeat_period = heartbeat_period
+        self._heartbeat_period_s = heartbeat_period_s
         self.endpoint_id = endpoint_id
 
         # remove these unused vars that we are adding to just keep
@@ -110,10 +110,12 @@ class GlobusComputeEngineBase(ABC):
         packed_status = messagepack.pack(status_report)
         self.results_passthrough.put(packed_status)
 
-    def _status_report(self, shutdown_event: threading.Event, heartbeat_period: float):
+    def _status_report(
+        self, shutdown_event: threading.Event, heartbeat_period_s: float
+    ):
         while not shutdown_event.is_set():
             # waiting for the event returns True and wakes us early
-            if shutdown_event.wait(timeout=heartbeat_period):
+            if shutdown_event.wait(timeout=heartbeat_period_s):
                 pass
             else:
                 status_report = self.get_status_report()

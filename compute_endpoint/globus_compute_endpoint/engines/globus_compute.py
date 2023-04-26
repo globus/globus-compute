@@ -21,16 +21,16 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         *args,
         label: str = "GlobusComputeEngine",
         address: t.Optional[str] = None,
-        heartbeat_period: float = 30.0,
+        heartbeat_period_s: float = 30.0,
         **kwargs,
     ):
         self.address = address
         self.run_dir = os.getcwd()
         self.label = label
         self._status_report_thread = ReportingThread(
-            target=self.report_status, args=[], reporting_period=heartbeat_period
+            target=self.report_status, args=[], reporting_period=heartbeat_period_s
         )
-        super().__init__(*args, heartbeat_period=heartbeat_period, **kwargs)
+        super().__init__(*args, heartbeat_period=heartbeat_period_s, **kwargs)
         self.executor = HighThroughputExecutor(  # type: ignore
             *args, address=address, **kwargs
         )
@@ -95,7 +95,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 "min_blocks": 1,
                 "max_workers_per_node": 0,
                 "nodes_per_block": 1,
-                "heartbeat_period": self._heartbeat_period,
+                "heartbeat_period": self._heartbeat_period_s,
             },
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}
