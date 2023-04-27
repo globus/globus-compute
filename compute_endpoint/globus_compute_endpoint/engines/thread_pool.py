@@ -9,7 +9,10 @@ from concurrent.futures import ThreadPoolExecutor as NativeExecutor
 from multiprocessing.queues import Queue as mpQueue
 
 import psutil
-from funcx_common.messagepack.message_types import EPStatusReport, TaskTransition
+from globus_compute_common.messagepack.message_types import (
+    EPStatusReport,
+    TaskTransition,
+)
 from globus_compute_endpoint.engines.base import (
     GlobusComputeEngineBase,
     ReportingThread,
@@ -31,7 +34,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         self._status_report_thread = ReportingThread(
             target=self.report_status, args=[], reporting_period=heartbeat_period_s
         )
-        super().__init__(*args, heartbeat_period=heartbeat_period_s, **kwargs)
+        super().__init__(*args, heartbeat_period_s=heartbeat_period_s, **kwargs)
 
     def start(
         self,
@@ -91,7 +94,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
             task_statuses=task_status_deltas,
         )
 
-    def submit(
+    def _submit(
         self,
         func: t.Callable,
         *args: t.Any,

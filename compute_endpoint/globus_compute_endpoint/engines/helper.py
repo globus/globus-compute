@@ -3,25 +3,27 @@ import time
 import typing as t
 import uuid
 
-from funcx.errors import MaxResultSizeExceeded
-from funcx.serialize import FuncXSerializer
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import Result, Task, TaskTransition
-from funcx_common.tasks import ActorName, TaskState
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import Result, Task, TaskTransition
+from globus_compute_common.tasks import ActorName, TaskState
 from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
 from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
 from globus_compute_endpoint.executors.high_throughput.messages import Message
+from globus_compute_sdk.errors import MaxResultSizeExceeded
+from globus_compute_sdk.serialize import ComputeSerializer
 
 log = logging.getLogger(__name__)
 
-serializer = FuncXSerializer()
+serializer = ComputeSerializer()
 
 
 def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) -> bytes:
-    """
+    """Execute task is designed to enable any executor to execute a Task payload
+    and return a Result payload, where the payload follows the globus-compute protocols
+    This method is placed here to make serialization easy for executor classes
     Parameters
     ----------
     task_id: uuid string

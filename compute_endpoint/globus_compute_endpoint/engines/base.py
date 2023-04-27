@@ -7,14 +7,13 @@ import uuid
 from abc import ABC, abstractmethod
 from concurrent.futures import Future
 
-from funcx_common import messagepack
-from funcx_common.messagepack.message_types import (
+from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     Result,
-    Task,
     TaskTransition,
 )
-from funcx_common.tasks import ActorName, TaskState
+from globus_compute_common.tasks import ActorName, TaskState
 from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_endpoint.exception_handling import (
     get_error_string,
@@ -113,14 +112,10 @@ class GlobusComputeEngineBase(ABC):
     def _status_report(
         self, shutdown_event: threading.Event, heartbeat_period_s: float
     ):
-        while not shutdown_event.is_set():
-            # waiting for the event returns True and wakes us early
-            if shutdown_event.wait(timeout=heartbeat_period_s):
-                pass
-            else:
-                status_report = self.get_status_report()
-                packed = messagepack.pack(status_report)
-                self.results_passthrough.put(packed)
+        while not shutdown_event.wait(timeout=heartbeat_period_s):
+            status_report = self.get_status_report()
+            packed = messagepack.pack(status_report)
+            self.results_passthrough.put(packed)
 
     def _future_done_callback(self, future: Future):
         """Callback to post result to the passthrough queue
@@ -151,15 +146,16 @@ class GlobusComputeEngineBase(ABC):
         self.results_passthrough.put(packed_result)
 
     @abstractmethod
-    def submit(
+    def _submit(
         self,
         func: t.Callable,
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
+        """Subclass should use the internal execution system to implement this"""
         raise NotImplementedError()
 
-    def submit_raw(self, packed_task: bytes) -> Future:
+    def submit(self, task_id: uuid.UUID, packed_task: bytes) -> Future:
         """GC Endpoints should submit tasks via this method so that tasks are
         tracked properly.
         Parameters
@@ -170,13 +166,11 @@ class GlobusComputeEngineBase(ABC):
         future
         """
 
-        task = messagepack.unpack(packed_task)
-        assert isinstance(task, Task)
-        future: Future = self.submit(execute_task, packed_task)
+        future: Future = self._submit(execute_task, packed_task)
 
         # Executors mark futures are failed in the event of faults
         # We need to tie the task_id info into the future to identify
         # which tasks have failed
-        future.task_id = task.task_id  # type: ignore
+        future.task_id = task_id  # type: ignore
         future.add_done_callback(self._future_done_callback)
         return future

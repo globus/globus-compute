@@ -5,7 +5,10 @@ import typing as t
 import uuid
 from concurrent.futures import Future
 
-from funcx_common.messagepack.message_types import EPStatusReport, TaskTransition
+from globus_compute_common.messagepack.message_types import (
+    EPStatusReport,
+    TaskTransition,
+)
 from globus_compute_endpoint.engines.base import (
     GlobusComputeEngineBase,
     ReportingThread,
@@ -30,7 +33,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self._status_report_thread = ReportingThread(
             target=self.report_status, args=[], reporting_period=heartbeat_period_s
         )
-        super().__init__(*args, heartbeat_period=heartbeat_period_s, **kwargs)
+        super().__init__(*args, heartbeat_period_s=heartbeat_period_s, **kwargs)
         self.executor = HighThroughputExecutor(  # type: ignore
             *args, address=address, **kwargs
         )
@@ -56,7 +59,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.executor.start()
         self._status_report_thread.start()
 
-    def submit(
+    def _submit(
         self,
         func: t.Callable,
         *args: t.Any,
