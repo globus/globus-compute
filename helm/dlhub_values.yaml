@@ -4,13 +4,14 @@
 
 replicaCount: 1
 funcXServiceAddress: https://api2.funcx.org
+useUserCredentials: true
 image:
   repository: funcx/kube-endpoint
-  tag: dlhub_deployment_version_0.3-3.7
+  tag: 1.0.13-3.7
   pullPolicy: Always
 
 workerImage: python:3.7-buster
-workerInit: pip install funcx-endpoint>=0.3.0; pip install -U home_run; export PYTHONPATH="$PYTHONPATH:/app:/home/ubuntu"; mkdir -p /home/ubuntu/
+workerInit: pip install funcx==1.0.13 funcx-endpoint==1.0.13; pip install home_run==0.5.0; export PYTHONPATH="$PYTHONPATH:/app:/home/ubuntu"; mkdir -p /home/ubuntu/
 workerNamespace: dlhub
 workingDir: /home/ubuntu
 workerImageSecret: ryan-kube-secret
