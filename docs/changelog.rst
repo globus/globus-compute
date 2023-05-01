@@ -3,6 +3,22 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.0.2a0:
+
+globus-compute-sdk & globus-compute-endpoint v2.0.2a0
+-----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Address a concurrent data structure modification error that resulted in
+  stalled processing and lost tasks
+
+Changed
+^^^^^^^
+
+- The API ``https://api2.funcx.org/..`` URL has been updated to ``https://compute.api.globus.org/..``
+
 .. _changelog-2.0.1:
 
 globus-compute-sdk & globus-compute-endpoint v2.0.1

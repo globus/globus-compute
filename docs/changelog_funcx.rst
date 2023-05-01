@@ -15,6 +15,17 @@ New Functionality
  - ``from funcx.sdk.client import FuncXClient`` and ``from funcx.sdk.executor import FuncXExecutor``
    will both work if used in old scripts, in addition to ``from funcx import FuncXClient/FuncXExecutor``
 
+Bug Fixes
+^^^^^^^^^
+
+- Address a concurrent data structure modification error that resulted in
+  stalled processing and lost tasks
+
+Changed
+^^^^^^^
+
+- The API ``https://api2.funcx.org/..`` URL has been updated to ``https://compute.api.globus.org/..``
+
 .. _changelog-2.0.1:
 
 funcx & funcx-endpoint v2.0.1
