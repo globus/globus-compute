@@ -1,0 +1,12 @@
+Notes for redeploying DLHub endpoint:
+
+As of the release of globus-compute 2.0, the dlhub endpoint needed to be pegged
+at funcx 1.0.13, to avoid problems w/ the funcx 2.0.0 compatibility layer
+(That errored out on a "from funcx.sdk import FuncXClient")
+
+BenG fixed a problem w/ the helm chart, so the full set of commands to do this is:
+
+$ helm repo add funcx http://funcx.org/funcx-helm-charts/ && helm repo update
+$ helm install --version 0.3.4-post.1 -f dlhub_values.yaml funcx-dlhub funcx/funcx_endpoint
+
+Note: you may have to do a helm uninstall funcx-dlhub first.
