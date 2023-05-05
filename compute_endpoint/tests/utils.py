@@ -74,3 +74,35 @@ def try_for_timeout(
             return True
         time.sleep(check_period_s)
     return False
+
+
+def ez_pack_function(serializer, func, args, kwargs):
+    serialized_func = serializer.serialize(func)
+    serialized_args = serializer.serialize(args)
+    serialized_kwargs = serializer.serialize(kwargs)
+    return serializer.pack_buffers(
+        [serialized_func, serialized_args, serialized_kwargs]
+    )
+
+
+def double(x: int) -> int:
+    return x * 2
+
+
+def slow_double(x: int, sleep_duration_s: int) -> int:
+    import time
+
+    time.sleep(sleep_duration_s)
+    return x * 2
+
+
+def kill_manager():
+    import os
+    import signal
+
+    manager_pid = os.getppid()
+    os.kill(manager_pid, signal.SIGKILL)
+
+
+def div_zero(x: int):
+    return x / 0
