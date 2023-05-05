@@ -105,6 +105,7 @@ class Config(RepresentationMixin):
         environment: str | None = None,
         funcx_service_address=None,
         multi_tenant: bool | None = None,
+        allowed_functions: list[str] | None = None,
         # Tuning info
         heartbeat_period=30,
         heartbeat_threshold=120,
@@ -148,6 +149,7 @@ class Config(RepresentationMixin):
         self.funcx_service_address = funcx_service_address
 
         self.multi_tenant = multi_tenant is True
+        self.allowed_functions = allowed_functions
 
         # Tuning info
         self.heartbeat_period = heartbeat_period

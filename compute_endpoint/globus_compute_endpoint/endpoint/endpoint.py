@@ -695,6 +695,7 @@ def _serialize_config(config: Config) -> dict:
     """
 
     expand_list = ["strategy", "provider", "launcher"]
+    pass_through_list = ["allowed_functions"]
 
     def to_dict(o):
         mems = {"_type": type(o).__name__}
@@ -705,10 +706,10 @@ def _serialize_config(config: Config) -> dict:
 
             if k in expand_list:
                 mems[k] = to_dict(v)
-            elif not isinstance(v, str):
-                mems[k] = repr(v)
-            else:
+            elif isinstance(v, str) or k in pass_through_list:
                 mems[k] = v
+            else:
+                mems[k] = repr(v)
 
         return mems
 
