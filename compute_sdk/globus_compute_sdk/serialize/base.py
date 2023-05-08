@@ -1,19 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
 
-class DeserializationError(Exception):
-    """Base class for all deserialization errors"""
-
-    def __init__(self, reason):
-        self.reason = reason
-
-    def __repr__(self):
-        return f"Deserialization failed due to {self.reason}"
-
-    def __str__(self):
-        return self.__repr__()
-
-
 class SerializeBase(metaclass=ABCMeta):
     """Shared functionality for all serializer implementations"""
 
@@ -37,14 +24,6 @@ class SerializeBase(metaclass=ABCMeta):
             )
         return payload
 
-    def check(self, payload):
-        try:
-            x = self.serialize(payload)
-            self.deserialize(x)
-
-        except Exception as e:
-            raise SerializerError(f"Serialize-Deserialize combo failed due to {e}")
-
     @abstractmethod
     def serialize(self, data):
         raise NotImplementedError("Concrete class did not implement serialize")
@@ -58,8 +37,15 @@ class SerializerError:
     def __init__(self, reason):
         self.reason = reason
 
-    def __str__(self):
-        return self.reason
+    def __repr__(self):
+        return f"Serialization failed due to {self.reason}"
+
+
+class DeserializationError(Exception):
+    """Base class for all deserialization errors"""
+
+    def __init__(self, reason):
+        self.reason = reason
 
     def __repr__(self):
-        return self.__str__()
+        return f"Deserialization failed due to {self.reason}"

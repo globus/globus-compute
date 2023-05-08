@@ -201,7 +201,7 @@ class CombinedCode(SerializeBase):
 """
 Functions are serialized using the follow methods and
 the resulting encoded versions are stored.  Redundancy if
-one of the methods fail on deserlization, undetectable during
+one of the methods fail on deserialization, undetectable during
 serialization attempts previously.
 
 Note that of the 3 categories of failures:
