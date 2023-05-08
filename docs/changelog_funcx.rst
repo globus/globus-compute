@@ -3,9 +3,9 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.0.2a0:
+.. _changelog-2.0.2a1:
 
-funcx & funcx-endpoint v2.0.2a0
+funcx & funcx-endpoint v2.0.2a1
 -----------------------------
 
 New Functionality

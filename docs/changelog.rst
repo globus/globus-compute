@@ -3,9 +3,9 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.0.2a0:
+.. _changelog-2.0.2a1:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.2a0
+globus-compute-sdk & globus-compute-endpoint v2.0.2a1
 -----------------------------------------------------
 
 Bug Fixes
