@@ -3,10 +3,22 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.0.2a0:
+.. _changelog-2.0.2:
 
-globus-compute-sdk & globus-compute-endpoint v2.0.2a0
------------------------------------------------------
+globus-compute-sdk & globus-compute-endpoint v2.0.2
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Enable users to specify a custom Globus Compute directory (i.e., ``.globus_compute/``)
+  via the environment variable ``GLOBUS_COMPUTE_USER_DIR``.
+
+Removed
+^^^^^^^
+
+- Removed the ``check`` method from ``globus_compute_sdk.serialize.base.BaseSerializer``,
+  and consequently also from ``globus_compute_sdk.serialize.ComputeSerializer``
 
 Bug Fixes
 ^^^^^^^^^
