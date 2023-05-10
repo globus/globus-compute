@@ -90,7 +90,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
 
         return EPStatusReport(
             endpoint_id=self.endpoint_id,
-            ep_status_report=executor_status,
+            global_state=executor_status,
             task_statuses=task_status_deltas,
         )
 
