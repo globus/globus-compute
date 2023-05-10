@@ -555,6 +555,15 @@ class Interchange:
     def _status_report_loop(self, kill_event, status_report_queue: queue.Queue):
         log.info(f"Endpoint id: {self.endpoint_id}")
 
+        def _enqueue_status_report(ep_state: dict, task_states: dict):
+            try:
+                msg = EPStatusReport(self.endpoint_id, ep_state, dict(task_states))
+                status_report_queue.put(msg.pack())
+            except Exception:
+                log.exception("Unable to create or send EP status report.")
+                log.debug("Attempted to send chunk: %s", tsd_chunk)
+                # ignoring so that the thread continues; "it's just a status"
+
         while True:
             with self._task_status_delta_lock:
                 task_status_deltas = copy.deepcopy(self.task_status_deltas)
@@ -565,21 +574,20 @@ class Interchange:
                 len(task_status_deltas),
             )
 
+            # For multi-chunk reports ("lots-o-tasks"), the state won't change *that*
+            # much each iteration, so cache the result
+            global_state = self.get_global_state_for_status_report()
+
             # The result processor will gracefully handle any size message, but
             # courtesy says to chunk work; 4,096 is empirically chosen to be plenty
             # "bulk enough," but not rude.
             for tsd_chunk in chunk_by(task_status_deltas.items(), 4_096):
-                try:
-                    msg = EPStatusReport(
-                        self.endpoint_id,
-                        self.get_global_state_for_status_report(),
-                        dict(tsd_chunk),
-                    )
-                    status_report_queue.put(msg.pack())
-                except Exception:
-                    log.exception("Unable to create or send EP status report.")
-                    log.debug("Attempted to send chunk: %s", tsd_chunk)
-                    # ignoring so that the thread continues; "it's just a status"
+                _enqueue_status_report(global_state, dict(tsd_chunk))
+
+            if not task_status_deltas:
+                _enqueue_status_report(global_state, {})
+
+            del task_status_deltas  # free some memory in "large case"
 
             if kill_event.wait(self.heartbeat_period):
                 break
