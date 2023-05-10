@@ -3,7 +3,7 @@ Quickstart
 
 **Globus Compute** client and endpoint software releases are available on `PyPI <https://pypi.org/project/funcx/>`_.
 
-You can try Globus Compute on a hosted Jupyter notebook with `Binder <https://mybinder.org/v2/gh/funcx-faas/examples/HEAD?filepath=notebooks%2FIntroduction.ipynb>`_
+You can try Globus Compute on a hosted `Jupyter notebook <https://jupyter.demo.globus.org/hub/user-redirect/lab/tree/globus-jupyter-notebooks/Compute_Introduction.ipynb>`_
 
 
 Installation
