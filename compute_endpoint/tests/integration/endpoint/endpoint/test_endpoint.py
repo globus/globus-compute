@@ -129,6 +129,45 @@ def test_start_endpoint_display_name(mocker, fs, patch_funcx_client, display_nam
         assert "display_name" not in called_data
 
 
+def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_funcx_client):
+    gcc_addy = "http://api.funcx/"
+    gcc = globus_compute_sdk.Client(
+        funcx_service_address=gcc_addy,
+        do_version_check=False,
+        login_manager=mocker.Mock(),
+    )
+    fxwc = WebClient(base_url=gcc_addy)
+    fxwc.post = MagicMock()
+    gcc.web_client = fxwc
+    patch_funcx_client.return_value = gcc
+
+    responses.add(
+        responses.GET,
+        gcc_addy + "version",
+        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        gcc_addy + "endpoints",
+        json={},
+        status=200,
+    )
+
+    ep = endpoint.Endpoint()
+    ep_conf = Config()
+    ep_dir = pathlib.Path("/some/path/some_endpoint_name")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    ep_conf.allowed_functions = ["a", "b"]
+
+    with pytest.raises(SystemExit):
+        ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+
+    config = gcc.web_client.post.call_args[1]["data"]["metadata"]["config"]
+    assert len(config["allowed_functions"]) == 2
+    assert config["allowed_functions"][1] == "b"
+
+
 def test_endpoint_logout(monkeypatch):
     # not forced, and no running endpoints
     logout_true = Mock(return_value=True)
