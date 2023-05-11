@@ -15,7 +15,7 @@ import pytest
 import responses
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.default_config import config as default_config
-from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.endpoint import Endpoint, _serialize_config
 from globus_compute_endpoint.endpoint.utils.config import Config
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
@@ -451,3 +451,32 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data):
 
     assert not mock_sys.stdout.write.called
     assert not mock_sys.stderr.write.called
+
+
+def test_serialize_config_field_types():
+    ep_config = Config()
+    ep_config._hidden_field = "123"
+
+    class S:
+        def __init__(self):
+            self.a = 1
+
+    ep_config.strategy = S()
+    ep_config.random_field = [1, 2]
+    ep_config.allowed_functions = ["a", "b", "c"]
+
+    result = _serialize_config(ep_config)
+
+    # Items in expand_list are serialized as dict
+    assert "strategy" in result and result["strategy"]["a"] == "1"
+
+    # Items with _ prefix are ignored
+    assert "_hidden_field" not in result
+
+    # Items in pass_through_list maintain their type
+    assert isinstance(result["allowed_functions"], list)
+    assert len(result["allowed_functions"]) == 3
+
+    # Other items are converted to str
+    assert "random_field" in result
+    assert result["random_field"] == "[1, 2]"
