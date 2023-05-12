@@ -3,6 +3,7 @@ import sys
 
 import globus_compute_sdk.serialize.concretes as concretes
 import pytest
+from globus_compute_sdk.serialize.facade import ComputeSerializer
 
 
 def foo(x, y=3):
@@ -233,8 +234,6 @@ def test_code_dill_source():
 
 
 def test_overall():
-    from globus_compute_sdk.serialize.facade import ComputeSerializer
-
     check_serialize_deserialize_foo(ComputeSerializer())
     check_serialize_deserialize_bar(ComputeSerializer())
 
@@ -263,9 +262,25 @@ def test_serialize_deserialize_combined():
     code_deserial = single_code.deserialize(code_serialized_func)
     assert 14 == code_deserial(4, 6, 3)
 
+    # assumes DillCodeSource is first method that CombinedSerializer tries
     deserialized = combined.deserialize(combined_serialized_func)
     with pytest.raises(NameError):
         _ = deserialized(3, 5, 2)
 
     alternate_deserialized = combined.deserialize(combined_serialized_func, variation=2)
     assert alternate_deserialized != deserialized
+
+
+def test_compute_serializer_defaults():
+    serializer = ComputeSerializer()
+    identifier_length = 3
+
+    assert (
+        serializer.serialize("something non-callable")[:identifier_length]
+        == concretes.DEFAULT_METHOD_DATA.identifier
+    )
+
+    assert (
+        serializer.serialize(foo)[:identifier_length]
+        == concretes.DEFAULT_METHOD_CODE.identifier
+    )
