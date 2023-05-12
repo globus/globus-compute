@@ -33,7 +33,7 @@ class SerializeBase(metaclass=ABCMeta):
         raise NotImplementedError("Concrete class did not implement deserialize")
 
 
-class SerializerError:
+class SerializerError(Exception):
     def __init__(self, reason):
         self.reason = reason
 
