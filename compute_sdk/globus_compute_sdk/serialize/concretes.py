@@ -150,9 +150,27 @@ class CombinedCode(SerializeBase):
 
     identifier = "10\n"
 
+    # Functions are serialized using the following methods and the resulting encoded
+    # versions are stored as chunks.  Allows redundancy if one of the methods fails on
+    # deserialization (undetectable during previous serialization attempts).
+    # Note that, of the 3 categories of failures:
+    #   1) Failure on serialization
+    #   2) Failure on deserialization
+    #   3) Failure on running the method
+    # We have agreed that we can only assist with 1) and 2).
+    _chunk_serializers = OrderedDict(
+        [
+            (DillCodeSource.identifier, DillCodeSource),
+            (DillCode.identifier, DillCode),
+            (DillCodeTextInspect.identifier, DillCodeTextInspect),
+        ]
+    )
+
+    _separator = ":"
+
     def get_multiple_payloads(self, payload: str) -> tuple[tuple[str, str], ...]:
-        parts: list[str] = self.chomp(payload).split(COMBINED_SEPARATOR)
-        assert len(parts) == 2 * len(COMBINED_SERIALIZE_METHODS)
+        parts: list[str] = self.chomp(payload).split(CombinedCode._separator)
+        assert len(parts) == 2 * len(CombinedCode._chunk_serializers)
         ai = iter(parts)
 
         # ie. ((04\n', 'gACQ...'), ('01\n', 'sAAbk2...'), ...)
@@ -160,13 +178,13 @@ class CombinedCode(SerializeBase):
 
     def serialize(self, data) -> str:
         chunks = []
-        for id in COMBINED_SERIALIZE_METHODS:
-            method = METHODS_MAP_CODE[id]()
+        for id, cls in CombinedCode._chunk_serializers.items():
+            method = cls()
             serialized = method.serialize(data)
             id_length = len(id)
             chunks.append(serialized[:id_length])
             chunks.append(serialized[id_length:])
-        return self.identifier + COMBINED_SEPARATOR.join(chunks)
+        return self.identifier + CombinedCode._separator.join(chunks)
 
     def deserialize(self, payload: str, variation: int = 0):
         """
@@ -182,8 +200,8 @@ class CombinedCode(SerializeBase):
         for serial_id, encoded_func in self.get_multiple_payloads(payload):
             count += 1
             if variation == 0 or count == variation:
-                if serial_id in METHODS_MAP_CODE:
-                    deserialize_method = METHODS_MAP_CODE[serial_id]()
+                if serial_id in CombinedCode._chunk_serializers:
+                    deserialize_method = CombinedCode._chunk_serializers[serial_id]()
                     try:
                         return deserialize_method.deserialize(serial_id + encoded_func)
                     except Exception:
@@ -198,41 +216,14 @@ class CombinedCode(SerializeBase):
         raise DeserializationError(f"Deserialization failed after {count} tries")
 
 
-"""
-Functions are serialized using the follow methods and
-the resulting encoded versions are stored.  Redundancy if
-one of the methods fail on deserialization, undetectable during
-serialization attempts previously.
+METHODS_MAP = {
+    DillDataBase64.identifier: DillDataBase64,
+    DillCodeSource.identifier: DillCodeSource,
+    DillCode.identifier: DillCode,
+    DillCodeTextInspect.identifier: DillCodeTextInspect,
+    PickleCode.identifier: PickleCode,
+    CombinedCode.identifier: CombinedCode,
+}
 
-Note that of the 3 categories of failures:
-  1) Failure on serialization (previously handled)
-  2) Failure on deserialization (currently and with off_process_checker)
-  3) Failure on running the method (we can't do much about this type)
-
-  We have agreed that we can only assist with 1) and 2)
-"""
-COMBINED_SERIALIZE_METHODS = [
-    DillCodeSource.identifier,
-    DillCode.identifier,
-]
-
-# Used to separate base64 encoded serialized chunks of methods
-COMBINED_SEPARATOR = ":"
-
-
-METHODS_MAP_CODE = OrderedDict(
-    [
-        (DillCodeSource.identifier, DillCodeSource),
-        (DillCode.identifier, DillCode),
-        (DillCodeTextInspect.identifier, DillCodeTextInspect),
-        (PickleCode.identifier, PickleCode),
-        (CombinedCode.identifier, CombinedCode),
-    ]
-)
-
-
-METHODS_MAP_DATA = OrderedDict(
-    [
-        (DillDataBase64.identifier, DillDataBase64),
-    ]
-)
+DEFAULT_METHOD_CODE = DillCode
+DEFAULT_METHOD_DATA = DillDataBase64
