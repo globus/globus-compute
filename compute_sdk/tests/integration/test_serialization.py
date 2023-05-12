@@ -3,7 +3,11 @@ import sys
 
 import globus_compute_sdk.serialize.concretes as concretes
 import pytest
+from globus_compute_sdk.serialize.base import SerializeBase, SerializerError
 from globus_compute_sdk.serialize.facade import ComputeSerializer
+
+# length of serializer identifier
+ID_LEN = 3
 
 
 def foo(x, y=3):
@@ -273,14 +277,43 @@ def test_serialize_deserialize_combined():
 
 def test_compute_serializer_defaults():
     serializer = ComputeSerializer()
-    identifier_length = 3
 
     assert (
-        serializer.serialize("something non-callable")[:identifier_length]
+        serializer.serialize("something non-callable")[:ID_LEN]
         == concretes.DEFAULT_METHOD_DATA.identifier
     )
 
     assert (
-        serializer.serialize(foo)[:identifier_length]
-        == concretes.DEFAULT_METHOD_CODE.identifier
+        serializer.serialize(foo)[:ID_LEN] == concretes.DEFAULT_METHOD_CODE.identifier
     )
+
+
+@pytest.mark.parametrize("method", concretes.SELECTABLE_SERIALIZERS)
+def test_selectable_serialization(method):
+    if method._for_code:
+        serializer = ComputeSerializer(method_code=method())
+        data = foo
+    else:
+        serializer = ComputeSerializer(method_data=method())
+        data = "foo"
+    ser_data = serializer.serialize(data)
+    assert ser_data[:ID_LEN] == method.identifier
+
+
+def test_serializer_errors_on_unknown_method():
+    class NewMethod(SerializeBase):
+        identifier = "aa\n"
+
+        def serialize(self, data):
+            pass
+
+        def deserialize(self, payload):
+            pass
+
+    method = NewMethod()
+
+    with pytest.raises(SerializerError):
+        ComputeSerializer(method_code=method)
+
+    with pytest.raises(SerializerError):
+        ComputeSerializer(method_data=method)

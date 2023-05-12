@@ -4,6 +4,7 @@ import codecs
 import inspect
 import logging
 import pickle
+import typing as t
 from collections import OrderedDict
 
 import dill
@@ -124,6 +125,7 @@ class DillCode(SerializeBase):
     """
 
     identifier = "01\n"
+    _for_code = True
 
     def __init__(self):
         super().__init__()
@@ -149,6 +151,7 @@ class CombinedCode(SerializeBase):
     """
 
     identifier = "10\n"
+    _for_code = True
 
     # Functions are serialized using the following methods and the resulting encoded
     # versions are stored as chunks.  Allows redundancy if one of the methods fails on
@@ -216,7 +219,7 @@ class CombinedCode(SerializeBase):
         raise DeserializationError(f"Deserialization failed after {count} tries")
 
 
-METHODS_MAP = {
+METHODS_MAP: dict[str, t.Type[SerializeBase]] = {
     DillDataBase64.identifier: DillDataBase64,
     DillCodeSource.identifier: DillCodeSource,
     DillCode.identifier: DillCode,
@@ -225,5 +228,13 @@ METHODS_MAP = {
     CombinedCode.identifier: CombinedCode,
 }
 
-DEFAULT_METHOD_CODE = DillCode
-DEFAULT_METHOD_DATA = DillDataBase64
+SELECTABLE_SERIALIZERS = [
+    DillDataBase64,
+    DillCodeSource,
+    DillCode,
+    DillCodeTextInspect,
+    CombinedCode,
+]
+
+DEFAULT_METHOD_CODE = DillCode()
+DEFAULT_METHOD_DATA = DillDataBase64()
