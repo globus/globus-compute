@@ -7,6 +7,7 @@ import shlex
 from unittest import mock
 
 import pytest
+import yaml
 from click import ClickException
 from click.testing import CliRunner
 from globus_compute_endpoint.cli import app, init_config_dir
@@ -39,34 +40,15 @@ def make_endpoint_dir(mock_command_ensure):
     def func(name):
         ep_dir = mock_command_ensure.endpoint_config_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
-        ep_config = ep_dir / "config.py"
+        ep_config = ep_dir / "config.yaml"
         ep_config.write_text(  # Default config for testing
             """
-from globus_compute_endpoint.endpoint.utils.config import Config
-from globus_compute_endpoint.executors import HighThroughputExecutor
-from parsl.providers import LocalProvider
-
-config = Config(
-    display_name=None,
-    executors=[
-        HighThroughputExecutor(
-            provider=LocalProvider(
-                init_blocks=1,
-                min_blocks=0,
-                max_blocks=1,
-            ),
-        )
-    ],
-)
-
-meta = {
-    "name": "$name",
-    "description": "",
-    "organization": "",
-    "department": "",
-    "public": False,
-    "visible_to": [],
-}
+display_name: None
+provider:
+    type: LocalProvider
+    init_blocks: 1
+    min_blocks: 0
+    max_blocks: 1
             """
         )
 
@@ -140,7 +122,7 @@ def test_init_config_dir_permission_error(fs):
 def test_start_ep_corrupt(run_line, mock_cli_state, make_endpoint_dir):
     make_endpoint_dir("foo")
     mock_ep, mock_state = mock_cli_state
-    conf = mock_state.endpoint_config_dir / "foo" / "config.py"
+    conf = mock_state.endpoint_config_dir / "foo" / "config.yaml"
     conf.unlink()
     res = run_line("start foo", assert_exit_code=1)
     assert "corrupted?" in res.stderr
@@ -199,8 +181,8 @@ def test_start_ep_reads_stdin(
         assert reg_info_found == {}
 
 
-@mock.patch("globus_compute_endpoint.cli.read_config")
-def test_stop_endpoint(read_config, run_line, mock_cli_state, make_endpoint_dir):
+@mock.patch("globus_compute_endpoint.cli.get_config")
+def test_stop_endpoint(get_config, run_line, mock_cli_state, make_endpoint_dir):
     run_line("stop foo")
     mock_ep, _ = mock_cli_state
     mock_ep.stop_endpoint.assert_called_once()
@@ -238,18 +220,38 @@ def test_start_ep_display_name_in_config(
 ):
     ep_name, display_name = display_test
 
-    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.py"
+    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
     configure_arg = ""
     if display_name is not None:
         configure_arg = f" --display-name '{display_name}'"
     run_line(f"configure {ep_name}{configure_arg}")
 
-    dn_str = f'"{display_name}"' if display_name is not None else "None"
+    dn_str = f"{display_name}" if display_name is not None else "None"
 
-    assert f"display_name={dn_str}," in conf.read_text()
+    with open(conf) as f:
+        conf_dict = yaml.safe_load(f)
+
+    assert conf_dict["display_name"] == dn_str
 
 
-def test_start_ep_incorrect(run_line, mock_cli_state, make_endpoint_dir):
+def test_start_ep_incorrect_config_yaml(run_line, mock_cli_state, make_endpoint_dir):
+    make_endpoint_dir("foo")
+    mock_ep, mock_state = mock_cli_state
+    conf = mock_state.endpoint_config_dir / "foo" / "config.yaml"
+
+    conf.write_text("asdf")
+    res = run_line("start foo", assert_exit_code=1)
+    assert "Invalid syntax" in res.stderr
+
+    # `coverage` demands a valid syntax file.  FBOW, then, the ordering and
+    # commingling of these two tests is intentional.  Bit of a meta problem ...
+    conf.unlink()
+    conf.write_text("asdf: asdf")
+    res = run_line("start foo", assert_exit_code=1)
+    assert "field required" in res.stderr
+
+
+def test_start_ep_incorrect_config_py(run_line, mock_cli_state, make_endpoint_dir):
     make_endpoint_dir("foo")
     mock_ep, mock_state = mock_cli_state
     conf = mock_state.endpoint_config_dir / "foo" / "config.py"
@@ -268,8 +270,40 @@ def test_start_ep_incorrect(run_line, mock_cli_state, make_endpoint_dir):
     assert "modified incorrectly?" in res.stderr
 
 
-@mock.patch("globus_compute_endpoint.cli.read_config")
-def test_delete_endpoint(read_config, run_line, mock_cli_state):
+@mock.patch("globus_compute_endpoint.cli.read_config_py")
+def test_start_ep_config_py_override(
+    read_config, run_line, mock_cli_state, make_endpoint_dir
+):
+    make_endpoint_dir("foo")
+    mock_ep, mock_state = mock_cli_state
+    conf_py = mock_state.endpoint_config_dir / "foo" / "config.py"
+    conf_py.write_text(
+        """
+from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.executors import HighThroughputExecutor
+from parsl.providers import LocalProvider
+
+config = Config(
+    display_name=None,
+    executors=[
+        HighThroughputExecutor(
+            provider=LocalProvider(
+                init_blocks=1,
+                min_blocks=0,
+                max_blocks=1,
+            ),
+        )
+    ],
+)
+        """
+    )
+
+    run_line("start foo", assert_exit_code=1)
+    read_config.assert_called_once()
+
+
+@mock.patch("globus_compute_endpoint.cli.get_config")
+def test_delete_endpoint(get_config, run_line, mock_cli_state):
     run_line("delete foo --yes")
     mock_ep, _ = mock_cli_state
     mock_ep.delete_endpoint.assert_called_once()

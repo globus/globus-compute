@@ -10,16 +10,19 @@ import sys
 import uuid
 
 import click
+import yaml
 from click import ClickException
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.utils.config_model import ConfigModel
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 from packaging.version import Version
+from pydantic import ValidationError
 
 log = logging.getLogger(__name__)
 
@@ -182,8 +185,8 @@ def configure_endpoint(
 ):
     """Configure an endpoint
 
-    Drops a config.py template into the Globus Compute configs directory.
-    The template usually goes to ~/.globus_compute/<ENDPOINT_NAME>/config.py
+    Drops a config.yaml template into the Globus Compute configs directory.
+    The template usually goes to ~/.globus_compute/<ENDPOINT_NAME>/config.yaml
     """
     try:
         Endpoint.validate_endpoint_name(name)
@@ -366,8 +369,11 @@ def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
         raise ClickException(msg) from err
 
 
-def read_config(endpoint_dir: pathlib.Path) -> Config:
-    endpoint_name = endpoint_dir.name
+def read_config_py(endpoint_dir: pathlib.Path) -> Config | None:
+    conf_path = endpoint_dir / "config.py"
+
+    if not conf_path.exists():
+        return None
 
     try:
         from funcx_endpoint.version import VERSION
@@ -383,7 +389,6 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
         pass
 
     try:
-        conf_path = endpoint_dir / "config.py"
         spec = importlib.util.spec_from_file_location("config", conf_path)
         if not (spec and spec.loader):
             raise Exception(f"Unable to import configuration (no spec): {conf_path}")
@@ -394,19 +399,6 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
         return config.config
 
     except FileNotFoundError as err:
-        if not endpoint_dir.exists():
-            configure_command = "globus-compute-endpoint configure"
-            if endpoint_name != "default":
-                configure_command += f" {endpoint_name}"
-            msg = (
-                f"{err}"
-                f"\n\nEndpoint '{endpoint_name}' is not configured!"
-                "\n1. Please create a configuration template with:"
-                f"\n\t{configure_command}"
-                "\n2. Update the configuration"
-                "\n3. Start the endpoint\n"
-            )
-            raise ClickException(msg) from err
         msg = (
             f"{err}"
             "\n\nUnable to find required configuration file; has the configuration"
@@ -454,6 +446,60 @@ def read_config(endpoint_dir: pathlib.Path) -> Config:
         raise
 
 
+def get_config_yaml(endpoint_dir: pathlib.Path) -> dict:
+    config_path = endpoint_dir / "config.yaml"
+    endpoint_name = endpoint_dir.name
+
+    try:
+        with open(config_path) as f:
+            return dict(yaml.safe_load(f))
+    except FileNotFoundError as err:
+        if endpoint_dir.exists():
+            msg = (
+                f"{err}"
+                "\n\nUnable to find required configuration file; has the configuration"
+                "\ndirectory been corrupted?"
+            )
+        else:
+            configure_command = "globus-compute-endpoint configure"
+            if endpoint_name != "default":
+                configure_command += f" {endpoint_name}"
+            msg = (
+                f"{err}"
+                f"\n\nEndpoint '{endpoint_name}' is not configured!"
+                "\n1. Please create a configuration template with:"
+                f"\n\t{configure_command}"
+                "\n2. Update the configuration"
+                "\n3. Start the endpoint\n"
+            )
+        raise ClickException(msg) from err
+    except Exception as err:
+        raise ClickException(f"Invalid syntax in {config_path}: {str(err)}") from err
+
+
+def get_config(endpoint_dir: pathlib.Path) -> Config:
+    config = read_config_py(endpoint_dir)
+    if config:
+        # Use config.py if present
+        return config
+
+    config_dict = get_config_yaml(endpoint_dir)
+
+    try:
+        config_schema = ConfigModel(**config_dict)
+    except ValidationError as err:
+        raise ClickException(str(err)) from err
+
+    config_dict = config_schema.dict(exclude_unset=True)
+
+    try:
+        config = Config(**config_dict)
+    except Exception as err:
+        raise ClickException(str(err)) from err
+
+    return config
+
+
 def _do_start_endpoint(
     *,
     name: str,
@@ -485,7 +531,7 @@ def _do_start_endpoint(
             exc_type = e.__class__.__name__
             log.debug("Invalid registration info on stdin -- (%s) %s", exc_type, e)
 
-    ep_config = read_config(ep_dir)
+    ep_config = get_config(ep_dir)
     if ep_config.multi_tenant:
         epm = EndpointManager(ep_dir, endpoint_uuid, ep_config)
         epm.start()
@@ -533,7 +579,7 @@ def update_funcx_endpoint_config(*, name: str, force: bool):
 
 def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
     ep_dir = get_config_dir() / name
-    Endpoint.stop_endpoint(ep_dir, read_config(ep_dir), remote=remote)
+    Endpoint.stop_endpoint(ep_dir, get_config(ep_dir), remote=remote)
 
 
 @app.command("restart")
@@ -579,7 +625,7 @@ def delete_endpoint(*, name: str, force: bool, yes: bool):
         )
 
     ep_dir = get_config_dir() / name
-    Endpoint.delete_endpoint(ep_dir, read_config(ep_dir), force)
+    Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), force)
 
 
 def cli_run():

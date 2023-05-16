@@ -7,9 +7,10 @@ import uuid
 from importlib.machinery import SourceFileLoader
 from unittest.mock import ANY
 
+import globus_compute_endpoint.endpoint
 import pytest
 import requests
-from globus_compute_endpoint.endpoint import default_config
+import yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_sdk import GlobusAPIError
 
@@ -31,9 +32,12 @@ class TestStart:
         funcx_dir = f"{os.getcwd()}"
         config_dir = pathlib.Path(funcx_dir) / "mock_endpoint"
         assert not config_dir.exists()
-
         # pyfakefs will take care of newly created files, not existing config
-        fs.add_real_file(default_config.__file__)
+        def_config_path = (
+            pathlib.Path(globus_compute_endpoint.endpoint.__file__).resolve().parent
+            / "default_config.yaml"
+        )
+        fs.add_real_file(def_config_path)
 
         yield
 
@@ -56,8 +60,8 @@ class TestStart:
     def test_configure_multi_tenant_existing_config(self, mt):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
-        config_file = config_dir / "config.py"
-        config_copy = str(config_dir.parent / "config2.py")
+        config_file = config_dir / "config.yaml"
+        config_copy = str(config_dir.parent / "config2.yaml")
 
         # First, make an entry with multi_tenant
         manager.configure_endpoint(config_dir, None, multi_tenant=True)
@@ -67,8 +71,9 @@ class TestStart:
         # Then, modify it with new setting
         manager.configure_endpoint(config_dir, config_copy, multi_tenant=mt)
 
-        config = config_file.read_text()
-        assert f"multi_tenant={mt is True}," in config
+        with open(config_file) as f:
+            config_dict = yaml.safe_load(f)
+        assert "multi_tenant" in config_dict
 
         os.remove(config_copy)
 
@@ -76,7 +81,7 @@ class TestStart:
     def test_configure_multi_tenant(self, mt):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
-        config_file = config_dir / "config.py"
+        config_file = config_dir / "config.yaml"
 
         if mt is not None:
             manager.configure_endpoint(config_dir, None, multi_tenant=mt)
@@ -85,11 +90,12 @@ class TestStart:
 
         assert config_file.exists()
 
-        config = config_file.read_text()
+        with open(config_file) as f:
+            config_dict = yaml.safe_load(f)
         if mt:
-            assert f"multi_tenant={mt is True}," in config
+            assert config_dict["multi_tenant"] == mt is True
         else:
-            assert "multi_tenant" not in config
+            assert "multi_tenant" not in config_dict
 
     @pytest.mark.skip(
         "This test needs to be re-written after endpoint_register is updated"
@@ -138,7 +144,7 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(config_dir, "config.py")
+            "config", os.path.join(config_dir, "config.yaml")
         ).load_module()
         manager.start_endpoint("mock_endpoint", None, endpoint_config)
 
@@ -212,7 +218,7 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(config_dir, "config.py")
+            "config", os.path.join(config_dir, "config.yaml")
         ).load_module()
 
         with pytest.raises(GlobusAPIError):
@@ -282,7 +288,7 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(config_dir, "config.py")
+            "config", os.path.join(config_dir, "config.yaml")
         ).load_module()
 
         manager.start_endpoint("mock_endpoint", None, endpoint_config)
@@ -371,7 +377,7 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(config_dir, "config.py")
+            "config", os.path.join(config_dir, "config.yaml")
         ).load_module()
 
         funcx_client_options = None
@@ -419,7 +425,7 @@ class TestStart:
 
         manager.configure_endpoint("mock_endpoint", None)
         endpoint_config = SourceFileLoader(
-            "config", os.path.join(config_dir, "config.py")
+            "config", os.path.join(config_dir, "config.yaml")
         ).load_module()
 
         funcx_client_options = {}
