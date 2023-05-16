@@ -223,7 +223,7 @@ def test_endpoint_logout(monkeypatch):
     "globus_compute_endpoint.cli.get_config_dir",
     return_value=pathlib.Path("some_ep_dir"),
 )
-@patch("globus_compute_endpoint.cli.read_config")
+@patch("globus_compute_endpoint.cli.get_config")
 @patch("globus_compute_endpoint.endpoint.endpoint.Client.stop_endpoint")
 def test_stop_remote_endpoint(
     mock_get_id, mock_get_conf, mock_get_gcc, mock_stop_endpoint

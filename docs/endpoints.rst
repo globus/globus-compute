@@ -63,7 +63,7 @@ To generate the appropriate directories and default configuration template, run 
   $ globus-compute-endpoint configure <ENDPOINT_NAME>
 
 This command will create a profile for your endpoint in ``$HOME/.globus_compute/<ENDPOINT_NAME>/`` and will instantiate a
-``config.py`` file. This file should be updated with the appropriate configurations for the computational system you are
+``config.yaml`` file. This file should be updated with the appropriate configurations for the computational system you are
 targeting before you start the endpoint.
 Globus Compute is configured using a :class:`~compute_endpoint.endpoint.utils.config.Config` object.
 Globus Compute uses `Parsl <https://parsl-project.org>`_ to manage resources. For more information,

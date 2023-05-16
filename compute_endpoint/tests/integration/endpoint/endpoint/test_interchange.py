@@ -3,11 +3,11 @@ import pathlib
 import pickle
 import threading
 import uuid
-from importlib.machinery import SourceFileLoader
 
 import pytest
 from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
+from globus_compute_endpoint.cli import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
 from globus_compute_endpoint.endpoint.utils.config import Config
@@ -41,13 +41,12 @@ def test_endpoint_id(funcx_dir):
     config_dir = funcx_dir / "mock_endpoint"
 
     manager.configure_endpoint(config_dir, None)
-    endpoint_config = SourceFileLoader(
-        "config", str(funcx_dir / "mock_endpoint" / "config.py")
-    ).load_module()
-    endpoint_config.config.executors[0].passthrough = False
+
+    endpoint_config = get_config(pathlib.Path(config_dir))
+    endpoint_config.executors[0].passthrough = False
 
     ic = EndpointInterchange(
-        endpoint_config.config,
+        endpoint_config,
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         endpoint_id="mock_endpoint_id",
     )

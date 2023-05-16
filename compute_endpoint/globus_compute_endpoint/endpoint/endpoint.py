@@ -5,22 +5,20 @@ import logging
 import os
 import pathlib
 import pwd
-import re
 import shutil
 import signal
 import socket
 import sys
 import typing
 import uuid
-from string import Template
 
 import daemon
 import daemon.pidfile
 import psutil
 import setproctitle
 import texttable
+import yaml
 from globus_compute_endpoint import __version__
-from globus_compute_endpoint.endpoint import default_config as endpoint_default_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
@@ -50,55 +48,26 @@ class Endpoint:
 
     @staticmethod
     def _config_file_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
-        return endpoint_dir / "config.py"
+        return endpoint_dir / "config.yaml"
 
     @staticmethod
     def update_config_file(
-        ep_name: str,
         original_path: pathlib.Path,
         target_path: pathlib.Path,
         multi_tenant: bool,
         display_name: str | None,
     ):
-        endpoint_config = Template(original_path.read_text()).substitute(name=ep_name)
+        config_text = original_path.read_text()
+        config_dict = yaml.safe_load(config_text)
 
-        # Note that this logic does NOT support replacing arbitrary
-        # display_name="abc xyz" entries, as str quote parsing is beyond the
-        # current use case of calling this method only at endpoint creation
-        display_str = "None" if display_name is None else f'"{display_name}"'
-        display_text = f"display_name={display_str},"
+        if display_name:
+            config_dict["display_name"] = display_name
 
-        d_index = endpoint_config.find("display_name")
-        if d_index != -1:
-            if endpoint_config[d_index + 13 : d_index + 18] == "None,":
-                if display_name is not None:
-                    endpoint_config = endpoint_config.replace(
-                        "display_name=None,", display_text
-                    )
-            else:
-                raise Exception(
-                    "Modifying existing display_name not supported "
-                    f"at this time. Please edit {original_path} manually."
-                )
-        else:
-            endpoint_config = endpoint_config.replace(
-                "\nconfig = Config(\n", f"\nconfig = Config(\n    {display_text}\n"
-            )
+        if multi_tenant:
+            config_dict["multi_tenant"] = multi_tenant
 
-        if endpoint_config.find("multi_tenant=") != -1:
-            # If the option is already in the config, merely update the value
-            endpoint_config = re.sub(
-                "multi_tenant=(True|False)",
-                f"multi_tenant={multi_tenant is True}",
-                endpoint_config,
-            )
-        elif multi_tenant:
-            # If the option isn't pre-existing, add only if set to True
-            endpoint_config = endpoint_config.replace(
-                "\nconfig = Config(\n", "\nconfig = Config(\n    multi_tenant=True,\n"
-            )
-
-        target_path.write_text(endpoint_config)
+        config_text = yaml.safe_dump(config_dict)
+        target_path.write_text(config_text)
 
     @staticmethod
     def init_endpoint_dir(
@@ -128,10 +97,10 @@ class Endpoint:
             config_target_path = Endpoint._config_file_path(endpoint_dir)
 
             if endpoint_config is None:
-                endpoint_config = pathlib.Path(endpoint_default_config.__file__)
+                package_dir = pathlib.Path(__file__).resolve().parent
+                endpoint_config = package_dir / "default_config.yaml"
 
             Endpoint.update_config_file(
-                endpoint_dir.name,
                 endpoint_config,
                 config_target_path,
                 multi_tenant,
@@ -646,7 +615,7 @@ class Endpoint:
         ep_statuses = {}
 
         funcx_conf_dir = pathlib.Path(funcx_conf_dir)
-        ep_dir_paths = (p.parent for p in funcx_conf_dir.glob("*/config.py"))
+        ep_dir_paths = (p.parent for p in funcx_conf_dir.glob("*/config.*"))
         for ep_path in ep_dir_paths:
             ep_status = {
                 "status": "Initialized",
