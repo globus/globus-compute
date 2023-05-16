@@ -19,10 +19,10 @@ import setproctitle
 import texttable
 import yaml
 from globus_compute_endpoint import __version__
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
-from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.client import Client
 from globus_sdk import GlobusAPIError, NetworkError
@@ -98,7 +98,7 @@ class Endpoint:
 
             if endpoint_config is None:
                 package_dir = pathlib.Path(__file__).resolve().parent
-                endpoint_config = package_dir / "default_config.yaml"
+                endpoint_config = package_dir / "config/default_config.yaml"
 
             Endpoint.update_config_file(
                 endpoint_config,

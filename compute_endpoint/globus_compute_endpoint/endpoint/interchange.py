@@ -17,7 +17,7 @@ import typing as t
 # see: https://github.com/python/typeshed/issues/4266
 from multiprocessing.synchronize import Event as EventType
 
-import globus_compute_endpoint.endpoint.utils.config
+import globus_compute_endpoint.endpoint.config
 import pika.exceptions
 import setproctitle
 from globus_compute_common.messagepack import InvalidMessageError, pack, unpack
@@ -61,7 +61,7 @@ class EndpointInterchange:
 
     def __init__(
         self,
-        config: globus_compute_endpoint.endpoint.utils.config.Config,
+        config: globus_compute_endpoint.endpoint.config.Config,
         reg_info: dict[str, dict],
         logdir=".",
         endpoint_id=None,

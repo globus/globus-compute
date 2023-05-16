@@ -16,7 +16,7 @@ from globus_compute_endpoint.cli import (
     app,
 )
 from globus_compute_endpoint.endpoint import endpoint
-from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_sdk.sdk.web_client import WebClient
 
 

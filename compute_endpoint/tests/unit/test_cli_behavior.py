@@ -257,7 +257,7 @@ def test_start_ep_incorrect_config_py(run_line, mock_cli_state, make_endpoint_di
     conf = mock_state.endpoint_config_dir / "foo" / "config.py"
 
     conf.write_text("asa asd df = 5")  # fail the import
-    with mock.patch("globus_compute_endpoint.cli.log") as mock_log:
+    with mock.patch("globus_compute_endpoint.endpoint.config.utils.log") as mock_log:
         res = run_line("start foo", assert_exit_code=1)
         assert "might be out of date" in mock_log.exception.call_args[0][0]
     assert isinstance(res.exception, SyntaxError)
@@ -270,7 +270,7 @@ def test_start_ep_incorrect_config_py(run_line, mock_cli_state, make_endpoint_di
     assert "modified incorrectly?" in res.stderr
 
 
-@mock.patch("globus_compute_endpoint.cli.read_config_py")
+@mock.patch("globus_compute_endpoint.endpoint.config.utils.read_config_py")
 def test_start_ep_config_py_override(
     read_config, run_line, mock_cli_state, make_endpoint_dir
 ):
@@ -279,7 +279,7 @@ def test_start_ep_config_py_override(
     conf_py = mock_state.endpoint_config_dir / "foo" / "config.py"
     conf_py.write_text(
         """
-from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 
@@ -302,8 +302,8 @@ config = Config(
     read_config.assert_called_once()
 
 
-@mock.patch("globus_compute_endpoint.cli.get_config")
-def test_delete_endpoint(get_config, run_line, mock_cli_state):
+@mock.patch("globus_compute_endpoint.endpoint.config.utils.read_config_py")
+def test_delete_endpoint(read_config, run_line, mock_cli_state):
     run_line("delete foo --yes")
     mock_ep, _ = mock_cli_state
     mock_ep.delete_endpoint.assert_called_once()
