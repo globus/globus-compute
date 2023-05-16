@@ -24,22 +24,16 @@ if [[ ! -d "$conf_dir/" ]]; then
     exit 2
 fi
 
-cat > "$conf_dir/config.py" <<EOF
-from parsl.providers import LocalProvider
-
-from funcx_endpoint.endpoint.utils.config import Config
-from funcx_endpoint.executors import HighThroughputExecutor
-
-config = Config(
-    executors=[
-        HighThroughputExecutor(
-            provider=LocalProvider(init_blocks=1, min_blocks=0, max_blocks=1),
-            heartbeat_period=10,
-        )
-    ],
-    environment="$env",
-    detach_endpoint=False,
-)
+cat > "$conf_dir/config.yaml" <<EOF
+environment: $env
+detach_endpoint: False
+executor:
+    heartbeat_period: 10
+    provider:
+        type: LocalProvider
+        init_blocks: 1
+        min_blocks: 0
+        max_blocks: 1
 EOF
 
 exit_code=3
