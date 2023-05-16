@@ -3,11 +3,13 @@ from __future__ import annotations
 import typing as t
 from types import ModuleType
 
+from globus_compute_endpoint import strategies
 from globus_compute_endpoint.executors import HighThroughputExecutor
+from parsl import addresses as parsl_addresses
 from parsl import channels as parsl_channels
 from parsl import launchers as parsl_launchers
 from parsl import providers as parsl_providers
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 
 
 def _validate_import(field: str, package: ModuleType):
@@ -22,15 +24,35 @@ def _validate_import(field: str, package: ModuleType):
 
 def _validate_params(field: str):
     def inner(cls, model: t.Optional[BaseModel]):
-        if model:
-            fields = model.dict(exclude_unset=True, exclude_none=True)
-            cls = fields.pop("type")
-            try:
-                return cls(**fields)
-            except Exception as err:
-                raise ValueError(str(err)) from err
+        if not isinstance(model, BaseModel):
+            return model
+
+        fields = model.dict(exclude_none=True)
+        cls = fields.pop("type")
+        try:
+            return cls(**fields)
+        except Exception as err:
+            raise ValueError(str(err)) from err
 
     return validator(field, allow_reuse=True)(inner)
+
+
+class AddressModel(BaseModel):
+    type: str
+
+    _validate_type = _validate_import("type", parsl_addresses)
+
+    class Config:
+        extra = "allow"
+
+
+class StrategyModel(BaseModel):
+    type: str
+
+    _validate_type = _validate_import("type", strategies)
+
+    class Config:
+        extra = "allow"
 
 
 class LauncherModel(BaseModel):
@@ -64,8 +86,22 @@ class ProviderModel(BaseModel):
         extra = "allow"
 
 
-class ConfigModel(BaseModel):
+class ExecutorModel(BaseModel):
+    type: type = Field(default=HighThroughputExecutor, const=True)
     provider: ProviderModel
+    strategy: t.Optional[StrategyModel]
+    address: t.Optional[t.Union[str, AddressModel]]
+
+    _validate_provider = _validate_params("provider")
+    _validate_strategy = _validate_params("strategy")
+    _validate_strategy = _validate_params("address")
+
+    class Config:
+        extra = "allow"
+
+
+class ConfigModel(BaseModel):
+    executor: ExecutorModel
     display_name: t.Optional[str]
     environment: t.Optional[str]
     funcx_service_address: t.Optional[str]
@@ -80,13 +116,14 @@ class ConfigModel(BaseModel):
     stdout: t.Optional[str]
     stderr: t.Optional[str]
 
-    _validate_provider = _validate_params("provider")
+    _validate_executor = _validate_params("executor")
 
     def dict(self, *args, **kwargs):
-        # Special handling of the provider is needed
+        # Slight modification is needed here since we still
+        # store the executor in a list named executors
         ret = super().dict(*args, **kwargs)
-        provider = ret.pop("provider")
-        ret["executors"] = [HighThroughputExecutor(provider=provider)]
+        executor = ret.pop("executor")
+        ret["executors"] = [executor]
         return ret
 
     class Config:

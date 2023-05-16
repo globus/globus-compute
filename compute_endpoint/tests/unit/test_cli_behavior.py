@@ -44,11 +44,12 @@ def make_endpoint_dir(mock_command_ensure):
         ep_config.write_text(  # Default config for testing
             """
 display_name: None
-provider:
-    type: LocalProvider
-    init_blocks: 1
-    min_blocks: 0
-    max_blocks: 1
+executor:
+    provider:
+        type: LocalProvider
+        init_blocks: 1
+        min_blocks: 0
+        max_blocks: 1
             """
         )
 
