@@ -8,56 +8,26 @@ metadata:
     chart: {{ .Chart.Name }}-{{ .Chart.Version }}
     app: {{ .Release.Name }}
 data:
-  config.py: |
-    from globus_compute_endpoint.endpoint.config import Config
-    from globus_compute_endpoint.executors import HighThroughputExecutor
-    from globus_compute_endpoint.providers.kubernetes.kube import KubernetesProvider
-    from globus_compute_endpoint.strategies import KubeSimpleStrategy
-    from parsl.addresses import address_by_route
-
-    config = Config(
-        display_name="{{ coalesce .Values.endpointDisplayName .Values.endpointName .Release.Name }}",
-        executors=[
-            HighThroughputExecutor(
-                max_workers_per_node={{ .Values.maxWorkersPerPod }},
-                address=address_by_route(),
-                strategy=KubeSimpleStrategy(max_idletime={{ .Values.maxIdleTime }}),
-                container_type='docker',
-                scheduler_mode='hard',
-                worker_debug={{- ternary "True" "False" .Values.workerDebug }},
-                working_dir='{{ .Values.logDir }}',
-                provider=KubernetesProvider(
-                    init_blocks={{ .Values.initBlocks }},
-                    min_blocks={{ .Values.minBlocks }},
-                    max_blocks={{ .Values.maxBlocks }},
-                    init_cpu={{ .Values.initCPU }},
-                    max_cpu={{ .Values.maxCPU }},
-                    init_mem="{{ .Values.initMem }}",
-                    max_mem="{{ .Values.maxMem }}",
-                    image="{{ .Values.workerImage }}",
-                    worker_init='{{ .Values.workerInit }}',
-                    namespace='{{ .Values.workerNamespace }}',
-                    {{- if .Values.imagePullSecret }}
-                    secret='{{ .Values.imagePullSecret }}',
-                    {{- end }}
-                    incluster_config=True
-                ),
-            )
-        ],
-        heartbeat_period=15,
-        heartbeat_threshold=200,
-        funcx_service_address="{{ .Values.funcXServiceAddress }}/v2",
-        detach_endpoint=False,
-    )
-
-    # For now, visible_to must be a list of URNs for globus auth users or groups, e.g.:
-    # urn:globus:auth:identity:{user_uuid}
-    # urn:globus:groups:id:{group_uuid}
-    meta = {
-        "name": "default",
-        "description": "",
-        "organization": "",
-        "department": "",
-        "public": True,
-        "visible_to": []
-    }
+  config.yaml: |
+    display_name: {{ coalesce .Values.endpointDisplayName .Values.endpointName .Release.Name }}
+    heartbeat_period: 15
+    heartbeat_threshold: 200
+    funcx_service_address: {{ .Values.funcXServiceAddress }}/v2
+    detach_endpoint: False
+    executor:
+        provider:
+            type: KubernetesProvider
+            init_blocks: { .Values.initBlocks }}
+            min_blocks: {{ .Values.minBlocks }}
+            max_blocks: {{ .Values.maxBlocks }}
+            init_cpu: {{ .Values.initCPU }}
+            max_cpu: {{ .Values.maxCPU }}
+            init_mem: {{ .Values.initMem }}
+            max_mem: {{ .Values.maxMem }}
+            image: {{ .Values.workerImage }}
+            worker_init: {{ .Values.workerInit }}
+            namespace: {{ .Values.workerNamespace }}
+            {{- if .Values.imagePullSecret }}
+            secret: {{ .Values.imagePullSecret }}
+            {{- end }}
+            incluster_config: True
