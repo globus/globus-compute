@@ -1,8 +1,8 @@
 import random
 
 import pytest
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
-from globus_compute_endpoint.endpoint.utils.config import Config
 
 _mock_base = "globus_compute_endpoint.endpoint.interchange."
 

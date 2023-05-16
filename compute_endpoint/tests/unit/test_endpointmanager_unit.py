@@ -14,9 +14,9 @@ from unittest import mock
 import pika
 import pytest as pytest
 import responses
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
-from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_sdk import GlobusAPIError, NetworkError
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."

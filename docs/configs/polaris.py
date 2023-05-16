@@ -1,4 +1,4 @@
-from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.executors import HighThroughputExecutor
 from globus_compute_endpoint.strategies import SimpleStrategy
 from parsl.addresses import address_by_interface

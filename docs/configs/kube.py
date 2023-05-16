@@ -1,4 +1,4 @@
-from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.executors import HighThroughputExecutor
 from globus_compute_endpoint.providers.kubernetes.kube import KubernetesProvider
 from globus_compute_endpoint.strategies import KubeSimpleStrategy

@@ -1,6 +1,6 @@
 # fmt: off
 
-from globus_compute_endpoint.endpoint.utils.config import Config
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 

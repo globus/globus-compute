@@ -8,9 +8,9 @@ import pytest
 from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
 from globus_compute_endpoint.cli import get_config
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
-from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_compute_endpoint.executors.high_throughput.messages import (
     EPStatusReport as HTEPStatusReport,
 )

@@ -19,12 +19,12 @@ from datetime import datetime
 import globus_compute_sdk as gc
 import setproctitle
 from globus_compute_endpoint import __version__
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
     CommandQueueSubscriber,
 )
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
-from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:

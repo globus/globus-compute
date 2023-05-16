@@ -14,9 +14,11 @@ from unittest import mock
 import pytest
 import responses
 from globus_compute_endpoint.endpoint import endpoint
-from globus_compute_endpoint.endpoint.default_config import config as default_config
+from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config.default_config import (
+    config as default_config,
+)
 from globus_compute_endpoint.endpoint.endpoint import Endpoint, _serialize_config
-from globus_compute_endpoint.endpoint.utils.config import Config
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
 

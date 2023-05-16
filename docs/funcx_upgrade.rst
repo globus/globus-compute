@@ -219,7 +219,7 @@ to
 Other endpoint notes
 ......................
 
-* ``Config.funcx_service_address`` in ``globus_compute_endpoint.endpoint.utils.config`` has not been renamed.
+* ``Config.funcx_service_address`` in ``globus_compute_endpoint.endpoint.config`` has not been renamed.
 
 Using the new funcx-endpoint wrapper package
 ............................................

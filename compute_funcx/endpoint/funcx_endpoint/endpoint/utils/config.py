@@ -1,1 +1,1 @@
-from globus_compute_endpoint.endpoint.utils.config import Config as Config  # noqa: F401
+from globus_compute_endpoint.endpoint.config import Config  # noqa: F401

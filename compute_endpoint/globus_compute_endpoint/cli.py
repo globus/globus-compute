@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import difflib
-import importlib.util
 import json
 import logging
 import pathlib
@@ -10,19 +9,15 @@ import sys
 import uuid
 
 import click
-import yaml
 from click import ClickException
+from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
-from globus_compute_endpoint.endpoint.utils.config import Config
-from globus_compute_endpoint.endpoint.utils.config_model import ConfigModel
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
-from packaging.version import Version
-from pydantic import ValidationError
 
 log = logging.getLogger(__name__)
 
@@ -294,7 +289,7 @@ def _do_logout_endpoints(
 
 
 FUNCX_COMPUTE_IMPORT_UPDATES = {
-    "from funcx_endpoint.endpoint.utils.config": "from globus_compute_endpoint.endpoint.utils.config",  # noqa E501
+    "from funcx_endpoint.endpoint.utils.config": "from globus_compute_endpoint.endpoint.config",  # noqa E501
     "from funcx_endpoint.executors": "from globus_compute_endpoint.executors",  # noqa E501
 }
 
@@ -367,137 +362,6 @@ def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
     except Exception as err:
         msg = f"Unknown Exception {err} attempting to reformat config.py in {ep_dir}"
         raise ClickException(msg) from err
-
-
-def read_config_py(endpoint_dir: pathlib.Path) -> Config | None:
-    conf_path = endpoint_dir / "config.py"
-
-    if not conf_path.exists():
-        return None
-
-    try:
-        from funcx_endpoint.version import VERSION
-
-        if Version(VERSION) < Version("2.0.0"):
-            msg = (
-                "To avoid compatibility issues with Globus Compute, please uninstall "
-                "funcx-endpoint or upgrade funcx-endpoint to >=2.0.0. Note that the "
-                "funcx-endpoint package is now deprecated."
-            )
-            raise ClickException(msg)
-    except ModuleNotFoundError:
-        pass
-
-    try:
-        spec = importlib.util.spec_from_file_location("config", conf_path)
-        if not (spec and spec.loader):
-            raise Exception(f"Unable to import configuration (no spec): {conf_path}")
-        config = importlib.util.module_from_spec(spec)
-        if not config:
-            raise Exception(f"Unable to import configuration (no config): {conf_path}")
-        spec.loader.exec_module(config)
-        return config.config
-
-    except FileNotFoundError as err:
-        msg = (
-            f"{err}"
-            "\n\nUnable to find required configuration file; has the configuration"
-            "\ndirectory been corrupted?"
-        )
-        raise ClickException(msg) from err
-
-    except AttributeError as err:
-        msg = (
-            f"{err}"
-            "\n\nFailed to find expected data structure in configuration file."
-            "\nHas the configuration file been corrupted or modified incorrectly?\n"
-        )
-        raise ClickException(msg) from err
-
-    except ModuleNotFoundError as err:
-        # Catch specific error when old config.py references funcx_endpoint
-        if "No module named 'funcx_endpoint'" in err.msg:
-            msg = (
-                f"{conf_path} contains import statements from a previously "
-                "configured endpoint that uses the (deprecated) "
-                "funcx-endpoint library. Please update the imports to reference "
-                "globus_compute_endpoint.\n\ni.e.\n"
-                "    from funcx_endpoint.endpoint.utils.config -> "
-                "from globus_compute_endpoint.endpoint.utils.config\n"
-                "    from funcx_endpoint.executors -> "
-                "from globus_compute_endpoint.executors\n"
-                "\n"
-                "You can also use the command "
-                "`globus-compute-endpoint update_funcx_config [endpoint_name]` "
-                "to update them\n"
-            )
-            raise ClickException(msg) from err
-        else:
-            log.exception(err.msg)
-            raise
-
-    except Exception:
-        log.exception(
-            "Globus Compute v2.0.0 made several non-backwards compatible changes to "
-            "the config. Your config might be out of date. "
-            "Refer to "
-            "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
-        )
-        raise
-
-
-def get_config_yaml(endpoint_dir: pathlib.Path) -> dict:
-    config_path = endpoint_dir / "config.yaml"
-    endpoint_name = endpoint_dir.name
-
-    try:
-        with open(config_path) as f:
-            return dict(yaml.safe_load(f))
-    except FileNotFoundError as err:
-        if endpoint_dir.exists():
-            msg = (
-                f"{err}"
-                "\n\nUnable to find required configuration file; has the configuration"
-                "\ndirectory been corrupted?"
-            )
-        else:
-            configure_command = "globus-compute-endpoint configure"
-            if endpoint_name != "default":
-                configure_command += f" {endpoint_name}"
-            msg = (
-                f"{err}"
-                f"\n\nEndpoint '{endpoint_name}' is not configured!"
-                "\n1. Please create a configuration template with:"
-                f"\n\t{configure_command}"
-                "\n2. Update the configuration"
-                "\n3. Start the endpoint\n"
-            )
-        raise ClickException(msg) from err
-    except Exception as err:
-        raise ClickException(f"Invalid syntax in {config_path}: {str(err)}") from err
-
-
-def get_config(endpoint_dir: pathlib.Path) -> Config:
-    config = read_config_py(endpoint_dir)
-    if config:
-        # Use config.py if present
-        return config
-
-    config_dict = get_config_yaml(endpoint_dir)
-
-    try:
-        config_schema = ConfigModel(**config_dict)
-    except ValidationError as err:
-        raise ClickException(str(err)) from err
-
-    config_dict = config_schema.dict(exclude_unset=True)
-
-    try:
-        config = Config(**config_dict)
-    except Exception as err:
-        raise ClickException(str(err)) from err
-
-    return config
 
 
 def _do_start_endpoint(

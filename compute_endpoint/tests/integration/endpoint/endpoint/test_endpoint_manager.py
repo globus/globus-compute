@@ -34,7 +34,9 @@ class TestStart:
         assert not config_dir.exists()
         # pyfakefs will take care of newly created files, not existing config
         def_config_path = (
-            pathlib.Path(globus_compute_endpoint.endpoint.__file__).resolve().parent
+            pathlib.Path(globus_compute_endpoint.endpoint.config.__file__)
+            .resolve()
+            .parent
             / "default_config.yaml"
         )
         fs.add_real_file(def_config_path)
