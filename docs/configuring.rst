@@ -17,7 +17,8 @@ The following snippet shows an example configuration for executing remotely on B
 The configuration assumes the user is running on a login node, uses the ``TorqueProvider`` to interface
 with the scheduler, and uses the ``AprunLauncher`` to launch workers.
 
-.. literalinclude:: configs/bluewaters.py
+.. literalinclude:: configs/bluewaters.yaml
+   :language: yaml
 
 UChicago AI Cluster
 ^^^^^^^^^^^^^^^^^^^
@@ -30,7 +31,13 @@ with the scheduler and launch onto the GPUs.
 
 Link to `docs <https://howto.cs.uchicago.edu/slurm:ai>`_.
 
+.. literalinclude:: configs/uchicago_ai_cluster.yaml
+   :language: yaml
+
+Here is some Python that demonstrates how to compute the variables in the YAML example above:
+
 .. literalinclude:: configs/uchicago_ai_cluster.py
+   :language: python
 
 Midway (RCC, UChicago)
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -42,11 +49,13 @@ The snippet below shows an example configuration for executing remotely on Midwa
 The configuration assumes the user is running on a login node and uses the ``SlurmProvider`` to interface
 with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 
-.. literalinclude:: configs/midway.py
+.. literalinclude:: configs/midway.yaml
+   :language: yaml
 
 The following configuration is an example to use singularity container on Midway.
 
-.. literalinclude:: configs/midway_singularity.py
+.. literalinclude:: configs/midway_singularity.yaml
+   :language: yaml
 
 
 Kubernetes Clusters
@@ -58,7 +67,8 @@ Kubernetes is an open-source system for container management, such as automating
 The snippet below shows an example configuration for deploying pods as workers on a Kubernetes cluster.
 The KubernetesProvider exploits the Python Kubernetes API, which assumes that you have kube config in ``~/.kube/config``.
 
-.. literalinclude:: configs/kube.py
+.. literalinclude:: configs/kube.yaml
+   :language: yaml
 
 
 Theta (ALCF)
@@ -70,11 +80,13 @@ The following snippet shows an example configuration for executing on Argonne Le
 **Theta** supercomputer. This example uses the ``HighThroughputExecutor`` and connects to Theta's Cobalt scheduler
 using the ``CobaltProvider``. This configuration assumes that the script is being executed on the login nodes of Theta.
 
-.. literalinclude:: configs/theta.py
+.. literalinclude:: configs/theta.yaml
+   :language: yaml
 
 The following configuration is an example to use singularity container on Theta.
 
-.. literalinclude:: configs/theta_singularity.py
+.. literalinclude:: configs/theta_singularity.yaml
+   :language: yaml
 
 
 Cooley (ALCF)
@@ -86,7 +98,8 @@ The following snippet shows an example configuration for executing on Argonne Le
 **Cooley** cluster. This example uses the ``HighThroughputExecutor`` and connects to Cooley's Cobalt scheduler
 using the ``CobaltProvider``. This configuration assumes that the script is being executed on the login nodes of Cooley.
 
-.. literalinclude:: configs/cooley.py
+.. literalinclude:: configs/cooley.yaml
+   :language: yaml
 
 
 Polaris (ALCF)
@@ -98,7 +111,8 @@ The following snippet shows an example configuration for executing on Argonne Le
 **Polaris** cluster. This example uses the ``HighThroughputExecutor`` and connects to Polaris's PBS scheduler
 using the ``PBSProProvider``. This configuration assumes that the script is being executed on the login node of Polaris.
 
-.. literalinclude:: configs/polaris.py
+.. literalinclude:: configs/polaris.yaml
+   :language: yaml
 
 
 Cori (NERSC)
@@ -109,7 +123,8 @@ Cori (NERSC)
 The following snippet shows an example configuration for accessing NERSC's **Cori** supercomputer. This example uses the ``HighThroughputExecutor`` and connects to Cori's Slurm scheduler.
 It is configured to request 2 nodes configured with 1 TaskBlock per node. Finally, it includes override information to request a particular node type (Haswell) and to configure a specific Python environment on the worker nodes using Anaconda.
 
-.. literalinclude:: configs/cori.py
+.. literalinclude:: configs/cori.yaml
+   :language: yaml
 
 
 Perlmutter (NERSC)
@@ -123,7 +138,8 @@ It is configured to request 2 nodes configured with 1 TaskBlock per node. Finall
 .. note:: Please run ``module load cgpu`` prior to executing ``globus-compute-endpoint start <endpoint_name>``
           on the Cori login nodes to access the Perlmutter queues.
 
-.. literalinclude:: configs/perlmutter.py
+.. literalinclude:: configs/perlmutter.yaml
+   :language: yaml
 
 
 Frontera (TACC)
@@ -134,7 +150,8 @@ Frontera (TACC)
 The following snippet shows an example configuration for accessing the Frontera system at TACC. The configuration below assumes that the user is
 running on a login node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 
-.. literalinclude:: configs/frontera.py
+.. literalinclude:: configs/frontera.yaml
+   :language: yaml
 
 
 Bebop (LCRC, ANL)
@@ -145,7 +162,8 @@ Bebop (LCRC, ANL)
 The following snippet shows an example configuration for accessing the Bebop system at Argonne's LCRC. The configuration below assumes that the user is
 running on a login node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 
-.. literalinclude:: configs/bebop.py
+.. literalinclude:: configs/bebop.yaml
+   :language: yaml
 
 
 Pinning Workers to devices
@@ -159,4 +177,5 @@ will have the following environment variables set to the worker specific identit
 ``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``, ``SYCL_DEVICE_FILTER``.
 
 
-.. literalinclude:: configs/worker_pinning.py
+.. literalinclude:: configs/worker_pinning.yaml
+   :language: yaml
