@@ -1,0 +1,30 @@
+executor:
+    label: fe.cs.uchicago
+    worker_debug: False
+
+    address:
+        type: address_by_interface
+        ifname: ens2f1
+
+    provider:
+        type: SlurmProvider
+        partition: general
+
+        # This is a hack. We use hostname ; to terminate the srun command, and
+        # start our own
+        launcher:
+            type: SrunLauncher
+            overrides: >
+                hostname; srun --ntasks={{ TOTAL_WORKERS }}
+                --ntasks-per-node={{ WORKERS_PER_NODE }}
+                --gpus-per-task=rtx2080ti:{{ GPUS_PER_WORKER }}
+                --gpu-bind=map_gpu:{{ GPU_MAP }}
+
+        # Scale between 0-1 blocks with 2 nodes per block
+        nodes_per_block: {{ NODES_PER_JOB }}
+        init_blocks: 0
+        min_blocks: 0
+        max_blocks: 1
+
+        # Hold blocks for 30 minutes
+        walltime: 00:30:00

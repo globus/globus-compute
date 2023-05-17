@@ -1,0 +1,38 @@
+executor:
+    max_workers_per_node: 2
+    worker_debug: False
+
+    address:
+        type: address_by_interface
+        ifname: bond0.144
+
+    provider:
+        type: SlurmProvider
+        partition: debug  # Partition / QOS
+
+        # We request all hyperthreads on a node.
+        launcher:
+            type: SrunLauncher
+            overrides: -c 272
+
+        # string to prepend to #SBATCH blocks in the submit
+        # script to the scheduler
+        # eg: '#SBATCH --constraint=knl,quad,cache'
+        scheduler_options: {{ OPTIONS }}
+
+        # Command to be run before starting a worker
+        # e.g., 'module load Anaconda; source activate parsl_env'
+        worker_init: {{ COMMAND }}
+
+        # Increase timeout as Cori's scheduler may be slow
+        # to respond
+        cmd_timeout: 120
+
+        # Scale between 0-1 blocks with 2 nodes per block
+        nodes_per_block: 2
+        init_blocks: 0
+        min_blocks: 0
+        max_blocks: 1
+
+        # Hold blocks for 10 minutes
+        walltime: 00:10:00

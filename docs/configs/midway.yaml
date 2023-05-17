@@ -1,0 +1,32 @@
+executor:
+    max_workers_per_node: 2
+    worker_debug: False
+
+    address:
+        type: address_by_interface
+        ifname: bond0
+
+    provider:
+        type: SlurmProvider
+        partition: broadwl
+
+        launcher:
+            type: SrunLauncher
+
+        # string to prepend to #SBATCH blocks in the submit
+        # script to the scheduler
+        # e.g., '#SBATCH --constraint=knl,quad,cache'
+        scheduler_options: {{ OPTIONS }}
+
+        # Command to be run before starting a worker
+        # e.g., module load Anaconda; source activate parsl_env
+        worker_init: {{ COMMAND }}
+
+        # Scale between 0-1 blocks with 2 nodes per block
+        nodes_per_block: 2
+        init_blocks: 0
+        min_blocks: 0
+        max_blocks: 1
+
+        # Hold blocks for 30 minutes
+        walltime: 00:30:00
