@@ -5,6 +5,7 @@ import logging
 import os
 import pathlib
 import pwd
+import re
 import shutil
 import signal
 import socket
@@ -20,6 +21,7 @@ import texttable
 import yaml
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
@@ -712,7 +714,7 @@ class Endpoint:
         metadata["sdk_version"] = None
 
         try:
-            metadata["config"] = _serialize_config(config)
+            metadata["config"] = serialize_config(config)
         except Exception as e:
             log.warning(
                 f"Error when serializing config ({type(e).__name__}). Ignoring."
@@ -720,34 +722,3 @@ class Endpoint:
             log.debug("Config serialization exception details", exc_info=e)
 
         return metadata
-
-
-def _serialize_config(config: Config) -> dict:
-    """
-    Short-term serialization method until config.py is replaced with config.yaml
-    """
-
-    expand_list = ["strategy", "provider", "launcher"]
-    pass_through_list = ["allowed_functions"]
-
-    def to_dict(o):
-        mems = {"_type": type(o).__name__}
-
-        for k, v in o.__dict__.items():
-            if k.startswith("_"):
-                continue
-
-            if k in expand_list:
-                mems[k] = to_dict(v)
-            elif isinstance(v, str) or k in pass_through_list:
-                mems[k] = v
-            else:
-                mems[k] = repr(v)
-
-        return mems
-
-    result = to_dict(config)
-    # when we move to config.yaml, should only need to support a single executor
-    result["executors"] = [to_dict(executor) for executor in config.executors]
-
-    return result

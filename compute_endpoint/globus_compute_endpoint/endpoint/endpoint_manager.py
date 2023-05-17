@@ -20,6 +20,7 @@ import globus_compute_sdk as gc
 import setproctitle
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
     CommandQueueSubscriber,
@@ -140,14 +141,7 @@ class EndpointManager:
             "endpoint_version": __version__,
             "hostname": socket.getfqdn(),
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
-            "config": {
-                "_type": type(config).__name__,
-                "multi_tenant": True,  # redundant, but "whatev"
-                "stdout": config.stdout,
-                "stderr": config.stderr,
-                "environment": config.environment,
-                "funcx_service_address": config.funcx_service_address,
-            },
+            "config": serialize_config(config),
         }
 
     def request_shutdown(self, sig_num, curr_stack_frame):

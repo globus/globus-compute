@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
+import json
 import logging
 import pathlib
 
@@ -146,3 +148,62 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
         raise ClickException(str(err)) from err
 
     return config
+
+
+def serialize_config(config: Config) -> dict:
+    """Converts a Config object into a dict that matches the
+    standard YAML config schema.
+
+    E.g.,
+    {
+        ...
+        "display_name": "My Endpoint",
+        ...
+        "executor": {
+            ...
+            "provider": {
+                ...
+                "type": "LocalProvider"
+                ...
+            }
+            ...
+        }
+    }
+    """
+
+    def _prep(val):
+        if hasattr(val, "__dict__") and hasattr(val, "__init__"):
+            return _to_dict(val)
+        try:
+            json.dumps(val, allow_nan=False)
+            return val
+        except (TypeError, ValueError):
+            return repr(val)
+
+    def _to_dict(obj):
+        res = {"type": type(obj).__name__}
+        obj_dict = vars(obj)
+
+        # We only want to include attributes that are
+        # configurable as constructor arguments
+        sig = inspect.signature(obj.__init__)
+        params = list(sig.parameters.keys())
+
+        for key in params:
+            try:
+                val = obj_dict[key]
+            except KeyError:
+                continue
+
+            if isinstance(val, (list, tuple)):
+                new_list = []
+                for item in val:
+                    new_list.append(_prep(item))
+                res[key] = new_list
+
+            else:
+                res[key] = _prep(val)
+
+        return res
+
+    return _to_dict(config)

@@ -173,6 +173,7 @@ def test_gracefully_exits_if_in_conflict_or_locked(
 
 def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
     ep_uuid, mock_gcc = mock_client
+    mock_conf.multi_tenant = True
     EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert mock_gcc.register_endpoint.called
@@ -181,7 +182,7 @@ def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
         assert key in k["metadata"], "Expected minimal metadata"
 
     for key in (
-        "_type",
+        "type",
         "multi_tenant",
         "stdout",
         "stderr",
