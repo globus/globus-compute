@@ -18,7 +18,8 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.default_config import (
     config as default_config,
 )
-from globus_compute_endpoint.endpoint.endpoint import Endpoint, _serialize_config
+from globus_compute_endpoint.endpoint.config.utils import serialize_config
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
 
@@ -342,8 +343,8 @@ def test_endpoint_get_metadata(mocker):
     config = meta["config"]
     assert "funcx_service_address" in config
     assert len(config["executors"]) == 1
-    assert config["executors"][0]["_type"] == "HighThroughputExecutor"
-    assert config["executors"][0]["provider"]["_type"] == "LocalProvider"
+    assert config["executors"][0]["type"] == "HighThroughputExecutor"
+    assert config["executors"][0]["provider"]["type"] == "LocalProvider"
 
 
 @pytest.mark.parametrize("env", [None, "blar", "local", "production"])
@@ -460,31 +461,29 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data):
 
 def test_serialize_config_field_types():
     ep_config = Config()
-    ep_config._hidden_field = "123"
 
-    class S:
-        def __init__(self):
-            self.a = 1
-
-    ep_config.strategy = S()
-    ep_config.random_field = [1, 2]
+    ep_config._hidden_attr = "123"
+    ep_config.rando_attr = "howdy"
     ep_config.allowed_functions = ["a", "b", "c"]
+    ep_config.heartbeat_threshold = float("inf")
 
-    result = _serialize_config(ep_config)
+    result = serialize_config(ep_config)
 
-    # Items in expand_list are serialized as dict
-    assert "strategy" in result and result["strategy"]["a"] == "1"
+    # Objects with a __dict__ attr are expanded
+    assert "type" in result["executors"][0]["provider"]
 
-    # Items with _ prefix are ignored
-    assert "_hidden_field" not in result
+    # Only constructor parameters should be included
+    assert "_hidden_attr" not in result
+    assert "rando_attr" not in result
 
-    # Items in pass_through_list maintain their type
+    # Most values should retain their type
     assert isinstance(result["allowed_functions"], list)
     assert len(result["allowed_functions"]) == 3
+    assert isinstance(result["heartbeat_period"], int)
+    assert isinstance(result["detach_endpoint"], bool)
 
-    # Other items are converted to str
-    assert "random_field" in result
-    assert result["random_field"] == "[1, 2]"
+    # Others should not
+    assert isinstance(result["heartbeat_threshold"], str)
 
 
 @pytest.mark.parametrize(
