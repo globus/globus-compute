@@ -2,7 +2,7 @@ from globus_compute_endpoint.endpoint.utils.config import Config
 from globus_compute_endpoint.executors import HighThroughputExecutor
 from globus_compute_endpoint.strategies import SimpleStrategy
 from parsl.addresses import address_by_interface
-from parsl.launchers import SingleNodeLauncher
+from parsl.launchers import MpiExecLauncher
 from parsl.providers import PBSProProvider
 
 # fmt: off
@@ -15,17 +15,21 @@ user_opts = {
         'scheduler_options': '#PBS -l filesystems=home:grand:eagle\n#PBS -k doe',
         # ALCF allocation to use
         'account': '',
+        # Un-comment to give each worker exclusive access to a single GPU
+        # 'available_accelerators': 4,
     }
 }
 
 config = Config(
     executors=[
         HighThroughputExecutor(
-            max_workers_per_node=1,
+            available_accelerators=user_opts['polaris'].get('available_accelerators'),
             strategy=SimpleStrategy(max_idletime=300),
             address=address_by_interface('bond0'),
             provider=PBSProProvider(
-                launcher=SingleNodeLauncher(),
+                launcher=MpiExecLauncher(
+                    bind_cmd="--cpu-bind", overrides="--depth=64 --ppn 1"
+                ),  # Ensures 1 manger per node, work on all 64 cores
                 account=user_opts['polaris']['account'],
                 queue='preemptable',
                 cpus_per_node=32,
