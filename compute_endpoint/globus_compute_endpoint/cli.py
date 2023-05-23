@@ -185,6 +185,10 @@ def configure_endpoint(
     Drops a config.py template into the Globus Compute configs directory.
     The template usually goes to ~/.globus_compute/<ENDPOINT_NAME>/config.py
     """
+    try:
+        Endpoint.validate_endpoint_name(name)
+    except ValueError as e:
+        raise ClickException(str(e))
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
     Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant, display_name)
