@@ -217,6 +217,11 @@ def test_restart_endpoint_does_start_and_stop(
     mock_ep.start_endpoint.assert_called_once()
 
 
+def test_configure_validates_name(run_line):
+    run_line("configure ValidName")
+    run_line("configure 'Invalid name with spaces'", assert_exit_code=1)
+
+
 @pytest.mark.parametrize(
     "display_test",
     [

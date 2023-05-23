@@ -20,6 +20,9 @@ from globus_compute_endpoint.endpoint.utils.config import Config
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
 
+# bloody line length ...
+_whitespace_msg = "no whitespace (spaces, newlines, tabs), slashes, or prefixed '.'"
+
 
 @pytest.fixture
 def register_endpoint_response(endpoint_uuid):
@@ -480,3 +483,41 @@ def test_serialize_config_field_types():
     # Other items are converted to str
     assert "random_field" in result
     assert result["random_field"] == "[1, 2]"
+
+
+@pytest.mark.parametrize(
+    "ep_path_name",
+    (
+        (True, "nice_normal_name", None, None),
+        (True, "12345AnotherValid_name", None, None),
+        (False, "", False, "Received no endpoint name"),
+        (True, "a" * 128, None, None),
+        (False, "a" * 129, False, "must be less than 129 characters (length: "),
+        (False, "../ep_name", True, "no '..' or '/' characters"),
+        (False, "./ep_name", True, "no '..' or '/' characters"),
+        (False, "/ep_name", True, "no '..' or '/' characters"),
+        (False, ".initial_dot_hidden_directories_disallowed", True, _whitespace_msg),
+        (False, "contains...\r...other_whitespace", True, _whitespace_msg),
+        (False, "contains...\v...other_whitespace", True, _whitespace_msg),
+        (False, "contains...\t...other_whitespace", True, _whitespace_msg),
+        (False, "contains...\n...other_whitespace", True, _whitespace_msg),
+        (False, " NoSpaces", True, _whitespace_msg),
+        (False, "No Spaces", True, _whitespace_msg),
+        (False, "NoSpaces ", True, _whitespace_msg),
+        (False, "NoEsc\\apes", True, _whitespace_msg),
+        (False, "No'singlequotes'", True, _whitespace_msg),
+        (False, 'No"doublequotes"', True, _whitespace_msg),
+    ),
+)
+def test_validate_endpoint_name(ep_path_name):
+    is_valid, name, shows_before_after, err_msg = ep_path_name
+    if not is_valid:
+        with pytest.raises(ValueError) as pyt_exc:
+            Endpoint.validate_endpoint_name(name)
+        assert err_msg in str(pyt_exc.value)
+        if shows_before_after:
+            assert "Requested: " in str(pyt_exc.value), "Should show what was received"
+            assert name in str(pyt_exc.value), "Should show what was received"
+            assert "Reduced to: " in str(pyt_exc.value), "Should show potential fix"
+    else:
+        Endpoint.validate_endpoint_name(name)

@@ -169,6 +169,70 @@ class Endpoint:
         )
 
     @staticmethod
+    def validate_endpoint_name(path_name: str) -> None:
+        # Validate the path by removing all relative path modifiers (i.e., ../),
+        # taking the basename, ensuring it's not Unix hidden (initial dot [.]), and
+        # has no whitespace.  The path name is used deep within Parsl, which uses
+        # raw shell to perform some actions ... and is not robust about it at all.
+        # The path of least resistence, then, is to restrict this EP name upfront.
+        # Examples:
+        #
+        # Good: "nice_normal_name"
+        # Good: "91239anothervalidname"
+        # Bad: " has_a_space"
+        # Bad: "has_a_space "
+        # Bad: "has a_space"
+        # Bad: "has/../relative_path_syntax"
+        # Bad: ".has_an_initial_dot(.);_'hidden'_directories_disallowed"
+        # Bad: "a" * 129  # too long
+        # Bad: ""  # come on now
+        # Bad: "/absolute_path"
+        # Bad: "contains...\r\v\t\n...other_whitespace"
+        # Bad: "we_\\_do_not_accept_escapes"
+        # Bad: "we_don't_accept_single_qoutes"
+        # Bad: 'we_do_not_accept_"double_qoutes"'
+        err_msg = "Invalid endpoint name: "
+        pathname_re = re.compile(r"[\\/\s'\"]")
+        if not path_name:
+            err_msg += "Received no endpoint name"
+            raise ValueError(err_msg)
+
+        if len(path_name) > 128:
+            err_msg += f"must be less than 129 characters (length: {len(path_name)})"
+            raise ValueError(err_msg)
+
+        # let pathlib resolve to an absolute (no ../), then take basename
+        validated = pathlib.Path(path_name).resolve().name
+        if validated != path_name:
+            err_msg += (
+                "no '..' or '/' characters"
+                f"\n  Requested:  {path_name}"
+                f"\n  Reduced to: {validated} (*potentially* valid)"
+            )
+            raise ValueError(err_msg)
+
+        validated = pathname_re.sub("", validated).lstrip(".")
+        if validated != path_name:
+            err_msg += (
+                "no whitespace (spaces, newlines, tabs), slashes, or prefixed '.'"
+                f"\n  Requested:  {path_name}"
+                f"\n  Reduced to: {validated} (*potentially* valid)"
+            )
+            raise ValueError(err_msg)
+
+        # verify it's still a valid pathname *after* our ministrations
+        validated = pathlib.Path(validated).name
+
+        # only valid if completely unchanged by pathlib and basename shenanigans
+        if path_name != validated:
+            err_msg += (
+                "unknown reason"
+                f"\n  Requested:  {path_name}"
+                f"\n  Reduced to: {validated} (*potentially* valid)"
+            )
+            raise ValueError(err_msg)
+
+    @staticmethod
     def get_endpoint_id(endpoint_dir: pathlib.Path) -> str | None:
         info_file_path = endpoint_dir / "endpoint.json"
         try:
