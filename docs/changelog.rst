@@ -3,6 +3,32 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.1.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.1.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Support for 3 new execution ``Engines``, designed to replace the ``HighThroughputExecutor``
+
+  - ``GlobusComputeEngine``: Wraps Parsl's ``HighThroughputExecutor`` to match the current
+    default executor (globus-computes' fork of ``HighThroughputExecutor``)
+  - ``ProcessPoolEngine``: Wraps ``concurrent.futures.ProcessPoolExecutor`` for concurrent
+    local execution
+  - ``ThreadPoolEngine``: Wraps ``concurrent.futures.ThreadPoolEngine`` for concurrent
+    local execution on MacOS.
+
+Bug Fixes
+^^^^^^^^^
+
+- Add validation logic to the endpoint ``configure`` subcommand to prevent
+  certain classes of endpoint names.  That is, Compute Endpoints may have
+  arbitrary _display_ names, but the name for use on the filesystem works best
+  without, for example, spaces.  Now, the ``configure`` step will exit early
+  with a (hopefully!) helpul error message explaining the problem.
+
 .. _changelog-2.0.3:
 
 globus-compute-sdk & globus-compute-endpoint v2.0.3
