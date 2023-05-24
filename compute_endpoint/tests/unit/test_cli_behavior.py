@@ -217,7 +217,10 @@ def test_restart_endpoint_does_start_and_stop(
     mock_ep.start_endpoint.assert_called_once()
 
 
-def test_configure_validates_name(run_line):
+def test_configure_validates_name(mock_command_ensure, run_line):
+    compute_dir = mock_command_ensure.endpoint_config_dir
+    compute_dir.mkdir(parents=True, exist_ok=True)
+
     run_line("configure ValidName")
     run_line("configure 'Invalid name with spaces'", assert_exit_code=1)
 
