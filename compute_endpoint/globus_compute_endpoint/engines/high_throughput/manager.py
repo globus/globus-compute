@@ -22,20 +22,20 @@ import psutil
 import zmq
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.exception_handling import (
-    get_error_string,
-    get_result_error_details,
-)
-from globus_compute_endpoint.executors.high_throughput.container_sched import (
+from globus_compute_endpoint.engines.high_throughput.container_sched import (
     naive_scheduler,
 )
-from globus_compute_endpoint.executors.high_throughput.mac_safe_queue import mpQueue
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.mac_safe_queue import mpQueue
+from globus_compute_endpoint.engines.high_throughput.messages import (
     ManagerStatusReport,
     Message,
     Task,
 )
-from globus_compute_endpoint.executors.high_throughput.worker_map import WorkerMap
+from globus_compute_endpoint.engines.high_throughput.worker_map import WorkerMap
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
+)
 from globus_compute_endpoint.logging_config import ComputeLogger, setup_logging
 from parsl.version import VERSION as PARSL_VERSION
 
