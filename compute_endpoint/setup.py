@@ -83,11 +83,11 @@ setup(
         "console_scripts": [
             "globus-compute-endpoint=globus_compute_endpoint.cli:cli_run",
             "globus-compute-interchange"
-            "=globus_compute_endpoint.executors.high_throughput.interchange:cli_run",
+            "=globus_compute_endpoint.engines.high_throughput.interchange:cli_run",
             "globus-compute-manager"
-            "=globus_compute_endpoint.executors.high_throughput.manager:cli_run",
+            "=globus_compute_endpoint.engines.high_throughput.manager:cli_run",
             "globus-compute-worker"
-            "=globus_compute_endpoint.executors.high_throughput.worker:cli_run",
+            "=globus_compute_endpoint.engines.high_throughput.worker:cli_run",
         ]
     },
     include_package_data=True,

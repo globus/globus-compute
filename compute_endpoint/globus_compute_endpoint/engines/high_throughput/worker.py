@@ -5,23 +5,22 @@ import logging
 import os
 import signal
 import sys
-import time
+import typing as t
 
 import dill
 import zmq
 from globus_compute_common import messagepack
-from globus_compute_common.messagepack.message_types import TaskTransition
-from globus_compute_common.tasks import ActorName, TaskState
+from globus_compute_common.messagepack.message_types import Result as OutgoingResult
+from globus_compute_common.messagepack.message_types import (
+    ResultErrorDetails as OutgoingResultErrorDetails,
+)
+from globus_compute_endpoint.engines.high_throughput.messages import Message
 from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
-from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
-from globus_compute_endpoint.executors.high_throughput.messages import Message
 from globus_compute_endpoint.logging_config import setup_logging
-from globus_compute_sdk.errors import MaxResultSizeExceeded
 from globus_compute_sdk.serialize import ComputeSerializer
-from parsl.app.python import timeout
 
 log = logging.getLogger(__name__)
 
@@ -113,7 +112,7 @@ class Worker:
                 # Kill the worker after accepting death in message to manager.
                 sys.exit()
             else:
-                result = self.execute_task(task_id, msg)
+                result = self._worker_execute_task(task_id, msg)
                 result["container_id"] = container_id
                 log.debug("Sending result")
                 # send bytes over the socket back to the manager
@@ -121,76 +120,41 @@ class Worker:
 
         log.warning("Broke out of the loop... dying")
 
-    def execute_task(self, task_id: str, task_body: bytes) -> dict:
-        log.debug("executing task task_id='%s'", task_id)
-        exec_start = TaskTransition(
-            timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
+    def compose_exception_message(self, task_id: str) -> bytes:
+        code, user_message = get_result_error_details()
+        outgoing_result = OutgoingResult(
+            task_id=task_id,
+            data=get_error_string(),
+            error_details=OutgoingResultErrorDetails(
+                code=code,
+                user_message=user_message,
+            ),
         )
+        return messagepack.pack(outgoing_result)
 
+    def _worker_execute_task(
+        self, task_id: str, msg: bytes
+    ) -> dict[str, t.Union[str, bytes]]:
+        result_message: dict[str, t.Union[str, bytes]] = {"task_id": task_id}
         try:
-            result = self.call_user_function(task_body)
+            # Unwrap HTEX's Task packing
+            task_message = Message.unpack(msg)
+            serialized_fn_package = task_message.task_buffer.decode()
+
+            # Deserialize HTEX executors' wrapping of
+            # execute_task, messagepack_payload)
+            function, args, kwargs = self.deserialize(serialized_fn_package)
+
+            # Execute
+            serialized_result: bytes = function(*args, **kwargs)
+            result_message["data"] = serialized_result
+
         except Exception:
-            log.exception("Caught an exception while executing user function")
-            result_message: dict[
-                str, str | tuple[str, str] | list[TaskTransition]
-            ] = dict(
-                task_id=task_id,
-                exception=get_error_string(),
-                error_details=get_result_error_details(),
-            )
+            log.exception("Failed to execute task")
+            serialized_error = self.compose_exception_message(task_id)
+            result_message["data"] = serialized_error
 
-        else:
-            log.debug("Execution completed without exception")
-            result_message = dict(task_id=task_id, data=result)
-
-        exec_end = TaskTransition(
-            timestamp=time.time_ns(),
-            state=TaskState.EXEC_END,
-            actor=ActorName.WORKER,
-        )
-
-        result_message["task_statuses"] = [exec_start, exec_end]
-
-        log.debug(
-            "task %s completed in %d ns",
-            task_id,
-            (exec_end.timestamp - exec_start.timestamp),
-        )
         return result_message
-
-    def call_user_function(self, message: bytes) -> str:
-        """Deserialize the buffer and execute the task.
-
-        Returns the result or throws exception.
-        """
-        # try to unpack it as a messagepack message
-        try:
-            task = messagepack.unpack(message)
-            if not isinstance(task, messagepack.message_types.Task):
-                raise CouldNotExecuteUserTaskError(
-                    f"wrong type of message in worker: {type(task)}"
-                )
-            task_data = task.task_buffer
-        # on parse errors, failover to trying the "legacy" message reading
-        except (
-            messagepack.InvalidMessageError,
-            messagepack.UnrecognizedProtocolVersion,
-        ):
-            task = Message.unpack(message)
-            task_data = task.task_buffer.decode("utf-8")  # type: ignore[attr-defined]
-
-        f, args, kwargs = self.serializer.unpack_and_deserialize(task_data)
-        GC_TASK_TIMEOUT = max(0.0, float(os.environ.get("GC_TASK_TIMEOUT", 0.0)))
-        if GC_TASK_TIMEOUT > 0.0:
-            log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
-            f = timeout(f, GC_TASK_TIMEOUT)
-        result_data = f(*args, **kwargs)
-        serialized_data = self.serialize(result_data)
-
-        if len(serialized_data) > self.result_size_limit:
-            raise MaxResultSizeExceeded(len(serialized_data), self.result_size_limit)
-
-        return serialized_data
 
 
 def cli_run():

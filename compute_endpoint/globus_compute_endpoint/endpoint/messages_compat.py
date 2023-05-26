@@ -15,14 +15,25 @@ from globus_compute_common.messagepack.message_types import (
 )
 from globus_compute_common.messagepack.message_types import Task as OutgoingTask
 from globus_compute_common.messagepack.message_types import TaskTransition
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     EPStatusReport as InternalEPStatusReport,
 )
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     Task as InternalTask,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def convert_ep_status_report(
+    internal: InternalEPStatusReport,
+) -> OutgoingEPStatusReport:
+    messagepack_msg = OutgoingEPStatusReport(
+        endpoint_id=internal._header,
+        global_state=internal.global_state,
+        task_statuses=internal.task_statuses,
+    )
+    return messagepack_msg
 
 
 def try_convert_to_messagepack(message: bytes) -> bytes:
