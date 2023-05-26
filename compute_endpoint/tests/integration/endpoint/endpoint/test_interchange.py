@@ -11,7 +11,7 @@ from globus_compute_common.messagepack.message_types import EPStatusReport, Resu
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
 from globus_compute_endpoint.endpoint.utils.config import Config
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     EPStatusReport as HTEPStatusReport,
 )
 from tests.utils import try_for_timeout

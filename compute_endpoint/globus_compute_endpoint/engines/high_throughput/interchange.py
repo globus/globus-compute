@@ -20,19 +20,19 @@ import dill
 import zmq
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.exception_handling import (
-    get_error_string,
-    get_result_error_details,
-)
-from globus_compute_endpoint.executors.high_throughput.interchange_task_dispatch import (  # noqa: E501
+from globus_compute_endpoint.engines.high_throughput.interchange_task_dispatch import (  # noqa: E501
     naive_interchange_task_dispatch,
 )
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     BadCommand,
     EPStatusReport,
     Heartbeat,
     Message,
     MessageType,
+)
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
 )
 from globus_compute_endpoint.logging_config import ComputeLogger
 from globus_compute_sdk.sdk.utils import chunk_by
@@ -557,7 +557,7 @@ class Interchange:
 
         def _enqueue_status_report(ep_state: dict, task_states: dict):
             try:
-                msg = EPStatusReport(self.endpoint_id, ep_state, dict(task_states))
+                msg = EPStatusReport(str(self.endpoint_id), ep_state, dict(task_states))
                 status_report_queue.put(msg.pack())
             except Exception:
                 log.exception("Unable to create or send EP status report.")
@@ -991,9 +991,6 @@ class Interchange:
 
                         mdata["total_tasks"] -= len(b_messages)
 
-                    # TODO: handle this with a Task message or something?
-                    # previously used this; switched to mono-message,
-                    # self.results_outgoing.send_multipart(b_messages)
                     self.results_outgoing.send(dill.dumps(b_messages))
                     interesting_managers.add(manager)
 

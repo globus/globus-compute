@@ -5,8 +5,8 @@ from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_endpoint.executors.high_throughput.messages import Task
-from globus_compute_endpoint.executors.high_throughput.worker import Worker
+from globus_compute_endpoint.engines.high_throughput.messages import Task
+from globus_compute_endpoint.engines.high_throughput.worker import Worker
 from parsl.app.errors import AppTimeout
 
 
@@ -36,7 +36,7 @@ def reset_signals_auto(reset_signals):
 @pytest.fixture
 def test_worker():
     with mock.patch(
-        "globus_compute_endpoint.executors.high_throughput.worker.zmq.Context"
+        "globus_compute_endpoint.engines.high_throughput.worker.zmq.Context"
     ) as mock_context:
         # the worker will receive tasks and send messages on this mock socket
         mock_socket = mock.Mock()
@@ -76,52 +76,48 @@ def test_register_and_kill(test_worker):
 
 def test_execute_hello_world(test_worker):
     task_id = uuid.uuid1()
-    task_body = ez_pack_function(test_worker.serializer, hello_world, (), {})
+    # task_body = ez_pack_function(test_worker.serializer, hello_world, (), {})
+    task_body = test_worker.serializer.serialize((hello_world, (), {}))
+    internal_task = Task(task_id, "RAW", task_body)
+    payload = internal_task.pack()
 
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
-
-    result = test_worker.execute_task(str(task_id), task_message)
+    result = test_worker._worker_execute_task(str(task_id), payload)
     assert isinstance(result, dict)
     assert "exception" not in result
     assert isinstance(result.get("data"), str)
 
-    result_data = test_worker.deserialize(result["data"])
-    assert result_data == "hello world"
+    assert result["data"] == "hello world"
 
 
 def test_execute_failing_function(test_worker):
     task_id = uuid.uuid1()
-    task_body = ez_pack_function(test_worker.serializer, failing_function, (), {})
+    # task_body = ez_pack_function(test_worker.serializer, failing_function, (), {})
+    task_body = test_worker.serializer.serialize((failing_function, (), {}))
+    task_message = Task(task_id, "RAW", task_body).pack()
 
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
-
-    result = test_worker.execute_task(str(task_id), task_message)
+    result = test_worker._worker_execute_task(str(task_id), task_message)
     assert isinstance(result, dict)
-    assert "data" not in result
-    assert "exception" in result
-    assert isinstance(result.get("exception"), str)
+    assert "data" in result
+
+    result = messagepack.unpack(result["data"])
+    assert isinstance(result, messagepack.message_types.Result)
+    assert result.task_id == task_id
 
     # error string contains the KeyError which failed
-    assert "KeyError" in result["exception"]
-    # but it does not contain some of the funcx-constructed calling context
-    # a result of traceback traversal done when formatting
-    assert "call_user_function" not in result["exception"]
+    assert "KeyError" in result.data
+    assert result.is_error is True
 
-    assert isinstance(result.get("error_details"), tuple)
-    assert result["error_details"] == (
-        "RemoteExecutionError",
-        "An error occurred during the execution of this task",
+    assert isinstance(
+        result.error_details, messagepack.message_types.ResultErrorDetails
+    )
+    assert result.error_details.code == "RemoteExecutionError"
+    assert (
+        result.error_details.user_message
+        == "An error occurred during the execution of this task"
     )
 
 
+@pytest.mark.skip("Result size checking is done by the helper.execute_task method")
 def test_execute_function_exceeding_result_size_limit(test_worker):
     test_worker.result_size_limit = 0
     task_id = uuid.uuid1()
@@ -158,6 +154,9 @@ def sleeper(t):
     return True
 
 
+@pytest.mark.skip(
+    "Timeout is done by the helper.execute_task method and not by the worker"
+)
 def test_app_timeout(test_worker):
     task_id = uuid.uuid1()
     task_body = ez_pack_function(test_worker.serializer, sleeper, (1,), {})

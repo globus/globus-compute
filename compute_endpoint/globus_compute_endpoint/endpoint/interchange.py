@@ -141,8 +141,8 @@ class EndpointInterchange:
         self.executor: HighThroughputExecutor = self.config.executors[0]
         self._test_start = False
 
-    def start_executor(self):
-        log.info("Starting Executor")
+    def start_engine(self):
+        log.info("Starting Engine")
         self.executor.start(
             results_passthrough=self.results_passthrough,
             endpoint_id=self.endpoint_id,
@@ -252,7 +252,7 @@ class EndpointInterchange:
         # NOTE: currently we only start the executors once because
         # the current behavior is to keep them running decoupled while
         # the endpoint is waiting for reconnection
-        self.start_executor()
+        self.start_engine()
 
         while not self._kill_event.is_set():
             if self._reconnect_fail_counter >= self.reconnect_attempt_limit:

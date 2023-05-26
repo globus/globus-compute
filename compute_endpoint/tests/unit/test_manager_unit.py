@@ -3,11 +3,11 @@ import uuid
 from unittest import mock
 
 from globus_compute_common.tasks import TaskState
-from globus_compute_endpoint.executors.high_throughput.manager import Manager
-from globus_compute_endpoint.executors.high_throughput.messages import Task
+from globus_compute_endpoint.engines.high_throughput.manager import Manager
+from globus_compute_endpoint.engines.high_throughput.messages import Task
 
 
-@mock.patch("globus_compute_endpoint.executors.high_throughput.manager.zmq")
+@mock.patch("globus_compute_endpoint.engines.high_throughput.manager.zmq")
 class TestManager:
     def test_task_to_worker_status_change(self, randomstring):
         task_type = randomstring()
