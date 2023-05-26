@@ -44,7 +44,8 @@ _CONFIGS = {
         # This fn is public
         "public_hello_fn_uuid": "b0a5d1a0-2b22-4381-b899-ba73321e41e0",
         # For production tests, the target endpoint should be the tutorial_endpoint
-        "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
+        # "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
+        "endpoint_uuid": "12ac8236-6f88-4da1-a7cc-ca3d32773357",
     },
     "local": {
         # localhost; typical defaults for a helm deploy
