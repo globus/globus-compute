@@ -16,7 +16,6 @@ RUN if [ -n "$pip_conf" ]; then echo "$pip_conf" > "/etc/pip.conf"; fi
 
 RUN python -m pip install -U pip
 RUN python -m pip install kubernetes
-RUN python -m pip install --no-binary :all: --force-reinstall pyzmq
 
 RUN mkdir /opt/compute
 COPY compute_sdk /opt/compute/compute_sdk/
