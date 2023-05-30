@@ -961,7 +961,7 @@ class Interchange:
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
                         with self._task_status_delta_lock:
-                            for idx, b_message in enumerate(b_messages):
+                            for _idx, b_message in enumerate(b_messages):
                                 r = dill.loads(b_message)
                                 tid = r["task_id"]
 
@@ -977,8 +977,10 @@ class Interchange:
 
                                 mdata["tasks"][task_container].remove(tid)
 
-                                # Transfer any outstanding task statuses to the
-                                # result message
+                                # Yadu: Todo needs a fix
+                                # Each Result is now an independent message, there's no
+                                # piggybacking of status deltas
+                                """
                                 if tid in self.task_status_deltas:
                                     r["task_statuses"] += self.task_status_deltas[tid]
                                     del self.task_status_deltas[tid]
@@ -988,6 +990,7 @@ class Interchange:
                                         tid,
                                         r["task_statuses"],
                                     )
+                                """
 
                         mdata["total_tasks"] -= len(b_messages)
 
