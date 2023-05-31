@@ -641,7 +641,6 @@ class Client:
         data = FunctionRegistrationData(
             function=function,
             container_uuid=container_uuid,
-            entry_point=function_name,
             description=description,
             public=public,
             group=group,
