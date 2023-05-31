@@ -34,7 +34,6 @@ class FunctionRegistrationData:
         function_name: t.Optional[str] = None,
         function_code: t.Optional[str] = None,
         container_uuid: t.Optional[ID_PARAM_T] = None,
-        entry_point: t.Optional[str] = None,
         description: t.Optional[str] = None,
         public: bool = False,
         group: t.Optional[str] = None,
@@ -55,7 +54,6 @@ class FunctionRegistrationData:
         self.container_uuid = (
             str(container_uuid) if container_uuid is not None else container_uuid
         )
-        self.entry_point = entry_point if entry_point is not None else function_name
         self.description = description
         self.public = public
         self.group = group
@@ -65,7 +63,6 @@ class FunctionRegistrationData:
             "function_name": self.function_name,
             "function_code": self.function_code,
             "container_uuid": self.container_uuid,
-            "entry_point": self.entry_point,
             "description": self.description,
             "public": self.public,
             "group": self.group,
