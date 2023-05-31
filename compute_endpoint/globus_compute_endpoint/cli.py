@@ -505,7 +505,7 @@ def delete_endpoint(*, name: str, force: bool, yes: bool):
         )
 
     ep_dir = get_config_dir() / name
-    Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), create_info=False, force)
+    Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), create_info=False, force=force)
 
 
 def cli_run():
