@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import shlex
+import uuid
 from unittest import mock
 
 import pytest
@@ -141,6 +142,13 @@ def test_start_endpoint_existing_ep(run_line, mock_cli_state, make_endpoint_dir)
     run_line("start foo")
     mock_ep, _ = mock_cli_state
     mock_ep.start_endpoint.assert_called_once()
+
+
+@pytest.mark.parametrize("cli_cmd", ["start", "configure", "stop"])
+def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
+    ep_uuid_name = uuid.uuid4()
+    res = run_line(f"{cli_cmd} {ep_uuid_name}", assert_exit_code=2)
+    assert "UUID" in res.stderr and "not currently supported" in res.stderr
 
 
 @pytest.mark.parametrize(
