@@ -271,7 +271,7 @@ def test_start_ep_incorrect_config_py(run_line, mock_cli_state, make_endpoint_di
     assert "modified incorrectly?" in res.stderr
 
 
-@mock.patch("globus_compute_endpoint.endpoint.config.utils.read_config_py")
+@mock.patch("globus_compute_endpoint.endpoint.config.utils._read_config_py")
 def test_start_ep_config_py_override(
     read_config, run_line, mock_cli_state, make_endpoint_dir
 ):
@@ -303,7 +303,7 @@ config = Config(
     read_config.assert_called_once()
 
 
-@mock.patch("globus_compute_endpoint.endpoint.config.utils.read_config_py")
+@mock.patch("globus_compute_endpoint.endpoint.config.utils._read_config_py")
 def test_delete_endpoint(read_config, run_line, mock_cli_state):
     run_line("delete foo --yes")
     mock_ep, _ = mock_cli_state

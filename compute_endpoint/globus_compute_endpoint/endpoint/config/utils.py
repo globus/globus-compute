@@ -17,7 +17,7 @@ from .model import ConfigModel
 log = logging.getLogger(__name__)
 
 
-def read_config_py(endpoint_dir: pathlib.Path) -> Config | None:
+def _read_config_py(endpoint_dir: pathlib.Path) -> Config | None:
     conf_path = endpoint_dir / "config.py"
 
     if not conf_path.exists():
@@ -94,13 +94,13 @@ def read_config_py(endpoint_dir: pathlib.Path) -> Config | None:
         raise
 
 
-def read_config_yaml(endpoint_dir: pathlib.Path) -> dict:
+def _read_config_yaml(endpoint_dir: pathlib.Path) -> Config:
     config_path = endpoint_dir / "config.yaml"
     endpoint_name = endpoint_dir.name
 
     try:
         with open(config_path) as f:
-            return dict(yaml.safe_load(f))
+            config_dict = dict(yaml.safe_load(f))
     except FileNotFoundError as err:
         if endpoint_dir.exists():
             msg = (
@@ -124,17 +124,6 @@ def read_config_yaml(endpoint_dir: pathlib.Path) -> dict:
     except Exception as err:
         raise ClickException(f"Invalid syntax in {config_path}: {str(err)}") from err
 
-
-def get_config(endpoint_dir: pathlib.Path) -> Config:
-    config = read_config_py(endpoint_dir)
-    if config:
-        # Use config.py if present
-        # Note that if config.py exists but is invalid,
-        # an exception will be raised
-        return config
-
-    config_dict = read_config_yaml(endpoint_dir)
-
     try:
         config_schema = ConfigModel(**config_dict)
     except ValidationError as err:
@@ -148,6 +137,17 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
         raise ClickException(str(err)) from err
 
     return config
+
+
+def get_config(endpoint_dir: pathlib.Path) -> Config:
+    config = _read_config_py(endpoint_dir)
+    if config:
+        # Use config.py if present
+        # Note that if config.py exists but is invalid,
+        # an exception will be raised
+        return config
+
+    return _read_config_yaml(endpoint_dir)
 
 
 def serialize_config(config: Config) -> dict:
