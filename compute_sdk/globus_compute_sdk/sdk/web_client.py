@@ -66,6 +66,7 @@ class FunctionRegistrationData:
             "description": self.description,
             "public": self.public,
             "group": self.group,
+            "entry_point": None,  # temporary fix for smoke tests
         }
 
     def __str__(self):
