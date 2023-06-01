@@ -517,7 +517,7 @@ class Endpoint:
         endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
         if endpoint_id is None:
             log.warning(
-                f"Endpoint named <{ep_name}>'s configuration not found, it "
+                f"Configuration for endpoint <{ep_name}> could not be found, it "
                 "might not have been initialized locally"
             )
             if not force:
