@@ -1,8 +1,10 @@
 from abc import ABCMeta, abstractmethod
 
 
-class SerializeBase(metaclass=ABCMeta):
-    """Shared functionality for all serializer implementations"""
+class SerializationStrategy(metaclass=ABCMeta):
+    """A SerializationStrategy is in charge of converting function source code or
+    arguments into string data and back again.
+    """
 
     @property
     @abstractmethod

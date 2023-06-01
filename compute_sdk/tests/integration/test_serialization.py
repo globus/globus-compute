@@ -3,7 +3,7 @@ import sys
 
 import globus_compute_sdk.serialize.concretes as concretes
 import pytest
-from globus_compute_sdk.serialize.base import SerializeBase, SerializerError
+from globus_compute_sdk.serialize.base import SerializationStrategy, SerializerError
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 
 # length of serializer identifier
@@ -266,7 +266,7 @@ def test_serialize_deserialize_combined():
     code_deserial = single_code.deserialize(code_serialized_func)
     assert 14 == code_deserial(4, 6, 3)
 
-    # assumes DillCodeSource is first method that CombinedSerializer tries
+    # assumes DillCodeSource is first strategy that CombinedSerializer tries
     deserialized = combined.deserialize(combined_serialized_func)
     with pytest.raises(NameError):
         _ = deserialized(3, 5, 2)
@@ -280,28 +280,28 @@ def test_compute_serializer_defaults():
 
     assert (
         serializer.serialize("something non-callable")[:ID_LEN]
-        == concretes.DEFAULT_METHOD_DATA.identifier
+        == concretes.DEFAULT_STRATEGY_DATA.identifier
     )
 
     assert (
-        serializer.serialize(foo)[:ID_LEN] == concretes.DEFAULT_METHOD_CODE.identifier
+        serializer.serialize(foo)[:ID_LEN] == concretes.DEFAULT_STRATEGY_CODE.identifier
     )
 
 
-@pytest.mark.parametrize("method", concretes.SELECTABLE_SERIALIZERS)
-def test_selectable_serialization(method):
-    if method._for_code:
-        serializer = ComputeSerializer(method_code=method())
+@pytest.mark.parametrize("strategy", concretes.SELECTABLE_STRATEGIES)
+def test_selectable_serialization(strategy):
+    if strategy._for_code:
+        serializer = ComputeSerializer(strategy_code=strategy())
         data = foo
     else:
-        serializer = ComputeSerializer(method_data=method())
+        serializer = ComputeSerializer(strategy_data=strategy())
         data = "foo"
     ser_data = serializer.serialize(data)
-    assert ser_data[:ID_LEN] == method.identifier
+    assert ser_data[:ID_LEN] == strategy.identifier
 
 
-def test_serializer_errors_on_unknown_method():
-    class NewMethod(SerializeBase):
+def test_serializer_errors_on_unknown_strategy():
+    class NewStrategy(SerializationStrategy):
         identifier = "aa\n"
 
         def serialize(self, data):
@@ -310,10 +310,10 @@ def test_serializer_errors_on_unknown_method():
         def deserialize(self, payload):
             pass
 
-    method = NewMethod()
+    strategy = NewStrategy()
 
     with pytest.raises(SerializerError):
-        ComputeSerializer(method_code=method)
+        ComputeSerializer(strategy_code=strategy)
 
     with pytest.raises(SerializerError):
-        ComputeSerializer(method_data=method)
+        ComputeSerializer(strategy_data=strategy)
