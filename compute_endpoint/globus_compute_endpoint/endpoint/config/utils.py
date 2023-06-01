@@ -17,7 +17,7 @@ from .model import ConfigModel
 log = logging.getLogger(__name__)
 
 
-def _read_config_py(endpoint_dir: pathlib.Path) -> Config | None:
+def _load_config_py(endpoint_dir: pathlib.Path) -> Config | None:
     conf_path = endpoint_dir / "config.py"
 
     if not conf_path.exists():
@@ -94,7 +94,7 @@ def _read_config_py(endpoint_dir: pathlib.Path) -> Config | None:
         raise
 
 
-def _read_config_yaml(endpoint_dir: pathlib.Path) -> Config:
+def _load_config_yaml(endpoint_dir: pathlib.Path) -> Config:
     config_path = endpoint_dir / "config.yaml"
     endpoint_name = endpoint_dir.name
 
@@ -140,14 +140,14 @@ def _read_config_yaml(endpoint_dir: pathlib.Path) -> Config:
 
 
 def get_config(endpoint_dir: pathlib.Path) -> Config:
-    config = _read_config_py(endpoint_dir)
+    config = _load_config_py(endpoint_dir)
     if config:
         # Use config.py if present
         # Note that if config.py exists but is invalid,
         # an exception will be raised
         return config
 
-    return _read_config_yaml(endpoint_dir)
+    return _load_config_yaml(endpoint_dir)
 
 
 def serialize_config(config: Config) -> dict:
