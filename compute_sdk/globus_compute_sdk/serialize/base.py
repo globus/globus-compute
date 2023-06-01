@@ -35,7 +35,7 @@ class SerializationStrategy(metaclass=ABCMeta):
         raise NotImplementedError("Concrete class did not implement deserialize")
 
 
-class SerializerError(Exception):
+class SerializationError(Exception):
     def __init__(self, reason):
         self.reason = reason
 
