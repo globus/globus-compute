@@ -130,13 +130,13 @@ class Endpoint:
         )
         config_path = Endpoint._config_file_path(conf_dir)
         if multi_tenant:
-            print(f"Created multi-tenant profile for <{ep_name}>")
+            print(f"Created multi-tenant profile for endpoint named <{ep_name}>")
         else:
-            print(f"Created profile for <{ep_name}>")
+            print(f"Created profile for endpoint named <{ep_name}>")
         print(
-            f"\n    Configuration file: {config_path}\n"
+            f"\n\tConfiguration file: {config_path}\n"
             "\nUse the `start` subcommand to run it:\n"
-            f"\n    $ globus-compute-endpoint start {ep_name}"
+            f"\n\t$ globus-compute-endpoint start {ep_name}"
         )
 
     @staticmethod
@@ -516,7 +516,10 @@ class Endpoint:
 
         endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
         if endpoint_id is None:
-            log.warning(f"Endpoint <{ep_name}> could not be located")
+            log.warning(
+                f"Configuration for endpoint <{ep_name}> could not be found, it "
+                "might not have been initialized locally"
+            )
             if not force:
                 exit(-1)
 

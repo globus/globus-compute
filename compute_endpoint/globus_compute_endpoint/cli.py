@@ -121,7 +121,23 @@ def start_options(f):
     return f
 
 
+def verify_not_uuid(ctx, param, value):
+    try:
+        uuid.UUID(value)
+        raise click.BadParameter(
+            "Specifying an UUID for endpoint commands is not currently supported"
+        )
+    except ValueError:
+        return value
+
+
 def name_arg(f):
+    return click.argument(
+        "name", required=False, callback=verify_not_uuid, default="default"
+    )(f)
+
+
+def name_arg_allow_uuid(f):
     return click.argument("name", required=False, default="default")(f)
 
 
@@ -470,7 +486,7 @@ def list_endpoints():
 
 
 @app.command("delete")
-@name_arg
+@name_arg_allow_uuid
 @click.option(
     "--force",
     default=False,
@@ -485,11 +501,11 @@ def delete_endpoint(*, name: str, force: bool, yes: bool):
     """Deletes an endpoint and its config."""
     if not yes:
         click.confirm(
-            f"Are you sure you want to delete the endpoint <{name}>?", abort=True
+            f"Are you sure you want to delete the endpoint named <{name}>?", abort=True
         )
 
     ep_dir = get_config_dir() / name
-    Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), force)
+    Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), force=force)
 
 
 def cli_run():
