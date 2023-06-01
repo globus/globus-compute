@@ -1,7 +1,7 @@
-from globus_compute_sdk.serialize.base import SerializeBase
+from globus_compute_sdk.serialize.base import SerializationStrategy
 from globus_compute_sdk.serialize.concretes import (
-    DEFAULT_METHOD_CODE,
-    DEFAULT_METHOD_DATA,
+    DEFAULT_STRATEGY_CODE,
+    DEFAULT_STRATEGY_DATA,
     CombinedCode,
     DillCode,
     DillCodeSource,
@@ -12,10 +12,10 @@ from globus_compute_sdk.serialize.facade import ComputeSerializer
 
 __all__ = [
     "ComputeSerializer",
-    "SerializeBase",
-    "DEFAULT_METHOD_CODE",
-    "DEFAULT_METHOD_DATA",
-    # Selectable serializers:
+    "SerializationStrategy",
+    "DEFAULT_STRATEGY_CODE",
+    "DEFAULT_STRATEGY_DATA",
+    # Selectable strategies:
     "CombinedCode",
     "DillCode",
     "DillCodeSource",

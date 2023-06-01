@@ -21,7 +21,7 @@ from globus_compute_sdk.sdk._environments import (
 from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
 from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
-from globus_compute_sdk.serialize import ComputeSerializer, SerializeBase
+from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
 from globus_compute_sdk.version import __version__, compare_versions
 
 from .batch import Batch
@@ -62,8 +62,8 @@ class Client:
         search_authorizer: t.Any = None,
         fx_authorizer: t.Any = None,
         *,
-        code_serializer_method: SerializeBase | None = None,
-        data_serializer_method: SerializeBase | None = None,
+        code_serialization_strategy: SerializationStrategy | None = None,
+        data_serialization_strategy: SerializationStrategy | None = None,
         login_manager: LoginManagerProtocol | None = None,
         **kwargs,
     ):
@@ -123,13 +123,13 @@ class Client:
             session or to reestablish Executor futures.
             Default: None (will be auto generated)
 
-        code_serializer_method: SerializeBase
-            Serializer method to use when serializing function code. If None,
-            globus_compute_sdk.serialize.DEFAULT_METHOD_CODE will be used.
+        code_serialization_strategy: SerializationStrategy
+            Strategy to use when serializing function code. If None,
+            globus_compute_sdk.serialize.DEFAULT_STRATEGY_CODE will be used.
 
-        data_serializer_method: SerializeBase
-            Serializer method to use when serializing function arguments. If None,
-            globus_compute_sdk.serialize.DEFAULT_METHOD_DATA will be used.
+        data_serialization_strategy: SerializationStrategy
+            Strategy to use when serializing function arguments. If None,
+            globus_compute_sdk.serialize.DEFAULT_STRATEGY_DATA will be used.
 
         Keyword arguments are the same as for BaseClient.
 
@@ -173,8 +173,8 @@ class Client:
             base_url=funcx_service_address
         )
         self.fx_serializer = ComputeSerializer(
-            method_code=code_serializer_method,
-            method_data=data_serializer_method,
+            strategy_code=code_serialization_strategy,
+            strategy_data=data_serialization_strategy,
         )
 
         self.funcx_service_address = funcx_service_address

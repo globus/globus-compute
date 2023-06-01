@@ -8,12 +8,15 @@ import typing as t
 from collections import OrderedDict
 
 import dill
-from globus_compute_sdk.serialize.base import DeserializationError, SerializeBase
+from globus_compute_sdk.serialize.base import (
+    DeserializationError,
+    SerializationStrategy,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class DillDataBase64(SerializeBase):
+class DillDataBase64(SerializationStrategy):
     identifier = "00\n"
     _for_code = False
 
@@ -30,8 +33,8 @@ class DillDataBase64(SerializeBase):
         return data
 
 
-class DillCodeSource(SerializeBase):
-    """This method uses dill's getsource method to extract the function body and
+class DillCodeSource(SerializationStrategy):
+    """This strategy uses dill's getsource method to extract the function body and
     then serializes it.
 
     Code from interpreter/main        : Yes
@@ -59,8 +62,8 @@ class DillCodeSource(SerializeBase):
         return locals()[name]
 
 
-class DillCodeTextInspect(SerializeBase):
-    """This method uses the inspect library to extract the function body and
+class DillCodeTextInspect(SerializationStrategy):
+    """This strategy uses the inspect library to extract the function body and
     then serializes it.
 
     Code from interpreter/main        : ?
@@ -88,7 +91,7 @@ class DillCodeTextInspect(SerializeBase):
         return locals()[name]
 
 
-class PickleCode(SerializeBase):
+class PickleCode(SerializationStrategy):
     """
     Deprecated in favor of just using dill, but deserialization is
     supported for legacy functions
@@ -115,8 +118,8 @@ class PickleCode(SerializeBase):
         return data
 
 
-class DillCode(SerializeBase):
-    """This method uses dill to directly serialize a function.
+class DillCode(SerializationStrategy):
+    """This strategy uses dill to directly serialize a function.
 
     Code from interpreter/main        : No
     Code from notebooks               : Yes
@@ -140,10 +143,10 @@ class DillCode(SerializeBase):
         return function
 
 
-class CombinedCode(SerializeBase):
-    """This method uses multiple methods to serialize a function
+class CombinedCode(SerializationStrategy):
+    """This strategy uses multiple strategies to serialize a function
 
-    # These should be a superset of the methods
+    # These should be a superset of the strategies
     Code from interpreter/main        : Yes
     Code from notebooks               : Yes
     Works with mismatching py versions: Yes
@@ -153,15 +156,15 @@ class CombinedCode(SerializeBase):
     identifier = "10\n"
     _for_code = True
 
-    # Functions are serialized using the following methods and the resulting encoded
-    # versions are stored as chunks.  Allows redundancy if one of the methods fails on
-    # deserialization (undetectable during previous serialization attempts).
+    # Functions are serialized using the following strategies and the resulting encoded
+    # versions are stored as chunks.  Allows redundancy if one of the strategies fails
+    # on deserialization (undetectable during previous serialization attempts).
     # Note that, of the 3 categories of failures:
     #   1) Failure on serialization
     #   2) Failure on deserialization
-    #   3) Failure on running the method
+    #   3) Failure on running the strategy
     # We have agreed that we can only assist with 1) and 2).
-    _chunk_serializers = OrderedDict(
+    _chunk_strategies = OrderedDict(
         [
             (DillCodeSource.identifier, DillCodeSource),
             (DillCode.identifier, DillCode),
@@ -173,7 +176,7 @@ class CombinedCode(SerializeBase):
 
     def get_multiple_payloads(self, payload: str) -> tuple[tuple[str, str], ...]:
         parts: list[str] = self.chomp(payload).split(CombinedCode._separator)
-        assert len(parts) == 2 * len(CombinedCode._chunk_serializers)
+        assert len(parts) == 2 * len(CombinedCode._chunk_strategies)
         ai = iter(parts)
 
         # ie. ((04\n', 'gACQ...'), ('01\n', 'sAAbk2...'), ...)
@@ -181,9 +184,9 @@ class CombinedCode(SerializeBase):
 
     def serialize(self, data) -> str:
         chunks = []
-        for id, cls in CombinedCode._chunk_serializers.items():
-            method = cls()
-            serialized = method.serialize(data)
+        for id, cls in CombinedCode._chunk_strategies.items():
+            strategy = cls()
+            serialized = strategy.serialize(data)
             id_length = len(id)
             chunks.append(serialized[:id_length])
             chunks.append(serialized[id_length:])
@@ -191,22 +194,22 @@ class CombinedCode(SerializeBase):
 
     def deserialize(self, payload: str, variation: int = 0):
         """
-        If a variation is specified, try that method/payload if
+        If a variation is specified, try that strategy/payload if
         present.
         If variation is not specified, loop and return the first
         one that deserializes successfully.  If none works, raise
 
-        Note variation is 1-indexed (ie. 2 means 2nd method), not
-        the .identifier/serial_id of the method like 04\n or 01\n
+        Note variation is 1-indexed (ie. 2 means 2nd strategy), not
+        the .identifier/serial_id of the strategy like 04\n or 01\n
         """
         count = 0
         for serial_id, encoded_func in self.get_multiple_payloads(payload):
             count += 1
             if variation == 0 or count == variation:
-                if serial_id in CombinedCode._chunk_serializers:
-                    deserialize_method = CombinedCode._chunk_serializers[serial_id]()
+                if serial_id in CombinedCode._chunk_strategies:
+                    strategy = CombinedCode._chunk_strategies[serial_id]()
                     try:
-                        return deserialize_method.deserialize(serial_id + encoded_func)
+                        return strategy.deserialize(serial_id + encoded_func)
                     except Exception:
                         if variation > 0:
                             # Only raise if this variation was specified and fails
@@ -219,7 +222,7 @@ class CombinedCode(SerializeBase):
         raise DeserializationError(f"Deserialization failed after {count} tries")
 
 
-METHODS_MAP: dict[str, t.Type[SerializeBase]] = {
+STRATEGIES_MAP: dict[str, t.Type[SerializationStrategy]] = {
     DillDataBase64.identifier: DillDataBase64,
     DillCodeSource.identifier: DillCodeSource,
     DillCode.identifier: DillCode,
@@ -228,7 +231,7 @@ METHODS_MAP: dict[str, t.Type[SerializeBase]] = {
     CombinedCode.identifier: CombinedCode,
 }
 
-SELECTABLE_SERIALIZERS = [
+SELECTABLE_STRATEGIES = [
     DillDataBase64,
     DillCodeSource,
     DillCode,
@@ -236,5 +239,5 @@ SELECTABLE_SERIALIZERS = [
     CombinedCode,
 ]
 
-DEFAULT_METHOD_CODE = DillCode()
-DEFAULT_METHOD_DATA = DillDataBase64()
+DEFAULT_STRATEGY_CODE = DillCode()
+DEFAULT_STRATEGY_DATA = DillDataBase64()

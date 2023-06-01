@@ -174,7 +174,7 @@ def compute_test_config(pytestconfig, compute_test_config_name):
     if api_client_id and api_client_secret:
         _add_args_for_client_creds_login(api_client_id, api_client_secret, client_args)
 
-    client_args["code_serializer_method"] = DillCodeSource()
+    client_args["code_serialization_strategy"] = DillCodeSource()
 
     return config
 
