@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import typing as t
 import uuid
@@ -14,6 +15,7 @@ from globus_compute_endpoint.exception_handling import (
 from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
 from globus_compute_sdk.errors import MaxResultSizeExceeded
 from globus_compute_sdk.serialize import ComputeSerializer
+from parsl.app.python import timeout
 
 log = logging.getLogger(__name__)
 
@@ -118,7 +120,12 @@ def _call_user_function(
     -------
     Returns serialized result or throws exception.
     """
+    GC_TASK_TIMEOUT = max(0.0, float(os.environ.get("GC_TASK_TIMEOUT", 0.0)))
     f, args, kwargs = serializer.unpack_and_deserialize(task_buffer)
+    if GC_TASK_TIMEOUT > 0.0:
+        log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
+        f = timeout(f, GC_TASK_TIMEOUT)
+
     result_data = f(*args, **kwargs)
     serialized_data = serializer.serialize(result_data)
 

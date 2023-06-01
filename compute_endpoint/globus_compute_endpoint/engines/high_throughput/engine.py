@@ -18,7 +18,6 @@ import uuid
 from concurrent.futures import Future
 from multiprocessing import Process
 
-import daemon
 import dill
 from globus_compute_common import messagepack
 from globus_compute_endpoint.endpoint.messages_compat import convert_ep_status_report
@@ -33,7 +32,6 @@ from globus_compute_endpoint.engines.high_throughput.messages import (
     Task,
     TaskCancel,
 )
-from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.strategies.simple import SimpleStrategy
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.dataflow.error import ConfigurationError
@@ -921,20 +919,3 @@ class HTEXFuture(concurrent.futures.Future):
         Bool
         """
         return self.executor._cancel(self)
-
-
-def executor_starter(htex, logdir, endpoint_id):
-    stdout = open(os.path.join(logdir, f"executor.{endpoint_id}.stdout"), "w")
-    stderr = open(os.path.join(logdir, f"executor.{endpoint_id}.stderr"), "w")
-
-    logdir = os.path.abspath(logdir)
-    with daemon.DaemonContext(stdout=stdout, stderr=stderr):
-        print("cwd: ", os.getcwd())
-        setup_logging(
-            logfile=os.path.join(logdir, f"executor.{endpoint_id}.log"),
-            console_enabled=False,
-        )
-        htex.start()
-
-    stdout.close()
-    stderr.close()
