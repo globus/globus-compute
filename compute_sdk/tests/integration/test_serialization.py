@@ -3,7 +3,7 @@ import sys
 
 import globus_compute_sdk.serialize.concretes as concretes
 import pytest
-from globus_compute_sdk.serialize.base import SerializationStrategy, SerializerError
+from globus_compute_sdk.serialize.base import SerializationError, SerializationStrategy
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 
 # length of serializer identifier
@@ -312,8 +312,8 @@ def test_serializer_errors_on_unknown_strategy():
 
     strategy = NewStrategy()
 
-    with pytest.raises(SerializerError):
+    with pytest.raises(SerializationError):
         ComputeSerializer(strategy_code=strategy)
 
-    with pytest.raises(SerializerError):
+    with pytest.raises(SerializationError):
         ComputeSerializer(strategy_data=strategy)

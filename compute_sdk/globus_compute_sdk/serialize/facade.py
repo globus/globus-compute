@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from globus_compute_sdk.serialize.base import SerializationStrategy, SerializerError
+from globus_compute_sdk.serialize.base import SerializationError, SerializationStrategy
 from globus_compute_sdk.serialize.concretes import (
     DEFAULT_STRATEGY_CODE,
     DEFAULT_STRATEGY_DATA,
@@ -25,7 +25,7 @@ class ComputeSerializer:
 
         def validate(strategy: SerializationStrategy) -> SerializationStrategy:
             if type(strategy) not in SELECTABLE_STRATEGIES:
-                raise SerializerError(
+                raise SerializationError(
                     f"{strategy} is not a known serialization strategy "
                     f"(must be one of {SELECTABLE_STRATEGIES})"
                 )
@@ -58,7 +58,7 @@ class ComputeSerializer:
             return strategy.serialize(data)
         except Exception as e:
             err_msg = f"{stype} Serialization strategy {strategy} failed"
-            raise SerializerError(err_msg) from e
+            raise SerializationError(err_msg) from e
 
     def deserialize(self, payload):
         """
@@ -72,7 +72,7 @@ class ComputeSerializer:
         strategy = self.strategies.get(header)
 
         if not strategy:
-            raise SerializerError(f"Invalid header: {header} in data payload")
+            raise SerializationError(f"Invalid header: {header} in data payload")
 
         return strategy.deserialize(payload)
 
