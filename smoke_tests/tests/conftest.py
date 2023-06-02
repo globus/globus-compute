@@ -9,7 +9,7 @@ import time
 import pytest
 from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.web_client import WebClient
-from globus_compute_sdk.serialize import DillCodeSource
+from globus_compute_sdk.serialize.concretes import DillCodeSource
 from globus_sdk import AccessTokenAuthorizer, AuthClient, ConfidentialAppAuthClient
 
 # the non-tutorial endpoint will be required, with the following priority order for
