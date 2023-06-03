@@ -36,6 +36,7 @@ REQUIRES = [
     "parsl==2023.03.27",
     "pika>=1.2.0",
     "setproctitle>=1.3.2,<1.4",
+    "pyyaml>=6.0,<7.0",
 ]
 
 TEST_REQUIRES = [
