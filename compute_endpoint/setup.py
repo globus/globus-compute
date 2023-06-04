@@ -37,6 +37,7 @@ REQUIRES = [
     "pika>=1.2.0",
     "setproctitle>=1.3.2,<1.4",
     "pyyaml>=6.0,<7.0",
+    "jinja2>=3.1.2,<3.2",
 ]
 
 TEST_REQUIRES = [

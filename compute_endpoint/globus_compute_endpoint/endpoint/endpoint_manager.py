@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
 import os
@@ -20,7 +21,10 @@ import globus_compute_sdk as gc
 import setproctitle
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
-from globus_compute_endpoint.endpoint.config.utils import serialize_config
+from globus_compute_endpoint.endpoint.config.utils import (
+    render_config_user_template,
+    serialize_config,
+)
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
     CommandQueueSubscriber,
@@ -48,6 +52,7 @@ class EndpointManager:
     ):
         log.info("Endpoint Manager initialization")
 
+        self.conf_dir = conf_dir
         self._reload_requested = False
         self._time_to_stop = False
         self._kill_event = threading.Event()
@@ -295,6 +300,7 @@ class EndpointManager:
 
                 msg = json.loads(body)
                 command = msg.get("command")
+                user_opts = msg.get("user_opts", {})
                 command_args = msg.get("args", [])
                 command_kwargs = msg.get("kwargs", {})
             except Exception as e:
@@ -337,11 +343,11 @@ class EndpointManager:
                 if not (command and valid_method_name_re.match(command)):
                     raise InvalidCommandError(f"Unknown or invalid command: {command}")
 
-                command_func = getattr(self.__class__, command, None)
+                command_func = getattr(self, command, None)
                 if not command_func:
                     raise InvalidCommandError(f"Unknown or invalid command: {command}")
 
-                command_func(self._child_args, local_user, command_args, command_kwargs)
+                command_func(local_user, user_opts, command_args, command_kwargs)
                 log.info(
                     f"Command process successfully forked for '{globus_username}'"
                     f" ('{globus_uuid}')."
@@ -358,13 +364,15 @@ class EndpointManager:
             finally:
                 self._command.ack(d_tag)
 
-    @staticmethod
     def cmd_start_endpoint(
-        child_args: dict[int, tuple[int, int, str, str]],
+        self,
         local_username: str,
+        user_opts: dict | None,
         args: list[str] | None,
         kwargs: dict | None,
     ):
+        if not user_opts:
+            user_opts = {}
         if not args:
             args = []
         if not kwargs:
@@ -394,7 +402,7 @@ class EndpointManager:
 
         if pid > 0:
             proc_args_s = f"({uname}, {ep_name}) {' '.join(proc_args)}"
-            child_args[pid] = (uid, gid, local_username, proc_args_s)
+            self._child_args[pid] = (uid, gid, local_username, proc_args_s)
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
 
@@ -453,7 +461,12 @@ class EndpointManager:
             startup_proc_title = f"Endpoint starting up for {uname} [{args_title}]"
             setproctitle.setproctitle(startup_proc_title)
 
-            amqp_creds = json.dumps(kwargs.get("amqp_creds"))
+            stdin_data_dict = {
+                "amqp_creds": kwargs.get("amqp_creds"),
+                "config": render_config_user_template(self.conf_dir, user_opts),
+            }
+            stdin_data = json.dumps(stdin_data_dict)
+            exit_code += 1
 
             # Reminder: this is *os*.open, not *open*.  Descriptors will not be closed
             # unless we explicitly do so, so `null_fd =` in loop will work.
@@ -465,6 +478,18 @@ class EndpointManager:
 
             log.debug("Setting up process stdin")
             read_handle, write_handle = os.pipe()
+
+            # fcntl.F_GETPIPE_SZ is not available in Python versions less than 3.10
+            F_GETPIPE_SZ = 1032
+            # 256 - Allow some head room for multiple kernel-specific factors
+            max_buf_size = fcntl.fcntl(write_handle, F_GETPIPE_SZ) - 256
+            stdin_data_size = len(stdin_data)
+            if stdin_data_size > max_buf_size:
+                raise ValueError(
+                    f"Unable to write {stdin_data_size} bytes of data to stdin; "
+                    f"the maximum allowed is {max_buf_size} bytes"
+                )
+
             exit_code += 1
             if os.dup2(read_handle, 0) != 0:  # close old stdin, use read_handle
                 raise OSError("Unable to close stdin")
@@ -483,10 +508,10 @@ class EndpointManager:
             # exit_code as a last-ditch attempt at sharing "what went wrong where" to
             # the parent process.
             exit_code += 1
-            log.debug("Writing credentials")
-            with os.fdopen(write_handle, "w") as cred_pipe:
+            log.debug("Writing credentials and config to stdin")
+            with os.fdopen(write_handle, "w") as stdin_pipe:
                 # intentional side effect: close handle
-                cred_pipe.write(amqp_creds)
+                stdin_pipe.write(stdin_data)
 
             exit_code += 1
             _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)

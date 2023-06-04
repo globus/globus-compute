@@ -10,7 +10,7 @@ import uuid
 
 import click
 from click import ClickException
-from globus_compute_endpoint.endpoint.config.utils import get_config
+from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.logging_config import setup_logging
@@ -397,21 +397,35 @@ def _do_start_endpoint(
         )
 
     reg_info = {}
+    config_str = None
     if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
         try:
             stdin_data = json.loads(sys.stdin.read())
+
             if not isinstance(stdin_data, dict):
                 type_name = stdin_data.__class__.__name__
                 raise ValueError(
-                    "Expecting JSON dictionary with endpoint registration info; got"
+                    "Expecting JSON dictionary with endpoint info; got"
                     f" {type_name} instead"
                 )
-            reg_info = stdin_data
+
+            reg_info = stdin_data.get("amqp_creds", {})
+            config_str = stdin_data.get("config", None)
+
         except Exception as e:
             exc_type = e.__class__.__name__
-            log.debug("Invalid registration info on stdin -- (%s) %s", exc_type, e)
+            log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
 
-    ep_config = get_config(ep_dir)
+    if config_str is not None:
+        ep_config = load_config_yaml(config_str)
+    else:
+        ep_config = get_config(ep_dir)
+
+    if die_with_parent and ep_config.detach_endpoint:
+        # The endpoint cannot die with it's parent if it
+        # doesn't have one :)
+        ep_config.detach_endpoint = False
+
     if ep_config.multi_tenant:
         epm = EndpointManager(ep_dir, endpoint_uuid, ep_config)
         epm.start()

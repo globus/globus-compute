@@ -1,3 +1,4 @@
+import fcntl
 import getpass
 import json
 import os
@@ -34,6 +35,22 @@ def mock_conf():
     yield Config(executors=[])
 
 
+@pytest.fixture
+def user_conf_template(conf_dir):
+    template = conf_dir / "config_user.yaml"
+    template.write_text(
+        """
+heartbeat_period: {{ heartbeat }}
+executor:
+    provider:
+        type: LocalProvider
+        init_blocks: 1
+        min_blocks: 0
+        max_blocks: 1
+        """
+    )
+
+
 @pytest.fixture(autouse=True)
 def mock_setproctitle(mocker, randomstring):
     orig_proc_title = randomstring()
@@ -57,6 +74,10 @@ def mock_client(mocker):
 @pytest.fixture
 def epmanager(mocker, conf_dir, mock_conf, mock_client):
     ep_uuid, mock_gcc = mock_client
+
+    # Needed to mock the pipe buffer size
+    mocker.patch.object(fcntl, "fcntl", return_value=512)
+
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     em._command = mocker.Mock()
 
@@ -78,7 +99,7 @@ def register_endpoint_failure_response():
 
 
 @pytest.fixture
-def successful_exec(mocker, epmanager):
+def successful_exec(mocker, epmanager, user_conf_template):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     conf_dir, mock_conf, mock_client, em = epmanager
 
@@ -101,6 +122,7 @@ def successful_exec(mocker, epmanager):
         "globus_uuid": "a",
         "globus_username": "a",
         "command": "cmd_start_endpoint",
+        "user_opts": {"heartbeat": 10},
         "kwargs": {"name": "some_ep_name"},
     }
     queue_item = (1, props, json.dumps(pld).encode())
@@ -640,7 +662,12 @@ def test_handles_invalid_command_gracefully(mocker, epmanager, cmd_name):
         expiration="10000",
     )
 
-    pld = {"globus_uuid": "a", "globus_username": "a", "command": cmd_name}
+    pld = {
+        "globus_uuid": "a",
+        "globus_username": "a",
+        "command": cmd_name,
+        "user_opts": {"heartbeat": 10},
+    }
     queue_item = (1, props, json.dumps(pld).encode())
 
     em._command_queue = mocker.Mock()
@@ -670,7 +697,12 @@ def test_handles_failed_command(mocker, epmanager):
         expiration="10000",
     )
 
-    pld = {"globus_uuid": "a", "globus_username": "a", "command": "cmd_start_endpoint"}
+    pld = {
+        "globus_uuid": "a",
+        "globus_username": "a",
+        "command": "cmd_start_endpoint",
+        "user_opts": {"heartbeat": 10},
+    }
     queue_item = (1, props, json.dumps(pld).encode())
 
     em._command_queue = mocker.Mock()
@@ -709,7 +741,7 @@ def test_start_endpoint_children_die_with_parent(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 85, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_os.execvpe.call_args
     assert a[0] == "globus-compute-endpoint", "Sanity check"
     assert k["args"][0] == a[0], "Expect transparency for admin"
@@ -721,7 +753,7 @@ def test_start_endpoint_children_have_own_session(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 85, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
     assert mock_os.setsid.called
 
 
@@ -730,7 +762,7 @@ def test_start_endpoint_privileges_dropped(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 85, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
 
     expected_user = getpass.getuser()
     expected_gid = os.getgid()  # "cheating"; exploit knowledge of test setup
@@ -754,7 +786,7 @@ def test_default_to_secure_umask(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 85, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
 
     assert mock_os.umask.called
     umask = mock_os.umask.call_args[0][0]
@@ -766,7 +798,7 @@ def test_start_from_user_dir(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 85, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
 
     ud = mock_os.chdir.call_args[0][0]
     assert ud == str(pathlib.Path.home())  # "cheating"; exploit knowledge of test setup
@@ -777,7 +809,7 @@ def test_all_files_closed(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 85, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
 
     _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)
     assert mock_os.closerange.called
@@ -789,3 +821,29 @@ def test_all_files_closed(successful_exec):
     assert mock_os.dup2.call_count == 3, "Expect to close 3 std* files"
     closed = [std_to_close for (_fd, std_to_close), _ in mock_os.dup2.call_args_list]
     assert closed == [0, 1, 2]
+
+
+@pytest.mark.parametrize("conf_size", [10, 222, 223, 300])
+def test_pipe_size_limit(mocker, successful_exec, conf_size):
+    _mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+
+    conf_str = "$" * conf_size
+
+    # Add 34 bytes for dict keys, etc.
+    stdin_data_size = conf_size + 34
+    pipe_buffer_size = 512
+    # Subtract 256 for hard-coded buffer in-code
+    is_valid = pipe_buffer_size - 256 - stdin_data_size >= 0
+
+    mocker.patch.object(fcntl, "fcntl", return_value=pipe_buffer_size)
+    mocker.patch(f"{_MOCK_BASE}render_config_user_template", return_value=conf_str)
+
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    if is_valid:
+        assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+    else:
+        assert pyexc.value.code < 86
+        assert f"{stdin_data_size} bytes" in mock_log.error.call_args[0][0]

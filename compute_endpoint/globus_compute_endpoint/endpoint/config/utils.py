@@ -17,9 +17,7 @@ from .model import ConfigModel
 log = logging.getLogger(__name__)
 
 
-def _load_config_py(endpoint_dir: pathlib.Path) -> Config | None:
-    conf_path = endpoint_dir / "config.py"
-
+def _load_config_py(conf_path: pathlib.Path) -> Config | None:
     if not conf_path.exists():
         return None
 
@@ -94,13 +92,13 @@ def _load_config_py(endpoint_dir: pathlib.Path) -> Config | None:
         raise
 
 
-def _load_config_yaml(endpoint_dir: pathlib.Path) -> Config:
-    config_path = endpoint_dir / "config.yaml"
+def _read_config_yaml(config_path: pathlib.Path) -> str:
+    endpoint_dir = config_path.parent
     endpoint_name = endpoint_dir.name
 
     try:
         with open(config_path) as f:
-            config_dict = dict(yaml.safe_load(f))
+            return f.read()
     except FileNotFoundError as err:
         if endpoint_dir.exists():
             msg = (
@@ -121,8 +119,13 @@ def _load_config_yaml(endpoint_dir: pathlib.Path) -> Config:
                 "\n3. Start the endpoint\n"
             )
         raise ClickException(msg) from err
+
+
+def load_config_yaml(config_str: str) -> Config:
+    try:
+        config_dict = dict(yaml.safe_load(config_str))
     except Exception as err:
-        raise ClickException(f"Invalid syntax in {config_path}: {str(err)}") from err
+        raise ClickException(f"Invalid config syntax: {str(err)}") from err
 
     try:
         config_schema = ConfigModel(**config_dict)
@@ -140,14 +143,36 @@ def _load_config_yaml(endpoint_dir: pathlib.Path) -> Config:
 
 
 def get_config(endpoint_dir: pathlib.Path) -> Config:
-    config = _load_config_py(endpoint_dir)
+    config_py_path = endpoint_dir / "config.py"
+    config_yaml_path = endpoint_dir / "config.yaml"
+
+    config = _load_config_py(config_py_path)
     if config:
         # Use config.py if present
         # Note that if config.py exists but is invalid,
         # an exception will be raised
         return config
 
-    return _load_config_yaml(endpoint_dir)
+    config_str = _read_config_yaml(config_yaml_path)
+    config = load_config_yaml(config_str)
+    return config
+
+
+def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> str:
+    # Only load package when called by EP manager
+    import jinja2
+
+    user_config_path = endpoint_dir / "config_user.yaml"
+
+    template_str = _read_config_yaml(user_config_path)
+    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+    template = environment.from_string(template_str)
+
+    try:
+        return template.render(**user_opts)
+    except jinja2.exceptions.UndefinedError as e:
+        log.debug(f"Missing required user option(s): {str(e)}")
+        raise
 
 
 def serialize_config(config: Config) -> dict:

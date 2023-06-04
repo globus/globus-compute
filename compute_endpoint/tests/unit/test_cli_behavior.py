@@ -12,6 +12,7 @@ import yaml
 from click import ClickException
 from click.testing import CliRunner
 from globus_compute_endpoint.cli import app, init_config_dir
+from globus_compute_endpoint.endpoint.config import Config
 
 
 @pytest.fixture
@@ -42,9 +43,21 @@ def make_endpoint_dir(mock_command_ensure):
         ep_dir = mock_command_ensure.endpoint_config_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
         ep_config = ep_dir / "config.yaml"
-        ep_config.write_text(  # Default config for testing
+        ep_template = ep_dir / "config_user.yaml"
+        ep_config.write_text(
             """
 display_name: None
+executor:
+    provider:
+        type: LocalProvider
+        init_blocks: 1
+        min_blocks: 0
+        max_blocks: 1
+            """
+        )
+        ep_template.write_text(
+            """
+heartbeat_period: {{ heartbeat }}
 executor:
     provider:
         type: LocalProvider
@@ -152,26 +165,35 @@ def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
 
 
 @pytest.mark.parametrize(
-    "reg_data",
+    "stdin_data",
     [
         (False, "..."),
         (False, "()"),
         (False, json.dumps([1, 2, 3])),
         (False, json.dumps("abc")),
-        (True, json.dumps({"a": 1})),
-        (True, json.dumps({})),
+        (True, "{}"),
+        (True, json.dumps({"amqp_creds": {}})),
+        (True, json.dumps({"config": "myconfig"})),
+        (True, json.dumps({"amqp_creds": {}, "config": ""})),
+        (True, json.dumps({"amqp_creds": {"a": 1}, "config": "myconfig"})),
+        (True, json.dumps({"amqp_creds": {}, "config": "myconfig"})),
     ],
 )
 def test_start_ep_reads_stdin(
-    mocker, run_line, mock_cli_state, make_endpoint_dir, reg_data
+    mocker, run_line, mock_cli_state, make_endpoint_dir, stdin_data
 ):
-    data_is_valid, reg_info = reg_data
+    data_is_valid, data = stdin_data
+
+    mock_load_conf = mocker.patch("globus_compute_endpoint.cli.load_config_yaml")
+    mock_load_conf.return_value = Config()
+    mock_get_config = mocker.patch("globus_compute_endpoint.cli.get_config")
+    mock_get_config.return_value = Config()
 
     mock_log = mocker.patch("globus_compute_endpoint.cli.log")
     mock_sys = mocker.patch("globus_compute_endpoint.cli.sys")
     mock_sys.stdin.closed = False
     mock_sys.stdin.isatty.return_value = False
-    mock_sys.stdin.read.return_value = reg_info
+    mock_sys.stdin.read.return_value = data
 
     make_endpoint_dir("foo")
 
@@ -181,12 +203,20 @@ def test_start_ep_reads_stdin(
     reg_info_found = mock_ep.start_endpoint.call_args[0][5]
 
     if data_is_valid:
-        assert reg_info_found == json.loads(reg_info)
+        data_dict = json.loads(data)
+        reg_info = data_dict.get("amqp_creds", {})
+        config_str = data_dict.get("config", None)
+
+        assert reg_info_found == reg_info
+        if config_str:
+            config_str_found = mock_load_conf.call_args[0][0]
+            assert config_str_found == config_str
 
     else:
+        assert mock_get_config.called
         assert mock_log.debug.called
         a, k = mock_log.debug.call_args
-        assert "Invalid registration info on stdin" in a[0]
+        assert "Invalid info on stdin" in a[0]
         assert reg_info_found == {}
 
 
@@ -250,7 +280,7 @@ def test_start_ep_incorrect_config_yaml(run_line, mock_cli_state, make_endpoint_
 
     conf.write_text("asdf")
     res = run_line("start foo", assert_exit_code=1)
-    assert "Invalid syntax" in res.stderr
+    assert "Invalid config syntax" in res.stderr
 
     # `coverage` demands a valid syntax file.  FBOW, then, the ordering and
     # commingling of these two tests is intentional.  Bit of a meta problem ...
