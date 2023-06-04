@@ -11,14 +11,19 @@ from collections import namedtuple
 from types import SimpleNamespace
 from unittest import mock
 
+import jinja2
 import pytest
 import responses
+import yaml
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.default_config import (
     config as default_config,
 )
-from globus_compute_endpoint.endpoint.config.utils import serialize_config
+from globus_compute_endpoint.endpoint.config.utils import (
+    render_config_user_template,
+    serialize_config,
+)
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
@@ -484,6 +489,43 @@ def test_serialize_config_field_types():
 
     # Others should not
     assert isinstance(result["heartbeat_threshold"], str)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        (False, {}),
+        (False, {"foo": "bar"}),
+        (True, {"heartbeat": 10}),
+        (True, {"heartbeat": 10, "foo": "bar"}),
+    ],
+)
+def test_render_config_user_template(fs, data):
+    is_valid, user_opts = data
+
+    ep_dir = pathlib.Path("config_user.yaml")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = ep_dir / "config_user.yaml"
+    template.write_text(
+        """
+heartbeat_period: {{ heartbeat }}
+executor:
+    provider:
+        type: LocalProvider
+        init_blocks: 1
+        min_blocks: 0
+        max_blocks: 1
+        """
+    )
+
+    if is_valid:
+        rendered = render_config_user_template(ep_dir, user_opts)
+        rendered_dict = yaml.safe_load(rendered)
+        assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
+    else:
+        with pytest.raises(jinja2.exceptions.UndefinedError) as e:
+            render_config_user_template(ep_dir, user_opts)
+            assert "Missing required" in str(e)
 
 
 @pytest.mark.parametrize(
