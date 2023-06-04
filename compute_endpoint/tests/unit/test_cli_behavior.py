@@ -346,3 +346,19 @@ def test_delete_endpoint(read_config, run_line, mock_cli_state):
     run_line("delete foo --yes")
     mock_ep, _ = mock_cli_state
     mock_ep.delete_endpoint.assert_called_once()
+
+
+@pytest.mark.parametrize("die_with_parent", [True, False])
+@mock.patch("globus_compute_endpoint.cli.get_config")
+def test_die_with_parent_detached(
+    mock_get_config, run_line, mock_cli_state, die_with_parent
+):
+    config = Config()
+    mock_get_config.return_value = config
+
+    if die_with_parent:
+        run_line("start foo --die-with-parent")
+        assert not config.detach_endpoint
+    else:
+        run_line("start foo")
+        assert config.detach_endpoint

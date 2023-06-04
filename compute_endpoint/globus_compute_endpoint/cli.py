@@ -421,10 +421,11 @@ def _do_start_endpoint(
     else:
         ep_config = get_config(ep_dir)
 
-    if die_with_parent and ep_config.detach_endpoint:
+    if die_with_parent:
         # The endpoint cannot die with it's parent if it
         # doesn't have one :)
         ep_config.detach_endpoint = False
+        log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
     if ep_config.multi_tenant:
         epm = EndpointManager(ep_dir, endpoint_uuid, ep_config)
