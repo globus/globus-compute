@@ -1,7 +1,7 @@
 Globus Compute Executor
 =======================
 
-The |Executor|_ class, a subclass of Python's |Executor|_, is the
+The |Executor|_ class, a subclass of Python's |ConcurrentFuturesExecutor|_, is the
 preferred approach to collecting results from the Globus Compute web services.  Over
 polling (the historical approach) where the web service must be repeatedly
 queried for the status of tasks and results eventually collected in bulk, the
@@ -332,8 +332,8 @@ processing:
 .. _Executor: reference/executor.html
 .. |Future| replace:: ``Future``
 .. _Future: https://docs.python.org/3/library/concurrent.futures.html#future-objects
-.. |Executor| replace:: ``Executor``
-.. _Executor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
+.. |ConcurrentFuturesExecutor| replace:: ``concurrent.futures.Executor``
+.. _ConcurrentFuturesExecutor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
 .. |.shutdown()| replace:: ``.shutdown()``
 .. _.shutdown(): reference/executor.html#globus_compute_sdk.Executor.shutdown
 .. |.submit()| replace:: ``.submit()``
