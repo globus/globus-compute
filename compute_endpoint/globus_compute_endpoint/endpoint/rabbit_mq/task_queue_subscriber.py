@@ -33,8 +33,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
         self,
         *,
         endpoint_id: str,
-        queue_info: dict,
         external_queue: multiprocessing.Queue,
+        queue_info: dict,
         quiesce_event: EventType,
     ):
         """
@@ -61,8 +61,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
 
         self.endpoint_id = endpoint_id
         self.queue_info = queue_info
-        self.external_queue = external_queue
         self.quiesce_event = quiesce_event
+        self.external_queue = external_queue
+
         self._channel_closed = multiprocessing.Event()
         self._cleanup_complete = multiprocessing.Event()
 
@@ -242,7 +243,8 @@ class TaskQueueSubscriber(multiprocessing.Process):
         instance of BasicProperties with the message properties and the body
         is the message that was sent.
         """
-        logger.debug(
+        logger.warning("XXZ")
+        logger.info(
             "Received message from %s: %s, %s",
             basic_deliver.delivery_tag,
             properties.app_id,
@@ -252,7 +254,9 @@ class TaskQueueSubscriber(multiprocessing.Process):
         # Not sure if we need to do this in a locked context,
         # rabbit's ACK system should make sure you don't lose tasks.
         try:
-            self.external_queue.put(body)
+            # TODO move ack'ing the message to final processing instead
+            # self.external_queue.put(body)
+            self.external_queue.put([properties.headers, body])
         except Exception:
             # No sense in waiting for the RMQ default 30m timeout; let it know
             # *now* that this message failed.

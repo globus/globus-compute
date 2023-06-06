@@ -26,7 +26,7 @@ def test_synch(start_task_q_publisher, start_task_q_subscriber, count=10):
     tasks_out = multiprocessing.Queue()
     start_task_q_subscriber(queue=tasks_out)
     for i in range(count):
-        message = tasks_out.get()
+        _, message = tasks_out.get()
         assert messages[i] == message
 
 
@@ -48,7 +48,7 @@ def test_subscriber_recovery(start_task_q_publisher, start_task_q_subscriber):
     proc = start_task_q_subscriber(queue=tasks_out, quiesce_event=quiesce_event)
     logging.warning("Proc started")
     for i in range(10):
-        message = tasks_out.get()
+        _, message = tasks_out.get()
         assert messages[i] == message
 
     # Terminate the connection
@@ -73,7 +73,7 @@ def test_subscriber_recovery(start_task_q_publisher, start_task_q_subscriber):
     logging.warning("Replacement proc started")
     for i in range(10):
         logging.warning("getting message")
-        message = tasks_out.get()
+        _, message = tasks_out.get()
         logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
@@ -103,7 +103,7 @@ def test_exclusive_subscriber(start_task_q_publisher, start_task_q_subscriber):
 
     # Confirm that the first subscriber received all the messages
     for i in range(10):
-        message = tasks_out_1.get(timeout=1)
+        _, message = tasks_out_1.get(timeout=1)
         logging.warning(f"Got message: {message}")
         assert messages[i] == message
 
@@ -123,7 +123,7 @@ def test_perf_combined_pub_sub_latency(start_task_q_publisher, start_task_q_subs
         b_message = f"Hello World! {i}".encode()
         start_t = time.time()
         task_q_pub.publish(b_message)
-        x = tasks_out.get()
+        _, x = tasks_out.get()
         delta = time.time() - start_t
         latency.append(delta)
         assert b_message == x

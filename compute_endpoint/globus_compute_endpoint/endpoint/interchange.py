@@ -215,6 +215,13 @@ class EndpointInterchange:
         log.warning("Received SIGTERM, setting termination flag.")
         self.time_to_quit = True
 
+    def function_allowed(self, function_id: str):
+        if self.config.allowed_functions is None:
+            # Not a restricted endpoint
+            return True
+
+        return function_id in self.config.allowed_functions
+
     def start(self):
         """Start the Interchange"""
         signal.signal(signal.SIGHUP, self.handle_sigterm)
@@ -367,9 +374,35 @@ class EndpointInterchange:
                     if self.time_to_quit:
                         self.stop()
                         continue  # nominally == break; but let event do it
+
                     try:
-                        incoming_task = self.pending_task_queue.get(timeout=1)
-                        task_msg = unpack(incoming_task)
+                        raise ValueError("x")
+                        prop_headers, body = self.pending_task_queue.get(timeout=1)
+
+                        # web-service should already be filtering on
+                        # allowed functions, but we also check it locally
+                        fid = prop_headers.get("function_id", None)
+                        tid = prop_headers.get("task_id", None)
+                        if fid and not self.function_allowed(fid):
+                            # Same as web-service message but packed in a
+                            # result error
+                            reject_msg = (
+                                f"Function {fid} not permitted on "
+                                f"endpoint {self.endpoint_id}"
+                            )
+
+                            log.warning(reject_msg)
+                            failed_result = Result(
+                                task_id=tid,
+                                data=reject_msg,
+                                error_details=ResultErrorDetails(
+                                    code="FUNCTION_NOT_ALLOWED", user_message=reject_msg
+                                ),
+                            )
+                            results_publisher.publish(pack(failed_result))
+                            continue
+
+                        task_msg = unpack(body)
                         if not isinstance(task_msg, Task):
                             raise InvalidMessageError()
 

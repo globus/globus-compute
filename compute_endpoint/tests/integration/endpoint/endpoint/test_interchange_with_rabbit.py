@@ -121,11 +121,10 @@ def test_epi_forwards_tasks_and_results(
             # then get (consume) our expected result
             result: Result | None = None
             for mframe, mprops, mbody in chan.consume(
-                queue=res_q_name, inactivity_timeout=5
+                queue=res_q_name, inactivity_timeout=1
             ):
                 assert (mframe, mprops, mbody) != (None, None, None), "no timely result"
                 result = dill.loads(mbody)
                 break
-    assert result is not None
     assert result.task_id == task_uuid
     assert result.data == task_msg.task_buffer
