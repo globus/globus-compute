@@ -318,7 +318,7 @@ class Endpoint:
             except GlobusAPIError as e:
                 if e.http_status in (409, 410, 423):
                     # CONFLICT, GONE or LOCKED
-                    log.warning(f"Endpoint registration blocked.  [{e.message}]")
+                    log.warning(f"Endpoint registration blocked.  [{e.text}]")
                     exit(os.EX_UNAVAILABLE)
                 raise
 
@@ -531,7 +531,7 @@ class Endpoint:
         except GlobusAPIError as e:
             log.warning(
                 f"Endpoint <{ep_name}> could not be deleted from the web service"
-                f"  [{e.message}]"
+                f"  [{e.text}]"
             )
             if not force:
                 log.critical("Exiting without deleting the endpoint")
