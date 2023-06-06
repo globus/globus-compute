@@ -1,21 +1,14 @@
-import logging
+import warnings
 
 from globus_compute_endpoint.engines import HighThroughputEngine
 
-log = logging.getLogger(__name__)
-
-warning_message = (
-    "WARNING: \n"
-    "The HighThroughputExecutor will be deprecated by globus-compute-endpoint v2.2 "
-    "and will be replaced by the HighThroughputEngine"
+warnings.warn(
+    f"{__name__} is deprecated.  Please import from globus_compute_sdk.engines instead"
 )
 
 
-class HighThroughputExecutor:
-    """The HighThroughputExecutor class is a wrapper
-    over the engines.HighThroughputEngine
-    """
-
-    def __new__(cls, *args, **kwargs):
-        print(warning_message)
-        return object.__new__(HighThroughputEngine, *args, **kwargs)
+def HighThroughputExecutor(*args, **kwargs) -> HighThroughputEngine:
+    warnings.warn(
+        "HighThroughputExecutor is deprecated.  Please use HighThroughputEngine instead"
+    )
+    return HighThroughputEngine(*args, **kwargs)
