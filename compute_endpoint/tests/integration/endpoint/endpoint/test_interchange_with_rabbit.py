@@ -17,7 +17,10 @@ from tests.utils import try_for_timeout
 
 @pytest.fixture
 def run_interchange_process(
-    get_standard_compute_client, setup_register_endpoint_response, tmp_path
+    get_standard_compute_client,
+    setup_register_endpoint_response,
+    tmp_path,
+    request,  # Allows a custom config to be passed in if needed
 ):
     """
     Start and stop a subprocess that executes the EndpointInterchange class.
@@ -30,7 +33,11 @@ def run_interchange_process(
         mock_exe = MockExecutor()
         mock_exe.endpoint_id = endpoint_uuid
 
-        config = Config(executors=[mock_exe])
+        if hasattr(request, "param") and request.param:
+            config = request.param
+        else:
+            config = Config()
+        config.executors = [mock_exe]
 
         ix = EndpointInterchange(
             config=config,
@@ -114,16 +121,87 @@ def test_epi_forwards_tasks_and_results(
             chan.queue_purge(task_q_name)
             chan.queue_purge(res_q_name)
             # publish our canary task
-            chan.basic_publish(task_exch, task_q_name, pack(task_msg))
+            chan.basic_publish(
+                task_exch,
+                task_q_name,
+                pack(task_msg),
+                properties=pika.BasicProperties(
+                    content_type="application/json",
+                    content_encoding="utf-8",
+                    headers={
+                        "function_uuid": "some_func",
+                        "task_uuid": str(task_uuid),
+                    },
+                ),
+            )
 
             # then get (consume) our expected result
             result: Result | None = None
             for mframe, mprops, mbody in chan.consume(
-                queue=res_q_name, inactivity_timeout=5
+                queue=res_q_name, inactivity_timeout=1
             ):
                 assert (mframe, mprops, mbody) != (None, None, None), "no timely result"
                 result = unpack(mbody)
                 break
-    assert result is not None
     assert result.task_id == task_uuid
     assert result.data == task_msg.task_buffer
+
+
+@pytest.mark.parametrize(
+    "run_interchange_process",
+    [
+        None,
+        Config(allowed_functions=None),
+        Config(allowed_functions=["allowed_func_1", "allowed_func_2"]),
+        Config(allowed_functions=["allowed_func_3"]),
+    ],
+    indirect=True,
+)
+def test_epi_rejects_allowlist_task(
+    run_interchange_process, pika_conn_params, randomstring, request
+):
+    """
+    Copy of test_epi_forwards_tasks_and_results, but check for disallowed
+    """
+    _, _, endpoint_uuid, reg_info = run_interchange_process
+
+    task_uuid = uuid.uuid4()
+    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
+    task_q, res_q = reg_info["task_queue_info"], reg_info["result_queue_info"]
+    res_q_name = res_q["queue"]
+    task_q_name = task_q["queue"]
+    task_exch = task_q["exchange"]
+
+    func_to_run = "allowed_func_3"
+
+    with pika.BlockingConnection(pika_conn_params) as mq_conn:
+        with mq_conn.channel() as chan:
+            chan.queue_purge(task_q_name)
+            chan.queue_purge(res_q_name)
+            chan.basic_publish(
+                task_exch,
+                task_q_name,
+                pack(task_msg),
+                properties=pika.BasicProperties(
+                    content_type="application/json",
+                    content_encoding="utf-8",
+                    headers={
+                        "function_uuid": func_to_run,
+                        "task_uuid": str(task_uuid),
+                    },
+                ),
+            )
+
+            for _, _, mbody in chan.consume(queue=res_q_name, inactivity_timeout=1):
+                result = unpack(mbody)
+                config = request.node.callspec.params["run_interchange_process"]
+                if (
+                    config is None
+                    or config.allowed_functions is None
+                    or func_to_run in config.allowed_functions
+                ):
+                    assert result.data == task_msg.task_buffer
+                else:
+                    assert f"Function {func_to_run} not permitted" in result.data
+                    assert f"on endpoint {endpoint_uuid}" in result.data
+                break

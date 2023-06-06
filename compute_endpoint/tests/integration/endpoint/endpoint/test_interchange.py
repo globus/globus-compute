@@ -72,7 +72,7 @@ def test_invalid_task_received(mocker, endpoint_uuid):
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_results)
     mocker.patch(f"{_MOCK_BASE}convert_to_internaltask", side_effect=Exception("BLAR"))
     task = Task(task_id=uuid.uuid4(), task_buffer="")
-    ei.pending_task_queue.put(pack(task))
+    ei.pending_task_queue.put([{}, pack(task)])
     t = threading.Thread(target=ei._main_loop, daemon=True)
     t.start()
 

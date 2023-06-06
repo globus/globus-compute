@@ -24,7 +24,6 @@ from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     Result,
     ResultErrorDetails,
-    Task,
 )
 from globus_compute_endpoint import __version__ as funcx_endpoint_version
 from globus_compute_endpoint.endpoint.rabbit_mq import (
@@ -209,6 +208,13 @@ class EndpointInterchange:
         log.warning("Received SIGTERM, setting termination flag.")
         self.time_to_quit = True
 
+    def function_allowed(self, function_id: str):
+        if self.config.allowed_functions is None:
+            # Not a restricted endpoint
+            return True
+
+        return function_id in self.config.allowed_functions
+
     def start(self):
         """Start the Interchange"""
         signal.signal(signal.SIGHUP, self.handle_sigterm)
@@ -360,11 +366,33 @@ class EndpointInterchange:
                     if self.time_to_quit:
                         self.stop()
                         continue  # nominally == break; but let event do it
+
                     try:
-                        incoming_task = self.pending_task_queue.get(timeout=1)
-                        task_msg = unpack(incoming_task)
-                        if not isinstance(task_msg, Task):
-                            raise InvalidMessageError()
+                        prop_headers, body = self.pending_task_queue.get(timeout=1)
+
+                        fid = prop_headers.get("function_uuid")
+                        tid = prop_headers.get("task_uuid")
+                        if not fid or not tid:
+                            raise InvalidMessageError("Task message missing headers")
+
+                        if fid and not self.function_allowed(fid):
+                            # Same as web-service message but packed in a
+                            # result error
+                            reject_msg = (
+                                f"Function {fid} not permitted on "
+                                f"endpoint {self.endpoint_id}"
+                            )
+                            log.warning(reject_msg)
+
+                            failed_result = Result(
+                                task_id=tid,
+                                data=reject_msg,
+                                error_details=ResultErrorDetails(
+                                    code="FUNCTION_NOT_ALLOWED", user_message=reject_msg
+                                ),
+                            )
+                            results_publisher.publish(pack(failed_result))
+                            continue
 
                     except queue.Empty:
                         continue
@@ -374,16 +402,14 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        executor.submit(
-                            task_id=task_msg.task_id, packed_task=incoming_task
-                        )
+                        executor.submit(task_id=tid, packed_task=body)
                         num_tasks_forwarded += 1  # Safe given GIL
 
                     except Exception as exc:
-                        log.exception(f"Failed to process {task_msg.task_id}")
+                        log.exception(f"Failed to process task {tid}")
                         code, msg = get_result_error_details()
                         failed_result = Result(
-                            task_id=task_msg.task_id,
+                            task_id=tid,
                             data=f"Failed to start task: {exc}",
                             error_details=ResultErrorDetails(
                                 code=code, user_message=msg
@@ -391,7 +417,7 @@ class EndpointInterchange:
                             task_statuses=[],
                         )
                         res = {
-                            "task_id": task_msg.task_id,
+                            "task_id": tid,
                             "message": pack(failed_result),
                         }
                         self.results_passthrough.put(res)
