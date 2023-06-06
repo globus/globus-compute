@@ -38,15 +38,9 @@ def test_engine_submit_internal(engine):
     future = engine._submit(double, param, task_id=task_id)
     assert isinstance(future, concurrent.futures.Future)
 
-    # The content of the future object is likely junk
-    # Do not check if the result makes sense
-    assert future.result()
-    logger.warning(f"Got result {future.result()}")
-
     unpacked_result = messagepack.unpack(future.result())
     assert isinstance(unpacked_result, messagepack.message_types.Result)
     assert unpacked_result.task_id == task_id
-    logger.warning(f"Result: {unpacked_result}")
     final_result = serializer.deserialize(unpacked_result.data)
     assert final_result == 2 * param
 
@@ -55,7 +49,8 @@ def test_engine_submit(engine):
     q = engine.results_passthrough
     task_id = uuid.uuid1()
     serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, double, (3,), {})
+    task_arg = random.randint(1, 1000)
+    task_body = ez_pack_function(serializer, double, (task_arg,), {})
     task_message = messagepack.pack(
         messagepack.message_types.Task(
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
@@ -88,8 +83,7 @@ def test_engine_submit(engine):
         ), "Result from passthrough_q and future should match"
 
         assert result.task_id == task_id
-        logger.warning(f"Result info : {result}")
-        logger.warning(f"Result.data : {result.data}")
         final_result = serializer.deserialize(result.data)
-        assert final_result == 6, f"Expected 6, but got: {final_result}"
+        expected = task_arg * 2
+        assert final_result == expected, f"Expected {expected}, but got: {final_result}"
         break
