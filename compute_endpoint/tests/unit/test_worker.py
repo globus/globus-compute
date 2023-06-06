@@ -5,9 +5,9 @@ from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
+from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_endpoint.engines.high_throughput.messages import Task
 from globus_compute_endpoint.engines.high_throughput.worker import Worker
-from parsl.app.errors import AppTimeout
 
 
 def hello_world():
@@ -17,6 +17,10 @@ def hello_world():
 def failing_function():
     x = {}
     return x["foo"]  # will fail, but in a "natural" way
+
+
+def large_result(size):
+    return bytearray(size)
 
 
 def ez_pack_function(serializer, func, args, kwargs):
@@ -76,7 +80,6 @@ def test_register_and_kill(test_worker):
 
 def test_execute_hello_world(test_worker):
     task_id = uuid.uuid1()
-    # task_body = ez_pack_function(test_worker.serializer, hello_world, (), {})
     task_body = test_worker.serializer.serialize((hello_world, (), {}))
     internal_task = Task(task_id, "RAW", task_body)
     payload = internal_task.pack()
@@ -91,7 +94,6 @@ def test_execute_hello_world(test_worker):
 
 def test_execute_failing_function(test_worker):
     task_id = uuid.uuid1()
-    # task_body = ez_pack_function(test_worker.serializer, failing_function, (), {})
     task_body = test_worker.serializer.serialize((failing_function, (), {}))
     task_message = Task(task_id, "RAW", task_body).pack()
 
@@ -117,34 +119,24 @@ def test_execute_failing_function(test_worker):
     )
 
 
-@pytest.mark.skip("Result size checking is done by the helper.execute_task method")
 def test_execute_function_exceeding_result_size_limit(test_worker):
-    test_worker.result_size_limit = 0
-    task_id = uuid.uuid1()
-    task_body = ez_pack_function(test_worker.serializer, hello_world, (), {})
+    return_size = 10
 
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
+    task_id = uuid.uuid1()
+
+    payload = ez_pack_function(test_worker.serializer, large_result, (return_size,), {})
+    task_body = messagepack.pack(
+        messagepack.message_types.Task(task_id=task_id, task_buffer=payload)
     )
 
-    result = test_worker.execute_task(str(task_id), task_message)
-    assert isinstance(result, dict)
-    assert "data" not in result
-    assert "exception" in result
-    assert isinstance(result.get("exception"), str)
+    s_result = execute_task(task_body, result_size_limit=return_size - 2)
+    result = messagepack.unpack(s_result)
 
-    # error string contains the error
-    assert "MaxResultSizeExceeded" in result["exception"]
-    # but it does not contain some of the funcx-constructed calling context
-    # a result of traceback traversal done when formatting
-    assert "call_user_function" not in result["exception"]
-
-    assert isinstance(result.get("error_details"), tuple)
-    assert len(result["error_details"]) == 2
-    assert result["error_details"][0] == "MaxResultSizeExceeded"
-    assert result["error_details"][1].startswith("remote error: ")
+    assert isinstance(result, messagepack.message_types.Result)
+    assert result.error_details
+    assert result.task_id == task_id
+    assert result.error_details
+    assert result.error_details.code == "MaxResultSizeExceeded"
 
 
 def sleeper(t):
@@ -154,18 +146,17 @@ def sleeper(t):
     return True
 
 
-@pytest.mark.skip(
-    "Timeout is done by the helper.execute_task method and not by the worker"
-)
 def test_app_timeout(test_worker):
     task_id = uuid.uuid1()
     task_body = ez_pack_function(test_worker.serializer, sleeper, (1,), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
+    task_body = messagepack.pack(
+        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
     )
 
     with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.1"}):
-        with pytest.raises(AppTimeout):
-            test_worker.call_user_function(task_message)
+        packed_result = execute_task(task_body)
+
+    result = messagepack.unpack(packed_result)
+    assert isinstance(result, messagepack.message_types.Result)
+    assert result.task_id == task_id
+    assert "AppTimeout" in result.data
