@@ -719,7 +719,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
         ser_payload = fx_serializer.serialize((func, args, kwargs))
         payload = Task(s_task_id, "RAW", ser_payload)
-        self.tasks[s_task_id] = HTEXFuture(self)
+        self.tasks[s_task_id] = HTEXFuture(self, task_id=s_task_id)
         self.tasks[s_task_id].task_id = s_task_id
         assert self.outgoing_q
         self.outgoing_q.put(payload.pack())
@@ -884,9 +884,12 @@ FINISHED = "FINISHED"
 
 
 class HTEXFuture(concurrent.futures.Future):
-    def __init__(self, executor):
+    __slots__ = ("engine", "task_id")
+
+    def __init__(self, engine: HighThroughputEngine, task_id: t.Optional[str]):
         super().__init__()
-        self.executor = executor
+        self.engine = engine
+        self.task_id = task_id
 
     def cancel(self):
         raise NotImplementedError(
@@ -918,4 +921,4 @@ class HTEXFuture(concurrent.futures.Future):
         -------
         Bool
         """
-        return self.executor._cancel(self)
+        return self.engine._cancel(self)
