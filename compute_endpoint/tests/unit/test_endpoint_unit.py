@@ -509,7 +509,7 @@ def test_render_config_user_template(fs, data):
     template.write_text(
         """
 heartbeat_period: {{ heartbeat }}
-executor:
+engine:
     provider:
         type: LocalProvider
         init_blocks: 1

@@ -1,4 +1,4 @@
-executor:
+engine:
     label: fe.cs.uchicago
     worker_debug: False
 

@@ -41,7 +41,7 @@ def user_conf_template(conf_dir):
     template.write_text(
         """
 heartbeat_period: {{ heartbeat }}
-executor:
+engine:
     provider:
         type: LocalProvider
         init_blocks: 1
