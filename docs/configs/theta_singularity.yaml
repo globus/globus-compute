@@ -1,4 +1,4 @@
-executor:
+engine:
     max_workers_per_node: 1
     worker_debug: False
 

@@ -14,7 +14,7 @@ data:
     heartbeat_threshold: 200
     funcx_service_address: {{ .Values.funcXServiceAddress }}/v2
     detach_endpoint: False
-    executor:
+    engine:
         provider:
             type: KubernetesProvider
             init_blocks: { .Values.initBlocks }}

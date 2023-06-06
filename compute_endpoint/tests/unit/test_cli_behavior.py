@@ -47,7 +47,7 @@ def make_endpoint_dir(mock_command_ensure):
         ep_config.write_text(
             """
 display_name: None
-executor:
+engine:
     provider:
         type: LocalProvider
         init_blocks: 1
@@ -58,7 +58,7 @@ executor:
         ep_template.write_text(
             """
 heartbeat_period: {{ heartbeat }}
-executor:
+engine:
     provider:
         type: LocalProvider
         init_blocks: 1

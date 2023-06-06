@@ -86,7 +86,7 @@ class ProviderModel(BaseModel):
         extra = "allow"
 
 
-class ExecutorModel(BaseModel):
+class EngineModel(BaseModel):
     type: type = Field(default=HighThroughputExecutor, const=True)
     provider: ProviderModel
     strategy: t.Optional[StrategyModel]
@@ -101,7 +101,7 @@ class ExecutorModel(BaseModel):
 
 
 class ConfigModel(BaseModel):
-    executor: ExecutorModel
+    engine: EngineModel
     display_name: t.Optional[str]
     environment: t.Optional[str]
     funcx_service_address: t.Optional[str]
@@ -116,13 +116,13 @@ class ConfigModel(BaseModel):
     stdout: t.Optional[str]
     stderr: t.Optional[str]
 
-    _validate_executor = _validate_params("executor")
+    _validate_engine = _validate_params("engine")
 
     def dict(self, *args, **kwargs):
         # Slight modification is needed here since we still
-        # store the executor in a list named executors
+        # store the engine/executor in a list named executors
         ret = super().dict(*args, **kwargs)
-        executor = ret.pop("executor")
+        executor = ret.pop("engine")
         ret["executors"] = [executor]
         return ret
 
