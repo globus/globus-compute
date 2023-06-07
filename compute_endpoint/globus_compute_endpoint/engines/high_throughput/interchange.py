@@ -65,7 +65,7 @@ class ManagerLost(Exception):
 
 
 class BadRegistration(Exception):
-    """A new Manager tried to join the executor with a BadRegistration message"""
+    """A new Manager tried to join the Engine with a BadRegistration message"""
 
     def __init__(self, worker_id, critical=False):
         self.worker_id = worker_id
@@ -570,7 +570,7 @@ class Interchange:
                 self.task_status_deltas.clear()
 
             log.debug(
-                "Cleared task deltas (%s); sending status report to executor.",
+                "Cleared task deltas (%s); sending status report to Engine.",
                 len(task_status_deltas),
             )
 
@@ -1170,7 +1170,7 @@ class Interchange:
 def starter(comm_q: mp.Queue, *args, **kwargs) -> None:
     """Start the interchange process
 
-    The executor is expected to call this function. The args, kwargs match that of the
+    The Engine is expected to call this function. The args, kwargs match that of the
     Interchange.__init__
     """
     ic = None
