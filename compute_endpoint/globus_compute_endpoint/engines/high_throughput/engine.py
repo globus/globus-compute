@@ -534,7 +534,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                     return
 
                 elif isinstance(msgs, EPStatusReport):
-                    log.debug(f"Received EPStatusReport {msgs}")
+                    log.debug(f"Received {msgs!r}")
                     if self.passthrough:
                         external_ep_status = convert_ep_status_report(msgs)
                         self.results_passthrough.put(
