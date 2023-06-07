@@ -1,6 +1,5 @@
 import concurrent.futures
-import logging
-import multiprocessing
+import queue
 import random
 import uuid
 
@@ -9,8 +8,6 @@ from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import HighThroughputEngine
 from globus_compute_sdk.serialize import ComputeSerializer
 from tests.utils import double, ez_pack_function
-
-logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -21,8 +18,8 @@ def engine():
         heartbeat_period=1,
         worker_debug=True,
     )
-    queue = multiprocessing.Queue()
-    engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
+    results_queue = queue.Queue()
+    engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=results_queue)
 
     yield engine
     engine.shutdown()
