@@ -52,7 +52,7 @@ class CommandClient:
 
 
 class TasksOutgoing:
-    """Outgoing task queue from the executor to the Interchange"""
+    """Outgoing task queue from the Engine to the Interchange"""
 
     def __init__(self, ip_address, port_range):
         """
@@ -127,7 +127,7 @@ class TasksOutgoing:
 
 
 class ResultsIncoming:
-    """Incoming results queue from the Interchange to the executor"""
+    """Incoming results queue from the Interchange to the Engine"""
 
     def __init__(self, ip_address, port_range):
         """

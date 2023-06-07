@@ -1,8 +1,5 @@
-"""HighThroughputExecutor builds on the Swift/T EMEWS architecture to use MPI for fast
-task distribution
-
-There's a slow but sure deviation from Parsl's Executor interface here, that needs
-to be addressed.
+"""HighThroughputEngine builds on Parsl's HighThroughputExecutor for execution
+of functions within containerized workers in a distributed setting.
 """
 from __future__ import annotations
 
@@ -49,15 +46,15 @@ ITEM_THRESHOLD = 1024
 
 
 class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
-    """Executor designed for cluster-scale
+    """Engine designed for cluster-scale
 
-    The HighThroughputExecutor system has the following components:
-      1. The HighThroughputExecutor instance which is run as part of the Parsl script.
+    The HighThroughputEngine system has the following components:
+      1. The HighThroughputEngine instance which is run as a client
       2. The Interchange which is acts as a load-balancing proxy between workers and
          Parsl
       3. The multiprocessing based worker pool which coordinates task execution over
          several cores on a node.
-      4. ZeroMQ pipes connect the HighThroughputExecutor, Interchange and the
+      4. ZeroMQ pipes connect the HighThroughputEngine, Interchange and the
          process_worker_pool
 
     Here is a diagram
@@ -65,7 +62,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
     .. code:: python
 
 
-                        |  Data   |  Executor   |  Interchange  | External Process(es)
+                        |  Data   |  Engine     |  Interchange  | External Process(es)
                         |  Flow   |             |               |
                    Task | Kernel  |             |               |
                  +----->|-------->|------------>|->outgoing_q---|-> process_worker_pool
@@ -96,7 +93,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         :class:`~parsl.providers.torque.torque.Torque`.
 
     label : str
-        Label for this executor instance.
+        Label for this Engine instance.
 
     launch_cmd : str
         Command line string to launch the process_worker_pool from the provider. The
@@ -116,7 +113,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         --task_url={task_url} --result_url={result_url}"
 
     address : string
-        An address of the host on which the executor runs, which is reachable from the
+        An address of the host on which the engine runs, which is reachable from the
         network in which workers will be running. This can be either a hostname as
         returned by `hostname` or an IP address. Most login nodes on clusters have
         several network interfaces available, only some of which can be reached
@@ -134,7 +131,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         Port range used by Parsl to communicate with the Interchange.
 
     working_dir : str
-        Working dir to be used by the executor.
+        Working dir to be used by the engine.
 
     worker_debug : Bool
         Enables worker debug logging.
@@ -177,7 +174,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         counterpart (interchange, manager). Default:30s
 
     poll_period : int
-        Timeout period to be used by the executor components in milliseconds.
+        Timeout period to be used by the engine components in milliseconds.
         Increasing poll_periods trades performance for cpu efficiency. Default: 10ms
 
     container_image : str
@@ -201,7 +198,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         Queue to pass updates to task statuses back to the forwarder.
 
     strategy: Stategy Object
-        Specify the scaling strategy to use for this executor.
+        Specify the scaling strategy to use for this engine.
 
     launch_cmd: str
         Specify the launch command as using f-string format that will be used to specify
@@ -222,7 +219,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
     def __init__(
         self,
-        label="HighThroughputExecutor",
+        label="HighThroughputEngine",
         # NEW
         strategy=SimpleStrategy(),
         max_workers_per_node=float("inf"),
@@ -256,7 +253,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         passthrough=True,
         task_status_queue=None,
     ):
-        log.debug("Initializing HighThroughputExecutor")
+        log.debug("Initializing HighThroughputEngine")
         self.provider = provider
         self.label = label
         self.launch_cmd = launch_cmd
@@ -360,8 +357,8 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         **kwargs,
     ):
         """Create the Interchange process and connect to it."""
-        assert run_dir, "GCExecutor requires kwarg:run_dir at start"
-        assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
+        assert run_dir, "HighThroughputEngine requires kwarg:run_dir at start"
+        assert endpoint_id, "HighThroughputEngine requires kwarg:endpoint_id at start"
         self.run_dir = run_dir
         self.endpoint_id = endpoint_id
 
@@ -380,14 +377,14 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         if self.passthrough is True:
             if results_passthrough is None:
                 raise Exception(
-                    "Executors configured in passthrough mode, must be started with"
+                    "Engines configured in passthrough mode, must be started with"
                     "a multiprocessing queue for results_passthrough"
                 )
             self.results_passthrough = results_passthrough
-            log.debug(f"Executor:{self.label} starting in results_passthrough mode")
+            log.debug(f"Engine:{self.label} starting in results_passthrough mode")
 
-        self._executor_bad_state = threading.Event()
-        self._executor_exception: t.Optional[Exception] = None
+        self._engine_bad_state = threading.Event()
+        self._engine_exception: t.Optional[Exception] = None
         self._start_queue_management_thread()
 
         log.info("Attempting local interchange start")
@@ -404,7 +401,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
             pass
         else:
             self._scaling_enabled = False
-            log.debug("Starting HighThroughputExecutor with no provider")
+            log.debug("Starting HighThroughputEngine with no provider")
 
         return self.outgoing_q.port, self.incoming_q.port, self.command_client.port
 
@@ -417,10 +414,10 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         comm_q = mpQueue(maxsize=10)
         self.queue_proc = Process(
             target=interchange.starter,
-            name="Executor-Interchange",
+            name="Engine-Interchange",
             args=(comm_q,),
             kwargs={
-                "client_address": "127.0.0.1",  # executor and ix are on the same node
+                "client_address": "127.0.0.1",  # engine and ix are on the same node
                 "client_ports": (
                     self.outgoing_q.port,
                     self.incoming_q.port,
@@ -514,7 +511,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         """
         log.debug("queue management worker starting")
 
-        while self.is_alive and not self._executor_bad_state.is_set():
+        while self.is_alive and not self._engine_bad_state.is_set():
             try:
                 msgs = self.incoming_q.get(timeout=1)
 
@@ -563,22 +560,22 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                             # essentially shutting down the client with little
                             # indication to the user.
                             log.warning(
-                                "Executor shutting down due to fatal "
+                                "Engine shutting down due to fatal "
                                 "exception from interchange"
                             )
-                            self._executor_exception = fx_serializer.deserialize(
+                            self._engine_exception = fx_serializer.deserialize(
                                 msg["exception"]
                             )
-                            log.exception(f"Exception: {self._executor_exception}")
+                            log.exception(f"Exception: {self._engine_exception}")
                             # Set bad state to prevent new tasks from being submitted
-                            self._executor_bad_state.set()
+                            self._engine_bad_state.set()
                             # We set all current tasks to this exception to make sure
                             # that this is raised in the main context.
                             # YADU: Report failure on all pending tasks
                             for task_id in self.tasks:
                                 try:
                                     self.tasks[task_id].set_exception(
-                                        self._executor_exception
+                                        self._engine_exception
                                     )
                                 except concurrent.futures.InvalidStateError:
                                     # Task was already cancelled, the exception can be
@@ -642,7 +639,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         assert isinstance(msg["data"], bytes)
         return msg["data"]
 
-    # When the executor gets lost, the weakref callback will wake up
+    # When the engine gets lost, the weakref callback will wake up
     # the queue management thread.
     def weakref_cb(self, q=None):
         """We do not use this yet."""
@@ -739,9 +736,9 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         """
         log.debug(f"Submitting task:{task_id}")
 
-        if self._executor_bad_state.is_set():
+        if self._engine_bad_state.is_set():
             # If the flag is set the exception body must exist
-            raise self._executor_exception  # type: ignore
+            raise self._engine_exception  # type: ignore
 
         future = self._submit(execute_task, packed_task, task_id=task_id)
         return future
@@ -828,7 +825,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         return status
 
     def shutdown(self, hub=True, targets="all", block=False):
-        """Shutdown the executor, including all workers and controllers.
+        """Shutdown the Engine, including all workers and controllers.
 
         This is not implemented.
 
@@ -841,24 +838,24 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
              NotImplementedError
         """
 
-        log.info("Attempting HighThroughputExecutor shutdown")
+        log.info("Attempting HighThroughputEngine shutdown")
         # self.outgoing_q.close()
         # self.incoming_q.close()
         if self.queue_proc:
             try:
                 self.queue_proc.terminate()
             except AttributeError:
-                log.info("Executor interchange terminate skipped due to wrong context")
+                log.info("Engine interchange terminate skipped due to wrong context")
             except Exception:
                 log.exception("Terminating the interchange failed")
-        log.info("Finished HighThroughputExecutor shutdown attempt")
+        log.info("Finished HighThroughputEngine shutdown attempt")
         return True
 
     def _cancel(self, future):
         """Attempt cancelling a task tracked by the future by requesting
         cancellation from the interchange. Task cancellation is attempted
         only if the future is cancellable i.e not already in a terminal
-        state. This relies on the executor not setting the task to a running
+        state. This relies on the Engine not setting the task to a running
         state, and the task only tracking pending, and completed states.
 
         Parameters
@@ -898,7 +895,7 @@ class HTEXFuture(concurrent.futures.Future):
         )
 
     def _cancel(self):
-        """Should be invoked only by the executor
+        """Should be invoked only by the Engine
         Returns
         -------
         Bool
