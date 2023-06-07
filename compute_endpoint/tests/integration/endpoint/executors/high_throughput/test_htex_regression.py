@@ -1,4 +1,3 @@
-import concurrent.futures
 import queue
 import random
 import uuid
@@ -23,23 +22,6 @@ def engine():
 
     yield engine
     engine.shutdown()
-
-
-@pytest.mark.skip()
-def test_engine_submit_internal(engine):
-    "Test engine.submit with multiple engines"
-
-    param = random.randint(1, 100)
-    serializer = ComputeSerializer()
-    task_id = uuid.uuid1()
-    future = engine._submit(double, param, task_id=task_id)
-    assert isinstance(future, concurrent.futures.Future)
-
-    unpacked_result = messagepack.unpack(future.result())
-    assert isinstance(unpacked_result, messagepack.message_types.Result)
-    assert unpacked_result.task_id == task_id
-    final_result = serializer.deserialize(unpacked_result.data)
-    assert final_result == 2 * param
 
 
 def test_engine_submit(engine):
