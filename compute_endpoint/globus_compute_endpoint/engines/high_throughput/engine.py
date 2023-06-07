@@ -707,21 +707,18 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         *args: t.Any,
         task_id: uuid.UUID = None,
         **kwargs: t.Any,
-    ) -> Future:
+    ) -> HTEXFuture:
         self._task_counter += 1
-        if task_id is None:
-            s_task_id = str(self._task_counter)
-        else:
-            s_task_id = str(task_id)
+        s_task_id = str(task_id)
 
         ser_payload = fx_serializer.serialize((func, args, kwargs))
         payload = Task(s_task_id, "RAW", ser_payload)
-        self.tasks[s_task_id] = HTEXFuture(self, task_id=s_task_id)
-        self.tasks[s_task_id].task_id = s_task_id
+        future = HTEXFuture(self, task_id=s_task_id)
+        self.tasks[s_task_id] = future
         assert self.outgoing_q
         self.outgoing_q.put(payload.pack())
 
-        return self.tasks[s_task_id]
+        return future
 
     def submit(self, task_id: uuid.UUID, packed_task: bytes) -> Future:
         """Submits a messagepacked.Task for execution
