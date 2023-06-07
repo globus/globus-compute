@@ -184,6 +184,11 @@ class EPStatusReport(Message):
         self.global_state = global_state
         self.task_statuses = task_statuses
 
+    def __repr__(self):
+        name = type(self).__name__
+        ep_id = uuid.UUID(bytes=self._header)
+        return f"{name}(ep:{ep_id}; task count:{len(self.task_statuses)})"
+
     @classmethod
     def unpack(cls, msg):
         endpoint_id = str(uuid.UUID(bytes=msg[:16]))
