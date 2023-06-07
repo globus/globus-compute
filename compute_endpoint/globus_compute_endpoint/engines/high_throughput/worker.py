@@ -141,7 +141,7 @@ class Worker:
             task_message = Message.unpack(msg)
             serialized_fn_package = task_message.task_buffer.decode()
 
-            # Deserialize HTEX executors' wrapping of
+            # Deserialize HTEX Engines' wrapping of
             # execute_task, messagepack_payload)
             function, args, kwargs = self.deserialize(serialized_fn_package)
 
