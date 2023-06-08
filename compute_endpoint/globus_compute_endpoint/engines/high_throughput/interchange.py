@@ -977,20 +977,9 @@ class Interchange:
 
                                 mdata["tasks"][task_container].remove(tid)
 
-                                # Yadu: Todo needs a fix
-                                # Each Result is now an independent message, there's no
-                                # piggybacking of status deltas
-                                """
                                 if tid in self.task_status_deltas:
-                                    r["task_statuses"] += self.task_status_deltas[tid]
                                     del self.task_status_deltas[tid]
-                                    b_messages[idx] = dill.dumps(r)
-                                    log.debug(
-                                        "Transferring statuses for %s: %s",
-                                        tid,
-                                        r["task_statuses"],
-                                    )
-                                """
+                                    b_messages[_idx] = dill.dumps(r)
 
                         mdata["total_tasks"] -= len(b_messages)
 
