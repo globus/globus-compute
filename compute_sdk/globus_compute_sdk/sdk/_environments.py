@@ -5,7 +5,11 @@ from urllib.parse import urlparse
 
 
 def _get_envname():
-    return os.getenv("FUNCX_SDK_ENVIRONMENT", "production")
+    return os.getenv(
+        "GLOBUS_SDK_ENVIRONMENT",
+        # Fallback to the old ENV var if GLOBUS_SDK_ENVIRONMENT is not set
+        os.getenv("FUNCX_SDK_ENVIRONMENT", "production"),
+    )
 
 
 def get_web_service_url(envname: str | None) -> str:
@@ -15,6 +19,9 @@ def get_web_service_url(envname: str | None) -> str:
         "dev": "https://api.dev.funcx.org/v2",
         "local": "http://localhost:5000/v2",
     }
+    for test_env in ["sandbox", "test", "integration", "staging", "preview"]:
+        urls[test_env] = f"https://compute.api.{test_env}.globuscs.info/v2"
+
     return urls.get(env, urls["production"])
 
 
