@@ -77,7 +77,7 @@ class ComputeSerializer:
         strategy = self.strategies.get(header)
 
         if not strategy:
-            raise SerializationError(f"Invalid header: {header} in data payload")
+            raise DeserializationError(f"Invalid header: {header} in data payload")
 
         return strategy.deserialize(payload)
 
