@@ -1,4 +1,5 @@
 import inspect
+import random
 import sys
 
 import globus_compute_sdk.serialize.concretes as concretes
@@ -317,3 +318,28 @@ def test_serializer_errors_on_unknown_strategy():
 
     with pytest.raises(SerializationError):
         ComputeSerializer(strategy_data=strategy)
+
+
+@pytest.mark.parametrize(
+    "strategy_code", (s for s in concretes.SELECTABLE_STRATEGIES if s._for_code)
+)
+@pytest.mark.parametrize(
+    "strategy_data", (s for s in concretes.SELECTABLE_STRATEGIES if not s._for_code)
+)
+@pytest.mark.parametrize(
+    "function, args, kwargs",
+    [(foo, (random.random(),), {}), (foo, (random.random(),), {"y": random.random()})],
+)
+def test_check_strategies(strategy_code, strategy_data, function, args, kwargs):
+    serializer = ComputeSerializer(
+        strategy_code=strategy_code(), strategy_data=strategy_data()
+    )
+
+    new_fn, new_args, new_kwargs = serializer.check_strategies(
+        function, *args, **kwargs
+    )
+
+    original_result = function(*args, **kwargs)
+    new_result = new_fn(*new_args, **new_kwargs)
+
+    assert original_result == new_result
