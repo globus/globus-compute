@@ -275,3 +275,33 @@ More details on the Globus Compute login manager prototcol are available `here. 
   )
 
   fx = Client(login_manager=compute_login_manager)
+
+Specifying a Serialization Strategy
+-----------------------------------
+
+When sending functions and arguments for execution on a Compute endpoint, the SDK uses
+the ``ComputeSerializer`` class to convert data to and from a format that can be easily
+sent over the wire. Internally, ``ComputeSerializer`` uses instances of
+``SerializationStrategy`` to do the actual work of serializing (converting function code
+arguments to strings) and deserializing (converting well-formatted strings back into
+function code and arguments).
+
+The default strategies are ``DillCode`` for function code and ``DillDataBase64`` for
+function ``*args`` and ``**kwargs``, which are both wrappers around |dill|_. To choose
+another serializer, use the ``code_serialization_strategy`` and
+``data_serialization_strategy`` members of the Compute ``Client``:
+
+.. code:: python
+
+  from globus_compute_sdk import Client, Executor
+  from globus_compute_sdk.serialize import DillDataBase64, CombinedCode
+
+  gcc = Client(
+    code_serialization_strategy=CombinedCode(),
+    data_serialization_strategy=DillDataBase64()
+  )
+  gcx = Executor('4b116d3c-1703-4f8f-9f6f-39921e5864df', funcx_client=gcc)
+
+  # do something with gcx
+
+Note that currently the only supported data serialization strategy is ``DillDataBase64``.
