@@ -305,3 +305,29 @@ another serializer, use the ``code_serialization_strategy`` and
   # do something with gcx
 
 Note that currently the only supported data serialization strategy is ``DillDataBase64``.
+
+To check whether a strategy works for a given use-case, use the ``check_strategies``
+method:
+
+.. code:: python
+
+  from globus_compute_sdk.serialize import ComputeSerializer, DillCodeSource, DillDataBase64
+
+  def greet(name, greeting = "greetings"):
+    return f"{greeting} {name}"
+
+  serializer = ComputeSerializer(
+    strategy_code=DillCodeSource(),
+    strategy_data=DillDataBase64()
+  )
+
+  serializer.check_strategies(greet, "world", greeting="hello")
+  # serializes like the following:
+  gcx.submit(greet, "world", greeting="hello")
+
+  # use the return value of check_strategies:
+  fn, args, kwargs = serializer.check_strategies(greet, "world", greeting="hello")
+  assert fn(*args, **kwargs) == greet("world", greeting="hello")
+
+.. |dill| replace:: ``dill``
+.. _dill: https://dill.readthedocs.io/en/latest/#basic-usage
