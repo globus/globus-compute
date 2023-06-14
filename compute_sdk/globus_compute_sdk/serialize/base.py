@@ -44,8 +44,6 @@ class SerializationError(Exception):
 
 
 class DeserializationError(Exception):
-    """Base class for all deserialization errors"""
-
     def __init__(self, reason):
         self.reason = reason
 
