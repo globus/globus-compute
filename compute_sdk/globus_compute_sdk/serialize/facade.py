@@ -55,14 +55,14 @@ class ComputeSerializer:
 
     def serialize(self, data):
         if callable(data):
-            stype, strategy = "Callable", self.strategy_code
+            stype, strategy = "Code", self.strategy_code
         else:
             stype, strategy = "Data", self.strategy_data
 
         try:
             return strategy.serialize(data)
         except Exception as e:
-            err_msg = f"{stype} Serialization strategy {strategy} failed"
+            err_msg = f"{stype} serialization strategy {type(strategy).__name__} failed"
             raise SerializationError(err_msg) from e
 
     def deserialize(self, payload):
