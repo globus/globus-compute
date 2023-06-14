@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import logging
+import typing as t
 
-from globus_compute_sdk.serialize.base import SerializationError, SerializationStrategy
+from globus_compute_sdk.serialize.base import (
+    DeserializationError,
+    SerializationError,
+    SerializationStrategy,
+)
 from globus_compute_sdk.serialize.concretes import (
     DEFAULT_STRATEGY_CODE,
     DEFAULT_STRATEGY_DATA,
@@ -125,3 +130,27 @@ class ComputeSerializer:
         )
 
         return unpacked
+
+    def check_strategies(self, function: t.Callable, *args, **kwargs):
+        """
+        Check that the given function, args, and kwargs are compatible with this
+        ComputeSerializer's serialization strategies.
+
+        Uses the same interface as Executor.submit. Returns a list containing the
+        function, args, and kwargs after going through serialization and
+        deserialization.
+        """
+
+        try:
+            ser_fn = self.serialize(function)
+            ser_args = self.serialize(args)
+            ser_kwargs = self.serialize(kwargs)
+
+            packed = self.pack_buffers([ser_fn, ser_args, ser_kwargs])
+        except Exception as e:
+            raise SerializationError("check_strategies failed to serialize") from e
+
+        try:
+            return self.unpack_and_deserialize(packed)
+        except Exception as e:
+            raise DeserializationError("check_strategies failed to deserialize") from e
