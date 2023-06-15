@@ -22,7 +22,9 @@ log = logging.getLogger(__name__)
 serializer = ComputeSerializer()
 
 
-def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) -> bytes:
+def execute_task(
+    task_id: uuid.UUID, task_body: bytes, result_size_limit: int = 10 * 1024 * 1024
+) -> bytes:
     """Execute task is designed to enable any executor to execute a Task payload
     and return a Result payload, where the payload follows the globus-compute protocols
     This method is placed here to make serialization easy for executor classes
@@ -41,22 +43,22 @@ def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) ->
 
     result_message: dict[
         str,
-        t.Union[uuid.UUID, str, tuple[str, str], list[TaskTransition], dict[str, str]],
-    ] = {}
+        uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
+    ]
 
     try:
-        task, task_buffer = _unpack_messagebody(task_body)
-        log.debug("executing task task_id='%s'", task.task_id)
+        _task, task_buffer = _unpack_messagebody(task_body)
+        log.debug("executing task task_id='%s'", task_id)
         result = _call_user_function(task_buffer, result_size_limit=result_size_limit)
         log.debug("Execution completed without exception")
-        result_message = dict(task_id=task.task_id, data=result)
+        result_message = dict(task_id=task_id, data=result)
 
     except Exception:
         log.exception("Caught an exception while executing user function")
         code, user_message = get_result_error_details()
         error_details = {"code": code, "user_message": user_message}
         result_message = dict(
-            task_id=task.task_id,
+            task_id=task_id,
             data=get_error_string(),
             exception=get_error_string(),
             error_details=error_details,
@@ -72,7 +74,7 @@ def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) ->
 
     log.debug(
         "task %s completed in %d ns",
-        task.task_id,
+        task_id,
         (exec_end.timestamp - exec_start.timestamp),
     )
 

@@ -23,7 +23,11 @@ INTERNAL_ERROR_CLASSES: tuple[type[Exception], ...] = (
 )
 
 
-def _typed_excinfo() -> tuple[type[Exception], Exception, types.TracebackType]:
+def _typed_excinfo(
+    exc: Exception | None = None,
+) -> tuple[type[Exception], Exception, types.TracebackType]:
+    if exc:
+        return type(exc), exc, exc.__traceback__
     return t.cast(
         t.Tuple[t.Type[Exception], Exception, types.TracebackType],
         sys.exc_info(),
@@ -37,8 +41,8 @@ def _inner_traceback(tb: types.TracebackType, levels: int = 2) -> types.Tracebac
     return tb
 
 
-def get_error_string(*, tb_levels: int = 2) -> str:
-    exc_info = _typed_excinfo()
+def get_error_string(*, exc: t.Any | None = None, tb_levels: int = 2) -> str:
+    exc_info = _typed_excinfo(exc)
     exc_type, exc, tb = exc_info
     if isinstance(exc, INTERNAL_ERROR_CLASSES):
         return repr(exc)
@@ -49,11 +53,11 @@ def get_error_string(*, tb_levels: int = 2) -> str:
     )
 
 
-def get_result_error_details() -> tuple[str, str]:
-    _, error, _ = _typed_excinfo()
+def get_result_error_details(exc: BaseException | None = None) -> tuple[str, str]:
+    _, error, _ = _typed_excinfo(exc)
     # code, user_message
     if isinstance(error, INTERNAL_ERROR_CLASSES):
-        return (error.__class__.__name__, f"remote error: {error}")
+        return type(error).__name__, f"remote error: {error}"
     return (
         "RemoteExecutionError",
         "An error occurred during the execution of this task",
