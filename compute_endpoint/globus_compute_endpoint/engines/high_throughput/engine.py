@@ -36,7 +36,7 @@ from parsl.executors.errors import BadMessage, ScalingFailed
 from parsl.providers import LocalProvider
 from parsl.utils import RepresentationMixin
 
-fx_serializer = ComputeSerializer()
+serializer = ComputeSerializer()
 
 log = logging.getLogger(__name__)
 
@@ -563,7 +563,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                                 "Engine shutting down due to fatal "
                                 "exception from interchange"
                             )
-                            self._engine_exception = fx_serializer.deserialize(
+                            self._engine_exception = serializer.deserialize(
                                 msg["exception"]
                             )
                             log.exception(f"Exception: {self._engine_exception}")
@@ -609,7 +609,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                             continue
 
                         if "result" in msg:
-                            result = fx_serializer.deserialize(msg["result"])
+                            result = serializer.deserialize(msg["result"])
                             try:
                                 task_fut.set_result(result)
                             except concurrent.futures.InvalidStateError:
@@ -618,7 +618,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                                     "Already in terminal state"
                                 )
                         elif "exception" in msg:
-                            exception = fx_serializer.deserialize(msg["exception"])
+                            exception = serializer.deserialize(msg["exception"])
                             try:
                                 task_fut.set_result(exception)
                             except concurrent.futures.InvalidStateError:
@@ -701,26 +701,10 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         log.debug(f"Got managers: {workers}")
         return workers
 
-    def _submit(
-        self,
-        func: t.Callable,
-        *args: t.Any,
-        task_id: uuid.UUID = None,
-        **kwargs: t.Any,
-    ) -> HTEXFuture:
-        self._task_counter += 1
-        s_task_id = str(task_id)
+    def _submit(self, func: t.Callable, *args: t.Any, **kwargs: t.Any) -> Future:
+        raise RuntimeError("Invalid attempt to _submit()")
 
-        ser_payload = fx_serializer.serialize((func, args, kwargs))
-        payload = Task(s_task_id, "RAW", ser_payload)
-        future = HTEXFuture(self, task_id=s_task_id)
-        self.tasks[s_task_id] = future
-        assert self.outgoing_q
-        self.outgoing_q.put(payload.pack())
-
-        return future
-
-    def submit(self, task_id: uuid.UUID, packed_task: bytes) -> Future:
+    def submit(self, task_id: uuid.UUID, packed_task: bytes) -> HTEXFuture:
         """Submits a messagepacked.Task for execution
 
         Parameters
@@ -731,13 +715,21 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         Returns:
               Submit status
         """
-        log.debug(f"Submitting task:{task_id}")
-
         if self._engine_bad_state.is_set():
             # If the flag is set the exception body must exist
             raise self._engine_exception  # type: ignore
 
-        future = self._submit(execute_task, packed_task, task_id=task_id)
+        self._task_counter += 1
+
+        task_id_str = str(task_id)
+        future = HTEXFuture(self, task_id_str)
+        self.tasks[task_id_str] = future
+
+        ser = serializer.serialize((execute_task, [task_id, packed_task], {}))
+        payload = Task(task_id_str, "RAW", ser).pack()
+        assert self.outgoing_q  # Placate mypy
+        self.outgoing_q.put(payload)
+
         return future
 
     def _get_block_and_job_ids(self):
@@ -848,28 +840,27 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         log.info("Finished HighThroughputEngine shutdown attempt")
         return True
 
-    def _cancel(self, future):
-        """Attempt cancelling a task tracked by the future by requesting
-        cancellation from the interchange. Task cancellation is attempted
-        only if the future is cancellable i.e not already in a terminal
-        state. This relies on the Engine not setting the task to a running
-        state, and the task only tracking pending, and completed states.
+    def cancel_task(self, task_id: uuid.UUID | str) -> bool:
+        """
+        Attempt to cancel the task `task_id` by requesting cancellation
+        from the interchange.  Task cancellation is attempted only if the
+        future is cancellable (i.e., not already in a terminal state).  This
+        relies on the Engine not setting the task to a running state, and the
+        task only tracking pending, and completed states.
 
         Parameters
         ----------
-        future
+        task_id
 
         Returns
         -------
         Bool
         """
 
-        ret_value = future._cancel()
+        log.debug("Send TaskCancel to interchange (%s)", task_id)
         log.debug("Sending cancel of task_id:{future.task_id} to interchange")
-        if ret_value is True:
-            self.command_client.run(TaskCancel(future.task_id))
-            log.debug("Sent TaskCancel to interchange")
-        return ret_value
+        # TODO: Doesn't yet return a bool ...
+        return self.command_client.run(TaskCancel(str(task_id)))
 
 
 CANCELLED = "CANCELLED"
@@ -880,7 +871,7 @@ FINISHED = "FINISHED"
 class HTEXFuture(concurrent.futures.Future):
     __slots__ = ("engine", "task_id")
 
-    def __init__(self, engine: HighThroughputEngine, task_id: t.Optional[str]):
+    def __init__(self, engine: HighThroughputEngine, task_id: str):
         super().__init__()
         self.engine = engine
         self.task_id = task_id
@@ -890,14 +881,6 @@ class HTEXFuture(concurrent.futures.Future):
             f"{self.__class__} does not implement cancel() "
             "try using best_effort_cancel()"
         )
-
-    def _cancel(self):
-        """Should be invoked only by the Engine
-        Returns
-        -------
-        Bool
-        """
-        return super().cancel()
 
     def best_effort_cancel(self):
         """Attempt to cancel the function.
@@ -915,4 +898,4 @@ class HTEXFuture(concurrent.futures.Future):
         -------
         Bool
         """
-        return self.engine._cancel(self)
+        return self.engine.cancel_task(self.task_id)

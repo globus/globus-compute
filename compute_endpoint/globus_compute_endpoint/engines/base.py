@@ -117,33 +117,47 @@ class GlobusComputeEngineBase(ABC):
             packed = messagepack.pack(status_report)
             self.results_passthrough.put(packed)
 
-    def _future_done_callback(self, future: Future):
-        """Callback to post result to the passthrough queue
+    def _setup_future_done_callback(self, task_id: uuid.UUID, future: Future) -> None:
+        """
+        Set up the done() callback for the provided future.
+
+        The done callback handles
+        Callback to post result to the passthrough queue
         Parameters
         ----------
         future: Future for which the callback is triggerd
         """
 
-        if future.exception():
-            code, user_message = get_result_error_details()
-            error_details = {"code": code, "user_message": user_message}
-            exec_end = TaskTransition(
-                timestamp=time.time_ns(),
-                state=TaskState.EXEC_END,
-                actor=ActorName.WORKER,
-            )
-            result_message = dict(
-                task_id=future.task_id,  # type: ignore
-                data=get_error_string(),
-                exception=get_error_string(),
-                error_details=error_details,
-                task_statuses=[exec_end],  # We don't have any more info transitions
-            )
-            packed_result = messagepack.pack(Result(**result_message))
-        else:
-            packed_result = future.result()
+        exec_beg = TaskTransition(  # Reminder: used by *closure*, below
+            timestamp=time.time_ns(),
+            actor=ActorName.INTERCHANGE,
+            state=TaskState.WAITING_FOR_LAUNCH,
+        )
 
-        self.results_passthrough.put(packed_result)
+        def _done_cb(f: Future):
+            if f.exception():
+                exc = f.exception()
+                code, user_message = get_result_error_details(exc)
+                error_details = {"code": code, "user_message": user_message}
+                exec_end = TaskTransition(
+                    timestamp=time.time_ns(),
+                    actor=ActorName.INTERCHANGE,
+                    state=TaskState.EXEC_END,
+                )
+                result_message = dict(
+                    task_id=task_id,
+                    data=get_error_string(exc=exc),
+                    exception=get_error_string(exc=exc),
+                    error_details=error_details,
+                    task_statuses=[exec_beg, exec_end],  # only transition info we have
+                )
+                packed_result = messagepack.pack(Result(**result_message))
+            else:
+                packed_result = f.result()
+
+            self.results_passthrough.put(packed_result)
+
+        future.add_done_callback(_done_cb)
 
     @abstractmethod
     def _submit(
@@ -166,11 +180,6 @@ class GlobusComputeEngineBase(ABC):
         future
         """
 
-        future: Future = self._submit(execute_task, packed_task)
-
-        # Executors mark futures are failed in the event of faults
-        # We need to tie the task_id info into the future to identify
-        # which tasks have failed
-        future.task_id = task_id  # type: ignore
-        future.add_done_callback(self._future_done_callback)
+        future = self._submit(execute_task, packed_task)
+        self._setup_future_done_callback(task_id, future)
         return future
