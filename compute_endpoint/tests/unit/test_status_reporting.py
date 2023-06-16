@@ -27,7 +27,7 @@ def gc_engine(tmp_path):
     engine.shutdown()
 
 
-def test_status_reporting(x, gc_engine):
+def test_status_reporting(gc_engine):
     engine = gc_engine
 
     report = engine.get_status_report()

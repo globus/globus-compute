@@ -25,7 +25,7 @@ def test_execute_task():
         )
     )
 
-    packed_result = execute_task(task_message)
+    packed_result = execute_task(task_id, task_message)
     assert isinstance(packed_result, bytes)
 
     result = messagepack.unpack(packed_result)
@@ -53,7 +53,7 @@ def test_execute_task_with_exception():
         )
     )
 
-    packed_result = execute_task(task_message)
+    packed_result = execute_task(task_id, task_message)
     assert isinstance(packed_result, bytes)
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)

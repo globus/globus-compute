@@ -129,7 +129,7 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
         messagepack.message_types.Task(task_id=task_id, task_buffer=payload)
     )
 
-    s_result = execute_task(task_body, result_size_limit=return_size - 2)
+    s_result = execute_task(task_id, task_body, result_size_limit=return_size - 2)
     result = messagepack.unpack(s_result)
 
     assert isinstance(result, messagepack.message_types.Result)
@@ -154,7 +154,7 @@ def test_app_timeout(test_worker):
     )
 
     with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.1"}):
-        packed_result = execute_task(task_body)
+        packed_result = execute_task(task_id, task_body)
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
