@@ -12,11 +12,12 @@ import pathlib
 import re
 import sys
 import uuid
+from datetime import datetime
 
 log = logging.getLogger(__name__)
 
 DEFAULT_FORMAT = (
-    "%(created)f %(asctime)s %(levelname)s %(processName)s-%(process)d "
+    "%(asctime)s %(levelname)s %(processName)s-%(process)d "
     "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
     "%(message)s"
 )
@@ -33,7 +34,7 @@ _gray = "\033[37m"
 _grayonb = "\033[37;40m"
 _r = "\033[m"
 _C_BASE = (
-    f"{_teal}%(created)f{_r} {_yel}%(asctime)s{_r} {_ital}%(levelname)s{_r}"
+    f"{_yel}%(asctime)s{_r} {_ital}%(levelname)s{_r}"
     " %(processName)s-%(process)d %(threadName)s-%(thread)d"
     f" %(name)s:{_cyan}%(lineno)d{_r} {_purp}%(funcName)s{_r}"
 )
@@ -45,6 +46,14 @@ C_ERROR_FMT = _C_BASE + f" {COLOR_ERROR}%(message)s{_r}"
 C_WARNING_FMT = _C_BASE + f" {COLOR_WARNING}%(message)s{_r}"
 C_INFO_FMT = _C_BASE + f" {COLOR_INFO}%(message)s{_r}"
 C_DEBUG_FMT = _C_BASE + f" {COLOR_DEBUG}%(message)s{_r}"
+
+
+class DatetimeFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        ct = datetime.fromtimestamp(record.created)
+        if not datefmt:
+            datefmt = self.default_time_format
+        return ct.strftime(datefmt)
 
 
 class ComputeConsoleFormatter(logging.Formatter):
@@ -66,13 +75,11 @@ class ComputeConsoleFormatter(logging.Formatter):
     uuid_re = re.compile(rf"(?<!\dm)({_uuid_re})")
 
     def __init__(
-        self,
-        debug: bool = False,
-        no_color: bool = False,
-        fmt: str = "",
-        datefmt: str = "%Y-%m-%d %H:%M:%S",
+        self, debug: bool = False, no_color: bool = False, fmt: str = "", **kwargs
     ) -> None:
         super().__init__()
+
+        kwargs.setdefault("datefmt", "%Y-%m-%d %H:%M:%S,%f")
 
         self.use_color = debug and not no_color and sys.stderr.isatty()
 
@@ -94,13 +101,13 @@ class ComputeConsoleFormatter(logging.Formatter):
             e_fmt = ansi_re.sub("", e_fmt)
 
         if debug:
-            self._error_formatter = logging.Formatter(fmt=e_fmt, datefmt=datefmt)
-            self._warning_formatter = logging.Formatter(fmt=w_fmt, datefmt=datefmt)
-            self._debug_formatter = logging.Formatter(fmt=d_fmt, datefmt=datefmt)
-            self._info_formatter = logging.Formatter(fmt=i_fmt, datefmt=datefmt)
+            self._error_formatter = DatetimeFormatter(fmt=e_fmt, **kwargs)
+            self._warning_formatter = DatetimeFormatter(fmt=w_fmt, **kwargs)
+            self._debug_formatter = DatetimeFormatter(fmt=d_fmt, **kwargs)
+            self._info_formatter = DatetimeFormatter(fmt=i_fmt, **kwargs)
         else:
-            self._info_formatter = logging.Formatter(fmt="> %(message)s")
-            self._warning_formatter = logging.Formatter(fmt=w_fmt, datefmt=datefmt)
+            self._info_formatter = DatetimeFormatter(fmt="> %(message)s")
+            self._warning_formatter = DatetimeFormatter(fmt=w_fmt, **kwargs)
             self._error_formatter = self._warning_formatter
             self._debug_formatter = self._warning_formatter
 
@@ -158,13 +165,15 @@ def _get_file_dict_config(
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "globus_compute_endpoint.logging_config.ComputeConsoleFormatter",
+                "()": ComputeConsoleFormatter,
                 "debug": debug,
                 "no_color": no_color,
+                "datefmt": "%Y-%m-%d %H:%M:%S,%f",
             },
             "filefmt": {
+                "()": DatetimeFormatter,
                 "format": DEFAULT_FORMAT,
-                "datefmt": "%Y-%m-%d %H:%M:%S",
+                "datefmt": "%Y-%m-%d %H:%M:%S,%f",
             },
         },
         "handlers": {
@@ -201,9 +210,10 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
         "version": 1,
         "formatters": {
             "streamfmt": {
-                "()": "globus_compute_endpoint.logging_config.ComputeConsoleFormatter",
+                "()": ComputeConsoleFormatter,
                 "debug": debug,
                 "no_color": no_color,
+                "datefmt": "%Y-%m-%d %H:%M:%S,%f",
             },
         },
         "handlers": {
