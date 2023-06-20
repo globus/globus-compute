@@ -12,15 +12,24 @@ def _clear_sdk_env(monkeypatch):
 
 
 def test_web_service_url(monkeypatch):
-    assert get_web_service_url(None) == "https://compute.api.globus.org/v2"
-    assert get_web_service_url("production") == "https://compute.api.globus.org/v2"
-    assert (
-        get_web_service_url("no-such-env-name-known")
-        == "https://compute.api.globus.org/v2"
-    )
-    assert get_web_service_url("dev") == "https://api.dev.funcx.org/v2"
+    env_url_map = {
+        None: "https://compute.api.globus.org/v2",
+        "production": "https://compute.api.globus.org/v2",
+        "bad-env-name": "https://compute.api.globus.org/v2",
+        "sandbox": "https://compute.api.sandbox.globuscs.info/v2",
+        "test": "https://compute.api.test.globuscs.info/v2",
+        "preview": "https://compute.api.preview.globuscs.info/v2",
+    }
+
+    for env, url in env_url_map.items():
+        assert get_web_service_url(env) == url
+
     monkeypatch.setenv("FUNCX_SDK_ENVIRONMENT", "dev")
     assert get_web_service_url(None) == "https://api.dev.funcx.org/v2"
+
+    # GLOBUS_SDK_ENVIRONMENT should override FUNCX_SDK_ENVIRONMENT
+    monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", "sandbox")
+    assert get_web_service_url(None) == env_url_map["sandbox"]
 
 
 def test_web_socket_url(monkeypatch):
