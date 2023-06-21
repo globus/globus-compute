@@ -27,7 +27,7 @@ def _typed_excinfo(
     exc: Exception | None = None,
 ) -> tuple[type[Exception], Exception, types.TracebackType]:
     if exc:
-        return type(exc), exc, exc.__traceback__
+        return type(exc), exc, exc.__traceback__  # type: ignore
     return t.cast(
         t.Tuple[t.Type[Exception], Exception, types.TracebackType],
         sys.exc_info(),
@@ -54,7 +54,7 @@ def get_error_string(*, exc: t.Any | None = None, tb_levels: int = 2) -> str:
 
 
 def get_result_error_details(exc: BaseException | None = None) -> tuple[str, str]:
-    _, error, _ = _typed_excinfo(exc)
+    _, error, _ = _typed_excinfo(exc)  # type: ignore
     # code, user_message
     if isinstance(error, INTERNAL_ERROR_CLASSES):
         return type(error).__name__, f"remote error: {error}"

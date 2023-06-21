@@ -474,7 +474,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
     def get_status_report(self) -> EPStatusReport:
         """HTEX Interchange reports EPStatusReport periodically"""
-        pass
+        raise NotImplementedError
 
     def _queue_management_worker(self):
         """Listen to the queue for task status messages and handle them.
@@ -860,6 +860,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         log.debug("Send TaskCancel to interchange (%s)", task_id)
         log.debug("Sending cancel of task_id:{future.task_id} to interchange")
         # TODO: Doesn't yet return a bool ...
+        assert self.command_client
         return self.command_client.run(TaskCancel(str(task_id)))
 
 
