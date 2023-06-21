@@ -4,7 +4,7 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 REQUIRES = [
-    "globus-compute-endpoint==2.2.0a0",
+    "globus-compute-endpoint==2.2.0a1",
 ]
 
 version_ns = {}
