@@ -4,9 +4,8 @@ import multiprocessing
 import unittest.mock
 import uuid
 
-import dill
+from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task
-from globus_compute_endpoint.engines.high_throughput.messages import Message
 from globus_compute_sdk import Client
 
 
@@ -28,8 +27,8 @@ class MockExecutor(unittest.mock.Mock):
         self.endpoint_id = endpoint_id
         self.run_dir = run_dir
 
-    def submit_raw(self, packed_task: bytes):
-        task: Task = Message.unpack(packed_task)
-        res = Result(task_id=task.task_id, data=task.task_buffer)
-        res = {"task_id": "abc", "message": dill.dumps(res)}
-        self.results_passthrough.put(res)
+    def submit(self, task_id: uuid.UUID, packed_task: bytes):
+        task: Task = messagepack.unpack(packed_task)
+        res = Result(task_id=task_id, data=task.task_buffer)
+        packed_result = messagepack.pack(res)
+        self.results_passthrough.put(packed_result)

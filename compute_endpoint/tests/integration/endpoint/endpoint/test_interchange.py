@@ -11,9 +11,6 @@ from globus_compute_endpoint.cli import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
 from globus_compute_endpoint.endpoint.utils.config import Config
-from globus_compute_endpoint.engines.high_throughput.messages import (
-    EPStatusReport as HTEPStatusReport,
-)
 from tests.utils import try_for_timeout
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
@@ -63,6 +60,7 @@ def test_start_requires_pre_registered(funcx_dir):
         )
 
 
+@pytest.mark.skip("EPInterchange is no longer unpacking a task")
 def test_invalid_task_received(mocker, endpoint_uuid):
     ei = EndpointInterchange(
         endpoint_id=endpoint_uuid,
@@ -89,6 +87,7 @@ def test_invalid_task_received(mocker, endpoint_uuid):
     assert "Failed to start task" in result.data
 
 
+@pytest.mark.skip("EPInterchange no longer unpacks result body")
 def test_invalid_result_received(mocker, endpoint_uuid):
     mock_rqp = mocker.MagicMock()
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_rqp)
@@ -330,9 +329,11 @@ def test_faithfully_handles_status_report_messages(mocker, endpoint_uuid, random
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
     )
 
-    epsr = HTEPStatusReport(endpoint_uuid, {"sentinel": randomstring()}, {})
-    msg = {"task_id": None, "message": pickle.dumps(epsr)}
-    ei.results_passthrough.put(msg)
+    status_report = EPStatusReport(
+        endpoint_id=endpoint_uuid, global_state={"sentinel": "foo"}, task_statuses=[]
+    )
+
+    ei.results_passthrough.put(pack(status_report))
     t = threading.Thread(target=ei._main_loop, daemon=True)
     t.start()
 
@@ -345,4 +346,4 @@ def test_faithfully_handles_status_report_messages(mocker, endpoint_uuid, random
     found_epsr = unpack(packed_bytes)
     assert isinstance(found_epsr, EPStatusReport)
     assert found_epsr.endpoint_id == uuid.UUID(endpoint_uuid)
-    assert found_epsr.global_state["sentinel"] == epsr.global_state["sentinel"]
+    assert found_epsr.global_state["sentinel"] == status_report.global_state["sentinel"]
