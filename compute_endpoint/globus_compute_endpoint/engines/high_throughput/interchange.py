@@ -978,7 +978,6 @@ class Interchange:
                                 mdata["tasks"][task_container].remove(tid)
 
                                 if tid in self.task_status_deltas:
-                                    del self.task_status_deltas[tid]
                                     b_messages[_idx] = dill.dumps(r)
 
                         mdata["total_tasks"] -= len(b_messages)
