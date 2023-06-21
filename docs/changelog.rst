@@ -3,9 +3,54 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.2.0a0:
+.. _changelog-2.2.0:
 
-globus-compute-sdk & globus-compute-endpoint v2.2.0a0
+globus-compute-sdk & globus-compute-endpoint v2.2.0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for defining an endpoint's configuration in a config.yaml file.
+
+  For backward compatibility, we will continue to support using a config.py file
+  and ignore the config.yml file when a config.py file is in the endpoint directory.
+
+- Users can now import the ``Config`` object via:
+  ``from globus_compute_endpoint.endpoint.config import Config``
+
+  For backwards compatibility, we continue to support importing from the old path:
+  ``from globus_compute_endpoint.endpoint.utils.config import Config``
+
+- The strategies used to serialize functions and arguments are now selectable at the
+  ``Client`` level via constructor arguments (``code_serialization_strategy`` and
+  ``data_serialization_strategy``)
+  - For example, to use ``DillCodeSource`` when serializing functions:
+    ``client = Client(code_serialization_strategy=DillCodeSource())``
+  - This functionality is available to ``Executor``s by passing a custom client. Using
+    the client above: ``executor = Executor(funcx_client=client)``
+
+- Added ``check_strategies`` method to ``ComputeSerializer`` for determining whether
+  serialization strategies are compatible with a given use-case
+
+Removed
+^^^^^^^
+
+- The SDK no longer sends ``entry_point`` when registering a function. (This field was
+  unused elsewhere.)
+
+Changed
+^^^^^^^
+
+- To avoid confusion, UUIDs will no longer be allowed as the name of an Endpoint.
+
+- Simplified the logic used to select a serialization strategy when one isn't specified -
+  rather than try every strategy in order, Globus Compute now simply defaults to
+  ``DillCode`` and ``DillDataBase64`` for code and data respectively
+
+.. _changelog-2.1.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.1.0
 ---------------------------------------------------
 
 New Functionality

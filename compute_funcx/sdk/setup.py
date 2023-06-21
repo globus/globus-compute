@@ -5,7 +5,7 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 REQUIRES = [
-    "globus-compute-sdk==2.2.0a0",
+    "globus-compute-sdk==2.2.0",
 ]
 
 
