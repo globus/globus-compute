@@ -26,8 +26,8 @@ engine:
         cpus_per_node: 32
         select_options: ngpus=4
 
-        # e.g., '#PBS -l filesystems=home:grand:eagle\n#PBS -k doe'
-        scheduler_options: {{ OPTIONS }}
+        # e.g., "#PBS -l filesystems=home:grand:eagle\n#PBS -k doe"
+        scheduler_options: "#PBS -l filesystems=home:grand:eagle"
 
         # Node setup: activate necessary conda environment and such
         worker_init: {{ COMMAND }}
