@@ -112,6 +112,7 @@ class ConfigModel(BaseModel):
     idle_heartbeats_soft: t.Optional[int]
     idle_heartbeats_hard: t.Optional[int]
     detach_endpoint: t.Optional[bool]
+    endpoint_setup: t.Optional[str]
     log_dir: t.Optional[str]
     stdout: t.Optional[str]
     stderr: t.Optional[str]

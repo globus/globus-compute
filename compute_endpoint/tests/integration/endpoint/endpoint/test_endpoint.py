@@ -343,3 +343,40 @@ def test_endpoint_update_funcx(mock_get_id, mock_get_conf, fs, cur_config):
                 assert "Rename it or use" in str(e)
         else:
             assert AssertionError(f"Unexpected exception: {e}")
+
+
+def test_endpoint_setup_execution(mocker, tmp_path, randomstring, capfd):
+    mocker.patch(
+        "globus_compute_endpoint.endpoint.endpoint.Endpoint.check_pidfile",
+        return_value={"exists": False},
+    )
+
+    tmp_file_content = randomstring()
+    tmp_file = tmp_path / "random.txt"
+    tmp_file.write_text(tmp_file_content)
+
+    command = f"""\
+cat {tmp_file}
+exit 1  # exit early to avoid the rest of endpoint setup
+    """
+
+    endpoint_dir = None
+    endpoint_uuid = None
+    endpoint_config = Config(endpoint_setup=command)
+    log_to_console = None
+    no_color = None
+    reg_info = None
+
+    ep = endpoint.Endpoint()
+    with pytest.raises(SystemExit) as e:
+        ep.start_endpoint(
+            endpoint_dir,
+            endpoint_uuid,
+            endpoint_config,
+            log_to_console,
+            no_color,
+            reg_info,
+        )
+
+    assert e.value.code == os.EX_CONFIG
+    assert tmp_file_content in capfd.readouterr().out

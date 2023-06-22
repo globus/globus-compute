@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import socket
+import subprocess
 import sys
 import typing
 import uuid
@@ -264,6 +265,16 @@ class Endpoint:
                     "proper cleanup. Cleaning up now."
                 )
                 Endpoint.pidfile_cleanup(endpoint_dir)
+
+        if endpoint_config.endpoint_setup:
+            try:
+                subprocess.check_call(endpoint_config.endpoint_setup, shell=True)
+            except Exception:
+                log.exception(
+                    "unable to execute endpoint_setup command: "
+                    + endpoint_config.endpoint_setup
+                )
+                exit(os.EX_CONFIG)
 
         result_store = ResultStore(endpoint_dir=endpoint_dir)
 
