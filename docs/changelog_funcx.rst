@@ -3,9 +3,81 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.2.0a0:
+.. _changelog-2.2.0:
 
-funcx & funcx-endpoint v2.2.0a0
+globus-compute-sdk & globus-compute-endpoint v2.2.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for defining an endpoint's configuration in a config.yaml file.
+
+  For backward compatibility, we will continue to support using a config.py file
+  and ignore the config.yml file when a config.py file is in the endpoint directory.
+
+- Users can now import the ``Config`` object via:
+  ``from globus_compute_endpoint.endpoint.config import Config``
+
+  For backwards compatibility, we continue to support importing from the old path:
+  ``from globus_compute_endpoint.endpoint.utils.config import Config``
+
+- The strategies used to serialize functions and arguments are now selectable at the
+  ``Client`` level via constructor arguments (``code_serialization_strategy`` and
+  ``data_serialization_strategy``)
+  - For example, to use ``DillCodeSource`` when serializing functions:
+    ``client = Client(code_serialization_strategy=DillCodeSource())``
+  - This functionality is available to ``Executor``s by passing a custom client. Using
+    the client above: ``executor = Executor(funcx_client=client)``
+
+- Added ``check_strategies`` method to ``ComputeSerializer`` for determining whether
+  serialization strategies are compatible with a given use-case
+
+Removed
+^^^^^^^
+
+- The SDK no longer sends ``entry_point`` when registering a function. (This field was
+  unused elsewhere.)
+
+Changed
+^^^^^^^
+
+- To avoid confusion, UUIDs will no longer be allowed as the name of an Endpoint.
+
+- Simplified the logic used to select a serialization strategy when one isn't specified -
+  rather than try every strategy in order, Globus Compute now simply defaults to
+  ``DillCode`` and ``DillDataBase64`` for code and data respectively
+
+.. _changelog-2.1.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.1.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Support for 3 new execution ``Engines``, designed to replace the ``HighThroughputExecutor``
+
+  - ``GlobusComputeEngine``: Wraps Parsl's ``HighThroughputExecutor`` to match the current
+    default executor (globus-computes' fork of ``HighThroughputExecutor``)
+  - ``ProcessPoolEngine``: Wraps ``concurrent.futures.ProcessPoolExecutor`` for concurrent
+    local execution
+  - ``ThreadPoolEngine``: Wraps ``concurrent.futures.ThreadPoolEngine`` for concurrent
+    local execution on MacOS.
+
+Bug Fixes
+^^^^^^^^^
+
+- Add validation logic to the endpoint ``configure`` subcommand to prevent
+  certain classes of endpoint names.  That is, Compute Endpoints may have
+  arbitrary _display_ names, but the name for use on the filesystem works best
+  without, for example, spaces.  Now, the ``configure`` step will exit early
+  with a (hopefully!) helpul error message explaining the problem.
+
+
+.. _changelog-2.0.3:
+
+funcx & funcx-endpoint v2.0.3
 ---------------------------------------------------
 
 Bug Fixes
