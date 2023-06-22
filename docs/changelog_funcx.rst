@@ -3,9 +3,9 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.2.0:
+.. _changelog-2.2.1:
 
-globus-compute-sdk & globus-compute-endpoint v2.2.0
+funcx & funcx-endpoint v2.2.1
 ---------------------------------------------------
 
 New Functionality
@@ -50,7 +50,7 @@ Changed
 
 .. _changelog-2.1.0:
 
-globus-compute-sdk & globus-compute-endpoint v2.1.0
+funcx & funcx-endpoint v2.1.0
 ---------------------------------------------------
 
 New Functionality
