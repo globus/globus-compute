@@ -94,7 +94,7 @@ class EngineModel(BaseModel):
 
     _validate_provider = _validate_params("provider")
     _validate_strategy = _validate_params("strategy")
-    _validate_strategy = _validate_params("address")
+    _validate_address = _validate_params("address")
 
     class Config:
         extra = "allow"
