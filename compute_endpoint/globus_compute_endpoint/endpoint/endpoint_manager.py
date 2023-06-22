@@ -437,13 +437,10 @@ class EndpointManager:
             # can't -- for whatever reason -- that's a problem.  So, don't ignore the
             # potential error.
             log.debug("Setting process group for %s to %s", pid, gid)
-            # raises (good!) on error
-            # Yadu: Check with Kevin if this is kosher on MacOS
-            os.setresgid(gid, gid, gid)  # type: ignore
+            os.setresgid(gid, gid, gid)  # raises (good!) on error
             exit_code += 1
             log.debug("Setting process uid for %s to %s (%s)", pid, uid, uname)
-            # raises (good!) on error
-            os.setresuid(uid, uid, uid)  # type: ignore
+            os.setresuid(uid, uid, uid)  # raises (good!) on error
             exit_code += 1
 
             os.setsid()
