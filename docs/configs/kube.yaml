@@ -1,6 +1,6 @@
 heartbeat_period: 15
 heartbeat_threshold: 200
-log_dir: '.'
+log_dir: "."
 
 engine:
     label: Kubernetes_funcX
@@ -29,7 +29,7 @@ engine:
         # e.g., python:3.8-buster
         image: {{ IMAGE }}
 
-        # e.g., 'pip install --force-reinstall globus_compute_endpoint>=2.0.1'
+        # e.g., "pip install --force-reinstall globus_compute_endpoint>=2.0.1"
         worker_init: {{ COMMAND }}
 
         # e.g., default

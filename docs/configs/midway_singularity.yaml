@@ -19,11 +19,11 @@ engine:
 
         # string to prepend to #SBATCH blocks in the submit
         # script to the scheduler
-        # eg: '#SBATCH --constraint=knl,quad,cache'
+        # eg: "#SBATCH --constraint=knl,quad,cache"
         scheduler_options: {{ OPTIONS }}
 
         # Command to be run before starting a worker
-        # e.g., 'module load Anaconda; source activate parsl_env'
+        # e.g., "module load Anaconda; source activate parsl_env"
         worker_init: {{ COMMAND }}
 
         # Scale between 0-1 blocks with 2 nodes per block

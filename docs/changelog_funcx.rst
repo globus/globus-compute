@@ -27,7 +27,7 @@ New Functionality
   ``data_serialization_strategy``)
   - For example, to use ``DillCodeSource`` when serializing functions:
     ``client = Client(code_serialization_strategy=DillCodeSource())``
-  - This functionality is available to the ``Executor`` s by passing a custom client.
+  - This functionality is available to the ``Executor`` by passing a custom client.
     Using the client above: ``executor = Executor(funcx_client=client)``
 
 - Added ``check_strategies`` method to ``ComputeSerializer`` for determining whether
