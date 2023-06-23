@@ -3,9 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+funcx & funcx-endpoint v2.2.2
+---------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Address bug in which adding a `strategy` stanza to a YAML config prohibits an
+  endpoint from starting.
+
 .. _changelog-2.2.0:
 
-globus-compute-sdk & globus-compute-endpoint v2.2.0
+funcx & funcx-endpoint v2.2.0
 ---------------------------------------------------
 
 New Functionality
@@ -50,7 +59,7 @@ Changed
 
 .. _changelog-2.1.0:
 
-globus-compute-sdk & globus-compute-endpoint v2.1.0
+funcx & funcx-endpoint v2.1.0
 ---------------------------------------------------
 
 New Functionality
