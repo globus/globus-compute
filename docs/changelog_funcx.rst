@@ -3,9 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.2.1:
+funcx & funcx-endpoint v2.2.2
+---------------------------------------------------
 
-funcx & funcx-endpoint v2.2.1
+Bug Fixes
+^^^^^^^^^
+
+- Address bug in which adding a `strategy` stanza to a YAML config prohibits an
+  endpoint from starting.
+
+.. _changelog-2.2.0:
+
+funcx & funcx-endpoint v2.2.0
 ---------------------------------------------------
 
 New Functionality

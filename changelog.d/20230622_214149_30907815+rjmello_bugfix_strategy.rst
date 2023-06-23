@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Address bug in which adding a `strategy` stanza to a YAML config prohibits an
-  endpoint from starting.
