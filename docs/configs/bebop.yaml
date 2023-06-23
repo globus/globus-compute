@@ -18,7 +18,7 @@ engine:
         scheduler_options: {{ OPTIONS }}
 
         # Command to be run before starting a worker
-        # e.g., 'module load Anaconda; source activate parsl_env'
+        # e.g., "module load Anaconda; source activate parsl_env"
         worker_init: {{ COMMAND }}
 
         nodes_per_block: 1

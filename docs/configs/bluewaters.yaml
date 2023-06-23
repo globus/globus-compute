@@ -15,7 +15,7 @@ engine:
         scheduler_options: {{ OPTIONS }}
 
         # Command to be run before starting a worker
-        # e.g., 'module load bwpy; source activate compute env'
+        # e.g., "module load bwpy; source activate compute env"
         worker_init: {{ COMMAND }}
 
         # Scale between 0-1 blocks with 2 nodes per block

@@ -15,7 +15,7 @@ engine:
 
         # string to prepend to #SBATCH blocks in the submit
         # script to the scheduler
-        # e.g., '#SBATCH --constraint=knl,quad,cache'
+        # e.g., "#SBATCH --constraint=knl,quad,cache"
         scheduler_options: {{ OPTIONS }}
 
         # Command to be run before starting a worker
