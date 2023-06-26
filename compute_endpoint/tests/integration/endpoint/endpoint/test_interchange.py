@@ -140,7 +140,6 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker):
     ppid = os.getppid()
 
     mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
-    mocker.patch(f"{_MOCK_BASE}convert_to_internaltask")
     mocker.patch(f"{_MOCK_BASE}time.sleep")
     mock_ppid = mocker.patch(f"{_MOCK_BASE}os.getppid")
     mock_ppid.side_effect = (ppid, 1)
@@ -197,7 +196,8 @@ def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt):
         config=conf,
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
     )
-    ei.results_passthrough.put({"task_id": uuid.uuid1(), "message": b""})
+    result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
+    ei.results_passthrough.put(pack(result))
 
     ei._main_loop()
 
@@ -272,7 +272,8 @@ def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt):
     )
 
     def insert_msg():
-        ei.results_passthrough.put({"task_id": uuid.uuid1(), "message": b""})
+        result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
+        ei.results_passthrough.put(pack(result))
         while True:
             yield
 
