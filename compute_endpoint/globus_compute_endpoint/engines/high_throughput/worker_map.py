@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import logging
 import os
+import pathlib
+import queue
 import random
+import shlex
 import subprocess
 import time
 from collections import defaultdict
@@ -40,7 +43,7 @@ class WorkerMap:
         }
         self.pending_worker_type_counts: dict[str, Any] = {}
         # a dict to keep track of all the worker_queues with the key of work_type
-        self.worker_queues: dict[str, Any] = {}
+        self.worker_queues: dict[str, Queue[str]] = {}
         # a dict to keep track of all the worker_types with the key of worker_id
         self.worker_types: dict[str, str] = {}
         self.worker_id_counter = 0  # used to create worker_ids
@@ -56,16 +59,16 @@ class WorkerMap:
         self.worker_idle_since: dict[str, float] = {}
 
         # Create a queue of available accelerators, if accelerators are defined
-        self.available_accelerators: Queue | None = None
+        self.available_accelerators: Queue[str] | None = None
         if len(available_accelerators) != 0:
             self.available_accelerators = Queue()
             for device in available_accelerators:
                 self.available_accelerators.put(device)
-        self.assigned_accelerators: dict[str, str] = {}  # Map worker ID -> accelerator
+        self.assigned_accelerators: dict[str, str] = {}  # worker ID -> accelerator
 
         self._noisy_log: dict[str, Any] = defaultdict(dict)
 
-    def register_worker(self, worker_id, worker_type):
+    def register_worker(self, worker_id: str, worker_type: str):
         """Add a new worker"""
         log.debug(f"In register worker worker_id: {worker_id} type:{worker_type}")
         self.worker_types[worker_id] = worker_type
@@ -94,17 +97,38 @@ class WorkerMap:
         """Increase the to_die_count in prep for a worker getting removed"""
         self.to_die_count[worker_type] += 1
 
-    def remove_worker(self, worker_id):
+    def remove_worker(self, worker_id: str):
         """Remove the worker from the WorkerMap
 
         Should already be KILLed by this point.
         """
-        worker_type = self.worker_types[worker_id]
-        self.active_workers -= 1
-        self.total_worker_type_counts[worker_type] -= 1
-        self.to_die_count[worker_type] -= 1
+
+        worker_type = self.worker_types.pop(worker_id, None)
+        if worker_type:
+            self.total_worker_type_counts[worker_type] -= 1
+            self.to_die_count[worker_type] -= 1
+
+            # ugly, ugly cleanup.  The data structure does not make this
+            # simple, and I don't want to refactor the whole class at this
+            # time.  So ... work within the confines now and will change
+            # the problem at a later date.
+            worker_queue = self.worker_queues.get(worker_type)
+            if worker_queue:
+                num_to_search = worker_queue.qsize()
+                try:
+                    while num_to_search > 0:
+                        num_to_search -= 1
+                        wid = worker_queue.get_nowait()
+                        if wid == worker_id:
+                            break
+                        worker_queue.put(wid)
+                except queue.Empty:
+                    pass
+
         self.total_worker_type_counts["unused"] += 1
         self.ready_worker_type_counts["unused"] += 1
+
+        self.active_workers -= 1
 
         # Mark the accelerator as available, if provided
         if worker_id in self.assigned_accelerators:
@@ -145,7 +169,7 @@ class WorkerMap:
         ---------
         Total number of spun-up workers.
         """
-        spin_ups = {}
+        spin_ups: dict[bytes, subprocess.Popen] = {}
 
         log.trace("Next Worker Qsize: %s", len(next_worker_q))
         log.trace("Active Workers: %s", self.active_workers)
@@ -291,7 +315,7 @@ class WorkerMap:
 
     def add_worker(
         self,
-        worker_id=None,
+        worker_id: str | None = None,
         mode="no_container",
         worker_type="RAW",
         container_cmd_options="",
@@ -301,7 +325,7 @@ class WorkerMap:
         worker_port=None,
         logdir=None,
         uid=None,
-    ):
+    ) -> dict[str, subprocess.Popen]:
         """Launch the appropriate worker
 
         Parameters
@@ -315,21 +339,17 @@ class WorkerMap:
 
         """
         if worker_id is None:
-            str(random.random())
-
-        debug = " --debug" if debug else ""
-
-        worker_id = f" --worker_id {worker_id}"
+            worker_id = str(random.random())[2:]
 
         self.worker_id_counter += 1
 
-        cmd = (
-            f"globus-compute-worker {debug}{worker_id} "
-            f"-a {address} "
-            f"-p {worker_port} "
-            f"-t {worker_type} "
-            f"--logdir={os.path.join(logdir, uid)} "
-        )
+        cmd = ["globus-compute-worker"]
+        if debug:
+            cmd.append("--debug")
+        cmd.extend(("--worker_id", worker_id))
+        cmd.extend(("-a", str(address)))
+        cmd.extend(("-p", str(worker_port)))
+        cmd.extend(("-t", str(worker_type)))
 
         container_uri = None
         if worker_type != "RAW":
@@ -356,43 +376,50 @@ class WorkerMap:
             environment_variables["ROCR_VISIBLE_DEVICES"] = device
             environment_variables["SYCL_DEVICE_FILTER"] = f"*:*:{device}"
 
-        log.info(f"Command string :\n {cmd}")
-        log.info(f"Mode: {mode}")
-        log.info(f"Container uri: {container_uri}")
-        log.info(f"Container cmd options: {container_cmd_options}")
-        log.info(f"Worker type: {worker_type}")
+        log.info(
+            f"\n  Command string: {shlex.join(cmd)}"
+            f"\n     Worker type: {worker_type}"
+            f"\n            Mode: {mode}"
+            f"\n   Container URI: {container_uri}"
+            f"\n Container cmd options: {container_cmd_options}"
+        )
 
         if mode == "no_container":
-            modded_cmd = cmd
+            pass
         elif mode == "singularity_reuse":
             if container_uri is None:
                 log.warning(
                     "No container is specified for singularity mode. "
                     "Spawning a worker in a raw process instead."
                 )
-                modded_cmd = cmd
             elif not os.path.exists(container_uri):
                 log.warning(
                     f"Container uri {container_uri} is not found. "
                     "Spawning a worker in a raw process instead."
                 )
-                modded_cmd = cmd
             else:
-                modded_cmd = (
-                    f"singularity exec {container_cmd_options} {container_uri} {cmd}"
-                )
-            log.info(f"Command string with singularity:\n {modded_cmd}")
+                s_cmd = ["singularity", "exec"]
+                s_cmd.extend(shlex.split(str(container_cmd_options)))
+                s_cmd.append(container_uri)
+                s_cmd.extend(cmd)
+                cmd = s_cmd
+                del s_cmd
+                log.info(f"Command string with singularity:\n {shlex.join(cmd)}")
         else:
             raise NameError("Invalid container launch mode.")
 
         try:
-            proc = subprocess.Popen(
-                modded_cmd.split(),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                shell=False,
-                env=environment_variables,
-            )
+            bname = f"gc_worker_{worker_id}.s"
+            bdir = pathlib.Path(logdir) / uid
+            sout_path, serr_path = bdir / f"{bname}out", bdir / f"{bname}err"
+            with open(sout_path, "w") as sout, open(serr_path, "w") as serr:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=sout,
+                    stderr=serr,
+                    shell=False,
+                    env=environment_variables,
+                )
 
         except Exception:
             log.exception("Got an error in worker launch")
@@ -405,7 +432,7 @@ class WorkerMap:
         )
         self.pending_workers += 1
 
-        return {str(self.worker_id_counter - 1): proc}
+        return {worker_id: proc}
 
     def get_next_worker_q(self, new_worker_map) -> tuple[list[str], bool]:
         """Helper function to generate a queue of next workers to spin up .
@@ -462,7 +489,7 @@ class WorkerMap:
         log.debug(f"Worker idle since: {self.worker_idle_since}")
         self.worker_idle_since[worker_type] = time.time()
 
-    def put_worker(self, worker):
+    def put_worker(self, worker: str):
         """Adds worker to the list of waiting workers"""
         worker_type = self.worker_types[worker]
 

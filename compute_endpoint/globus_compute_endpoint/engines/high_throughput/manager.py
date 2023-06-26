@@ -9,11 +9,13 @@ import multiprocessing
 import os
 import platform
 import queue
+import random
+import signal
+import string
 import subprocess
 import sys
 import threading
 import time
-import uuid
 from collections import defaultdict
 from typing import Any
 
@@ -226,7 +228,7 @@ class Manager:
             )
         )
 
-        self.task_queues: dict[str, queue.Queue] = {}
+        self.task_queues: dict[str, queue.Queue[Task]] = {}
         if worker_type:
             self.task_queues[worker_type] = queue.Queue()
         self.outstanding_task_count: dict[str, int] = {}
@@ -259,10 +261,15 @@ class Manager:
         self.poller = zmq.Poller()
         self.poller.register(self.task_incoming, zmq.POLLIN)
         self.poller.register(self.funcx_task_socket, zmq.POLLIN)
+        self.worker_task_map: dict[str, str] = {}  # for task failure if worker dies
         self.task_worker_map: dict[str, Any] = {}
 
         self.task_done_counter = 0
         self.task_finalization_lock = threading.Lock()
+
+        # In case a worker process unexpectedly dies, have a catchall of when
+        # to scan and cleanup
+        self._worker_has_died = False
 
     def create_reg_message(self):
         """Creates a registration message to identify the worker to the interchange"""
@@ -317,6 +324,9 @@ class Manager:
         last_count_pending = -1
         last_count_worker = -1
         while not kill_event.is_set():
+            if self._worker_has_died:
+                self.scan_for_stale_workers()
+
             # Disabling the check on ready_worker_queue disables batching
             pending_task_count = task_recv_counter - self.task_done_counter
             ready_worker_count = self.worker_map.ready_worker_count()
@@ -349,14 +359,6 @@ class Manager:
 
             # Receive task batches from Interchange and forward to workers
             if self.task_incoming in socks and socks[self.task_incoming] == zmq.POLLIN:
-                # If we want to wrap the task_incoming polling into a separate function,
-                # we need to
-                #   self.poll_task_incoming(
-                #       poll_timer,
-                #       last_interchange_contact,
-                #       kill_event,
-                #       task_revc_counter
-                #   )
                 poll_timer = 0
                 _, pkl_msg = self.task_incoming.recv_multipart()
                 message = dill.loads(pkl_msg)
@@ -376,15 +378,12 @@ class Manager:
                             log.warning("Possible duplicate cancel or race-condition")
                             continue
                         # Cancel task by killing the worker it is on
-                        worker_id_raw = self.task_worker_map[task_id]["worker_id"]
-                        worker_to_kill = self.task_worker_map[task_id][
-                            "worker_id"
-                        ].decode("utf-8")
-                        worker_type = self.task_worker_map[task_id]["task_type"]
-                        log.debug(
-                            "Cancelling task running on worker: %s",
-                            self.task_worker_map[task_id],
-                        )
+                        task = self.task_worker_map[task_id]
+                        worker_id_raw = task["worker_id"]
+                        worker_to_kill = worker_id_raw.decode()
+                        worker_type = task["task_type"]
+
+                        log.debug("Cancelling task running on worker: %s", task)
                         try:
                             log.info(f"Removing worker:{worker_id_raw} from map")
                             self.worker_map.start_remove_worker(worker_type)
@@ -392,7 +391,7 @@ class Manager:
                             log.info(
                                 f"Popping worker:{worker_to_kill} from worker_procs"
                             )
-                            proc = self.worker_procs.pop(worker_to_kill)
+                            proc = self.worker_procs.pop(worker_id_raw)
                             log.warning(f"Sending process:{proc.pid} terminate signal")
                             proc.terminate()
                             try:
@@ -437,21 +436,14 @@ class Manager:
                     log.debug("Got heartbeat from interchange")
 
                 else:
-                    tasks = [
+                    tasks: list[tuple[str, Task]] = [
                         (rt["local_container"], Message.unpack(rt["raw_buffer"]))
                         for rt in message
                     ]
 
                     task_recv_counter += len(tasks)
-                    log.debug(
-                        "Got tasks: {} of {}".format(
-                            [t[1].task_id for t in tasks], task_recv_counter
-                        )
-                    )
-
+                    enqueued = []
                     for task_type, task in tasks:
-                        log.debug(f"Task is of type: {task_type}")
-
                         if task_type not in self.task_queues:
                             self.task_queues[task_type] = queue.Queue()
                         if task_type not in self.outstanding_task_count:
@@ -459,15 +451,17 @@ class Manager:
                         self.task_queues[task_type].put(task)
                         self.outstanding_task_count[task_type] += 1
                         self.task_type_mapping[task.task_id] = task_type
+                        enqueued.append((task.task_id, task_type))
+
+                    if log.isEnabledFor(logging.DEBUG):
                         log.debug(
-                            "Got task: Outstanding task counts: {}".format(
-                                self.outstanding_task_count
-                            )
+                            "Enqueued %s tasks (cumulative: %s)"
+                            "\n  Task ID (type)\n  %s\n  Count outstanding: %s",
+                            len(tasks),
+                            task_recv_counter,
+                            "\n  ".join(f"{tid} ({ttype}" for tid, ttype in enqueued),
                         )
-                        log.debug(
-                            f"Task {task.task_id} pushed to task queue "
-                            f"for type: {task_type}"
-                        )
+                    del enqueued
 
             else:
                 log.trace("No incoming tasks")
@@ -577,7 +571,8 @@ class Manager:
 
     def poll_funcx_task_socket(self, test=False):
         try:
-            w_id, m_type, message = self.funcx_task_socket.recv_multipart()
+            w_id_raw, m_type, message = self.funcx_task_socket.recv_multipart()
+            w_id = w_id_raw.decode()
             if m_type == b"REGISTER":
                 reg_info = dill.loads(message)
                 log.debug(f"Registration received from worker:{w_id} {reg_info}")
@@ -596,32 +591,6 @@ class Manager:
                         self.pending_result_queue.put(message)
                         self.worker_map.put_worker(w_id)
 
-            elif m_type == b"WRKR_DIE":
-                log.debug(f"[WORKER_REMOVE] Removing worker {w_id} from worker_map...")
-                log.debug(
-                    "Ready worker counts: {}".format(
-                        self.worker_map.ready_worker_type_counts
-                    )
-                )
-                log.debug(
-                    "Total worker counts: {}".format(
-                        self.worker_map.total_worker_type_counts
-                    )
-                )
-                self.worker_map.remove_worker(w_id)
-                proc = self.worker_procs.pop(w_id.decode())
-                if not proc.poll():
-                    try:
-                        proc.wait(timeout=1)
-                    except subprocess.TimeoutExpired:
-                        log.warning(
-                            "[WORKER_REMOVE] Timeout waiting for worker %s process to "
-                            "terminate",
-                            w_id,
-                        )
-                log.debug(f"[WORKER_REMOVE] Removing worker {w_id} process object")
-                log.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
-
             if test:
                 return dill.loads(message)
 
@@ -630,6 +599,7 @@ class Manager:
 
     def remove_task(self, task_id: str):
         task_type = self.task_type_mapping.pop(task_id)
+        self.task_worker_map.pop(task_id, None)
         self.task_status_deltas.pop(task_id, None)
         self.outstanding_task_count[task_type] -= 1
         self.task_done_counter += 1
@@ -641,7 +611,7 @@ class Manager:
         log.debug(f"Sending task {task.task_id} to {worker_id}")
         # TODO: Some duplication of work could be avoided here
         to_send = [
-            worker_id,
+            worker_id.encode(),
             dill.dumps(task.task_id),
             dill.dumps(task.container_id),
             task.pack(),
@@ -649,13 +619,14 @@ class Manager:
         self.funcx_task_socket.send_multipart(to_send)
         self.worker_map.update_worker_idle(task_type)
         if task.task_id != "KILL":
-            log.debug(f"Set task {task.task_id} to RUNNING")
+            log.debug("Set task to RUNNING: %s", task.task_id)
             tt = TaskTransition(
                 timestamp=time.time_ns(),
                 state=TaskState.RUNNING,
                 actor=ActorName.MANAGER,
             )
             self.task_status_deltas[task.task_id].append(tt)
+            self.worker_task_map[worker_id] = task.task_id
             self.task_worker_map[task.task_id] = {
                 "worker_id": worker_id,
                 "task_type": task_type,
@@ -744,6 +715,47 @@ class Manager:
         task = Task(task_id="KILL", container_id="RAW", task_buffer="KILL")
         self.task_queues[worker_type].put(task)
 
+    def set_worker_died(self, _sig_num, _curr_stack_frame):
+        self._worker_has_died = True
+
+    def scan_for_stale_workers(self):
+        self._worker_has_died = False
+        procs = list(self.worker_procs.items())
+        for wid, proc in procs:
+            if proc.poll() is None:
+                pass
+
+            rc = proc.wait()
+            log.debug(
+                "[WORKER_REMOVE] Removing worker from worker_map: %s (rc: %s)"
+                "\n  Ready worker counts: %s"
+                "\n  Total worker counts: %s",
+                wid,
+                rc,
+                self.worker_map.ready_worker_type_counts,
+                self.worker_map.total_worker_type_counts,
+            )
+
+            log.warning("WORKER TASK MAP: %s", self.worker_task_map)
+            log.warning("TASK WORKER MAP: %s", self.task_worker_map)
+            task_id = self.worker_task_map.pop(wid)
+            task = self.task_worker_map.pop(task_id, None)
+            self.worker_map.remove_worker(wid)
+            del self.worker_procs[wid]
+
+            log.debug(f"[WORKER_REMOVE] Worker processes: {self.worker_procs}")
+
+            if task:
+                self.remove_task(task_id)
+                log.debug("[WORKER_REMOVE] Marking task as failed: %s", task_id)
+                result_package = {
+                    "task_id": task_id,
+                    "container_id": task["task_type"],
+                    "error_details": "Worker died unexpectedly",
+                    "exception": "",
+                }
+                self.pending_result_queue.put(dill.dumps(result_package))
+
     def start(self):
         """
         * while True:
@@ -751,6 +763,8 @@ class Manager:
             Push tasks to available workers
             Forward results
         """
+
+        signal.signal(signal.SIGCHLD, self.set_worker_died)
 
         if self.worker_type and self.scheduler_mode == "hard":
             log.debug(
@@ -792,7 +806,7 @@ def cli_run():
     parser.add_argument(
         "-u",
         "--uid",
-        default=str(uuid.uuid4()).split("-")[-1],
+        default=None,
         help="Unique identifier string for Manager",
     )
     parser.add_argument(
@@ -860,8 +874,20 @@ def cli_run():
 
     args = parser.parse_args()
 
+    uid = args.uid
+    if not uid:
+        d, ts = divmod(round(time.time()), 60)
+        d, tm = divmod(d, 60)
+        d, th = divmod(d, 24)
+
+        rid = "".join(random.choices(string.ascii_letters + string.digits, k=6))
+        # Manager doesn't care *what* it is, but slightly easier to sort and see
+        # during a retrospective analysis, for example, in the filesystem.
+        # For mental parsing, the time portion is "<days-since-epoch>.hhmmss"
+        uid = f"{d}.{th:02}{tm:02}{ts:02}-{args.block_id}-{rid}"
+
     setup_logging(
-        logfile=os.path.join(args.logdir, args.uid, "manager.log"), debug=args.debug
+        logfile=os.path.join(args.logdir, uid, "manager.log"), debug=args.debug
     )
 
     try:
@@ -870,7 +896,7 @@ def cli_run():
             "Arguments:"
             f"\n  Debug logging: {args.debug}"
             f"\n  Log dir: {args.logdir}"
-            f"\n  Manager ID: {args.uid}"
+            f"\n  Manager ID: {uid}"
             f"\n  Block ID: {args.block_id}"
             f"\n  cores_per_worker: {args.cores_per_worker}"
             f"\n  available_accelerators: {args.available_accelerators}"
@@ -889,7 +915,7 @@ def cli_run():
         manager = Manager(
             task_q_url=args.task_url,
             result_q_url=args.result_url,
-            uid=args.uid,
+            uid=uid,
             block_id=args.block_id,
             cores_per_worker=float(args.cores_per_worker),
             available_accelerators=args.available_accelerators,

@@ -962,6 +962,9 @@ class Interchange:
                         log.info(f"Got {len(b_messages)} result items in batch")
                         for idx, b_message in enumerate(b_messages):
                             r = dill.loads(b_message)
+                            log.info(
+                                "\x1b[41;30mR: %s (type: %s)\x1b[0m", r, type(r)
+                            )
                             tid = r["task_id"]
 
                             log.debug("Received task result %s (from %s)", tid, manager)

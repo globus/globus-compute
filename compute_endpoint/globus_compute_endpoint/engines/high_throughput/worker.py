@@ -98,18 +98,15 @@ class Worker:
         self._send_registration_message()
 
         while True:
-            log.debug("Waiting for task")
+            log.debug("Waiting for task ---")
             p_task_id, p_container_id, msg = self.task_socket.recv_multipart()
+            log.debug("Received a message: %s, %s, %s", p_task_id, p_container_id, msg)
             task_id: str = dill.loads(p_task_id)
             container_id: str = dill.loads(p_container_id)
             log.debug(f"Received task with task_id='{task_id}' and msg='{msg}'")
 
             if task_id == "KILL":
                 log.info("[KILL] -- Worker KILL message received! ")
-                # send a "worker die" message back to the manager
-                self.task_socket.send_multipart([b"WRKR_DIE", b""])
-                log.info(f"*** WORKER {self.worker_id} ABOUT TO DIE ***")
-                # Kill the worker after accepting death in message to manager.
                 sys.exit()
             else:
                 result = self._worker_execute_task(task_id, msg)
@@ -117,8 +114,6 @@ class Worker:
                 log.debug("Sending result")
                 # send bytes over the socket back to the manager
                 self.task_socket.send_multipart([b"TASK_RET", dill.dumps(result)])
-
-        log.warning("Broke out of the loop... dying")
 
     def compose_exception_message(self, task_id: str) -> bytes:
         code, user_message = get_result_error_details()
@@ -175,9 +170,6 @@ def cli_run():
         help="Internal port at which the worker connects to the manager",
     )
     parser.add_argument(
-        "--logdir", required=True, help="Directory path where worker log files written"
-    )
-    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
@@ -185,32 +177,14 @@ def cli_run():
     )
     args = parser.parse_args()
 
-    setup_logging(
-        logfile=os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.log"),
-        debug=args.debug,
-    )
+    setup_logging(debug=args.debug)
 
-    # Redirect the stdout and stderr
-    stdout_path = os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.stdout")
-    stderr_path = os.path.join(args.logdir, f"funcx_worker_{args.worker_id}.stderr")
-    with open(stdout_path, "w") as fo, open(stderr_path, "w") as fe:
-        # Redirect the stdout
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = fo
-        sys.stderr = fe
-
-        try:
-            worker = Worker(
-                args.worker_id,
-                args.address,
-                int(args.port),
-                worker_type=args.type,
-            )
-            worker.start()
-        finally:
-            # Switch them back
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    Worker(
+        args.worker_id,
+        args.address,
+        int(args.port),
+        worker_type=args.type,
+    ).start()
 
 
 if __name__ == "__main__":
