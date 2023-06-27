@@ -961,7 +961,7 @@ class Interchange:
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
                         with self._task_status_delta_lock:
-                            for _idx, b_message in enumerate(b_messages):
+                            for idx, b_message in enumerate(b_messages):
                                 r = dill.loads(b_message)
                                 tid = r["task_id"]
 
@@ -978,7 +978,7 @@ class Interchange:
                                 mdata["tasks"][task_container].remove(tid)
 
                                 if tid in self.task_status_deltas:
-                                    b_messages[_idx] = dill.dumps(r)
+                                    b_messages[idx] = dill.dumps(r)
 
                         mdata["total_tasks"] -= len(b_messages)
 
