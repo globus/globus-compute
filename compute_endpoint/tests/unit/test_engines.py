@@ -74,9 +74,6 @@ def test_result_message_packing():
     assert serializer.deserialize(unpacked.data) == result
 
 
-@pytest.mark.skip(
-    "Skipping gc_engine since parsl.htex.submit has an unreliable serialization method."
-)
 def test_engine_submit(gc_engine):
     """Test engine.submit with multiple engines"""
     engine = gc_engine
