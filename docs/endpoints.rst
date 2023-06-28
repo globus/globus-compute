@@ -146,6 +146,51 @@ Endpoints can be the following states:
   necessary endpoint cleanup, since it was not stopped correctly previously.
 
 
+Ensuring execution environment
+------------------------------
+
+When running a function, endpoint worker processes expect to have all the necessary
+dependencies readily available to them. For example, if a function uses ``numpy`` to do
+some calculations, and a worker is running on a machine without ``numpy`` installed, any
+attempts to execute that function using that worker will result in an error.
+
+In HPC contexts, the endpoint process - which receives tasks from the Compute central
+services and queues them up for execution - generally runs on a separate node from the
+workers which actually do the computation. As a result, it's often necessary to load in
+some kind of pre-initialized environment, such as a ``conda`` environment or ``venv``,
+when starting workers. This can be achieved using the |worker_init|_ config option:
+
+.. code-block:: yaml
+
+  engine:
+    provider:
+        worker_init: conda activate my-conda-env
+
+The exact behavior of ``worker_init`` depends on the |Provider|_ being used.
+
+In some cases, it may also be helpful to run some setup during the startup process of
+the endpoint itself, before any workers start. This can be achieved using the top-level
+``endpoint_setup`` config option:
+
+.. code-block:: yaml
+
+  endpoint_setup: |
+    conda create -n my-conda-env
+    conda activate my-conda-env
+    pip install -r requirements.txt
+
+Note that ``endpoint_setup`` is run by the system shell, as a child of the endpoint
+startup process.
+
+Similarly, artifacts created by ``endpoint_setup`` can be cleaned up with
+``endpoint_teardown``:
+
+.. code-block:: yaml
+
+  endpoint_teardown: |
+    conda remove -n my-conda-env --all
+
+
 Container behaviors and routing
 -------------------------------
 
@@ -173,3 +218,9 @@ Example configurations
 ----------------------
 
 .. include:: configuring.rst
+
+.. |worker_init| replace:: ``worker_init``
+.. _worker_init: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.SlurmProvider.html#parsl.providers.SlurmProvider#:~:text=worker_init%20%28str%29,env%E2%80%99
+
+.. |Provider| replace:: ``ExecutionProvider``
+.. _Provider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.base.ExecutionProvider.html
