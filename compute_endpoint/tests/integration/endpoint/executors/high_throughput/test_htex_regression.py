@@ -10,7 +10,7 @@ from tests.utils import double, ez_pack_function
 
 
 @pytest.fixture
-def engine():
+def engine(tmp_path):
     ep_id = uuid.uuid4()
     engine = HighThroughputEngine(
         label="HTEXEngine",
@@ -18,7 +18,7 @@ def engine():
         worker_debug=True,
     )
     results_queue = queue.Queue()
-    engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=results_queue)
+    engine.start(endpoint_id=ep_id, run_dir=tmp_path, results_passthrough=results_queue)
 
     yield engine
     engine.shutdown()
