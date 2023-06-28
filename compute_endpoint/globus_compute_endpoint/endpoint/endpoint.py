@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import socket
+import subprocess
 import sys
 import typing
 import uuid
@@ -265,6 +266,9 @@ class Endpoint:
                 )
                 Endpoint.pidfile_cleanup(endpoint_dir)
 
+        if endpoint_config.endpoint_setup:
+            Endpoint._run_command("endpoint_setup", endpoint_config.endpoint_setup)
+
         result_store = ResultStore(endpoint_dir=endpoint_dir)
 
         # Create a daemon context
@@ -474,6 +478,12 @@ class Endpoint:
             return
 
         log.debug(f"{ep_name} has a daemon.pid file")
+
+        if endpoint_config and endpoint_config.endpoint_teardown:
+            Endpoint._run_command(
+                "endpoint_teardown", endpoint_config.endpoint_teardown
+            )
+
         pid = int(pid_path.read_text().strip())
         try:
             log.debug(f"Signaling process: {pid}")
@@ -725,3 +735,16 @@ class Endpoint:
             log.debug("Config serialization exception details", exc_info=e)
 
         return metadata
+
+    @staticmethod
+    def _run_command(name: str, command: str):
+        log.info(f"running {name} command: {command}")
+        completed_process = subprocess.run(command, shell=True, capture_output=True)
+
+        log.info(f"{name} stdout: {str(completed_process.stdout)}")
+        log.info(f"{name} stderr: {str(completed_process.stderr)}")
+
+        returncode = completed_process.returncode
+        if returncode:
+            log.error(f"{name} failed with exit code {returncode}")
+            exit(os.EX_CONFIG)
