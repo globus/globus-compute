@@ -95,6 +95,12 @@ class Config(RepresentationMixin):
     display_name : str | None
         The display name for the endpoint.  If None, defaults to name
         Default: None
+
+    endpoint_setup : str | None
+        Command or commands to be run during the endpoint initialization process.
+
+    endpoint_teardown : str | None
+        Command or commands to be run during the endpoint shutdown process.
     """
 
     def __init__(
@@ -112,6 +118,8 @@ class Config(RepresentationMixin):
         idle_heartbeats_soft=0,
         idle_heartbeats_hard=5760,  # Two days, divided by `heartbeat_period`
         detach_endpoint=True,
+        endpoint_setup: str | None = None,
+        endpoint_teardown: str | None = None,
         # Misc info
         display_name: str | None = None,
         # Logging info
@@ -157,6 +165,9 @@ class Config(RepresentationMixin):
         self.idle_heartbeats_soft = int(max(0, idle_heartbeats_soft))
         self.idle_heartbeats_hard = int(max(0, idle_heartbeats_hard))
         self.detach_endpoint = detach_endpoint
+
+        self.endpoint_setup = endpoint_setup
+        self.endpoint_teardown = endpoint_teardown
 
         # Logging info
         self.log_dir = log_dir
