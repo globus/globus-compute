@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import typing as t
 import uuid
@@ -6,21 +7,24 @@ import uuid
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task, TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
+from globus_compute_endpoint.engines.high_throughput.messages import Message
 from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
 from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
-from globus_compute_endpoint.executors.high_throughput.messages import Message
 from globus_compute_sdk.errors import MaxResultSizeExceeded
 from globus_compute_sdk.serialize import ComputeSerializer
+from parsl.app.python import timeout
 
 log = logging.getLogger(__name__)
 
 serializer = ComputeSerializer()
 
 
-def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) -> bytes:
+def execute_task(
+    task_id: uuid.UUID, task_body: bytes, result_size_limit: int = 10 * 1024 * 1024
+) -> bytes:
     """Execute task is designed to enable any executor to execute a Task payload
     and return a Result payload, where the payload follows the globus-compute protocols
     This method is placed here to make serialization easy for executor classes
@@ -39,22 +43,22 @@ def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) ->
 
     result_message: dict[
         str,
-        t.Union[uuid.UUID, str, tuple[str, str], list[TaskTransition], dict[str, str]],
-    ] = {}
+        uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
+    ]
 
     try:
-        task, task_buffer = _unpack_messagebody(task_body)
-        log.debug("executing task task_id='%s'", task.task_id)
+        _task, task_buffer = _unpack_messagebody(task_body)
+        log.debug("executing task task_id='%s'", task_id)
         result = _call_user_function(task_buffer, result_size_limit=result_size_limit)
         log.debug("Execution completed without exception")
-        result_message = dict(task_id=task.task_id, data=result)
+        result_message = dict(task_id=task_id, data=result)
 
     except Exception:
         log.exception("Caught an exception while executing user function")
         code, user_message = get_result_error_details()
         error_details = {"code": code, "user_message": user_message}
         result_message = dict(
-            task_id=task.task_id,
+            task_id=task_id,
             data=get_error_string(),
             exception=get_error_string(),
             error_details=error_details,
@@ -70,7 +74,7 @@ def execute_task(task_body: bytes, result_size_limit: int = 10 * 1024 * 1024) ->
 
     log.debug(
         "task %s completed in %d ns",
-        task.task_id,
+        task_id,
         (exec_end.timestamp - exec_start.timestamp),
     )
 
@@ -118,7 +122,12 @@ def _call_user_function(
     -------
     Returns serialized result or throws exception.
     """
+    GC_TASK_TIMEOUT = max(0.0, float(os.environ.get("GC_TASK_TIMEOUT", 0.0)))
     f, args, kwargs = serializer.unpack_and_deserialize(task_buffer)
+    if GC_TASK_TIMEOUT > 0.0:
+        log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
+        f = timeout(f, GC_TASK_TIMEOUT)
+
     result_data = f(*args, **kwargs)
     serialized_data = serializer.serialize(result_data)
 

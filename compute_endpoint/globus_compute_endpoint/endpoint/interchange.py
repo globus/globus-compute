@@ -10,7 +10,6 @@ import signal
 import sys
 import threading
 import time
-import typing as t
 
 # multiprocessing.Event is a method, not a class
 # to annotate, we need the "real" class
@@ -28,21 +27,15 @@ from globus_compute_common.messagepack.message_types import (
     Task,
 )
 from globus_compute_endpoint import __version__ as funcx_endpoint_version
-from globus_compute_endpoint.endpoint.messages_compat import (
-    convert_to_internaltask,
-    try_convert_to_messagepack,
-)
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultQueuePublisher,
     TaskQueueSubscriber,
 )
 from globus_compute_endpoint.endpoint.result_store import ResultStore
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_endpoint.exception_handling import get_result_error_details
 from globus_compute_sdk import __version__ as funcx_sdk_version
 from parsl.version import VERSION as PARSL_VERSION
-
-if t.TYPE_CHECKING:
-    from globus_compute_endpoint.executors import HighThroughputExecutor
 
 log = logging.getLogger(__name__)
 
@@ -138,11 +131,12 @@ class EndpointInterchange:
         self.results_passthrough: queue.Queue[
             dict[str, bytes | str | None]
         ] = queue.Queue()
-        self.executor: HighThroughputExecutor = self.config.executors[0]
+        # Rename self.executor -> self.engine in second round
+        self.executor: GlobusComputeEngineBase = self.config.executors[0]
         self._test_start = False
 
-    def start_executor(self):
-        log.info("Starting Executor")
+    def start_engine(self):
+        log.info("Starting Engine")
         self.executor.start(
             results_passthrough=self.results_passthrough,
             endpoint_id=self.endpoint_id,
@@ -252,7 +246,7 @@ class EndpointInterchange:
         # NOTE: currently we only start the executors once because
         # the current behavior is to keep them running decoupled while
         # the endpoint is waiting for reconnection
-        self.start_executor()
+        self.start_engine()
 
         while not self._kill_event.is_set():
             if self._reconnect_fail_counter >= self.reconnect_attempt_limit:
@@ -362,7 +356,6 @@ class EndpointInterchange:
                 # globus-compute-manager.  In terms of shutting down (or "rebooting")
                 # gracefully, iterate once a second whether or not a task has arrived.
                 nonlocal num_tasks_forwarded
-                ctype = executor.container_type
                 while not self._quiesce_event.is_set():
                     if self.time_to_quit:
                         self.stop()
@@ -381,8 +374,9 @@ class EndpointInterchange:
                         continue
 
                     try:
-                        task = convert_to_internaltask(task_msg, ctype)
-                        executor.submit_raw(task)
+                        executor.submit(
+                            task_id=task_msg.task_id, packed_task=incoming_task
+                        )
                         num_tasks_forwarded += 1  # Safe given GIL
 
                     except Exception as exc:
@@ -394,6 +388,7 @@ class EndpointInterchange:
                             error_details=ResultErrorDetails(
                                 code=code, user_message=msg
                             ),
+                            task_statuses=[],
                         )
                         res = {
                             "task_id": task_msg.task_id,
@@ -411,9 +406,8 @@ class EndpointInterchange:
                 nonlocal num_results_forwarded
                 while not self._quiesce_event.is_set():
                     try:
-                        result = self.results_passthrough.get(timeout=1)
-                        task_id: str | None = result["task_id"]
-                        packed_result: bytes = result["message"]
+                        packed_message = self.results_passthrough.get(timeout=1)
+                        unpacked_message = unpack(packed_message)
 
                     except queue.Empty:
                         # Empty queue!  Let's see if we have any prior results to send
@@ -425,47 +419,14 @@ class EndpointInterchange:
                         )
                         continue
 
-                    try:
-                        # This either works or it doesn't; if it doesn't, then
-                        # serialize an exception and send _that_
-                        # will be a packed EPStatusReport or Result
-                        message = try_convert_to_messagepack(packed_result)
-
-                    except Exception as exc:
-                        if not task_id:
-                            log.exception(
-                                "Unable to parse result message; no task id, so"
-                                " likely a garbled EPStatusReport; ignoring"
-                            )
-                            continue
-
-                        log.exception(
-                            f"Unable to parse result message for task {task_id}."
-                            "   Marking task as failed."
-                        )
-
-                        err = f"[Task ID: {task_id}] ({exc.__class__.__name__}) {exc}"
-
-                        kwargs = {
-                            "task_id": task_id,
-                            "data": err,
-                            "error_details": ResultErrorDetails(
-                                code=0,
-                                user_message=(
-                                    "Endpoint failed to serialize."
-                                    f"  Exception text: {exc}"
-                                ),
-                            ),
-                        }
-                        message = pack(Result(**kwargs))
-
-                    if task_id:
-                        log.debug(f"Forwarding result for task {task_id}")
+                    task_id = None
+                    if isinstance(unpacked_message, Result):
+                        num_results_forwarded += 1
+                        task_id = unpacked_message.task_id
+                        log.debug("Forwarding result for task: %s", task_id)
 
                     try:
-                        results_publisher.publish(message)
-                        if task_id:
-                            num_results_forwarded += 1  # Safe given GIL
+                        results_publisher.publish(packed_message)
 
                     except Exception:
                         # Publishing didn't work -- quiesce and see if a simple restart
@@ -475,7 +436,7 @@ class EndpointInterchange:
                         log.exception("Something broke while forwarding results")
                         if task_id:
                             log.info("Storing result for later: %s", task_id)
-                            self.result_store[task_id] = packed_result
+                            self.result_store[task_id] = packed_message
                         continue  # just be explicit
 
                 log.debug("Exit process-pending-results thread.")

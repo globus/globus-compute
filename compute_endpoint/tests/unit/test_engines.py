@@ -1,9 +1,7 @@
 import concurrent.futures
 import logging
 import multiprocessing
-import os
 import random
-import shutil
 import time
 import uuid
 from queue import Queue
@@ -12,11 +10,7 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.engines import (
-    GlobusComputeEngine,
-    ProcessPoolEngine,
-    ThreadPoolEngine,
-)
+from globus_compute_endpoint.engines import GlobusComputeEngine, ThreadPoolEngine
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.executors.high_throughput.interchange import ManagerLost
 from tests.utils import double, ez_pack_function, slow_double
@@ -25,44 +19,28 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def proc_pool_engine():
-    ep_id = uuid.uuid4()
-    engine = ProcessPoolEngine(
-        label="ProcessPoolEngine", heartbeat_period_s=1, max_workers=2
-    )
-    queue = multiprocessing.Queue()
-    engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
-
-    yield engine
-    engine.shutdown()
-
-
-@pytest.fixture
-def thread_pool_engine():
+def thread_pool_engine(tmp_path):
     ep_id = uuid.uuid4()
     engine = ThreadPoolEngine(heartbeat_period_s=1, max_workers=2)
 
     queue = Queue()
-    engine.start(endpoint_id=ep_id, run_dir="/tmp", results_passthrough=queue)
+    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
 
     yield engine
     engine.shutdown()
 
 
 @pytest.fixture
-def gc_engine():
+def gc_engine(tmp_path):
     ep_id = uuid.uuid4()
     engine = GlobusComputeEngine(
         address="127.0.0.1", heartbeat_period_s=1, heartbeat_threshold=1
     )
     queue = multiprocessing.Queue()
-    tempdir = "/tmp/HTEX_logs"
-    os.makedirs(tempdir, exist_ok=True)
-    engine.start(endpoint_id=ep_id, run_dir=tempdir, results_passthrough=queue)
+    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
 
     yield engine
     engine.shutdown()
-    shutil.rmtree(tempdir, ignore_errors=True)
 
 
 def test_result_message_packing():
@@ -96,30 +74,18 @@ def test_result_message_packing():
     assert serializer.deserialize(unpacked.data) == result
 
 
-# Skipping "gc_engine" since parsl.htex.submit has an
-# unreliable serialization method.
-# @pytest.mark.parametrize("x", ["gc_engine"])
-@pytest.mark.parametrize("x", ["proc_pool_engine"])
-def test_engine_submit(x, gc_engine, proc_pool_engine):
-    "Test engine.submit with multiple engines"
-    if x == "gc_engine":
-        engine = gc_engine
-    else:
-        engine = proc_pool_engine
+def test_engine_submit(gc_engine):
+    """Test engine.submit with multiple engines"""
+    engine = gc_engine
 
     param = random.randint(1, 100)
     future = engine._submit(double, param)
     assert isinstance(future, concurrent.futures.Future)
-    logger.warning(f"Got result: {future.result()}")
     assert future.result() == param * 2
 
 
-@pytest.mark.parametrize("x", ["gc_engine", "proc_pool_engine"])
-def test_engine_submit_internal(x, gc_engine, proc_pool_engine):
-    if x == "gc_engine":
-        engine = gc_engine
-    else:
-        engine = proc_pool_engine
+def test_engine_submit_internal(gc_engine):
+    engine = gc_engine
 
     q = engine.results_passthrough
     task_id = uuid.uuid1()

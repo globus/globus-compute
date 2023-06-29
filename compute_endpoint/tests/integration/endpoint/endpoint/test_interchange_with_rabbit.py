@@ -5,10 +5,9 @@ import time
 import uuid
 import warnings
 
-import dill
 import pika
 import pytest
-from globus_compute_common.messagepack import pack
+from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
@@ -106,7 +105,6 @@ def test_epi_forwards_tasks_and_results(
 
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
-
     task_q, res_q = reg_info["task_queue_info"], reg_info["result_queue_info"]
     res_q_name = res_q["queue"]
     task_q_name = task_q["queue"]
@@ -124,7 +122,7 @@ def test_epi_forwards_tasks_and_results(
                 queue=res_q_name, inactivity_timeout=5
             ):
                 assert (mframe, mprops, mbody) != (None, None, None), "no timely result"
-                result = dill.loads(mbody)
+                result = unpack(mbody)
                 break
     assert result is not None
     assert result.task_id == task_uuid

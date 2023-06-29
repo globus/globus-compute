@@ -20,19 +20,19 @@ import dill
 import zmq
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.exception_handling import (
-    get_error_string,
-    get_result_error_details,
-)
-from globus_compute_endpoint.executors.high_throughput.interchange_task_dispatch import (  # noqa: E501
+from globus_compute_endpoint.engines.high_throughput.interchange_task_dispatch import (  # noqa: E501
     naive_interchange_task_dispatch,
 )
-from globus_compute_endpoint.executors.high_throughput.messages import (
+from globus_compute_endpoint.engines.high_throughput.messages import (
     BadCommand,
     EPStatusReport,
     Heartbeat,
     Message,
     MessageType,
+)
+from globus_compute_endpoint.exception_handling import (
+    get_error_string,
+    get_result_error_details,
 )
 from globus_compute_endpoint.logging_config import ComputeLogger
 from globus_compute_sdk.sdk.utils import chunk_by
@@ -65,7 +65,7 @@ class ManagerLost(Exception):
 
 
 class BadRegistration(Exception):
-    """A new Manager tried to join the executor with a BadRegistration message"""
+    """A new Manager tried to join the Engine with a BadRegistration message"""
 
     def __init__(self, worker_id, critical=False):
         self.worker_id = worker_id
@@ -557,7 +557,7 @@ class Interchange:
 
         def _enqueue_status_report(ep_state: dict, task_states: dict):
             try:
-                msg = EPStatusReport(self.endpoint_id, ep_state, dict(task_states))
+                msg = EPStatusReport(str(self.endpoint_id), ep_state, dict(task_states))
                 status_report_queue.put(msg.pack())
             except Exception:
                 log.exception("Unable to create or send EP status report.")
@@ -570,7 +570,7 @@ class Interchange:
                 self.task_status_deltas.clear()
 
             log.debug(
-                "Cleared task deltas (%s); sending status report to executor.",
+                "Cleared task deltas (%s); sending status report to Engine.",
                 len(task_status_deltas),
             )
 
@@ -960,40 +960,23 @@ class Interchange:
                         pass
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
-                        with self._task_status_delta_lock:
-                            for idx, b_message in enumerate(b_messages):
-                                r = dill.loads(b_message)
-                                tid = r["task_id"]
+                        for idx, b_message in enumerate(b_messages):
+                            r = dill.loads(b_message)
+                            tid = r["task_id"]
 
-                                log.debug(
-                                    "Received task result %s (from %s)", tid, manager
-                                )
-                                task_container = self.containers[r["container_id"]]
-                                log.debug(
-                                    "Removing for manager: %s from %s",
-                                    manager,
-                                    self._ready_manager_queue,
-                                )
+                            log.debug("Received task result %s (from %s)", tid, manager)
+                            task_container = self.containers[r["container_id"]]
+                            log.debug(
+                                "Removing for manager: %s from %s",
+                                manager,
+                                self._ready_manager_queue,
+                            )
 
-                                mdata["tasks"][task_container].remove(tid)
-
-                                # Transfer any outstanding task statuses to the
-                                # result message
-                                if tid in self.task_status_deltas:
-                                    r["task_statuses"] += self.task_status_deltas[tid]
-                                    del self.task_status_deltas[tid]
-                                    b_messages[idx] = dill.dumps(r)
-                                    log.debug(
-                                        "Transferring statuses for %s: %s",
-                                        tid,
-                                        r["task_statuses"],
-                                    )
+                            mdata["tasks"][task_container].remove(tid)
+                            b_messages[idx] = dill.dumps(r)
 
                         mdata["total_tasks"] -= len(b_messages)
 
-                    # TODO: handle this with a Task message or something?
-                    # previously used this; switched to mono-message,
-                    # self.results_outgoing.send_multipart(b_messages)
                     self.results_outgoing.send(dill.dumps(b_messages))
                     interesting_managers.add(manager)
 
@@ -1173,7 +1156,7 @@ class Interchange:
 def starter(comm_q: mp.Queue, *args, **kwargs) -> None:
     """Start the interchange process
 
-    The executor is expected to call this function. The args, kwargs match that of the
+    The Engine is expected to call this function. The args, kwargs match that of the
     Interchange.__init__
     """
     ic = None

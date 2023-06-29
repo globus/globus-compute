@@ -348,7 +348,7 @@ def test_endpoint_get_metadata(mocker):
     config = meta["config"]
     assert "funcx_service_address" in config
     assert len(config["executors"]) == 1
-    assert config["executors"][0]["type"] == "HighThroughputExecutor"
+    assert config["executors"][0]["type"] == "HighThroughputEngine"
     assert config["executors"][0]["provider"]["type"] == "LocalProvider"
 
 
