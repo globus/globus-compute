@@ -960,25 +960,20 @@ class Interchange:
                         pass
                     if len(b_messages):
                         log.info(f"Got {len(b_messages)} result items in batch")
-                        with self._task_status_delta_lock:
-                            for idx, b_message in enumerate(b_messages):
-                                r = dill.loads(b_message)
-                                tid = r["task_id"]
+                        for idx, b_message in enumerate(b_messages):
+                            r = dill.loads(b_message)
+                            tid = r["task_id"]
 
-                                log.debug(
-                                    "Received task result %s (from %s)", tid, manager
-                                )
-                                task_container = self.containers[r["container_id"]]
-                                log.debug(
-                                    "Removing for manager: %s from %s",
-                                    manager,
-                                    self._ready_manager_queue,
-                                )
+                            log.debug("Received task result %s (from %s)", tid, manager)
+                            task_container = self.containers[r["container_id"]]
+                            log.debug(
+                                "Removing for manager: %s from %s",
+                                manager,
+                                self._ready_manager_queue,
+                            )
 
-                                mdata["tasks"][task_container].remove(tid)
-
-                                if tid in self.task_status_deltas:
-                                    b_messages[idx] = dill.dumps(r)
+                            mdata["tasks"][task_container].remove(tid)
+                            b_messages[idx] = dill.dumps(r)
 
                         mdata["total_tasks"] -= len(b_messages)
 
