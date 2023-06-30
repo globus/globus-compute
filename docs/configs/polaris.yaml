@@ -1,4 +1,5 @@
 engine:
+    type: HighThroughputEngine
     max_workers_per_node: 1
 
     # Un-comment to give each worker exclusive access to a single GPU

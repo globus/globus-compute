@@ -1,4 +1,5 @@
 engine:
+    type: HighThroughputEngine
     worker_debug: False
 
     address:

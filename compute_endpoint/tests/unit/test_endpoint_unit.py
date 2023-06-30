@@ -510,6 +510,7 @@ def test_render_config_user_template(fs, data):
         """
 heartbeat_period: {{ heartbeat }}
 engine:
+    type: HighThroughputEngine
     provider:
         type: LocalProvider
         init_blocks: 1

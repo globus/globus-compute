@@ -1,4 +1,5 @@
 engine:
+    type: HighThroughputEngine
     label: fe.cs.uchicago
     worker_debug: False
 
