@@ -321,13 +321,13 @@ def test_start_ep_config_py_override(
     conf_py.write_text(
         """
 from globus_compute_endpoint.endpoint.config import Config
-from globus_compute_endpoint.executors import HighThroughputExecutor
+from globus_compute_endpoint.engines import HighThroughputEngine
 from parsl.providers import LocalProvider
 
 config = Config(
     display_name=None,
     executors=[
-        HighThroughputExecutor(
+        HighThroughputEngine(
             provider=LocalProvider(
                 init_blocks=1,
                 min_blocks=0,
