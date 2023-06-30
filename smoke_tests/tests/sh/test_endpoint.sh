@@ -42,6 +42,7 @@ cat > "$conf_dir/config.yaml" <<EOF
 environment: $env
 detach_endpoint: False
 engine:
+    type: HighThroughputEngine
     heartbeat_period: 10
     provider:
         type: LocalProvider

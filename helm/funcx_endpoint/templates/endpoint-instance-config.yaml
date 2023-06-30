@@ -15,6 +15,7 @@ data:
     funcx_service_address: {{ .Values.funcXServiceAddress }}/v2
     detach_endpoint: False
     engine:
+        type: HighThroughputEngine
         provider:
             type: KubernetesProvider
             init_blocks: { .Values.initBlocks }}

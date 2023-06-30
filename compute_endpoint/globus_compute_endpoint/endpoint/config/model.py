@@ -3,13 +3,12 @@ from __future__ import annotations
 import typing as t
 from types import ModuleType
 
-from globus_compute_endpoint import strategies
-from globus_compute_endpoint.executors import HighThroughputExecutor
+from globus_compute_endpoint import engines, strategies
 from parsl import addresses as parsl_addresses
 from parsl import channels as parsl_channels
 from parsl import launchers as parsl_launchers
 from parsl import providers as parsl_providers
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, validator
 
 
 def _validate_import(field: str, package: ModuleType):
@@ -87,11 +86,12 @@ class ProviderModel(BaseModel):
 
 
 class EngineModel(BaseModel):
-    type: type = Field(default=HighThroughputExecutor, const=True)
+    type: str
     provider: ProviderModel
     strategy: t.Optional[StrategyModel]
     address: t.Optional[t.Union[str, AddressModel]]
 
+    _validate_type = _validate_import("type", engines)
     _validate_provider = _validate_params("provider")
     _validate_strategy = _validate_params("strategy")
     _validate_address = _validate_params("address")

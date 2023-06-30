@@ -77,7 +77,7 @@ Theta (ALCF)
 .. image:: _static/images/ALCF-Theta_111016-1000px.jpg
 
 The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
-**Theta** supercomputer. This example uses the ``HighThroughputExecutor`` and connects to Theta's Cobalt scheduler
+**Theta** supercomputer. This example uses the ``HighThroughputEngine`` and connects to Theta's Cobalt scheduler
 using the ``CobaltProvider``. This configuration assumes that the script is being executed on the login nodes of Theta.
 
 .. literalinclude:: configs/theta.yaml
@@ -95,7 +95,7 @@ Cooley (ALCF)
 .. image:: _static/images/31174D02-Cooley800.jpg
 
 The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
-**Cooley** cluster. This example uses the ``HighThroughputExecutor`` and connects to Cooley's Cobalt scheduler
+**Cooley** cluster. This example uses the ``HighThroughputEngine`` and connects to Cooley's Cobalt scheduler
 using the ``CobaltProvider``. This configuration assumes that the script is being executed on the login nodes of Cooley.
 
 .. literalinclude:: configs/cooley.yaml
@@ -108,7 +108,7 @@ Polaris (ALCF)
 .. image:: _static/images/ALCF_Polaris.jpeg
 
 The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
-**Polaris** cluster. This example uses the ``HighThroughputExecutor`` and connects to Polaris's PBS scheduler
+**Polaris** cluster. This example uses the ``HighThroughputEngine`` and connects to Polaris's PBS scheduler
 using the ``PBSProProvider``. This configuration assumes that the script is being executed on the login node of Polaris.
 
 .. literalinclude:: configs/polaris.yaml
@@ -120,7 +120,7 @@ Cori (NERSC)
 
 .. image:: _static/images/Cori-NERSC.png
 
-The following snippet shows an example configuration for accessing NERSC's **Cori** supercomputer. This example uses the ``HighThroughputExecutor`` and connects to Cori's Slurm scheduler.
+The following snippet shows an example configuration for accessing NERSC's **Cori** supercomputer. This example uses the ``HighThroughputEngine`` and connects to Cori's Slurm scheduler.
 It is configured to request 2 nodes configured with 1 TaskBlock per node. Finally, it includes override information to request a particular node type (Haswell) and to configure a specific Python environment on the worker nodes using Anaconda.
 
 .. literalinclude:: configs/cori.yaml
@@ -132,7 +132,7 @@ Perlmutter (NERSC)
 
 .. image:: _static/images/Nersc9-image-compnew-sizer7-group-type-4-1.jpg
 
-The following snippet shows an example configuration for accessing NERSC's **Perlmutter** supercomputer. This example uses the ``HighThroughputExecutor`` and connects to Perlmutters's Slurm scheduler.
+The following snippet shows an example configuration for accessing NERSC's **Perlmutter** supercomputer. This example uses the ``HighThroughputEngine`` and connects to Perlmutters's Slurm scheduler.
 It is configured to request 2 nodes configured with 1 TaskBlock per node. Finally, it includes override information to request a particular node type (Haswell) and to configure a specific Python environment on the worker nodes using Anaconda.
 
 .. note:: Please run ``module load cgpu`` prior to executing ``globus-compute-endpoint start <endpoint_name>``
@@ -183,7 +183,7 @@ Pinning Workers to devices
 
 Many modern clusters provide multiple accelerators per compute note, yet many applications are best suited to using a
 single accelerator per task. Globus Compute supports pinning each worker to different accelerators using the ``available_accelerators``
-option of the ``HighThroughputExecutor``. Provide either the number of accelerators (Globus Compute will assume they are named
+option of the ``HighThroughputEngine``. Provide either the number of accelerators (Globus Compute will assume they are named
 in integers starting from zero) or a list of the names of the accelerators available on the node. Each Globus Compute worker
 will have the following environment variables set to the worker specific identity assigned:
 ``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``, ``SYCL_DEVICE_FILTER``.

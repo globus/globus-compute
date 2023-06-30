@@ -48,6 +48,7 @@ def make_endpoint_dir(mock_command_ensure):
             """
 display_name: None
 engine:
+    type: HighThroughputEngine
     provider:
         type: LocalProvider
         init_blocks: 1
@@ -59,6 +60,7 @@ engine:
             """
 heartbeat_period: {{ heartbeat }}
 engine:
+    type: HighThroughputEngine
     provider:
         type: LocalProvider
         init_blocks: 1

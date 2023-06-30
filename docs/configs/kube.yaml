@@ -3,6 +3,7 @@ heartbeat_threshold: 200
 log_dir: "."
 
 engine:
+    type: HighThroughputEngine
     label: Kubernetes_funcX
     max_workers_per_node: 1
 
