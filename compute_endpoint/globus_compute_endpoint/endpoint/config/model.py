@@ -76,7 +76,7 @@ class ProviderModel(BaseConfigModel):
 
 
 class EngineModel(BaseConfigModel):
-    type: str
+    type: str = "HighThroughputEngine"
     provider: ProviderModel
     strategy: t.Optional[StrategyModel]
     address: t.Optional[t.Union[str, AddressModel]]
@@ -85,6 +85,9 @@ class EngineModel(BaseConfigModel):
     _validate_provider = _validate_params("provider")
     _validate_strategy = _validate_params("strategy")
     _validate_address = _validate_params("address")
+
+    class Config:
+        validate_all = True
 
 
 class ConfigModel(BaseConfigModel):
