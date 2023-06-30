@@ -15,12 +15,12 @@ def _get_envname():
 def get_web_service_url(envname: str | None) -> str:
     env = envname or _get_envname()
     urls = {
-        "production": "https://compute.api.globus.org/v2",
-        "dev": "https://api.dev.funcx.org/v2",
-        "local": "http://localhost:5000/v2",
+        "production": "https://compute.api.globus.org",
+        "dev": "https://api.dev.funcx.org",
+        "local": "http://localhost:5000",
     }
     for test_env in ["sandbox", "test", "integration", "staging", "preview"]:
-        urls[test_env] = f"https://compute.api.{test_env}.globuscs.info/v2"
+        urls[test_env] = f"https://compute.api.{test_env}.globuscs.info"
 
     return urls.get(env, urls["production"])
 

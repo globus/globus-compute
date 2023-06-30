@@ -39,7 +39,7 @@ def test_start_endpoint_blocked(
 ):
     # happy-path tested in tests/unit/test_endpoint_unit.py
 
-    fx_addy = "http://api.funcx/"
+    fx_addy = "http://api.funcx"
     gcc = globus_compute_sdk.Client(
         funcx_service_address=fx_addy,
         do_version_check=False,
@@ -53,13 +53,13 @@ def test_start_endpoint_blocked(
     reason_msg = randomstring()
     responses.add(
         responses.GET,
-        fx_addy + "version",
+        fx_addy + "/v2/version",
         json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
         status=200,
     )
     responses.add(
         responses.POST,
-        fx_addy + "endpoints",
+        fx_addy + "/v2/endpoints",
         json={"reason": reason_msg},
         status=status_code,
     )
@@ -89,7 +89,7 @@ def test_start_endpoint_blocked(
     ],
 )
 def test_start_endpoint_display_name(mocker, fs, patch_funcx_client, display_name):
-    fx_addy = "http://api.funcx/"
+    fx_addy = "http://api.funcx"
     gcc = globus_compute_sdk.Client(
         funcx_service_address=fx_addy,
         do_version_check=False,
@@ -102,13 +102,13 @@ def test_start_endpoint_display_name(mocker, fs, patch_funcx_client, display_nam
 
     responses.add(
         responses.GET,
-        fx_addy + "version",
+        fx_addy + "/v2/version",
         json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
         status=200,
     )
     responses.add(
         responses.POST,
-        fx_addy + "endpoints",
+        fx_addy + "/v2/endpoints",
         json={},
         status=200,
     )
@@ -131,7 +131,7 @@ def test_start_endpoint_display_name(mocker, fs, patch_funcx_client, display_nam
 
 
 def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_funcx_client):
-    gcc_addy = "http://api.funcx/"
+    gcc_addy = "http://api.funcx"
     gcc = globus_compute_sdk.Client(
         funcx_service_address=gcc_addy,
         do_version_check=False,
@@ -144,13 +144,13 @@ def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_funcx_client):
 
     responses.add(
         responses.GET,
-        gcc_addy + "version",
+        gcc_addy + "/v2/version",
         json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
         status=200,
     )
     responses.add(
         responses.POST,
-        gcc_addy + "endpoints",
+        gcc_addy + "/v2/endpoints",
         json={},
         status=200,
     )

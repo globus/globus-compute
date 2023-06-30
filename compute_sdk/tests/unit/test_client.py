@@ -20,11 +20,11 @@ def test_client_init_sets_addresses_by_env(
     monkeypatch, env, usage_method, explicit_params, randomstring
 ):
     if env in (None, "production"):
-        web_uri = "https://compute.api.globus.org/v2"
+        web_uri = "https://compute.api.globus.org"
     elif env == "dev":
-        web_uri = "https://api.dev.funcx.org/v2"
+        web_uri = "https://api.dev.funcx.org"
     elif env == "local":
-        web_uri = "http://localhost:5000/v2"
+        web_uri = "http://localhost:5000"
     else:
         raise NotImplementedError
 
@@ -272,7 +272,7 @@ def test_build_container(mocker, login_manager):
     assert container_id == "123-456"
     login_manager.get_web_client.post.assert_called()
     calls = login_manager.get_web_client.post.call_args
-    assert calls[0][0] == "containers/build"
+    assert calls[0][0] == "/v2/containers/build"
     assert calls[1] == {"data": spec.to_json()}
 
 

@@ -535,7 +535,7 @@ class Client:
         """
         data = {"endpoint_name": name, "description": description}
 
-        r = self.web_client.post("get_containers", data=data)
+        r = self.web_client.post("/v2/get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
     @requires_login
@@ -556,7 +556,7 @@ class Client:
         """
         self.version_check()
 
-        r = self.web_client.get(f"containers/{container_uuid}/{container_type}")
+        r = self.web_client.get(f"/v2/containers/{container_uuid}/{container_type}")
         return r.data["container"]
 
     @requires_login
@@ -692,7 +692,7 @@ class Client:
             "type": container_type,
         }
 
-        r = self.web_client.post("containers", data=payload)
+        r = self.web_client.post("/v2/containers", data=payload)
         return r.data["container_id"]
 
     @requires_login
@@ -721,11 +721,11 @@ class Client:
         ContainerBuildForbidden
             User is not in the globus group that protects the build
         """
-        r = self.web_client.post("containers/build", data=container_spec.to_json())
+        r = self.web_client.post("/v2/containers/build", data=container_spec.to_json())
         return r.data["container_id"]
 
     def get_container_build_status(self, container_id):
-        r = self.web_client.get(f"containers/build/{container_id}")
+        r = self.web_client.get(f"/v2/containers/build/{container_id}")
         if r.http_status == 200:
             return r["status"]
         elif r.http_status == 404:

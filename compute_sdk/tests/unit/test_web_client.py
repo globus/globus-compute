@@ -44,7 +44,7 @@ def test_get_version_service_param(client, service_param):
     # to match on querystring and URL
     responses.add(
         responses.GET,
-        "https://api.funcx/version",
+        "https://api.funcx/v2/version",
         json={"version": 100},
         match=[responses.matchers.query_param_matcher({"service": expect_param})],
     )
@@ -92,7 +92,7 @@ def test_get_amqp_url(client, randomstring):
     expected_response = randomstring()
     responses.add(
         responses.GET,
-        "https://api.funcx/get_amqp_result_connection_url",
+        "https://api.funcx/v2/get_amqp_result_connection_url",
         json={"some_key": expected_response},
     )
 
@@ -102,7 +102,7 @@ def test_get_amqp_url(client, randomstring):
 
 @pytest.mark.parametrize("multi_tenant", [None, True, False])
 def test_multi_tenant_post(client, multi_tenant):
-    responses.post(url="https://api.funcx/endpoints")
+    responses.post(url="https://api.funcx/v2/endpoints")
     resp = client.register_endpoint("ep_name", "ep_id", multi_tenant=multi_tenant)
     req_body = json.loads(resp._response.request.body)
     if multi_tenant:
