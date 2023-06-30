@@ -8,6 +8,7 @@ It also implements data helpers for building complex payloads. Most notably,
 import json
 import typing as t
 import uuid
+from urllib.parse import urlparse
 
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
@@ -91,20 +92,26 @@ class WebClient(globus_sdk.BaseClient):
     ):
         if base_url is None:
             base_url = get_web_service_url(environment)
+
+        # Remove path from base url
+        parsed_base_url = urlparse(base_url)
+        base_url = f"{parsed_base_url.scheme}://{parsed_base_url.netloc}"
+
         super().__init__(environment=environment, base_url=base_url, **kwargs)
+
         self._user_app_name = None
         self.user_app_name = app_name
 
     def get_version(self, *, service: str = "all") -> globus_sdk.GlobusHTTPResponse:
-        return self.get("version", query_params={"service": service})
+        return self.get("/v2/version", query_params={"service": service})
 
     def get_taskgroup_tasks(
         self, task_group_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
-        return self.get(f"/taskgroup/{task_group_id}")
+        return self.get(f"/v2/taskgroup/{task_group_id}")
 
     def get_task(self, task_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
-        return self.get(f"tasks/{task_id}")
+        return self.get(f"/v2/tasks/{task_id}")
 
     def get_batch_status(
         self,
@@ -117,7 +124,7 @@ class WebClient(globus_sdk.BaseClient):
         data = {"task_ids": [str(t) for t in task_ids]}
         if additional_fields is not None:
             data.update(additional_fields)
-        return self.post("/batch_status", data=data)
+        return self.post("/v2/batch_status", data=data)
 
     # the Client needs to send version information through BaseClient.app_name,
     # so that's overridden here to prevent direct manipulation. use user_app_name
@@ -144,7 +151,7 @@ class WebClient(globus_sdk.BaseClient):
         globus_sdk.BaseClient.app_name.fset(self, app_name)
 
     def submit(self, batch: t.Dict[str, t.Any]) -> globus_sdk.GlobusHTTPResponse:
-        return self.post("submit", data=batch)
+        return self.post("/v2/submit", data=batch)
 
     def register_endpoint(
         self,
@@ -176,23 +183,23 @@ class WebClient(globus_sdk.BaseClient):
             data["metadata"] = metadata
         if additional_fields is not None:
             data.update(additional_fields)
-        return self.post("/endpoints", data=data)
+        return self.post("/v2/endpoints", data=data)
 
     def get_result_amqp_url(self) -> globus_sdk.GlobusHTTPResponse:
-        return self.get("get_amqp_result_connection_url")
+        return self.get("/v2/get_amqp_result_connection_url")
 
     def get_endpoint_status(
         self, endpoint_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
-        return self.get(f"endpoints/{endpoint_id}/status")
+        return self.get(f"/v2/endpoints/{endpoint_id}/status")
 
     def get_endpoint_metadata(
         self, endpoint_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
-        return self.get(f"endpoints/{endpoint_id}")
+        return self.get(f"/v2/endpoints/{endpoint_id}")
 
     def get_endpoints(self) -> globus_sdk.GlobusHTTPResponse:
-        return self.get("/endpoints")
+        return self.get("/v2/endpoints")
 
     def register_function(
         self,
@@ -205,10 +212,10 @@ class WebClient(globus_sdk.BaseClient):
             if isinstance(function_registration_data, FunctionRegistrationData)
             else function_registration_data
         )
-        return self.post("/functions", data=data)
+        return self.post("/v2/functions", data=data)
 
     def get_whitelist(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
-        return self.get(f"/endpoints/{endpoint_id}/whitelist")
+        return self.get(f"/v2/endpoints/{endpoint_id}/whitelist")
 
     def whitelist_add(
         self, endpoint_id: ID_PARAM_T, function_ids: t.Iterable[ID_PARAM_T]
@@ -216,15 +223,15 @@ class WebClient(globus_sdk.BaseClient):
         if isinstance(function_ids, str):
             function_ids = [function_ids]
         data = {"func": [str(f) for f in function_ids]}
-        return self.post(f"/endpoints/{endpoint_id}/whitelist", data=data)
+        return self.post(f"/v2/endpoints/{endpoint_id}/whitelist", data=data)
 
     def whitelist_remove(
         self, endpoint_id: ID_PARAM_T, function_id: ID_PARAM_T
     ) -> globus_sdk.GlobusHTTPResponse:
-        return self.delete(f"/endpoints/{endpoint_id}/whitelist/{function_id}")
+        return self.delete(f"/v2/endpoints/{endpoint_id}/whitelist/{function_id}")
 
     def stop_endpoint(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
-        return self.post(f"/endpoints/{endpoint_id}/lock", data={})
+        return self.post(f"/v2/endpoints/{endpoint_id}/lock", data={})
 
     def delete_endpoint(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
-        return self.delete(f"/endpoints/{endpoint_id}")
+        return self.delete(f"/v2/endpoints/{endpoint_id}")
