@@ -36,43 +36,36 @@ def _validate_params(field: str):
     return validator(field, allow_reuse=True)(inner)
 
 
-class AddressModel(BaseModel):
+class BaseConfigModel(BaseModel):
+    class Config:
+        extra = "allow"
+
+
+class AddressModel(BaseConfigModel):
     type: str
 
     _validate_type = _validate_import("type", parsl_addresses)
 
-    class Config:
-        extra = "allow"
 
-
-class StrategyModel(BaseModel):
+class StrategyModel(BaseConfigModel):
     type: str
 
     _validate_type = _validate_import("type", strategies)
 
-    class Config:
-        extra = "allow"
 
-
-class LauncherModel(BaseModel):
+class LauncherModel(BaseConfigModel):
     type: str
 
     _validate_type = _validate_import("type", parsl_launchers)
 
-    class Config:
-        extra = "allow"
 
-
-class ChannelModel(BaseModel):
+class ChannelModel(BaseConfigModel):
     type: str
 
     _validate_type = _validate_import("type", parsl_channels)
 
-    class Config:
-        extra = "allow"
 
-
-class ProviderModel(BaseModel):
+class ProviderModel(BaseConfigModel):
     type: str
     channel: t.Optional[ChannelModel]
     launcher: t.Optional[LauncherModel]
@@ -81,11 +74,8 @@ class ProviderModel(BaseModel):
     _validate_channel = _validate_params("channel")
     _validate_launcher = _validate_params("launcher")
 
-    class Config:
-        extra = "allow"
 
-
-class EngineModel(BaseModel):
+class EngineModel(BaseConfigModel):
     type: str
     provider: ProviderModel
     strategy: t.Optional[StrategyModel]
@@ -96,11 +86,8 @@ class EngineModel(BaseModel):
     _validate_strategy = _validate_params("strategy")
     _validate_address = _validate_params("address")
 
-    class Config:
-        extra = "allow"
 
-
-class ConfigModel(BaseModel):
+class ConfigModel(BaseConfigModel):
     engine: EngineModel
     display_name: t.Optional[str]
     environment: t.Optional[str]
@@ -127,6 +114,3 @@ class ConfigModel(BaseModel):
         executor = ret.pop("engine")
         ret["executors"] = [executor]
         return ret
-
-    class Config:
-        extra = "allow"
