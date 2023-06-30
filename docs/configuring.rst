@@ -166,6 +166,18 @@ running on a login node, uses the ``SlurmProvider`` to interface with the schedu
    :language: yaml
 
 
+Bridges-2 (PSC)
+^^^^^^^^^^^^^^^
+
+.. image:: _static/images/bridges-2.png
+
+The following snippet shows an example configuration for accessing the Bridges-2 system at PSC. The configuration below assumes that the user is
+running on a login node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the ``SrunLauncher`` to launch workers.
+
+.. literalinclude:: configs/bridges-2.yaml
+   :language: yaml
+
+
 Pinning Workers to devices
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
