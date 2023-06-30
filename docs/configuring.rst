@@ -177,6 +177,18 @@ running on a login node, uses the ``SlurmProvider`` to interface with the schedu
 .. literalinclude:: configs/bridges-2.yaml
    :language: yaml
 
+Stampede2 (TACC)
+^^^^^^^^^^^^^^^^
+
+.. image:: _static/images/stampede2.jpg
+
+The following snippet shows an example configuration for accessing the Stampede2 system at the Texas Advanced Computing Center (TACC).
+The configuration below assumes that the user is running on a login node, uses the ``SlurmProvider`` to interface with the scheduler,
+and uses the ``SrunLauncher`` to launch workers.
+
+.. literalinclude:: configs/stampede2.yaml
+   :language: yaml
+
 
 Pinning Workers to devices
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
