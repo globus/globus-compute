@@ -20,6 +20,18 @@ with the scheduler, and uses the ``AprunLauncher`` to launch workers.
 .. literalinclude:: configs/bluewaters.yaml
    :language: yaml
 
+Delta (NCSA)
+^^^^^^^^^^^^
+
+.. image:: _static/images/delta_front.png
+
+The following snippet shows an example configuration for executing remotely on Delta, a supercomputer at the National Center for Supercomputing Applications.
+The configuration assumes the user is running on a login node, uses the ``SlurmProvider`` to interface
+with the scheduler, and uses the ``SrunLauncher`` to launch workers.
+
+.. literalinclude:: configs/delta.yaml
+   :language: yaml
+
 UChicago AI Cluster
 ^^^^^^^^^^^^^^^^^^^
 
