@@ -263,12 +263,12 @@ def test_stop_remote_endpoint(
         [
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.executors import HighThroughputExecutor\n"
+                "from funcx_endpoint.engines import HighThroughputEngine\n"
                 "from parsl.providers import LocalProvider\n"
                 "\n"
                 "config = Config(\n"
                 "    executors=[\n"
-                "        HighThroughputExecutor(\n"
+                "        HighThroughputEngine(\n"
                 "            provider=LocalProvider(\n"
                 "                init_blocks=1,\n"
                 "                min_blocks=0,\n"
@@ -283,7 +283,7 @@ def test_stop_remote_endpoint(
         [
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.executors import HighThroughputExecutor\n"
+                "from funcx_endpoint.engines import HighThroughputEngine\n"
                 "from parsl.providers import LocalProvider\n"
             ),
             False,
@@ -294,7 +294,7 @@ def test_stop_remote_endpoint(
         [
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.executors import HighThroughputExecutor\n"
+                "from funcx_endpoint.engines import HighThroughputEngine\n"
                 "from parsl.providers import LocalProvider\n"
             ),
             False,
@@ -306,7 +306,7 @@ def test_stop_remote_endpoint(
             (
                 "def abc():"
                 "    from funcx_endpoint.endpoint.utils.config import Config\n"
-                "    from funcx_endpoint.executors import HighThroughputExecutor\n"
+                "    from funcx_endpoint.engines import HighThroughputEngine\n"
                 "    from parsl.providers import LocalProvider\n"
                 "    return 'hello'\n"
             ),
