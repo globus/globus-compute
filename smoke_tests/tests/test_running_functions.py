@@ -3,7 +3,6 @@ import time
 
 import globus_compute_sdk as gc
 import pytest
-import requests
 from globus_compute_sdk import Executor
 from packaging.version import Version
 
@@ -80,12 +79,11 @@ def test_wait_on_new_hello_world_func(compute_client, endpoint):
 
 def test_executor(compute_client, endpoint, tutorial_function_id):
     """Test using Executor to retrieve results."""
+    res = compute_client.web_client.get_version()
+    url = res._response.url
 
-    url = f"{compute_client.funcx_service_address}/version"
-    res = requests.get(url)
-
-    assert res.status_code == 200, f"Received {res.status_code} instead!"
-    server_version = Version(res.json())
+    assert res.http_status == 200, f"Received {res.http_status} instead!"
+    server_version = Version(res.data["api"])
     if server_version.release < (1, 0, 5):
         pytest.skip(
             "Server too old (use `tox -- -v` for details)"

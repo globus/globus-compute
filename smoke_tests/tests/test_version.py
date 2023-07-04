@@ -1,19 +1,16 @@
-import requests
 from packaging.version import Version
 
 
 def test_web_service(compute_client, endpoint, compute_test_config):
     """This test checks 1) web-service is online, 2) version of the web-service"""
-    service_address = compute_client.funcx_service_address
+    response = compute_client.web_client.get_version()
 
-    response = requests.get(f"{service_address}/version")
-
-    assert response.status_code == 200, (
+    assert response.http_status == 200, (
         "Request to version expected status_code=200, "
-        f"got {response.status_code} instead"
+        f"got {response.http_status} instead"
     )
 
-    service_version = response.json()
+    service_version = response.data["api"]
     api_min_version = compute_test_config.get("api_min_version")
     if api_min_version is not None:
         parsed_min = Version(api_min_version)
