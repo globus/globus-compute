@@ -8,11 +8,10 @@ It also implements data helpers for building complex payloads. Most notably,
 import json
 import typing as t
 import uuid
-from urllib.parse import urlparse
 
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
-from globus_compute_sdk.sdk._environments import get_web_service_url
+from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url_path
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
 from globus_sdk.exc.api import GlobusAPIError
@@ -92,10 +91,7 @@ class WebClient(globus_sdk.BaseClient):
     ):
         if base_url is None:
             base_url = get_web_service_url(environment)
-
-        # Remove path from base url
-        parsed_base_url = urlparse(base_url)
-        base_url = f"{parsed_base_url.scheme}://{parsed_base_url.netloc}"
+        base_url = remove_url_path(base_url)
 
         super().__init__(environment=environment, base_url=base_url, **kwargs)
 

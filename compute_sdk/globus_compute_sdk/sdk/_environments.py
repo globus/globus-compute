@@ -38,3 +38,8 @@ def get_web_socket_url(envname: str | None) -> str:
 def urls_might_mismatch(service_url: str, socket_url: str) -> bool:
     parsed_service, parsed_socket = urlparse(service_url), urlparse(socket_url)
     return parsed_service.hostname != parsed_socket.hostname
+
+
+def remove_url_path(url: str):
+    parsed_url = urlparse(url)
+    return f"{parsed_url.scheme}://{parsed_url.netloc}"
