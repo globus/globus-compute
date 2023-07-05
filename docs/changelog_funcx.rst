@@ -3,6 +3,37 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.2.3a0:
+
+funcx & funcx-endpoint v2.2.3a0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``endpoint_setup`` and ``endpoint_teardown`` options to endpoint config, which,
+  if present, are run by the system shell during the endpoint initialization process and
+  shutdown process, respectively.
+
+Deprecated
+^^^^^^^^^^
+
+ - The ``HighThroughputExecutor`` is now marked for deprecation.
+   Importing and using this class will raise a warning.
+   Upgrade to the ``funcx_endpoint.engines.GlobusComputeEngine`` which
+   supercedes the ``HighThroughputExecutor``.
+
+   Please note that the ``GlobusComputeEngine`` has the following limitations:
+   1. It binds to all network interfaces instead of binding to a single interface
+      to limit incoming worker connections to the internal network.
+   2. Does not support dynamically switching containers are runtime, and requires
+      containers to be specified at the time the endpoint is started.
+   3. Pending support for auto-scaling with ``strategy``
+
+   If the above limitations affect you, consider using ``funcx_endpoint.engines.HighThroughputEngine``
+   which is a designed to bridge backward compatibility issues.
+
+
 funcx & funcx-endpoint v2.2.2
 ---------------------------------------------------
 
