@@ -6,7 +6,7 @@ Changelog
 .. _changelog-2.2.3:
 
 globus-compute-sdk & globus-compute-endpoint v2.2.3
------------------------------------------------------
+---------------------------------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -14,6 +14,10 @@ New Functionality
 - Added ``endpoint_setup`` and ``endpoint_teardown`` options to endpoint config, which,
   if present, are run by the system shell during the endpoint initialization process and
   shutdown process, respectively.
+
+- The engine ``type`` field is now supported in ``config.yaml``. Here you can
+  specify ``GlobusComputeEngine`` or ``HighThroughputEngine``, which is designed
+  to bridge any backward compatibility issues.
 
 Deprecated
 ^^^^^^^^^^

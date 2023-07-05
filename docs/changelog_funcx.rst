@@ -15,6 +15,10 @@ New Functionality
   if present, are run by the system shell during the endpoint initialization process and
   shutdown process, respectively.
 
+- The engine ``type`` field is now supported in ``config.yaml``. Here you can
+  specify ``GlobusComputeEngine`` or ``HighThroughputEngine``, which is designed
+  to bridge any backward compatibility issues.
+
 Deprecated
 ^^^^^^^^^^
 
