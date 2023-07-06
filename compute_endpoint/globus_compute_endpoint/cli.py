@@ -4,6 +4,7 @@ import difflib
 import json
 import logging
 import pathlib
+import re
 import shutil
 import sys
 import uuid
@@ -306,6 +307,7 @@ def _do_logout_endpoints(
 
 FUNCX_COMPUTE_IMPORT_UPDATES = {
     "from funcx_endpoint.endpoint.utils.config": "from globus_compute_endpoint.endpoint.config",  # noqa E501
+    "from funcx_endpoint.engines": "from globus_compute_endpoint.engines",  # noqa E501
     "from funcx_endpoint.executors": "from globus_compute_endpoint.executors",  # noqa E501
 }
 
@@ -329,8 +331,8 @@ def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
         config_text = config_path.read_text()
         upd_config_text = config_text
 
-        for original, repl in FUNCX_COMPUTE_IMPORT_UPDATES.items():
-            upd_config_text = upd_config_text.replace(original, repl)
+        for pattern, repl in FUNCX_COMPUTE_IMPORT_UPDATES.items():
+            upd_config_text = re.sub(f"^{pattern}", repl, upd_config_text, flags=re.M)
 
         if upd_config_text == config_text:
             return f"No funcX import statements found in config.py for {name}"
@@ -361,7 +363,15 @@ def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
         tmp_output_path.write_text(upd_config_text)
 
         # Rename files last, as it's the least likely to err
-        config_backup.unlink(missing_ok=True)
+        if sys.version_info < (3, 8):
+            try:
+                # Dropping support for Python 3.7 "real soon", so this branch will
+                # soon go away
+                config_backup.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            config_backup.unlink(missing_ok=True)
         shutil.move(config_path, config_backup)  # Preserve file timestamp
         shutil.move(tmp_output_path, config_path)
 
