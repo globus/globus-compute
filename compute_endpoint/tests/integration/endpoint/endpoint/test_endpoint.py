@@ -1,5 +1,5 @@
 import logging
-import os.path
+import os
 import pathlib
 import uuid
 from unittest.mock import MagicMock, Mock, patch
@@ -20,10 +20,12 @@ from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_sdk.sdk.web_client import WebClient
 
+_MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
+
 
 @pytest.fixture(autouse=True)
-def patch_funcx_client(mocker):
-    return mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
+def patch_compute_client(mocker):
+    return mocker.patch(f"{_MOCK_BASE}Client")
 
 
 def test_non_configured_endpoint(mocker):
@@ -35,31 +37,30 @@ def test_non_configured_endpoint(mocker):
 @pytest.mark.parametrize("status_code", [409, 410, 423])
 @responses.activate
 def test_start_endpoint_blocked(
-    mocker, fs, randomstring, patch_funcx_client, status_code
+    mocker, fs, randomstring, patch_compute_client, status_code
 ):
     # happy-path tested in tests/unit/test_endpoint_unit.py
 
-    fx_addy = "http://api.funcx"
+    svc_addy = "http://api.funcx"
     gcc = globus_compute_sdk.Client(
-        funcx_service_address=fx_addy,
+        funcx_service_address=svc_addy,
         do_version_check=False,
         login_manager=mocker.Mock(),
     )
-    fxwc = WebClient(base_url=fx_addy)
-    gcc.web_client = fxwc
-    patch_funcx_client.return_value = gcc
+    gcc.web_client = WebClient(base_url=svc_addy)
+    patch_compute_client.return_value = gcc
 
-    mock_log = mocker.patch("globus_compute_endpoint.endpoint.endpoint.log")
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     reason_msg = randomstring()
     responses.add(
         responses.GET,
-        fx_addy + "/v2/version",
+        svc_addy + "/v2/version",
         json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
         status=200,
     )
     responses.add(
         responses.POST,
-        fx_addy + "/v2/endpoints",
+        svc_addy + "/v2/endpoints",
         json={"reason": reason_msg},
         status=status_code,
     )
@@ -88,27 +89,27 @@ def test_start_endpoint_blocked(
         "😎 Great display/.name",
     ],
 )
-def test_start_endpoint_display_name(mocker, fs, patch_funcx_client, display_name):
-    fx_addy = "http://api.funcx"
+def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_name):
+    svc_addy = "http://api.funcx"
     gcc = globus_compute_sdk.Client(
-        funcx_service_address=fx_addy,
+        funcx_service_address=svc_addy,
         do_version_check=False,
         login_manager=mocker.Mock(),
     )
-    fxwc = WebClient(base_url=fx_addy)
-    fxwc.post = MagicMock()
-    gcc.web_client = fxwc
-    patch_funcx_client.return_value = gcc
+    gcwc = WebClient(base_url=svc_addy)
+    gcwc.post = MagicMock()
+    gcc.web_client = gcwc
+    patch_compute_client.return_value = gcc
 
     responses.add(
         responses.GET,
-        fx_addy + "/v2/version",
+        svc_addy + "/v2/version",
         json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
         status=200,
     )
     responses.add(
         responses.POST,
-        fx_addy + "/v2/endpoints",
+        svc_addy + "/v2/endpoints",
         json={},
         status=200,
     )
@@ -130,17 +131,17 @@ def test_start_endpoint_display_name(mocker, fs, patch_funcx_client, display_nam
         assert "display_name" not in called_data
 
 
-def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_funcx_client):
+def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_compute_client):
     gcc_addy = "http://api.funcx"
     gcc = globus_compute_sdk.Client(
         funcx_service_address=gcc_addy,
         do_version_check=False,
         login_manager=mocker.Mock(),
     )
-    fxwc = WebClient(base_url=gcc_addy)
-    fxwc.post = MagicMock()
-    gcc.web_client = fxwc
-    patch_funcx_client.return_value = gcc
+    gcwc = WebClient(base_url=gcc_addy)
+    gcwc.post = MagicMock()
+    gcc.web_client = gcwc
+    patch_compute_client.return_value = gcc
 
     responses.add(
         responses.GET,
@@ -176,20 +177,14 @@ def test_endpoint_logout(monkeypatch):
     monkeypatch.setattr(
         globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
     )
-    success, msg = _do_logout_endpoints(
-        False,
-        running_endpoints={},
-    )
+    success, msg = _do_logout_endpoints(False, running_endpoints={})
     logout_true.assert_called_once()
     assert success
 
     logout_true.reset_mock()
 
     # forced, and no running endpoints
-    success, msg = _do_logout_endpoints(
-        True,
-        running_endpoints={},
-    )
+    success, msg = _do_logout_endpoints(True, running_endpoints={})
     logout_true.assert_called_once()
     assert success
 
@@ -216,16 +211,13 @@ def test_endpoint_logout(monkeypatch):
     assert success
 
 
-@patch(
-    "globus_compute_endpoint.endpoint.endpoint.Endpoint.get_endpoint_id",
-    return_value="abc-uuid",
-)
+@patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
 @patch(
     "globus_compute_endpoint.cli.get_config_dir",
     return_value=pathlib.Path("some_ep_dir"),
 )
 @patch("globus_compute_endpoint.cli.get_config")
-@patch("globus_compute_endpoint.endpoint.endpoint.Client.stop_endpoint")
+@patch(f"{_MOCK_BASE}Client.stop_endpoint")
 def test_stop_remote_endpoint(
     mock_get_id, mock_get_conf, mock_get_gcc, mock_stop_endpoint
 ):
@@ -235,35 +227,17 @@ def test_stop_remote_endpoint(
     assert mock_stop_endpoint.called
 
 
-@patch(
-    "globus_compute_endpoint.endpoint.endpoint.Endpoint.get_endpoint_id",
-    return_value="abc-uuid",
-)
-@patch(
-    "globus_compute_endpoint.cli.get_config_dir",
-    return_value=pathlib.Path(),
-)
+@patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
 @pytest.mark.parametrize(
     "cur_config",
     [
-        [
-            ("abc\n" "bcd" "cef"),
-            False,
-            False,
-            True,
-            False,
-        ],
-        [
-            ("abc\n" "bcd" "cef"),
-            False,
-            False,
-            True,
-            True,
-        ],
+        ["abc\nbcdcef", False, True, False],
+        ["abc\nbcdcef", False, True, True],
         [
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
                 "from funcx_endpoint.engines import HighThroughputEngine\n"
+                "from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "from parsl.providers import LocalProvider\n"
                 "\n"
                 "config = Config(\n"
@@ -275,7 +249,6 @@ def test_stop_remote_endpoint(
                 "                max_blocks=1,\n"
                 "),\n"
             ),
-            False,
             True,
             False,
             False,
@@ -284,9 +257,9 @@ def test_stop_remote_endpoint(
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
                 "from funcx_endpoint.engines import HighThroughputEngine\n"
+                "from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "from parsl.providers import LocalProvider\n"
             ),
-            False,
             True,
             False,
             True,
@@ -295,9 +268,9 @@ def test_stop_remote_endpoint(
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
                 "from funcx_endpoint.engines import HighThroughputEngine\n"
+                "from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "from parsl.providers import LocalProvider\n"
             ),
-            False,
             True,
             True,
             True,
@@ -307,19 +280,25 @@ def test_stop_remote_endpoint(
                 "def abc():"
                 "    from funcx_endpoint.endpoint.utils.config import Config\n"
                 "    from funcx_endpoint.engines import HighThroughputEngine\n"
+                "    from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "    from parsl.providers import LocalProvider\n"
                 "    return 'hello'\n"
             ),
             False,
             False,
             False,
-            False,
         ],
     ],
 )
-def test_endpoint_update_funcx(mock_get_id, mock_get_conf, fs, cur_config):
-    file_content, should_raise, modified, has_bak, do_force = cur_config
-    ep_dir = pathlib.Path("some_ep_dir")
+def test_endpoint_update_funcx(mock_get_id, mocker, fs, cur_config, randomstring):
+    mocker.patch(
+        "globus_compute_endpoint.cli.get_config_dir",
+        return_value=pathlib.Path(),
+    )
+
+    ep_name = randomstring()
+    file_content, modified, has_bak, do_force = cur_config
+    ep_dir = pathlib.Path(ep_name)
     ep_dir.mkdir(parents=True, exist_ok=True)
     with open(ep_dir / "config.py", "w") as f:
         f.write(file_content)
@@ -328,29 +307,28 @@ def test_endpoint_update_funcx(mock_get_id, mock_get_conf, fs, cur_config):
             f.write("old backup data\n")
 
     try:
-        msg = _upgrade_funcx_imports_in_config("some_ep_dir", force=do_force)
-        assert not should_raise
+        msg = _upgrade_funcx_imports_in_config(ep_name, force=do_force)
         if modified:
-            assert "lines were modified" in msg
-            assert os.path.exists(ep_dir / "config.py.bak")
+            config_backup = ep_dir / "config.py.bak"
+            assert "Applied following diff for endpoint" in msg
+            assert ep_name in msg
+            assert "renamed to" in msg
+            assert str(config_backup) in msg
+            assert (ep_dir / "config.py.bak").exists()
         else:
             assert "No funcX import statements" in msg
         with open(ep_dir / "config.py") as f:
             for line in f.readlines():
                 assert not line.startswith("from funcx_endpoint.")
     except ClickException as e:
-        if should_raise:
-            if has_bak and not do_force:
-                assert "Rename it or use" in str(e)
+        if has_bak and not do_force:
+            assert "Rename it or use" in str(e)
         else:
-            assert AssertionError(f"Unexpected exception: {e}")
+            raise AssertionError(f"Unexpected exception: ({type(e).__name__}) {e}")
 
 
 def test_endpoint_setup_execution(mocker, tmp_path, randomstring, caplog):
-    mocker.patch(
-        "globus_compute_endpoint.endpoint.endpoint.Endpoint.check_pidfile",
-        return_value={"exists": False},
-    )
+    mocker.patch(f"{_MOCK_BASE}Endpoint.check_pidfile", return_value={"exists": False})
 
     tmp_file_content = randomstring()
     tmp_file = tmp_path / "random.txt"
@@ -385,7 +363,7 @@ exit 1  # exit early to avoid the rest of endpoint setup
 
 def test_endpoint_teardown_execution(mocker, tmp_path, randomstring, caplog):
     mocker.patch(
-        "globus_compute_endpoint.endpoint.endpoint.Endpoint.check_pidfile",
+        f"{_MOCK_BASE}Endpoint.check_pidfile",
         return_value={"exists": True, "active": True},
     )
 
