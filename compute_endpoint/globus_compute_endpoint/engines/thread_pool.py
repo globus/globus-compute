@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
+import queue
 import typing as t
 import uuid
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor as NativeExecutor
-from multiprocessing.queues import Queue as mpQueue
 
 import psutil
 from globus_compute_common.messagepack.message_types import (
@@ -40,7 +40,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         self,
         *args,
         endpoint_id: t.Optional[uuid.UUID] = None,
-        results_passthrough: t.Optional[mpQueue] = None,
+        results_passthrough: t.Optional[queue.Queue] = None,
         **kwargs,
     ) -> None:
         """

@@ -1,6 +1,6 @@
 import logging
-import multiprocessing
 import os
+import queue
 import typing as t
 import uuid
 from concurrent.futures import Future
@@ -43,7 +43,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         *args,
         endpoint_id: t.Optional[uuid.UUID] = None,
         run_dir: t.Optional[str] = None,
-        results_passthrough: t.Optional[multiprocessing.Queue] = None,
+        results_passthrough: t.Optional[queue.Queue] = None,
         **kwargs,
     ):
         assert run_dir, "GCExecutor requires kwarg:run_dir at start"
