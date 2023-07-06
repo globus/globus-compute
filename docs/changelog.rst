@@ -3,7 +3,41 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.2.2:
+.. _changelog-2.2.3:
+
+globus-compute-sdk & globus-compute-endpoint v2.2.3
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``endpoint_setup`` and ``endpoint_teardown`` options to endpoint config, which,
+  if present, are run by the system shell during the endpoint initialization process and
+  shutdown process, respectively.
+
+- The engine ``type`` field is now supported in ``config.yaml``. Here you can
+  specify ``GlobusComputeEngine`` or ``HighThroughputEngine``, which is designed
+  to bridge any backward compatibility issues.
+
+Deprecated
+^^^^^^^^^^
+
+ - The ``HighThroughputExecutor`` is now marked for deprecation.
+   Importing and using this class will raise a warning.
+   Upgrade to the ``globus_compute_endpoint.engines.GlobusComputeEngine`` which
+   supercedes the ``HighThroughputExecutor``.
+
+   Please note that the ``GlobusComputeEngine`` has the following limitations:
+   1. It binds to all network interfaces instead of binding to a single interface
+      to limit incoming worker connections to the internal network.
+   2. Does not support dynamically switching containers are runtime, and requires
+      containers to be specified at the time the endpoint is started.
+   3. Pending support for auto-scaling with ``strategy``
+
+   If the above limitations affect you, consider using ``globus_compute_endpoint.engines.HighThroughputEngine``
+   which is a designed to bridge backward compatibility issues.
+
+.. _Changelog-2.2.2:
 
 globus-compute-sdk & globus-compute-endpoint v2.2.2
 ---------------------------------------------------
