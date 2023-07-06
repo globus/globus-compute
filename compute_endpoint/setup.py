@@ -21,7 +21,7 @@ REQUIRES = [
     # provides easy daemonization of the endpoint
     "python-daemon>=2,<3",
     # CLI parsing
-    "click>=8,<9",
+    "click<=8.1.3",
     # disallow use of 22.3.0; the whl package on some platforms causes ZMQ issues
     #
     # NOTE: 22.3.0 introduced a patched version of libzmq.so to the wheel packaging
