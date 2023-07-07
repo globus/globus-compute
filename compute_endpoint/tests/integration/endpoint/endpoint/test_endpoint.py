@@ -74,8 +74,10 @@ def test_start_endpoint_blocked(
     ep_conf = Config()
 
     ep = endpoint.Endpoint()
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as pyt_exc:
         ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
+    assert pyt_exc.value.args[0] == os.EX_UNAVAILABLE  # Q&D check of expected path
+
     args, kwargs = mock_log.warning.call_args
     assert "blocked" in args[0]
     assert reason_msg in args[0]

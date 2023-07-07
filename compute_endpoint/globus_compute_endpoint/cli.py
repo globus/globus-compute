@@ -309,6 +309,7 @@ FUNCX_COMPUTE_IMPORT_UPDATES = {
     "from funcx_endpoint.endpoint.utils.config": "from globus_compute_endpoint.endpoint.config",  # noqa E501
     "from funcx_endpoint.engines": "from globus_compute_endpoint.engines",  # noqa E501
     "from funcx_endpoint.executors": "from globus_compute_endpoint.executors",  # noqa E501
+    "from funcx_endpoint.engines": "from globus_compute_endpoint.engines",  # noqa E501
 }
 
 
