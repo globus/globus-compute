@@ -39,7 +39,7 @@ class BaseStrategy:
     from a duplicate logger being added by the thread.
     """
 
-    def __init__(self, *args, threshold=20, interval=5):
+    def __init__(self, *args, threshold: int = 20, interval: float = 5.0):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
