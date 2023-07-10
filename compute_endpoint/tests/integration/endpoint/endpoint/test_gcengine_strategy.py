@@ -34,13 +34,34 @@ def gc_engine_scaling(tmp_path):
     engine.shutdown()
 
 
+@pytest.fixture
+def gc_engine_non_scaling(tmp_path):
+    ep_id = uuid.uuid4()
+    engine = GlobusComputeEngine(
+        address="127.0.0.1",
+        heartbeat_period_s=1,
+        heartbeat_threshold=1,
+        provider=LocalProvider(
+            init_blocks=1,
+            min_blocks=1,
+            max_blocks=1,
+        ),
+        strategy=None,
+    )
+    queue = multiprocessing.Queue()
+    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
+
+    yield engine
+    engine.shutdown()
+
+
 def test_engine_submit_init_0(gc_engine_scaling):
     """Test engine.submit with multiple engines"""
     engine = gc_engine_scaling
     max_idletime = engine.strategy.max_idletime
 
     # At the start there should be 0 managers
-    outstanding = gc_engine_scaling.get_outstanding_breakdown()
+    outstanding = engine.get_outstanding_breakdown()
     assert len(outstanding) == 1, "Expected only interchange"
 
     # Run a function to trigger scale_out and confirm via breakdown
@@ -49,7 +70,7 @@ def test_engine_submit_init_0(gc_engine_scaling):
     assert isinstance(future, concurrent.futures.Future)
     assert future.result() == param * 2
 
-    outstanding = gc_engine_scaling.get_outstanding_breakdown()
+    outstanding = engine.get_outstanding_breakdown()
     assert len(outstanding) == 2, "Expected 1 manager + interchange"
 
     # With 0 tasks and excess workers we should expect scale_down
@@ -58,9 +79,26 @@ def test_engine_submit_init_0(gc_engine_scaling):
     while True:
         import time
 
-        managers = gc_engine_scaling.executor.connected_managers
+        managers = engine.executor.connected_managers
         if len(managers) == 0:
             break
         idle_time = managers[0]["idle_duration"]
         assert idle_time <= max_idletime + 1, "Manager exceeded idletime"
         time.sleep(0.1)
+
+
+def test_engine_no_scaling(gc_engine_non_scaling):
+    """Confirm that Engine works with fixes # of blocks"""
+
+    engine = gc_engine_non_scaling
+    assert engine.strategy is None
+
+    # At the start there should be 0 managers
+    outstanding = engine.get_outstanding_breakdown()
+    assert len(outstanding) == 1, "Expected only interchange"
+
+    # Run a function to trigger scale_out and confirm via breakdown
+    param = random.randint(1, 100)
+    future = engine._submit(double, param)
+    assert isinstance(future, concurrent.futures.Future)
+    assert future.result() == param * 2

@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+import typing as t
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ class BaseStrategy:
         self.callback = self.strategize
         self._handle = None
         self._event_count = 0
-        self._event_buffer = []
+        self._event_buffer: t.List[t.Any] = []
         self._wake_up_time = time.time() + 1
         self._kill_event = threading.Event()
         self._thread = threading.Thread(
@@ -113,7 +114,7 @@ class BaseStrategy:
             else:
                 print("Sleeping a bit more")
 
-    def notify(self, event_id):
+    def notify(self, event_id: t.Any):
         """Let the FlowControl system know that there is an event.
 
         This method is to be called from the Interchange to notify the flowcontrol

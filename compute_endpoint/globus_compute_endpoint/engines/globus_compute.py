@@ -26,7 +26,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         label: str = "GlobusComputeEngine",
         address: t.Optional[str] = None,
         heartbeat_period_s: float = 30.0,
-        strategy=SimpleStrategy(),
+        strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         **kwargs,
     ):
         self.address = address
@@ -61,7 +61,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             # a queue is passed in
             self.results_passthrough = results_passthrough
         self.executor.start()
-        self.strategy.start(self)
+        if self.strategy:
+            self.strategy.start(self)
         self._status_report_thread.start()
 
     def _submit(
@@ -113,7 +114,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def get_total_live_workers(self) -> int:
         manager_info = self.executor.connected_managers
-        worker_count = [mgr["worker_count"] for mgr in manager_info]
+        worker_count = sum([mgr["worker_count"] for mgr in manager_info])
         return worker_count
 
     def scale_out(self, blocks: int):
@@ -168,4 +169,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def shutdown(self):
         self._status_report_thread.stop()
+        if self.strategy:
+            self.strategy.close()
         return self.executor.shutdown()
