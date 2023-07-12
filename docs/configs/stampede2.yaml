@@ -1,6 +1,7 @@
 display_name: Stampede2.TACC.batch
 
 engine:
+  type: HighThroughputEngine
   address:
     type: address_by_interface
     ifname: em3

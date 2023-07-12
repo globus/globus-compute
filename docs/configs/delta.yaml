@@ -1,5 +1,6 @@
 display_name: NCSA Delta 2 CPU
 engine:
+    type: HighThroughputEngine
     max_workers_per_node: 2
     worker_debug: False
 
