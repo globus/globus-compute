@@ -8,6 +8,17 @@ contact the Globus Compute Team via Slack.
    All configuration examples below must be customized for the user's
    allocation, Python environment, file system, etc.
 
+Anvil (RCAC, Purdue)
+^^^^^^^^^^^^^^^^^^^^
+
+.. image:: _static/images/anvil.jpeg
+
+The following snippet shows an example configuration for executing remotely on Anvil, a supercomputer at Purdue University's Rosen Center for Advanced Computing (RCAC). The configuration assumes the user is running on a login node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the ``SrunLauncher`` to launch workers.
+
+.. literalinclude:: configs/anvil.yaml
+   :language: yaml
+
+
 Blue Waters (NCSA)
 ^^^^^^^^^^^^^^^^^^
 

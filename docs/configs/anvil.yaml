@@ -1,0 +1,31 @@
+display_name: Anvil CPU
+engine:
+  type: HighThroughputEngine
+  max_workers_per_node: 2
+
+  address:
+    type: address_by_interface
+    ifname: ib0
+
+  provider:
+    type: SlurmProvider
+    partition: debug
+
+    account: {{ ACCOUNT }}
+    launcher:
+        type: SrunLauncher
+
+    # string to prepend to #SBATCH blocks in the submit
+    # script to the scheduler
+    # e.g., "#SBATCH --constraint=knl,quad,cache"
+    scheduler_options: {{ OPTIONS }}
+
+    # Command to be run before starting a worker
+    # e.g., "module load anaconda; source activate gce_env
+    worker_init: {{ COMMAND }}
+
+    init_blocks: 1
+    max_blocks: 1
+    min_blocks: 0
+
+    walltime: 00:05:00
