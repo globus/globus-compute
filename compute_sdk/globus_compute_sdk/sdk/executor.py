@@ -206,11 +206,12 @@ class Executor(concurrent.futures.Executor):
 
     def __repr__(self) -> str:
         name = self.__class__.__name__
-        label = self.label and f"{self.label}, " or ""
-        ep_id = self.endpoint_id and f", ep_id:{self.endpoint_id}" or ""
-        c_id = self.container_id and f", c_id:{self.container_id}" or ""
-        tg_id = f", tg_id:{self.task_group_id}"
-        return f"{name}<{label}{self.batch_size}{ep_id}{c_id}{tg_id}>"
+        label = self.label and f"{self.label}; " or ""
+        ep_id = self.endpoint_id and f"ep_id:{self.endpoint_id}; " or ""
+        c_id = self.container_id and f"c_id:{self.container_id}; " or ""
+        tg_id = f"tg_id:{self.task_group_id}; "
+        bs = f"bs:{self.batch_size}"
+        return f"{name}<{label}{ep_id}{c_id}{tg_id}{bs}>"
 
     @property
     def task_group_id(self) -> str:
