@@ -13,7 +13,7 @@ from globus_compute_common.messagepack.message_types import Result, ResultErrorD
 from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
-from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
+from globus_compute_sdk.sdk.executor import _ResultWatcher, _TaskSubmissionInfo
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 from tests.utils import try_assert, try_for_timeout
 
@@ -101,18 +101,18 @@ def gc_executor(mocker):
 
 def test_task_submission_info_stringification():
     fut_id = 10
-    func_id = "foo_func"
-    ep_id = "bar_ep"
+    func_id = uuid.uuid4()
+    ep_id = uuid.uuid4()
 
-    info = TaskSubmissionInfo(
+    info = _TaskSubmissionInfo(
         task_num=fut_id, function_id=func_id, endpoint_id=ep_id, args=(), kwargs={}
     )
     as_str = str(info)
-    assert as_str.startswith("TaskSubmissionInfo(")
-    assert as_str.endswith("args=..., kwargs=...)")
+    assert as_str.startswith("_TaskSubmissionInfo(")
+    assert as_str.endswith("args=[0], kwargs=[0])")
     assert "task_num=10" in as_str
-    assert "function_id='foo_func'" in as_str
-    assert "endpoint_id='bar_ep'" in as_str
+    assert f"function_uuid='{func_id}'" in as_str
+    assert f"endpoint_uuid='{ep_id}'" in as_str
 
 
 @pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
@@ -225,8 +225,8 @@ def test_submit_raises_if_thread_stopped(gc_executor):
 def test_submit_auto_registers_function(gc_executor):
     gcc, gce = gc_executor
 
-    gcc.register_function.return_value = "abc"
-    gce.endpoint_id = "some_ep_id"
+    gcc.register_function.return_value = uuid.uuid4()
+    gce.endpoint_id = uuid.uuid4()
     gce.submit(noop)
 
     assert gcc.register_function.called
@@ -480,10 +480,10 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
     gcc, gce = gc_executor
 
     gcc.create_batch.side_effect = mock.MagicMock
-    gcc.register_function.return_value = "abc"
+    gcc.register_function.return_value = uuid.uuid4()
     num_batches = 50
 
-    gce.endpoint_id = "some_ep_id"
+    gce.endpoint_id = uuid.uuid4()
     gce.batch_size = batch_size
     for _ in range(num_batches * batch_size):
         gce.submit(noop)
@@ -507,9 +507,13 @@ def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
 
     upstream_error = Exception(f"Upstream error {randomstring}!!")
     gce.funcx_client.batch_run.side_effect = upstream_error
-    gce.task_group_id = "abc"
-    tsi = TaskSubmissionInfo(
-        task_num=12345, function_id="abc", endpoint_id="abc", args=(), kwargs={}
+    gce.task_group_id = uuid.uuid4()
+    tsi = _TaskSubmissionInfo(
+        task_num=12345,
+        function_id=uuid.uuid4(),
+        endpoint_id=uuid.uuid4(),
+        args=(),
+        kwargs={},
     )
     gce._tasks_to_send.put((ComputeFuture(), tsi))
 
@@ -519,7 +523,8 @@ def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
 
 def test_task_submitter_handles_stale_result_watcher_gracefully(gc_executor, mocker):
     gcc, gce = gc_executor
-    gce.endpoint_id = "blah"
+    gcc.register_function.return_value = uuid.uuid4()
+    gce.endpoint_id = uuid.uuid4()
 
     task_id = str(uuid.uuid4())
     gcc.batch_run.return_value = [task_id]
