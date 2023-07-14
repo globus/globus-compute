@@ -23,8 +23,12 @@ if [[ "$VERSION" != "$ENDPOINT_VERSION" ]]; then
 fi
 
 if ! grep '^globus\-compute\-sdk \& globus\-compute\-endpoint v'"$VERSION"'$' docs/changelog.rst; then
-  echo "package version v$VERSION not noted in docs/changelog.rst"
-  exit 1
+  read -p "Package version v$VERSION not noted in docs/changelog.rst.  Proceed? [y/n] " -n 1 -r
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    [[ $0 = $BASH_SOURCE ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
+  else
+    echo "\n  Releasing globus-compute-sdk and globus-compute-endpoint without changelog updates for v$VERSION"
+  fi
 fi
 
 echo "releasing v$VERSION"
