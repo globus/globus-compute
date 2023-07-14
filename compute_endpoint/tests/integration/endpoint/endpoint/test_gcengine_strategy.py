@@ -79,7 +79,7 @@ def test_engine_submit_init_0(gc_engine_scaling):
     while True:
         import time
 
-        managers = engine.executor.connected_managers
+        managers = engine.executor.connected_managers()
         if len(managers) == 0:
             break
         idle_time = managers[0]["idle_duration"]

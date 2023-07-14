@@ -113,7 +113,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         return status
 
     def get_total_live_workers(self) -> int:
-        manager_info = self.executor.connected_managers
+        manager_info: t.List[dict[str, t.Any]] = self.executor.connected_managers()
         worker_count = sum([mgr["worker_count"] for mgr in manager_info])
         return worker_count
 
