@@ -51,29 +51,44 @@ def __executor_atexit():
 threading.Thread(target=__executor_atexit).start()
 
 
-class TaskSubmissionInfo:
+UUID_LIKE_T = t.Union[uuid.UUID, str]
+
+
+def _as_uuid(uuid_like: UUID_LIKE_T) -> uuid.UUID:
+    return uuid_like if isinstance(uuid_like, uuid.UUID) else uuid.UUID(uuid_like)
+
+
+class _TaskSubmissionInfo:
+    __slots__ = (
+        "task_num",
+        "function_uuid",
+        "endpoint_uuid",
+        "args",
+        "kwargs",
+    )
+
     def __init__(
         self,
         *,
         task_num: int,
-        function_id: str,
-        endpoint_id: str,
+        function_id: UUID_LIKE_T,
+        endpoint_id: UUID_LIKE_T,
         args: tuple,
         kwargs: dict,
     ):
         self.task_num = task_num
-        self.function_id = function_id
-        self.endpoint_id = endpoint_id
+        self.function_uuid = _as_uuid(function_id)
+        self.endpoint_uuid = _as_uuid(endpoint_id)
         self.args = args
         self.kwargs = kwargs
 
     def __repr__(self):
         return (
-            "TaskSubmissionInfo("
-            f"task_num={self.task_num}, "
-            f"function_id='{self.function_id}', "
-            f"endpoint_id='{self.endpoint_id}', "
-            "args=..., kwargs=...)"
+            f"{self.__class__.__name__}"
+            f"(task_num={self.task_num},"
+            f" function_uuid='{self.function_uuid}',"
+            f" endpoint_uuid='{self.endpoint_uuid}',"
+            f" args=[{len(self.args)}], kwargs=[{len(self.kwargs)}])"
         )
 
 
@@ -173,7 +188,7 @@ class Executor(concurrent.futures.Executor):
         self._task_counter: int = 0
         self._task_group_id: str = task_group_id or str(uuid.uuid4())
         self._tasks_to_send: queue.Queue[
-            tuple[ComputeFuture, TaskSubmissionInfo] | tuple[None, None]
+            tuple[ComputeFuture, _TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
         self._function_registry: dict[tuple[t.Callable, str | None], str] = {}
 
@@ -401,7 +416,7 @@ class Executor(concurrent.futures.Executor):
 
         self._task_counter += 1
 
-        task = TaskSubmissionInfo(
+        task = _TaskSubmissionInfo(
             task_num=self._task_counter,  # unnecessary; maybe useful for debugging?
             function_id=function_id,
             endpoint_id=self.endpoint_id,
@@ -576,7 +591,7 @@ class Executor(concurrent.futures.Executor):
             fut: ComputeFuture | None = ComputeFuture()  # just start the loop; please
             while fut is not None:
                 futs = []
-                tasks: list[TaskSubmissionInfo] = []
+                tasks: list[_TaskSubmissionInfo] = []
                 task_count = 0
                 try:
                     fut, task = to_send.get()  # Block; wait for first result ...
@@ -661,7 +676,9 @@ class Executor(concurrent.futures.Executor):
                 pass
             log.debug("%s: task submission thread complete", self)
 
-    def _submit_tasks(self, futs: list[ComputeFuture], tasks: list[TaskSubmissionInfo]):
+    def _submit_tasks(
+        self, futs: list[ComputeFuture], tasks: list[_TaskSubmissionInfo]
+    ):
         """
         Submit a batch of tasks to the webservice, destined for self.endpoint_id.
         Upon success, update the futures with their associated task_id.
@@ -675,7 +692,9 @@ class Executor(concurrent.futures.Executor):
             create_websocket_queue=True,
         )
         for task in tasks:
-            batch.add(task.function_id, task.endpoint_id, task.args, task.kwargs)
+            f_uuid_str = str(task.function_uuid)
+            ep_uuid_str = str(task.endpoint_uuid)
+            batch.add(f_uuid_str, ep_uuid_str, task.args, task.kwargs)
             log.debug("Added task to Globus Compute batch: %s", task)
 
         try:
