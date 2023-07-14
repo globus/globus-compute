@@ -18,7 +18,7 @@ def test_web_service_url(monkeypatch):
         "bad-env-name": "https://compute.api.globus.org",
         "sandbox": "https://compute.api.sandbox.globuscs.info",
         "test": "https://compute.api.test.globuscs.info",
-        "preview": "https://compute.api.preview.globuscs.info",
+        "preview": "https://compute.api.preview.globus.org",
     }
 
     for env, url in env_url_map.items():
