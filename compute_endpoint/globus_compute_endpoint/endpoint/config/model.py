@@ -77,7 +77,7 @@ class ProviderModel(BaseConfigModel):
 
 class EngineModel(BaseConfigModel):
     type: str = "HighThroughputEngine"
-    provider: ProviderModel
+    provider: t.Optional[ProviderModel]
     strategy: t.Optional[StrategyModel]
     address: t.Optional[t.Union[str, AddressModel]]
 
