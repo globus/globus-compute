@@ -43,6 +43,20 @@ with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 .. literalinclude:: configs/delta.yaml
    :language: yaml
 
+
+Expanse (SDSC)
+^^^^^^^^^^^^^^
+
+.. image:: _static/images/expanse.jpeg
+
+The following snippet shows an example configuration for executing remotely on Expanse, a supercomputer at the San Diego Supercomputer Center.
+The configuration assumes the user is running on a login node, uses the ``SlurmProvider`` to interface
+with the scheduler, and uses the ``SrunLauncher`` to launch workers.
+
+.. literalinclude:: configs/expanse.yaml
+   :language: yaml
+
+
 UChicago AI Cluster
 ^^^^^^^^^^^^^^^^^^^
 
