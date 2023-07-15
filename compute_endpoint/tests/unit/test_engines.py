@@ -10,12 +10,27 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.engines import GlobusComputeEngine, ThreadPoolEngine
+from globus_compute_endpoint.engines import (
+    GlobusComputeEngine,
+    ProcessPoolEngine,
+    ThreadPoolEngine,
+)
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.executors.high_throughput.interchange import ManagerLost
 from tests.utils import double, ez_pack_function, slow_double
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def proc_pool_engine(tmp_path):
+    ep_id = uuid.uuid4()
+    engine = ProcessPoolEngine(heartbeat_period_s=1, max_workers=2)
+    queue = multiprocessing.Queue()
+    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
+
+    yield engine
+    engine.shutdown()
 
 
 @pytest.fixture
@@ -74,9 +89,20 @@ def test_result_message_packing():
     assert serializer.deserialize(unpacked.data) == result
 
 
-def test_engine_submit(gc_engine):
+@pytest.mark.parametrize("engine_type", ["proc_pool", "thread_pool", "gc"])
+def test_engine_submit(
+    proc_pool_engine: ProcessPoolEngine,
+    thread_pool_engine: ThreadPoolEngine,
+    gc_engine: GlobusComputeEngine,
+    engine_type: str,
+):
     """Test engine.submit with multiple engines"""
-    engine = gc_engine
+    if engine_type == "proc_pool":
+        engine = proc_pool_engine
+    elif engine_type == "thread_pool":
+        engine = thread_pool_engine
+    else:
+        engine = gc_engine
 
     param = random.randint(1, 100)
     future = engine._submit(double, param)
@@ -84,8 +110,19 @@ def test_engine_submit(gc_engine):
     assert future.result() == param * 2
 
 
-def test_engine_submit_internal(gc_engine):
-    engine = gc_engine
+@pytest.mark.parametrize("engine_type", ["proc_pool", "thread_pool", "gc"])
+def test_engine_submit_internal(
+    proc_pool_engine: ProcessPoolEngine,
+    thread_pool_engine: ThreadPoolEngine,
+    gc_engine: GlobusComputeEngine,
+    engine_type: str,
+):
+    if engine_type == "proc_pool":
+        engine = proc_pool_engine
+    elif engine_type == "thread_pool":
+        engine = thread_pool_engine
+    else:
+        engine = gc_engine
 
     q = engine.results_passthrough
     task_id = uuid.uuid1()
@@ -128,7 +165,19 @@ def test_engine_submit_internal(gc_engine):
         break
 
 
-def test_gc_engine_system_failure(gc_engine):
+def test_proc_pool_engine_not_started():
+    engine = ProcessPoolEngine(heartbeat_period_s=1, max_workers=2)
+
+    with pytest.raises(AssertionError) as pyt_exc:
+        engine.submit(double, 10)
+    assert "engine has not been started" in str(pyt_exc)
+
+    with pytest.raises(AssertionError):
+        engine.get_status_report()
+    assert "engine has not been started" in str(pyt_exc)
+
+
+def test_gc_engine_system_failure(gc_engine: GlobusComputeEngine):
     """Test behavior of engine failure killing task"""
     param = random.randint(1, 100)
     q = gc_engine.results_passthrough
