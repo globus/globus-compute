@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import multiprocessing
 import random
 import signal
 import string
 import time
 import uuid
+from queue import Queue
 
 import globus_compute_sdk as gc
 import globus_sdk
 import pytest
 import responses
+from globus_compute_endpoint import engines
 from globus_compute_sdk.sdk.web_client import WebClient
 
 
@@ -94,6 +97,63 @@ def get_standard_compute_client():
         )
 
     return func
+
+
+###
+# Engines
+###
+
+
+@pytest.fixture
+def engine_heartbeat() -> float:
+    return 0.1
+
+
+@pytest.fixture
+def proc_pool_engine(tmp_path, engine_heartbeat: float):
+    ep_id = uuid.uuid4()
+    queue = Queue()
+
+    engine = engines.ProcessPoolEngine(
+        heartbeat_period_s=engine_heartbeat, max_workers=2
+    )
+    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
+
+    yield engine
+    engine.shutdown()
+
+
+@pytest.fixture
+def thread_pool_engine(tmp_path, engine_heartbeat: float):
+    ep_id = uuid.uuid4()
+    queue = Queue()
+
+    engine = engines.ThreadPoolEngine(
+        heartbeat_period_s=engine_heartbeat, max_workers=2
+    )
+    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
+
+    yield engine
+    engine.shutdown()
+
+
+@pytest.fixture
+def gc_engine(tmp_path, engine_heartbeat: float):
+    ep_id = uuid.uuid4()
+    queue = multiprocessing.Queue()
+
+    engine = engines.GlobusComputeEngine(
+        address="127.0.0.1", heartbeat_period_s=engine_heartbeat, heartbeat_threshold=1
+    )
+    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
+
+    yield engine
+    engine.shutdown()
+
+
+###
+# Misc
+###
 
 
 @pytest.fixture

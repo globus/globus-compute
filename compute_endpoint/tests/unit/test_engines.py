@@ -1,10 +1,8 @@
 import concurrent.futures
 import logging
-import multiprocessing
 import random
 import time
 import uuid
-from queue import Queue
 
 import pytest
 from globus_compute_common import messagepack
@@ -20,42 +18,6 @@ from parsl.executors.high_throughput.interchange import ManagerLost
 from tests.utils import double, ez_pack_function, slow_double
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture
-def proc_pool_engine(tmp_path):
-    ep_id = uuid.uuid4()
-    engine = ProcessPoolEngine(heartbeat_period_s=1, max_workers=2)
-    queue = multiprocessing.Queue()
-    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
-
-    yield engine
-    engine.shutdown()
-
-
-@pytest.fixture
-def thread_pool_engine(tmp_path):
-    ep_id = uuid.uuid4()
-    engine = ThreadPoolEngine(heartbeat_period_s=1, max_workers=2)
-
-    queue = Queue()
-    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
-
-    yield engine
-    engine.shutdown()
-
-
-@pytest.fixture
-def gc_engine(tmp_path):
-    ep_id = uuid.uuid4()
-    engine = GlobusComputeEngine(
-        address="127.0.0.1", heartbeat_period_s=1, heartbeat_threshold=1
-    )
-    queue = multiprocessing.Queue()
-    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
-
-    yield engine
-    engine.shutdown()
 
 
 def test_result_message_packing():
