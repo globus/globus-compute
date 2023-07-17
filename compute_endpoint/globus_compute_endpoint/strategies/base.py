@@ -61,10 +61,7 @@ class BaseStrategy:
         self._event_buffer: t.List[t.Any] = []
         self._wake_up_time = time.time() + 1
         self._kill_event = threading.Event()
-        self._thread = threading.Thread(
-            target=self._wake_up_timer, args=(self._kill_event,), name="Base-Strategy"
-        )
-        self._thread.daemon = True
+        self._thread: t.Optional[threading.Thread] = None
 
     def start(self, interchange):
         """Actually start the strategy
@@ -74,6 +71,10 @@ class BaseStrategy:
          globus_compute_endpoint.executors.high_throughput.interchange.Interchange
             Interchange to bind the strategy to
         """
+        self._thread = threading.Thread(
+            target=self._wake_up_timer, args=(self._kill_event,), name="Base-Strategy"
+        )
+        self._thread.daemon = True
         self.interchange = interchange
         if hasattr(interchange, "provider"):
             log.debug(
@@ -138,8 +139,10 @@ class BaseStrategy:
 
     def close(self):
         """Merge the threads and terminate."""
+        if self._thread is None:
+            return
         self._kill_event.set()
-        self._thread.join()
+        self._thread.join(timeout=0.1)
 
 
 class Timer:
