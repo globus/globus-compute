@@ -41,17 +41,18 @@ def test_batch(compute_client, endpoint):
     double_fn_id = compute_client.register_function(double)
 
     inputs = list(range(10))
-    batch = compute_client.create_batch()
+    batch = compute_client.create_batch(endpoint)
 
     for x in inputs:
-        batch.add(double_fn_id, endpoint, args=(x,))
+        batch.add(double_fn_id, args=(x,))
 
     batch_res = compute_client.batch_run(batch)
+    tasks = [t for tl in batch_res["tasks"].values() for t in tl]
 
     total = 0
     for _i in range(12):
         time.sleep(5)
-        results = compute_client.get_batch_result(batch_res)
+        results = compute_client.get_batch_result(tasks)
         try:
             total = sum(results[tid]["result"] for tid in results)
             break
