@@ -13,6 +13,7 @@ from click import ClickException
 from click.testing import CliRunner
 from globus_compute_endpoint.cli import app, init_config_dir
 from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def make_endpoint_dir(mock_command_ensure):
         ep_template = ep_dir / "config_user.yaml"
         ep_config.write_text(
             """
-display_name: None
+display_name: null
 engine:
     type: HighThroughputEngine
     provider:
@@ -267,12 +268,29 @@ def test_start_ep_display_name_in_config(
         configure_arg = f" --display-name '{display_name}'"
     run_line(f"configure {ep_name}{configure_arg}")
 
-    dn_str = f"{display_name}" if display_name is not None else "None"
-
     with open(conf) as f:
         conf_dict = yaml.safe_load(f)
 
-    assert conf_dict["display_name"] == dn_str
+    assert conf_dict["display_name"] == display_name
+
+
+@pytest.mark.parametrize("display_name", [None, "None"])
+def test_config_yaml_display_none(
+    run_line, mock_command_ensure, make_endpoint_dir, display_name
+):
+    ep_name = "test_display_none"
+
+    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+
+    config_cmd = f"configure {ep_name}"
+    if display_name is not None:
+        config_cmd += f" --display-name {display_name}"
+    run_line(config_cmd)
+
+    with open(conf) as f:
+        conf_dict = load_config_yaml(f)
+
+    assert conf_dict.display_name is None
 
 
 def test_start_ep_incorrect_config_yaml(run_line, mock_cli_state, make_endpoint_dir):

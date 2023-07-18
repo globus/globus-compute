@@ -139,6 +139,13 @@ def load_config_yaml(config_str: str) -> Config:
     except Exception as err:
         raise ClickException(str(err)) from err
 
+    # Special case of 'display_name: None' converting to the empty
+    #   None instead of the string "None" which was the default
+    #   display_name since we started generating yaml configs from
+    #   Jun til Jul 2023.
+    # This has the side effect of disallowing the display name 'None'
+    if config.display_name == "None":
+        config.display_name = None
     return config
 
 
