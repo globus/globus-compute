@@ -1,0 +1,4 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for deleting functions via the ``Client.delete_function`` method.
