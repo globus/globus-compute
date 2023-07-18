@@ -826,3 +826,19 @@ class Client:
             The response of the request
         """
         return self.web_client.delete_endpoint(endpoint_id)
+
+    @requires_login
+    def delete_function(self, function_id: str):
+        """Delete a function
+
+        Parameters
+        ----------
+        function_id : str
+            The UUID of the function
+
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        return self.web_client.delete_function(function_id)

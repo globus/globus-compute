@@ -231,3 +231,6 @@ class WebClient(globus_sdk.BaseClient):
 
     def delete_endpoint(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
         return self.delete(f"/v2/endpoints/{endpoint_id}")
+
+    def delete_function(self, function_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
+        return self.delete(f"/v2/functions/{function_id}")

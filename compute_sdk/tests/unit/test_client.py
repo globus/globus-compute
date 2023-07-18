@@ -317,3 +317,13 @@ def test_container_build_status_failure(mocker, login_manager):
         gcc.get_container_build_status("123-434")
 
     assert type(excinfo.value) == SystemError
+
+
+def test_delete_function():
+    func_uuid_str = str(uuid.uuid4())
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
+
+    gcc.delete_function(func_uuid_str)
+
+    assert gcc.web_client.delete_function.called_with(func_uuid_str)
