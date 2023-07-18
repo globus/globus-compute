@@ -11,6 +11,7 @@ import time
 import typing as t
 import uuid
 import warnings
+from collections import defaultdict
 
 if sys.version_info >= (3, 8):
     from concurrent.futures import InvalidStateError
@@ -25,8 +26,10 @@ from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
+from globus_compute_sdk.sdk.batch import Batch
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.utils import chunk_by
+from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T, as_uuid
 
 log = logging.getLogger(__name__)
 
@@ -51,13 +54,6 @@ def __executor_atexit():
 threading.Thread(target=__executor_atexit).start()
 
 
-UUID_LIKE_T = t.Union[uuid.UUID, str]
-
-
-def _as_uuid(uuid_like: UUID_LIKE_T) -> uuid.UUID:
-    return uuid_like if isinstance(uuid_like, uuid.UUID) else uuid.UUID(uuid_like)
-
-
 class _TaskSubmissionInfo:
     __slots__ = (
         "task_num",
@@ -77,8 +73,8 @@ class _TaskSubmissionInfo:
         kwargs: dict,
     ):
         self.task_num = task_num
-        self.function_uuid = _as_uuid(function_id)
-        self.endpoint_uuid = _as_uuid(endpoint_id)
+        self.function_uuid = as_uuid(function_id)
+        self.endpoint_uuid = as_uuid(endpoint_id)
         self.args = args
         self.kwargs = kwargs
 
@@ -220,15 +216,18 @@ class Executor(concurrent.futures.Executor):
         be sent to this Task Group upstream, and the result listener will only listen
         for results for this group.
 
-        Must be a string.  Set by simple assignment::
+        Must be a valid UUID.  Set by simple assignment::
 
             gce = Executor(endpoint_id="...")
-            gce.task_group_id = "Some-stored-id"
+            gce.task_group_id = "00000000-0000-0000-0000-000000000000"
 
         This is typically used when reattaching to a previously initiated set of tasks.
         See `reload_tasks()`_ for more information.
 
-        [default: ``None``, which translates to the Client task group id]
+        If not set manually, this will be set automatically on `submit()`_, to a Task
+        Group ID supplied by the services.
+
+        [default: ``None``]
         """
         return self._task_group_id
 
@@ -462,6 +461,8 @@ class Executor(concurrent.futures.Executor):
         nominally intended to "reattach" to a previously initiated session, based on
         the Task Group ID.
 
+        :param task_group_id: Optionally specify a task_group_id to use. If present,
+            will overwrite the Executor's task_group_id
         :returns: An iterable of futures.
         :raises ValueError: if the server response is incorrect or invalid
         :raises KeyError: the server did not return an expected response
@@ -471,15 +472,12 @@ class Executor(concurrent.futures.Executor):
         Notes
         -----
         Any previous futures received from this executor will be cancelled.
-
-        :param task_group_id: optionally specify a task_group_id to use. if present,
-            will overwrite the Executor's task_group_id
         """  # noqa
+        if task_group_id is not None:
+            self.task_group_id = task_group_id
+
         if self.task_group_id is None:
-            if task_group_id is not None:
-                self.task_group_id = task_group_id
-            else:
-                raise Exception("must specify a task_group_id in order to reload tasks")
+            raise ValueError("must specify a task_group_id in order to reload tasks")
 
         # step 1: cleanup!
         if self._result_watcher:
@@ -598,12 +596,11 @@ class Executor(concurrent.futures.Executor):
             "%s: task submission thread started (%s)", self, threading.get_ident()
         )
         to_send = self._tasks_to_send  # cache lookup
-        futs: list[ComputeFuture] = []  # for mypy/the exception branch
         try:
             fut: ComputeFuture | None = ComputeFuture()  # just start the loop; please
             while fut is not None:
-                futs = []
-                tasks: list[_TaskSubmissionInfo] = []
+                futs: dict[uuid.UUID, list[ComputeFuture]] = defaultdict(list)
+                tasks: dict[uuid.UUID, list[_TaskSubmissionInfo]] = defaultdict(list)
                 task_count = 0
                 try:
                     fut, task = to_send.get()  # Block; wait for first result ...
@@ -611,9 +608,9 @@ class Executor(concurrent.futures.Executor):
                     bs = max(1, self.batch_size)  # May have changed while waiting
                     while task is not None:
                         assert fut is not None  # Come on mypy; contextually clear!
-                        tasks.append(task)
-                        futs.append(fut)
-                        if not (len(tasks) < bs):
+                        tasks[task.endpoint_uuid].append(task)
+                        futs[task.endpoint_uuid].append(fut)
+                        if any(len(tl) >= bs for tl in tasks.values()):
                             break
                         fut, task = to_send.get(block=False)  # ... don't block again
                         task_count += 1
@@ -623,26 +620,39 @@ class Executor(concurrent.futures.Executor):
                 if not tasks:
                     continue
 
-                log.info(f"Submitting tasks to Globus Compute: {len(tasks)}")
-                self._submit_tasks(futs, tasks)
+                for ep_uuid in tasks:
+                    task_list = tasks[ep_uuid]
+                    fut_list = futs[ep_uuid]
 
-                with self._shutdown_lock:
-                    if self._stopped:
+                    log.info(
+                        f"Submitting tasks to Endpoint {ep_uuid}: {len(task_list):,}"
+                    )
+
+                    self._submit_tasks(ep_uuid, fut_list, task_list)
+
+                    to_watch = [f for f in fut_list if f.task_id and not f.done()]
+                    if not to_watch:
                         continue
 
-                    if not (self._result_watcher and self._result_watcher.is_alive()):
-                        # Don't initialize the result watcher unless at least
-                        # one batch has been sent
-                        self._result_watcher = _ResultWatcher(self)
-                        self._result_watcher.start()
-                    try:
-                        self._result_watcher.watch_for_task_results(futs)
-                    except self._result_watcher.__class__.ShuttingDownError:
-                        log.debug("Waiting for previous ResultWatcher to shutdown")
-                        self._result_watcher.join()
-                        self._result_watcher = _ResultWatcher(self)
-                        self._result_watcher.start()
-                        self._result_watcher.watch_for_task_results(futs)
+                    with self._shutdown_lock:
+                        if self._stopped:
+                            continue
+
+                        if not (
+                            self._result_watcher and self._result_watcher.is_alive()
+                        ):
+                            # Don't initialize the result watcher unless at least
+                            # one batch has been sent
+                            self._result_watcher = _ResultWatcher(self)
+                            self._result_watcher.start()
+                        try:
+                            self._result_watcher.watch_for_task_results(to_watch)
+                        except self._result_watcher.__class__.ShuttingDownError:
+                            log.debug("Waiting for previous ResultWatcher to shutdown")
+                            self._result_watcher.join()
+                            self._result_watcher = _ResultWatcher(self)
+                            self._result_watcher.start()
+                            self._result_watcher.watch_for_task_results(to_watch)
 
                 # important to clear futures; else a legitimately early-shutdown
                 # request (e.g., __exit__()) can cancel these (finally block,
@@ -676,11 +686,8 @@ class Executor(concurrent.futures.Executor):
             while not self._tasks_to_send.empty():
                 fut, _task = self._tasks_to_send.get()
                 if fut:
-                    futs.append(fut)
-
-            for fut in futs:
-                fut.cancel()
-                fut.set_running_or_notify_cancel()
+                    fut.cancel()
+                    fut.set_running_or_notify_cancel()
             try:
                 while True:
                     self._tasks_to_send.task_done()
@@ -689,41 +696,92 @@ class Executor(concurrent.futures.Executor):
             log.debug("%s: task submission thread complete", self)
 
     def _submit_tasks(
-        self, futs: list[ComputeFuture], tasks: list[_TaskSubmissionInfo]
+        self,
+        endpoint_uuid: uuid.UUID,
+        futs: list[ComputeFuture],
+        tasks: list[_TaskSubmissionInfo],
     ):
         """
         Submit a batch of tasks to the webservice, destined for self.endpoint_id.
         Upon success, update the futures with their associated task_id.
 
+        :param endpoint_uuid: UUID of the Endpoint on which to execute this batch.
         :param futs: a list of ComputeFutures; will have their task_id attribute
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
-        batch = self.funcx_client.create_batch(
-            task_group_id=self.task_group_id,
-            create_websocket_queue=True,
+        batch = Batch(endpoint_uuid, self.task_group_id, request_queue=True)
+        submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
+            list
         )
-        for task in tasks:
+        for fut, task in zip(futs, tasks):
             f_uuid_str = str(task.function_uuid)
-            ep_uuid_str = str(task.endpoint_uuid)
-            batch.add(f_uuid_str, ep_uuid_str, task.args, task.kwargs)
+            submitted_futs_by_fn[f_uuid_str].append(fut)
+            batch.add(f_uuid_str, task.args, task.kwargs)
             log.debug("Added task to Globus Compute batch: %s", task)
 
         try:
-            batch_tasks = self.funcx_client.batch_run(batch)
-        except Exception:
-            log.error(f"Error submitting {len(tasks)} tasks to Globus Compute")
+            batch_response = self.funcx_client.batch_run(batch)
+        except Exception as e:
+            log.exception(f"Error submitting {len(tasks)} tasks to Globus Compute")
+            for fut_list in submitted_futs_by_fn.values():
+                for fut in fut_list:
+                    fut.set_exception(e)
             raise
 
-        self.task_count_submitted += len(batch_tasks)
+        try:
+            received_tasks_by_fn: dict[str, list[str]] = batch_response["tasks"]
+            new_tg_id: str = batch_response["task_group_id"]
+        except Exception as e:
+            log.exception(
+                f"Server response ({batch_response}) missing an expected field"
+            )
+            for fut_list in submitted_futs_by_fn.values():
+                for fut in fut_list:
+                    fut.set_exception(e)
+            raise
+
+        if self.task_group_id != new_tg_id:
+            log.info(
+                f"Updating task_group_id from {self._task_group_id} to {new_tg_id}"
+            )
+            self.task_group_id = new_tg_id
+
+        self.task_count_submitted += sum(len(x) for x in received_tasks_by_fn.values())
         log.debug(
             "Batch submitted to task_group: %s - %s",
             self.task_group_id,
             self.task_count_submitted,
         )
 
-        for fut, task_uuid in zip(futs, batch_tasks):
-            fut.task_id = task_uuid
+        for fn_id, fut_list in submitted_futs_by_fn.items():
+            task_uuids = received_tasks_by_fn.get(fn_id)
+
+            if task_uuids is None:
+                fut_exc = Exception(
+                    f"The Globus Compute Service ignored tasks for function {fn_id}!"
+                    "  This 'should not happen,' so please reach out to the Globus"
+                    " Compute team if you are able to recreate this behavior."
+                )
+                for fut in fut_list:
+                    fut.set_exception(fut_exc)
+                continue
+
+            if len(fut_list) != len(task_uuids):
+                fut_exc = Exception(
+                    "The Globus Compute Service only partially initiated requested"
+                    f" tasks for function {fn_id}!  It is unclear which tasks it"
+                    " honored, so marking all futures as failed.  Please reach out"
+                    " to the Globus Compute team if you are able to recreate this"
+                    " behavior."
+                )
+                for fut in fut_list:
+                    fut.set_exception(fut_exc)
+                continue
+
+            # Happy -- expected -- path
+            for fut, task_id in zip(fut_list, task_uuids):
+                fut.task_id = task_id
 
 
 class _ResultWatcher(threading.Thread):
@@ -937,7 +995,9 @@ class _ResultWatcher(threading.Thread):
             to_watch = {
                 f.task_id: f
                 for f in futures
-                if f.task_id and f.task_id not in self._open_futures
+                if f.task_id
+                if not f.done()
+                if f.task_id not in self._open_futures
             }
             self._open_futures.update(to_watch)
 
