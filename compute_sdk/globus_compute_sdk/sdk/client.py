@@ -408,11 +408,11 @@ class Client:
         endpoint_id : UUID-like
             ID of the endpoint where the tasks in this batch will be executed
 
-        task_group_id : str
-            Override the session wide session_task_group_id with a different
-            task_group_id for this batch.
-            If task_group_id is not specified, it will default to using the client's
-            session_task_group_id
+        task_group_id : UUID-like (optional)
+            Associate this batch with a pre-existing Task Group. If there is no Task
+            Group associated with the given ID, or the user is not authorized to use
+            it, the services will respond with an error.
+            If task_group_id is not specified, the services will create a Task Group.
 
         create_websocket_queue : bool
             Whether to create a websocket queue for the task_group_id if
@@ -422,9 +422,6 @@ class Client:
         -------
         Batch instance
         """
-        if not task_group_id:
-            task_group_id = self.session_task_group_id
-
         return Batch(endpoint_id, task_group_id, create_websocket_queue)
 
     @requires_login
