@@ -3,7 +3,9 @@ from __future__ import annotations
 import difflib
 import json
 import logging
+import os
 import pathlib
+import platform
 import re
 import shutil
 import sys
@@ -532,6 +534,25 @@ def delete_endpoint(*, name: str, force: bool, yes: bool):
 
     ep_dir = get_config_dir() / name
     Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), force=force)
+
+
+@app.command("diagnostic")
+@common_options
+def self_diagnostic():
+    """Generate endpoint diagnostic information"""
+    # TODO ifconfig and tar/zip
+
+    compute_dir = get_config_dir()
+    print(f"User({os.getlogin()}) uid({os.getuid()}) compute_dir({compute_dir})")
+    print(f"{platform.release()} {platform.version()}")
+    print(
+        f"{os.popen('python --version').read().strip()} @ "
+        f"{os.popen('which python').read()}"
+    )
+    print("globus-compute-endpoint whoami:")
+    print_whoami_info(True)
+    print("\nPackages:")
+    print(f"{os.popen('pip freeze').read()}")
 
 
 def cli_run():
