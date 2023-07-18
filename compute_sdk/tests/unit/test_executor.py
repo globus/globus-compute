@@ -263,12 +263,43 @@ def test_map_raises(gc_executor):
         gce.map(noop)
 
 
+def test_reload_tasks_requires_task_group_id(gc_executor):
+    _gcc, gce = gc_executor
+
+    with pytest.raises(Exception) as e:
+        gce.reload_tasks()
+
+    assert "must specify a task_group_id in order to reload tasks" in str(e.value)
+
+
+@mock.patch(
+    "globus_compute_sdk.sdk.executor.Executor.task_group_id",
+    new_callable=mock.PropertyMock,
+)
+def test_reload_tasks_sets_passed_task_group_id(mock_task_group_id, gc_executor):
+    _gcc, gce = gc_executor
+
+    def raise_if_setting(*args):
+        if args:
+            raise Exception("bailing")
+
+    mock_task_group_id.side_effect = raise_if_setting
+
+    tg_id = str(uuid.uuid4())
+    with pytest.raises(Exception) as e:
+        gce.reload_tasks(tg_id)
+
+    assert "bailing" in str(e.value)
+    assert mock_task_group_id.called_with(tg_id)
+
+
 @pytest.mark.parametrize("num_tasks", [0, 1, 2, 10])
 def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
     gcc, gce = gc_executor
 
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
+    gce.task_group_id = str(uuid.uuid4())
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
@@ -297,6 +328,7 @@ def test_reload_tasks_some_completed(gc_executor, mocker, num_tasks):
 
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
+    gce.task_group_id = str(uuid.uuid4())
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
@@ -336,6 +368,7 @@ def test_reload_tasks_all_completed(gc_executor):
     serialize = ComputeSerializer().serialize
     num_tasks = 5
 
+    gce.task_group_id = str(uuid.uuid4())
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [
@@ -367,6 +400,7 @@ def test_reload_starts_new_watcher(gc_executor):
 
     num_tasks = 3
 
+    gce.task_group_id = str(uuid.uuid4())
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
@@ -393,6 +427,8 @@ def test_reload_starts_new_watcher(gc_executor):
 def test_reload_tasks_cancels_existing_futures(gc_executor, randomstring):
     gcc, gce = gc_executor
 
+    gce.task_group_id = str(uuid.uuid4())
+
     def mock_data():
         return {
             "taskgroup_id": gce.task_group_id,
@@ -413,6 +449,7 @@ def test_reload_tasks_cancels_existing_futures(gc_executor, randomstring):
 def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
     gcc, gce = gc_executor
 
+    gce.task_group_id = str(uuid.uuid4())
     mock_datum = (
         (KeyError, {"mispeleed": gce.task_group_id}),
         (ValueError, {"taskgroup_id": "abcd"}),
@@ -431,6 +468,7 @@ def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
 def test_reload_sets_failed_tasks(gc_executor):
     gcc, gce = gc_executor
 
+    gce.task_group_id = str(uuid.uuid4())
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [
@@ -455,6 +493,7 @@ def test_reload_handles_deseralization_error_gracefully(gc_executor):
     gcc, gce = gc_executor
     gcc.fx_serializer = ComputeSerializer()
 
+    gce.task_group_id = str(uuid.uuid4())
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [
