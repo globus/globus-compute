@@ -147,7 +147,7 @@ class WebClient(globus_sdk.BaseClient):
         globus_sdk.BaseClient.app_name.fset(self, app_name)
 
     def submit(self, batch: t.Dict[str, t.Any]) -> globus_sdk.GlobusHTTPResponse:
-        return self.post("/v2/submit", data=batch)
+        return self.post("/v3/submit", data=batch)
 
     def register_endpoint(
         self,

@@ -18,8 +18,8 @@ from globus_compute_sdk.sdk._environments import (
     get_web_socket_url,
     urls_might_mismatch,
 )
-from globus_compute_sdk.sdk.asynchronous.compute_task import ComputeTask
 from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
+from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
 from globus_compute_sdk.version import __version__, compare_versions
@@ -387,18 +387,26 @@ class Client:
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
-        batch = self.create_batch(create_websocket_queue=self.asynchronous)
-        batch.add(function_id, endpoint_id, args, kwargs)
+        batch = self.create_batch(endpoint_id, create_websocket_queue=self.asynchronous)
+        batch.add(function_id, args, kwargs)
         r = self.batch_run(batch)
 
-        return r[0]
+        return r["tasks"][function_id][0]
 
-    def create_batch(self, task_group_id=None, create_websocket_queue=False) -> Batch:
+    def create_batch(
+        self,
+        endpoint_id: UUID_LIKE_T,
+        task_group_id: UUID_LIKE_T | None = None,
+        create_websocket_queue: bool = False,
+    ) -> Batch:
         """
         Create a Batch instance to handle batch submission in Globus Compute
 
         Parameters
         ----------
+
+        endpoint_id : UUID-like
+            ID of the endpoint where the tasks in this batch will be executed
 
         task_group_id : str
             Override the session wide session_task_group_id with a different
@@ -413,66 +421,33 @@ class Client:
         Returns
         -------
         Batch instance
-            Status block containing "status" key.
         """
         if not task_group_id:
             task_group_id = self.session_task_group_id
 
-        return Batch(
-            task_group_id=task_group_id, create_websocket_queue=create_websocket_queue
-        )
+        return Batch(endpoint_id, task_group_id, create_websocket_queue)
 
     @requires_login
-    def batch_run(self, batch) -> t.List[str]:
-        """Initiate a batch of tasks to Globus Compute
+    def batch_run(self, batch: Batch) -> dict[str, str | list[str]]:
+        """
+        Initiate a batch of tasks to Globus Compute
 
-        Parameters
-        ----------
-        batch: a Batch object
+        :param batch: a Batch object
 
         Returns
         -------
-        task_ids : a list of UUID strings that identify the tasks
+        dictionary with the following keys:
+            tasks: a mapping of function IDs to lists of task IDs
+            request_id: arbitrary unique string the web-service assigns this request
+                (only intended for help with support requests)
+            task_group_id: the task group identifier associated with the submitted tasks
+            endpoint_id: the endpoint the tasks were submitted to
         """
-        assert isinstance(batch, Batch), "Requires a Batch object as input"
-        assert len(batch.tasks) > 0, "Requires a non-empty batch"
-
-        data = batch.prepare()
+        if not batch:
+            raise ValueError("No tasks specified for batch run")
 
         # Send the data to Globus Compute
-        r = self.web_client.submit(data)
-
-        task_uuids: t.List[str] = []
-        for result in r["results"]:
-            task_id = result["task_uuid"]
-            task_uuids.append(task_id)
-            if not (200 <= result["http_status_code"] < 300):
-                # this method of handling errors for a batch response is not
-                # ideal, as it will raise any error in the multi-response,
-                # but it will do until batch_run is deprecated in favor of Executer
-                # Note that some errors may already be caught and raised
-                # by globus_compute_sdk.sdk.client.request as GlobusAPIError
-
-                # Checking for 'Failed' is how FuncxResponseError.unpack
-                # originally checked for errors.
-
-                # All errors should have 'reason' but just in case
-                error_reason = result.get("reason", "Unknown execution failure")
-                raise TaskExecutionFailed(error_reason)
-
-        if self.asynchronous:
-            task_group_id = r["task_group_id"]
-            asyncio_tasks = []
-            for task_id in task_uuids:
-                funcx_task = ComputeTask(task_id)
-                asyncio_task = self.loop.create_task(funcx_task.get_result())
-                asyncio_tasks.append(asyncio_task)
-
-                self.ws_polling_task.add_task(funcx_task)
-            self.ws_polling_task.put_task_group_id(task_group_id)
-            return asyncio_tasks
-
-        return task_uuids
+        return self.web_client.submit(batch.prepare()).data
 
     @requires_login
     def register_endpoint(
