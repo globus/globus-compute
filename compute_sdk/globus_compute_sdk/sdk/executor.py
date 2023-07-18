@@ -186,7 +186,7 @@ class Executor(concurrent.futures.Executor):
 
         self.task_count_submitted = 0
         self._task_counter: int = 0
-        self._task_group_id: str = task_group_id or str(uuid.uuid4())
+        self._task_group_id: str | None = task_group_id
         self._tasks_to_send: queue.Queue[
             tuple[ComputeFuture, _TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
@@ -214,7 +214,7 @@ class Executor(concurrent.futures.Executor):
         return f"{name}<{label}{ep_id}{c_id}{tg_id}{bs}>"
 
     @property
-    def task_group_id(self) -> str:
+    def task_group_id(self) -> str | None:
         """
         The Task Group with which this instance is currently associated.  New tasks will
         be sent to this Task Group upstream, and the result listener will only listen
@@ -233,7 +233,7 @@ class Executor(concurrent.futures.Executor):
         return self._task_group_id
 
     @task_group_id.setter
-    def task_group_id(self, task_group_id: str):
+    def task_group_id(self, task_group_id: str | None):
         self._task_group_id = task_group_id
 
     def _fn_cache_key(self, fn: t.Callable):
@@ -451,7 +451,9 @@ class Executor(concurrent.futures.Executor):
         """  # noqa
         raise NotImplementedError()
 
-    def reload_tasks(self) -> t.Iterable[ComputeFuture]:
+    def reload_tasks(
+        self, task_group_id: str | None = None
+    ) -> t.Iterable[ComputeFuture]:
         """
         .. _reload_tasks():
 
@@ -469,7 +471,16 @@ class Executor(concurrent.futures.Executor):
         Notes
         -----
         Any previous futures received from this executor will be cancelled.
+
+        :param task_group_id: optionally specify a task_group_id to use. if present,
+            will overwrite the Executor's task_group_id
         """  # noqa
+        if self.task_group_id is None:
+            if task_group_id is not None:
+                self.task_group_id = task_group_id
+            else:
+                raise Exception("must specify a task_group_id in order to reload tasks")
+
         # step 1: cleanup!
         if self._result_watcher:
             self._result_watcher.shutdown(wait=False, cancel_futures=True)
