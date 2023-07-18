@@ -1,8 +1,9 @@
 import concurrent.futures
 import logging
-import multiprocessing
 import random
+import time
 import uuid
+from queue import Queue
 
 import pytest
 from globus_compute_endpoint.engines import GlobusComputeEngine
@@ -27,7 +28,7 @@ def gc_engine_scaling(tmp_path):
         ),
         strategy=SimpleStrategy(interval=0.1, max_idletime=0),
     )
-    queue = multiprocessing.Queue()
+    queue = Queue()
     engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
 
     yield engine
@@ -48,7 +49,7 @@ def gc_engine_non_scaling(tmp_path):
         ),
         strategy=None,
     )
-    queue = multiprocessing.Queue()
+    queue = Queue()
     engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
 
     yield engine
@@ -56,7 +57,7 @@ def gc_engine_non_scaling(tmp_path):
 
 
 def test_engine_submit_init_0(gc_engine_scaling):
-    """Test engine.submit with multiple engines"""
+    """Test engine scaling from 0 blocks with GCE"""
     engine = gc_engine_scaling
     max_idletime = engine.strategy.max_idletime
 
@@ -77,8 +78,6 @@ def test_engine_submit_init_0(gc_engine_scaling):
     # While scale_down might be triggered it appears to take 1s
     # lowest heartbeat period to detect a manager going down
     while True:
-        import time
-
         managers = engine.executor.connected_managers()
         if len(managers) == 0:
             break
@@ -102,3 +101,7 @@ def test_engine_no_scaling(gc_engine_non_scaling):
     future = engine._submit(double, param)
     assert isinstance(future, concurrent.futures.Future)
     assert future.result() == param * 2
+
+    # Confirm that there's 1 manager
+    outstanding = engine.get_outstanding_breakdown()
+    assert len(outstanding) == 2, "Expecting 1 manager+interchange"

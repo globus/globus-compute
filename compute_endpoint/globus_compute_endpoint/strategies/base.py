@@ -71,6 +71,9 @@ class BaseStrategy:
          globus_compute_endpoint.executors.high_throughput.interchange.Interchange
             Interchange to bind the strategy to
         """
+        # This thread is created here to ensure a new thread is created whenever start
+        # is called. This is to avoid errors from tests reusing strategy objects which
+        # would attempt to restart stopped threads.
         self._thread = threading.Thread(
             target=self._wake_up_timer, args=(self._kill_event,), name="Base-Strategy"
         )
