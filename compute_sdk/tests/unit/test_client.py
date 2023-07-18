@@ -1,4 +1,5 @@
 import uuid
+from types import SimpleNamespace
 from unittest import mock
 
 import globus_compute_sdk as gc
@@ -147,78 +148,22 @@ def test_batch_created_websocket_queue(create_ws_queue):
     gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     gcc.web_client = mock.MagicMock()
     if create_ws_queue is None:
-        batch = gcc.create_batch()
+        batch = gcc.create_batch(eid)
     else:
-        batch = gcc.create_batch(create_websocket_queue=create_ws_queue)
+        batch = gcc.create_batch(eid, create_websocket_queue=create_ws_queue)
 
-    batch.add(fid, eid, (1,))
-    batch.add(fid, eid, (2,))
+    batch.add(fid, (1,))
+    batch.add(fid, (2,))
 
     gcc.batch_run(batch)
 
     assert gcc.web_client.submit.called
     submit_data = gcc.web_client.submit.call_args[0][0]
-    assert "create_websocket_queue" in submit_data
+    assert "create_queue" in submit_data
     if create_ws_queue:
-        assert submit_data["create_websocket_queue"] is True
+        assert submit_data["create_queue"] is True
     else:
-        assert submit_data["create_websocket_queue"] is False
-
-
-def test_batch_error():
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    gcc.web_client = mock.MagicMock()
-
-    error_reason = "reason 1 2 3"
-    error_results = {
-        "response": "batch",
-        "results": [
-            {
-                "http_status_code": 200,
-                "status": "Success",
-                "task_uuid": "abc",
-            },
-            {
-                "http_status_code": 400,
-                "status": "Failed",
-                "task_uuid": "def",
-                "reason": error_reason,
-            },
-        ],
-        "task_group_id": "tg_id",
-    }
-    gcc.web_client.submit = mock.MagicMock(return_value=error_results)
-
-    batch = gcc.create_batch()
-    batch.add("fid1", "eid1", "arg1")
-    batch.add("fid2", "eid2", "arg2")
-    with pytest.raises(TaskExecutionFailed) as excinfo:
-        gcc.batch_run(batch)
-
-    assert error_reason in str(excinfo)
-
-
-def test_batch_no_reason():
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    gcc.web_client = mock.MagicMock()
-
-    error_results = {
-        "response": "batch",
-        "results": [
-            {
-                "http_status_code": 500,
-                "status": "Failed",
-                "task_uuid": "def",
-            },
-        ],
-        "task_group_id": "tg_id",
-    }
-    gcc.web_client.submit = mock.MagicMock(return_value=error_results)
-
-    with pytest.raises(TaskExecutionFailed) as excinfo:
-        gcc.run(endpoint_id="fid", function_id="fid")
-
-    assert "Unknown execution failure" in str(excinfo)
+        assert submit_data["create_queue"] is False
 
 
 @pytest.mark.parametrize("asynchronous", [True, False, None])
@@ -232,25 +177,28 @@ def test_single_run_websocket_queue_depend_async(asynchronous):
 
     gcc.web_client = mock.MagicMock()
 
+    ep_id = str(uuid.uuid4())
+    fn_id = str(uuid.uuid4())
+
     fake_results = {
-        "results": [
-            {
-                "task_uuid": str(uuid.uuid4()),
-                "http_status_code": 200,
-            }
-        ],
+        "request_id": "blah",
         "task_group_id": str(uuid.uuid4()),
+        "endpoint_id": ep_id,
+        "tasks": {fn_id: [str(uuid.uuid4())]},
     }
-    gcc.web_client.submit = mock.MagicMock(return_value=fake_results)
-    gcc.run(endpoint_id=str(uuid.uuid4()), function_id=str(uuid.uuid4()))
+
+    gcc.web_client.submit = mock.MagicMock(
+        return_value=SimpleNamespace(data=fake_results)
+    )
+    gcc.run(endpoint_id=ep_id, function_id=fn_id)
 
     assert gcc.web_client.submit.called
     submit_data = gcc.web_client.submit.call_args[0][0]
-    assert "create_websocket_queue" in submit_data
+    assert "create_queue" in submit_data
     if asynchronous:
-        assert submit_data["create_websocket_queue"] is True
+        assert submit_data["create_queue"] is True
     else:
-        assert submit_data["create_websocket_queue"] is False
+        assert submit_data["create_queue"] is False
 
 
 def test_build_container(mocker, login_manager):

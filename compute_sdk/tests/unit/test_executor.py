@@ -272,25 +272,18 @@ def test_reload_tasks_requires_task_group_id(gc_executor):
     assert "must specify a task_group_id in order to reload tasks" in str(e.value)
 
 
-@mock.patch(
-    "globus_compute_sdk.sdk.executor.Executor.task_group_id",
-    new_callable=mock.PropertyMock,
-)
-def test_reload_tasks_sets_passed_task_group_id(mock_task_group_id, gc_executor):
-    _gcc, gce = gc_executor
+def test_reload_tasks_sets_passed_task_group_id(gc_executor):
+    gcc, gce = gc_executor
 
-    def raise_if_setting(*args):
-        if args:
-            raise Exception("bailing")
-
-    mock_task_group_id.side_effect = raise_if_setting
+    # for less mocking:
+    gcc.web_client.get_taskgroup_tasks.side_effect = RuntimeError("bailing out early")
 
     tg_id = str(uuid.uuid4())
-    with pytest.raises(Exception) as e:
+    with pytest.raises(RuntimeError) as e:
         gce.reload_tasks(tg_id)
 
-    assert "bailing" in str(e.value)
-    assert mock_task_group_id.called_with(tg_id)
+    assert "bailing out early" in str(e.value)
+    assert gce.task_group_id == tg_id
 
 
 @pytest.mark.parametrize("num_tasks", [0, 1, 2, 10])
@@ -515,10 +508,15 @@ def test_reload_handles_deseralization_error_gracefully(gc_executor):
 
 
 @pytest.mark.parametrize("batch_size", tuple(range(1, 11)))
-def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
+def test_task_submitter_respects_batch_size(gc_executor, batch_size: int, mocker):
     gcc, gce = gc_executor
 
-    gcc.create_batch.side_effect = mock.MagicMock
+    # ugly way to replace Batch with a MagicMock factory
+    mocker.patch(
+        f"{_MOCK_BASE}Batch",
+        side_effect=lambda *_args, **_kwargs: mock.MagicMock(),
+    )
+
     gcc.register_function.return_value = uuid.uuid4()
     num_batches = 50
 
@@ -526,11 +524,16 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
     gce.batch_size = batch_size
     for _ in range(num_batches * batch_size):
         gce.submit(noop)
+
+    # force the batches to be populated by flushing the queues. more consistent than
+    # waiting for the queues to flush themselves manually due to slowdowns
+    # introduced by `coverage`.
     gce.shutdown(cancel_futures=True)
 
+    assert gcc.batch_run.call_count >= num_batches
     for args, _kwargs in gcc.batch_run.call_args_list:
         batch, *_ = args
-        assert batch.add.call_count <= batch_size
+        assert 0 < batch.add.call_count <= batch_size
 
 
 def test_task_submitter_stops_executor_on_exception():
@@ -565,8 +568,13 @@ def test_task_submitter_handles_stale_result_watcher_gracefully(gc_executor, moc
     gcc.register_function.return_value = uuid.uuid4()
     gce.endpoint_id = uuid.uuid4()
 
+    fn_id = str(uuid.uuid4())
+    gce._function_registry[gce._fn_cache_key(noop)] = fn_id
     task_id = str(uuid.uuid4())
-    gcc.batch_run.return_value = [task_id]
+    gcc.batch_run.return_value = {
+        "tasks": {fn_id: [task_id]},
+        "task_group_id": str(uuid.uuid4()),
+    }
     gce.submit(noop)
     try_assert(lambda: bool(gce._result_watcher), "Test prerequisite")
     try_assert(lambda: bool(gce._result_watcher._open_futures), "Test prerequisite")
@@ -583,12 +591,44 @@ def test_task_submitter_sets_future_task_ids(gc_executor):
 
     num_tasks = random.randint(2, 20)
     futs = [ComputeFuture() for _ in range(num_tasks)]
+    tasks = [
+        mock.MagicMock(function_uuid="fn_id", args=[], kwargs={})
+        for _ in range(num_tasks)
+    ]
     batch_ids = [uuid.uuid4() for _ in range(num_tasks)]
 
-    gcc.batch_run.return_value = batch_ids
-    gce._submit_tasks(futs, [])
+    gcc.batch_run.return_value = {
+        "request_id": "rq_id",
+        "task_group_id": "tg_id",
+        "endpoint_id": "ep_id",
+        "tasks": {"fn_id": batch_ids},
+    }
+    gce._submit_tasks("ep_id", futs, tasks)
 
     assert all(f.task_id == task_id for f, task_id in zip(futs, batch_ids))
+
+
+@pytest.mark.parametrize("batch_response", [{"tasks": "foo"}, {"task_group_id": "foo"}])
+def test_submit_tasks_stops_futures_on_bad_response(
+    gc_executor, batch_response, caplog
+):
+    gcc, gce = gc_executor
+
+    gcc.batch_run.return_value = batch_response
+
+    num_tasks = random.randint(2, 20)
+    futs = [ComputeFuture() for _ in range(num_tasks)]
+    tasks = [
+        mock.MagicMock(function_uuid="fn_id", args=[], kwargs={})
+        for _ in range(num_tasks)
+    ]
+
+    with pytest.raises(Exception) as e:
+        gce._submit_tasks("ep_id", futs, tasks)
+
+    assert "missing an expected field" in caplog.text
+    for fut in futs:
+        assert fut.exception() == e.value
 
 
 def test_resultwatcher_stops_if_unable_to_connect(mocker):
