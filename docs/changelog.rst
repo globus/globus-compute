@@ -3,6 +3,55 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.2.4:
+
+globus-compute-sdk & globus-compute-endpoint v2.2.4
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+* Auto-scaling support for ``GlobusComputeEngine``
+  Here is an example configuration in python:
+
+  ```
+  engine = GlobusComputeEngine(
+        address="127.0.0.1",
+        heartbeat_period_s=1,
+        heartbeat_threshold=1,
+        provider=LocalProvider(
+            init_blocks=0,  # Start with 0 blocks
+            min_blocks=0,   # 0 minimum blocks
+            max_blocks=4,   # scale upto 4 blocks
+        ),
+        strategy=SimpleStrategy(
+            # Shut down blocks idle for more that 30s
+            max_idletime=30.0,
+        ),
+    )
+  ```
+
+- Reimplemented ``ProcessPoolEngine``, which wraps ``concurrent.futures.ProcessPoolExecutor``,
+  for concurrent local execution. We temporarily removed the former implementation because of a
+  critical bug.
+
+- Added support for deleting functions via the ``Client.delete_function`` method.
+
+Bug Fixes
+^^^^^^^^^
+
+- The ``provider`` field was required in the endpoint YAML configuration but is
+  not accepted by the ``ThreadPoolEngine``, rendering it unusable. The ``provider``
+  field is now optional.
+
+Changed
+^^^^^^^
+
+- Update Parsl requirement to version ``2023.7.3``
+
+- As part of Parsl upgrade, drop support for Python 3.7.  Supported versions
+  are now 3.8, 3.9, 3.10, and 3.11
+
 .. _changelog-2.2.3:
 
 globus-compute-sdk & globus-compute-endpoint v2.2.3
