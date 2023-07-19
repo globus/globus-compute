@@ -17,6 +17,8 @@ from globus_compute_sdk.sdk.executor import TaskSubmissionInfo, _ResultWatcher
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 from tests.utils import try_assert, try_for_timeout
 
+_MOCK_BASE = "globus_compute_sdk.sdk.executor."
+
 
 def _is_stopped(thread: threading.Thread | None) -> bool:
     def _wrapped():
@@ -72,9 +74,7 @@ def gc_executor(mocker):
     gcc = mock.MagicMock()
     gcc.session_task_group_id = str(uuid.uuid4())
     gce = Executor(funcx_client=gcc)
-    watcher = mocker.patch(
-        "globus_compute_sdk.sdk.executor._ResultWatcher", autospec=True
-    )
+    watcher = mocker.patch(f"{_MOCK_BASE}_ResultWatcher", autospec=True)
 
     def create_mock_watcher(*args, **kwargs):
         return MockedResultWatcher(gce)
@@ -117,7 +117,7 @@ def test_task_submission_info_stringification():
 
 @pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
 def test_deprecated_args_warned(argname, mocker):
-    mock_warn = mocker.patch("globus_compute_sdk.sdk.executor.warnings")
+    mock_warn = mocker.patch(f"{_MOCK_BASE}warnings")
     gcc = mock.Mock(spec=Client)
     Executor(funcx_client=gcc).shutdown()
     mock_warn.warn.assert_not_called()
@@ -137,7 +137,7 @@ def test_invalid_args_raise(randomstring):
 
 
 def test_creates_default_client_if_none_provided(mocker):
-    mock_gcc_klass = mocker.patch("globus_compute_sdk.sdk.executor.Client")
+    mock_gcc_klass = mocker.patch(f"{_MOCK_BASE}Client")
     Executor().shutdown()
 
     mock_gcc_klass.assert_called()
@@ -267,7 +267,7 @@ def test_map_raises(gc_executor):
 def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
     gcc, gce = gc_executor
 
-    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
     mock_data = {
         "taskgroup_id": gce.task_group_id,
@@ -295,7 +295,7 @@ def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
 def test_reload_tasks_some_completed(gc_executor, mocker, num_tasks):
     gcc, gce = gc_executor
 
-    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
     mock_data = {
         "taskgroup_id": gce.task_group_id,
@@ -548,7 +548,7 @@ def test_task_submitter_sets_future_task_ids(gc_executor):
 
 
 def test_resultwatcher_stops_if_unable_to_connect(mocker):
-    mock_time = mocker.patch("globus_compute_sdk.sdk.executor.time")
+    mock_time = mocker.patch(f"{_MOCK_BASE}time")
     gce = mock.Mock(spec=Executor)
     rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
@@ -570,7 +570,7 @@ def test_resultwatcher_ignores_invalid_tasks(mocker):
 
 
 def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
-    mocker.patch("globus_compute_sdk.sdk.executor.time")
+    mocker.patch(f"{_MOCK_BASE}time")
     gce = mock.Mock(spec=Executor)
     rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
@@ -583,8 +583,8 @@ def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
 
 
 def test_resultwatcher_gracefully_handles_unexpected_exception(mocker):
-    mocker.patch("globus_compute_sdk.sdk.executor.time")
-    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log")
+    mocker.patch(f"{_MOCK_BASE}time")
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     gce = mock.Mock(spec=Executor)
     rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
@@ -722,7 +722,7 @@ def test_resultwatcher_match_handles_deserialization_error():
 
 @pytest.mark.parametrize("unpacked", ("not_a_Result", Exception))
 def test_resultwatcher_onmessage_verifies_result_type(mocker, unpacked):
-    mock_unpack = mocker.patch("globus_compute_sdk.sdk.executor.messagepack.unpack")
+    mock_unpack = mocker.patch(f"{_MOCK_BASE}messagepack.unpack")
 
     mock_unpack.side_effect = unpacked
     mock_channel = mock.Mock()
@@ -749,7 +749,7 @@ def test_resultwatcher_onmessage_sets_check_results_flag():
 
 @pytest.mark.parametrize("exc", (MemoryError("some description"), "some description"))
 def test_resultwatcher_stops_loop_on_open_failure(mocker, exc):
-    mock_log = mocker.patch("globus_compute_sdk.sdk.executor.log", autospec=True)
+    mock_log = mocker.patch(f"{_MOCK_BASE}log", autospec=True)
 
     mrw = MockedResultWatcher(mock.Mock())
     mrw.start()
