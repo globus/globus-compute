@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+import typing as t
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class BaseStrategy:
     from a duplicate logger being added by the thread.
     """
 
-    def __init__(self, *args, threshold=20, interval=5):
+    def __init__(self, *args, threshold: int = 20, interval: float = 5.0):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
@@ -57,13 +58,10 @@ class BaseStrategy:
         self.callback = self.strategize
         self._handle = None
         self._event_count = 0
-        self._event_buffer = []
+        self._event_buffer: t.List[t.Any] = []
         self._wake_up_time = time.time() + 1
         self._kill_event = threading.Event()
-        self._thread = threading.Thread(
-            target=self._wake_up_timer, args=(self._kill_event,), name="Base-Strategy"
-        )
-        self._thread.daemon = True
+        self._thread: t.Optional[threading.Thread] = None
 
     def start(self, interchange):
         """Actually start the strategy
@@ -73,6 +71,13 @@ class BaseStrategy:
          globus_compute_endpoint.executors.high_throughput.interchange.Interchange
             Interchange to bind the strategy to
         """
+        # This thread is created here to ensure a new thread is created whenever start
+        # is called. This is to avoid errors from tests reusing strategy objects which
+        # would attempt to restart stopped threads.
+        self._thread = threading.Thread(
+            target=self._wake_up_timer, args=(self._kill_event,), name="Base-Strategy"
+        )
+        self._thread.daemon = True
         self.interchange = interchange
         if hasattr(interchange, "provider"):
             log.debug(
@@ -113,7 +118,7 @@ class BaseStrategy:
             else:
                 print("Sleeping a bit more")
 
-    def notify(self, event_id):
+    def notify(self, event_id: t.Any):
         """Let the FlowControl system know that there is an event.
 
         This method is to be called from the Interchange to notify the flowcontrol
@@ -137,8 +142,10 @@ class BaseStrategy:
 
     def close(self):
         """Merge the threads and terminate."""
+        if self._thread is None:
+            return
         self._kill_event.set()
-        self._thread.join()
+        self._thread.join(timeout=0.1)
 
 
 class Timer:

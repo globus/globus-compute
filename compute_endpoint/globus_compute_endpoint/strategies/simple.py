@@ -13,7 +13,13 @@ log = logging.getLogger(__name__)
 class SimpleStrategy(BaseStrategy):
     """Implements the simple strategy"""
 
-    def __init__(self, *args, threshold=20, interval=1, max_idletime=60):
+    def __init__(
+        self,
+        *args,
+        threshold: int = 20,
+        interval: float = 1.0,
+        max_idletime: float = 60.0,
+    ):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
@@ -23,10 +29,10 @@ class SimpleStrategy(BaseStrategy):
         threshold:(int)
           Tasks after which the callback is triggered
 
-        interval (int)
+        interval (float)
           seconds after which timer expires
 
-        max_idletime: (int)
+        max_idletime: (float)
           maximum idle time(seconds) allowed for resources after which strategy will
           try to kill them.
           default: 60s

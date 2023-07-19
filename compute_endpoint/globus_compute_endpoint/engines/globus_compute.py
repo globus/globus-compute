@@ -13,6 +13,7 @@ from globus_compute_endpoint.engines.base import (
     GlobusComputeEngineBase,
     ReportingThread,
 )
+from globus_compute_endpoint.strategies import SimpleStrategy
 from parsl.executors.high_throughput.executor import HighThroughputExecutor
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         label: str = "GlobusComputeEngine",
         address: t.Optional[str] = None,
         heartbeat_period_s: float = 30.0,
+        strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         **kwargs,
     ):
         self.address = address
@@ -34,9 +36,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             target=self.report_status, args=[], reporting_period=heartbeat_period_s
         )
         super().__init__(*args, heartbeat_period_s=heartbeat_period_s, **kwargs)
+        self.strategy = strategy
         self.executor = HighThroughputExecutor(  # type: ignore
             *args, address=address, **kwargs
         )
+        self.max_workers_per_node = 1
 
     def start(
         self,
@@ -57,6 +61,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             # a queue is passed in
             self.results_passthrough = results_passthrough
         self.executor.start()
+        if self.strategy:
+            self.strategy.start(self)
         self._status_report_thread.start()
 
     def _submit(
@@ -66,6 +72,59 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         **kwargs: t.Any,
     ) -> Future:
         return self.executor.submit(func, {}, *args, **kwargs)
+
+    @property
+    def provider(self):
+        return self.executor.provider
+
+    def get_outstanding_breakdown(self) -> t.List[t.Tuple[str, int, bool]]:
+        """
+
+        Returns
+        -------
+        List of tuples of the form (component, # of tasks on component, active?)
+        """
+        total_task_count = self.executor.outstanding
+        manager_info: t.List[t.Dict[str, t.Any]] = self.executor.connected_managers()
+        breakdown = [(m["manager"], m["tasks"], m["active"]) for m in manager_info]
+        total_count_managers = sum([m["tasks"] for m in manager_info])
+        task_count_interchange = total_task_count - total_count_managers
+        breakdown = [("interchange", task_count_interchange, True)] + breakdown
+        return breakdown
+
+    def get_total_tasks_outstanding(self):
+        """
+
+        Returns
+        -------
+        Returns a dict of type {str_task_type: count_tasks}
+
+        """
+        outstanding = self.get_outstanding_breakdown()
+        total = sum([component[1] for component in outstanding])
+        return {"RAW": total}
+
+    def provider_status(self):
+        status = []
+        if self.provider:
+            # ex.locks is a dict of block_id:job_id mappings
+            job_ids = self.executor.blocks.values()
+            status = self.provider.status(job_ids=job_ids)
+        return status
+
+    def get_total_live_workers(self) -> int:
+        manager_info: t.List[dict[str, t.Any]] = self.executor.connected_managers()
+        worker_count = sum([mgr["worker_count"] for mgr in manager_info])
+        return worker_count
+
+    def scale_out(self, blocks: int):
+        logger.info(f"Scaling out {blocks} blocks")
+        return self.executor.scale_out(blocks=blocks)
+
+    def scale_in(self, blocks: int):
+        logger.info(f"Scaling in {blocks} blocks")
+        to_kill = list(self.executor.blocks.values())[:blocks]
+        return self.provider.cancel(to_kill)
 
     def get_status_report(self) -> EPStatusReport:
         """
@@ -110,4 +169,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def shutdown(self):
         self._status_report_thread.stop()
+        if self.strategy:
+            self.strategy.close()
         return self.executor.shutdown()
