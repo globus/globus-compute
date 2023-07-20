@@ -4,7 +4,7 @@ engine:
 
     address:
         type: address_by_interface
-        ifname: nmn0
+        ifname: nmnb0
 
     provider:
         type: SlurmProvider
