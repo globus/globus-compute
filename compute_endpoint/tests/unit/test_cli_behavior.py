@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import pathlib
 import shlex
+import typing as t
 import uuid
 from unittest import mock
 
@@ -14,6 +16,8 @@ from click.testing import CliRunner
 from globus_compute_endpoint.cli import app, init_config_dir
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
+from pyfakefs import fake_filesystem as fakefs
+from pytest_mock import MockFixture
 
 
 @pytest.fixture
@@ -69,6 +73,7 @@ engine:
         max_blocks: 1
             """
         )
+        return ep_dir
 
     return func
 
@@ -382,3 +387,120 @@ def test_die_with_parent_detached(
     else:
         run_line("start foo")
         assert config.detach_endpoint
+
+
+def test_self_diagnostic(
+    mocker: MockFixture,
+    mock_command_ensure,
+    mock_cli_state,
+    randomstring,
+    fs: fakefs.FakeFilesystem,
+    run_line: t.Callable,
+):
+    mocker.patch("socket.create_connection")
+
+    home_path = os.path.expanduser("~")
+    ep_dir_path = f"{home_path}/.globus_compute/foo/"
+    conf_path = f"{ep_dir_path}/config.yaml"
+    log_path = f"{ep_dir_path}/endpoint.log"
+    conf_data = randomstring()
+    log_data = randomstring()
+
+    fs.create_dir(ep_dir_path)
+
+    with open(conf_path, "w") as f:
+        f.write(conf_data)
+
+    with open(log_path, "w") as f:
+        f.write(log_data)
+
+    res = run_line("self-diagnostic")
+    stdout = res.stdout_bytes.decode("utf-8")
+
+    assert stdout.count("== Diagnostic") >= 16
+    assert stdout.count("was successful!") == 2
+    assert conf_data in stdout
+    assert log_data in stdout
+
+
+def test_self_diagnostic_gzip(
+    mocker: MockFixture,
+    mock_cli_state,
+    mock_command_ensure,
+    fs: fakefs.FakeFilesystem,
+    run_line: t.Callable,
+):
+    mocker.patch("socket.create_connection")
+
+    res = run_line("self-diagnostic --gzip")
+    stdout = res.stdout_bytes.decode("utf-8")
+
+    assert "Successfully created" in stdout
+    assert "== Diagnostic" not in stdout
+
+    for fname in fs.listdir("."):
+        if fname.endswith(".txt.gz"):
+            break
+    with gzip.open(fname, "rb") as f:
+        contents = f.read().decode("utf-8")
+
+    assert contents.count("== Diagnostic") >= 16
+
+
+@pytest.mark.parametrize("test_data", [(True, 1), (False, 0.5), (False, "")])
+def test_self_diagnostic_log_size(
+    mocker: MockFixture,
+    mock_cli_state,
+    mock_command_ensure,
+    fs: fakefs.FakeFilesystem,
+    run_line: t.Callable,
+    test_data: list[tuple[bool, int | float | str]],
+):
+    should_succeed, kb = test_data
+
+    mocker.patch("socket.create_connection")
+
+    def run_cmd():
+        res = run_line(f"self-diagnostic --log-kb {kb}")
+        return res.stdout_bytes.decode("utf-8")
+
+    if should_succeed:
+        stdout = run_cmd()
+        assert stdout.count("== Diagnostic") >= 16
+    else:
+        with pytest.raises(AssertionError):
+            stdout = run_cmd()
+
+
+def test_self_diagnostic_log_size_limit(
+    mocker: MockFixture,
+    mock_cli_state,
+    mock_command_ensure,
+    fs: fakefs.FakeFilesystem,
+    run_line: t.Callable,
+):
+    home_path = os.path.expanduser("~")
+    ep_dir_path = f"{home_path}/.globus_compute/foo/"
+    log_path = f"{ep_dir_path}/endpoint.log"
+
+    fs.create_dir(ep_dir_path)
+
+    mocker.patch("socket.create_connection")
+
+    def run_cmd():
+        # Limit log file size to 1 KB
+        res = run_line("self-diagnostic --log-kb 1")
+        return res.stdout_bytes.decode("utf-8")
+
+    f_size = 1024  # 1 KB
+    with open(log_path, "w") as f:
+        f.write("$" * f_size)
+    stdout = run_cmd()
+
+    f_size += 1  # Adding 1 extra byte
+    with open(log_path, "w") as f:
+        # Adding one extra byte
+        f.write("$" * f_size)
+    stdout_limited = run_cmd()
+
+    assert len(stdout) == len(stdout_limited)
