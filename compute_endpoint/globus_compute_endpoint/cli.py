@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import difflib
+import gzip
 import json
 import logging
 import pathlib
@@ -8,6 +10,7 @@ import re
 import shutil
 import sys
 import uuid
+from datetime import datetime
 
 import click
 from click import ClickException
@@ -15,6 +18,7 @@ from globus_compute_endpoint.endpoint.config.utils import get_config, load_confi
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
 from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
@@ -532,6 +536,44 @@ def delete_endpoint(*, name: str, force: bool, yes: bool):
 
     ep_dir = get_config_dir() / name
     Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), force=force)
+
+
+@app.command("self-diagnostic")
+@click.option(
+    "-z",
+    "--gzip",
+    "compress",
+    default=False,
+    is_flag=True,
+    help="Save the output to a Gzip-compressed file.",
+)
+@click.option(
+    "--log-kb",
+    default=5120,
+    help=(
+        "Specify the number of kilobytes (KB) to read from log files."
+        " Defaults to 5,120 KB (5 MB)."
+    ),
+)
+@click.help_option("-h", "--help")
+def self_diagnostic(compress: bool, log_kb: int):
+    """Run several diagnostic commands to help identify issues.
+
+    This may produce a large amount of output.
+    """
+    log_bytes = log_kb * 1024
+
+    if not compress:
+        run_self_diagnostic(log_bytes=log_bytes)
+    else:
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        filename = f"globus_compute_diagnostic_{current_date}.txt.gz"
+
+        with gzip.open(filename, "wb") as f:
+            with contextlib.redirect_stdout(f):  # type: ignore[type-var]
+                run_self_diagnostic(log_bytes=log_bytes)
+
+        click.echo(f"Successfully created {filename}")
 
 
 def cli_run():

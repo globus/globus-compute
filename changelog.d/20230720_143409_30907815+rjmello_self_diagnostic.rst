@@ -1,0 +1,14 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added a ``globus-compute-endpoint self-diagnostic`` command, which runs several
+  diagnostic commands to help users and Globus Support troubleshoot issues.
+
+  By default, all output prints to the terminal. The ``--gzip`` (or ``-z``) flag
+  redirects the output to a Gzip-compressed file that the user can easily share
+  with Globus Support.
+
+  Endpoint log files can be quite large, so we cap the data taken from each file
+  at 5,120 KB (5 MB). A user can modify this with the ``--log-kb`` option. For
+  example, if a user wants to include 1,024 KB (1 MB) of data per log file, they
+  would use ``--log-kb 1024``.
