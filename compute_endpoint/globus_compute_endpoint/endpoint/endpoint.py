@@ -127,7 +127,10 @@ class Endpoint:
 
         templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
         Endpoint.init_endpoint_dir(
-            conf_dir, templ_conf_path, multi_tenant, display_name
+            conf_dir,
+            templ_conf_path,
+            multi_tenant,
+            display_name if display_name else ep_name,
         )
         config_path = Endpoint._config_file_path(conf_dir)
         if multi_tenant:
