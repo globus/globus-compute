@@ -136,10 +136,10 @@ class Executor(concurrent.futures.Executor):
 
     def __init__(
         self,
-        endpoint_id: str | None = None,
-        container_id: str | None = None,
+        endpoint_id: UUID_LIKE_T | None = None,
+        container_id: UUID_LIKE_T | None = None,
         funcx_client: Client | None = None,
-        task_group_id: str | None = None,
+        task_group_id: UUID_LIKE_T | None = None,
         label: str = "",
         batch_size: int = 128,
         **kwargs,
@@ -182,7 +182,7 @@ class Executor(concurrent.futures.Executor):
 
         self.task_count_submitted = 0
         self._task_counter: int = 0
-        self._task_group_id: str | None = task_group_id
+        self._task_group_id: UUID_LIKE_T | None = task_group_id
         self._tasks_to_send: queue.Queue[
             tuple[ComputeFuture, _TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
@@ -210,7 +210,7 @@ class Executor(concurrent.futures.Executor):
         return f"{name}<{label}{ep_id}{c_id}{tg_id}{bs}>"
 
     @property
-    def task_group_id(self) -> str | None:
+    def task_group_id(self) -> UUID_LIKE_T | None:
         """
         The Task Group with which this instance is currently associated.  New tasks will
         be sent to this Task Group upstream, and the result listener will only listen
@@ -232,11 +232,12 @@ class Executor(concurrent.futures.Executor):
         return self._task_group_id
 
     @task_group_id.setter
-    def task_group_id(self, task_group_id: str | None):
+    def task_group_id(self, task_group_id: UUID_LIKE_T | None):
         self._task_group_id = task_group_id
 
     def _fn_cache_key(self, fn: t.Callable):
-        return (fn, self.container_id)
+        c_id = str(self.container_id) if self.container_id else None
+        return (fn, c_id)
 
     def register_function(
         self, fn: t.Callable, function_id: str | None = None, **func_register_kwargs
@@ -289,7 +290,10 @@ class Executor(concurrent.futures.Executor):
 
         log.debug("Function not registered. Registering: %s", fn)
         func_register_kwargs.pop("function", None)  # just to be sure
-        reg_kwargs = {"function_name": fn.__name__, "container_uuid": self.container_id}
+        reg_kwargs = {
+            "function_name": fn.__name__,
+            "container_uuid": str(self.container_id),
+        }
         reg_kwargs.update(func_register_kwargs)
 
         try:
@@ -451,7 +455,7 @@ class Executor(concurrent.futures.Executor):
         raise NotImplementedError()
 
     def reload_tasks(
-        self, task_group_id: str | None = None
+        self, task_group_id: UUID_LIKE_T | None = None
     ) -> t.Iterable[ComputeFuture]:
         """
         .. _reload_tasks():
@@ -741,7 +745,7 @@ class Executor(concurrent.futures.Executor):
                     fut.set_exception(e)
             raise
 
-        if self.task_group_id != new_tg_id:
+        if str(self.task_group_id) != new_tg_id:
             log.info(
                 f"Updating task_group_id from {self._task_group_id} to {new_tg_id}"
             )
