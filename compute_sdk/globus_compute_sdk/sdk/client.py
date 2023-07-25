@@ -84,6 +84,8 @@ class Client:
             session or to reestablish Executor futures.
             Default: None (will be auto generated)
 
+            DEPRECATED - use create_batch or the executor instead
+
         code_serialization_strategy: SerializationStrategy
             Strategy to use when serializing function code. If None,
             globus_compute_sdk.serialize.DEFAULT_STRATEGY_CODE will be used.
@@ -99,6 +101,7 @@ class Client:
         for arg, name in [
             (http_timeout, "http_timeout"),
             (funcx_home, "funcx_home"),
+            (task_group_id, "task_group_id"),
         ]:
             if arg is not None:
                 msg = (
