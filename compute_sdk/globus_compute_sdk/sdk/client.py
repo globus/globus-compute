@@ -23,8 +23,6 @@ from .login_manager import LoginManager, LoginManagerProtocol, requires_login
 
 logger = logging.getLogger(__name__)
 
-_FUNCX_HOME = os.path.join("~", ".globus_compute")
-
 
 class Client:
     """Main class for interacting with the Globus Compute service
@@ -43,7 +41,7 @@ class Client:
     def __init__(
         self,
         http_timeout=None,
-        funcx_home=_FUNCX_HOME,
+        funcx_home=None,
         environment: str | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         funcx_service_address: str | None = None,
@@ -64,6 +62,9 @@ class Client:
             Default is no timeout
 
             DEPRECATED - see self.web_client
+
+        funcx_home: any
+            DEPRECATED - was never used
 
         environment: str
             For internal use only. The name of the environment to use. Sets
@@ -96,9 +97,11 @@ class Client:
             funcx_service_address = get_web_service_url(environment)
 
         self._task_status_table: t.Dict[str, t.Dict] = {}
-        self.funcx_home = os.path.expanduser(funcx_home)
 
-        for arg, name in [(http_timeout, "http_timeout")]:
+        for arg, name in [
+            (http_timeout, "http_timeout"),
+            (funcx_home, "funcx_home"),
+        ]:
             if arg is not None:
                 msg = (
                     f"The '{name}' argument is deprecated. "
