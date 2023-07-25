@@ -63,6 +63,8 @@ class Client:
             Timeout for any call to service in seconds.
             Default is no timeout
 
+            DEPRECATED - see self.web_client
+
         environment: str
             For internal use only. The name of the environment to use. Sets
             funcx_service_address appropriately, unless already set.
@@ -98,6 +100,14 @@ class Client:
 
         self._task_status_table: t.Dict[str, t.Dict] = {}
         self.funcx_home = os.path.expanduser(funcx_home)
+
+        for arg, name in [(http_timeout, "http_timeout")]:
+            if arg is not None:
+                msg = (
+                    f"The '{name}' argument is deprecated. "
+                    "It will be removed in a future release."
+                )
+                warnings.warn(msg)
 
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
