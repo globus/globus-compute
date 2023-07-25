@@ -1,5 +1,4 @@
 import uuid
-from types import SimpleNamespace
 from unittest import mock
 
 import globus_compute_sdk as gc
@@ -56,16 +55,6 @@ def test_client_init_sets_addresses_by_env(
 
     # finally, confirm that the address was set correctly
     assert client.funcx_service_address == web_uri
-
-
-def test_client_init_accepts_specified_taskgroup():
-    tg_uuid = uuid.uuid4()
-    gcc = gc.Client(
-        task_group_id=tg_uuid,
-        do_version_check=False,
-        login_manager=mock.Mock(),
-    )
-    assert gcc.session_task_group_id == str(tg_uuid)
 
 
 @pytest.mark.parametrize(
@@ -189,41 +178,6 @@ def test_batch_respects_serialization_strategy(strategy):
     expected = {fn_id: [ser.pack_buffers([ser.serialize(args), ser.serialize(kwargs)])]}
 
     assert tasks == expected
-
-
-@pytest.mark.parametrize("asynchronous", [True, False, None])
-def test_single_run_websocket_queue_depend_async(asynchronous):
-    if asynchronous is None:
-        gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    else:
-        gcc = gc.Client(
-            asynchronous=asynchronous, do_version_check=False, login_manager=mock.Mock()
-        )
-
-    gcc.web_client = mock.MagicMock()
-
-    ep_id = str(uuid.uuid4())
-    fn_id = str(uuid.uuid4())
-
-    fake_results = {
-        "request_id": "blah",
-        "task_group_id": str(uuid.uuid4()),
-        "endpoint_id": ep_id,
-        "tasks": {fn_id: [str(uuid.uuid4())]},
-    }
-
-    gcc.web_client.submit = mock.MagicMock(
-        return_value=SimpleNamespace(data=fake_results)
-    )
-    gcc.run(endpoint_id=ep_id, function_id=fn_id)
-
-    assert gcc.web_client.submit.called
-    submit_data = gcc.web_client.submit.call_args[0][0]
-    assert "create_queue" in submit_data
-    if asynchronous:
-        assert submit_data["create_queue"] is True
-    else:
-        assert submit_data["create_queue"] is False
 
 
 def test_build_container(mocker, login_manager):

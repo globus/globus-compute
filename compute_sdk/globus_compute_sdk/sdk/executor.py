@@ -91,44 +91,6 @@ class _TaskSubmissionInfo:
         )
 
 
-class AtomicController:
-    """This is used to synchronize between the Executor which starts
-    WebSocketPollingTasks and the WebSocketPollingTask which closes itself when there
-    are 0 tasks.
-    """
-
-    def __init__(self, start_callback, stop_callback):
-        self._value = 0
-        self._lock = threading.Lock()
-        self.start_callback = start_callback
-        self.stop_callback = stop_callback
-
-    def reset(self):
-        """Reset the counter to 0; this method does not call callbacks"""
-        with self._lock:
-            self._value = 0
-
-    def increment(self, val: int = 1):
-        with self._lock:
-            if self._value == 0:
-                self.start_callback()
-            self._value += val
-
-    def decrement(self):
-        with self._lock:
-            self._value -= 1
-            if self._value == 0:
-                self.stop_callback()
-            return self._value
-
-    def value(self):
-        with self._lock:
-            return self._value
-
-    def __repr__(self):
-        return f"AtomicController value:{self._value}"
-
-
 class Executor(concurrent.futures.Executor):
     """
     Extend Python's |Executor|_ base class for Globus Compute's purposes.
