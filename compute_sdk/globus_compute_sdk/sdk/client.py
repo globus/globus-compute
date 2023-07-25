@@ -120,7 +120,7 @@ class Client:
         if funcx_service_address is None:
             funcx_service_address = get_web_service_url(environment)
 
-        self._task_status_table: t.Dict[str, t.Dict] = {}
+        self._task_status_table: dict[str, dict] = {}
 
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
