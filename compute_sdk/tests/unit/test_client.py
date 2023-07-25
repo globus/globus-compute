@@ -7,6 +7,7 @@ import pytest
 from globus_compute_sdk import ContainerSpec
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.serialize import ComputeSerializer
+from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 
 
 @pytest.fixture(autouse=True)
@@ -164,6 +165,30 @@ def test_batch_created_websocket_queue(create_ws_queue):
         assert submit_data["create_queue"] is True
     else:
         assert submit_data["create_queue"] is False
+
+
+@pytest.mark.parametrize(
+    "strategy", [s for s in SELECTABLE_STRATEGIES if not s._for_code]
+)
+def test_batch_respects_serialization_strategy(strategy):
+    gcc = gc.Client(
+        data_serialization_strategy=strategy(),
+        do_version_check=False,
+        login_manager=mock.Mock(),
+    )
+
+    fn_id = str(uuid.uuid4())
+    args = (1, 2, 3)
+    kwargs = {"a": "b", "c": "d"}
+
+    batch = gcc.create_batch(endpoint_id=uuid.uuid4())
+    batch.add(fn_id, args, kwargs)
+    tasks = batch.prepare()["tasks"]
+
+    ser = ComputeSerializer(strategy_data=strategy())
+    expected = {fn_id: [ser.pack_buffers([ser.serialize(args), ser.serialize(kwargs)])]}
+
+    assert tasks == expected
 
 
 @pytest.mark.parametrize("asynchronous", [True, False, None])

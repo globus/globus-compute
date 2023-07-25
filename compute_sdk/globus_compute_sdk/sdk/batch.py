@@ -15,17 +15,20 @@ class Batch:
         endpoint_id: UUID_LIKE_T,
         task_group_id: UUID_LIKE_T | None,
         request_queue=False,
+        serializer: ComputeSerializer | None = None,
     ):
         """
         :param task_group_id: UUID of task group to which to submit the batch
         :param endpoint_id: UUID of endpoint where tasks should be executed
         :param request_queue: Whether to request a result queue from the web service;
             typically only used by the Executor
+        :param serialization_strategy: The strategy to use when serializing task
+            arguments
         """
         self.task_group_id = task_group_id
         self.endpoint_id = endpoint_id
         self.tasks: dict[str, list[str]] = defaultdict(list)
-        self._serde = ComputeSerializer()
+        self._serde = serializer or ComputeSerializer()
         self.request_queue = request_queue
 
     def __repr__(self):

@@ -26,7 +26,6 @@ from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
-from globus_compute_sdk.sdk.batch import Batch
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.utils import chunk_by
 from globus_compute_sdk.sdk.utils.uuid_like import (
@@ -747,7 +746,9 @@ class Executor(concurrent.futures.Executor):
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
-        batch = Batch(endpoint_uuid, self.task_group_id, request_queue=True)
+        batch = self.funcx_client.create_batch(
+            endpoint_uuid, self.task_group_id, create_websocket_queue=True
+        )
         submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
             list
         )

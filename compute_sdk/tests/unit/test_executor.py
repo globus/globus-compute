@@ -538,11 +538,8 @@ def test_reload_handles_deseralization_error_gracefully(gc_executor):
 def test_task_submitter_respects_batch_size(gc_executor, batch_size: int, mocker):
     gcc, gce = gc_executor
 
-    # ugly way to replace Batch with a MagicMock factory
-    mocker.patch(
-        f"{_MOCK_BASE}Batch",
-        side_effect=lambda *_args, **_kwargs: mock.MagicMock(),
-    )
+    # make a new MagicMock every time create_batch is called
+    gcc.create_batch.side_effect = lambda *_args, **_kwargs: mock.MagicMock()
 
     gcc.register_function.return_value = uuid.uuid4()
     num_batches = 50
@@ -553,7 +550,7 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int, mocker
         gce.submit(noop)
 
     # force the batches to be populated by flushing the queues. more consistent than
-    # waiting for the queues to flush themselves manually due to slowdowns
+    # waiting for the queues to flush themselves automatically due to slowdowns
     # introduced by `coverage`.
     gce.shutdown(cancel_futures=True)
 

@@ -422,7 +422,12 @@ class Client:
         -------
         Batch instance
         """
-        return Batch(endpoint_id, task_group_id, create_websocket_queue)
+        return Batch(
+            endpoint_id,
+            task_group_id,
+            create_websocket_queue,
+            serializer=self.fx_serializer,
+        )
 
     @requires_login
     def batch_run(self, batch: Batch) -> dict[str, str | list[str]]:
