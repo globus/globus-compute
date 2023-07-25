@@ -91,6 +91,10 @@ class Client:
         data_serialization_strategy: SerializationStrategy
             Strategy to use when serializing function arguments. If None,
             globus_compute_sdk.serialize.DEFAULT_STRATEGY_DATA will be used.
+
+        login_manager: LoginManagerProtocol
+            Allows login logic to be overridden for specific use cases. If None, a
+            LoginManager will be used.
         """
         # resolve URLs if not set
         if funcx_service_address is None:
