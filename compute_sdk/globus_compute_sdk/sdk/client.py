@@ -48,9 +48,6 @@ class Client:
         task_group_id: t.Union[None, uuid.UUID, str] = None,
         funcx_service_address: str | None = None,
         do_version_check: bool = True,
-        openid_authorizer: t.Any = None,
-        search_authorizer: t.Any = None,
-        fx_authorizer: t.Any = None,
         *,
         code_serialization_strategy: SerializationStrategy | None = None,
         data_serialization_strategy: SerializationStrategy | None = None,
@@ -101,18 +98,6 @@ class Client:
 
         self._task_status_table: t.Dict[str, t.Dict] = {}
         self.funcx_home = os.path.expanduser(funcx_home)
-
-        for arg, name in [
-            (openid_authorizer, "openid_authorizer"),
-            (fx_authorizer, "fx_authorizer"),
-            (search_authorizer, "search_authorizer"),
-        ]:
-            if arg is not None:
-                msg = (
-                    f"The '{name}' argument is deprecated. "
-                    "It will be removed in a future release."
-                )
-                warnings.warn(msg)
 
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
