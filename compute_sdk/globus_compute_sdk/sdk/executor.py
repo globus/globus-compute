@@ -29,7 +29,11 @@ from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.batch import Batch
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.utils import chunk_by
-from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T, as_uuid
+from globus_compute_sdk.sdk.utils.uuid_like import (
+    UUID_LIKE_T,
+    as_optional_uuid,
+    as_uuid,
+)
 
 log = logging.getLogger(__name__)
 
@@ -176,7 +180,10 @@ class Executor(concurrent.futures.Executor):
         self.funcx_client = funcx_client
 
         self.endpoint_id = endpoint_id
-        self.container_id = container_id
+
+        # mypy ... sometimes you just ain't too bright
+        self.container_id = container_id  # type: ignore[assignment]
+
         self.label = label
         self.batch_size = max(1, batch_size)
 
@@ -235,9 +242,38 @@ class Executor(concurrent.futures.Executor):
     def task_group_id(self, task_group_id: UUID_LIKE_T | None):
         self._task_group_id = task_group_id
 
+    @property
+    def container_id(self) -> uuid.UUID | None:
+        """
+        The container id with which this Executor instance is currently associated.
+        Tasks submitted after this is set will use this container.
+
+        Must be a UUID, valid uuid-like string, or None.  Set by simple assignment::
+
+            >>> import uuid
+            >>> from globus_compute_sdk import Executor
+            >>> c_id = "00000000-0000-0000-0000-000000000000"  # some known container id
+            >>> c_as_uuid = uuid.UUID(c_id)
+            >>> gce = Executor(container_id=c_id)
+
+            # May also alter after construction:
+            >>> gce.container_id = c_id
+            >>> gce.container_id = c_as_uuid  # also accepts a UUID object
+
+            # Internally, it is always stored as a UUID (or None):
+            >>> gce.container_id
+            UUID('00000000-0000-0000-0000-000000000000')
+
+        [default: ``None``]
+        """
+        return self._container_id
+
+    @container_id.setter
+    def container_id(self, c_id: UUID_LIKE_T | None):
+        self._container_id = as_optional_uuid(c_id)
+
     def _fn_cache_key(self, fn: t.Callable):
-        c_id = str(self.container_id) if self.container_id else None
-        return (fn, c_id)
+        return fn, self.container_id
 
     def register_function(
         self, fn: t.Callable, function_id: str | None = None, **func_register_kwargs
@@ -290,10 +326,7 @@ class Executor(concurrent.futures.Executor):
 
         log.debug("Function not registered. Registering: %s", fn)
         func_register_kwargs.pop("function", None)  # just to be sure
-        reg_kwargs = {
-            "function_name": fn.__name__,
-            "container_uuid": str(self.container_id),
-        }
+        reg_kwargs = {"function_name": fn.__name__, "container_uuid": self.container_id}
         reg_kwargs.update(func_register_kwargs)
 
         try:

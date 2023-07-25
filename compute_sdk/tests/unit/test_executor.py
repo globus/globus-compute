@@ -14,6 +14,7 @@ from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.executor import _ResultWatcher, _TaskSubmissionInfo
+from globus_compute_sdk.sdk.utils.uuid_like import as_optional_uuid, as_uuid
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 from tests.utils import try_assert, try_for_timeout
 
@@ -207,6 +208,32 @@ def test_failed_registration_shuts_down_executor(gc_executor, randomstring):
     exc = wrapped_exc.value
     assert exc_text in str(exc)
     try_assert(lambda: gce._stopped)
+
+
+@pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
+def test_container_id(gc_executor, container_id):
+    gcc, gce = gc_executor
+
+    assert gce.container_id is None, "Default value is None"
+    gce.container_id = container_id
+    if container_id is None:
+        assert gce.container_id is None
+    else:
+        expected_container_id = as_uuid(container_id)
+        assert gce.container_id == expected_container_id
+
+
+@pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
+def test_register_function_sends_container_id(gc_executor, container_id):
+    gcc, gce = gc_executor
+
+    gce.container_id = container_id
+    gce.register_function(noop)
+    assert gcc.register_function.called
+    a, k = gcc.register_function.call_args
+
+    expected_container_id = as_optional_uuid(container_id)
+    assert k["container_uuid"] == expected_container_id
 
 
 def test_submit_raises_if_thread_stopped(gc_executor):
