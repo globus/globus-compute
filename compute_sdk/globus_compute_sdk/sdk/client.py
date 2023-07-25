@@ -109,6 +109,13 @@ class Client:
                 )
                 warnings.warn(msg)
 
+        for arg_name in kwargs:
+            msg = (
+                f"The '{arg_name}' argument is unrecognized. "
+                "(It might have been removed in a previous release.)"
+            )
+            warnings.warn(msg)
+
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
             self.login_manager: LoginManagerProtocol = login_manager

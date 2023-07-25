@@ -14,6 +14,34 @@ def _clear_sdk_env(monkeypatch):
     monkeypatch.delenv("FUNCX_SDK_ENVIRONMENT", raising=False)
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"foo": "bar"},
+        {"environment": "dev", "fx_authorizer": "blah"},
+        {"asynchronous": True},
+    ],
+)
+def test_client_warns_on_unknown_kwargs(kwargs):
+    known_kwargs = [
+        "funcx_home",
+        "environment",
+        "funcx_service_address",
+        "do_version_check",
+        "code_serialization_strategy",
+        "data_serialization_strategy",
+        "login_manager",
+    ]
+    unknown_kwargs = [k for k in kwargs if k not in known_kwargs]
+
+    with pytest.warns(UserWarning) as warnings:
+        _ = gc.Client(do_version_check=False, login_manager=mock.Mock(), **kwargs)
+
+    assert len(warnings) == len(unknown_kwargs)
+    for warning in warnings:
+        assert any(k in str(warning.message) for k in unknown_kwargs)
+
+
 @pytest.mark.parametrize("env", [None, "local", "dev", "production"])
 @pytest.mark.parametrize("usage_method", ["env_var", "param"])
 @pytest.mark.parametrize("explicit_params", [None, "web"])
