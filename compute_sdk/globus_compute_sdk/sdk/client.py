@@ -96,12 +96,6 @@ class Client:
             Allows login logic to be overridden for specific use cases. If None, a
             LoginManager will be used.
         """
-        # resolve URLs if not set
-        if funcx_service_address is None:
-            funcx_service_address = get_web_service_url(environment)
-
-        self._task_status_table: t.Dict[str, t.Dict] = {}
-
         for arg, name in [
             (http_timeout, "http_timeout"),
             (funcx_home, "funcx_home"),
@@ -119,6 +113,11 @@ class Client:
                 "(It might have been removed in a previous release.)"
             )
             warnings.warn(msg)
+
+        if funcx_service_address is None:
+            funcx_service_address = get_web_service_url(environment)
+
+        self._task_status_table: t.Dict[str, t.Dict] = {}
 
         # if a login manager was passed, no login flow is triggered
         if login_manager is not None:
