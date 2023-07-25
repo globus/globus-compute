@@ -34,7 +34,7 @@ def ohai():
     return "ohai"
 
 
-@pytest.mark.skipif(sdk_version.release < (2, 2, 4), reason="batch.add iface updated")
+@pytest.mark.skipif(sdk_version.release < (2, 2, 5), reason="batch.add iface updated")
 def test_batch(compute_client, endpoint):
     """Test batch submission and get_batch_result"""
 
