@@ -57,6 +57,10 @@ def get_python_version():
     click.echo(f"Python version {sys.version}\n")
 
 
+def which_python():
+    click.echo(f"{sys.executable}\n")
+
+
 def _run_command(cmd: str):
     cmd_list = shlex.split(cmd)
     arg0 = cmd_list[0]
@@ -82,7 +86,7 @@ def run_self_diagnostic(log_bytes: int | None = None):
         "uname -a",
         cat("/etc/os-release"),
         "whoami",
-        "which python",
+        which_python,
         get_python_version,
         "pip freeze",
         test_conn("compute.api.globus.org", 443),
