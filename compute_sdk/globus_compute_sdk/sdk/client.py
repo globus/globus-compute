@@ -70,14 +70,6 @@ class Client:
             For internal use only. The name of the environment to use. Sets
             funcx_service_address appropriately, unless already set.
 
-        funcx_service_address: str
-            For internal use only. The address of the web service.
-
-        do_version_check: bool
-            Set to ``False`` to skip the version compatibility check on client
-            initialization
-            Default: True
-
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this Client instance.
             Typically, one uses this to submit new tasks to an existing
@@ -85,6 +77,14 @@ class Client:
             Default: None (will be auto generated)
 
             DEPRECATED - use create_batch or the executor instead
+
+        funcx_service_address: str
+            For internal use only. The address of the web service.
+
+        do_version_check: bool
+            Set to ``False`` to skip the version compatibility check on client
+            initialization
+            Default: True
 
         code_serialization_strategy: SerializationStrategy
             Strategy to use when serializing function code. If None,
