@@ -676,7 +676,7 @@ class Interchange:
         self._task_puller_thread.join()
         self._command_thread.join()
         self._status_report_thread.join()
-        log.info("HighThroughput Interchange stopped")
+        log.debug("HighThroughput Interchange stopped")
 
     def start(self, poll_period: int | None = None) -> None:
         """Start the Interchange

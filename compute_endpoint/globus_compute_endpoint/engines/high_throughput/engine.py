@@ -6,6 +6,7 @@ from __future__ import annotations
 import concurrent.futures
 import ipaddress
 import logging
+import multiprocessing
 import os
 import queue
 import threading
@@ -302,7 +303,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         self.poll_period = poll_period
         self.suppress_failure = suppress_failure
         self.run_dir = run_dir
-        self.queue_proc = None
+        self.queue_proc: multiprocessing.Process | None = None
         self.passthrough = passthrough
         self.task_status_queue = task_status_queue
         self.tasks = {}
@@ -828,8 +829,6 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         """
 
         log.info("Attempting HighThroughputEngine shutdown")
-        # self.outgoing_q.close()
-        # self.incoming_q.close()
         if self.queue_proc:
             try:
                 self.queue_proc.terminate()
@@ -837,7 +836,11 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                 log.info("Engine interchange terminate skipped due to wrong context")
             except Exception:
                 log.exception("Terminating the interchange failed")
-        log.info("Finished HighThroughputEngine shutdown attempt")
+            if block:
+                self.queue_proc.join(timeout=5)
+                if self.queue_proc.exitcode is None:
+                    self.queue_proc.kill()
+            log.info("Finished HighThroughputEngine shutdown attempt")
         return True
 
     def cancel_task(self, task_id: uuid.UUID | str) -> bool:
