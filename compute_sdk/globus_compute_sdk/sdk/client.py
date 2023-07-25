@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -13,12 +12,7 @@ from globus_compute_sdk.errors import (
     TaskExecutionFailed,
     TaskPending,
 )
-from globus_compute_sdk.sdk._environments import (
-    get_web_service_url,
-    get_web_socket_url,
-    urls_might_mismatch,
-)
-from globus_compute_sdk.sdk.asynchronous.ws_polling_task import WebSocketPollingTask
+from globus_compute_sdk.sdk._environments import get_web_service_url
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
@@ -50,13 +44,9 @@ class Client:
         self,
         http_timeout=None,
         funcx_home=_FUNCX_HOME,
-        asynchronous: bool | None = None,
-        loop=None,
         environment: str | None = None,
-        funcx_service_address: str | None = None,
-        results_ws_uri: str | None = None,
-        warn_about_url_mismatch: bool | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
+        funcx_service_address: str | None = None,
         do_version_check: bool = True,
         openid_authorizer: t.Any = None,
         search_authorizer: t.Any = None,
@@ -78,44 +68,15 @@ class Client:
 
         environment: str
             For internal use only. The name of the environment to use. Sets
-            funcx_service_address and results_ws_uri unless they are already passed in.
+            funcx_service_address appropriately, unless already set.
 
         funcx_service_address: str
             For internal use only. The address of the web service.
-
-        results_ws_uri: str
-            For internal use only. The address of the websocket service.
-
-            DEPRECATED - use Executor instead.
-
-        warn_about_url_mismatch: bool
-            For internal use only. If true, a warning is logged if funcx_service_address
-            and results_ws_uri appear to point to different environments.
-
-            DEPRECATED - use Executor instead.
 
         do_version_check: bool
             Set to ``False`` to skip the version compatibility check on client
             initialization
             Default: True
-
-        asynchronous: bool
-            Should the API use asynchronous interactions with the web service?
-            Currently only impacts the run method.
-
-            DEPRECATED - this was an early attempt at asynchronous result gathering.
-                Use the Executor instead.
-
-            Default: False
-
-        loop: AbstractEventLoop
-            If asynchronous mode is requested, then you can provide an optional
-            event loop instance. If None, then we will access asyncio.get_event_loop()
-
-            DEPRECATED - part of an early attempt at asynchronous result gathering.
-                Use the Executor instead.
-
-            Default: None
 
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this Client instance.
@@ -140,18 +101,11 @@ class Client:
 
         self._task_status_table: t.Dict[str, t.Dict] = {}
         self.funcx_home = os.path.expanduser(funcx_home)
-        self.session_task_group_id = (
-            task_group_id and str(task_group_id) or str(uuid.uuid4())
-        )
 
         for arg, name in [
             (openid_authorizer, "openid_authorizer"),
             (fx_authorizer, "fx_authorizer"),
             (search_authorizer, "search_authorizer"),
-            (asynchronous, "asynchronous"),
-            (loop, "loop"),
-            (results_ws_uri, "results_ws_uri"),
-            (warn_about_url_mismatch, "warn_about_url_mismatch"),
         ]:
             if arg is not None:
                 msg = (
@@ -181,35 +135,6 @@ class Client:
 
         if do_version_check:
             self.version_check()
-
-        self.results_ws_uri = None
-        self.asynchronous = asynchronous or False
-        if asynchronous:
-            self.loop = loop if loop else asyncio.get_event_loop()
-
-            if results_ws_uri is None:
-                results_ws_uri = get_web_socket_url(environment)
-            self.results_ws_uri = results_ws_uri
-
-            if warn_about_url_mismatch and urls_might_mismatch(
-                funcx_service_address, results_ws_uri
-            ):  # noqa
-                logger.warning(
-                    f"funcx_service_address={funcx_service_address} and "
-                    f"results_ws_uri={results_ws_uri} "
-                    "look like they might point to different environments.  "
-                    "Double check that they are the correct URLs."
-                )
-
-            # Start up an asynchronous polling loop in the background
-            self.ws_polling_task = WebSocketPollingTask(
-                self,
-                self.loop,
-                init_task_group_id=self.session_task_group_id,
-                results_ws_uri=self.results_ws_uri,
-            )
-        else:
-            self.loop = None
 
     def version_check(self, endpoint_version: str | None = None) -> None:
         """Check this client version meets the service's minimum supported version.
@@ -372,22 +297,16 @@ class Client:
             Endpoint UUID string. Required
         function_id : uuid str
             Function UUID string. Required
-        asynchronous : bool
-            Whether or not to run the function asynchronously
 
         Returns
         -------
         task_id : str
-        UUID string that identifies the task if asynchronous is False
-
-        Globus Compute Task: asyncio.Task
-        A future that will eventually resolve into the function's result if
-        asynchronous is True
+        UUID string that identifies the task
         """
         assert endpoint_id is not None, "endpoint_id key-word argument must be set"
         assert function_id is not None, "function_id key-word argument must be set"
 
-        batch = self.create_batch(endpoint_id, create_websocket_queue=self.asynchronous)
+        batch = self.create_batch(endpoint_id)
         batch.add(function_id, args, kwargs)
         r = self.batch_run(batch)
 
