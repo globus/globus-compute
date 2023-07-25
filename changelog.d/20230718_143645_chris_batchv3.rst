@@ -15,7 +15,7 @@ Removed
   which does not already exist on the services. If this happens, the services will
   respond with an error.
 
-    - Note that it is still possible to associate a task with an existing
+  - Note that it is still possible to associate a task with an existing
     ``task_group_id``, with the correct authorization.
 
 Changed
@@ -24,10 +24,10 @@ Changed
 - Batches of tasks can now only be associated with a single endpoint. (Previously, tasks
   within a batch could be sent to heterogeneous endpoints.)
 
-    - The signature of ``Client.create_batch`` has been adjusted to match.
+  - The signature of ``Client.create_batch`` has been adjusted to match.
 
 - The return type of ``Client.batch_run`` has been updated to reflect the schema returned
   by the ``v3/submit`` route of the Compute API.
 
-    - Concretely, ``Client.batch_run`` now returns a dictionary with information such as
-      task group ID, submission ID, and a mapping of function IDs to lists of task IDs.
+  - Concretely, ``Client.batch_run`` now returns a dictionary with information such as
+    task group ID, submission ID, and a mapping of function IDs to lists of task IDs.
