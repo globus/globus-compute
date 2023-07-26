@@ -535,7 +535,7 @@ def test_reload_handles_deseralization_error_gracefully(gc_executor):
 
 
 @pytest.mark.parametrize("batch_size", tuple(range(1, 11)))
-def test_task_submitter_respects_batch_size(gc_executor, batch_size: int, mocker):
+def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
     gcc, gce = gc_executor
 
     # make a new MagicMock every time create_batch is called
@@ -556,7 +556,7 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int, mocker
 
     assert gcc.batch_run.call_count >= num_batches
     for args, _kwargs in gcc.batch_run.call_args_list:
-        batch, *_ = args
+        *_, batch = args
         assert 0 < batch.add.call_count <= batch_size
 
 

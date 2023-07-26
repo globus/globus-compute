@@ -158,30 +158,27 @@ def test_pending_tasks_always_fetched():
             assert sf == args[0]
 
 
-@pytest.mark.parametrize("create_ws_queue", [True, False, None])
-def test_batch_created_websocket_queue(create_ws_queue):
+@pytest.mark.parametrize("create_result_queue", [True, False, None])
+def test_batch_created_websocket_queue(create_result_queue):
     eid = str(uuid.uuid4())
     fid = str(uuid.uuid4())
 
     gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     gcc.web_client = mock.MagicMock()
-    if create_ws_queue is None:
-        batch = gcc.create_batch(eid)
+    if create_result_queue is None:
+        batch = gcc.create_batch()
     else:
-        batch = gcc.create_batch(eid, create_websocket_queue=create_ws_queue)
+        batch = gcc.create_batch(create_websocket_queue=create_result_queue)
 
     batch.add(fid, (1,))
     batch.add(fid, (2,))
 
-    gcc.batch_run(batch)
+    gcc.batch_run(eid, batch)
 
     assert gcc.web_client.submit.called
-    submit_data = gcc.web_client.submit.call_args[0][0]
+    *_, submit_data = gcc.web_client.submit.call_args[0]
     assert "create_queue" in submit_data
-    if create_ws_queue:
-        assert submit_data["create_queue"] is True
-    else:
-        assert submit_data["create_queue"] is False
+    assert submit_data["create_queue"] is bool(create_result_queue)
 
 
 @pytest.mark.parametrize(
@@ -198,7 +195,7 @@ def test_batch_respects_serialization_strategy(strategy):
     args = (1, 2, 3)
     kwargs = {"a": "b", "c": "d"}
 
-    batch = gcc.create_batch(endpoint_id=uuid.uuid4())
+    batch = gcc.create_batch()
     batch.add(fn_id, args, kwargs)
     tasks = batch.prepare()["tasks"]
 

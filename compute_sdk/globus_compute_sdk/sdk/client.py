@@ -313,15 +313,14 @@ class Client:
         task_id : str
         UUID string that identifies the task
         """
-        batch = self.create_batch(endpoint_id)
+        batch = self.create_batch()
         batch.add(function_id, args, kwargs)
-        r = self.batch_run(batch)
+        r = self.batch_run(endpoint_id, batch)
 
         return r["tasks"][function_id][0]
 
     def create_batch(
         self,
-        endpoint_id: UUID_LIKE_T,
         task_group_id: UUID_LIKE_T | None = None,
         create_websocket_queue: bool = False,
     ) -> Batch:
@@ -349,17 +348,19 @@ class Client:
         Batch instance
         """
         return Batch(
-            endpoint_id,
             task_group_id,
             create_websocket_queue,
             serializer=self.fx_serializer,
         )
 
     @requires_login
-    def batch_run(self, batch: Batch) -> dict[str, str | list[str]]:
+    def batch_run(
+        self, endpoint_id: UUID_LIKE_T, batch: Batch
+    ) -> dict[str, str | list[str]]:
         """
         Initiate a batch of tasks to Globus Compute
 
+        :param endpoint_id: The endpoint identifier to which to send the batch
         :param batch: a Batch object
 
         Returns
@@ -375,7 +376,7 @@ class Client:
             raise ValueError("No tasks specified for batch run")
 
         # Send the data to Globus Compute
-        return self.web_client.submit(batch.prepare()).data
+        return self.web_client.submit(endpoint_id, batch.prepare()).data
 
     @requires_login
     def register_endpoint(

@@ -21,10 +21,15 @@ Removed
 Changed
 ^^^^^^^
 
-- Batches of tasks can now only be associated with a single endpoint. (Previously, tasks
-  within a batch could be sent to heterogeneous endpoints.)
+- Following the updated route and schema of the ``submit`` route
+  (``v3/endpoint/ENDPOINT_UUID/submit``), tasks in a batch are now associated
+  with a single endpoint and the endpoint is selected via the route at
+  submission time.  (Previously, tasks within a batch could be sent to
+  heterogeneous endpoints.)
 
   - The signature of ``Client.create_batch`` has been adjusted to match.
+
+  - The signature of ``WebClient.submit`` has been adjusted to match
 
 - The return type of ``Client.batch_run`` has been updated to reflect the schema returned
   by the ``v3/submit`` route of the Compute API.
