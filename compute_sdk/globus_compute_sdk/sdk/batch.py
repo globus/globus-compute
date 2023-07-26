@@ -6,6 +6,8 @@ from collections import defaultdict
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 
+_default_serde = ComputeSerializer()
+
 
 class Batch:
     """Utility class for creating batch submission in Globus Compute"""
@@ -28,7 +30,7 @@ class Batch:
         self.task_group_id = task_group_id
         self.endpoint_id = endpoint_id
         self.tasks: dict[str, list[str]] = defaultdict(list)
-        self._serde = serializer or ComputeSerializer()
+        self._serde = serializer or _default_serde
         self.request_queue = request_queue
 
     def __repr__(self):
