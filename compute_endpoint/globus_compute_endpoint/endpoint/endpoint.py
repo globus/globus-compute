@@ -257,7 +257,12 @@ class Endpoint:
         # potentially running with the existing pidfile
         if pid_check["exists"]:
             if pid_check["active"]:
-                log.info("Endpoint is already active")
+                endpoint_name = endpoint_dir.name
+                if endpoint_config.display_name:
+                    endpoint_name = endpoint_config.display_name
+                active_msg = f"Endpoint '{endpoint_name}' is already active"
+                print(active_msg)
+                log.info(active_msg)
                 sys.exit(-1)
             else:
                 log.info(
@@ -322,7 +327,9 @@ class Endpoint:
             except GlobusAPIError as e:
                 if e.http_status in (409, 410, 423):
                     # CONFLICT, GONE or LOCKED
-                    log.warning(f"Endpoint registration blocked.  [{e.text}]")
+                    blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
+                    print(blocked_msg)
+                    log.warning(blocked_msg)
                     exit(os.EX_UNAVAILABLE)
                 raise
 

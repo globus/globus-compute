@@ -8,6 +8,7 @@ import pathlib
 import random
 import uuid
 from collections import namedtuple
+from contextlib import redirect_stdout
 from types import SimpleNamespace
 from unittest import mock
 
@@ -75,12 +76,12 @@ def register_endpoint_response(endpoint_uuid):
 
 @pytest.fixture
 def register_endpoint_failure_response(endpoint_uuid):
-    def create_response(endpoint_id=endpoint_uuid, status_code=200):
+    def create_response(endpoint_id=endpoint_uuid, status_code=200, msg="Error Msg"):
         responses.add(
             method=responses.POST,
             url="https://compute.api.globus.org/v2/endpoints",
             headers={"Content-Type": "application/json"},
-            json={"error": "error msg"},
+            json={"error": msg},
             status=status_code,
         )
 
@@ -193,26 +194,71 @@ def test_register_endpoint_invalid_response(
     assert other_endpoint_id in mock_log.error.call_args[0][0]
 
 
+@pytest.mark.parametrize("ret_value", [[409, "Conflict"], [423, "Locked"]])
 @responses.activate
-def test_register_endpoint_locked_error(
+def test_register_endpoint_locked_conflict_print(
     mocker,
     fs,
     register_endpoint_failure_response,
     get_standard_compute_client,
     mock_ep_data,
+    ret_value,
 ):
     """
     Check to ensure endpoint registration escalates up with API error
     """
+    ret_code, ret_text = ret_value
     mock_gcc = get_standard_compute_client()
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+    f = io.StringIO()
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
-    register_endpoint_failure_response(endpoint_id=ep_id, status_code=423)
-    with pytest.raises(SystemExit) as pytest_exc:
-        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
-    assert pytest_exc.value.code == os.EX_UNAVAILABLE
+    register_endpoint_failure_response(
+        endpoint_id=ep_id,
+        status_code=ret_code,
+        msg=ret_text,
+    )
+    with redirect_stdout(f):
+        with pytest.raises(SystemExit) as pytest_exc:
+            ep.start_endpoint(
+                ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={}
+            )
+        err_msg = f.getvalue()
+        assert "Endpoint registration blocked" in err_msg and ret_text in err_msg
+        assert pytest_exc.value.code == os.EX_UNAVAILABLE
+
+
+def test_register_endpoint_already_active(
+    mocker,
+    fs,
+    get_standard_compute_client,
+    mock_ep_data,
+):
+    """
+    Check to ensure endpoint already active message prints to console
+    """
+    mock_gcc = get_standard_compute_client()
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+
+    pid_active = {
+        "exists": True,
+        "active": True,
+    }
+    mocker.patch(f"{_mock_base}Endpoint.check_pidfile").return_value = pid_active
+
+    f = io.StringIO()
+
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_id = str(uuid.uuid4())
+    # register_endpoint_failure_response(endpoint_id=ep_id, status_code=409)
+    with redirect_stdout(f):
+        with pytest.raises(SystemExit) as pytest_exc:
+            ep.start_endpoint(
+                ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={}
+            )
+        assert "is already active" in f.getvalue()
+        assert pytest_exc.value.code == -1
 
 
 @pytest.mark.parametrize("multi_tenant", [None, True, False])
