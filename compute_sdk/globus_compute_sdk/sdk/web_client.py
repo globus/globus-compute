@@ -7,16 +7,14 @@ It also implements data helpers for building complex payloads. Most notably,
 """
 import json
 import typing as t
-import uuid
 
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
 from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url_path
+from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
 from globus_sdk.exc.api import GlobusAPIError
-
-ID_PARAM_T = t.Union[uuid.UUID, str]
 
 
 def _get_packed_code(
@@ -33,7 +31,7 @@ class FunctionRegistrationData:
         function: t.Optional[t.Callable] = None,
         function_name: t.Optional[str] = None,
         function_code: t.Optional[str] = None,
-        container_uuid: t.Optional[ID_PARAM_T] = None,
+        container_uuid: t.Optional[UUID_LIKE_T] = None,
         description: t.Optional[str] = None,
         public: bool = False,
         group: t.Optional[str] = None,
@@ -102,16 +100,16 @@ class WebClient(globus_sdk.BaseClient):
         return self.get("/v2/version", query_params={"service": service})
 
     def get_taskgroup_tasks(
-        self, task_group_id: ID_PARAM_T
+        self, task_group_id: UUID_LIKE_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/taskgroup/{task_group_id}")
 
-    def get_task(self, task_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
+    def get_task(self, task_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/tasks/{task_id}")
 
     def get_batch_status(
         self,
-        task_ids: t.Iterable[ID_PARAM_T],
+        task_ids: t.Iterable[UUID_LIKE_T],
         *,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
@@ -152,7 +150,7 @@ class WebClient(globus_sdk.BaseClient):
     def register_endpoint(
         self,
         endpoint_name: str,
-        endpoint_id: ID_PARAM_T,
+        endpoint_id: UUID_LIKE_T,
         *,
         metadata: t.Optional[dict] = None,
         multi_tenant: t.Optional[bool] = None,
@@ -185,12 +183,12 @@ class WebClient(globus_sdk.BaseClient):
         return self.get("/v2/get_amqp_result_connection_url")
 
     def get_endpoint_status(
-        self, endpoint_id: ID_PARAM_T
+        self, endpoint_id: UUID_LIKE_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/endpoints/{endpoint_id}/status")
 
     def get_endpoint_metadata(
-        self, endpoint_id: ID_PARAM_T
+        self, endpoint_id: UUID_LIKE_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/endpoints/{endpoint_id}")
 
@@ -210,11 +208,11 @@ class WebClient(globus_sdk.BaseClient):
         )
         return self.post("/v2/functions", data=data)
 
-    def get_whitelist(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
+    def get_whitelist(self, endpoint_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/endpoints/{endpoint_id}/whitelist")
 
     def whitelist_add(
-        self, endpoint_id: ID_PARAM_T, function_ids: t.Iterable[ID_PARAM_T]
+        self, endpoint_id: UUID_LIKE_T, function_ids: t.Iterable[UUID_LIKE_T]
     ) -> globus_sdk.GlobusHTTPResponse:
         if isinstance(function_ids, str):
             function_ids = [function_ids]
@@ -222,15 +220,19 @@ class WebClient(globus_sdk.BaseClient):
         return self.post(f"/v2/endpoints/{endpoint_id}/whitelist", data=data)
 
     def whitelist_remove(
-        self, endpoint_id: ID_PARAM_T, function_id: ID_PARAM_T
+        self, endpoint_id: UUID_LIKE_T, function_id: UUID_LIKE_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.delete(f"/v2/endpoints/{endpoint_id}/whitelist/{function_id}")
 
-    def stop_endpoint(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
+    def stop_endpoint(self, endpoint_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.post(f"/v2/endpoints/{endpoint_id}/lock", data={})
 
-    def delete_endpoint(self, endpoint_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
+    def delete_endpoint(
+        self, endpoint_id: UUID_LIKE_T
+    ) -> globus_sdk.GlobusHTTPResponse:
         return self.delete(f"/v2/endpoints/{endpoint_id}")
 
-    def delete_function(self, function_id: ID_PARAM_T) -> globus_sdk.GlobusHTTPResponse:
+    def delete_function(
+        self, function_id: UUID_LIKE_T
+    ) -> globus_sdk.GlobusHTTPResponse:
         return self.delete(f"/v2/functions/{function_id}")
