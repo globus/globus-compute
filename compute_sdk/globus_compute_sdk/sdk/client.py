@@ -294,7 +294,9 @@ class Client:
         return results
 
     @requires_login
-    def run(self, *args, endpoint_id=None, function_id=None, **kwargs) -> str:
+    def run(
+        self, *args, endpoint_id: UUID_LIKE_T, function_id: UUID_LIKE_T, **kwargs
+    ) -> str:
         """Initiate an invocation
 
         Parameters
@@ -311,9 +313,6 @@ class Client:
         task_id : str
         UUID string that identifies the task
         """
-        assert endpoint_id is not None, "endpoint_id key-word argument must be set"
-        assert function_id is not None, "function_id key-word argument must be set"
-
         batch = self.create_batch(endpoint_id)
         batch.add(function_id, args, kwargs)
         r = self.batch_run(batch)
