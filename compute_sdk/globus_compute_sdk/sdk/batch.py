@@ -46,7 +46,7 @@ class Batch:
 
     def add(
         self,
-        function_id: str,
+        function_id: UUID_LIKE_T,
         args: tuple[t.Any, ...] | None = None,
         kwargs: dict[str, t.Any] | None = None,
     ) -> None:
@@ -65,7 +65,7 @@ class Batch:
         ser_kwargs = self._serde.serialize(kwargs)
         payload = self._serde.pack_buffers([ser_args, ser_kwargs])
 
-        self.tasks[function_id].append(payload)
+        self.tasks[str(function_id)].append(payload)
 
     def prepare(self) -> dict[str, str | list[tuple[str, str, str]]]:
         """
