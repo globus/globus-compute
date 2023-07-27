@@ -8,6 +8,7 @@ import random
 import re
 import resource
 import signal
+import sys
 import time
 import uuid
 from unittest import mock
@@ -15,6 +16,7 @@ from unittest import mock
 import pika
 import pytest as pytest
 import responses
+import yaml
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
@@ -100,7 +102,10 @@ def register_endpoint_failure_response():
 
 
 @pytest.fixture
-def successful_exec(mocker, epmanager, user_conf_template):
+def successful_exec(mocker, epmanager, user_conf_template, fs):
+    # fs (pyfakefs) not used directly in this fixture, but is intentionally
+    # utilized in epmanager -> conf_dir.  It is *assumed* in this fixture,
+    # however (e.g., local_user_lookup.json), so make it an explicit detail.
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     conf_dir, mock_conf, mock_client, em = epmanager
 
@@ -123,8 +128,7 @@ def successful_exec(mocker, epmanager, user_conf_template):
         "globus_uuid": "a",
         "globus_username": "a",
         "command": "cmd_start_endpoint",
-        "user_opts": {"heartbeat": 10},
-        "kwargs": {"name": "some_ep_name"},
+        "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
     }
     queue_item = (1, props, json.dumps(pld).encode())
 
@@ -737,12 +741,90 @@ def test_handles_shutdown_signal(successful_exec, sig, reset_signals):
     assert not em._command_queue.get.called, " ... that we've now confirmed works"
 
 
+def test_environment_default_path(successful_exec, mocker):
+    mock_os, *_, em = successful_exec
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    expected_pybindir = pathlib.Path(sys.executable).parent
+    expected_order = ("/usr/local/bin", "/usr/bin", "/bin", str(expected_pybindir))
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    a, k = mock_os.execvpe.call_args
+    env = k["env"]
+    assert "PATH" in env, "Path always set, with default if nothing else available"
+    for expected_dir, found_dir in zip(expected_order, env["PATH"].split(":")):
+        assert expected_dir == found_dir, "Expected sane default path order"
+
+
+def test_loads_user_environment(successful_exec, randomstring):
+    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+
+    sentinel_key = randomstring()
+    expected_env = {sentinel_key: randomstring()}
+    (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    a, k = mock_os.execvpe.call_args
+    env = k["env"]
+    assert sentinel_key in env
+    assert env[sentinel_key] == expected_env[sentinel_key]
+
+
+def test_handles_invalid_user_environment_file_gracefully(successful_exec, mocker):
+    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+    mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
+
+    env_path = conf_dir / "user_environment.yaml"
+    env_path.write_text("\nalkdhj: g\nkladhj - asdf -asd f")
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    a, k = mock_warn.call_args_list[0]
+    assert "Failed to parse user environment variables" in a[0]
+    assert env_path in a, "Expected pointer to problem file in warning"
+    assert "ScannerError" in a, "Expected exception name in warning"
+
+
+def test_environment_default_path_set_if_not_specified(successful_exec):
+    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+
+    expected_env = {"some_env_var": "some value"}
+    (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    a, k = mock_os.execvpe.call_args
+    env = k["env"]
+    assert "PATH" in env, "Expected PATH is always set"
+
+
+def test_warns_if_executable_not_found(successful_exec, mocker):
+    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+    mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
+
+    expected_env = {"PATH": "/some/typoed:/path:/here"}
+    (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
+    with pytest.raises(SystemExit):
+        em._event_loop()
+
+    assert mock_warn.called
+    a, k = mock_warn.call_args
+    assert "Unable to find executable" in a[0], "Expected precise problem in warning"
+    assert "(not found):" in a[0]
+    assert "globus-compute-endpoint" in a[0], "Share the precise thing not-found"
+    assert expected_env["PATH"] in a[0]
+
+
 def test_start_endpoint_children_die_with_parent(successful_exec):
     mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_os.execvpe.call_args
     assert a[0] == "globus-compute-endpoint", "Sanity check"
     assert k["args"][0] == a[0], "Expect transparency for admin"
@@ -754,7 +836,7 @@ def test_start_endpoint_children_have_own_session(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
     assert mock_os.setsid.called
 
 
@@ -763,7 +845,7 @@ def test_start_endpoint_privileges_dropped(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
 
     expected_user = getpass.getuser()
     expected_gid = os.getgid()  # "cheating"; exploit knowledge of test setup
@@ -787,7 +869,7 @@ def test_default_to_secure_umask(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
 
     assert mock_os.umask.called
     umask = mock_os.umask.call_args[0][0]
@@ -799,7 +881,7 @@ def test_start_from_user_dir(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
 
     ud = mock_os.chdir.call_args[0][0]
     assert ud == str(pathlib.Path.home())  # "cheating"; exploit knowledge of test setup
@@ -810,7 +892,7 @@ def test_all_files_closed(successful_exec):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
 
     _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)
     assert mock_os.closerange.called
@@ -844,7 +926,7 @@ def test_pipe_size_limit(mocker, successful_exec, conf_size):
         em._event_loop()
 
     if is_valid:
-        assert pyexc.value.code == 86, "Q&D: verify we exec'ed, based on '+= 1'"
+        assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
     else:
-        assert pyexc.value.code < 86
+        assert pyexc.value.code < 87
         assert f"{stdin_data_size} bytes" in mock_log.error.call_args[0][0]
