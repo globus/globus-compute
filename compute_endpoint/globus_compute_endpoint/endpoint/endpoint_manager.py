@@ -17,8 +17,9 @@ import time
 import typing as t
 from datetime import datetime
 
-import globus_compute_sdk as gc
+import globus_compute_sdk as GC
 import setproctitle
+import yaml
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import (
@@ -73,7 +74,7 @@ class EndpointManager:
                 "environment": config.environment,
             }
 
-            gcc = gc.Client(**client_options)
+            gcc = GC.Client(**client_options)
             reg_info = gcc.register_endpoint(
                 conf_dir.name,
                 endpoint_uuid,
@@ -302,7 +303,6 @@ class EndpointManager:
 
                 msg = json.loads(body)
                 command = msg.get("command")
-                user_opts = msg.get("user_opts", {})
                 command_args = msg.get("args", [])
                 command_kwargs = msg.get("kwargs", {})
             except Exception as e:
@@ -349,7 +349,7 @@ class EndpointManager:
                 if not command_func:
                     raise InvalidCommandError(f"Unknown or invalid command: {command}")
 
-                command_func(local_user, user_opts, command_args, command_kwargs)
+                command_func(local_user, command_args, command_kwargs)
                 log.info(
                     f"Command process successfully forked for '{globus_username}'"
                     f" ('{globus_uuid}')."
@@ -369,12 +369,9 @@ class EndpointManager:
     def cmd_start_endpoint(
         self,
         local_username: str,
-        user_opts: dict | None,
         args: list[str] | None,
         kwargs: dict | None,
     ):
-        if not user_opts:
-            user_opts = {}
         if not args:
             args = []
         if not kwargs:
@@ -411,12 +408,32 @@ class EndpointManager:
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
 
+        import shutil  # in the child process; no need to load this in MTEP space
+
         exit_code = 70
         try:
-            # TODO: PATH, which is crucial for execvpe, is currently required to
-            # be set by API call to /endpoint/command/<uuid>.  This will be
-            # addressed more thoroughly in SC-22804.
-            env = kwargs.get("env", {})
+            pybindir = pathlib.Path(sys.executable).parent
+            default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
+            env: dict[str, str] = {"PATH": ":".join(map(str, default_path))}
+            env_path = self.conf_dir / "user_environment.yaml"
+            try:
+                if env_path.exists():
+                    log.debug("Load default environment variables from: %s", env_path)
+                    env_text = env_path.read_text()
+                    if env_text:
+                        env.update(
+                            {k: str(v) for k, v in yaml.safe_load(env_text).items()}
+                        )
+
+            except Exception as e:
+                log.warning(
+                    "Failed to parse user environment variables from %s.  Using "
+                    "default: %s\n  --- Exception ---\n(%s) %s",
+                    env_path,
+                    env,
+                    type(e).__name__,
+                    e,
+                )
             env.update({"HOME": udir, "USER": uname})
             if not os.path.isdir(udir):
                 udir = "/"
@@ -445,7 +462,18 @@ class EndpointManager:
             os.setresuid(uid, uid, uid)  # raises (good!) on error
             exit_code += 1
 
+            # some Q&D verification for admin debugging purposes
+            if not shutil.which(proc_args[0], path=env["PATH"]):
+                log.warning(
+                    "Unable to find executable."
+                    f"\n  Executable (not found): {proc_args[0]}"
+                    f'\n  Path: "{env["PATH"]}"'
+                    f"\n\n  Will attempt exec anyway -- WARNING - it will likely fail."
+                    f"\n  (pid: {pid}, user: {uname}, {ep_name})"
+                )
+
             os.setsid()
+            exit_code += 1
 
             umask = 0o077  # Let child process set less restrictive, if desired
             log.debug("Setting process umask for %s to 0o%04o (%s)", pid, umask, uname)
@@ -463,6 +491,10 @@ class EndpointManager:
             startup_proc_title = f"Endpoint starting up for {uname} [{args_title}]"
             setproctitle.setproctitle(startup_proc_title)
 
+            gc_dir: pathlib.Path = GC.sdk.login_manager.tokenstore.ensure_compute_dir()
+            (gc_dir / ep_name).mkdir(mode=0o700, parents=True, exist_ok=True)
+
+            user_opts = kwargs.get("user_opts", {})
             stdin_data_dict = {
                 "amqp_creds": kwargs.get("amqp_creds"),
                 "config": render_config_user_template(self.conf_dir, user_opts),
