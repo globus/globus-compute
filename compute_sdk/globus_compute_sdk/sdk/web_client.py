@@ -144,8 +144,10 @@ class WebClient(globus_sdk.BaseClient):
             app_name += f"/{value}"
         globus_sdk.BaseClient.app_name.fset(self, app_name)
 
-    def submit(self, batch: t.Dict[str, t.Any]) -> globus_sdk.GlobusHTTPResponse:
-        return self.post("/v3/submit", data=batch)
+    def submit(
+        self, endpoint_id: UUID_LIKE_T, batch: t.Dict[str, t.Any]
+    ) -> globus_sdk.GlobusHTTPResponse:
+        return self.post(f"/v3/endpoints/{endpoint_id}/submit", data=batch)
 
     def register_endpoint(
         self,

@@ -709,7 +709,7 @@ class Executor(concurrent.futures.Executor):
         :param tasks: a list of tasks to submit upstream in a batch.
         """
         batch = self.funcx_client.create_batch(
-            endpoint_uuid, self.task_group_id, create_websocket_queue=True
+            self.task_group_id, create_websocket_queue=True
         )
         submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
             list
@@ -721,7 +721,7 @@ class Executor(concurrent.futures.Executor):
             log.debug("Added task to Globus Compute batch: %s", task)
 
         try:
-            batch_response = self.funcx_client.batch_run(batch)
+            batch_response = self.funcx_client.batch_run(endpoint_uuid, batch)
         except Exception as e:
             log.exception(f"Error submitting {len(tasks)} tasks to Globus Compute")
             for fut_list in submitted_futs_by_fn.values():
