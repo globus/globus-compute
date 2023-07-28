@@ -116,7 +116,6 @@ can be started cleanly again.
 
 .. note:: If the ENDPOINT_NAME is not specified, the default endpoint is stopped.
 
-.. warning:: Run the ``globus-compute-endpoint stop`` command **twice** to ensure that the endpoint is shutdown.
 
 Listing Endpoints
 -----------------
