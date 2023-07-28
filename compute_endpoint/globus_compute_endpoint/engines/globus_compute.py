@@ -54,7 +54,14 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
         self.run_dir = os.path.join(os.getcwd(), run_dir)
         self.endpoint_id = endpoint_id
-        self.executor.provider.script_dir = os.path.join(self.run_dir, "submit_scripts")
+        script_dir = os.path.join(self.run_dir, "submit_scripts")
+        self.executor.provider.script_dir = script_dir
+        if (
+            self.executor.provider.channel
+            and not self.executor.provider.channel.script_dir
+        ):
+            self.executor.provider.channel.script_dir = script_dir
+
         os.makedirs(self.executor.provider.script_dir, exist_ok=True)
         if results_passthrough:
             # Only update the default queue in GCExecutorBase if
