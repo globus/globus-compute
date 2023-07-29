@@ -73,7 +73,6 @@ class MockedResultWatcher(_ResultWatcher):
 @pytest.fixture
 def gc_executor(mocker):
     gcc = mock.MagicMock()
-    gcc.session_task_group_id = str(uuid.uuid4())
     gce = Executor(funcx_client=gcc)
     watcher = mocker.patch(f"{_MOCK_BASE}_ResultWatcher", autospec=True)
 
@@ -158,14 +157,6 @@ def test_executor_context_manager(gc_executor):
         pass
     assert _is_stopped(gce._task_submitter)
     assert _is_stopped(gce._result_watcher)
-
-
-def test_property_task_group_id_is_isolated(gc_executor):
-    gcc, gce = gc_executor
-    assert gce.task_group_id != gcc.session_task_group_id
-
-    gce.task_group_id = uuid.uuid4()
-    assert gce.task_group_id != gcc.session_task_group_id
 
 
 def test_multiple_register_function_fails(gc_executor):
