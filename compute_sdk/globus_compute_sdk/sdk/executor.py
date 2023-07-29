@@ -60,8 +60,9 @@ threading.Thread(target=__executor_atexit).start()
 class _TaskSubmissionInfo:
     __slots__ = (
         "task_num",
-        "function_uuid",
+        "task_group_uuid",
         "endpoint_uuid",
+        "function_uuid",
         "args",
         "kwargs",
     )
@@ -70,25 +71,29 @@ class _TaskSubmissionInfo:
         self,
         *,
         task_num: int,
-        function_id: UUID_LIKE_T,
+        task_group_id: UUID_LIKE_T | None,
         endpoint_id: UUID_LIKE_T,
+        function_id: UUID_LIKE_T,
         args: tuple,
         kwargs: dict,
     ):
         self.task_num = task_num
+        self.task_group_uuid = as_optional_uuid(task_group_id)
         self.function_uuid = as_uuid(function_id)
         self.endpoint_uuid = as_uuid(endpoint_id)
         self.args = args
         self.kwargs = kwargs
 
     def __repr__(self):
-        return (
-            f"{self.__class__.__name__}"
-            f"(task_num={self.task_num},"
-            f" function_uuid='{self.function_uuid}',"
-            f" endpoint_uuid='{self.endpoint_uuid}',"
-            f" args=[{len(self.args)}], kwargs=[{len(self.kwargs)}])"
+        attrs = (
+            f"task_num={self.task_num}",
+            f"task_group_uuid='{self.task_group_uuid}'",
+            f"endpoint_uuid='{self.endpoint_uuid}'",
+            f"function_uuid='{self.function_uuid}'",
+            f"args=[{len(self.args)}]",
+            f"kwargs=[{len(self.kwargs)}]",
         )
+        return f"{type(self).__name__}({'; '.join(attrs)})"
 
 
 class Executor(concurrent.futures.Executor):
@@ -431,8 +436,9 @@ class Executor(concurrent.futures.Executor):
 
         task = _TaskSubmissionInfo(
             task_num=self._task_counter,  # unnecessary; maybe useful for debugging?
-            function_id=function_id,
+            task_group_id=self.task_group_id,
             endpoint_id=self.endpoint_id,
+            function_id=function_id,
             args=args,
             kwargs=kwargs,
         )
@@ -611,11 +617,22 @@ class Executor(concurrent.futures.Executor):
             "%s: task submission thread started (%s)", self, threading.get_ident()
         )
         to_send = self._tasks_to_send  # cache lookup
+
+        # Alias types -- this awkward typing is all about the dict we use
+        # internally to make sure we appropriately group tasks for upstream
+        # submission.  For example, if the user submitted to two different
+        # endpoints, we separate the tasks by the dictionary key.
+        SubmitGroupFutures = t.Dict[
+            t.Tuple[t.Optional[uuid.UUID], uuid.UUID], t.List[ComputeFuture]
+        ]
+        SubmitGroupTasks = t.Dict[
+            t.Tuple[t.Optional[uuid.UUID], uuid.UUID], t.List[_TaskSubmissionInfo]
+        ]
         try:
             fut: ComputeFuture | None = ComputeFuture()  # just start the loop; please
             while fut is not None:
-                futs: dict[uuid.UUID, list[ComputeFuture]] = defaultdict(list)
-                tasks: dict[uuid.UUID, list[_TaskSubmissionInfo]] = defaultdict(list)
+                futs: SubmitGroupFutures = defaultdict(list)
+                tasks: SubmitGroupTasks = defaultdict(list)
                 task_count = 0
                 try:
                     fut, task = to_send.get()  # Block; wait for first result ...
@@ -623,8 +640,9 @@ class Executor(concurrent.futures.Executor):
                     bs = max(1, self.batch_size)  # May have changed while waiting
                     while task is not None:
                         assert fut is not None  # Come on mypy; contextually clear!
-                        tasks[task.endpoint_uuid].append(task)
-                        futs[task.endpoint_uuid].append(fut)
+                        submit_group = task.task_group_uuid, task.endpoint_uuid
+                        tasks[submit_group].append(task)
+                        futs[submit_group].append(fut)
                         if any(len(tl) >= bs for tl in tasks.values()):
                             break
                         fut, task = to_send.get(block=False)  # ... don't block again
@@ -635,15 +653,16 @@ class Executor(concurrent.futures.Executor):
                 if not tasks:
                     continue
 
-                for ep_uuid in tasks:
-                    task_list = tasks[ep_uuid]
-                    fut_list = futs[ep_uuid]
+                for submit_group, task_list in tasks.items():
+                    fut_list = futs[submit_group]
 
+                    tg_uuid, ep_uuid = submit_group
                     log.info(
-                        f"Submitting tasks to Endpoint {ep_uuid}: {len(task_list):,}"
+                        f"Submitting tasks for Task Group {tg_uuid} to"
+                        f" Endpoint {ep_uuid}: {len(task_list):,}"
                     )
 
-                    self._submit_tasks(ep_uuid, fut_list, task_list)
+                    self._submit_tasks(tg_uuid, ep_uuid, fut_list, task_list)
 
                     to_watch = [f for f in fut_list if f.task_id and not f.done()]
                     if not to_watch:
@@ -712,6 +731,7 @@ class Executor(concurrent.futures.Executor):
 
     def _submit_tasks(
         self,
+        taskgroup_uuid: uuid.UUID | None,
         endpoint_uuid: uuid.UUID,
         futs: list[ComputeFuture],
         tasks: list[_TaskSubmissionInfo],
@@ -725,8 +745,10 @@ class Executor(concurrent.futures.Executor):
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
+        if taskgroup_uuid is None and self.task_group_id:
+            taskgroup_uuid = self.task_group_id
         batch = self.funcx_client.create_batch(
-            self.task_group_id, create_websocket_queue=True
+            taskgroup_uuid, create_websocket_queue=True
         )
         submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
             list
@@ -762,10 +784,12 @@ class Executor(concurrent.futures.Executor):
             log.info(f"Updating task_group_id from {self.task_group_id} to {new_tg_id}")
             self.task_group_id = new_tg_id
 
-        self.task_count_submitted += sum(len(x) for x in received_tasks_by_fn.values())
+        batch_count = sum(len(x) for x in received_tasks_by_fn.values())
+        self.task_count_submitted += batch_count
         log.debug(
-            "Batch submitted to task_group: %s - %s",
+            "Batch submitted to task_group: %s - %s (total: %s)",
             self.task_group_id,
+            batch_count,
             self.task_count_submitted,
         )
 
