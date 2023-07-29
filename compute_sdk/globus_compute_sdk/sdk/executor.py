@@ -145,12 +145,14 @@ class Executor(concurrent.futures.Executor):
         # mypy ... sometimes you just ain't too bright
         self.container_id = container_id  # type: ignore[assignment]
 
+        self._task_group_id: uuid.UUID | None = None  # help mypy out
+        self.task_group_id = task_group_id
+
         self.label = label
         self.batch_size = max(1, batch_size)
 
         self.task_count_submitted = 0
         self._task_counter: int = 0
-        self._task_group_id: UUID_LIKE_T | None = task_group_id
         self._tasks_to_send: queue.Queue[
             tuple[ComputeFuture, _TaskSubmissionInfo] | tuple[None, None]
         ] = queue.Queue()
@@ -178,22 +180,35 @@ class Executor(concurrent.futures.Executor):
         return f"{name}<{label}{ep_id}{c_id}{tg_id}{bs}>"
 
     @property
-    def task_group_id(self) -> UUID_LIKE_T | None:
+    def task_group_id(self):
         """
         The Task Group with which this instance is currently associated.  New tasks will
         be sent to this Task Group upstream, and the result listener will only listen
         for results for this group.
 
-        Must be a valid UUID.  Set by simple assignment::
+        Must be a UUID, valid uuid-like string, or None.  Set by simple assignment::
 
-            gce = Executor(endpoint_id="...")
-            gce.task_group_id = "00000000-0000-0000-0000-000000000000"
+            >>> import uuid
+            >>> from globus_compute_sdk import Executor
+            >>> tg_id = uuid.uuid4()  # IRL: some *known* taskgroup id
+            >>> gce = Executor(task_group_id=tg_id)
 
-        This is typically used when reattaching to a previously initiated set of tasks.
-        See `reload_tasks()`_ for more information.
+            # Alternatively, may use a stringified uuid:
+            >>> gce = Executor(task_group_id=str(tg_id))
 
-        If not set manually, this will be set automatically on `submit()`_, to a Task
-        Group ID supplied by the services.
+            # May also alter after construction:
+            >>> gce.task_group_id = tg_id
+            >>> gce.task_group_id = str(tg_id)
+
+            # Internally, it is always stored as a UUID (or None):
+            >>> gce.task_group_id
+            UUID('11111111-2222-4444-8888-000000000000')
+
+        This is typically used when reattaching to a previously initiated set
+        of tasks.  See `reload_tasks()`_ for more information.
+
+        If not set manually, this will be set automatically on `submit()`_, to
+        a Task Group ID supplied by the services.
 
         [default: ``None``]
         """
@@ -201,7 +216,7 @@ class Executor(concurrent.futures.Executor):
 
     @task_group_id.setter
     def task_group_id(self, task_group_id: UUID_LIKE_T | None):
-        self._task_group_id = task_group_id
+        self._task_group_id = as_optional_uuid(task_group_id)
 
     @property
     def container_id(self) -> uuid.UUID | None:
@@ -483,6 +498,8 @@ class Executor(concurrent.futures.Executor):
             self._result_watcher = None
 
         task_group_id = self.task_group_id  # snapshot
+        assert task_group_id is not None  # mypy: we _just_ proved this
+
         # step 2: from server, acquire list of related task ids and make futures
         r = self.funcx_client.web_client.get_taskgroup_tasks(task_group_id)
         if r["taskgroup_id"] != task_group_id:
@@ -742,9 +759,7 @@ class Executor(concurrent.futures.Executor):
             raise
 
         if str(self.task_group_id) != new_tg_id:
-            log.info(
-                f"Updating task_group_id from {self._task_group_id} to {new_tg_id}"
-            )
+            log.info(f"Updating task_group_id from {self.task_group_id} to {new_tg_id}")
             self.task_group_id = new_tg_id
 
         self.task_count_submitted += sum(len(x) for x in received_tasks_by_fn.values())

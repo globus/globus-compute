@@ -243,7 +243,12 @@ def test_submit_raises_if_thread_stopped(gc_executor):
 def test_submit_auto_registers_function(gc_executor):
     gcc, gce = gc_executor
 
-    gcc.register_function.return_value = uuid.uuid4()
+    fn_id = uuid.uuid4()
+    gcc.register_function.return_value = str(fn_id)
+    gcc.batch_run.return_value = {
+        "task_group_id": str(uuid.uuid4()),
+        "tasks": {str(fn_id): [str(uuid.uuid4())]},
+    }
     gce.endpoint_id = uuid.uuid4()
     gce.submit(noop)
 
@@ -296,7 +301,7 @@ def test_reload_tasks_sets_passed_task_group_id(gc_executor):
     # for less mocking:
     gcc.web_client.get_taskgroup_tasks.side_effect = RuntimeError("bailing out early")
 
-    tg_id = str(uuid.uuid4())
+    tg_id = uuid.uuid4()
     with pytest.raises(RuntimeError) as e:
         gce.reload_tasks(tg_id)
 
@@ -310,7 +315,7 @@ def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
 
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
@@ -325,7 +330,7 @@ def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
     if num_tasks == 0:
         log_args, log_kwargs = mock_log.warning.call_args
         assert "Received no tasks" in log_args[0]
-        assert gce.task_group_id in log_args[0]
+        assert str(gce.task_group_id) in log_args[0]
     else:
         assert not mock_log.warning.called
 
@@ -339,7 +344,7 @@ def test_reload_tasks_some_completed(gc_executor, mocker, num_tasks):
 
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
@@ -379,7 +384,7 @@ def test_reload_tasks_all_completed(gc_executor):
     serialize = ComputeSerializer().serialize
     num_tasks = 5
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [
@@ -411,7 +416,7 @@ def test_reload_starts_new_watcher(gc_executor):
 
     num_tasks = 3
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
@@ -438,7 +443,7 @@ def test_reload_starts_new_watcher(gc_executor):
 def test_reload_tasks_cancels_existing_futures(gc_executor, randomstring):
     gcc, gce = gc_executor
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
 
     def mock_data():
         return {
@@ -460,7 +465,7 @@ def test_reload_tasks_cancels_existing_futures(gc_executor, randomstring):
 def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
     gcc, gce = gc_executor
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
     mock_datum = (
         (KeyError, {"mispeleed": gce.task_group_id}),
         (ValueError, {"taskgroup_id": "abcd"}),
@@ -479,7 +484,7 @@ def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
 def test_reload_sets_failed_tasks(gc_executor):
     gcc, gce = gc_executor
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [
@@ -504,7 +509,7 @@ def test_reload_handles_deseralization_error_gracefully(gc_executor):
     gcc, gce = gc_executor
     gcc.fx_serializer = ComputeSerializer()
 
-    gce.task_group_id = str(uuid.uuid4())
+    gce.task_group_id = uuid.uuid4()
     mock_data = {
         "taskgroup_id": gce.task_group_id,
         "tasks": [
@@ -532,7 +537,12 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
     # make a new MagicMock every time create_batch is called
     gcc.create_batch.side_effect = lambda *_args, **_kwargs: mock.MagicMock()
 
-    gcc.register_function.return_value = uuid.uuid4()
+    fn_id = str(uuid.uuid4())
+    gcc.register_function.return_value = fn_id
+    gcc.batch_run.return_value = {
+        "tasks": {fn_id: [str(uuid.uuid4()) for _ in range(batch_size)]},
+        "task_group_id": uuid.uuid4(),
+    }
     num_batches = 50
 
     gce.endpoint_id = uuid.uuid4()
@@ -614,7 +624,7 @@ def test_task_submitter_sets_future_task_ids(gc_executor):
 
     gcc.batch_run.return_value = {
         "request_id": "rq_id",
-        "task_group_id": "tg_id",
+        "task_group_id": str(uuid.uuid4()),
         "endpoint_id": "ep_id",
         "tasks": {"fn_id": batch_ids},
     }
