@@ -36,6 +36,7 @@ class MockedExecutor(Executor):
     def __init__(self, *args, **kwargs):
         kwargs.update({"funcx_client": mock.Mock(spec=Client)})
         super().__init__(*args, **kwargs)
+        self._test_paused = threading.Event()
         self._time_to_stop_mock = threading.Event()
         self._task_submitter_exception: t.Type[Exception] | None = None
 
@@ -99,19 +100,30 @@ def gc_executor(mocker):
         )
 
 
-def test_task_submission_info_stringification():
+@pytest.mark.parametrize(
+    "tg_id, fn_id, ep_id",
+    (
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4()),
+        tuple(map(str, (uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))),
+    ),
+)
+def test_task_submission_info_stringification(tg_id, fn_id, ep_id):
     fut_id = 10
-    func_id = uuid.uuid4()
-    ep_id = uuid.uuid4()
 
     info = _TaskSubmissionInfo(
-        task_num=fut_id, function_id=func_id, endpoint_id=ep_id, args=(), kwargs={}
+        task_num=fut_id,
+        task_group_id=tg_id,
+        function_id=fn_id,
+        endpoint_id=ep_id,
+        args=(),
+        kwargs={},
     )
     as_str = str(info)
     assert as_str.startswith("_TaskSubmissionInfo(")
-    assert as_str.endswith("args=[0], kwargs=[0])")
+    assert as_str.endswith("args=[0]; kwargs=[0])")
     assert "task_num=10" in as_str
-    assert f"function_uuid='{func_id}'" in as_str
+    assert f"task_group_uuid='{tg_id}'" in as_str
+    assert f"function_uuid='{fn_id}'" in as_str
     assert f"endpoint_uuid='{ep_id}'" in as_str
 
 
@@ -577,8 +589,9 @@ def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
     gce.task_group_id = uuid.uuid4()
     tsi = _TaskSubmissionInfo(
         task_num=12345,
-        function_id=uuid.uuid4(),
+        task_group_id=uuid.uuid4(),
         endpoint_id=uuid.uuid4(),
+        function_id=uuid.uuid4(),
         args=(),
         kwargs={},
     )
@@ -588,7 +601,41 @@ def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
     try_assert(lambda: str(upstream_error) == str(gce._task_submitter_exception))
 
 
-def test_task_submitter_handles_stale_result_watcher_gracefully(gc_executor, mocker):
+def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(mocker, gc_executor):
+    gcc, gce = gc_executor
+    gce.endpoint_id = uuid.uuid4()
+    gcc.register_function.return_value = uuid.uuid4()
+
+    can_continue = threading.Event()
+
+    def _mock_max(*a, **k):
+        can_continue.wait()
+        return max(*a, **k)
+
+    mocker.patch(f"{_MOCK_BASE}max", side_effect=_mock_max)
+    func_id = gce.register_function(noop)
+
+    tg_id_1 = uuid.uuid4()
+    tg_id_2 = uuid.uuid4()
+    gcc.batch_run.side_effect = (
+        ({"task_group_id": str(tg_id_1), "tasks": {func_id: [str(uuid.uuid4())]}}),
+        ({"task_group_id": str(tg_id_2), "tasks": {func_id: [str(uuid.uuid4())]}}),
+    )
+    gce.task_group_id = tg_id_1
+    gce.submit(noop)
+    gce.task_group_id = tg_id_2
+    gce.submit(noop)
+    assert not gcc.create_batch.called, "Verify test setup"
+    can_continue.set()
+
+    try_assert(lambda: gcc.batch_run.call_count == 2)
+
+    for expected, (a, _k) in zip((tg_id_1, tg_id_2), gcc.create_batch.call_args_list):
+        found_tg_uuid = a[0]
+        assert found_tg_uuid == expected
+
+
+def test_task_submitter_handles_stale_result_watcher_gracefully(gc_executor):
     gcc, gce = gc_executor
     gcc.register_function.return_value = uuid.uuid4()
     gce.endpoint_id = uuid.uuid4()
@@ -628,7 +675,7 @@ def test_task_submitter_sets_future_task_ids(gc_executor):
         "endpoint_id": "ep_id",
         "tasks": {"fn_id": batch_ids},
     }
-    gce._submit_tasks("ep_id", futs, tasks)
+    gce._submit_tasks("tg_id", "ep_id", futs, tasks)
 
     assert all(f.task_id == task_id for f, task_id in zip(futs, batch_ids))
 
@@ -649,7 +696,7 @@ def test_submit_tasks_stops_futures_on_bad_response(
     ]
 
     with pytest.raises(Exception) as e:
-        gce._submit_tasks("ep_id", futs, tasks)
+        gce._submit_tasks("tg_id", "ep_id", futs, tasks)
 
     assert "missing an expected field" in caplog.text
     for fut in futs:
@@ -667,7 +714,7 @@ def test_resultwatcher_stops_if_unable_to_connect(mocker):
     assert mock_time.sleep.call_count == rw._connection_tries - 1, "Should wait between"
 
 
-def test_resultwatcher_ignores_invalid_tasks(mocker):
+def test_resultwatcher_ignores_invalid_tasks():
     gce = mock.Mock(spec=Executor)
     rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
