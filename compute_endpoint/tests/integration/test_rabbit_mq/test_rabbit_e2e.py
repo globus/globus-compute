@@ -20,14 +20,14 @@ def test_simple_roundtrip(
 
     message = f"Hello test_simple_roundtrip: {randomstring()}".encode()
     task_pub.publish(message)
-    task_message = task_q.get(timeout=2)
+    _, task_message = task_q.get(timeout=2)
     assert message == task_message
 
     result_pub.publish(task_message)
-    result_message = result_q.get(timeout=2)
+    _, result_message = result_q.get(timeout=2)
 
     task_sub.quiesce_event.set()
     result_sub.kill_event.set()
 
-    expected = (result_pub.queue_info["test_routing_key"], message)
+    _, expected = (result_pub.queue_info["test_routing_key"], message)
     assert result_message == expected
