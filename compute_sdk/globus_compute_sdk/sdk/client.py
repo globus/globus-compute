@@ -356,7 +356,7 @@ class Client:
     @requires_login
     def batch_run(
         self, endpoint_id: UUID_LIKE_T, batch: Batch
-    ) -> dict[str, str | list[str]]:
+    ) -> dict[str, str | dict[str, list[str]]]:
         """
         Initiate a batch of tasks to Globus Compute
 
