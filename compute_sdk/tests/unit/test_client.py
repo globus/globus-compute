@@ -268,7 +268,7 @@ def test_container_build_status_failure(mocker, login_manager):
     with pytest.raises(SystemError) as excinfo:
         gcc.get_container_build_status("123-434")
 
-    assert type(excinfo.value) == SystemError
+    assert type(excinfo.value) is SystemError
 
 
 def test_delete_function():
