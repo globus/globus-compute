@@ -367,7 +367,7 @@ class Manager:
                     kill_event.set()
                     break
 
-                elif type(message) == tuple and message[0] == "TASK_CANCEL":
+                elif isinstance(message, tuple) and message[0] == "TASK_CANCEL":
                     with self.task_finalization_lock:
                         task_id = message[1]
                         log.info(f"Received TASK_CANCEL request for task: {task_id}")
