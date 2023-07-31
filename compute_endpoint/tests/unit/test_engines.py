@@ -69,7 +69,9 @@ def test_engine_submit(
     param = random.randint(1, 100)
     future = engine._submit(double, param)
     assert isinstance(future, concurrent.futures.Future)
-    assert future.result(timeout=1) == param * 2
+
+    # 5-seconds is nominally "overkill," but gc on CI appears to need (at least) >1s
+    assert future.result(timeout=5) == param * 2
 
 
 @pytest.mark.parametrize("engine_type", ["proc_pool", "thread_pool", "gc"])
