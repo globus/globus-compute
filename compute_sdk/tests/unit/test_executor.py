@@ -16,6 +16,7 @@ from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.executor import _ResultWatcher, _TaskSubmissionInfo
 from globus_compute_sdk.sdk.utils.uuid_like import as_optional_uuid, as_uuid
 from globus_compute_sdk.serialize.facade import ComputeSerializer
+from pytest_mock import MockerFixture
 from tests.utils import try_assert, try_for_timeout
 
 _MOCK_BASE = "globus_compute_sdk.sdk.executor."
@@ -101,13 +102,13 @@ def gc_executor(mocker):
 
 
 @pytest.mark.parametrize(
-    "tg_id, fn_id, ep_id",
+    "tg_id, fn_id, ep_id, uep_config",
     (
-        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4()),
-        tuple(map(str, (uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))),
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"heartbeat": 10}),
+        (str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), None),
     ),
 )
-def test_task_submission_info_stringification(tg_id, fn_id, ep_id):
+def test_task_submission_info_stringification(tg_id, fn_id, ep_id, uep_config):
     fut_id = 10
 
     info = _TaskSubmissionInfo(
@@ -115,6 +116,7 @@ def test_task_submission_info_stringification(tg_id, fn_id, ep_id):
         task_group_id=tg_id,
         function_id=fn_id,
         endpoint_id=ep_id,
+        user_endpoint_config=uep_config,
         args=(),
         kwargs={},
     )
@@ -125,6 +127,8 @@ def test_task_submission_info_stringification(tg_id, fn_id, ep_id):
     assert f"task_group_uuid='{tg_id}'" in as_str
     assert f"function_uuid='{fn_id}'" in as_str
     assert f"endpoint_uuid='{ep_id}'" in as_str
+    uep_config_len = len(uep_config) if uep_config else 0
+    assert f"user_endpoint_config={{{uep_config_len}}};"
 
 
 @pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
@@ -237,6 +241,50 @@ def test_register_function_sends_container_id(gc_executor, container_id):
 
     expected_container_id = as_optional_uuid(container_id)
     assert k["container_uuid"] == expected_container_id
+
+
+@pytest.mark.parametrize(
+    "test_data",
+    (
+        (True, None),
+        (True, {"foo": "bar"}),
+        (False, {"foo": str}),
+        (False, "{'foo': 'bar'}"),
+        (False, "config"),
+        (False, 1),
+    ),
+)
+def test_user_endpoint_config(
+    gc_executor: tuple[mock.MagicMock, Executor], test_data: tuple[bool, t.Any]
+):
+    _, gce = gc_executor
+    is_valid, uep_config = test_data
+
+    assert gce.user_endpoint_config is None, "Default value is None"
+
+    if is_valid:
+        gce.user_endpoint_config = uep_config
+        assert gce.user_endpoint_config == uep_config
+    else:
+        with pytest.raises(TypeError):
+            gce.user_endpoint_config = uep_config
+        assert gce.user_endpoint_config is None
+
+
+def test_user_endpoint_config_added_to_batch(
+    gc_executor: tuple[mock.MagicMock, Executor]
+):
+    gcc, gce = gc_executor
+
+    gce.endpoint_id = uuid.uuid4()
+    gce.user_endpoint_config = {"foo": "bar"}
+    gcc.register_function.return_value = uuid.uuid4()
+
+    gce.submit(noop)
+
+    try_assert(lambda: gcc.batch_run.called)
+    args, _ = gcc.create_batch.call_args
+    assert gce.user_endpoint_config in args
 
 
 def test_submit_raises_if_thread_stopped(gc_executor):
@@ -592,6 +640,7 @@ def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
         task_group_id=uuid.uuid4(),
         endpoint_id=uuid.uuid4(),
         function_id=uuid.uuid4(),
+        user_endpoint_config=None,
         args=(),
         kwargs={},
     )
@@ -635,6 +684,47 @@ def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(mocker, gc_execut
         assert found_tg_uuid == expected
 
 
+def test_task_submit_handles_multiple_user_endpoint_configs(
+    mocker: MockerFixture, gc_executor: tuple[mock.MagicMock, Executor]
+):
+    gcc, gce = gc_executor
+    gce.endpoint_id = uuid.uuid4()
+
+    func_uuid_str = str(uuid.uuid4())
+    tg_uuid_str = str(uuid.uuid4())
+    gcc.register_function.return_value = func_uuid_str
+    gcc.batch_run.side_effect = (
+        ({"task_group_id": tg_uuid_str, "tasks": {func_uuid_str: [str(uuid.uuid4())]}}),
+        ({"task_group_id": tg_uuid_str, "tasks": {func_uuid_str: [str(uuid.uuid4())]}}),
+    )
+
+    # Temporarily block the task submitter loop
+    can_continue = threading.Event()
+
+    def _mock_max(*a, **k):
+        can_continue.wait()
+        return max(*a, **k)
+
+    mocker.patch(f"{_MOCK_BASE}max", side_effect=_mock_max)
+
+    uep_config_1 = {"heartbeat": 10}
+    uep_config_2 = {"heartbeat": 20}
+    gce.user_endpoint_config = uep_config_1
+    gce.submit(noop)
+    gce.user_endpoint_config = uep_config_2
+    gce.submit(noop)
+
+    assert not gcc.create_batch.called, "Verify test setup"
+    can_continue.set()
+
+    try_assert(lambda: gcc.batch_run.call_count == 2)
+    for expected, (a, _k) in zip(
+        (uep_config_1, uep_config_2), gcc.create_batch.call_args_list
+    ):
+        found_uep_config = a[1]
+        assert found_uep_config == expected
+
+
 def test_task_submitter_handles_stale_result_watcher_gracefully(gc_executor):
     gcc, gce = gc_executor
     gcc.register_function.return_value = uuid.uuid4()
@@ -675,7 +765,7 @@ def test_task_submitter_sets_future_task_ids(gc_executor):
         "endpoint_id": "ep_id",
         "tasks": {"fn_id": batch_ids},
     }
-    gce._submit_tasks("tg_id", "ep_id", futs, tasks)
+    gce._submit_tasks("tg_id", "ep_id", None, futs, tasks)
 
     assert all(f.task_id == task_id for f, task_id in zip(futs, batch_ids))
 
@@ -696,7 +786,7 @@ def test_submit_tasks_stops_futures_on_bad_response(
     ]
 
     with pytest.raises(Exception) as e:
-        gce._submit_tasks("tg_id", "ep_id", futs, tasks)
+        gce._submit_tasks("tg_id", "ep_id", None, futs, tasks)
 
     assert "missing an expected field" in caplog.text
     for fut in futs:

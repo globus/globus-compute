@@ -322,6 +322,7 @@ class Client:
     def create_batch(
         self,
         task_group_id: UUID_LIKE_T | None = None,
+        user_endpoint_config: dict[str, t.Any] | None = None,
         create_websocket_queue: bool = False,
     ) -> Batch:
         """
@@ -339,6 +340,10 @@ class Client:
             it, the services will respond with an error.
             If task_group_id is not specified, the services will create a Task Group.
 
+        user_endpoint_config: dict (optional)
+            User endpoint configuration values as described and allowed by endpoint
+            administrators
+
         create_websocket_queue : bool
             Whether to create a websocket queue for the task_group_id if
             it isn't already created
@@ -349,6 +354,7 @@ class Client:
         """
         return Batch(
             task_group_id,
+            user_endpoint_config,
             create_websocket_queue,
             serializer=self.fx_serializer,
         )

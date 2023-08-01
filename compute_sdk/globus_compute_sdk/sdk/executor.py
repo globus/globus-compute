@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
 import os
 import queue
@@ -63,6 +64,7 @@ class _TaskSubmissionInfo:
         "task_group_uuid",
         "endpoint_uuid",
         "function_uuid",
+        "user_endpoint_config",
         "args",
         "kwargs",
     )
@@ -74,6 +76,7 @@ class _TaskSubmissionInfo:
         task_group_id: UUID_LIKE_T | None,
         endpoint_id: UUID_LIKE_T,
         function_id: UUID_LIKE_T,
+        user_endpoint_config: dict[str, t.Any] | None,
         args: tuple,
         kwargs: dict,
     ):
@@ -81,6 +84,7 @@ class _TaskSubmissionInfo:
         self.task_group_uuid = as_optional_uuid(task_group_id)
         self.function_uuid = as_uuid(function_id)
         self.endpoint_uuid = as_uuid(endpoint_id)
+        self.user_endpoint_config = user_endpoint_config
         self.args = args
         self.kwargs = kwargs
 
@@ -90,6 +94,7 @@ class _TaskSubmissionInfo:
             f"task_group_uuid='{self.task_group_uuid}'",
             f"endpoint_uuid='{self.endpoint_uuid}'",
             f"function_uuid='{self.function_uuid}'",
+            f"user_endpoint_config={{{len(self.user_endpoint_config or {})}}}",
             f"args=[{len(self.args)}]",
             f"kwargs=[{len(self.kwargs)}]",
         )
@@ -110,6 +115,7 @@ class Executor(concurrent.futures.Executor):
         container_id: UUID_LIKE_T | None = None,
         funcx_client: Client | None = None,
         task_group_id: UUID_LIKE_T | None = None,
+        user_endpoint_config: dict[str, t.Any] | None = None,
         label: str = "",
         batch_size: int = 128,
         **kwargs,
@@ -122,6 +128,9 @@ class Executor(concurrent.futures.Executor):
             arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
             one will be instantiated.
+        :param user_endpoint_config: User endpoint configuration values as described
+            and allowed by endpoint administrators. Must be a JSON-serializable dict
+            or None.
         :param label: a label to name the executor; mainly utilized for
             logging and advanced needs with multiple executors.
         :param batch_size: the maximum number of tasks to coalesce before
@@ -152,6 +161,8 @@ class Executor(concurrent.futures.Executor):
 
         self._task_group_id: uuid.UUID | None = None  # help mypy out
         self.task_group_id = task_group_id
+
+        self.user_endpoint_config = user_endpoint_config
 
         self.label = label
         self.batch_size = max(1, batch_size)
@@ -222,6 +233,36 @@ class Executor(concurrent.futures.Executor):
     @task_group_id.setter
     def task_group_id(self, task_group_id: UUID_LIKE_T | None):
         self._task_group_id = as_optional_uuid(task_group_id)
+
+    @property
+    def user_endpoint_config(self) -> dict[str, t.Any] | None:
+        """
+        The endpoint configuration values, as described and allowed by endpoint
+        administrators, that this instance is currently associated with.
+
+        Must be a JSON-serializable dict or None. Set by simple assignment::
+
+            >>> from globus_compute_sdk import Executor
+            >>> uep_config = {"foo": "bar"}
+            >>> gce = Executor(user_endpoint_config=uep_config)
+
+            # May also alter after construction:
+            >>> gce.user_endpoint_config = uep_config
+        """
+        return self._user_endpoint_config
+
+    @user_endpoint_config.setter
+    def user_endpoint_config(self, val: dict | None):
+        if val is not None:
+            if not isinstance(val, dict):
+                raise TypeError(
+                    f"Config must be of type dict, not {type(val).__name__}"
+                )
+            try:
+                json.dumps(val)
+            except TypeError:
+                raise TypeError("Configuration must be JSON-serializable")
+        self._user_endpoint_config = val
 
     @property
     def container_id(self) -> uuid.UUID | None:
@@ -438,6 +479,7 @@ class Executor(concurrent.futures.Executor):
             task_num=self._task_counter,  # unnecessary; maybe useful for debugging?
             task_group_id=self.task_group_id,
             endpoint_id=self.endpoint_id,
+            user_endpoint_config=self.user_endpoint_config,
             function_id=function_id,
             args=args,
             kwargs=kwargs,
@@ -622,12 +664,20 @@ class Executor(concurrent.futures.Executor):
         # internally to make sure we appropriately group tasks for upstream
         # submission.  For example, if the user submitted to two different
         # endpoints, we separate the tasks by the dictionary key.
+        class SubmitGroup(t.NamedTuple):
+            task_group_uuid: uuid.UUID | None
+            endpoint_uuid: uuid.UUID
+            user_endpoint_config: str
+
         SubmitGroupFutures = t.Dict[
-            t.Tuple[t.Optional[uuid.UUID], uuid.UUID], t.List[ComputeFuture]
+            SubmitGroup,
+            t.List[ComputeFuture],
         ]
         SubmitGroupTasks = t.Dict[
-            t.Tuple[t.Optional[uuid.UUID], uuid.UUID], t.List[_TaskSubmissionInfo]
+            SubmitGroup,
+            t.List[_TaskSubmissionInfo],
         ]
+
         try:
             fut: ComputeFuture | None = ComputeFuture()  # just start the loop; please
             while fut is not None:
@@ -640,7 +690,12 @@ class Executor(concurrent.futures.Executor):
                     bs = max(1, self.batch_size)  # May have changed while waiting
                     while task is not None:
                         assert fut is not None  # Come on mypy; contextually clear!
-                        submit_group = task.task_group_uuid, task.endpoint_uuid
+                        submit_group = SubmitGroup(
+                            task.task_group_uuid,
+                            task.endpoint_uuid,
+                            # dict type is unhashable
+                            json.dumps(task.user_endpoint_config, sort_keys=True),
+                        )
                         tasks[submit_group].append(task)
                         futs[submit_group].append(fut)
                         if any(len(tl) >= bs for tl in tasks.values()):
@@ -656,13 +711,18 @@ class Executor(concurrent.futures.Executor):
                 for submit_group, task_list in tasks.items():
                     fut_list = futs[submit_group]
 
-                    tg_uuid, ep_uuid = submit_group
+                    tg_uuid, ep_uuid, uep_config = submit_group
+                    uep_config = json.loads(uep_config)
+                    # Needed for mypy
+                    assert uep_config is None or isinstance(uep_config, dict)
                     log.info(
                         f"Submitting tasks for Task Group {tg_uuid} to"
                         f" Endpoint {ep_uuid}: {len(task_list):,}"
                     )
 
-                    self._submit_tasks(tg_uuid, ep_uuid, fut_list, task_list)
+                    self._submit_tasks(
+                        tg_uuid, ep_uuid, uep_config, fut_list, task_list
+                    )
 
                     to_watch = [f for f in fut_list if f.task_id and not f.done()]
                     if not to_watch:
@@ -733,6 +793,7 @@ class Executor(concurrent.futures.Executor):
         self,
         taskgroup_uuid: uuid.UUID | None,
         endpoint_uuid: uuid.UUID,
+        user_endpoint_config: dict | None,
         futs: list[ComputeFuture],
         tasks: list[_TaskSubmissionInfo],
     ):
@@ -741,14 +802,18 @@ class Executor(concurrent.futures.Executor):
         Upon success, update the futures with their associated task_id.
 
         :param endpoint_uuid: UUID of the Endpoint on which to execute this batch.
+        :param taskgroup_uuid: UUID of the task group
+        :param user_endpoint_config: User endpoint configuration values as described and
+            allowed by endpoint administrators
         :param futs: a list of ComputeFutures; will have their task_id attribute
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
         if taskgroup_uuid is None and self.task_group_id:
             taskgroup_uuid = self.task_group_id
+
         batch = self.funcx_client.create_batch(
-            taskgroup_uuid, create_websocket_queue=True
+            taskgroup_uuid, user_endpoint_config, create_websocket_queue=True
         )
         submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
             list
