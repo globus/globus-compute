@@ -20,6 +20,7 @@ from globus_compute_endpoint.exception_handling import (
     get_result_error_details,
 )
 from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.serialize import ComputeSerializer
 
 log = logging.getLogger(__name__)
@@ -116,7 +117,9 @@ class Worker:
                 result["container_id"] = container_id
                 log.debug("Sending result")
                 # send bytes over the socket back to the manager
-                self.task_socket.send_multipart([b"TASK_RET", dill.dumps(result)])
+                ddr = dill.dumps(result)
+                # self.task_socket.send_multipart([b"TASK_RET", dill.dumps(result)])
+                self.task_socket.send_multipart([b"TASK_RET", ddr])
 
         log.warning("Broke out of the loop... dying")
 
@@ -129,6 +132,7 @@ class Worker:
                 code=code,
                 user_message=user_message,
             ),
+            details=get_env_details(),
         )
         return messagepack.pack(outgoing_result)
 

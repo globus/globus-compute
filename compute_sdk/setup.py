@@ -8,7 +8,7 @@ REQUIRES = [
     # request sending and authorization tools
     "requests>=2.20.0",
     "globus-sdk>=3.20.1,<4",
-    "globus-compute-common==0.2.0",
+    "globus-compute-common==0.3.0a2",
     # 'websockets' is used for the client-side websocket listener
     "websockets==10.3",
     # dill is an extension of `pickle` to a wider array of native python types

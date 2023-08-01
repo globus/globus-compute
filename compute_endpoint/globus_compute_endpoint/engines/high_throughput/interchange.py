@@ -1058,6 +1058,7 @@ class Interchange:
         """
         log.info(f"Scaling out by {blocks} more blocks for task type {task_type}")
         r = []
+
         for _i in range(blocks):
             if self.provider:
                 self._block_counter += 1

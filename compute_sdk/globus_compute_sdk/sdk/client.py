@@ -164,7 +164,11 @@ class Client:
         """Remove credentials from your local system"""
         self.login_manager.logout()
 
-    def _update_task_table(self, return_msg: str | t.Dict, task_id: str):
+    def _update_task_table(
+        self,
+        return_msg: str | t.Dict,
+        task_id: str,
+    ):
         """
         Parses the return message from the service and updates the
         internal _task_status_table
@@ -185,6 +189,7 @@ class Client:
         r_status = r_dict.get("status", "unknown").lower()
         pending = r_status not in ("success", "failed")
         status = {"pending": pending, "status": r_status}
+        task_details = r_dict.get("details")
 
         if not pending:
             if "result" not in r_dict and "exception" not in r_dict:
@@ -194,11 +199,15 @@ class Client:
                 try:
                     r_obj = self.fx_serializer.deserialize(r_dict["result"])
                 except Exception:
-                    raise SerializationError("Result Object Deserialization")
+                    raise SerializationError(
+                        "Result Object Deserialization", task_details=task_details
+                    )
                 else:
                     status.update({"result": r_obj, "completion_t": completion_t})
             elif "exception" in r_dict:
-                raise TaskExecutionFailed(r_dict["exception"], completion_t)
+                raise TaskExecutionFailed(
+                    r_dict["exception"], completion_t, task_details=task_details
+                )
             else:
                 raise NotImplementedError("unreachable")
 

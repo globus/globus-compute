@@ -3,6 +3,25 @@ from __future__ import annotations
 import textwrap
 import time
 
+from globus_compute_sdk.sdk.utils import get_env_details
+
+
+def check_version(task_details: dict | None) -> str:
+    if task_details:
+        worker_py = task_details.get("python_version", "UnknownPy")
+        worker_os = task_details.get("os", "UnknownOS")
+        sdk_py = get_env_details()["python_version"]
+        if sdk_py != worker_py:
+            return (
+                f"Warning:  Client uses Python {sdk_py} "
+                f"but worker used {worker_py} on {worker_os}. "
+            )
+        else:
+            return f"Task execution info: {task_details}"
+
+    # Add no text to existing error msg if no info
+    return ""
+
 
 class ComputeError(Exception):
     """Base class for all funcx exceptions"""
@@ -24,11 +43,15 @@ class VersionMismatch(ComputeError):
 class SerializationError(ComputeError):
     """Something failed during serialization or deserialization."""
 
-    def __init__(self, message):
+    def __init__(self, message, task_details: dict | None = None):
         self.message = message
+        self.task_details = task_details
 
     def __repr__(self):
-        return f"Serialization Error during: {self.message}"
+        return (
+            check_version(self.task_details)
+            + "Serialization Error during: {self.message}"
+        )
 
 
 class TaskPending(ComputeError):
@@ -61,10 +84,20 @@ class TaskExecutionFailed(Exception):
     Error result from the remote end, wrapped as an exception object
     """
 
-    def __init__(self, remote_data: str, completion_t: str | None = None):
+    def __init__(
+        self,
+        remote_data: str,
+        completion_t: str | None = None,
+        task_details: dict | None = None,
+    ):
         self.remote_data = remote_data
+        self.task_details = task_details
         # Fill in completion time if missing
         self.completion_t = completion_t or str(time.time())
 
     def __str__(self) -> str:
-        return "\n" + textwrap.indent(self.remote_data, "    ")
+        return (
+            check_version(self.task_details)
+            + "\n"
+            + textwrap.indent(self.remote_data, "    ")
+        )

@@ -1,6 +1,7 @@
 import pickle
 import uuid
 
+import pytest
 from globus_compute_common.messagepack import unpack
 from globus_compute_common.messagepack.message_types import Container, ContainerImage
 from globus_compute_common.messagepack.message_types import (
@@ -101,3 +102,30 @@ def test_external_task_without_container_id_converts_to_RAW():
     assert internal.task_id == str(task_id)
     assert internal.container_id == "RAW"
     assert internal.task_buffer == task_buffer
+
+
+@pytest.mark.parametrize(
+    "packed_result",
+    [
+        [
+            (
+                b'\x01{"message_type":"result","data":{"task_id":'
+                b'"1aa3202c-336d-4c43-9a6e-98711add151d","data":"abc 123",'
+                b'"error_details":{"code":"err_code","user_message":"msg"},'
+                b'"task_statuses":[]}}'
+            ),
+            "result",
+            "1aa3202c-336d-4c43-9a6e-98711add151d",
+            "abc 123",
+            "err_code",
+        ],
+    ],
+)
+def test_unpack_result_without_details(packed_result):
+    raw, result, task_id, data, err = packed_result
+    unpacked = unpack(raw)
+    assert unpacked.message_type == result
+    assert isinstance(unpacked.task_id, uuid.UUID)
+    assert str(unpacked.task_id) == task_id
+    assert unpacked.data == data
+    assert unpacked.error_details.code == err

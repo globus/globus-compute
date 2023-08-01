@@ -358,7 +358,7 @@ class Manager:
                 #       task_revc_counter
                 #   )
                 poll_timer = 0
-                _, pkl_msg = self.task_incoming.recv_multipart()
+                p1, pkl_msg = self.task_incoming.recv_multipart()
                 message = dill.loads(pkl_msg)
                 last_interchange_contact = time.time()
 

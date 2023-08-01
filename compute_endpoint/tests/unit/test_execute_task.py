@@ -31,6 +31,9 @@ def test_execute_task():
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
     assert result.data
+    assert "os" in result.details
+    assert "python_version" in result.details
+    assert "dill_version" in result.details
     assert serializer.deserialize(result.data) == output
 
 
@@ -58,4 +61,8 @@ def test_execute_task_with_exception():
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
     assert result.error_details
+    assert "python_version" in result.details
+    assert "os" in result.details
+    assert float(result.details["execution_time_s"]) > 0
+    assert result.details["dill_version"]
     assert "ZeroDivisionError" in result.data
