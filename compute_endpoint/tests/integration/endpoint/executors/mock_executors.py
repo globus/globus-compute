@@ -31,4 +31,5 @@ class MockExecutor(unittest.mock.Mock):
         task: Task = messagepack.unpack(packed_task)
         res = Result(task_id=task_id, data=task.task_buffer)
         packed_result = messagepack.pack(res)
-        self.results_passthrough.put(packed_result)
+        msg = {"task_id": str(task_id), "message": packed_result}
+        self.results_passthrough.put(msg)

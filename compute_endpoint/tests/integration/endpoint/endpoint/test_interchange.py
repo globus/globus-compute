@@ -200,7 +200,8 @@ def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt):
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
     )
     result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
-    ei.results_passthrough.put(pack(result))
+    msg = {"task_id": str(result.task_id), "message": pack(result)}
+    ei.results_passthrough.put(msg)
 
     ei._main_loop()
 
@@ -276,7 +277,8 @@ def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt):
 
     def insert_msg():
         result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
-        ei.results_passthrough.put(pack(result))
+        msg = {"task_id": str(result.task_id), "message": pack(result)}
+        ei.results_passthrough.put(msg)
         while True:
             yield
 
@@ -337,7 +339,7 @@ def test_faithfully_handles_status_report_messages(mocker, endpoint_uuid, random
         endpoint_id=endpoint_uuid, global_state={"sentinel": "foo"}, task_statuses=[]
     )
 
-    ei.results_passthrough.put(pack(status_report))
+    ei.results_passthrough.put({"message": pack(status_report)})
     t = threading.Thread(target=ei._main_loop, daemon=True)
     t.start()
 

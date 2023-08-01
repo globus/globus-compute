@@ -36,8 +36,9 @@ def test_status_reporting(
 
     # Confirm heartbeats in regular intervals
     for _i in range(3):
-        message = results_q.get(timeout=0.2)
-        assert isinstance(message, bytes)
+        q_msg = results_q.get(timeout=1)
+        assert isinstance(q_msg, dict)
 
+        message = q_msg["message"]
         report = messagepack.unpack(message)
         assert isinstance(report, EPStatusReport)

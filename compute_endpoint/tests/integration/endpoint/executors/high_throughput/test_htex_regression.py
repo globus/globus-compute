@@ -35,7 +35,7 @@ def test_engine_submit(engine):
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = engine.submit(task_id, task_message)
+    future = engine.submit(str(task_id), task_message)
     packed_result = future.result()
 
     # Confirm that the future got the right answer
@@ -46,11 +46,10 @@ def test_engine_submit(engine):
 
     # Confirm that the same result got back though the queue
     for _i in range(10):
-        packed_result_q = q.get(timeout=0.1)
-        assert isinstance(
-            packed_result_q, bytes
-        ), "Expected bytes from the passthrough_q"
+        q_msg = q.get(timeout=5)
+        assert isinstance(q_msg, dict)
 
+        packed_result_q = q_msg["message"]
         result = messagepack.unpack(packed_result_q)
         # Handle a sneaky EPStatusReport that popped in ahead of the result
         if isinstance(result, messagepack.message_types.EPStatusReport):
