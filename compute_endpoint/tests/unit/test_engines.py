@@ -97,7 +97,7 @@ def test_engine_submit_internal(
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = engine.submit(task_id, task_message)
+    future = engine.submit(str(task_id), task_message)
     packed_result = future.result()
 
     # Confirm that the future got the right answer
@@ -108,21 +108,22 @@ def test_engine_submit_internal(
 
     # Confirm that the same result got back though the queue
     for _i in range(3):
-        packed_result_q = q.get(timeout=0.1)
-        assert isinstance(
-            packed_result_q, bytes
-        ), "Expected bytes from the passthrough_q"
+        q_msg = q.get(timeout=0.1)
+        assert isinstance(q_msg, dict)
 
+        packed_result_q = q_msg["message"]
         result = messagepack.unpack(packed_result_q)
         # Handle a sneaky EPStatusReport that popped in ahead of the result
         if isinstance(result, messagepack.message_types.EPStatusReport):
             continue
 
+        passed_task_id = q_msg["task_id"]
         # At this point the message should be the result
         assert (
             packed_result == packed_result_q
         ), "Result from passthrough_q and future should match"
 
+        assert passed_task_id == str(task_id)
         assert result.task_id == task_id
         final_result = serializer.deserialize(result.data)
         assert final_result == 6, f"Expected 6, but got: {final_result}"
@@ -162,7 +163,7 @@ def test_gc_engine_system_failure(gc_engine: GlobusComputeEngine):
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = gc_engine.submit(task_id, task_message)
+    future = gc_engine.submit(str(task_id), task_message)
 
     assert isinstance(future, concurrent.futures.Future)
     # Trigger a failure from managers scaling in.
@@ -173,14 +174,15 @@ def test_gc_engine_system_failure(gc_engine: GlobusComputeEngine):
         future.result()
 
     for _i in range(10):
-        packed_result = q.get(timeout=1)
-        assert packed_result
+        q_msg = q.get(timeout=1)
+        assert q_msg
 
+        packed_result = q_msg["message"]
         result = messagepack.unpack(packed_result)
         if isinstance(result, messagepack.message_types.EPStatusReport):
             continue
-        else:
-            assert result.task_id == task_id
-            assert result.error_details
-            assert "ManagerLost" in result.data
-            break
+
+        assert result.task_id == task_id
+        assert result.error_details
+        assert "ManagerLost" in result.data
+        break

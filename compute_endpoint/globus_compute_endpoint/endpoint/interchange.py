@@ -19,7 +19,7 @@ from multiprocessing.synchronize import Event as EventType
 import globus_compute_endpoint.endpoint.config
 import pika.exceptions
 import setproctitle
-from globus_compute_common.messagepack import InvalidMessageError, pack, unpack
+from globus_compute_common.messagepack import InvalidMessageError, pack
 from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     Result,
@@ -370,8 +370,8 @@ class EndpointInterchange:
                     try:
                         prop_headers, body = self.pending_task_queue.get(timeout=1)
 
-                        fid = prop_headers.get("function_uuid")
-                        tid = prop_headers.get("task_uuid")
+                        fid: str = prop_headers.get("function_uuid")
+                        tid: str = prop_headers.get("task_uuid")
                         if not fid or not tid:
                             raise InvalidMessageError("Task message missing headers")
 
@@ -432,8 +432,9 @@ class EndpointInterchange:
                 nonlocal num_results_forwarded
                 while not self._quiesce_event.is_set():
                     try:
-                        packed_message = self.results_passthrough.get(timeout=1)
-                        unpacked_message = unpack(packed_message)
+                        msg = self.results_passthrough.get(timeout=1)
+                        packed_message: bytes = msg["message"]
+                        task_id: str | None = msg.get("task_id")
 
                     except queue.Empty:
                         # Empty queue!  Let's see if we have any prior results to send
@@ -441,14 +442,13 @@ class EndpointInterchange:
 
                     except Exception as exc:
                         log.warning(
-                            f"Invalid message received: no task_id.  Ignoring. {exc}"
+                            "Invalid message received.  Ignoring."
+                            f"  ([{type(exc).__name__}] {exc})"
                         )
                         continue
 
-                    task_id = None
-                    if isinstance(unpacked_message, Result):
+                    if task_id:
                         num_results_forwarded += 1
-                        task_id = unpacked_message.task_id
                         log.debug("Forwarding result for task: %s", task_id)
 
                     try:

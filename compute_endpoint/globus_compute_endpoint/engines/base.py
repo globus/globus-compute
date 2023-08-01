@@ -90,7 +90,9 @@ class GlobusComputeEngineBase(ABC):
         self.run_dir: t.Optional[str] = None
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
-        self.results_passthrough: queue.Queue = queue.Queue()
+        self.results_passthrough: queue.Queue[
+            dict[str, bytes | str | None]
+        ] = queue.Queue()
 
     @abstractmethod
     def start(
@@ -104,10 +106,10 @@ class GlobusComputeEngineBase(ABC):
     def get_status_report(self) -> EPStatusReport:
         raise NotImplementedError
 
-    def report_status(self):
+    def report_status(self) -> None:
         status_report = self.get_status_report()
-        packed_status = messagepack.pack(status_report)
-        self.results_passthrough.put(packed_status)
+        packed: bytes = messagepack.pack(status_report)
+        self.results_passthrough.put({"message": packed})
 
     def _status_report(
         self, shutdown_event: threading.Event, heartbeat_period_s: float
@@ -115,9 +117,9 @@ class GlobusComputeEngineBase(ABC):
         while not shutdown_event.wait(timeout=heartbeat_period_s):
             status_report = self.get_status_report()
             packed = messagepack.pack(status_report)
-            self.results_passthrough.put(packed)
+            self.results_passthrough.put({"message": packed})
 
-    def _setup_future_done_callback(self, task_id: uuid.UUID, future: Future) -> None:
+    def _setup_future_done_callback(self, task_id: str, future: Future) -> None:
         """
         Set up the done() callback for the provided future.
 
@@ -151,11 +153,11 @@ class GlobusComputeEngineBase(ABC):
                     error_details=error_details,
                     task_statuses=[exec_beg, exec_end],  # only transition info we have
                 )
-                packed_result = messagepack.pack(Result(**result_message))
+                packed = messagepack.pack(Result(**result_message))
             else:
-                packed_result = f.result()
+                packed = f.result()
 
-            self.results_passthrough.put(packed_result)
+            self.results_passthrough.put({"task_id": task_id, "message": packed})
 
         future.add_done_callback(_done_cb)
 
@@ -169,7 +171,7 @@ class GlobusComputeEngineBase(ABC):
         """Subclass should use the internal execution system to implement this"""
         raise NotImplementedError()
 
-    def submit(self, task_id: uuid.UUID, packed_task: bytes) -> Future:
+    def submit(self, task_id: str, packed_task: bytes) -> Future:
         """GC Endpoints should submit tasks via this method so that tasks are
         tracked properly.
         Parameters

@@ -539,7 +539,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                     if self.passthrough:
                         external_ep_status = convert_ep_status_report(msgs)
                         self.results_passthrough.put(
-                            messagepack.pack(external_ep_status)
+                            {"message": messagepack.pack(external_ep_status)}
                         )
 
                 else:
@@ -593,7 +593,11 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                             # identifiers for other message types
                             sent_task_id = tid if isinstance(tid, str) else None
                             packed_result = self._convert_result_to_outgoing(msg)
-                            self.results_passthrough.put(packed_result)
+                            task_result = {
+                                "task_id": sent_task_id,
+                                "message": packed_result,
+                            }
+                            self.results_passthrough.put(task_result)
                             self.tasks[sent_task_id].set_result(packed_result)
                             continue
 
@@ -705,7 +709,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
     def _submit(self, func: t.Callable, *args: t.Any, **kwargs: t.Any) -> Future:
         raise RuntimeError("Invalid attempt to _submit()")
 
-    def submit(self, task_id: uuid.UUID, packed_task: bytes) -> HTEXFuture:
+    def submit(self, task_id: str, packed_task: bytes) -> HTEXFuture:
         """Submits a messagepacked.Task for execution
 
         Parameters
@@ -722,12 +726,11 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
         self._task_counter += 1
 
-        task_id_str = str(task_id)
-        future = HTEXFuture(self, task_id_str)
-        self.tasks[task_id_str] = future
+        future = HTEXFuture(self, task_id)
+        self.tasks[task_id] = future
 
         ser = serializer.serialize((execute_task, [task_id, packed_task], {}))
-        payload = Task(task_id_str, "RAW", ser).pack()
+        payload = Task(task_id, "RAW", ser).pack()
         assert self.outgoing_q  # Placate mypy
         self.outgoing_q.put(payload)
 
