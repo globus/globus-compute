@@ -14,6 +14,7 @@ from globus_compute_endpoint.exception_handling import (
 )
 from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
 from globus_compute_sdk.errors import MaxResultSizeExceeded
+from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.app.python import timeout
 
@@ -46,6 +47,7 @@ def execute_task(
         uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
     ]
 
+    env_details = get_env_details()
     try:
         _task, task_buffer = _unpack_messagebody(task_body)
         log.debug("executing task task_id='%s'", task_id)
@@ -63,6 +65,8 @@ def execute_task(
             exception=get_error_string(),
             error_details=error_details,
         )
+
+    result_message["details"] = env_details
 
     exec_end = TaskTransition(
         timestamp=time.time_ns(),

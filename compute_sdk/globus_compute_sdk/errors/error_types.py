@@ -61,10 +61,16 @@ class TaskExecutionFailed(Exception):
     Error result from the remote end, wrapped as an exception object
     """
 
-    def __init__(self, remote_data: str, completion_t: str | None = None):
+    def __init__(
+        self,
+        remote_data: str,
+        completion_t: str | None = None,
+        task_details: dict | None = None,
+    ):
         self.remote_data = remote_data
+        self.task_details = task_details
         # Fill in completion time if missing
         self.completion_t = completion_t or str(time.time())
 
     def __str__(self) -> str:
-        return "\n" + textwrap.indent(self.remote_data, "    ")
+        return "\n" + textwrap.indent(self.remote_data, " ")

@@ -13,6 +13,7 @@ from globus_compute_sdk.errors import (
     TaskPending,
 )
 from globus_compute_sdk.sdk._environments import get_web_service_url
+from globus_compute_sdk.sdk.utils import check_version
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
@@ -164,7 +165,22 @@ class Client:
         """Remove credentials from your local system"""
         self.login_manager.logout()
 
-    def _update_task_table(self, return_msg: str | t.Dict, task_id: str):
+    @staticmethod
+    def _log_version_mismatch(worker_details: dict | None):
+        """
+        If worker environment details was returned from the endpoint
+        and an exception was encountered, we will log/print to console
+        the mismatch information
+        """
+        check_result = check_version(worker_details)
+        if check_result is not None:
+            logger.warning(check_result)
+
+    def _update_task_table(
+        self,
+        return_msg: str | t.Dict,
+        task_id: str,
+    ):
         """
         Parses the return message from the service and updates the
         internal _task_status_table
@@ -185,6 +201,8 @@ class Client:
         r_status = r_dict.get("status", "unknown").lower()
         pending = r_status not in ("success", "failed")
         status = {"pending": pending, "status": r_status}
+        if "details" in r_dict:
+            status["details"] = r_dict["details"]
 
         if not pending:
             # We are tolerant on the other fields but task_id should be there
@@ -200,10 +218,12 @@ class Client:
                 try:
                     r_obj = self.fx_serializer.deserialize(r_dict["result"])
                 except Exception:
+                    self._log_version_mismatch(r_dict.get("details"))
                     raise SerializationError("Result Object Deserialization")
                 else:
                     status.update({"result": r_obj, "completion_t": completion_t})
             elif "exception" in r_dict:
+                self._log_version_mismatch(r_dict.get("details"))
                 raise TaskExecutionFailed(r_dict["exception"], completion_t)
             else:
                 raise NotImplementedError("unreachable")
@@ -231,8 +251,7 @@ class Client:
 
         r = self.web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
-        rets = self._update_task_table(r.text, task_id)
-        return rets
+        return self._update_task_table(r.text, task_id)
 
     @requires_login
     def get_result(self, task_id):
