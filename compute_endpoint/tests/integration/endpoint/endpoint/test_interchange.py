@@ -7,6 +7,7 @@ import uuid
 import pytest
 from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
+from globus_compute_endpoint import engines
 from globus_compute_endpoint.cli import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
@@ -33,7 +34,7 @@ def mock_spt(mocker):
     yield mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
 
 
-def test_endpoint_id(funcx_dir):
+def test_endpoint_id_conveyed_to_executor(funcx_dir):
     manager = Endpoint()
     config_dir = funcx_dir / "mock_endpoint"
 
@@ -47,14 +48,16 @@ def test_endpoint_id(funcx_dir):
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         endpoint_id="mock_endpoint_id",
     )
-    ic.start()
+    ic.executor = engines.ThreadPoolEngine()  # test does not need a child process
+    ic.start_engine()
     assert ic.executor.endpoint_id == "mock_endpoint_id"
+    ic.executor.shutdown()
 
 
-def test_start_requires_pre_registered(funcx_dir):
+def test_start_requires_pre_registered(mocker, funcx_dir):
     with pytest.raises(TypeError):
         EndpointInterchange(
-            config=Config(),
+            config=Config(executors=[mocker.Mock()]),
             reg_info=None,
             endpoint_id="mock_endpoint_id",
         )
