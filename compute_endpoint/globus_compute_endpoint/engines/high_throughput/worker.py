@@ -20,6 +20,7 @@ from globus_compute_endpoint.exception_handling import (
     get_result_error_details,
 )
 from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.serialize import ComputeSerializer
 
 log = logging.getLogger(__name__)
@@ -129,6 +130,7 @@ class Worker:
                 code=code,
                 user_message=user_message,
             ),
+            details=get_env_details(),
         )
         return messagepack.pack(outgoing_result)
 

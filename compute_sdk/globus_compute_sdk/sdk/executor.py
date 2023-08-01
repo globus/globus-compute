@@ -1208,7 +1208,9 @@ class _ResultWatcher(threading.Thread):
         message to AMQP service -- the responsibility to handle invalid messages
         is not with this class.
         """
-        msg_id: int = basic_deliver.delivery_tag
+        msg_id: int = 0  # TODO throw an exception if this is missing?
+        if basic_deliver.delivery_tag is not None:
+            msg_id = basic_deliver.delivery_tag
         log.debug("Received message %s: [%s] %s", msg_id, props, body)
 
         try:

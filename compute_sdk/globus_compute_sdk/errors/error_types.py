@@ -67,4 +67,4 @@ class TaskExecutionFailed(Exception):
         self.completion_t = completion_t or str(time.time())
 
     def __str__(self) -> str:
-        return "\n" + textwrap.indent(self.remote_data, "    ")
+        return "\n" + textwrap.indent(self.remote_data, " ")
