@@ -97,8 +97,7 @@ def _read_config_yaml(config_path: pathlib.Path) -> str:
     endpoint_name = endpoint_dir.name
 
     try:
-        with open(config_path) as f:
-            return f.read()
+        return config_path.read_text()
     except FileNotFoundError as err:
         if endpoint_dir.exists():
             msg = (
