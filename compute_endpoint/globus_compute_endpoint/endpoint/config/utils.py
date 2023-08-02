@@ -93,31 +93,7 @@ def _load_config_py(conf_path: pathlib.Path) -> Config | None:
 
 
 def _read_config_yaml(config_path: pathlib.Path) -> str:
-    endpoint_dir = config_path.parent
-    endpoint_name = endpoint_dir.name
-
-    try:
-        return config_path.read_text()
-    except FileNotFoundError as err:
-        if endpoint_dir.exists():
-            msg = (
-                f"{err}"
-                "\n\nUnable to find required configuration file; has the configuration"
-                "\ndirectory been corrupted?"
-            )
-        else:
-            configure_command = "globus-compute-endpoint configure"
-            if endpoint_name != "default":
-                configure_command += f" {endpoint_name}"
-            msg = (
-                f"{err}"
-                f"\n\nEndpoint '{endpoint_name}' is not configured!"
-                "\n1. Please create a configuration template with:"
-                f"\n\t{configure_command}"
-                "\n2. Update the configuration"
-                "\n3. Start the endpoint\n"
-            )
-        raise ClickException(msg) from err
+    return config_path.read_text()
 
 
 def load_config_yaml(config_str: str) -> Config:
@@ -159,7 +135,31 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
         # an exception will be raised
         return config
 
-    config_str = _read_config_yaml(config_yaml_path)
+    try:
+        config_str = _read_config_yaml(config_yaml_path)
+    except FileNotFoundError as err:
+        endpoint_name = endpoint_dir.name
+
+        if endpoint_dir.exists():
+            msg = (
+                f"{err}"
+                "\n\nUnable to find required configuration file; has the configuration"
+                "\ndirectory been corrupted?"
+            )
+        else:
+            configure_command = "globus-compute-endpoint configure"
+            if endpoint_name != "default":
+                configure_command += f" {endpoint_name}"
+            msg = (
+                f"{err}"
+                f"\n\nEndpoint '{endpoint_name}' is not configured!"
+                "\n1. Please create a configuration template with:"
+                f"\n\t{configure_command}"
+                "\n2. Update the configuration"
+                "\n3. Start the endpoint\n"
+            )
+        raise ClickException(msg) from err
+
     config = load_config_yaml(config_str)
     return config
 
