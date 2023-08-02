@@ -142,7 +142,7 @@ def test_die_with_parent_refuses_to_start_if_not_parent(mocker):
 def test_die_with_parent_goes_away_if_parent_dies(mocker):
     ppid = os.getppid()
 
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
     mocker.patch(f"{_MOCK_BASE}time.sleep")
     mock_ppid = mocker.patch(f"{_MOCK_BASE}os.getppid")
     mock_ppid.side_effect = (ppid, 1)
@@ -164,7 +164,7 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker):
 
 def test_no_idle_if_not_configured(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
@@ -187,7 +187,7 @@ def test_no_idle_if_not_configured(mocker, endpoint_uuid, mock_spt):
 
 def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
@@ -225,7 +225,7 @@ def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt):
 
 def test_hard_idle_honored(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
@@ -261,7 +261,7 @@ def test_hard_idle_honored(mocker, endpoint_uuid, mock_spt):
 
 def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher")
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
@@ -298,7 +298,7 @@ def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt):
 
 def test_sends_final_status_message_on_shutdown(mocker, endpoint_uuid):
     mock_rqp = mocker.MagicMock()
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_rqp)
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
@@ -323,7 +323,7 @@ def test_sends_final_status_message_on_shutdown(mocker, endpoint_uuid):
 
 def test_faithfully_handles_status_report_messages(mocker, endpoint_uuid, randomstring):
     mock_rqp = mocker.MagicMock()
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_rqp)
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],

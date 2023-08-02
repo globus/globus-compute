@@ -1,7 +1,5 @@
-import time
 from urllib import parse
 
-import pika
 import pytest
 
 
@@ -25,24 +23,16 @@ def test_no_heartbeat(
     result_pub = start_result_q_publisher(override_params=q_info)
 
     # simply ensure no crash between two message sends
-    result_pub.publish(b"Hello test_no_heartbeat: 1")
-    time.sleep(5)
-    result_pub.publish(b"Hello test_no_heartbeat: 2")
-
-
-def test_fail_after_manual_close(start_result_q_publisher):
-    """Confirm that result_q_publisher raises an error following a manual conn close"""
-    result_pub = start_result_q_publisher()
-
-    result_pub.publish(b"Hello")
-    result_pub.close()
-    with pytest.raises(pika.exceptions.ChannelWrongStateError):
-        result_pub.publish(b"Hello test_fail_after_manual_close")
+    f = result_pub.publish(b"Hello test_no_heartbeat: 1")
+    f.result(timeout=5)
+    f = result_pub.publish(b"Hello test_no_heartbeat: 2")
+    f.result(timeout=5)
 
 
 def test_reconnect_after_disconnect(start_result_q_publisher):
-    result_pub = start_result_q_publisher()
-    result_pub.publish(b"Hello test_reconnect_after_disconnect: 1")
-    result_pub.close()
-    result_pub.connect()
-    result_pub.publish(b"Hello test_reconnect_after_disconnect: 2")
+    rp = start_result_q_publisher()
+    f = rp.publish(b"Hello test_reconnect_after_disconnect: before")
+    f.result(timeout=5)
+    rp._mq_chan.close()
+    f = rp.publish(b"Hello test_reconnect_after_disconnect: afterward")
+    f.result(timeout=5)

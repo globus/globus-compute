@@ -10,6 +10,7 @@ import signal
 import sys
 import threading
 import time
+from concurrent.futures import Future
 
 # multiprocessing.Event is a method, not a class
 # to annotate, we need the "real" class
@@ -27,7 +28,7 @@ from globus_compute_common.messagepack.message_types import (
 )
 from globus_compute_endpoint import __version__ as funcx_endpoint_version
 from globus_compute_endpoint.endpoint.rabbit_mq import (
-    ResultQueuePublisher,
+    ResultPublisher,
     TaskQueueSubscriber,
 )
 from globus_compute_endpoint.endpoint.result_store import ResultStore
@@ -329,263 +330,282 @@ class EndpointInterchange:
         """
         log.debug("_main_loop begins")
 
-        results_publisher = ResultQueuePublisher(queue_info=self.result_q_info)
+        results_publisher = ResultPublisher(queue_info=self.result_q_info)
+        results_publisher.start()
 
-        with results_publisher:
-            executor = self.executor
+        executor = self.executor
 
-            num_tasks_forwarded = 0
-            num_results_forwarded = 0
+        num_tasks_forwarded = 0
+        num_results_forwarded = 0
 
-            def process_stored_results():
-                # Handle any previously stored results, either from a previous run or
-                # from a quarter of a second-ago.  Basically, check every second
-                # (.wait()) if there are any items on disk to be sent.  If there are,
-                # don't treat them any differently than "fresh" results: put the into
-                # the same multiprocessing queue as results incoming directly from
-                # the executors.  The normal processing by `process_pending_results()`
-                # will take over from there.
-                while not self._quiesce_event.wait(timeout=1):
-                    for task_id, packed_result in self.result_store:
-                        if self._quiesce_event.is_set():
-                            # important to check every iteration as well, so as not to
-                            # potentially hang up the shutdown procedure
-                            return
-                        log.debug("Retrieved stored result (%s)", task_id)
-                        msg = {"task_id": task_id, "message": packed_result}
-                        self.result_store.discard(task_id)
-                        self.results_passthrough.put(msg)
-                log.debug("Exit process-stored-results thread.")
+        def process_stored_results():
+            # Handle any previously stored results, either from a previous run or
+            # from a quarter of a second-ago.  Basically, check every second
+            # (.wait()) if there are any items on disk to be sent.  If there are,
+            # don't treat them any differently than "fresh" results: put the into
+            # the same multiprocessing queue as results incoming directly from
+            # the executors.  The normal processing by `process_pending_results()`
+            # will take over from there.
+            while not self._quiesce_event.wait(timeout=1):
+                for task_id, packed_result in self.result_store:
+                    log.debug("Retrieved stored result (%s)", task_id)
+                    msg = {"task_id": task_id, "message": packed_result}
+                    self.result_store.discard(task_id)
+                    self.results_passthrough.put(msg)
 
-            def process_pending_tasks():
-                # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
-                # globus-compute-manager.  In terms of shutting down (or "rebooting")
-                # gracefully, iterate once a second whether or not a task has arrived.
-                nonlocal num_tasks_forwarded
-                while not self._quiesce_event.is_set():
-                    if self.time_to_quit:
-                        self.stop()
-                        continue  # nominally == break; but let event do it
+                    if self._quiesce_event.is_set():
+                        # important to check every iteration as well, so as not to
+                        # potentially hang up the shutdown procedure
+                        return
+            log.debug("Exit process-stored-results thread.")
 
-                    try:
-                        prop_headers, body = self.pending_task_queue.get(timeout=1)
+        def process_pending_tasks():
+            # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
+            # globus-compute-manager.  In terms of shutting down (or "rebooting")
+            # gracefully, iterate once a second whether a task has arrived.
+            nonlocal num_tasks_forwarded
+            while not self._quiesce_event.is_set():
+                if self.time_to_quit:
+                    self.stop()
+                    continue  # nominally == break; but let event do it
 
-                        fid: str = prop_headers.get("function_uuid")
-                        tid: str = prop_headers.get("task_uuid")
-                        if not fid or not tid:
-                            raise InvalidMessageError("Task message missing headers")
+                try:
+                    prop_headers, body = self.pending_task_queue.get(timeout=1)
 
-                        if fid and not self.function_allowed(fid):
-                            # Same as web-service message but packed in a
-                            # result error
-                            reject_msg = (
-                                f"Function {fid} not permitted on "
-                                f"endpoint {self.endpoint_id}"
-                            )
-                            log.warning(reject_msg)
+                    fid: str = prop_headers.get("function_uuid")
+                    tid: str = prop_headers.get("task_uuid")
+                    if not fid or not tid:
+                        raise InvalidMessageError("Task message missing headers")
 
-                            failed_result = Result(
-                                task_id=tid,
-                                data=reject_msg,
-                                error_details=ResultErrorDetails(
-                                    code="FUNCTION_NOT_ALLOWED", user_message=reject_msg
-                                ),
-                            )
-                            results_publisher.publish(pack(failed_result))
-                            continue
+                    if fid and not self.function_allowed(fid):
+                        # Same as web-service message but packed in a
+                        # result error
+                        reject_msg = (
+                            f"Function {fid} not permitted on "
+                            f"endpoint {self.endpoint_id}"
+                        )
+                        log.warning(reject_msg)
 
-                    except queue.Empty:
-                        continue
-
-                    except Exception:
-                        log.exception("Unhandled error processing incoming task")
-                        continue
-
-                    try:
-                        executor.submit(task_id=tid, packed_task=body)
-                        num_tasks_forwarded += 1  # Safe given GIL
-
-                    except Exception as exc:
-                        log.exception(f"Failed to process task {tid}")
-                        code, msg = get_result_error_details()
                         failed_result = Result(
                             task_id=tid,
-                            data=f"Failed to start task: {exc}",
+                            data=reject_msg,
                             error_details=ResultErrorDetails(
-                                code=code, user_message=msg
+                                code="FUNCTION_NOT_ALLOWED", user_message=reject_msg
                             ),
-                            task_statuses=[],
                         )
-                        res = {
-                            "task_id": tid,
-                            "message": pack(failed_result),
-                        }
-                        self.results_passthrough.put(res)
-
-                log.debug("Exit process-pending-tasks thread.")
-
-            def process_pending_results():
-                # Forward incoming results from the globus-compute-manager to the
-                # Globus Compute services. For graceful handling of shutdown
-                # (or "reboot"), wait up to a second or incoming results before
-                # iterating the loop regardless.
-                nonlocal num_results_forwarded
-                while not self._quiesce_event.is_set():
-                    try:
-                        msg = self.results_passthrough.get(timeout=1)
-                        packed_message: bytes = msg["message"]
-                        task_id: str | None = msg.get("task_id")
-
-                    except queue.Empty:
-                        # Empty queue!  Let's see if we have any prior results to send
+                        results_publisher.publish(pack(failed_result))
                         continue
 
-                    except Exception as exc:
-                        log.warning(
-                            "Invalid message received.  Ignoring."
-                            f"  ([{type(exc).__name__}] {exc})"
-                        )
-                        continue
-
-                    if task_id:
-                        num_results_forwarded += 1
-                        log.debug("Forwarding result for task: %s", task_id)
-
-                    try:
-                        results_publisher.publish(packed_message)
-
-                    except Exception:
-                        # Publishing didn't work -- quiesce and see if a simple restart
-                        # fixes the issue.
-                        self._quiesce_event.set()
-
-                        log.exception("Something broke while forwarding results")
-                        if task_id:
-                            log.info("Storing result for later: %s", task_id)
-                            self.result_store[task_id] = packed_message
-                        continue  # just be explicit
-
-                log.debug("Exit process-pending-results thread.")
-
-            stored_processor_thread = threading.Thread(
-                target=process_stored_results, name="Stored Result Handler"
-            )
-            task_processor_thread = threading.Thread(
-                target=process_pending_tasks, name="Pending Task Handler"
-            )
-            result_processor_thread = threading.Thread(
-                target=process_pending_results, name="Pending Result Handler"
-            )
-            stored_processor_thread.start()
-            task_processor_thread.start()
-            result_processor_thread.start()
-
-            last_t, last_r = 0, 0
-
-            soft_idle_limit = max(0, self.config.idle_heartbeats_soft)
-            hard_idle_limit = max(soft_idle_limit + 1, self.config.idle_heartbeats_hard)
-            soft_idle_heartbeats = 0  # "happy path" idle timeout
-            hard_idle_heartbeats = 0  # catch-all idle timeout
-
-            live_proc_title = setproctitle.getproctitle()
-            log.debug("_main_loop entered running state")
-            while not self._quiesce_event.wait(self.heartbeat_period):
-                # Possibly TOCTOU here, but we don't need to be super precise.  The
-                # point here is to mention "still alive" and that we're still working
-                num_t, num_r = num_tasks_forwarded, num_results_forwarded
-                diff_t, diff_r = num_t - last_t, num_r - last_r
-                log.debug(
-                    "Heartbeat.  Approximate Tasks and Results forwarded since last "
-                    "heartbeat: %s (T), %s (R)",
-                    diff_t,
-                    diff_r,
-                )
-                last_t, last_r = num_t, num_r
-
-                # only reset come heartbeat and still alive
-                self._reconnect_fail_counter = 0
-
-                if not soft_idle_limit:
-                    # idle timeout not enabled; "always on"
+                except queue.Empty:
                     continue
 
-                if diff_t or diff_r:
-                    # a task moved; reset idle heartbeat counter
-                    if soft_idle_heartbeats or hard_idle_heartbeats:
-                        log.info(
-                            "Moved to active state (due to tasks processed since"
-                            " last heartbeat)."
-                        )
-                    setproctitle.setproctitle(live_proc_title)
-                    soft_idle_heartbeats = 0
-                    hard_idle_heartbeats = 0
+                except Exception:
+                    log.exception("Unhandled error processing incoming task")
                     continue
 
-                # only start "timer" if we've at least done *some* work
-                hard_idle_heartbeats += 1
-                if (num_t or num_r) and num_r >= num_t:
-                    # similar to above, only start "timer" if *idle* ... but
-                    # note that given self.result_store, it's possible to
-                    # have forwarded more results than tasks received.
-                    soft_idle_heartbeats += 1
-                    shutdown_s = soft_idle_limit - soft_idle_heartbeats
-                    shutdown_s *= self.heartbeat_period
+                try:
+                    executor.submit(task_id=tid, packed_task=body)
+                    num_tasks_forwarded += 1  # Safe given GIL
 
-                    if soft_idle_heartbeats == 1:
-                        log.info(
-                            "In idle state (due to no task or result movement);"
-                            f" shut down in {shutdown_s:,}s.  (idle_heartbeats_soft)"
-                        )
-                    idle_proc_title = "[idle; shut down in {:,}s] {}"
-                    setproctitle.setproctitle(
-                        idle_proc_title.format(shutdown_s, live_proc_title)
+                except Exception as exc:
+                    log.exception(f"Failed to process task {tid}")
+                    code, msg = get_result_error_details()
+                    failed_result = Result(
+                        task_id=tid,
+                        data=f"Failed to start task: {exc}",
+                        error_details=ResultErrorDetails(code=code, user_message=msg),
+                        task_statuses=[],
                     )
+                    res = {
+                        "task_id": tid,
+                        "message": pack(failed_result),
+                    }
+                    self.results_passthrough.put(res)
 
-                    if soft_idle_heartbeats >= soft_idle_limit:
-                        log.info("Idle heartbeats reached.  Shutting down.")
-                        self.time_to_quit = True
-                        self.stop()
+            log.debug("Exit process-pending-tasks thread.")
 
-                elif hard_idle_heartbeats > hard_idle_limit:
-                    log.warning("Shutting down due to idle heartbeats HARD limit.")
+        def process_pending_results():
+            # Forward incoming results from the globus-compute-manager to the
+            # Globus Compute services. For graceful handling of shutdown
+            # (or "reboot"), wait up to a second or incoming results before
+            # iterating the loop regardless.
+            nonlocal num_results_forwarded
+
+            def _create_done_cb(mq_msg: bytes, tid: str | None):
+                def _done_cb(pub_fut: Future):
+                    _exc = pub_fut.exception()
+                    if _exc:
+                        # Publishing didn't work -- quiesce and see if a simple
+                        # restart fixes the issue.
+                        if tid:
+                            log.info(f"Storing result for later: {tid}")
+                            self.result_store[tid] = mq_msg
+
+                        self._quiesce_event.set()
+                        log.error("Failed to publish results", exc_info=_exc)
+
+                return _done_cb
+
+            while not self._quiesce_event.is_set():
+                try:
+                    msg = self.results_passthrough.get(timeout=1)
+                    packed_message: bytes = msg["message"]
+                    task_id: str | None = msg.get("task_id")
+
+                except queue.Empty:
+                    continue
+
+                except Exception as exc:
+                    log.warning(
+                        "Invalid message received.  Ignoring."
+                        f"  ([{type(exc).__name__}] {exc})"
+                    )
+                    continue
+
+                if task_id:
+                    num_results_forwarded += 1
+                    log.debug("Forwarding result for task: %s", task_id)
+
+                try:
+                    f = results_publisher.publish(packed_message)
+                    f.add_done_callback(_create_done_cb(packed_message, task_id))
+
+                except Exception:
+                    # Publishing didn't work -- quiesce and see if a simple restart
+                    # fixes the issue.
+                    self._quiesce_event.set()
+
+                    log.exception("Something broke while forwarding results")
+                    if task_id:
+                        log.info("Storing result for later: %s", task_id)
+                        self.result_store[task_id] = packed_message
+                    continue  # just be explicit
+
+            log.debug("Exit process-pending-results thread.")
+
+        stored_processor_thread = threading.Thread(
+            target=process_stored_results, name="Stored Result Handler"
+        )
+        task_processor_thread = threading.Thread(
+            target=process_pending_tasks, name="Pending Task Handler"
+        )
+        result_processor_thread = threading.Thread(
+            target=process_pending_results, name="Pending Result Handler"
+        )
+        stored_processor_thread.start()
+        task_processor_thread.start()
+        result_processor_thread.start()
+
+        last_t, last_r = 0, 0
+
+        soft_idle_limit = max(0, self.config.idle_heartbeats_soft)
+        hard_idle_limit = max(soft_idle_limit + 1, self.config.idle_heartbeats_hard)
+        soft_idle_heartbeats = 0  # "happy path" idle timeout
+        hard_idle_heartbeats = 0  # catch-all idle timeout
+
+        live_proc_title = setproctitle.getproctitle()
+        log.debug("_main_loop entered running state")
+        while not self._quiesce_event.wait(self.heartbeat_period):
+            # Possibly TOCTOU here, but we don't need to be super precise.  The
+            # point here is to mention "still alive" and that we're still working
+            num_t, num_r = num_tasks_forwarded, num_results_forwarded
+            diff_t, diff_r = num_t - last_t, num_r - last_r
+            log.debug(
+                "Heartbeat.  Approximate Tasks and Results forwarded since last "
+                "heartbeat: %s (T), %s (R)",
+                diff_t,
+                diff_r,
+            )
+            last_t, last_r = num_t, num_r
+
+            # only reset come heartbeat and still alive
+            self._reconnect_fail_counter = 0
+
+            if not soft_idle_limit:
+                # idle timeout not enabled; "always on"
+                continue
+
+            if diff_t or diff_r:
+                # a task moved; reset idle heartbeat counter
+                if soft_idle_heartbeats or hard_idle_heartbeats:
+                    log.info(
+                        "Moved to active state (due to tasks processed since"
+                        " last heartbeat)."
+                    )
+                setproctitle.setproctitle(live_proc_title)
+                soft_idle_heartbeats = 0
+                hard_idle_heartbeats = 0
+                continue
+
+            # only start "timer" if we've at least done *some* work
+            hard_idle_heartbeats += 1
+            if (num_t or num_r) and num_r >= num_t:
+                # similar to above, only start "timer" if *idle* ... but
+                # note that given self.result_store, it's possible to
+                # have forwarded more results than tasks received.
+                soft_idle_heartbeats += 1
+                shutdown_s = soft_idle_limit - soft_idle_heartbeats
+                shutdown_s *= self.heartbeat_period
+
+                if soft_idle_heartbeats == 1:
+                    log.info(
+                        "In idle state (due to no task or result movement);"
+                        f" shut down in {shutdown_s:,}s.  (idle_heartbeats_soft)"
+                    )
+                idle_proc_title = "[idle; shut down in {:,}s] {}"
+                setproctitle.setproctitle(
+                    idle_proc_title.format(shutdown_s, live_proc_title)
+                )
+
+                if soft_idle_heartbeats >= soft_idle_limit:
+                    log.info("Idle heartbeats reached.  Shutting down.")
                     self.time_to_quit = True
                     self.stop()
 
-                elif hard_idle_heartbeats > soft_idle_limit:
-                    shutdown_s = hard_idle_limit - hard_idle_heartbeats
-                    shutdown_s *= self.heartbeat_period
-                    if hard_idle_heartbeats == soft_idle_limit + 1:
-                        # only log the first time; no sense in filling logs
-                        log.info(
-                            "Possibly idle -- no task or result movement.  Will"
-                            f" shut down in {shutdown_s:,}s.  (idle_heartbeats_hard)"
-                        )
-                    idle_proc_title = "[possibly idle; shut down in {:,}s] {}"
-                    setproctitle.setproctitle(
-                        idle_proc_title.format(shutdown_s, live_proc_title)
+            elif hard_idle_heartbeats > hard_idle_limit:
+                log.warning("Shutting down due to idle heartbeats HARD limit.")
+                self.time_to_quit = True
+                self.stop()
+
+            elif hard_idle_heartbeats > soft_idle_limit:
+                # Reminder: this branch only hit if EP started and no tasks
+                # or results have moved.  If *any* movement occurs, this branch
+                # won't get executed.
+                shutdown_s = hard_idle_limit - hard_idle_heartbeats
+                shutdown_s *= self.heartbeat_period
+                if hard_idle_heartbeats == soft_idle_limit + 1:
+                    # only log the first time; no sense in filling logs
+                    log.info(
+                        "Possibly idle -- no task or result movement.  Will"
+                        f" shut down in {shutdown_s:,}s.  (idle_heartbeats_hard)"
                     )
+                idle_proc_title = "[possibly idle; shut down in {:,}s] {}"
+                setproctitle.setproctitle(
+                    idle_proc_title.format(shutdown_s, live_proc_title)
+                )
 
-            # The timeouts aren't nominally necessary because if the above loop has
-            # quit, then the _quiesce_event is set, and both threads check that event
-            # every internal iteration.  But "for kicks."
-            stored_processor_thread.join(timeout=5)
-            task_processor_thread.join(timeout=5)
-            result_processor_thread.join(timeout=5)
+        # The timeouts aren't nominally necessary because if the above loop has
+        # quit, then the _quiesce_event is set, and both threads check that event
+        # every internal iteration.  But "for kicks."
+        stored_processor_thread.join(timeout=5)
+        task_processor_thread.join(timeout=5)
+        result_processor_thread.join(timeout=5)
 
-            # let higher-level error handling take over if the following excepts
-            message = EPStatusReport(
-                endpoint_id=self.endpoint_id,
-                # 0 == "no more heartbeats coming"
-                global_state={
-                    "managers": 0,
-                    "total_workers": 0,
-                    "idle_workers": 0,
-                    "pending_tasks": 0,
-                    "outstanding_tasks": {},
-                    "heartbeat_period": 0,
-                },
-                task_statuses={},
-            )
-            results_publisher.publish(pack(message))
+        # let higher-level error handling take over if the following excepts
+        message = EPStatusReport(
+            endpoint_id=self.endpoint_id,
+            global_state={
+                "managers": 0,
+                "total_workers": 0,
+                "idle_workers": 0,
+                "pending_tasks": 0,
+                "outstanding_tasks": {},
+                "heartbeat_period": 0,  # 0 == "shutting down now"
+            },
+            task_statuses={},
+        )
+        f = results_publisher.publish(pack(message))
+        f.result(timeout=5)
+        results_publisher.stop()
 
-            log.debug("_main_loop exits")
+        log.debug("_main_loop exits")
