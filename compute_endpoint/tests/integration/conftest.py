@@ -15,7 +15,7 @@ import pika.exceptions
 import pytest
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
-    ResultQueuePublisher,
+    ResultPublisher,
     TaskQueueSubscriber,
 )
 from pika.exchange_type import ExchangeType
@@ -23,6 +23,7 @@ from tests.integration.test_rabbit_mq.result_queue_subscriber import (
     ResultQueueSubscriber,
 )
 from tests.integration.test_rabbit_mq.task_queue_publisher import TaskQueuePublisher
+from tests.utils import try_assert
 
 
 @pytest.fixture(scope="session")
@@ -247,7 +248,10 @@ def running_publishers(request):
     def cleanup():
         for x in run_list:
             if x.status is RabbitPublisherStatus.connected:
-                x.close()
+                if hasattr(x, "stop"):
+                    x.stop()  # ResultPublisher
+                else:
+                    x.close()  # TaskQueuePublisher (from tests)
 
     request.addfinalizer(cleanup)
     return run_list
@@ -275,10 +279,11 @@ def start_result_q_publisher(
             queue_opts = {"queue": queue_name, "durable": True}
             ensure_result_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
 
-        result_pub = ResultQueuePublisher(queue_info=q_info)
-        result_pub.connect()
+        result_pub = ResultPublisher(queue_info=q_info)
+        result_pub.start()
         if queue_purge:  # Make sure queue is empty
-            result_pub._channel.queue_purge(q_info["queue"])
+            try_assert(lambda: result_pub._mq_chan is not None)
+            result_pub._mq_chan.queue_purge(q_info["queue"])
         running_publishers.append(result_pub)
         return result_pub
 

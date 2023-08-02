@@ -6,6 +6,8 @@ import uuid
 import pika
 import pika.exceptions
 import pytest
+from globus_compute_endpoint.endpoint.rabbit_mq import ResultPublisher
+from tests.utils import try_assert
 
 
 def publish_messages(result_pub, count) -> None:
@@ -27,8 +29,9 @@ def test_result_queue_basic(start_result_q_publisher):
     """
     result_pub = start_result_q_publisher()
     publish_messages(result_pub, 10)
-    result_pub._channel.queue_purge("results")
-    result_pub.close()
+    try_assert(lambda: result_pub._mq_chan is not None, "Required for cleanup")
+    result_pub._mq_chan.queue_purge("results")
+    result_pub.stop()
 
 
 @pytest.mark.parametrize("size", [10, 2**10, 2**20, (2**20) * 10])
@@ -92,7 +95,7 @@ def test_publish_multiple_then_subscribe(
     ],
 )
 def test_broken_connection(
-    start_result_q_publisher, create_result_queue_info, conn_url, rabbitmq_conn_url
+    mocker, create_result_queue_info, conn_url, rabbitmq_conn_url
 ):
     """Test exception raised on connect with bad connection info"""
     vhost_path = rabbitmq_conn_url.rsplit(":", maxsplit=1)[-1].lstrip("0123456789")
@@ -113,8 +116,13 @@ def test_broken_connection(
 
     q_info = create_result_queue_info(connection_url=conn_url)
 
-    with pytest.raises(pika.exceptions.AMQPConnectionError):
-        start_result_q_publisher(override_params=q_info)
+    rp = ResultPublisher(queue_info=q_info)
+    mock_cb = mocker.patch.object(rp, "_on_open_failed")
+    try:
+        rp.start()
+        try_assert(lambda: mock_cb.called)
+    finally:
+        rp.stop()
 
 
 def test_disconnect_from_client_side(
@@ -126,10 +134,11 @@ def test_disconnect_from_client_side(
     """
 
     result_pub = start_result_q_publisher()
-    res = result_pub.publish(b"Hello test_disconnect_from_client_side 1")
-    assert res is None
+    f = result_pub.publish(b"Hello test_disconnect_from_client_side 1")
+    assert f.result(timeout=1) is None
 
-    result_pub.close()
+    result_pub.stop()
 
-    with pytest.raises(pika.exceptions.ChannelWrongStateError):
+    try_assert(lambda: not result_pub.is_alive(), "Verify test setup")
+    with pytest.raises(ValueError):
         result_pub.publish(b"Hello test_disconnect_from_client_side 2")
