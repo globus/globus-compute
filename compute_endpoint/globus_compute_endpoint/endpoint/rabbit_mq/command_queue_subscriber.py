@@ -9,6 +9,7 @@ import time
 import typing as t
 
 import pika
+from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 
 if t.TYPE_CHECKING:
     from pika.channel import Channel
@@ -239,7 +240,7 @@ class CommandQueueSubscriber(threading.Thread):
                 self,
                 d_tag,
                 properties.app_id,
-                body,
+                _redact_url_creds(body),
             )
             self._command_queue.put((d_tag, properties, body))
         except Exception:
