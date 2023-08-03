@@ -116,6 +116,30 @@ def test_on_message_puts_to_queue(randomstring):
     assert mock_q.put.call_args[0][0] == (bd.delivery_tag, props, body)
 
 
+def test_on_message_redacts_credentials(mocker, randomstring):
+    mock_dlog = mocker.patch(f"{_MOCK_BASE}log.debug")
+    mock_q = mock.Mock(spec=queue.SimpleQueue)
+    cq = cqs.CommandQueueSubscriber(
+        queue_info=None, command_queue=mock_q, stop_event=None
+    )
+    mock_chan = mock.Mock()
+    bd = Basic.Deliver(delivery_tag=random.randint(1, 1000))
+    props = BasicProperties()
+    uname, pword = randomstring(), randomstring()
+    body = f"amqps://{uname}:{pword}@somehost...".encode()
+    cq._on_message(mock_chan, bd, props, body)
+
+    assert mock_dlog.called
+    a, _k = mock_dlog.call_args
+    msg = a[0] % a[1:]
+    assert "Received message from" in msg
+    assert "amqps://" in msg
+    assert "@somehost" in msg
+    assert uname not in msg
+    assert pword not in msg
+    assert "***:***" in msg
+
+
 def test_on_message_gracefully_handles_garbled_packet(mocker):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     cq = cqs.CommandQueueSubscriber(
