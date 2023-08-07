@@ -13,11 +13,13 @@ import time
 import uuid
 from unittest import mock
 
+import jinja2
 import pika
 import pytest as pytest
 import responses
 import yaml
 from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config.utils import render_config_user_template
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_sdk import GlobusAPIError, NetworkError
@@ -930,3 +932,98 @@ def test_pipe_size_limit(mocker, successful_exec, conf_size):
     else:
         assert pyexc.value.code < 87
         assert f"{stdin_data_size} bytes" in mock_log.error.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        (True, {"heartbeat": 10}),
+        (True, {"heartbeat": 10, "foo": "bar"}),
+        (False, {}),
+        (False, {"foo": "bar"}),
+    ],
+)
+def test_render_config_user_template(fs, data):
+    is_valid, user_opts = data
+
+    ep_dir = pathlib.Path("my-ep")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = ep_dir / "config_user.yaml"
+    template.write_text("heartbeat_period: {{ heartbeat }}")
+
+    if is_valid:
+        rendered = render_config_user_template(ep_dir, user_opts)
+        rendered_dict = yaml.safe_load(rendered)
+        assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
+    else:
+        with pytest.raises(jinja2.exceptions.UndefinedError) as e:
+            render_config_user_template(ep_dir, user_opts)
+            assert "Missing required" in str(e)
+
+
+def test_render_config_user_template_escape_strings(fs):
+    ep_dir = pathlib.Path("my-ep")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = ep_dir / "config_user.yaml"
+    template.write_text(
+        """
+endpoint_setup: {{ setup }}
+engine:
+    type: {{ engine.type }}
+    accelerators:
+        {%- for a in engine.accelerators %}
+        - {{ a }}
+        {% endfor %}
+        """
+    )
+
+    user_opts = {
+        "setup": f"my-setup\nallowed_functions:\n    - {uuid.uuid4()}",
+        "engine": {
+            "type": "GlobusComputeEngine\n    task_status_queue: bad_boy_queue",
+            "accelerators": [f"{uuid.uuid4()}\n    mem_per_worker: 100"],
+        },
+    }
+    rendered = render_config_user_template(ep_dir, user_opts)
+    rendered_dict = yaml.safe_load(rendered)
+
+    assert len(rendered_dict) == 2
+    assert len(rendered_dict["engine"]) == 2
+    assert rendered_dict["endpoint_setup"] == user_opts["setup"]
+    assert rendered_dict["engine"]["type"] == user_opts["engine"]["type"]
+    assert (
+        rendered_dict["engine"]["accelerators"] == user_opts["engine"]["accelerators"]
+    )
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        (True, 10),
+        (True, "bar"),
+        (True, 10.0),
+        (True, ["bar", 10]),
+        (True, {"bar": 10}),
+        (False, ("bar", 10)),
+        (False, {"bar", 10}),
+        (False, str),
+        (False, Exception),
+        (False, locals),
+    ],
+)
+def test_render_config_user_template_option_types(fs, data):
+    is_valid, val = data
+
+    ep_dir = pathlib.Path("my-ep")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = ep_dir / "config_user.yaml"
+    template.write_text("foo: {{ foo }}")
+
+    user_opts = {"foo": val}
+
+    if is_valid:
+        render_config_user_template(ep_dir, user_opts)
+    else:
+        with pytest.raises(ValueError) as pyt_exc:
+            render_config_user_template(ep_dir, user_opts)
+        assert "not a valid user option type" in str(pyt_exc.exconly)
