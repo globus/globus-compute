@@ -1,261 +1,240 @@
 Globus Compute Tutorial
 =======================
 
-Globus Compute is a Function-as-a-Service (FaaS) platform for science that enables you to register functions in a cloud-hosted service and then reliably execute those functions on a remote Globus Compute endpoint.
-This tutorial is configured to use a tutorial endpoint hosted by the Globus Compute Team.
+Globus Compute is a Function-as-a-Service (FaaS) platform that enables
+fire-and-forget execution of Python functions on one or more remote
+Globus Compute endpoints.
 
-You can setup and use your own endpoint by following the `endpoint documentation <https://funcx.readthedocs.io/en/latest/endpoints.html>`_.
+This tutorial is configured to use a tutorial endpoint hosted by the
+Globus Compute team. You can setup your own endpoint on resources to
+which you have access by following the `Globus Compute
+documentation <https://globus-compute.readthedocs.io/en/latest/endpoints.html>`__.
+Globus Compute endpoints can be deployed on many cloud platforms,
+clusters with batch schedulers (e.g., Slurm, PBS), Kubernetes, or on a
+local PC. After configuring an endpoint you can use it in this tutorial
+by simply setting the ``endpoint_id`` below.
 
 Globus Compute Python SDK
 -------------------------
 
-The Globus Compute Python SDK provides programming abstractions for interacting with the Globus Compute service. Before running this tutorial you should first install the Globus Compute SDK in its own `venv <https://docs.python.org/3/tutorial/venv.html>`_ environment:
+The Globus Compute Python SDK provides programming abstractions for
+interacting with the Globus Compute service. Before running this
+tutorial you should first install the Globus Compute SDK as follows:
 
-.. code-block:: bash
+::
 
-    $ python3 -m venv path/to/globus_compute_venv
-    $ source path/to/globus_compute_venv/bin/activate
-    (globus_compute_venv) $ python3 -m pip install globus-compute-sdk
+   $ pip install globus-compute-sdk
 
-The Globus Compute SDK exposes a ``Client`` object for all interactions with the Globus Compute service.
-In order to use the Globus Compute service you must first authenticate using one of hundreds of supported identity provides (e.g., your institution, ORCID, Google).
+The Globus Compute SDK exposes a ``Client`` and ``Executor`` for
+interacting with the Globus Compute service. In order to use Globus
+Compute, you must first authenticate using one of hundreds of supported
+identity provides (e.g., your institution, ORCID, or Google). As part of
+the authentication process you must grant permission for Globus Compute
+to access your identity information (to retrieve your email address) and
+Globus Groups management access (to share endpoints).
 
-As part of the authentication process you must grant permission for Globus Compute to access your identity information (to retrieve your email address), Globus Groups management access (to share functions and endpoints).
+.. code:: ipython3
 
-.. code-block:: python
-
-    from globus_compute_sdk import Client
-
-    gcc = Client()
-
-Basic Usage
------------
-
-The following example demonstrates how you can register and execute a function.
-
-Registering a Function
-~~~~~~~~~~~~~~~~~~~~~~
-
-Globus Compute works like any other FaaS platform, you must first register a function with Globus Compute before being able to execute it on a remote endpoint.
-The registration process will serialize the function body and store it securely in the Globus Compute service.
-As we will see below, you may share functions with others and discover functions shared with you.
-
-Upon registration Globus Compute will return a UUID for the function. This UUID can then be used to manage and invoke the function.
-
-.. code-block:: python
-
-    def hello_world():
-        return "Hello World!"
-
-    func_uuid = gcc.register_function(hello_world)
-    print(func_uuid)
+    from globus_compute_sdk import Executor
 
 
-Running a Function
-~~~~~~~~~~~~~~~~~~
+**Note**: Here we use the public Globus Compute tutorial endpoint.
+You can use this endpoint to run the tutorial (the endpoint is shared
+with all Globus Compute users). You can also change the
+``endpoint_id`` to the UUID of any endpoint for which you have
+permission to execute functions.
 
-To invoke a function, you must provide a) the function's UUID; and b) the ``endpoint_id`` of the endpoint on which you wish to execute that function.
-Note: here we use the public Globus Compute tutorial endpoint, you may change the ``endpoint_id`` to the UUID of any endpoint for which you have permission to execute functions.
-
-Globus Compute functions are designed to be executed remotely and asynchrously.
-To avoid synchronous invocation, the result of a function invocation (called a ``task``) is a UUID which may be introspected to monitor execution status and retrieve results.
-
-The Globus Compute service will manage the reliable execution of a task, for example by qeueing tasks when the endpoint is busy or offline and retrying tasks in case of node failures.
-
-.. code-block:: python
+.. code:: ipython3
 
     tutorial_endpoint = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
-    res = gcc.run(endpoint_id=tutorial_endpoint, function_id=func_uuid)
-    print(res)
 
-Retrieving Results
-~~~~~~~~~~~~~~~~~~
+.. code:: ipython3
 
-When the task has completed executing you can access the results via the Globus Compute client as follows.
+    gce = Executor(endpoint_id = tutorial_endpoint)
+    print("Executor : ", gce)
 
-.. code-block:: python
+Globus Compute 101
+==================
 
-    gcc.get_result(res)
+The following example demonstrates how you can execute a function with
+the ``Executor`` interface.
 
-Functions with Arguments
-~~~~~~~~~~~~~~~~~~~~~~~~
+Submitting a function
+~~~~~~~~~~~~~~~~~~~~~
 
-Globus Compute supports registration and invocation of functions with arbitrary arguments and returned parameters.
-Globus Compute will serialize any ``*args`` and ``**kwargs`` when invoking a function and it will serialize any return parameters or exceptions.
+To execute a function, you simply call ``submit`` and pass a reference
+to the function. Optionally, you may also specify any input arguments to
+the function.
 
-.. note::
+.. code:: ipython3
 
-    Globus Compute uses standard Python serilaization libraries (e.g., Pickle, Dill) it also limits the size of input arguments and returned parameters to 5MB.
+    # Define the function for remote execution
+    def hello_world():
+        return "Hello World!"
+    
+    future = gce.submit(hello_world)
+    
+    print("Submit returned: ", future)
 
-The following example shows a function that computes the sum of a list of input arguments.
-First we register the function as above.
+Getting results
+~~~~~~~~~~~~~~~
 
-.. code-block:: python
+When you ``submit`` a function for execution (called a ``task``), the
+executor will return an instance of ``ComputeFuture`` in lieu of the
+result from the function. Futures are a common way to reference
+asynchronous tasks, enabling you to interrogate the future to find the
+status, results, exceptions, etc. without blocking to wait for results.
 
-    def get_sum(items):
-        return sum(items)
+``ComputeFuture``\ s returned from the ``Executor`` can be used in the
+following ways: \* ``future.done()`` is a non-blocking call that returns
+a boolean that indicates whether the task is finished. \*
+``future.result()`` is a blocking call that returns the result from the
+task execution or raises an exception if task execution failed.
 
-    sum_function = gcc.register_function(get_sum)
+.. code:: ipython3
 
-When invoking the function you can pass in arguments like any other function, either by position or with keyword arguments.
+    # Returns a boolean that indicates task completion
+    future.done()
 
-.. code-block:: python
+.. code:: ipython3
 
-    items = [1, 2, 3, 4, 5]
+    # Waits for the function to complete and returns the task result or exception on failure
+    future.result()
 
-    res = gcc.run(items, endpoint_id=tutorial_endpoint, function_id=sum_function)
+Catching exceptions
+~~~~~~~~~~~~~~~~~~~
 
-    print (gcc.get_result(res))
+When a task fails and you try to get its result, the ``future`` will
+raise an exception. In the following example, the ``ZeroDivisionError``
+exception is raised when ``future.result()`` is called.
 
-Functions with Dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code:: ipython3
 
-Globus Compute requires that functions explictly state all dependencies within the function body.
-It also assumes that the dependent libraries are available on the endpoint in which the function will execute.
-For example, in the following function we import from ``datetime``:
+    def division_by_zero():
+        return 42 / 0 # This will raise a ZeroDivisionError
+    
+    future = gce.submit(division_by_zero)
+    
+    try:
+        future.result()
+    except Exception as exc:
+        print("Globus Compute returned an exception: ", exc)
 
-.. code-block:: python
+Functions with arguments
+------------------------
+
+Globus Compute supports registration and execution of functions with
+arbitrary arguments and returned parameters. Globus Compute will
+serialize any ``*args`` and ``**kwargs`` when executing a function and
+it will serialize any return parameters or exceptions.
+
+Note: Globus Compute uses standard Python serilaization libraries (i.e.,
+Dill). It also limits the size of input arguments and returned
+parameters to 10 MB. For larger input or output data we suggest using
+Globus.
+
+The following example shows a function that computes the sum of a list
+of input arguments.
+
+.. code:: ipython3
+
+    def get_sum(a, b):
+        return a + b
+    
+    future = gce.submit(get_sum, 40, 2)
+    print(f"40 + 2 = {future.result()}")
+
+Functions with dependencies
+---------------------------
+
+In order to execute a function on a remote endpoint, Globus Compute
+requires that functions explictly state all dependencies within the
+function body. It also requires that any dependencies (e.g., libraries,
+modules) are available on the endpoint on which the function will
+execute. For example, in the following function, we explicitly import
+the datetime module.
+
+.. code:: ipython3
 
     def get_date():
         from datetime import date
         return date.today()
+    
+    future = gce.submit(get_date)
+    
+    print("Date fetched from endpoint: ", future.result())
 
-    date_function = gcc.register_function(get_date)
+Calling external applications
+-----------------------------
 
-    res = gcc.run(endpoint_id=tutorial_endpoint, function_id=date_function)
+While Globus Compute is designed to execute Python functions, you can
+easily invoke external applications that are accessible on the remote
+endpoint. For example, the following function calls the Linux ``echo``
+command.
 
-    print (gcc.get_result(res))
-
-Calling External Applications
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Depending on the configuration of the Globus Compute endpoint you can often invoke external applications that are avaialble in the endpoint environment.
-
-.. code-block:: python
+.. code:: ipython3
 
     def echo(name):
         import os
-        return os.popen("echo Hello %s" % name).read()
+        return os.popen("echo Hello {} from $HOSTNAME".format(name)).read()
+    
+    future = gce.submit(echo, "World")
+    
+    print("Echo output: ", future.result())
 
-    echo_function = gcc.register_function(echo)
+Running functions many times
+----------------------------
 
-    res = gcc.run("World", endpoint_id=tutorial_endpoint, function_id=echo_function)
+One of the strengths of Globus Compute is the ease by which you can run
+functions many times, perhaps with different input arguments. The
+following example shows how you can use the Monte Carlo method to
+estimate pi.
 
-    print (gcc.get_result(res))
+Specifically, if a circle with radius :math:`r` is inscribed inside a
+square with side length :math:`2r`, the area of the circle is
+:math:`\pi r^2` and the area of the square is :math:`(2r)^2`. Thus, if
+:math:`N` uniformly-distributed points are dropped at random locations
+within the square, approximately :math:`N\pi/4` will be inside the
+circle and therfore we can estimate the value of :math:`\pi`.
 
-Catching Exceptions
-~~~~~~~~~~~~~~~~~~~
-
-When functions fail, the exception is captured and serialized by the Globus Compute endpoint, and reraised when you try to get the result.
-In the following example, the "deterministic failure" exception is raised when ``gcc.get_result`` is called on the failing function.
-
-.. code-block:: python
-
-    def failing():
-        raise Exception("deterministic failure")
-
-    failing_function = gcc.register_function(failing)
-
-    res = gcc.run(endpoint_id=tutorial_endpoint, function_id=failing_function)
-
-    gcc.get_result(res)
-
-Running Functions Many Times
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-After registering a function you can invoke it repeatedly.
-The following example shows how the monte carlo method can be used to estimate pi.
-
-Specifically, if a circle with radius r is inscribed inside a square with side length 2r, the area of the circle is πr\ :sup:`2` and the area of the square is (2r)\ :sup:`2`.
-Thus, if N uniformly-distributed random points are dropped within the square, approximately Nπ/4 will be inside the circle.
-
-.. code-block:: python
+.. code:: ipython3
 
     import time
-
+    
     # function that estimates pi by placing points in a box
     def pi(num_points):
         from random import random
-        inside = 0
+        inside = 0   
+        
         for i in range(num_points):
-            x, y = random(), random()  # Drop a random point in the box.
+            x, y = random(), random()  # Drop a point randomly within the box.
             if x**2 + y**2 < 1:        # Count points within the circle.
-                inside += 1
+                inside += 1  
         return (inside*4 / num_points)
-
-    # register the function
-    pi_function = gcc.register_function(pi)
-
-    # execute the function 3 times
+    
+    
+    # execute the function 3 times 
     estimates = []
     for i in range(3):
-        estimates.append(gcc.run(10**5, endpoint_id=tutorial_endpoint, function_id=pi_function))
-
-    # wait for tasks to complete
-    time.sleep(5)
-
-    # wait for all tasks to complete
-    for e in estimates:
-        while gcc.get_task(e)['pending'] == 'True':
-            time.sleep(3)
-
+        estimates.append(gce.submit(pi, 
+                                   10**5))
+    
     # get the results and calculate the total
-    results = [gcc.get_result(i) for i in estimates]
-    total = 0
-    for r in results:
-        total += r
-
+    total = [future.result() for future in estimates]
+    
     # print the results
-    print("Estimates: %s" % results)
-    print("Average: {:.5f}".format(total/len(results)))
+    print("Estimates: {}".format(total))
+    print("Average: {:.5f}".format(sum(total)/len(estimates)))
 
-Managing Endpoints
-~~~~~~~~~~~~~~~~~~
+Endpoint operations
+===================
 
-Globus Compute endpoints advertise whether or not they are online as well as information about their avaialble resources, queued tasks, and other information.
-If you are permitted to execute functions on an endpoint you can also retrieve the status of the endpoint.
-The following example shows how to look up the status (online or offline) and the number of number of waiting tasks and workers connected to the endpoint.
+You can retrieve information about endpoints including status and
+information about how the endpoint is configured.
 
-.. code-block:: python
+.. code:: ipython3
 
-    endpoint_status = gcc.get_endpoint_status(tutorial_endpoint)
-
-    print("Status: %s" % endpoint_status['status'])
-    print("Workers: %s" % endpoint_status['logs'][0]['total_workers'])
-    print("Tasks: %s" % endpoint_status['logs'][0]['outstanding_tasks'])
-
-Advanced Features
------------------
-
-Globus Compute provides several features that address more advanced use cases.
-
-Running Batches
-~~~~~~~~~~~~~~~
-
-After registering a function, you might want to invoke that function many times without making individual calls to the Globus Compute service.
-Such examples occur when running monte carlo simulations, ensembles, and parameter sweep applications.
-
-Globus Compute provides a batch interface which enables specification of a range of function invocations.
-To use this interface you must create a Globus Compute batch object and then add each invocation to that object.
-You can then pass the constructed object to the ``batch_run`` interface.
-
-.. code-block:: python
-
-    def squared(x):
-        return x**2
-
-    squared_function = gcc.register_function(squared)
-
-    inputs = list(range(10))
-    batch = gcc.create_batch()
-
-    for x in inputs:
-        batch.add(x, endpoint_id=tutorial_endpoint, function_id=squared_function)
-
-    batch_res = gcc.batch_run(batch)
-
-Similary, Globus Compute provides an interface to retrieve the status of the entire batch of invocations.
-
-.. code-block:: python
-
-    gcc.get_batch_result(batch_res)
+    from globus_compute_sdk import Client
+    gcc = Client()
+    
+    gcc.get_endpoint_status(tutorial_endpoint)
