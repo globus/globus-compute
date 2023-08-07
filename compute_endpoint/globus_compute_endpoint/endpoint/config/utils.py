@@ -164,10 +164,29 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
     return config
 
 
+def _sanitize_user_opts(data):
+    """Prevent YAML injection via special characters.
+    Note that this will enforce double quoted YAML strings.
+    """
+    if isinstance(data, dict):
+        return {k: _sanitize_user_opts(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_sanitize_user_opts(v) for v in data]
+    elif isinstance(data, str):
+        return json.dumps(data)
+    elif isinstance(data, (int, float)):
+        return data
+    else:
+        # We do not expect to hit this because user options are passed
+        # from the web service as JSON
+        raise ValueError(f"{type(data).__name__} is not a valid user option type")
+
+
 def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> str:
     # Only load package when called by EP manager
     import jinja2
 
+    user_opts = _sanitize_user_opts(user_opts)
     user_config_path = endpoint_dir / "config_user.yaml"
 
     template_str = _read_config_yaml(user_config_path)
