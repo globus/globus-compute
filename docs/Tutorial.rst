@@ -71,9 +71,9 @@ the function.
     # Define the function for remote execution
     def hello_world():
         return "Hello World!"
-    
+
     future = gce.submit(hello_world)
-    
+
     print("Submit returned: ", future)
 
 Getting results
@@ -112,9 +112,9 @@ exception is raised when ``future.result()`` is called.
 
     def division_by_zero():
         return 42 / 0 # This will raise a ZeroDivisionError
-    
+
     future = gce.submit(division_by_zero)
-    
+
     try:
         future.result()
     except Exception as exc:
@@ -140,7 +140,7 @@ of input arguments.
 
     def get_sum(a, b):
         return a + b
-    
+
     future = gce.submit(get_sum, 40, 2)
     print(f"40 + 2 = {future.result()}")
 
@@ -159,9 +159,9 @@ the datetime module.
     def get_date():
         from datetime import date
         return date.today()
-    
+
     future = gce.submit(get_date)
-    
+
     print("Date fetched from endpoint: ", future.result())
 
 Calling external applications
@@ -177,9 +177,9 @@ command.
     def echo(name):
         import os
         return os.popen("echo Hello {} from $HOSTNAME".format(name)).read()
-    
+
     future = gce.submit(echo, "World")
-    
+
     print("Echo output: ", future.result())
 
 Running functions many times
@@ -200,28 +200,28 @@ circle and therfore we can estimate the value of :math:`\pi`.
 .. code:: ipython3
 
     import time
-    
+
     # function that estimates pi by placing points in a box
     def pi(num_points):
         from random import random
-        inside = 0   
-        
+        inside = 0
+
         for i in range(num_points):
             x, y = random(), random()  # Drop a point randomly within the box.
             if x**2 + y**2 < 1:        # Count points within the circle.
-                inside += 1  
+                inside += 1
         return (inside*4 / num_points)
-    
-    
-    # execute the function 3 times 
+
+
+    # execute the function 3 times
     estimates = []
     for i in range(3):
-        estimates.append(gce.submit(pi, 
+        estimates.append(gce.submit(pi,
                                    10**5))
-    
+
     # get the results and calculate the total
     total = [future.result() for future in estimates]
-    
+
     # print the results
     print("Estimates: {}".format(total))
     print("Average: {:.5f}".format(sum(total)/len(estimates)))
@@ -236,5 +236,5 @@ information about how the endpoint is configured.
 
     from globus_compute_sdk import Client
     gcc = Client()
-    
+
     gcc.get_endpoint_status(tutorial_endpoint)
