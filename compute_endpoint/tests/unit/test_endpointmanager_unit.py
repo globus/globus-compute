@@ -23,6 +23,7 @@ from globus_compute_endpoint.endpoint.config.utils import render_config_user_tem
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_sdk import GlobusAPIError, NetworkError
+from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
 
@@ -1027,3 +1028,29 @@ def test_render_config_user_template_option_types(fs, data):
         with pytest.raises(ValueError) as pyt_exc:
             render_config_user_template(ep_dir, user_opts)
         assert "not a valid user option type" in str(pyt_exc.exconly)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        ("{{ foo.__class__ }}", "bar"),
+        ("{{ foo.__code__ }}", lambda: None),
+        ("{{ foo._priv }}", type("Foo", (object,), {"_priv": "secret"})()),
+    ],
+)
+def test_render_config_user_template_sandbox(mocker: MockFixture, fs, data):
+    jinja_op, val = data
+
+    ep_dir = pathlib.Path("my-ep")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = ep_dir / "config_user.yaml"
+    template.write_text(f"foo: {jinja_op}")
+
+    user_opts = {"foo": val}
+    mocker.patch(
+        "globus_compute_endpoint.endpoint.config.utils._sanitize_user_opts",
+        return_value=user_opts,
+    )
+
+    with pytest.raises(jinja2.exceptions.SecurityError):
+        render_config_user_template(ep_dir, user_opts)
