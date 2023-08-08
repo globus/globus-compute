@@ -185,18 +185,22 @@ def _sanitize_user_opts(data):
 def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> str:
     # Only load package when called by EP manager
     import jinja2
+    from jinja2.sandbox import SandboxedEnvironment
 
     user_opts = _sanitize_user_opts(user_opts)
     user_config_path = endpoint_dir / "config_user.yaml"
 
     template_str = _read_config_yaml(user_config_path)
-    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+    environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
     template = environment.from_string(template_str)
 
     try:
         return template.render(**user_opts)
     except jinja2.exceptions.UndefinedError as e:
-        log.debug(f"Missing required user option(s): {str(e)}")
+        log.debug(f"Missing required user option(s): {e}")
+        raise
+    except jinja2.exceptions.SecurityError as e:
+        log.debug(f"Template tried accessing insecure code: {e}")
         raise
 
 
