@@ -5,6 +5,7 @@ import inspect
 import json
 import logging
 import pathlib
+import shlex
 
 import yaml
 from click import ClickException
@@ -182,6 +183,21 @@ def _sanitize_user_opts(data):
         raise ValueError(f"{type(data).__name__} is not a valid user option type")
 
 
+def _shell_escape_filter(val):
+    """Returns a shell-escaped version of the argument"""
+    if not isinstance(val, str):
+        return val
+
+    # We need to escape the command before serializing into JSON
+    # because PyYAML will strip the surrounding quotes when the
+    # YAML content is loaded
+    loaded = json.loads(val)
+    if not isinstance(loaded, str):
+        return val
+
+    return json.dumps(shlex.quote(loaded))
+
+
 def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> str:
     import jinja2  # Only load package when called by EP manager
     from globus_compute_endpoint.endpoint.endpoint import Endpoint
@@ -192,6 +208,7 @@ def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> 
 
     template_str = _read_config_yaml(user_config_path)
     environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
+    environment.filters["shell_escape"] = _shell_escape_filter
     template = environment.from_string(template_str)
 
     try:

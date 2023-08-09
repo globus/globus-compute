@@ -7,9 +7,11 @@ import queue
 import random
 import re
 import resource
+import shlex
 import signal
 import sys
 import time
+import typing as t
 import uuid
 from unittest import mock
 
@@ -1039,7 +1041,9 @@ def test_render_config_user_template_option_types(fs, data):
         ("{{ foo._priv }}", type("Foo", (object,), {"_priv": "secret"})()),
     ],
 )
-def test_render_config_user_template_sandbox(mocker: MockFixture, fs, data):
+def test_render_config_user_template_sandbox(
+    mocker: MockFixture, fs, data: t.Tuple[str, t.Any]
+):
     jinja_op, val = data
 
     ep_dir = pathlib.Path("my-ep")
@@ -1055,3 +1059,43 @@ def test_render_config_user_template_sandbox(mocker: MockFixture, fs, data):
 
     with pytest.raises(jinja2.exceptions.SecurityError):
         render_config_user_template(ep_dir, user_opts)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        (True, "-lh"),
+        (True, "'-lh'"),
+        (True, "'-l' '-h'"),
+        (True, "-lh; rm -rf"),
+        (True, '-lh && "rm -rf"'),
+        (True, '"-lh && "rm -rf"'),
+        (True, '-lh && rm -rf"'),
+        (True, "\0Do this thing"),
+        (True, '\r"-lh && rm -rf"'),
+        (True, '\n"-lh && rm -rf"'),
+        (True, '"-lh && \\u0015rm -rf"'),
+        (True, "-lh\nbad: boy"),
+        (False, 10),
+        (False, "10"),
+    ],
+)
+def test_render_config_user_template_shell_escape(fs, data: t.Tuple[bool, t.Any]):
+    is_valid, option = data
+
+    ep_dir = pathlib.Path("my-ep")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = Endpoint.user_config_template_path(ep_dir)
+    template.write_text("option: {{ option|shell_escape }}")
+
+    user_opts = {"option": option}
+    rendered = render_config_user_template(ep_dir, user_opts)
+    rendered_dict = yaml.safe_load(rendered)
+
+    assert len(rendered_dict) == 1
+    rendered_option = rendered_dict["option"]
+    if is_valid:
+        escaped_option = shlex.quote(option)
+        assert f"ls {rendered_option}" == f"ls {escaped_option}"
+    else:
+        assert rendered_option == option
