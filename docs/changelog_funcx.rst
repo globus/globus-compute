@@ -3,6 +3,103 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.3.0:
+
+funcx & funcx-endpoint v2.3.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added a ``globus-compute-endpoint self-diagnostic`` command, which runs several
+  diagnostic commands to help users and Globus Support troubleshoot issues.
+
+  By default, all output prints to the terminal. The ``--gzip`` (or ``-z``) flag
+  redirects the output to a Gzip-compressed file that the user can easily share
+  with Globus Support.
+
+  Endpoint log files can be quite large, so we cap the data taken from each file
+  at 5,120 KB (5 MB). A user can modify this with the ``--log-kb`` option. For
+  example, if a user wants to include 1,024 KB (1 MB) of data per log file, they
+  would use ``--log-kb 1024``.
+
+Bug Fixes
+^^^^^^^^^
+
+- Previously, starting an endpoint when it is already active or is currently locked will exit silently when ``globus-compute-endpoint start`` is run, with the only information available as a log line in endpoint.log.  Now, if start fails, a console message will display the reason on the command line.
+
+- The ``data_serialization_strategy`` argument of ``Client`` is now properly respected
+  when creating batches
+
+- For those who use multiple task groups, address race-condition where tasks
+  could be mis-associated.
+
+- Fixes a bug where the `globus_compute_endpoint.engines.GlobusComputeEngine` sets
+  the stdout and stderr capture filepaths incorrectly on the Providers, causing batch
+  jobs to fail.
+
+Removed
+^^^^^^^
+
+- When submitting functions, it is no longer possible to specify a ``task_group_id``
+  which does not already exist on the services. If this happens, the services will
+  respond with an error.
+
+  - Note that it is still possible to associate a task with an existing
+    ``task_group_id``, with the correct authorization.
+
+- The following arguments to ``Client``, which were previously deprecated, have been
+  removed:
+
+  - ``asynchronous``
+
+  - ``loop``
+
+  - ``results_ws_uri``
+
+  - ``warn_about_url_mismatch``
+
+  - ``openid_authorizer``
+
+  - ``search_authorizer``
+
+  - ``fx_authorizer``
+
+- Various internal classes relating to the former "asynchronous" mode of operating the
+  ``Client``, such as ``WebSocketPollingTask`` and ``AtomicController``, have been
+  removed alongside the removal of the ``asynchronous`` argument to the ``Client``.
+
+Deprecated
+^^^^^^^^^^
+
+- The following arguments to ``Client``, which were previously unused, have been deprecated:
+
+  - ``http_timeout``
+
+  - ``funcx_home``
+
+- The ``task_group_id`` argument to ``Client`` has been deprecated as a result of the
+  new Task Group behavior.
+
+Changed
+^^^^^^^
+
+- Following the updated route and schema of the ``submit`` route
+  (``v3/endpoint/ENDPOINT_UUID/submit``), tasks in a batch are now associated
+  with a single endpoint and the endpoint is selected via the route at
+  submission time.  (Previously, tasks within a batch could be sent to
+  heterogeneous endpoints.)
+
+  - The signature of ``Client.create_batch`` has been adjusted to match.
+
+  - The signature of ``WebClient.submit`` has been adjusted to match
+
+- The return type of ``Client.batch_run`` has been updated to reflect the schema returned
+  by the ``v3/submit`` route of the Compute API.
+
+  - Concretely, ``Client.batch_run`` now returns a dictionary with information such as
+    task group ID, submission ID, and a mapping of function IDs to lists of task IDs.
+
 .. _changelog-2.2.4:
 
 funcx & funcx-endpoint v2.2.4
