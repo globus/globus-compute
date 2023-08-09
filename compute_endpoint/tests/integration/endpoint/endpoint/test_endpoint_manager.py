@@ -16,6 +16,10 @@ from globus_sdk import GlobusAPIError
 
 logger = logging.getLogger("mock_funcx")
 
+DEF_CONFIG_DIR = (
+    pathlib.Path(globus_compute_endpoint.endpoint.config.__file__).resolve().parent
+)
+
 
 def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.Response:
     req = requests.Request(method, "https://funcx.example.org/")
@@ -33,13 +37,9 @@ class TestStart:
         config_dir = pathlib.Path(funcx_dir) / "mock_endpoint"
         assert not config_dir.exists()
         # pyfakefs will take care of newly created files, not existing config
-        def_config_path = (
-            pathlib.Path(globus_compute_endpoint.endpoint.config.__file__)
-            .resolve()
-            .parent
-            / "default_config.yaml"
-        )
-        fs.add_real_file(def_config_path)
+        fs.add_real_file(DEF_CONFIG_DIR / "default_config.yaml")
+        fs.add_real_file(DEF_CONFIG_DIR / "user_config_template.yaml")
+        fs.add_real_file(DEF_CONFIG_DIR / "user_environment.yaml")
 
         yield
 
@@ -62,7 +62,7 @@ class TestStart:
     def test_configure_multi_tenant_existing_config(self, mt):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
-        config_file = config_dir / "config.yaml"
+        config_file = Endpoint._config_file_path(config_dir)
         config_copy = str(config_dir.parent / "config2.yaml")
 
         # First, make an entry with multi_tenant

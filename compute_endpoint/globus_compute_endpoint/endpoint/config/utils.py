@@ -183,12 +183,12 @@ def _sanitize_user_opts(data):
 
 
 def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> str:
-    # Only load package when called by EP manager
-    import jinja2
+    import jinja2  # Only load package when called by EP manager
+    from globus_compute_endpoint.endpoint.endpoint import Endpoint
     from jinja2.sandbox import SandboxedEnvironment
 
     user_opts = _sanitize_user_opts(user_opts)
-    user_config_path = endpoint_dir / "config_user.yaml"
+    user_config_path = Endpoint.user_config_template_path(endpoint_dir)
 
     template_str = _read_config_yaml(user_config_path)
     environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined)

@@ -20,6 +20,7 @@ import responses
 import yaml
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import render_config_user_template
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_sdk import GlobusAPIError, NetworkError
@@ -42,7 +43,7 @@ def mock_conf():
 
 @pytest.fixture
 def user_conf_template(conf_dir):
-    template = conf_dir / "config_user.yaml"
+    template = Endpoint.user_config_template_path(conf_dir)
     template.write_text(
         """
 heartbeat_period: {{ heartbeat }}
@@ -949,7 +950,7 @@ def test_render_config_user_template(fs, data):
 
     ep_dir = pathlib.Path("my-ep")
     ep_dir.mkdir(parents=True, exist_ok=True)
-    template = ep_dir / "config_user.yaml"
+    template = Endpoint.user_config_template_path(ep_dir)
     template.write_text("heartbeat_period: {{ heartbeat }}")
 
     if is_valid:
@@ -965,7 +966,7 @@ def test_render_config_user_template(fs, data):
 def test_render_config_user_template_escape_strings(fs):
     ep_dir = pathlib.Path("my-ep")
     ep_dir.mkdir(parents=True, exist_ok=True)
-    template = ep_dir / "config_user.yaml"
+    template = Endpoint.user_config_template_path(ep_dir)
     template.write_text(
         """
 endpoint_setup: {{ setup }}
@@ -1017,7 +1018,7 @@ def test_render_config_user_template_option_types(fs, data):
 
     ep_dir = pathlib.Path("my-ep")
     ep_dir.mkdir(parents=True, exist_ok=True)
-    template = ep_dir / "config_user.yaml"
+    template = Endpoint.user_config_template_path(ep_dir)
     template.write_text("foo: {{ foo }}")
 
     user_opts = {"foo": val}
@@ -1043,7 +1044,7 @@ def test_render_config_user_template_sandbox(mocker: MockFixture, fs, data):
 
     ep_dir = pathlib.Path("my-ep")
     ep_dir.mkdir(parents=True, exist_ok=True)
-    template = ep_dir / "config_user.yaml"
+    template = Endpoint.user_config_template_path(ep_dir)
     template.write_text(f"foo: {jinja_op}")
 
     user_opts = {"foo": val}

@@ -54,6 +54,14 @@ class Endpoint:
         return endpoint_dir / "config.yaml"
 
     @staticmethod
+    def user_config_template_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+        return endpoint_dir / "user_config_template.yaml"
+
+    @staticmethod
+    def _user_environment_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+        return endpoint_dir / "user_environment.yaml"
+
+    @staticmethod
     def update_config_file(
         original_path: pathlib.Path,
         target_path: pathlib.Path,
@@ -81,11 +89,11 @@ class Endpoint:
     ):
         """Initialize a clean endpoint dir
 
-        :param endpoint_dir pathlib.Path Path to the endpoint configuration dir
-        :param endpoint_config str Path to a config file to be used instead
-         of the Globus Compute default config file
-        :param multi_tenant bool Whether the endpoint is a multi-user endpoint
-        :param display_name str A display name to use, if desired
+        :param endpoint_dir: Path to the endpoint configuration dir
+        :param endpoint_config: Path to a config file to be used instead of
+            the Globus Compute default config file
+        :param multi_tenant: Whether the endpoint is a multi-user endpoint
+        :param display_name: A display name to use, if desired
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
         user_umask = os.umask(0o0077)
@@ -98,9 +106,9 @@ class Endpoint:
             endpoint_dir.mkdir(parents=True, exist_ok=True)
 
             config_target_path = Endpoint._config_file_path(endpoint_dir)
+            package_dir = pathlib.Path(__file__).resolve().parent
 
             if endpoint_config is None:
-                package_dir = pathlib.Path(__file__).resolve().parent
                 endpoint_config = package_dir / "config/default_config.yaml"
 
             Endpoint.update_config_file(
@@ -109,6 +117,25 @@ class Endpoint:
                 multi_tenant,
                 display_name,
             )
+
+            if multi_tenant:
+                # template must be readable by user-endpoint processes (see
+                # endpoint_manager.py)
+                world_readable = 0o0644 & ((0o0777 - user_umask) | 0o0444)
+                world_executable = 0o0711 & ((0o0777 - user_umask) | 0o0111)
+                endpoint_dir.chmod(world_executable)
+
+                src_user_tmpl_path = package_dir / "config/user_config_template.yaml"
+                src_user_env_path = package_dir / "config/user_environment.yaml"
+                dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
+                dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
+
+                shutil.copy(src_user_tmpl_path, dst_user_tmpl_path)
+                shutil.copy(src_user_env_path, dst_user_env_path)
+
+                dst_user_tmpl_path.chmod(world_readable)
+                dst_user_env_path.chmod(world_readable)
+
         finally:
             os.umask(user_umask)
 
@@ -131,14 +158,25 @@ class Endpoint:
         )
         config_path = Endpoint._config_file_path(conf_dir)
         if multi_tenant:
+            user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
+            user_env_path = Endpoint._user_environment_path(conf_dir)
+
             print(f"Created multi-tenant profile for endpoint named <{ep_name}>")
+            print(
+                f"\n\tConfiguration file: {config_path}\n"
+                f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
+                f"\n\tUser endpoint environment variables: {user_env_path}"
+                "\n\nUse the `start` subcommand to run it:\n"
+                f"\n\t$ globus-compute-endpoint start {ep_name}"
+            )
+
         else:
             print(f"Created profile for endpoint named <{ep_name}>")
-        print(
-            f"\n\tConfiguration file: {config_path}\n"
-            "\nUse the `start` subcommand to run it:\n"
-            f"\n\t$ globus-compute-endpoint start {ep_name}"
-        )
+            print(
+                f"\n\tConfiguration file: {config_path}\n"
+                "\nUse the `start` subcommand to run it:\n"
+                f"\n\t$ globus-compute-endpoint start {ep_name}"
+            )
 
     @staticmethod
     def validate_endpoint_name(path_name: str) -> None:
