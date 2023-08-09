@@ -1,0 +1,44 @@
+# This is the default user-template provided with newly-configured Multi-Tenant
+# endpoints.  User endpoints generate a user-endpoint-specific configuration by
+# processing this YAML file as a Jinja template against user-provided
+# variables -- please modify this template to suit your site's requirements.
+#
+# For more information, please see the `user_endpoint_config` in Globus Compute
+# SDK's Executor.
+#
+# Some common options site-administrators may want to set:
+#  - address
+#  - provider (e.g., SlurmProvider, TorqueProvider, CobaltProvider, etc.)
+#  - account
+#  - scheduler_options
+#  - walltime
+#  - worker_init
+#
+# There are a number of example configurations available in the documentation:
+#    https://globus-compute.readthedocs.io/en/stable/endpoints.html#example-configurations
+
+engine:
+  type: HighThroughputEngine
+  max_workers_per_node: 1
+
+  provider:
+    type: LocalProvider
+
+    min_blocks: 0
+    max_blocks: 1
+    init_blocks: 1
+
+    endpoint_setup: {{ endpoint_setup|default() }}
+    endpoint_init: {{ endpoint_init|default() }}
+    worker_init: {{ worker_init|default() }}
+
+# Endpoints will be restarted when a user submits new tasks to the
+# web-services, so eagerly shut down if endpoint is idle.  At 30s/hb (default
+# value), 10 heartbeats is 300s.
+idle_heartbeats_soft: 10
+
+# If endpoint is *apparently* idle (e.g., outstanding tasks, but no movement)
+# for this many heartbeats, then shutdown anyway.  At 30s/hb (default value),
+# 5,760 heartbeats == "48 hours".  (Note that this value will be ignored if
+# idle_heartbeats_soft is 0 or not set.)
+idle_heartbeats_hard: 5760

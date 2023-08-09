@@ -19,7 +19,10 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.default_config import (
     config as default_config,
 )
-from globus_compute_endpoint.endpoint.config.utils import serialize_config
+from globus_compute_endpoint.endpoint.config.utils import (
+    render_config_user_template,
+    serialize_config,
+)
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
@@ -466,6 +469,28 @@ def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
 
     assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
     ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
+
+
+def test_mt_endpoint_user_ep_yamls_world_readable(tmp_path):
+    ep_dir = tmp_path / "new_endpoint_dir"
+    Endpoint.init_endpoint_dir(ep_dir, multi_tenant=True)
+
+    user_tmpl_path = Endpoint.user_config_template_path(ep_dir)
+    user_env_path = Endpoint._user_environment_path(ep_dir)
+
+    assert user_env_path != user_tmpl_path, "Dev typo while developing"
+    for p in (user_tmpl_path, user_env_path):
+        assert p.exists()
+        assert p.stat().st_mode & 0o444 == 0o444, "Minimum world readable"
+    assert ep_dir.stat().st_mode & 0o111 == 0o111, "Minimum world executable"
+
+
+def test_mt_endpoint_user_ep_sensible_default(tmp_path):
+    ep_dir = tmp_path / "new_endpoint_dir"
+    Endpoint.init_endpoint_dir(ep_dir, multi_tenant=True)
+
+    # Doesn't crash; loads yaml, jinja template has defaults
+    render_config_user_template(ep_dir, {})
 
 
 def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data):

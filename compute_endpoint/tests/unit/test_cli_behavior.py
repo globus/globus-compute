@@ -16,6 +16,7 @@ from click.testing import CliRunner
 from globus_compute_endpoint.cli import app, init_config_dir
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
+from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from pyfakefs import fake_filesystem as fakefs
 from pytest_mock import MockFixture
 
@@ -47,8 +48,8 @@ def make_endpoint_dir(mock_command_ensure):
     def func(name):
         ep_dir = mock_command_ensure.endpoint_config_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
-        ep_config = ep_dir / "config.yaml"
-        ep_template = ep_dir / "config_user.yaml"
+        ep_config = Endpoint._config_file_path(ep_dir)
+        ep_template = Endpoint.user_config_template_path(ep_dir)
         ep_config.write_text(
             """
 display_name: null

@@ -1,0 +1,19 @@
+# Use this YAML file to specify environment variables to inject into the user
+# endpoint processes.  Following standard process environment variables, any
+# variables specified here will be strings to the processes, and there is no
+# nesting -- this is a key-value description only.
+#
+# A couple of notes:
+#
+# - Values specified here will override any defaults (e.g., PATH)
+#
+# - Note that PATH is set to a sensible default, so typically won't need to
+#   be manually specified
+#
+# - Three variables cannot be set here: HOME, USER, and PWD.  These are set
+#   based on the user's GETENT(1) entry.
+#
+# Example:
+#
+#     PATH: /opt/bin:/other/dir/bin:/usr/bin
+#     SITE_SPECIFIC_VAR: some site specific value
