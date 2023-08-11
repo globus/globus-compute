@@ -92,6 +92,18 @@ class Config(RepresentationMixin):
         Designates the endpoint as a multi-tenant endpoint
         Default: None
 
+    force_mt_allow_same_user : bool
+        If set, override the heuristic that determines whether the uid running the
+        multi-tenant endpoint may also run user endpoints.
+
+        Normally, the multi-tenant endpoint disallows starting user endpoints with
+        the same UID as the parent process unless the UID has no privileges.  That
+        means that the UID is not 0 (root), or that the UID does *not* have (among
+        many others) the capability to change the user (otherwise known as "drop
+        privileges").
+
+        Default: False
+
     display_name : str | None
         The display name for the endpoint.  If None, defaults to name
         Default: None
@@ -120,6 +132,7 @@ class Config(RepresentationMixin):
         detach_endpoint=True,
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
+        force_mt_allow_same_user: bool = False,
         # Misc info
         display_name: str | None = None,
         # Logging info
@@ -157,6 +170,7 @@ class Config(RepresentationMixin):
         self.funcx_service_address = funcx_service_address
 
         self.multi_tenant = multi_tenant is True
+        self.force_mt_allow_same_user = force_mt_allow_same_user is True
         self.allowed_functions = allowed_functions
 
         # Tuning info

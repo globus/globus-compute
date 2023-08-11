@@ -35,6 +35,7 @@ REQUIRES = [
     # pin exact versions because it does not use semver
     "parsl==2023.7.3",
     "pika>=1.2.0",
+    "pyprctl<0.2.0",
     "setproctitle>=1.3.2,<1.4",
     "pyyaml>=6.0,<7.0",
     "jinja2>=3.1.2,<3.2",

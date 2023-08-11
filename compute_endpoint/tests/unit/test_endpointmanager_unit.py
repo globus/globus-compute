@@ -3,6 +3,7 @@ import getpass
 import json
 import os
 import pathlib
+import pwd
 import queue
 import random
 import re
@@ -13,17 +14,22 @@ import sys
 import time
 import typing as t
 import uuid
+from collections import namedtuple
 from unittest import mock
 
 import jinja2
 import pika
+import pyprctl
 import pytest as pytest
 import responses
 import yaml
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import render_config_user_template
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
+from globus_compute_endpoint.endpoint.endpoint_manager import (
+    EndpointManager,
+    InvalidUserError,
+)
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_sdk import GlobusAPIError, NetworkError
 from pytest_mock import MockFixture
@@ -868,6 +874,116 @@ def test_start_endpoint_privileges_dropped(successful_exec):
     assert mock_os.setresuid.called, "Do NOT save uid; truly change user"
     a, _ = mock_os.setresuid.call_args
     assert a == (expected_uid, expected_uid, expected_uid)
+
+
+def test_run_as_same_user_disabled_if_admin(mocker, conf_dir, mock_conf, mock_client):
+    ep_uuid, mock_gcc = mock_client
+
+    mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
+    mock_prctl = mocker.patch(f"{_MOCK_BASE}pyprctl")
+    mock_prctl.CapState.get_current.return_value.effective = set()
+
+    mock_pwd.getpwuid.return_value = namedtuple("getent", "pw_name,pw_uid")("asdf", 0)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    assert em._allow_same_user is False, "Verify check against UID 0"
+
+    mock_pwd.getpwuid.return_value = namedtuple("getent", "pw_name,pw_uid")("root", 999)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    assert em._allow_same_user is False, "Verify check against 'root' username"
+
+
+@pytest.mark.parametrize("cap", (pyprctl.Cap.SYS_ADMIN, pyprctl.Cap.SETUID))
+def test_run_as_same_user_disabled_if_privileged(
+    mocker, conf_dir, mock_conf, mock_client, cap
+):
+    # spot-check a couple of capabilities: if set, then same user is *disallowed*
+    ep_uuid, mock_gcc = mock_client
+
+    _test_mock_base = "globus_compute_endpoint.endpoint.utils."
+    mocker.patch(f"{_test_mock_base}_pwd")
+    mock_prctl = mocker.patch(f"{_test_mock_base}_pyprctl")
+
+    mock_prctl.CapState.get_current.return_value.effective = {cap}
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    assert em._allow_same_user is False
+
+
+def test_run_as_same_user_enabled_if_not_admin(
+    mocker, conf_dir, mock_conf, mock_client
+):
+    # spot-check a couple of capabilities: if set, then same user is *disallowed*
+    ep_uuid, mock_gcc = mock_client
+
+    _test_mock_base = "globus_compute_endpoint.endpoint.utils."
+    mocker.patch(f"{_test_mock_base}_pwd")
+    mocker.patch(f"{_test_mock_base}_pyprctl")
+
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    assert em._allow_same_user is True, "If not privileged, can only runas same user"
+
+
+def test_run_as_same_user_forced_warns(
+    mocker, conf_dir, mock_conf, mock_client, randomstring
+):
+    # spot-check a couple of capabilities: if set, then same user is *disallowed*
+    ep_uuid, mock_gcc = mock_client
+
+    mocker.patch(f"{_MOCK_BASE}pwd")
+    mock_os = mocker.patch(f"{_MOCK_BASE}os")
+    mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
+
+    _test_mock_base = "globus_compute_endpoint.endpoint.utils."
+    mocker.patch(f"{_test_mock_base}_pwd")
+    mock_prctl = mocker.patch(f"{_test_mock_base}_pyprctl")
+
+    mock_prctl.CapState.get_current.return_value.effective = {pyprctl.Cap.SYS_ADMIN}
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    assert em._allow_same_user is False, "Verify test setup"
+    assert not mock_warn.called, "Verify test setup"
+
+    mock_uid, mock_gid = randomstring(), randomstring()
+    mock_os.getuid.return_value = mock_uid
+    mock_os.getgid.return_value = mock_gid
+    mock_conf.force_mt_allow_same_user = True
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    assert em._allow_same_user is True
+    assert mock_warn.called
+
+    a, _k = mock_warn.call_args
+    assert "`force_mt_allow_same_user` set to true" in a[0]
+    assert "very dangerous override" in a[0]
+    assert "Endpoint (UID, GID):" in a[0], "Expect process UID, GID in warning"
+    assert f"({mock_uid}, {mock_gid})" in a[0], "Expect process UID, GID in warning"
+
+
+def test_run_as_same_user_fails_if_admin(successful_exec):
+    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+
+    pw_rec = pwd.getpwuid(os.getuid())
+    em._allow_same_user = False
+    kwargs = {"name": "some_endpoint_name"}
+    with pytest.raises(InvalidUserError) as pyexc:
+        em.cmd_start_endpoint(pw_rec.pw_name, None, kwargs)
+
+    assert "UID is same as" in str(pyexc.value)
+    assert "using a non-root user" in str(pyexc.value), "Expected suggested fix"
+    assert "removing privileges" in str(pyexc.value), "Expected suggested fix"
+
+
+def test_run_as_same_user_does_not_change_uid(successful_exec):
+    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+    mock_os.getuid.return_value = os.getuid()
+    mock_os.getgid.return_value = os.getgid()
+
+    em._allow_same_user = True
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 84, "Q&D: verify we exec'ed, but no privilege drop"
+
+    assert not mock_os.initgroups.called
+    assert not mock_os.setresuid.called
+    assert not mock_os.setresgid.called
 
 
 def test_default_to_secure_umask(successful_exec):

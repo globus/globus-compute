@@ -18,6 +18,7 @@ import typing as t
 from datetime import datetime
 
 import globus_compute_sdk as GC
+import pyprctl
 import setproctitle
 import yaml
 from globus_compute_endpoint import __version__
@@ -30,7 +31,7 @@ from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
     CommandQueueSubscriber,
 )
-from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.endpoint.utils import _redact_url_creds, is_privileged
 from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:
@@ -41,6 +42,10 @@ log = logging.getLogger(__name__)
 
 
 class InvalidCommandError(Exception):
+    pass
+
+
+class InvalidUserError(Exception):
     pass
 
 
@@ -114,6 +119,19 @@ class EndpointManager:
                 f" ({e.__class__.__name__}) {e}"
             )
             exit(os.EX_DATAERR)
+
+        self._mt_user = pwd.getpwuid(os.getuid())
+        if config.force_mt_allow_same_user:
+            self._allow_same_user = True
+            log.warning(
+                "Configuration item `force_mt_allow_same_user` set to true; this is"
+                " considered a very dangerous override -- please use with care,"
+                " especially if allowing this endpoint to be utilized by multiple"
+                " users."
+                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()}) "
+            )
+        else:
+            self._allow_same_user = not is_privileged(self._mt_user)
 
         # sanitize passwords in logs
         log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
@@ -354,7 +372,7 @@ class EndpointManager:
                     f"Command process successfully forked for '{globus_username}'"
                     f" ('{globus_uuid}')."
                 )
-            except InvalidCommandError as err:
+            except (InvalidCommandError, InvalidUserError) as err:
                 log.error(str(err))
 
             except Exception:
@@ -381,6 +399,22 @@ class EndpointManager:
         if not ep_name:
             raise InvalidCommandError("Missing endpoint name")
 
+        pw_rec = pwd.getpwnam(local_username)
+        udir, uid, gid = pw_rec.pw_dir, pw_rec.pw_uid, pw_rec.pw_gid
+        uname = pw_rec.pw_name
+
+        if not self._allow_same_user:
+            p_uname = self._mt_user.pw_name
+            if uname == p_uname or uid == os.getuid():
+                raise InvalidUserError(
+                    "Requested UID is same as multi-tenant UID, but configuration"
+                    " has not been marked to allow the multi-tenant user to process"
+                    " tasks.  To allow the same UID to also run user endpoints,"
+                    " consider using a non-root user or removing privileges from UID."
+                    f"\n  MT Process UID: {self._mt_user.pw_uid} ({p_uname})"
+                    f"\n  Requested UID:  {uid} ({uname})",
+                )
+
         proc_args = [
             "globus-compute-endpoint",
             "start",
@@ -388,10 +422,6 @@ class EndpointManager:
             "--die-with-parent",
             *args,
         ]
-
-        pw_rec = pwd.getpwnam(local_username)
-        udir, uid, gid = pw_rec.pw_dir, pw_rec.pw_uid, pw_rec.pw_gid
-        uname = pw_rec.pw_name
 
         try:
             pid = os.fork()
@@ -443,24 +473,49 @@ class EndpointManager:
             os.chdir("/")  # always succeeds, so start from known place
             exit_code += 1
 
-            try:
-                # The initialization of groups is "fungible" if not a privileged user
-                log.debug("Initializing groups for %s, %s", uname, gid)
-                os.initgroups(uname, gid)
-            except PermissionError as e:
-                log.warning("Unable to initialize groups; likely not a privileged user")
-                log.debug("Exception text: (%s) %s", e.__class__.__name__, e)
-            exit_code += 1
+            if (os.getuid(), os.getgid()) != (uid, gid):
+                # For multi-user systems, this is the expected path.  But for those
+                # who run the multi-tenant setup as a non-privileged user, there is
+                # no need to change the user: they're already executing _as that
+                # uid_!
+                try:
+                    # The initialization of groups is "fungible" if not a
+                    # privileged user
+                    log.debug("Initializing groups for %s, %s", uname, gid)
+                    os.initgroups(uname, gid)
+                except PermissionError as e:
+                    log.warning(
+                        "Unable to initialize groups; unprivileged user?  Ignoring"
+                        " error, but further attempts to drop privileges may fail."
+                        "\n  Process ID (pid): %s"
+                        "\n  Current user: %s (uid: %s, gid: %s)"
+                        "\n  Attempted to initgroups to: %s (uid: %s, name: %s)",
+                        os.getpid(),
+                        self._mt_user.pw_name,
+                        os.getuid(),
+                        os.getgid(),
+                        gid,
+                        uid,
+                        uname,
+                    )
+                    log.debug("Exception text: (%s) %s", e.__class__.__name__, e)
+                exit_code += 1
 
-            # But actually becoming the correct UID is _not_ fungible.  If we
-            # can't -- for whatever reason -- that's a problem.  So, don't ignore the
-            # potential error.
-            log.debug("Setting process group for %s to %s", pid, gid)
-            os.setresgid(gid, gid, gid)  # raises (good!) on error
-            exit_code += 1
-            log.debug("Setting process uid for %s to %s (%s)", pid, uid, uname)
-            os.setresuid(uid, uid, uid)  # raises (good!) on error
-            exit_code += 1
+                # But actually becoming the correct UID is _not_ fungible.  If we
+                # can't -- for whatever reason -- that's a problem.  So do NOT
+                # ignore the potential error.
+                log.debug("Setting process group for %s to %s", pid, gid)
+                os.setresgid(gid, gid, gid)  # raises (good!) on error
+                exit_code += 1
+                log.debug("Setting process uid for %s to %s (%s)", pid, uid, uname)
+                os.setresuid(uid, uid, uid)  # raises (good!) on error
+                exit_code += 1
+
+            # If we had any capabilities, we drop them now.
+            pyprctl.CapState().set_current()
+
+            # Even if exec'ing might return some privileges, "no."
+            pyprctl.set_no_new_privs()
 
             # some Q&D verification for admin debugging purposes
             if not shutil.which(proc_args[0], path=env["PATH"]):
