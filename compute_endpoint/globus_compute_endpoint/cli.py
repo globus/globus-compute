@@ -9,6 +9,7 @@ import pathlib
 import re
 import shutil
 import sys
+import textwrap
 import uuid
 from datetime import datetime
 
@@ -125,6 +126,31 @@ def start_options(f):
     return f
 
 
+def get_ep_dir_by_name_or_uuid(ctx, param, value):
+    conf_dir = get_config_dir()
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        # value is a name
+        path = conf_dir / value
+    else:
+        # value is a uuid
+        path = Endpoint.get_endpoint_dir_by_uuid(conf_dir, value)
+        if path is None:
+            msg = textwrap.dedent(
+                f"""
+                There is no endpoint on this machine with ID '{value}'!
+
+                1. Please create a configuration template with:
+                    globus-compute-endpoint configure
+                2. Update the configuration
+                3. Start the endpoint
+                """
+            )
+            raise ClickException(msg)
+    ctx.params["ep_dir"] = path
+
+
 def verify_not_uuid(ctx, param, value):
     try:
         uuid.UUID(value)
@@ -133,6 +159,16 @@ def verify_not_uuid(ctx, param, value):
         )
     except ValueError:
         return value
+
+
+def name_or_uuid_arg(f):
+    return click.argument(
+        "name_or_uuid",
+        required=False,
+        callback=get_ep_dir_by_name_or_uuid,
+        default="default",
+        expose_value=False,  # callback supplies ep_dir to command functions
+    )(f)
 
 
 def name_arg(f):
