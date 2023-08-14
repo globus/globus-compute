@@ -664,3 +664,31 @@ def test_validate_endpoint_name(ep_path_name):
             assert "Reduced to: " in str(pyt_exc.value), "Should show potential fix"
     else:
         Endpoint.validate_endpoint_name(name)
+
+
+_test_get_endpoint_dir_by_uuid__data = [
+    ("foo", str(uuid.uuid4()), True),
+    ("non-existent", str(uuid.uuid4()), False),
+]
+
+
+@pytest.mark.parametrize("name,uuid,exists", _test_get_endpoint_dir_by_uuid__data)
+def test_get_endpoint_dir_by_uuid(tmp_path, name, uuid, exists):
+    gc_conf_dir = tmp_path / ".globus_compute"
+    gc_conf_dir.mkdir()
+    for n, u, e in _test_get_endpoint_dir_by_uuid__data:
+        if not e:
+            continue
+        ep_conf_dir = gc_conf_dir / n
+        ep_conf_dir.mkdir()
+        ep_json = ep_conf_dir / "endpoint.json"
+        ep_json.write_text(json.dumps({"endpoint_id": u}))
+        # dummy config.yaml so that Endpoint._get_ep_dirs finds this
+        (ep_conf_dir / "config.yaml").write_text("")
+
+    result = Endpoint.get_endpoint_dir_by_uuid(gc_conf_dir, uuid)
+
+    if exists:
+        assert result is not None
+    else:
+        assert result is None

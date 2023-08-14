@@ -526,3 +526,56 @@ def test_self_diagnostic_log_size_limit(
     stdout_limited = run_cmd()
 
     assert len(stdout) == len(stdout_limited)
+
+
+_test_name_or_uuid_decorator__data = [
+    ("foo", str(uuid.uuid4())),
+    ("123", str(uuid.uuid4())),
+    ("nice_normal_name", str(uuid.uuid4())),
+]
+
+
+@pytest.mark.parametrize("name,uuid", _test_name_or_uuid_decorator__data)
+def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
+    gc_conf_dir = tmp_path / ".globus_compute"
+    gc_conf_dir.mkdir()
+    for n, u in _test_name_or_uuid_decorator__data:
+        ep_conf_dir = gc_conf_dir / n
+        ep_conf_dir.mkdir()
+        ep_json = ep_conf_dir / "endpoint.json"
+        ep_json.write_text(json.dumps({"endpoint_id": u}))
+        # dummy config.yaml so that Endpoint._get_ep_dirs finds this
+        (ep_conf_dir / "config.yaml").write_text("")
+
+    mock__do_start_endpoint = mocker.patch(
+        "globus_compute_endpoint.cli._do_start_endpoint"
+    )
+
+    run_line(f"-c {gc_conf_dir} start {name}")
+    run_line(f"-c {gc_conf_dir} start {uuid}")
+
+    assert mock__do_start_endpoint.call_count == 2
+
+    first_result, second_result = (
+        call.kwargs["ep_dir"] for call in mock__do_start_endpoint.call_args_list
+    )
+
+    assert first_result == second_result
+
+    assert first_result is not None
+    assert second_result is not None
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        ("foo", "is not configured"),
+        (str(uuid.uuid4()), "no endpoint on this machine with ID"),
+    ],
+)
+def test_get_endpoint_by_name_or_uuid_error_message(run_line, data):
+    value, error = data
+
+    result = run_line(f"start {value}", assert_exit_code=1)
+
+    assert error in result.stderr
