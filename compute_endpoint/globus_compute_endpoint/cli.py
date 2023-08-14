@@ -155,7 +155,8 @@ def verify_not_uuid(ctx, param, value):
     try:
         uuid.UUID(value)
         raise click.BadParameter(
-            "Specifying an UUID for endpoint commands is not currently supported"
+            f"'{ctx.command_path}' requires an endpoint name that"
+            f" is not a UUID (got: '{value}')"
         )
     except ValueError:
         return value
@@ -175,10 +176,6 @@ def name_arg(f):
     return click.argument(
         "name", required=False, callback=verify_not_uuid, default="default"
     )(f)
-
-
-def name_arg_allow_uuid(f):
-    return click.argument("name", required=False, default="default")(f)
 
 
 def config_dir_callback(ctx, param, value):
@@ -248,11 +245,11 @@ def configure_endpoint(
     Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant, display_name)
 
 
-@app.command(name="start", help="Start an endpoint by name")
-@name_arg
+@app.command(name="start", help="Start an endpoint")
+@name_or_uuid_arg
 @start_options
 @common_options
-def start_endpoint(*, name: str, **_kwargs):
+def start_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     """Start an endpoint
 
     This function will do:
@@ -274,7 +271,7 @@ def start_endpoint(*, name: str, **_kwargs):
     """
     state = CommandState.ensure()
     _do_start_endpoint(
-        name=name,
+        ep_dir=ep_dir,
         endpoint_uuid=state.endpoint_uuid,
         die_with_parent=state.die_with_parent,
     )
@@ -352,7 +349,7 @@ FUNCX_COMPUTE_IMPORT_UPDATES = {
 }
 
 
-def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
+def _upgrade_funcx_imports_in_config(ep_dir: pathlib.Path, force=False) -> str:
     """
     This only modifies unindented import lines, as are in the original
     config.py.  Indented matching lines are user created and would have to be
@@ -363,7 +360,7 @@ def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
     This method uses a randomly generated intermediate output file in case
     there are any permission or unforeseen file system issues
     """
-    ep_dir = get_config_dir() / name
+    name = ep_dir.name
     config_path = ep_dir / "config.py"
     config_backup = ep_dir / "config.py.bak"
 
@@ -432,12 +429,11 @@ def _upgrade_funcx_imports_in_config(name: str, force=False) -> str:
 
 def _do_start_endpoint(
     *,
-    name: str,
+    ep_dir: pathlib.Path,
     endpoint_uuid: str | None,
     die_with_parent: bool = False,
 ):
     state = CommandState.ensure()
-    ep_dir = get_config_dir() / name
     if ep_dir.is_dir():
         setup_logging(
             logfile=ep_dir / "endpoint.log",
@@ -501,50 +497,49 @@ def _do_start_endpoint(
 
 
 @app.command("stop")
-@name_arg
+@name_or_uuid_arg
 @click.option(
     "--remote",
     is_flag=True,
     help="send stop signal to all endpoints with this UUID, local or elsewhere",
 )
 @common_options
-def stop_endpoint(*, name: str, remote: bool):
+def stop_endpoint(*, ep_dir: pathlib.Path, remote: bool):
     """Stops an endpoint using the pidfile"""
-    _do_stop_endpoint(name=name, remote=remote)
+    _do_stop_endpoint(ep_dir=ep_dir, remote=remote)
 
 
 @app.command("update_funcx_config")
-@name_arg
+@name_or_uuid_arg
 @click.option(
     "--force",
     is_flag=True,
     default=False,
     help="update config and backup to config.py.bak even if it already exists",
 )
-def update_funcx_endpoint_config(*, name: str, force: bool):
+def update_funcx_endpoint_config(*, ep_dir: pathlib.Path, force: bool):
     """
     Update imports file from funcx_endpoint.* to globus_compute_endpoint.*
 
     Either should raise ClickException or returns modification result message
     """
-    print(_upgrade_funcx_imports_in_config(name=name, force=force))
+    print(_upgrade_funcx_imports_in_config(ep_dir=ep_dir, force=force))
 
 
-def _do_stop_endpoint(*, name: str, remote: bool = False) -> None:
-    ep_dir = get_config_dir() / name
+def _do_stop_endpoint(*, ep_dir: pathlib.Path, remote: bool = False) -> None:
     Endpoint.stop_endpoint(ep_dir, get_config(ep_dir), remote=remote)
 
 
 @app.command("restart")
-@name_arg
+@name_or_uuid_arg
 @common_options
 @start_options
-def restart_endpoint(*, name: str, **_kwargs):
+def restart_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     """Restarts an endpoint"""
     state = CommandState.ensure()
-    _do_stop_endpoint(name=name)
+    _do_stop_endpoint(ep_dir=ep_dir)
     _do_start_endpoint(
-        name=name,
+        ep_dir=ep_dir,
         endpoint_uuid=state.endpoint_uuid,
         die_with_parent=state.die_with_parent,
     )
@@ -559,7 +554,7 @@ def list_endpoints():
 
 
 @app.command("delete")
-@name_arg_allow_uuid
+@name_or_uuid_arg
 @click.option(
     "--force",
     default=False,
@@ -570,14 +565,14 @@ def list_endpoints():
     "--yes", default=False, is_flag=True, help="Do not ask for confirmation to delete."
 )
 @common_options
-def delete_endpoint(*, name: str, force: bool, yes: bool):
+def delete_endpoint(*, ep_dir: pathlib.Path, force: bool, yes: bool):
     """Deletes an endpoint and its config."""
     if not yes:
         click.confirm(
-            f"Are you sure you want to delete the endpoint named <{name}>?", abort=True
+            f"Are you sure you want to delete the endpoint named <{ep_dir.name}>?",
+            abort=True,
         )
 
-    ep_dir = get_config_dir() / name
     Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), force=force)
 
 
