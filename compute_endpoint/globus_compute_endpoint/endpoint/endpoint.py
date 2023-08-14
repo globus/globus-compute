@@ -11,7 +11,7 @@ import signal
 import socket
 import subprocess
 import sys
-import typing
+import typing as t
 import uuid
 
 import daemon
@@ -260,6 +260,15 @@ class Endpoint:
         return None
 
     @staticmethod
+    def get_endpoint_dir_by_uuid(
+        gc_conf_dir: pathlib.Path, uuid: str
+    ) -> pathlib.Path | None:
+        for ep_path in Endpoint._get_ep_dirs(gc_conf_dir):
+            if uuid == Endpoint.get_endpoint_id(ep_path):
+                return ep_path
+        return None
+
+    @staticmethod
     def get_or_create_endpoint_uuid(
         endpoint_dir: pathlib.Path, endpoint_uuid: str | None
     ) -> str:
@@ -326,10 +335,10 @@ class Endpoint:
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
         if endpoint_config.detach_endpoint:
-            stdout: typing.TextIO = open(
+            stdout: t.TextIO = open(
                 os.path.join(endpoint_dir, endpoint_config.stdout), "a+"
             )
-            stderr: typing.TextIO = open(
+            stderr: t.TextIO = open(
                 os.path.join(endpoint_dir, endpoint_config.stderr), "a+"
             )
         else:
@@ -687,9 +696,7 @@ class Endpoint:
         """
         ep_statuses = {}
 
-        funcx_conf_dir = pathlib.Path(funcx_conf_dir)
-        ep_dir_paths = (p.parent for p in funcx_conf_dir.glob("*/config.*"))
-        for ep_path in ep_dir_paths:
+        for ep_path in Endpoint._get_ep_dirs(pathlib.Path(funcx_conf_dir)):
             ep_status = {
                 "status": "Initialized",
                 "id": Endpoint.get_endpoint_id(ep_path),
@@ -806,3 +813,7 @@ class Endpoint:
         if returncode:
             log.error(f"{name} failed with exit code {returncode}")
             exit(os.EX_CONFIG)
+
+    @staticmethod
+    def _get_ep_dirs(gc_conf_dir: pathlib.Path) -> t.Iterable[pathlib.Path]:
+        return (p.parent for p in gc_conf_dir.glob("*/config.*"))
