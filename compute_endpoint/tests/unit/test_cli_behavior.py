@@ -27,6 +27,11 @@ def funcx_dir_path(tmp_path):
 
 
 @pytest.fixture
+def ep_name(randomstring):
+    yield randomstring()
+
+
+@pytest.fixture
 def mock_command_ensure(funcx_dir_path):
     with mock.patch("globus_compute_endpoint.cli.CommandState.ensure") as m_state:
         mock_state = mock.Mock()
@@ -37,15 +42,18 @@ def mock_command_ensure(funcx_dir_path):
 
 
 @pytest.fixture
-def mock_cli_state(funcx_dir_path, mock_command_ensure):
+def mock_cli_state(funcx_dir_path, mock_command_ensure, ep_name):
     with mock.patch("globus_compute_endpoint.cli.Endpoint") as mock_ep:
         mock_ep.return_value = mock_ep
+        mock_ep.get_endpoint_by_name_or_uuid.return_value = (
+            mock_command_ensure.endpoint_config_dir / ep_name
+        )
         yield mock_ep, mock_command_ensure
 
 
 @pytest.fixture
-def make_endpoint_dir(mock_command_ensure):
-    def func(name):
+def make_endpoint_dir(mock_command_ensure, ep_name):
+    def func(name=ep_name):
         ep_dir = mock_command_ensure.endpoint_config_dir / name
         ep_dir.mkdir(parents=True, exist_ok=True)
         ep_config = Endpoint._config_file_path(ep_dir)
@@ -143,34 +151,39 @@ def test_init_config_dir_permission_error(fs):
     assert "Permission denied" in str(exc)
 
 
-def test_start_ep_corrupt(run_line, mock_cli_state, make_endpoint_dir):
-    make_endpoint_dir("foo")
+def test_start_ep_corrupt(run_line, mock_cli_state, make_endpoint_dir, ep_name):
+    make_endpoint_dir()
     mock_ep, mock_state = mock_cli_state
-    conf = mock_state.endpoint_config_dir / "foo" / "config.yaml"
+    conf = mock_state.endpoint_config_dir / ep_name / "config.yaml"
     conf.unlink()
-    res = run_line("start foo", assert_exit_code=1)
+    res = run_line(f"start {ep_name}", assert_exit_code=1)
     assert "corrupted?" in res.stderr
 
 
-def test_start_endpoint_no_such_ep(run_line, mock_cli_state):
-    res = run_line("start foo", assert_exit_code=1)
+def test_start_endpoint_no_such_ep(run_line, mock_cli_state, ep_name):
+    res = run_line(f"start {ep_name}", assert_exit_code=1)
     mock_ep, _ = mock_cli_state
     mock_ep.start_endpoint.assert_not_called()
-    assert "Endpoint 'foo' is not configured" in res.stderr
+    assert f"Endpoint '{ep_name}' is not configured" in res.stderr
 
 
-def test_start_endpoint_existing_ep(run_line, mock_cli_state, make_endpoint_dir):
-    make_endpoint_dir("foo")
-    run_line("start foo")
+def test_start_endpoint_existing_ep(
+    run_line, mock_cli_state, make_endpoint_dir, ep_name
+):
+    make_endpoint_dir()
+    run_line(f"start {ep_name}")
     mock_ep, _ = mock_cli_state
     mock_ep.start_endpoint.assert_called_once()
 
 
-@pytest.mark.parametrize("cli_cmd", ["start", "configure", "stop"])
+@pytest.mark.parametrize("cli_cmd", ["configure"])
 def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
     ep_uuid_name = uuid.uuid4()
     res = run_line(f"{cli_cmd} {ep_uuid_name}", assert_exit_code=2)
-    assert "UUID" in res.stderr and "not currently supported" in res.stderr
+    assert (
+        cli_cmd in res.stderr
+        and "requires an endpoint name that is not a UUID" in res.stderr
+    )
 
 
 @pytest.mark.parametrize(
@@ -189,7 +202,7 @@ def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
     ],
 )
 def test_start_ep_reads_stdin(
-    mocker, run_line, mock_cli_state, make_endpoint_dir, stdin_data
+    mocker, run_line, mock_cli_state, make_endpoint_dir, stdin_data, ep_name
 ):
     data_is_valid, data = stdin_data
 
@@ -204,9 +217,9 @@ def test_start_ep_reads_stdin(
     mock_sys.stdin.isatty.return_value = False
     mock_sys.stdin.read.return_value = data
 
-    make_endpoint_dir("foo")
+    make_endpoint_dir()
 
-    run_line("start foo")
+    run_line(f"start {ep_name}")
     mock_ep, _ = mock_cli_state
     assert mock_ep.start_endpoint.called
     reg_info_found = mock_ep.start_endpoint.call_args[0][5]
@@ -230,17 +243,19 @@ def test_start_ep_reads_stdin(
 
 
 @mock.patch("globus_compute_endpoint.cli.get_config")
-def test_stop_endpoint(get_config, run_line, mock_cli_state, make_endpoint_dir):
-    run_line("stop foo")
+def test_stop_endpoint(
+    get_config, run_line, mock_cli_state, make_endpoint_dir, ep_name
+):
+    run_line(f"stop {ep_name}")
     mock_ep, _ = mock_cli_state
     mock_ep.stop_endpoint.assert_called_once()
 
 
 def test_restart_endpoint_does_start_and_stop(
-    run_line, mock_cli_state, make_endpoint_dir
+    run_line, mock_cli_state, make_endpoint_dir, ep_name
 ):
-    make_endpoint_dir("foo")
-    run_line("restart foo")
+    make_endpoint_dir()
+    run_line(f"restart {ep_name}")
 
     mock_ep, _ = mock_cli_state
     mock_ep.stop_endpoint.assert_called_once()
@@ -299,31 +314,35 @@ def test_config_yaml_display_none(
     assert conf_dict.display_name is None
 
 
-def test_start_ep_incorrect_config_yaml(run_line, mock_cli_state, make_endpoint_dir):
-    make_endpoint_dir("foo")
+def test_start_ep_incorrect_config_yaml(
+    run_line, mock_cli_state, make_endpoint_dir, ep_name
+):
+    make_endpoint_dir()
     mock_ep, mock_state = mock_cli_state
-    conf = mock_state.endpoint_config_dir / "foo" / "config.yaml"
+    conf = mock_state.endpoint_config_dir / ep_name / "config.yaml"
 
     conf.write_text("asdf")
-    res = run_line("start foo", assert_exit_code=1)
+    res = run_line(f"start {ep_name}", assert_exit_code=1)
     assert "Invalid config syntax" in res.stderr
 
     # `coverage` demands a valid syntax file.  FBOW, then, the ordering and
     # commingling of these two tests is intentional.  Bit of a meta problem ...
     conf.unlink()
     conf.write_text("asdf: asdf")
-    res = run_line("start foo", assert_exit_code=1)
+    res = run_line(f"start {ep_name}", assert_exit_code=1)
     assert "field required" in res.stderr
 
 
-def test_start_ep_incorrect_config_py(run_line, mock_cli_state, make_endpoint_dir):
-    make_endpoint_dir("foo")
+def test_start_ep_incorrect_config_py(
+    run_line, mock_cli_state, make_endpoint_dir, ep_name
+):
+    make_endpoint_dir()
     mock_ep, mock_state = mock_cli_state
-    conf = mock_state.endpoint_config_dir / "foo" / "config.py"
+    conf = mock_state.endpoint_config_dir / ep_name / "config.py"
 
     conf.write_text("asa asd df = 5")  # fail the import
     with mock.patch("globus_compute_endpoint.endpoint.config.utils.log") as mock_log:
-        res = run_line("start foo", assert_exit_code=1)
+        res = run_line(f"start {ep_name}", assert_exit_code=1)
         assert "might be out of date" in mock_log.exception.call_args[0][0]
     assert isinstance(res.exception, SyntaxError)
 
@@ -331,17 +350,17 @@ def test_start_ep_incorrect_config_py(run_line, mock_cli_state, make_endpoint_di
     # commingling of these two tests is intentional.  Bit of a meta problem ...
     conf.unlink()
     conf.write_text("asdf = 5")  # syntactically correct
-    res = run_line("start foo", assert_exit_code=1)
+    res = run_line(f"start {ep_name}", assert_exit_code=1)
     assert "modified incorrectly?" in res.stderr
 
 
 @mock.patch("globus_compute_endpoint.endpoint.config.utils._load_config_py")
 def test_start_ep_config_py_override(
-    read_config, run_line, mock_cli_state, make_endpoint_dir
+    read_config, run_line, mock_cli_state, make_endpoint_dir, ep_name
 ):
-    make_endpoint_dir("foo")
+    make_endpoint_dir()
     mock_ep, mock_state = mock_cli_state
-    conf_py = mock_state.endpoint_config_dir / "foo" / "config.py"
+    conf_py = mock_state.endpoint_config_dir / ep_name / "config.py"
     conf_py.write_text(
         """
 from globus_compute_endpoint.endpoint.config import Config
@@ -363,13 +382,13 @@ config = Config(
         """
     )
 
-    run_line("start foo", assert_exit_code=1)
+    run_line(f"start {ep_name}", assert_exit_code=1)
     read_config.assert_called_once()
 
 
 @mock.patch("globus_compute_endpoint.endpoint.config.utils._load_config_py")
-def test_delete_endpoint(read_config, run_line, mock_cli_state):
-    run_line("delete foo --yes")
+def test_delete_endpoint(read_config, run_line, mock_cli_state, ep_name):
+    run_line(f"delete {ep_name} --yes")
     mock_ep, _ = mock_cli_state
     mock_ep.delete_endpoint.assert_called_once()
 
@@ -377,16 +396,16 @@ def test_delete_endpoint(read_config, run_line, mock_cli_state):
 @pytest.mark.parametrize("die_with_parent", [True, False])
 @mock.patch("globus_compute_endpoint.cli.get_config")
 def test_die_with_parent_detached(
-    mock_get_config, run_line, mock_cli_state, die_with_parent
+    mock_get_config, run_line, mock_cli_state, die_with_parent, ep_name
 ):
     config = Config()
     mock_get_config.return_value = config
 
     if die_with_parent:
-        run_line("start foo --die-with-parent")
+        run_line(f"start {ep_name} --die-with-parent")
         assert not config.detach_endpoint
     else:
-        run_line("start foo")
+        run_line(f"start {ep_name}")
         assert config.detach_endpoint
 
 
@@ -397,11 +416,12 @@ def test_self_diagnostic(
     randomstring,
     fs: fakefs.FakeFilesystem,
     run_line: t.Callable,
+    ep_name,
 ):
     mocker.patch("socket.create_connection")
 
     home_path = os.path.expanduser("~")
-    ep_dir_path = f"{home_path}/.globus_compute/foo/"
+    ep_dir_path = f"{home_path}/.globus_compute/{ep_name}/"
     conf_path = f"{ep_dir_path}/config.yaml"
     log_path = f"{ep_dir_path}/endpoint.log"
     conf_data = randomstring()
@@ -479,9 +499,10 @@ def test_self_diagnostic_log_size_limit(
     mock_command_ensure,
     fs: fakefs.FakeFilesystem,
     run_line: t.Callable,
+    ep_name,
 ):
     home_path = os.path.expanduser("~")
-    ep_dir_path = f"{home_path}/.globus_compute/foo/"
+    ep_dir_path = f"{home_path}/.globus_compute/{ep_name}/"
     log_path = f"{ep_dir_path}/endpoint.log"
 
     fs.create_dir(ep_dir_path)

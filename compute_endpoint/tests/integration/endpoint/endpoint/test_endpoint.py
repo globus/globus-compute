@@ -214,18 +214,14 @@ def test_endpoint_logout(monkeypatch):
 
 
 @patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
-@patch(
-    "globus_compute_endpoint.cli.get_config_dir",
-    return_value=pathlib.Path("some_ep_dir"),
-)
 @patch("globus_compute_endpoint.cli.get_config")
 @patch(f"{_MOCK_BASE}Client.stop_endpoint")
-def test_stop_remote_endpoint(
-    mock_get_id, mock_get_conf, mock_get_gcc, mock_stop_endpoint
-):
-    _do_stop_endpoint(name="abc-endpoint", remote=False)
+def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
+    ep_dir = pathlib.Path("some_ep_dir") / "abc-endpoint"
+
+    _do_stop_endpoint(ep_dir=ep_dir, remote=False)
     assert not mock_stop_endpoint.called
-    _do_stop_endpoint(name="abc-endpoint", remote=True)
+    _do_stop_endpoint(ep_dir=ep_dir, remote=True)
     assert mock_stop_endpoint.called
 
 
@@ -309,7 +305,7 @@ def test_endpoint_update_funcx(mock_get_id, mocker, fs, cur_config, randomstring
             f.write("old backup data\n")
 
     try:
-        msg = _upgrade_funcx_imports_in_config(ep_name, force=do_force)
+        msg = _upgrade_funcx_imports_in_config(ep_dir, force=do_force)
         if modified:
             config_backup = ep_dir / "config.py.bak"
             assert "Applied following diff for endpoint" in msg
