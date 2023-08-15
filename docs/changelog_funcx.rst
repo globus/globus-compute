@@ -3,6 +3,17 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.3.1:
+
+funcx & funcx-endpoint v2.3.1
+---------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed ``Executor.reload_tasks``, which was broken in v2.3.0 after changes
+  related to using the new upstream submission route.
+
 .. _changelog-2.3.0:
 
 funcx & funcx-endpoint v2.3.0
