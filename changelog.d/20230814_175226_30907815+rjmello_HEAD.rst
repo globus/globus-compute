@@ -1,0 +1,5 @@
+Bug Fixes
+^^^^^^^^^
+
+- Fixed ``Executor.reload_tasks``, which was broken in v2.3.0 after changes
+  related to using the new upstream submission route.

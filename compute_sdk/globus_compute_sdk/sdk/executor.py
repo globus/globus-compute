@@ -550,7 +550,7 @@ class Executor(concurrent.futures.Executor):
 
         # step 2: from server, acquire list of related task ids and make futures
         r = self.funcx_client.web_client.get_taskgroup_tasks(task_group_id)
-        if r["taskgroup_id"] != task_group_id:
+        if r["taskgroup_id"] != str(task_group_id):
             msg = (
                 "Server did not respond with requested TaskGroup Tasks.  "
                 f"(Requested tasks for {task_group_id} but received "

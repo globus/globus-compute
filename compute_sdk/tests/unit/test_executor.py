@@ -377,7 +377,7 @@ def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
-        "taskgroup_id": gce.task_group_id,
+        "taskgroup_id": str(gce.task_group_id),
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
     }
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
@@ -406,7 +406,7 @@ def test_reload_tasks_some_completed(gc_executor, mocker, num_tasks):
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
-        "taskgroup_id": gce.task_group_id,
+        "taskgroup_id": str(gce.task_group_id),
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
     }
     num_completed = random.randint(1, num_tasks)
@@ -446,7 +446,7 @@ def test_reload_tasks_all_completed(gc_executor):
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
-        "taskgroup_id": gce.task_group_id,
+        "taskgroup_id": str(gce.task_group_id),
         "tasks": [
             {
                 "id": uuid.uuid4(),
@@ -478,7 +478,7 @@ def test_reload_starts_new_watcher(gc_executor):
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
-        "taskgroup_id": gce.task_group_id,
+        "taskgroup_id": str(gce.task_group_id),
         "tasks": [{"id": uuid.uuid4()} for _ in range(num_tasks)],
     }
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
@@ -507,7 +507,7 @@ def test_reload_tasks_cancels_existing_futures(gc_executor, randomstring):
 
     def mock_data():
         return {
-            "taskgroup_id": gce.task_group_id,
+            "taskgroup_id": str(gce.task_group_id),
             "tasks": [{"id": uuid.uuid4()} for i in range(random.randint(0, 20))],
         }
 
@@ -527,9 +527,9 @@ def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
 
     gce.task_group_id = uuid.uuid4()
     mock_datum = (
-        (KeyError, {"mispeleed": gce.task_group_id}),
+        (KeyError, {"mispeleed": str(gce.task_group_id)}),
         (ValueError, {"taskgroup_id": "abcd"}),
-        (None, {"taskgroup_id": gce.task_group_id}),
+        (None, {"taskgroup_id": str(gce.task_group_id)}),
     )
 
     for expected_exc_class, md in mock_datum:
@@ -546,7 +546,7 @@ def test_reload_sets_failed_tasks(gc_executor):
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
-        "taskgroup_id": gce.task_group_id,
+        "taskgroup_id": str(gce.task_group_id),
         "tasks": [
             {"id": uuid.uuid4(), "completion_t": 1, "exception": "doh!"}
             for i in range(random.randint(0, 10))
@@ -571,7 +571,7 @@ def test_reload_handles_deseralization_error_gracefully(gc_executor):
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
-        "taskgroup_id": gce.task_group_id,
+        "taskgroup_id": str(gce.task_group_id),
         "tasks": [
             {"id": uuid.uuid4(), "completion_t": 1, "result": "a", "status": "success"}
             for i in range(random.randint(0, 10))
