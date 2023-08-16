@@ -222,7 +222,13 @@ def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
 
     assert mock_gcc.register_endpoint.called
     _a, k = mock_gcc.register_endpoint.call_args
-    for key in ("endpoint_version", "hostname", "local_user", "config"):
+    for key in (
+        "endpoint_version",
+        "hostname",
+        "local_user",
+        "config",
+        "user_config_schema",
+    ):
         assert key in k["metadata"], "Expected minimal metadata"
 
     for key in (
@@ -1068,28 +1074,24 @@ def test_pipe_size_limit(mocker, successful_exec, conf_size):
         (False, {"foo": "bar"}),
     ],
 )
-def test_render_user_config(fs, data):
+def test_render_user_config(conf_dir: pathlib.Path, data):
     is_valid, user_opts = data
 
-    ep_dir = pathlib.Path("my-ep")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    template = Endpoint.user_config_template_path(ep_dir)
+    template = Endpoint.user_config_template_path(conf_dir)
     template.write_text("heartbeat_period: {{ heartbeat }}")
 
     if is_valid:
-        rendered = render_config_user_template(ep_dir, user_opts)
+        rendered = render_config_user_template(conf_dir, user_opts)
         rendered_dict = yaml.safe_load(rendered)
         assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
     else:
         with pytest.raises(jinja2.exceptions.UndefinedError) as e:
-            render_config_user_template(ep_dir, user_opts)
+            render_config_user_template(conf_dir, user_opts)
             assert "Missing required" in str(e)
 
 
-def test_render_user_config_escape_strings(fs):
-    ep_dir = pathlib.Path("my-ep")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    template = Endpoint.user_config_template_path(ep_dir)
+def test_render_user_config_escape_strings(conf_dir: pathlib.Path):
+    template = Endpoint.user_config_template_path(conf_dir)
     template.write_text(
         """
 endpoint_setup: {{ setup }}
@@ -1109,7 +1111,7 @@ engine:
             "accelerators": [f"{uuid.uuid4()}\n    mem_per_worker: 100"],
         },
     }
-    rendered = render_config_user_template(ep_dir, user_opts)
+    rendered = render_config_user_template(conf_dir, user_opts)
     rendered_dict = yaml.safe_load(rendered)
 
     assert len(rendered_dict) == 2
@@ -1136,21 +1138,19 @@ engine:
         (False, locals),
     ],
 )
-def test_render_user_config_option_types(fs, data):
+def test_render_user_config_option_types(conf_dir: pathlib.Path, data):
     is_valid, val = data
 
-    ep_dir = pathlib.Path("my-ep")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    template = Endpoint.user_config_template_path(ep_dir)
+    template = Endpoint.user_config_template_path(conf_dir)
     template.write_text("foo: {{ foo }}")
 
     user_opts = {"foo": val}
 
     if is_valid:
-        render_config_user_template(ep_dir, user_opts)
+        render_config_user_template(conf_dir, user_opts)
     else:
         with pytest.raises(ValueError) as pyt_exc:
-            render_config_user_template(ep_dir, user_opts)
+            render_config_user_template(conf_dir, user_opts)
         assert "not a valid user config option type" in pyt_exc.exconly()
 
 
@@ -1162,12 +1162,12 @@ def test_render_user_config_option_types(fs, data):
         ("{{ foo._priv }}", type("Foo", (object,), {"_priv": "secret"})()),
     ],
 )
-def test_render_user_config_sandbox(mocker: MockFixture, fs, data: t.Tuple[str, t.Any]):
+def test_render_user_config_sandbox(
+    mocker: MockFixture, conf_dir: pathlib.Path, data: t.Tuple[str, t.Any]
+):
     jinja_op, val = data
 
-    ep_dir = pathlib.Path("my-ep")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    template = Endpoint.user_config_template_path(ep_dir)
+    template = Endpoint.user_config_template_path(conf_dir)
     template.write_text(f"foo: {jinja_op}")
 
     user_opts = {"foo": val}
@@ -1177,7 +1177,7 @@ def test_render_user_config_sandbox(mocker: MockFixture, fs, data: t.Tuple[str, 
     )
 
     with pytest.raises(jinja2.exceptions.SecurityError):
-        render_config_user_template(ep_dir, user_opts)
+        render_config_user_template(conf_dir, user_opts)
 
 
 @pytest.mark.parametrize(
@@ -1199,16 +1199,16 @@ def test_render_user_config_sandbox(mocker: MockFixture, fs, data: t.Tuple[str, 
         (False, "10"),
     ],
 )
-def test_render_user_config_shell_escape(fs, data: t.Tuple[bool, t.Any]):
+def test_render_user_config_shell_escape(
+    conf_dir: pathlib.Path, data: t.Tuple[bool, t.Any]
+):
     is_valid, option = data
 
-    ep_dir = pathlib.Path("my-ep")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    template = Endpoint.user_config_template_path(ep_dir)
+    template = Endpoint.user_config_template_path(conf_dir)
     template.write_text("option: {{ option|shell_escape }}")
 
     user_opts = {"option": option}
-    rendered = render_config_user_template(ep_dir, user_opts)
+    rendered = render_config_user_template(conf_dir, user_opts)
     rendered_dict = yaml.safe_load(rendered)
 
     assert len(rendered_dict) == 1
@@ -1221,12 +1221,10 @@ def test_render_user_config_shell_escape(fs, data: t.Tuple[bool, t.Any]):
 
 
 @pytest.mark.parametrize("schema_exists", [True, False])
-def test_render_user_config_schema_applied(
-    mocker: MockFixture, fs, schema_exists: bool
+def test_render_user_config_apply_schema(
+    mocker: MockFixture, conf_dir: pathlib.Path, schema_exists: bool
 ):
-    ep_dir = pathlib.Path("my-ep")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    template = Endpoint.user_config_template_path(ep_dir)
+    template = Endpoint.user_config_template_path(conf_dir)
     template.write_text("foo: {{ foo }}")
     if schema_exists:
         schema = {
@@ -1236,13 +1234,13 @@ def test_render_user_config_schema_applied(
                 "foo": {"type": "string"},
             },
         }
-        schema_path = Endpoint.user_config_schema_path(ep_dir)
+        schema_path = Endpoint.user_config_schema_path(conf_dir)
         schema_path.write_text(json.dumps(schema))
 
     mock_validate = mocker.patch.object(jsonschema, "validate")
 
     user_opts = {"foo": "bar"}
-    render_config_user_template(ep_dir, user_opts)
+    render_config_user_template(conf_dir, user_opts)
 
     if schema_exists:
         assert mock_validate.called
@@ -1307,22 +1305,22 @@ def test_validate_user_config_options_invalid_schema(
 @pytest.mark.parametrize(
     "data", [(True, '{"foo": "bar"}'), (False, '{"foo": "bar", }')]
 )
-def test_load_user_config_schema(mocker: MockFixture, fs, data: t.Tuple[bool, str]):
+def test_load_user_config_schema(
+    mocker: MockFixture, conf_dir: pathlib.Path, data: t.Tuple[bool, str]
+):
     is_valid, schema_json = data
 
     mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
 
-    ep_dir = pathlib.Path("my-ep")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    template = Endpoint.user_config_schema_path(ep_dir)
+    template = Endpoint.user_config_schema_path(conf_dir)
     template.write_text(schema_json)
 
     if is_valid:
-        schema = load_user_config_schema(ep_dir)
+        schema = load_user_config_schema(conf_dir)
         assert schema == json.loads(schema_json)
     else:
         with pytest.raises(json.JSONDecodeError):
-            load_user_config_schema(ep_dir)
+            load_user_config_schema(conf_dir)
         assert mock_log.error.called
         a, *_ = mock_log.error.call_args
         assert "user config schema is not valid JSON" in str(a)

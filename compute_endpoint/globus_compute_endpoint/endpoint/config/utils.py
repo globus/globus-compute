@@ -165,12 +165,12 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
     return config
 
 
-def load_user_config_schema(endpoint_dir: pathlib.Path):
+def load_user_config_schema(endpoint_dir: pathlib.Path) -> dict | None:
     from globus_compute_endpoint.endpoint.endpoint import Endpoint
 
     user_config_schema_path = Endpoint.user_config_schema_path(endpoint_dir)
     if not user_config_schema_path.exists():
-        return
+        return None
 
     try:
         return json.loads(user_config_schema_path.read_text())
