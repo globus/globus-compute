@@ -3,6 +3,10 @@
 # processing this YAML file as a Jinja template against user-provided
 # variables -- please modify this template to suit your site's requirements.
 #
+# Optionally, you can define a JSON schema for the user-provided variables in a
+# file named `user_config_schema.json` within the same directory. The variables
+# will be validated against the schema before rendering this template.
+#
 # For more information, please see the `user_endpoint_config` in Globus Compute
 # SDK's Executor.
 #

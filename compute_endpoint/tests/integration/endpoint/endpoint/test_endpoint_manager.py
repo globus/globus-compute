@@ -39,6 +39,7 @@ class TestStart:
         # pyfakefs will take care of newly created files, not existing config
         fs.add_real_file(DEF_CONFIG_DIR / "default_config.yaml")
         fs.add_real_file(DEF_CONFIG_DIR / "user_config_template.yaml")
+        fs.add_real_file(DEF_CONFIG_DIR / "user_config_schema.json")
         fs.add_real_file(DEF_CONFIG_DIR / "user_environment.yaml")
 
         yield

@@ -18,13 +18,18 @@ from collections import namedtuple
 from unittest import mock
 
 import jinja2
+import jsonschema
 import pika
 import pyprctl
 import pytest as pytest
 import responses
 import yaml
 from globus_compute_endpoint.endpoint.config import Config
-from globus_compute_endpoint.endpoint.config.utils import render_config_user_template
+from globus_compute_endpoint.endpoint.config.utils import (
+    _validate_user_opts,
+    load_user_config_schema,
+    render_config_user_template,
+)
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.endpoint_manager import (
     EndpointManager,
@@ -1063,7 +1068,7 @@ def test_pipe_size_limit(mocker, successful_exec, conf_size):
         (False, {"foo": "bar"}),
     ],
 )
-def test_render_config_user_template(fs, data):
+def test_render_user_config(fs, data):
     is_valid, user_opts = data
 
     ep_dir = pathlib.Path("my-ep")
@@ -1081,7 +1086,7 @@ def test_render_config_user_template(fs, data):
             assert "Missing required" in str(e)
 
 
-def test_render_config_user_template_escape_strings(fs):
+def test_render_user_config_escape_strings(fs):
     ep_dir = pathlib.Path("my-ep")
     ep_dir.mkdir(parents=True, exist_ok=True)
     template = Endpoint.user_config_template_path(ep_dir)
@@ -1131,7 +1136,7 @@ engine:
         (False, locals),
     ],
 )
-def test_render_config_user_template_option_types(fs, data):
+def test_render_user_config_option_types(fs, data):
     is_valid, val = data
 
     ep_dir = pathlib.Path("my-ep")
@@ -1146,7 +1151,7 @@ def test_render_config_user_template_option_types(fs, data):
     else:
         with pytest.raises(ValueError) as pyt_exc:
             render_config_user_template(ep_dir, user_opts)
-        assert "not a valid user option type" in str(pyt_exc.exconly)
+        assert "not a valid user config option type" in pyt_exc.exconly()
 
 
 @pytest.mark.parametrize(
@@ -1157,9 +1162,7 @@ def test_render_config_user_template_option_types(fs, data):
         ("{{ foo._priv }}", type("Foo", (object,), {"_priv": "secret"})()),
     ],
 )
-def test_render_config_user_template_sandbox(
-    mocker: MockFixture, fs, data: t.Tuple[str, t.Any]
-):
+def test_render_user_config_sandbox(mocker: MockFixture, fs, data: t.Tuple[str, t.Any]):
     jinja_op, val = data
 
     ep_dir = pathlib.Path("my-ep")
@@ -1196,7 +1199,7 @@ def test_render_config_user_template_sandbox(
         (False, "10"),
     ],
 )
-def test_render_config_user_template_shell_escape(fs, data: t.Tuple[bool, t.Any]):
+def test_render_user_config_shell_escape(fs, data: t.Tuple[bool, t.Any]):
     is_valid, option = data
 
     ep_dir = pathlib.Path("my-ep")
@@ -1215,3 +1218,111 @@ def test_render_config_user_template_shell_escape(fs, data: t.Tuple[bool, t.Any]
         assert f"ls {rendered_option}" == f"ls {escaped_option}"
     else:
         assert rendered_option == option
+
+
+@pytest.mark.parametrize("schema_exists", [True, False])
+def test_render_user_config_schema_applied(
+    mocker: MockFixture, fs, schema_exists: bool
+):
+    ep_dir = pathlib.Path("my-ep")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = Endpoint.user_config_template_path(ep_dir)
+    template.write_text("foo: {{ foo }}")
+    if schema_exists:
+        schema = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "foo": {"type": "string"},
+            },
+        }
+        schema_path = Endpoint.user_config_schema_path(ep_dir)
+        schema_path.write_text(json.dumps(schema))
+
+    mock_validate = mocker.patch.object(jsonschema, "validate")
+
+    user_opts = {"foo": "bar"}
+    render_config_user_template(ep_dir, user_opts)
+
+    if schema_exists:
+        assert mock_validate.called
+        *_, kwargs = mock_validate.call_args
+        assert kwargs["instance"] == user_opts
+        assert kwargs["schema"] == schema
+    else:
+        assert not mock_validate.called
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        (True, {"foo": "bar", "nest": {"nested": 10}}),
+        (True, {"foo": "bar", "extra": "ok"}),
+        (False, {"foo": 10}),
+        (False, {"foo": {"nested": "bar"}}),
+        (False, {"nest": "nested"}),
+        (False, {"nest": {"nested": "blah", "extra": "baddie"}}),
+    ],
+)
+def test_validate_user_config_options(mocker: MockFixture, data: t.Tuple[bool, dict]):
+    is_valid, user_opts = data
+
+    mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "foo": {"type": "string"},
+            "nest": {
+                "type": "object",
+                "properties": {"nested": {"type": "number"}},
+                "additionalProperties": False,
+            },
+        },
+    }
+    if is_valid:
+        _validate_user_opts(user_opts, schema)
+    else:
+        with pytest.raises(jsonschema.ValidationError):
+            _validate_user_opts(user_opts, schema)
+        assert mock_log.error.called
+        a, *_ = mock_log.error.call_args
+        assert "user config options are invalid" in str(a)
+
+
+@pytest.mark.parametrize("schema", ["foo", {"type": "blah"}])
+def test_validate_user_config_options_invalid_schema(
+    mocker: MockFixture, schema: t.Any
+):
+    mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+    user_opts = {"foo": "bar"}
+    with pytest.raises(jsonschema.SchemaError):
+        _validate_user_opts(user_opts, schema)
+    assert mock_log.error.called
+    a, *_ = mock_log.error.call_args
+    assert "user config schema is invalid" in str(a)
+
+
+@pytest.mark.parametrize(
+    "data", [(True, '{"foo": "bar"}'), (False, '{"foo": "bar", }')]
+)
+def test_load_user_config_schema(mocker: MockFixture, fs, data: t.Tuple[bool, str]):
+    is_valid, schema_json = data
+
+    mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+
+    ep_dir = pathlib.Path("my-ep")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    template = Endpoint.user_config_schema_path(ep_dir)
+    template.write_text(schema_json)
+
+    if is_valid:
+        schema = load_user_config_schema(ep_dir)
+        assert schema == json.loads(schema_json)
+    else:
+        with pytest.raises(json.JSONDecodeError):
+            load_user_config_schema(ep_dir)
+        assert mock_log.error.called
+        a, *_ = mock_log.error.call_args
+        assert "user config schema is not valid JSON" in str(a)
