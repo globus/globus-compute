@@ -24,6 +24,7 @@ import yaml
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import (
+    load_user_config_schema,
     render_config_user_template,
     serialize_config,
 )
@@ -83,7 +84,7 @@ class EndpointManager:
             reg_info = gcc.register_endpoint(
                 conf_dir.name,
                 endpoint_uuid,
-                metadata=EndpointManager.get_metadata(config),
+                metadata=EndpointManager.get_metadata(config, conf_dir),
                 multi_tenant=True,
             )
         except GlobusAPIError as e:
@@ -160,7 +161,7 @@ class EndpointManager:
         )
 
     @staticmethod
-    def get_metadata(config: Config) -> dict:
+    def get_metadata(config: Config, conf_dir: pathlib.Path) -> dict:
         # Piecemeal Config settings because for MT, most of the ST items are
         # unrelated -- the MT (aka EndpointManager) does not execute tasks
         return {
@@ -168,6 +169,7 @@ class EndpointManager:
             "hostname": socket.getfqdn(),
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
             "config": serialize_config(config),
+            "user_config_schema": load_user_config_schema(conf_dir),
         }
 
     def request_shutdown(self, sig_num, curr_stack_frame):
