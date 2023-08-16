@@ -165,6 +165,36 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
     return config
 
 
+def load_user_config_schema(endpoint_dir: pathlib.Path):
+    from globus_compute_endpoint.endpoint.endpoint import Endpoint
+
+    user_config_schema_path = Endpoint.user_config_schema_path(endpoint_dir)
+    if not user_config_schema_path.exists():
+        return
+
+    try:
+        return json.loads(user_config_schema_path.read_text())
+    except json.JSONDecodeError:
+        log.error(
+            f"\n\nThe user config schema is not valid JSON: {user_config_schema_path}\n"
+        )
+        raise
+
+
+def _validate_user_opts(user_opts: dict, schema: dict) -> None:
+    """Validates user config options against a JSON schema."""
+    import jsonschema  # Only load package when called by EP manager
+
+    try:
+        jsonschema.validate(instance=user_opts, schema=schema)
+    except jsonschema.SchemaError:
+        log.error("\n\nThe user config schema is invalid\n")
+        raise
+    except jsonschema.ValidationError:
+        log.error("\n\nThe provided user config options are invalid\n")
+        raise
+
+
 def _sanitize_user_opts(data):
     """Prevent YAML injection via special characters.
     Note that this will enforce double quoted YAML strings.
@@ -180,7 +210,9 @@ def _sanitize_user_opts(data):
     else:
         # We do not expect to hit this because user options are passed
         # from the web service as JSON
-        raise ValueError(f"{type(data).__name__} is not a valid user option type")
+        raise ValueError(
+            f"{type(data).__name__} is not a valid user config option type"
+        )
 
 
 def _shell_escape_filter(val):
@@ -203,6 +235,9 @@ def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> 
     from globus_compute_endpoint.endpoint.endpoint import Endpoint
     from jinja2.sandbox import SandboxedEnvironment
 
+    user_config_schema = load_user_config_schema(endpoint_dir)
+    if user_config_schema:
+        _validate_user_opts(user_opts, user_config_schema)
     user_opts = _sanitize_user_opts(user_opts)
     user_config_path = Endpoint.user_config_template_path(endpoint_dir)
 

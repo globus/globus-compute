@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "endpoint_setup": { "type": "string" },
+    "endpoint_init": { "type": "string" },
+    "worker_init": { "type": "string" }
+  },
+  "additionalProperties": true
+}

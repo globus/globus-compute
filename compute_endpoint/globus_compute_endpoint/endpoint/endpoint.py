@@ -58,6 +58,10 @@ class Endpoint:
         return endpoint_dir / "user_config_template.yaml"
 
     @staticmethod
+    def user_config_schema_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+        return endpoint_dir / "user_config_schema.json"
+
+    @staticmethod
     def _user_environment_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
         return endpoint_dir / "user_environment.yaml"
 
@@ -126,14 +130,18 @@ class Endpoint:
                 endpoint_dir.chmod(world_executable)
 
                 src_user_tmpl_path = package_dir / "config/user_config_template.yaml"
+                src_user_schem_path = package_dir / "config/user_config_schema.json"
                 src_user_env_path = package_dir / "config/user_environment.yaml"
                 dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
+                dst_user_schem_path = Endpoint.user_config_schema_path(endpoint_dir)
                 dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
 
                 shutil.copy(src_user_tmpl_path, dst_user_tmpl_path)
+                shutil.copy(src_user_schem_path, dst_user_schem_path)
                 shutil.copy(src_user_env_path, dst_user_env_path)
 
                 dst_user_tmpl_path.chmod(world_readable)
+                dst_user_schem_path.chmod(world_readable)
                 dst_user_env_path.chmod(world_readable)
 
         finally:
