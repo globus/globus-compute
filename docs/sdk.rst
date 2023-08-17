@@ -329,5 +329,15 @@ method:
   fn, args, kwargs = serializer.check_strategies(greet, "world", greeting="hello")
   assert fn(*args, **kwargs) == greet("world", greeting="hello")
 
+Supported Method Serialization Strategies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Note that if ``DillCode`` does not work for your use case, whether it is due
+to differing python/dill version or because of the construction of your method,
+the other alternatives that we currently support are ``DillTextInspect`` and
+``DillCodeSource``.  ``CombinedCode`` serializes the payload in all available
+strategies and will use the first one that deserializes successfully at
+ execution time.
+
 .. |dill| replace:: ``dill``
 .. _dill: https://dill.readthedocs.io/en/latest/#basic-usage
