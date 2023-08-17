@@ -1,6 +1,7 @@
 import inspect
 import random
 import sys
+from unittest.mock import patch
 
 import globus_compute_sdk.serialize.concretes as concretes
 import pytest
@@ -248,6 +249,33 @@ def test_code_dill_source():
 def test_overall():
     check_serialize_deserialize_foo(ComputeSerializer())
     check_serialize_deserialize_bar(ComputeSerializer())
+
+
+def test_combined_serialize_fail():
+    single_source = concretes.DillCodeSource()
+
+    # built-in functions do not serialize with most strategies
+    with pytest.raises(TypeError):
+        single_source.serialize(max)
+
+    combined = concretes.CombinedCode()
+    combined_serialized_func = combined.serialize(max)
+    deserialized = combined.deserialize(combined_serialized_func)
+
+    assert deserialized(1, 4) == 4
+
+
+@patch(
+    "globus_compute_sdk.serialize.concretes.DillCode.serialize",
+    side_effect=Exception("block this"),
+)
+def test_combined_serialize_all_fail(code_mock):
+    # max() only works with DillCode.  Disabling that should trigger
+    # a failure when no methods work
+    combined = concretes.CombinedCode()
+    with pytest.raises(SerializationError) as exc_info:
+        combined.serialize(max)
+    assert "No serialization methods were successful" in str(exc_info.value)
 
 
 def test_serialize_deserialize_combined():
