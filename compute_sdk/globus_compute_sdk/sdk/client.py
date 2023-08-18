@@ -388,19 +388,28 @@ class Client:
     def register_endpoint(
         self,
         name,
-        endpoint_id,
-        metadata=None,
-        multi_tenant=False,
-        display_name=None,
+        endpoint_id: UUID_LIKE_T,
+        metadata: dict | None = None,
+        multi_tenant: bool | None = None,
+        display_name: str | None = None,
+        allowed_functions: list[UUID_LIKE_T] | None = None,
     ):
         """Register an endpoint with the Globus Compute service.
 
         Parameters
         ----------
-        :param name str Name of the endpoint
-        :param endpoint_id str The uuid of the endpoint
-        :param metadata dict endpoint metadata
-        :param multi_tenant bool Whether the endpoint supports multiple users
+        name : str
+            Name of the endpoint
+        endpoint_id : str | UUID
+            The uuid of the endpoint
+        metadata : dict | None
+            Endpoint metadata
+        multi_tenant : bool | None
+            Whether the endpoint supports multiple users
+        display_name : str | None
+            The display name of the endpoint
+        allowed_functions: list[str | UUID] | None
+            List of functions that are allowed to be run on the endpoint
 
         Returns
         -------
@@ -417,6 +426,7 @@ class Client:
             metadata=metadata,
             multi_tenant=multi_tenant,
             display_name=display_name,
+            allowed_functions=allowed_functions,
         )
         return r.data
 

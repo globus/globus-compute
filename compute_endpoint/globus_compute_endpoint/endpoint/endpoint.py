@@ -360,6 +360,7 @@ class Endpoint:
                     metadata=Endpoint.get_metadata(endpoint_config),
                     multi_tenant=False,
                     display_name=endpoint_config.display_name,
+                    allowed_functions=endpoint_config.allowed_functions,
                 )
 
             except GlobusAPIError as e:
