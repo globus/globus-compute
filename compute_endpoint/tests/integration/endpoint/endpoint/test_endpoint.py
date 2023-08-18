@@ -162,14 +162,14 @@ def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_compute_client):
     ep_conf = Config()
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
     ep_dir.mkdir(parents=True, exist_ok=True)
-    ep_conf.allowed_functions = ["a", "b"]
+    ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
 
     with pytest.raises(SystemExit):
         ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
 
-    config = gcc.web_client.post.call_args[1]["data"]["metadata"]["config"]
-    assert len(config["allowed_functions"]) == 2
-    assert config["allowed_functions"][1] == "b"
+    called_data = gcc.web_client.post.call_args[1]["data"]
+    assert len(called_data["allowed_functions"]) == 2
+    assert called_data["allowed_functions"][1] == ep_conf.allowed_functions[1]
 
 
 def test_endpoint_logout(monkeypatch):

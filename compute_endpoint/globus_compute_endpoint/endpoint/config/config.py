@@ -92,6 +92,9 @@ class Config(RepresentationMixin):
         Designates the endpoint as a multi-tenant endpoint
         Default: None
 
+    allowed_functions : list[str] | None
+        List of functions that are allowed to be run on the endpoint
+
     force_mt_allow_same_user : bool
         If set, override the heuristic that determines whether the uid running the
         multi-tenant endpoint may also run user endpoints.
