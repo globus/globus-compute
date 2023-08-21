@@ -21,7 +21,7 @@ The Globus Compute Python SDK provides programming abstractions for
 interacting with the Globus Compute service. Before running this
 tutorial you should first install the Globus Compute SDK as follows:
 
-::
+.. code:: shell
 
    $ pip install globus-compute-sdk
 
@@ -33,7 +33,7 @@ the authentication process you must grant permission for Globus Compute
 to access your identity information (to retrieve your email address) and
 Globus Groups management access (to share endpoints).
 
-.. code:: ipython3
+.. code:: python
 
     from globus_compute_sdk import Executor
 
@@ -44,11 +44,11 @@ with all Globus Compute users). You can also change the
 ``endpoint_id`` to the UUID of any endpoint for which you have
 permission to execute functions.
 
-.. code:: ipython3
+.. code:: python
 
     tutorial_endpoint = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
 
-.. code:: ipython3
+.. code:: python
 
     gce = Executor(endpoint_id = tutorial_endpoint)
     print("Executor : ", gce)
@@ -66,7 +66,7 @@ To execute a function, you simply call ``submit`` and pass a reference
 to the function. Optionally, you may also specify any input arguments to
 the function.
 
-.. code:: ipython3
+.. code:: python
 
     # Define the function for remote execution
     def hello_world():
@@ -91,12 +91,12 @@ a boolean that indicates whether the task is finished. \*
 ``future.result()`` is a blocking call that returns the result from the
 task execution or raises an exception if task execution failed.
 
-.. code:: ipython3
+.. code:: python
 
     # Returns a boolean that indicates task completion
     future.done()
 
-.. code:: ipython3
+.. code:: python
 
     # Waits for the function to complete and returns the task result or exception on failure
     future.result()
@@ -108,7 +108,7 @@ When a task fails and you try to get its result, the ``future`` will
 raise an exception. In the following example, the ``ZeroDivisionError``
 exception is raised when ``future.result()`` is called.
 
-.. code:: ipython3
+.. code:: python
 
     def division_by_zero():
         return 42 / 0 # This will raise a ZeroDivisionError
@@ -136,7 +136,7 @@ Globus.
 The following example shows a function that computes the sum of a list
 of input arguments.
 
-.. code:: ipython3
+.. code:: python
 
     def get_sum(a, b):
         return a + b
@@ -154,7 +154,7 @@ modules) are available on the endpoint on which the function will
 execute. For example, in the following function, we explicitly import
 the datetime module.
 
-.. code:: ipython3
+.. code:: python
 
     def get_date():
         from datetime import date
@@ -172,7 +172,7 @@ easily invoke external applications that are accessible on the remote
 endpoint. For example, the following function calls the Linux ``echo``
 command.
 
-.. code:: ipython3
+.. code:: python
 
     def echo(name):
         import os
@@ -197,7 +197,7 @@ square with side length :math:`2r`, the area of the circle is
 within the square, approximately :math:`N\pi/4` will be inside the
 circle and therfore we can estimate the value of :math:`\pi`.
 
-.. code:: ipython3
+.. code:: python
 
     import time
 
@@ -232,7 +232,7 @@ Endpoint operations
 You can retrieve information about endpoints including status and
 information about how the endpoint is configured.
 
-.. code:: ipython3
+.. code:: python
 
     from globus_compute_sdk import Client
     gcc = Client()
