@@ -87,7 +87,7 @@ how to download and configure an endpoint for local (multi-process) execution. :
    executor
    sdk
    endpoints
-   Tutorial
+   tutorial
    actionprovider
    reference/index
    limits
