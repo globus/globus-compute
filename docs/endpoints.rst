@@ -213,6 +213,55 @@ Native container support (docker, singularity, shifter):
 * Soft routing: When receiving a task for a specific container type, the Globus Compute endpoint attempts to send the task to a manager that has a suitable warm container to minimize the total number of container cold starts. If there are not any warmed containers in any connected managers, the Globus Compute endpoint chooses one manager randomly to dispatch the task.
 
 
+Restarting endpoint when machine restarts
+-----------------------------------------
+
+To ensure that a compute endpoint comes back online when its host machine restarts, a
+systemd service can be configured to run the endpoint.
+
+1. Ensure the endpoint isn't running:
+
+   .. code-block:: shell
+
+      $ globus-compute-endpoint stop <my-endpoint-name>
+
+2. Update the endpoint's ``config.yaml`` to set ``detach_endpoint`` to ``false``
+
+3. Create a service file at ``/etc/systemd/system/my-globus-compute-endpoint.service``,
+   and populate it with the following settings:
+
+   .. code-block:: cfg
+
+      [Unit]
+      Description=Globus Compute Endpoint systemd service
+      After=network.target
+      StartLimitIntervalSec=0
+
+      [Service]
+      ExecStart=</full/path/to/globus-compute-endpoint/executable> start <my-endpoint-name>
+      User=<user_account>
+      Type=simple
+      Restart=always
+      RestartSec=1
+
+      [Install]
+      WantedBy=multi-user.target
+
+4. Enable the service and start the endpoint:
+
+   .. code-block:: shell
+
+      $ sudo systemctl enable my-globus-compute-endpoint.service --now
+
+To edit an existing systemd service, make changes to the service file and then run the
+following:
+
+.. code-block:: shell
+
+   $ sudo systemctl daemon-reload
+   $ sudo systemctl restart my-globus-compute-endpoint.service
+
+
 Example configurations
 ----------------------
 
