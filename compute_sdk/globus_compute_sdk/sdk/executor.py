@@ -363,6 +363,8 @@ class Executor(concurrent.futures.Executor):
 
     def submit(self, fn, *args, **kwargs):
         """
+        .. _submit():
+
         Submit a function to be executed on the Executor's specified endpoint
         with the given arguments.
 
