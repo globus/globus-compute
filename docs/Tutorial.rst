@@ -15,7 +15,7 @@ local PC. After configuring an endpoint you can use it in this tutorial
 by simply setting the ``endpoint_id`` below.
 
 Globus Compute Python SDK
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Globus Compute Python SDK provides programming abstractions for
 interacting with the Globus Compute service. Before running this
@@ -54,13 +54,13 @@ permission to execute functions.
     print("Executor : ", gce)
 
 Globus Compute 101
-==================
+------------------
 
 The following example demonstrates how you can execute a function with
 the ``Executor`` interface.
 
 Submitting a function
-~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^
 
 To execute a function, you simply call ``submit`` and pass a reference
 to the function. Optionally, you may also specify any input arguments to
@@ -77,7 +77,7 @@ the function.
     print("Submit returned: ", future)
 
 Getting results
-~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^
 
 When you ``submit`` a function for execution (called a ``task``), the
 executor will return an instance of ``ComputeFuture`` in lieu of the
@@ -121,7 +121,7 @@ exception is raised when ``future.result()`` is called.
         print("Globus Compute returned an exception: ", exc)
 
 Functions with arguments
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Globus Compute supports registration and execution of functions with
 arbitrary arguments and returned parameters. Globus Compute will
@@ -145,7 +145,7 @@ of input arguments.
     print(f"40 + 2 = {future.result()}")
 
 Functions with dependencies
----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to execute a function on a remote endpoint, Globus Compute
 requires that functions explictly state all dependencies within the
@@ -165,7 +165,7 @@ the datetime module.
     print("Date fetched from endpoint: ", future.result())
 
 Calling external applications
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 While Globus Compute is designed to execute Python functions, you can
 easily invoke external applications that are accessible on the remote
@@ -183,7 +183,7 @@ command.
     print("Echo output: ", future.result())
 
 Running functions many times
-----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 One of the strengths of Globus Compute is the ease by which you can run
 functions many times, perhaps with different input arguments. The
@@ -227,7 +227,7 @@ circle and therfore we can estimate the value of :math:`\pi`.
     print("Average: {:.5f}".format(sum(total)/len(estimates)))
 
 Endpoint operations
-===================
+-------------------
 
 You can retrieve information about endpoints including status and
 information about how the endpoint is configured.
