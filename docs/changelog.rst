@@ -122,7 +122,8 @@ New Functionality
 * Auto-scaling support for ``GlobusComputeEngine``
   Here is an example configuration in python:
 
-  ```
+.. code-block:: python
+
   engine = GlobusComputeEngine(
         address="127.0.0.1",
         heartbeat_period_s=1,
@@ -137,7 +138,6 @@ New Functionality
             max_idletime=30.0,
         ),
     )
-  ```
 
 - Reimplemented ``ProcessPoolEngine``, which wraps ``concurrent.futures.ProcessPoolExecutor``,
   for concurrent local execution. We temporarily removed the former implementation because of a
@@ -179,20 +179,23 @@ New Functionality
 Deprecated
 ^^^^^^^^^^
 
- - The ``HighThroughputExecutor`` is now marked for deprecation.
-   Importing and using this class will raise a warning.
-   Upgrade to the ``globus_compute_endpoint.engines.GlobusComputeEngine`` which
-   supercedes the ``HighThroughputExecutor``.
+- The ``HighThroughputExecutor`` is now marked for deprecation.
+  Importing and using this class will raise a warning.
+  Upgrade to the ``globus_compute_endpoint.engines.GlobusComputeEngine`` which
+  supercedes the ``HighThroughputExecutor``.
 
-   Please note that the ``GlobusComputeEngine`` has the following limitations:
-   1. It binds to all network interfaces instead of binding to a single interface
-      to limit incoming worker connections to the internal network.
-   2. Does not support dynamically switching containers are runtime, and requires
-      containers to be specified at the time the endpoint is started.
-   3. Pending support for auto-scaling with ``strategy``
+  Please note that the ``GlobusComputeEngine`` has the following limitations:
 
-   If the above limitations affect you, consider using ``globus_compute_endpoint.engines.HighThroughputEngine``
-   which is a designed to bridge backward compatibility issues.
+  #. It binds to all network interfaces instead of binding to a single interface
+     to limit incoming worker connections to the internal network.
+
+  #. Does not support dynamically switching containers are runtime, and requires
+     containers to be specified at the time the endpoint is started.
+
+  #. Pending support for auto-scaling with ``strategy``
+
+  If the above limitations affect you, consider using ``globus_compute_endpoint.engines.HighThroughputEngine``
+  which is a designed to bridge backward compatibility issues.
 
 .. _Changelog-2.2.2:
 
@@ -227,8 +230,10 @@ New Functionality
 - The strategies used to serialize functions and arguments are now selectable at the
   ``Client`` level via constructor arguments (``code_serialization_strategy`` and
   ``data_serialization_strategy``)
+
   - For example, to use ``DillCodeSource`` when serializing functions:
     ``client = Client(code_serialization_strategy=DillCodeSource())``
+
   - This functionality is available to the ``Executor`` by passing a custom client.
     Using the client above: ``executor = Executor(funcx_client=client)``
 
