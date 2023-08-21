@@ -21,15 +21,6 @@ if [[ "$VERSION" != "$ENDPOINT_VERSION" ]]; then
   exit 1
 fi
 
-if ! grep '^funcx \& funcx\-endpoint v'"$VERSION"'$' ../docs/changelog_funcx.rst; then
-  read -p "Package version v$VERSION not noted in docs/changelog_funcx.rst.  Proceed? [y/n] " -n 1 -r
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    [[ $0 = $BASH_SOURCE ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
-  else
-    echo "\n  Releasing funcx wrappers without changelog updates for v$VERSION"
-  fi
-fi
-
 echo "releasing v$VERSION"
 if git tag -s -m "v$VERSION" "$VERSION" ; then
   echo "Git tagged $VERSION"
