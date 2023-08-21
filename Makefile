@@ -14,5 +14,7 @@ docs: .venv-docs
 	cd docs; rm -rf _build/
 	cd docs; ../.venv-docs/bin/sphinx-build -W --keep-going -d _build/doctrees -b dirhtml . _build/dirhtml
 
-clean:
+clean-docs:
 	rm -rf .venv-docs/
+
+clean: clean-docs
