@@ -363,20 +363,20 @@ class Client:
     def batch_run(
         self, endpoint_id: UUID_LIKE_T, batch: Batch
     ) -> dict[str, str | dict[str, list[str]]]:
-        """
-        Initiate a batch of tasks to Globus Compute
+        """Initiate a batch of tasks to Globus Compute
 
         :param endpoint_id: The endpoint identifier to which to send the batch
         :param batch: a Batch object
+        :return: a dictionary with the following keys:
 
-        Returns
-        -------
-        dictionary with the following keys:
-            tasks: a mapping of function IDs to lists of task IDs
-            request_id: arbitrary unique string the web-service assigns this request
-                (only intended for help with support requests)
-            task_group_id: the task group identifier associated with the submitted tasks
-            endpoint_id: the endpoint the tasks were submitted to
+          - tasks: a mapping of function IDs to lists of task IDs
+
+          - request_id: arbitrary unique string the web-service assigns this request
+            (only intended for help with support requests)
+
+          - task_group_id: the task group identifier associated with the submitted tasks
+
+          - endpoint_id: the endpoint the tasks were submitted to
         """
         if not batch:
             raise ValueError("No tasks specified for batch run")
