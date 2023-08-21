@@ -12,7 +12,7 @@ lint:
 docs: .venv-docs
 	# clean the build dir before rebuilding
 	cd docs; rm -rf _build/
-	cd docs; ../.venv-docs/bin/sphinx-build -d _build/doctrees -b dirhtml . _build/dirhtml
+	cd docs; ../.venv-docs/bin/sphinx-build -W --keep-going -d _build/doctrees -b dirhtml . _build/dirhtml
 
 clean:
 	rm -rf .venv-docs/
