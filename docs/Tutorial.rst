@@ -47,9 +47,6 @@ permission to execute functions.
 .. code:: python
 
     tutorial_endpoint = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
-
-.. code:: python
-
     gce = Executor(endpoint_id = tutorial_endpoint)
     print("Executor : ", gce)
 
@@ -95,8 +92,6 @@ task execution or raises an exception if task execution failed.
 
     # Returns a boolean that indicates task completion
     future.done()
-
-.. code:: python
 
     # Waits for the function to complete and returns the task result or exception on failure
     future.result()
