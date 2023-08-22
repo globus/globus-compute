@@ -10,6 +10,7 @@ from collections import OrderedDict
 import dill
 from globus_compute_sdk.serialize.base import (
     DeserializationError,
+    SerializationError,
     SerializationStrategy,
 )
 
@@ -176,7 +177,7 @@ class CombinedCode(SerializationStrategy):
 
     def get_multiple_payloads(self, payload: str) -> tuple[tuple[str, str], ...]:
         parts: list[str] = self.chomp(payload).split(CombinedCode._separator)
-        assert len(parts) == 2 * len(CombinedCode._chunk_strategies)
+        assert len(parts) > 0
         ai = iter(parts)
 
         # ie. ((04\n', 'gACQ...'), ('01\n', 'sAAbk2...'), ...)
@@ -186,10 +187,18 @@ class CombinedCode(SerializationStrategy):
         chunks = []
         for id, cls in CombinedCode._chunk_strategies.items():
             strategy = cls()
-            serialized = strategy.serialize(data)
+            try:
+                serialized = strategy.serialize(data)
+            except Exception:
+                # Ignore and move on to next
+                continue
             id_length = len(id)
             chunks.append(serialized[:id_length])
             chunks.append(serialized[id_length:])
+
+        if len(chunks) == 0:
+            raise SerializationError("No serialization methods were successful")
+
         return self.identifier + CombinedCode._separator.join(chunks)
 
     def deserialize(self, payload: str, variation: int = 0):
