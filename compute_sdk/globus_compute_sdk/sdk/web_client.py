@@ -97,7 +97,7 @@ class WebClient(globus_sdk.BaseClient):
         self.user_app_name = app_name
 
     def get_version(self, *, service: str = "all") -> globus_sdk.GlobusHTTPResponse:
-        return self.get("/v2/version", query_params={"service": service})
+        return self.get("/v3/version", query_params={"service": service})
 
     def get_taskgroup_tasks(
         self, task_group_id: UUID_LIKE_T

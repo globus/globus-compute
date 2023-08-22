@@ -151,7 +151,7 @@ class Client:
         """
         data = self.web_client.get_version()
 
-        min_ep_version = data["min_ep_version"]
+        min_ep_version = data["min_endpoint_version"]
         min_sdk_version = data["min_sdk_version"]
 
         compare_versions(__version__, min_sdk_version)

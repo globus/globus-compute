@@ -54,8 +54,12 @@ def test_start_endpoint_blocked(
     reason_msg = randomstring()
     responses.add(
         responses.GET,
-        svc_addy + "/v2/version",
-        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
+        svc_addy + "/v3/version",
+        json={
+            "api": "1.0.5",
+            "min_endpoint_version": "1.0.5",
+            "min_sdk_version": "0.0.2a0",
+        },
         status=200,
     )
     responses.add(
@@ -105,8 +109,12 @@ def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_n
 
     responses.add(
         responses.GET,
-        svc_addy + "/v2/version",
-        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
+        svc_addy + "/v3/version",
+        json={
+            "api": "1.0.5",
+            "min_endpoint_version": "1.0.5",
+            "min_sdk_version": "0.0.2a0",
+        },
         status=200,
     )
     responses.add(
@@ -147,8 +155,12 @@ def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_compute_client):
 
     responses.add(
         responses.GET,
-        gcc_addy + "/v2/version",
-        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
+        gcc_addy + "/v3/version",
+        json={
+            "api": "1.0.5",
+            "min_endpoint_version": "1.0.5",
+            "min_sdk_version": "0.0.2a0",
+        },
         status=200,
     )
     responses.add(

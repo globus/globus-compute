@@ -46,7 +46,7 @@ def test_get_version_service_param(client, service_param):
     # to match on querystring and URL
     responses.add(
         responses.GET,
-        "https://api.funcx/v2/version",
+        "https://api.funcx/v3/version",
         json={"version": 100},
         match=[responses.matchers.query_param_matcher({"service": expect_param})],
     )

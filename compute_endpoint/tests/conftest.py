@@ -85,9 +85,13 @@ class FakeLoginManager:
 def get_standard_compute_client():
     responses.add(
         method=responses.GET,
-        url="https://compute.api.globus.org/v2/version",
+        url="https://compute.api.globus.org/v3/version",
         headers={"Content-Type": "application/json"},
-        json={"api": "0.4.0", "min_ep_version": "0.0.0", "min_sdk_version": "0.0.0"},
+        json={
+            "api": "0.4.0",
+            "min_endpoint_version": "0.0.0",
+            "min_sdk_version": "0.0.0",
+        },
     )
 
     def func():
