@@ -101,7 +101,12 @@ def test_update_task_table_on_invalid_data(api_data):
 
 
 def test_update_task_table_on_exception():
-    api_data = {"status": "success", "exception": "foo-bar-baz", "completion_t": "1.1"}
+    api_data = {
+        "status": "success",
+        "exception": "foo-bar-baz",
+        "completion_t": "1.1",
+        "task_id": "task-id-foo",
+    }
     gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(TaskExecutionFailed) as excinfo:
@@ -115,7 +120,7 @@ def test_update_task_table_simple_object(randomstring):
     task_id = "some_task_id"
 
     payload = randomstring()
-    data = {"status": "success", "completion_t": "1.1"}
+    data = {"task_id": task_id, "status": "success", "completion_t": "1.1"}
     data["result"] = serde.serialize(payload)
 
     st = gcc._update_task_table(data, task_id)
@@ -132,7 +137,10 @@ def test_pending_tasks_always_fetched():
     gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     gcc.web_client = mock.MagicMock()
     gcc._task_status_table.update(
-        {should_fetch_01: {"pending": True}, no_fetch: {"pending": False}}
+        {
+            should_fetch_01: {"pending": True, "task_id": should_fetch_01},
+            no_fetch: {"pending": False, "task_id": no_fetch},
+        }
     )
     task_id_list = [no_fetch, should_fetch_01, should_fetch_02]
 
@@ -279,3 +287,35 @@ def test_delete_function():
     gcc.delete_function(func_uuid_str)
 
     assert gcc.web_client.delete_function.called_with(func_uuid_str)
+
+
+def test_missing_task_info(mocker, login_manager):
+    tid1 = str(uuid.uuid4())
+    tid1_reason = "XYZ tid1"
+    tid2 = str(uuid.uuid4())
+
+    mock_resp = {
+        "response": "batch",
+        "results": {
+            tid1: {
+                "task_id": tid1,
+                "status": "failed",
+                "reason": tid1_reason,
+            },
+            tid2: {
+                "task_id": tid2,
+                "status": "failed",
+            },
+        },
+    }
+    login_manager.get_web_client.get_batch_status = mocker.Mock(return_value=mock_resp)
+    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+
+    gcc.web_client.base_url = "https://a.g.org"
+    res = gcc.get_batch_result([tid1, tid2])
+
+    assert tid1 in res
+    assert res[tid1]["pending"] is False
+    assert res[tid1]["reason"] == tid1_reason
+    assert tid2 in res
+    assert res[tid2]["reason"] == "unknown"

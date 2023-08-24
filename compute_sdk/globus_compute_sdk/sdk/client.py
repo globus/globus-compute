@@ -187,10 +187,16 @@ class Client:
         status = {"pending": pending, "status": r_status}
 
         if not pending:
+            # We are tolerant on the other fields but task_id should be there
+            if task_id != r_dict.get("task_id"):
+                err_msg = f"Task {task_id} returned invalid response: ({r_dict})"
+                logger.error(err_msg)
+                raise ValueError(err_msg)
+
+            completion_t = r_dict.get("completion_t", "unknown")
             if "result" not in r_dict and "exception" not in r_dict:
-                raise ValueError("non-pending result is missing result data")
-            completion_t = r_dict["completion_t"]
-            if "result" in r_dict:
+                status["reason"] = r_dict.get("reason", "unknown")
+            elif "result" in r_dict:
                 try:
                     r_obj = self.fx_serializer.deserialize(r_dict["result"])
                 except Exception:
