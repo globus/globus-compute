@@ -3,7 +3,13 @@ import pwd as _pwd
 import re as _re
 import typing as t
 
-import pyprctl as _pyprctl
+try:
+    import pyprctl as _pyprctl
+
+    has_pyprctl = True
+except AttributeError:
+    has_pyprctl = False
+
 
 _url_user_pass_pattern = r"://([^:]+):[^@]+@"
 _url_user_pass_re = _re.compile(_url_user_pass_pattern)
@@ -11,46 +17,47 @@ _urlb_user_pass_re = _re.compile(_url_user_pass_pattern.encode())
 
 _T = t.TypeVar("_T", str, bytes)
 
-# List of Linux capabilities that would suggest the running process is
-# privileged, even if os.getuid() != 0.
-_MULTI_USER_CAPS = {
-    _pyprctl.Cap.AUDIT_CONTROL,
-    _pyprctl.Cap.AUDIT_READ,
-    _pyprctl.Cap.BPF,
-    _pyprctl.Cap.CHECKPOINT_RESTORE,
-    _pyprctl.Cap.CHOWN,
-    _pyprctl.Cap.DAC_OVERRIDE,
-    _pyprctl.Cap.DAC_READ_SEARCH,
-    _pyprctl.Cap.FOWNER,
-    _pyprctl.Cap.FSETID,
-    _pyprctl.Cap.IPC_OWNER,
-    _pyprctl.Cap.KILL,
-    _pyprctl.Cap.LINUX_IMMUTABLE,
-    _pyprctl.Cap.MAC_ADMIN,
-    _pyprctl.Cap.MAC_OVERRIDE,
-    _pyprctl.Cap.MKNOD,
-    _pyprctl.Cap.NET_ADMIN,
-    _pyprctl.Cap.NET_BIND_SERVICE,
-    _pyprctl.Cap.NET_RAW,
-    _pyprctl.Cap.PERFMON,
-    _pyprctl.Cap.SETGID,
-    _pyprctl.Cap.SETFCAP,
-    _pyprctl.Cap.SETPCAP,
-    _pyprctl.Cap.SETUID,
-    _pyprctl.Cap.SYS_ADMIN,
-    _pyprctl.Cap.SYS_BOOT,
-    _pyprctl.Cap.SYS_CHROOT,
-    _pyprctl.Cap.SYS_MODULE,
-    _pyprctl.Cap.SYS_NICE,
-    _pyprctl.Cap.SYS_PACCT,
-    _pyprctl.Cap.SYS_PTRACE,
-    _pyprctl.Cap.SYS_RAWIO,
-    _pyprctl.Cap.SYS_RESOURCE,
-    _pyprctl.Cap.SYS_TIME,
-    _pyprctl.Cap.SYS_TTY_CONFIG,
-    _pyprctl.Cap.SYSLOG,
-    _pyprctl.Cap.WAKE_ALARM,
-}
+if has_pyprctl:
+    # List of Linux capabilities that would suggest the running process is
+    # privileged, even if os.getuid() != 0.
+    _MULTI_USER_CAPS = {
+        _pyprctl.Cap.AUDIT_CONTROL,
+        _pyprctl.Cap.AUDIT_READ,
+        _pyprctl.Cap.BPF,
+        _pyprctl.Cap.CHECKPOINT_RESTORE,
+        _pyprctl.Cap.CHOWN,
+        _pyprctl.Cap.DAC_OVERRIDE,
+        _pyprctl.Cap.DAC_READ_SEARCH,
+        _pyprctl.Cap.FOWNER,
+        _pyprctl.Cap.FSETID,
+        _pyprctl.Cap.IPC_OWNER,
+        _pyprctl.Cap.KILL,
+        _pyprctl.Cap.LINUX_IMMUTABLE,
+        _pyprctl.Cap.MAC_ADMIN,
+        _pyprctl.Cap.MAC_OVERRIDE,
+        _pyprctl.Cap.MKNOD,
+        _pyprctl.Cap.NET_ADMIN,
+        _pyprctl.Cap.NET_BIND_SERVICE,
+        _pyprctl.Cap.NET_RAW,
+        _pyprctl.Cap.PERFMON,
+        _pyprctl.Cap.SETGID,
+        _pyprctl.Cap.SETFCAP,
+        _pyprctl.Cap.SETPCAP,
+        _pyprctl.Cap.SETUID,
+        _pyprctl.Cap.SYS_ADMIN,
+        _pyprctl.Cap.SYS_BOOT,
+        _pyprctl.Cap.SYS_CHROOT,
+        _pyprctl.Cap.SYS_MODULE,
+        _pyprctl.Cap.SYS_NICE,
+        _pyprctl.Cap.SYS_PACCT,
+        _pyprctl.Cap.SYS_PTRACE,
+        _pyprctl.Cap.SYS_RAWIO,
+        _pyprctl.Cap.SYS_RESOURCE,
+        _pyprctl.Cap.SYS_TIME,
+        _pyprctl.Cap.SYS_TTY_CONFIG,
+        _pyprctl.Cap.SYSLOG,
+        _pyprctl.Cap.WAKE_ALARM,
+    }
 
 
 def _redact_url_creds(raw: _T, redact_user=True, repl="***", count=0) -> _T:

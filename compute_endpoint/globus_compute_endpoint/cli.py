@@ -16,7 +16,6 @@ import click
 from click import ClickException
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
 from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
@@ -443,6 +442,14 @@ def _do_start_endpoint(
         log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
     if ep_config.multi_tenant:
+        try:
+            from globus_compute_endpoint.endpoint.endpoint_manager import (
+                EndpointManager,
+            )
+        except ImportError as e:
+            raise ClickException(
+                "multi-tenant endpoints are not supported on this system"
+            ) from e
         epm = EndpointManager(ep_dir, endpoint_uuid, ep_config)
         epm.start()
     else:

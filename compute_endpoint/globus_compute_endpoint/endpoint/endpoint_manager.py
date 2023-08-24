@@ -18,7 +18,11 @@ import typing as t
 from datetime import datetime
 
 import globus_compute_sdk as GC
-import pyprctl
+
+try:
+    import pyprctl
+except AttributeError as e:
+    raise ImportError("pyprctl is not supported on this system") from e
 import setproctitle
 import yaml
 from globus_compute_endpoint import __version__
