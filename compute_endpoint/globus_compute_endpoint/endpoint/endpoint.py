@@ -378,13 +378,14 @@ class Endpoint:
                 log.exception(
                     f"Caught exception while attempting endpoint registration: {e}"
                 )
-                log.critical(
+                msg = (
                     "globus-compute-endpoint is unable to reach the Globus Compute "
-                    "service due to a NetworkError \n"
-                    "Please make sure that the Globus Compute service address you "
-                    "provided is reachable \n"
-                    "and then attempt restarting the endpoint"
+                    "service due to a network error.\n"
+                    "Please ensure the Globus Compute service address is reachable, "
+                    "then attempt restarting the endpoint."
                 )
+                print(msg)
+                log.critical(msg)
                 exit(os.EX_TEMPFAIL)
 
             ret_ep_uuid = reg_info.get("endpoint_id")
@@ -600,13 +601,14 @@ class Endpoint:
                 f"  [{e}]"
             )
             if not force:
-                log.critical(
+                msg = (
                     "globus-compute-endpoint is unable to reach the Globus Compute "
-                    "service due to a NetworkError \n"
-                    "Please make sure that the Globus Compute service address you "
-                    "provided is reachable \n"
-                    "and then attempt to delete the endpoint again"
+                    "service due to a network error.\n"
+                    "Please ensure the Globus Compute service address is reachable, "
+                    "then attempt to delete the endpoint again."
                 )
+                print(msg)
+                log.critical(msg)
                 exit(os.EX_TEMPFAIL)
 
         # Stop endpoint to handle process cleanup
