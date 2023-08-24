@@ -24,6 +24,8 @@ from globus_compute_endpoint.endpoint.config.utils import (
     serialize_config,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_sdk import NetworkError
+from pytest_mock import MockFixture
 
 _mock_base = "globus_compute_endpoint.endpoint.endpoint."
 
@@ -161,6 +163,75 @@ def test_start_endpoint(
     assert "Registration information: " in debug_args
     assert uname not in debug_args
     assert pword not in debug_args
+
+
+@responses.activate
+def test_start_endpoint_network_error(
+    mocker: MockFixture,
+    fs,
+    randomstring,
+    get_standard_compute_client,
+    register_endpoint_response,
+    mock_ep_data,
+):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_uuid_str = str(uuid.uuid4())
+
+    uname, pword = randomstring(), randomstring()
+    register_endpoint_response(endpoint_id=ep_uuid_str, username=uname, password=pword)
+
+    mock_gcc = get_standard_compute_client()
+    mocker.patch.object(
+        mock_gcc, "register_endpoint", side_effect=NetworkError("foo", Exception)
+    )
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+    mock_log = mocker.patch(f"{_mock_base}log")
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        with pytest.raises(SystemExit) as pytest_exc:
+            ep.start_endpoint(
+                ep_dir, ep_uuid_str, ep_conf, log_to_console, no_color, reg_info={}
+            )
+
+    assert pytest_exc.value.code == os.EX_TEMPFAIL
+    assert "exception while attempting" in mock_log.exception.call_args[0][0]
+    assert "unable to reach the Globus Compute" in mock_log.critical.call_args[0][0]
+    assert "unable to reach the Globus Compute" in f.getvalue()  # stdout
+
+
+@responses.activate
+def test_delete_endpoint_network_error(
+    mocker: MockFixture,
+    fs,
+    randomstring,
+    get_standard_compute_client,
+    register_endpoint_response,
+    mock_ep_data,
+):
+    ep, ep_dir, _, _, ep_conf = mock_ep_data
+    ep_uuid_str = str(uuid.uuid4())
+
+    uname, pword = randomstring(), randomstring()
+    register_endpoint_response(endpoint_id=ep_uuid_str, username=uname, password=pword)
+
+    mock_gcc = get_standard_compute_client()
+    mocker.patch.object(
+        mock_gcc, "delete_endpoint", side_effect=NetworkError("foo", Exception)
+    )
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+    mocker.patch(f"{_mock_base}Endpoint.get_endpoint_id").return_value = ep_uuid_str
+    mock_log = mocker.patch(f"{_mock_base}log")
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        with pytest.raises(SystemExit) as pytest_exc:
+            ep.delete_endpoint(ep_dir, ep_conf)
+
+    assert pytest_exc.value.code == os.EX_TEMPFAIL
+    assert "could not be deleted from the web" in mock_log.warning.call_args[0][0]
+    assert "unable to reach the Globus Compute" in mock_log.critical.call_args[0][0]
+    assert "unable to reach the Globus Compute" in f.getvalue()  # stdout
 
 
 @responses.activate
