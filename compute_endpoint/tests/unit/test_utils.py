@@ -1,8 +1,13 @@
 from collections import namedtuple
 
-import pyprctl
 import pytest
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds, is_privileged
+
+try:
+    import pyprctl
+except AttributeError:
+    pytest.skip(allow_module_level=True)
+
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.utils."
 

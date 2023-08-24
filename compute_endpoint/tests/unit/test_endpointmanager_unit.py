@@ -20,7 +20,6 @@ from unittest import mock
 import jinja2
 import jsonschema
 import pika
-import pyprctl
 import pytest as pytest
 import responses
 import yaml
@@ -31,13 +30,21 @@ from globus_compute_endpoint.endpoint.config.utils import (
     render_config_user_template,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.endpoint_manager import (
-    EndpointManager,
-    InvalidUserError,
-)
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_sdk import GlobusAPIError, NetworkError
 from pytest_mock import MockFixture
+
+try:
+    import pyprctl
+except AttributeError:
+    pytest.skip(allow_module_level=True)
+else:
+    # these imports also import pyprctl later
+    from globus_compute_endpoint.endpoint.endpoint_manager import (
+        EndpointManager,
+        InvalidUserError,
+    )
+
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
 
