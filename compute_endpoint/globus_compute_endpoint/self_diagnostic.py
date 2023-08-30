@@ -8,8 +8,13 @@ import socket
 import subprocess
 import sys
 import textwrap
+from urllib.parse import urlparse
 
 import click
+from globus_compute_sdk.sdk._environments import (
+    get_amqp_service_host,
+    get_web_service_url,
+)
 
 
 def cat(path: str, wildcard: bool = False, max_bytes: int | None = None):
@@ -82,6 +87,9 @@ def _run_command(cmd: str):
 
 
 def run_self_diagnostic(log_bytes: int | None = None):
+    web_svc_host = urlparse(get_web_service_url()).netloc
+    amqp_svc_host = get_amqp_service_host()
+
     commands = [
         "uname -a",
         cat("/etc/os-release"),
@@ -89,8 +97,8 @@ def run_self_diagnostic(log_bytes: int | None = None):
         which_python,
         get_python_version,
         "pip freeze",
-        test_conn("compute.api.globus.org", 443),
-        test_conn("amqps.funcx.org", 5671),
+        test_conn(web_svc_host, 443),
+        test_conn(amqp_svc_host, 5671),
         "ip addr",
         "ifconfig",
         "ip route",

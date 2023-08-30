@@ -444,6 +444,29 @@ def test_self_diagnostic(
     assert log_data in stdout
 
 
+@pytest.mark.parametrize("env", ["sandbox", "integration", "staging"])
+def test_self_diagnostic_sdk_environment(
+    mocker: MockFixture,
+    mock_command_ensure,
+    mock_cli_state,
+    fs: fakefs.FakeFilesystem,
+    run_line: t.Callable,
+    monkeypatch,
+    env: str,
+):
+    mocker.patch("socket.create_connection")
+    mock_test_conn = mocker.patch(
+        "globus_compute_endpoint.self_diagnostic.test_conn",
+        return_value=lambda: "Success!",
+    )
+
+    monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", env)
+    run_line("self-diagnostic")
+
+    assert f"compute.api.{env}.globuscs.info" in mock_test_conn.call_args_list[0][0]
+    assert f"compute.amqps.{env}.globuscs.info" in mock_test_conn.call_args_list[1][0]
+
+
 def test_self_diagnostic_gzip(
     mocker: MockFixture,
     mock_cli_state,
