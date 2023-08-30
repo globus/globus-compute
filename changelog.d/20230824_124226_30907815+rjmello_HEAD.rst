@@ -1,5 +1,0 @@
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- An informative error message will print to stdout when attempting to start or delete an
-  endpoint while the Globus Compute web service is unreachable.
