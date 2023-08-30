@@ -15,6 +15,7 @@ from globus_compute_sdk.sdk._environments import (
     get_amqp_service_host,
     get_web_service_url,
 )
+from globus_compute_sdk.sdk.web_client import WebClient
 
 
 def cat(path: str, wildcard: bool = False, max_bytes: int | None = None):
@@ -58,6 +59,16 @@ def test_conn(host: str, port: int, timeout: int = 5):
     return kernel
 
 
+def get_service_versions(base_url: str):
+    def kernel():
+        wc = WebClient(base_url=base_url)
+        res = wc.get_version(service="all")
+        click.echo(f"{res}\n")
+
+    kernel.display_name = f"func:get_service_versions({base_url})"  # type: ignore
+    return kernel
+
+
 def get_python_version():
     click.echo(f"Python version {sys.version}\n")
 
@@ -87,7 +98,8 @@ def _run_command(cmd: str):
 
 
 def run_self_diagnostic(log_bytes: int | None = None):
-    web_svc_host = urlparse(get_web_service_url()).netloc
+    web_svc_url = get_web_service_url()
+    web_svc_host = urlparse(web_svc_url).netloc
     amqp_svc_host = get_amqp_service_host()
 
     commands = [
@@ -99,6 +111,7 @@ def run_self_diagnostic(log_bytes: int | None = None):
         "pip freeze",
         test_conn(web_svc_host, 443),
         test_conn(amqp_svc_host, 5671),
+        get_service_versions(web_svc_url),
         "ip addr",
         "ifconfig",
         "ip route",
