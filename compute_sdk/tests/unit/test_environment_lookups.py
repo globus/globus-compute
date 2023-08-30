@@ -1,5 +1,8 @@
 import pytest
-from globus_compute_sdk.sdk._environments import get_web_service_url
+from globus_compute_sdk.sdk._environments import (
+    get_amqp_service_host,
+    get_web_service_url,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -26,3 +29,22 @@ def test_web_service_url(monkeypatch):
     # GLOBUS_SDK_ENVIRONMENT should override FUNCX_SDK_ENVIRONMENT
     monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", "sandbox")
     assert get_web_service_url(None) == env_url_map["sandbox"]
+
+
+def test_get_amqp_service_host(monkeypatch):
+    env_url_map = {
+        None: "amqps.funcx.org",
+        "production": "amqps.funcx.org",
+        "sandbox": "compute.amqps.sandbox.globuscs.info",
+        "invalid-env": "amqps.funcx.org",
+    }
+
+    for env, url in env_url_map.items():
+        assert get_amqp_service_host(env) == url
+
+    monkeypatch.setenv("FUNCX_SDK_ENVIRONMENT", "production")
+    assert get_amqp_service_host(None) == env_url_map["production"]
+
+    # GLOBUS_SDK_ENVIRONMENT should override FUNCX_SDK_ENVIRONMENT
+    monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", "sandbox")
+    assert get_amqp_service_host(None) == env_url_map["sandbox"]

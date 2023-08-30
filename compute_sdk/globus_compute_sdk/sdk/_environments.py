@@ -12,7 +12,7 @@ def _get_envname():
     )
 
 
-def get_web_service_url(envname: str | None) -> str:
+def get_web_service_url(envname: str | None = None) -> str:
     env = envname or _get_envname()
     urls = {
         "production": "https://compute.api.globus.org",
@@ -25,6 +25,20 @@ def get_web_service_url(envname: str | None) -> str:
         urls[test_env] = f"https://compute.api.{test_env}.globuscs.info"
 
     return urls.get(env, urls["production"])
+
+
+def get_amqp_service_host(env_name: str | None = None) -> str:
+    env = env_name or _get_envname()
+    hosts = {
+        "production": "amqps.funcx.org",
+        "dev": "amqps.dev.funcx.org",
+        "preview": "compute.amqps.preview.globus.org",
+        "local": "localhost",
+    }
+    for test_env in ["sandbox", "test", "integration", "staging"]:
+        hosts[test_env] = f"compute.amqps.{test_env}.globuscs.info"
+
+    return hosts.get(env, hosts["production"])
 
 
 def remove_url_path(url: str):
