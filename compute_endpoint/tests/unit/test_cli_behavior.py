@@ -17,6 +17,7 @@ from globus_compute_endpoint.cli import app, init_config_dir
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_sdk.sdk.web_client import WebClient
 from pyfakefs import fake_filesystem as fakefs
 from pytest_mock import MockFixture
 
@@ -419,6 +420,7 @@ def test_self_diagnostic(
     ep_name,
 ):
     mocker.patch("socket.create_connection")
+    mocker.patch.object(WebClient, "get_version")
 
     home_path = os.path.expanduser("~")
     ep_dir_path = f"{home_path}/.globus_compute/{ep_name}/"
@@ -438,7 +440,7 @@ def test_self_diagnostic(
     res = run_line("self-diagnostic")
     stdout = res.stdout_bytes.decode("utf-8")
 
-    assert stdout.count("== Diagnostic") >= 16
+    assert stdout.count("== Diagnostic") >= 17
     assert stdout.count("was successful!") == 2
     assert conf_data in stdout
     assert log_data in stdout
@@ -455,6 +457,7 @@ def test_self_diagnostic_sdk_environment(
     env: str,
 ):
     mocker.patch("socket.create_connection")
+    mocker.patch.object(WebClient, "get_version")
     mock_test_conn = mocker.patch(
         "globus_compute_endpoint.self_diagnostic.test_conn",
         return_value=lambda: "Success!",
@@ -475,6 +478,7 @@ def test_self_diagnostic_gzip(
     run_line: t.Callable,
 ):
     mocker.patch("socket.create_connection")
+    mocker.patch.object(WebClient, "get_version")
 
     res = run_line("self-diagnostic --gzip")
     stdout = res.stdout_bytes.decode("utf-8")
@@ -488,7 +492,7 @@ def test_self_diagnostic_gzip(
     with gzip.open(fname, "rb") as f:
         contents = f.read().decode("utf-8")
 
-    assert contents.count("== Diagnostic") >= 16
+    assert contents.count("== Diagnostic") >= 17
 
 
 @pytest.mark.parametrize("test_data", [(True, 1), (False, 0.5), (False, "")])
@@ -503,6 +507,7 @@ def test_self_diagnostic_log_size(
     should_succeed, kb = test_data
 
     mocker.patch("socket.create_connection")
+    mocker.patch.object(WebClient, "get_version")
 
     def run_cmd():
         res = run_line(f"self-diagnostic --log-kb {kb}")
@@ -510,7 +515,7 @@ def test_self_diagnostic_log_size(
 
     if should_succeed:
         stdout = run_cmd()
-        assert stdout.count("== Diagnostic") >= 16
+        assert stdout.count("== Diagnostic") >= 17
     else:
         with pytest.raises(AssertionError):
             stdout = run_cmd()
@@ -531,6 +536,7 @@ def test_self_diagnostic_log_size_limit(
     fs.create_dir(ep_dir_path)
 
     mocker.patch("socket.create_connection")
+    mocker.patch.object(WebClient, "get_version")
 
     def run_cmd():
         # Limit log file size to 1 KB
