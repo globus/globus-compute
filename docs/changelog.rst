@@ -3,6 +3,35 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.3.2:
+
+globus-compute-sdk & globus-compute-endpoint v2.3.2
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- In the ``globus-compute-endpoint`` CLI, commands which operate on registered endpoints
+  can now accept UUID values in addition to names.
+
+  - The following sub-commands can now accept either a name or a UUID:
+
+    - ``delete``
+
+    - ``restart``
+
+    - ``start``
+
+    - ``stop``
+
+    - ``update_funcx_config``
+
+  - (The other sub-commands either do not accept endpoint name arguments, like ``list``,
+    or cannot accept UUID arguments, like ``configure``.)
+
+- An informative error message will print to stdout when attempting to start or delete an
+  endpoint while the Globus Compute web service is unreachable.
+
 .. _changelog-2.3.1:
 
 globus-compute-sdk & globus-compute-endpoint v2.3.1
