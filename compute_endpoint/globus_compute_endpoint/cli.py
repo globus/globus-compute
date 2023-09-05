@@ -24,6 +24,13 @@ from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
+try:
+    from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
+except ImportError:
+    _has_multi_tenant = False
+else:
+    _has_multi_tenant = True
+
 log = logging.getLogger(__name__)
 
 
@@ -240,6 +247,10 @@ def configure_endpoint(
         Endpoint.validate_endpoint_name(name)
     except ValueError as e:
         raise ClickException(str(e))
+
+    if multi_tenant and not _has_multi_tenant:
+        raise ClickException("multi-tenant endpoints are not supported on this system")
+
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
     Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant, display_name)
@@ -474,14 +485,10 @@ def _do_start_endpoint(
         log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
     if ep_config.multi_tenant:
-        try:
-            from globus_compute_endpoint.endpoint.endpoint_manager import (
-                EndpointManager,
-            )
-        except ImportError as e:
+        if not _has_multi_tenant:
             raise ClickException(
                 "multi-tenant endpoints are not supported on this system"
-            ) from e
+            )
         epm = EndpointManager(ep_dir, endpoint_uuid, ep_config)
         epm.start()
     else:
