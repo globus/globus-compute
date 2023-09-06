@@ -9,11 +9,17 @@ but we don't have time to do that (even though it would be better (a lot better)
 
 from __future__ import annotations
 
+import functools
+import logging
+import os
 import sys
+import textwrap
 import traceback
 import types
 import typing as t
 
+import click
+import globus_sdk
 from globus_compute_endpoint.exceptions import CouldNotExecuteUserTaskError
 from globus_compute_sdk.errors import MaxResultSizeExceeded
 
@@ -21,6 +27,8 @@ INTERNAL_ERROR_CLASSES: tuple[type[Exception], ...] = (
     CouldNotExecuteUserTaskError,
     MaxResultSizeExceeded,
 )
+
+log = logging.getLogger(__name__)
 
 
 def _typed_excinfo(
@@ -62,3 +70,24 @@ def get_result_error_details(exc: BaseException | None = None) -> tuple[str, str
         "RemoteExecutionError",
         "An error occurred during the execution of this task",
     )
+
+
+def handle_auth_errors(f: t.Callable) -> t.Callable:
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except globus_sdk.AuthAPIError as e:
+            msg = textwrap.dedent(
+                f"""
+                Compute CLI Error: An Auth API error occurred.
+                HTTP status:       {e.http_status}
+                code:              {e.code}
+                message:           {e.text}
+                """
+            )
+            log.warning(msg)
+            click.echo(msg)
+            sys.exit(os.EX_NOPERM)
+
+    return wrapper

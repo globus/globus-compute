@@ -28,7 +28,7 @@ from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.client import Client
-from globus_sdk import GlobusAPIError, NetworkError
+from globus_sdk import AuthAPIError, GlobusAPIError, NetworkError
 
 log = logging.getLogger(__name__)
 
@@ -604,6 +604,9 @@ class Endpoint:
             fx_client = Endpoint.get_funcx_client(endpoint_config)
             fx_client.delete_endpoint(endpoint_id)
             log.info(f"Endpoint <{ep_name}> has been deleted from the web service")
+        except AuthAPIError:
+            # Send to the exception handler
+            raise
         except GlobusAPIError as e:
             log.warning(
                 f"Endpoint <{ep_name}> could not be deleted from the web service"

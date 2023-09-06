@@ -17,6 +17,7 @@ import click
 from click import ClickException
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
 from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
@@ -249,6 +250,7 @@ def configure_endpoint(
 @name_or_uuid_arg
 @start_options
 @common_options
+@handle_auth_errors
 def start_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     """Start an endpoint
 
@@ -504,6 +506,7 @@ def _do_start_endpoint(
     help="send stop signal to all endpoints with this UUID, local or elsewhere",
 )
 @common_options
+@handle_auth_errors
 def stop_endpoint(*, ep_dir: pathlib.Path, remote: bool):
     """Stops an endpoint using the pidfile"""
     _do_stop_endpoint(ep_dir=ep_dir, remote=remote)
@@ -565,6 +568,7 @@ def list_endpoints():
     "--yes", default=False, is_flag=True, help="Do not ask for confirmation to delete."
 )
 @common_options
+@handle_auth_errors
 def delete_endpoint(*, ep_dir: pathlib.Path, force: bool, yes: bool):
     """Deletes an endpoint and its config."""
     if not yes:

@@ -9,6 +9,7 @@ import typing as t
 import uuid
 from unittest import mock
 
+import globus_sdk
 import pytest
 import yaml
 from click import ClickException
@@ -608,3 +609,41 @@ def test_get_endpoint_by_name_or_uuid_error_message(run_line, data):
     result = run_line(f"start {value}", assert_exit_code=1)
 
     assert error in result.stderr
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        ("start", "start_endpoint"),
+        ("stop", "stop_endpoint"),
+        ("delete --yes", "delete_endpoint"),
+    ],
+)
+def test_handle_globus_auth_error(
+    mocker: MockFixture,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+    data: tuple[str, str],
+):
+    cmd, ep_method = data
+    mock_ep, _ = mock_cli_state
+    make_endpoint_dir()
+
+    mock_log = mocker.patch("globus_compute_endpoint.exception_handling.log")
+    mocker.patch.object(
+        mock_ep,
+        ep_method,
+        side_effect=globus_sdk.AuthAPIError(r=mock.MagicMock(status_code=400)),
+    )
+
+    res = run_line(f"{cmd} {ep_name}", assert_exit_code=os.EX_NOPERM)
+
+    err_msg = "An Auth API error occurred."
+    a, k = mock_log.warning.call_args
+
+    assert err_msg in res.stdout
+    assert err_msg in a[0]
+    assert "400" in res.stdout
+    assert "400" in a[0]
