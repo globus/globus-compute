@@ -5,6 +5,7 @@ import os
 import shlex
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import textwrap
@@ -47,7 +48,7 @@ def test_conn(host: str, port: int, timeout: int = 5):
     def kernel():
         try:
             socket.create_connection((host, port), timeout=timeout)
-            click.echo(f"Connection to {host} over port {port} was successful!\n")
+            click.echo(f"Connected successfully to {host} over port {port}!\n")
         except OSError as e:
             click.secho(
                 f"Connection failed to {host} over port {port}: {e}\n",
@@ -59,6 +60,30 @@ def test_conn(host: str, port: int, timeout: int = 5):
     return kernel
 
 
+def test_ssl_conn(host: str, port: int, timeout: int = 5):
+    def kernel() -> None:
+        context = ssl.create_default_context()
+        try:
+            with socket.create_connection((host, port), timeout=timeout) as sock:
+                with context.wrap_socket(sock, server_hostname=host) as ssock:
+                    conn_data = ssock.cipher()
+                    cipher, version, _ = conn_data if conn_data else (None, None, None)
+            click.echo(
+                f"Successfully established SSL connection with {host}:{port}!\n"
+                f"Version: {version}\n"
+                f"Cipher:  {cipher}\n"
+            )
+        except OSError as e:
+            click.secho(
+                f"Failed to establish SSL connection with {host}:{port} - {e}\n",
+                fg="red",
+                bold=True,
+            )
+
+    kernel.display_name = f"func:test_ssl_conn({host}, {port})"  # type: ignore
+    return kernel
+
+
 def get_service_versions(base_url: str):
     def kernel():
         wc = WebClient(base_url=base_url)
@@ -67,6 +92,10 @@ def get_service_versions(base_url: str):
 
     kernel.display_name = f"func:get_service_versions({base_url})"  # type: ignore
     return kernel
+
+
+def get_openssl_version():
+    click.echo(f"{ssl.OPENSSL_VERSION}\n")
 
 
 def get_python_version():
@@ -109,8 +138,11 @@ def run_self_diagnostic(log_bytes: int | None = None):
         which_python,
         get_python_version,
         "pip freeze",
+        get_openssl_version,
         test_conn(web_svc_host, 443),
         test_conn(amqp_svc_host, 5671),
+        test_ssl_conn(web_svc_host, 443),
+        test_ssl_conn(amqp_svc_host, 5671),
         get_service_versions(web_svc_url),
         "ip addr",
         "ifconfig",

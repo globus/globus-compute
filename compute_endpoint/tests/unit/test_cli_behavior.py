@@ -420,7 +420,15 @@ def test_self_diagnostic(
     run_line: t.Callable,
     ep_name,
 ):
-    mocker.patch("socket.create_connection")
+    mock_sock = mock.MagicMock()
+    mock_ssock = mock.MagicMock()
+    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
+    mock_create_conn = mocker.patch("socket.create_connection")
+    mock_create_conn.return_value.__enter__.return_value = mock_sock
+    mock_create_ctx = mocker.patch("ssl.create_default_context")
+    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
+        mock_ssock
+    )
     mocker.patch.object(WebClient, "get_version")
 
     home_path = os.path.expanduser("~")
@@ -441,8 +449,9 @@ def test_self_diagnostic(
     res = run_line("self-diagnostic")
     stdout = res.stdout_bytes.decode("utf-8")
 
-    assert stdout.count("== Diagnostic") >= 17
-    assert stdout.count("was successful!") == 2
+    assert stdout.count("== Diagnostic") >= 19
+    assert stdout.count("Connected successfully") == 2
+    assert stdout.count("established SSL connection") == 2
     assert conf_data in stdout
     assert log_data in stdout
 
@@ -457,10 +466,23 @@ def test_self_diagnostic_sdk_environment(
     monkeypatch,
     env: str,
 ):
-    mocker.patch("socket.create_connection")
+    mock_sock = mock.MagicMock()
+    mock_ssock = mock.MagicMock()
+    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
+    mock_create_conn = mocker.patch("socket.create_connection")
+    mock_create_conn.return_value.__enter__.return_value = mock_sock
+    mock_create_ctx = mocker.patch("ssl.create_default_context")
+    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
+        mock_ssock
+    )
     mocker.patch.object(WebClient, "get_version")
+
     mock_test_conn = mocker.patch(
         "globus_compute_endpoint.self_diagnostic.test_conn",
+        return_value=lambda: "Success!",
+    )
+    mock_test_ssl_conn = mocker.patch(
+        "globus_compute_endpoint.self_diagnostic.test_ssl_conn",
         return_value=lambda: "Success!",
     )
 
@@ -469,6 +491,10 @@ def test_self_diagnostic_sdk_environment(
 
     assert f"compute.api.{env}.globuscs.info" in mock_test_conn.call_args_list[0][0]
     assert f"compute.amqps.{env}.globuscs.info" in mock_test_conn.call_args_list[1][0]
+    assert f"compute.api.{env}.globuscs.info" in mock_test_ssl_conn.call_args_list[0][0]
+    assert (
+        f"compute.amqps.{env}.globuscs.info" in mock_test_ssl_conn.call_args_list[1][0]
+    )
 
 
 def test_self_diagnostic_gzip(
@@ -478,7 +504,15 @@ def test_self_diagnostic_gzip(
     fs: fakefs.FakeFilesystem,
     run_line: t.Callable,
 ):
-    mocker.patch("socket.create_connection")
+    mock_sock = mock.MagicMock()
+    mock_ssock = mock.MagicMock()
+    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
+    mock_create_conn = mocker.patch("socket.create_connection")
+    mock_create_conn.return_value.__enter__.return_value = mock_sock
+    mock_create_ctx = mocker.patch("ssl.create_default_context")
+    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
+        mock_ssock
+    )
     mocker.patch.object(WebClient, "get_version")
 
     res = run_line("self-diagnostic --gzip")
@@ -493,7 +527,7 @@ def test_self_diagnostic_gzip(
     with gzip.open(fname, "rb") as f:
         contents = f.read().decode("utf-8")
 
-    assert contents.count("== Diagnostic") >= 17
+    assert contents.count("== Diagnostic") >= 19
 
 
 @pytest.mark.parametrize("test_data", [(True, 1), (False, 0.5), (False, "")])
@@ -507,7 +541,15 @@ def test_self_diagnostic_log_size(
 ):
     should_succeed, kb = test_data
 
-    mocker.patch("socket.create_connection")
+    mock_sock = mock.MagicMock()
+    mock_ssock = mock.MagicMock()
+    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
+    mock_create_conn = mocker.patch("socket.create_connection")
+    mock_create_conn.return_value.__enter__.return_value = mock_sock
+    mock_create_ctx = mocker.patch("ssl.create_default_context")
+    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
+        mock_ssock
+    )
     mocker.patch.object(WebClient, "get_version")
 
     def run_cmd():
@@ -516,7 +558,7 @@ def test_self_diagnostic_log_size(
 
     if should_succeed:
         stdout = run_cmd()
-        assert stdout.count("== Diagnostic") >= 17
+        assert stdout.count("== Diagnostic") >= 19
     else:
         with pytest.raises(AssertionError):
             stdout = run_cmd()
@@ -536,7 +578,15 @@ def test_self_diagnostic_log_size_limit(
 
     fs.create_dir(ep_dir_path)
 
-    mocker.patch("socket.create_connection")
+    mock_sock = mock.MagicMock()
+    mock_ssock = mock.MagicMock()
+    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
+    mock_create_conn = mocker.patch("socket.create_connection")
+    mock_create_conn.return_value.__enter__.return_value = mock_sock
+    mock_create_ctx = mocker.patch("ssl.create_default_context")
+    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
+        mock_ssock
+    )
     mocker.patch.object(WebClient, "get_version")
 
     def run_cmd():

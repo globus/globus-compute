@@ -1,0 +1,6 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added steps to the `self-diagnostic` endpoint command that print the local system's
+  OpenSSL version and attempt to establish SSL connections with the Globus Compute
+  web services.
