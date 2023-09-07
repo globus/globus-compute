@@ -16,11 +16,13 @@ def chunk_by(iterable: t.Iterable, size) -> t.Iterable[tuple]:
     return iter(lambda: tuple(islice(to_chunk_iter, size)), ())
 
 
-def log_tmp_file(item, filename: Path | None = None) -> None:
+def _log_tmp_file(item, filename: Path | None = None) -> None:
     """
     Convenience method for logging to a tmp file for debugging, getting
     around most thread or logging setup complexities.
     Usage of this should be removed after dev testing is done
+
+    Not intended for non-development debugging usage
 
     :param item: The info to log to file
     :param filename: An optional path to the log file.   If None,
@@ -30,7 +32,8 @@ def log_tmp_file(item, filename: Path | None = None) -> None:
         filename = Path.home() / "compute_debug.log"
     with open(filename, "a") as f:
         ts = datetime.now(timezone.utc).astimezone().isoformat()
-        f.write(f"{ts} {item}\n")
+        # Console as well as write to file
+        print(ts, item, file=f)
 
 
 def get_env_details() -> t.Dict[str, t.Any]:
