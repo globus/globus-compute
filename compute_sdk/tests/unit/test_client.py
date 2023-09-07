@@ -5,6 +5,7 @@ import globus_compute_sdk as gc
 import pytest
 from globus_compute_sdk import ContainerSpec
 from globus_compute_sdk.errors import TaskExecutionFailed
+from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 
@@ -319,3 +320,68 @@ def test_missing_task_info(mocker, login_manager):
     assert res[tid1]["reason"] == tid1_reason
     assert tid2 in res
     assert res[tid2]["reason"] == "unknown"
+
+
+@pytest.mark.parametrize(
+    "dill_python",
+    [
+        [None, None],
+        # Impossible dill and python versions will always warn
+        ["000.dill", None],
+        [None, "1.2.3"],
+        ["000.dill", "1.2.3"],
+    ],
+)
+def test_version_mismatch_from_details(
+    mocker, login_manager, mock_response, dill_python
+):
+    worker_dill, worker_python = dill_python
+
+    # Returned env same as client by default
+    response_details = get_env_details()
+    if worker_dill:
+        response_details["dill_version"] = worker_dill
+    if worker_python:
+        response_details["python_version"] = worker_python
+
+    tid = str(uuid.uuid4())
+    stack_trace = "Some Stack Trace\n  Line 40 stack trace"
+    returned_task = {
+        "task_id": tid,
+        "status": "success",
+        "completion_t": "1677183605.212898",
+        "exception": stack_trace,
+        "details": {
+            "os": "Linux-5.19.0-1025-aws-x86_64-with-glibc2.35",
+            "python_version": response_details["python_version"],
+            "dill_version": response_details["dill_version"],
+            "globus_compute_sdk_version": "2.3.2",
+            "task_transitions": {
+                "execution-start": 1692742841.843334,
+                "execution-end": 1692742846.123456,
+            },
+        },
+    }
+
+    mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
+
+    login_manager.get_web_client.get_task = mocker.Mock(
+        return_value=mock_response(200, returned_task)
+    )
+    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+
+    with pytest.raises(TaskExecutionFailed) as exc_info:
+        gcc.get_task(tid)
+
+    assert "Some Stack Trace" in str(exc_info)
+    should_warn = worker_dill is not None or worker_python is not None
+    assert mock_log.warning.called == should_warn
+    if worker_dill or worker_python:
+        a, *_ = mock_log.warning.call_args
+        assert "Warning:  Client SDK uses" in a[0]
+        if worker_dill and worker_python:
+            assert f"but worker used {worker_python}/{worker_dill}" in a[0]
+        if worker_python:
+            assert f"but worker used {worker_python}" in a[0]
+        if worker_dill:
+            assert f"/{worker_dill} (OS" in a[0]
