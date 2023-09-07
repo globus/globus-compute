@@ -6,7 +6,7 @@ from setuptools import find_namespace_packages, setup
 
 REQUIRES = [
     # request sending and authorization tools
-    "requests>=2.20.0",
+    "requests>=2.31.0,<3",
     "globus-sdk>=3.20.1,<4",
     "globus-compute-common==0.3.0a2",
     # 'websockets' is used for the client-side websocket listener
