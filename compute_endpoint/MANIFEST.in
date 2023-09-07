@@ -1,2 +1,4 @@
 include PyPI.md
 include globus_compute_endpoint/endpoint/config/default_config.yaml
+include globus_compute_endpoint/endpoint/config/user_config_template.yaml
+include globus_compute_endpoint/endpoint/config/user_environment.yaml
