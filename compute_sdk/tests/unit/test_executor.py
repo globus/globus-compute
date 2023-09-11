@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import random
 import threading
 import typing as t
@@ -10,7 +11,7 @@ import pika
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
-from globus_compute_sdk import Client, Executor
+from globus_compute_sdk import Client, Executor, __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.executor import _ResultWatcher, _TaskSubmissionInfo
@@ -241,6 +242,17 @@ def test_register_function_sends_container_id(gc_executor, container_id):
 
     expected_container_id = as_optional_uuid(container_id)
     assert k["container_uuid"] == expected_container_id
+
+
+def test_register_function_sends_metadata(gc_executor):
+    gcc, gce = gc_executor
+
+    gce.register_function(noop)
+
+    assert gcc.register_function.called
+    a, k = gcc.register_function.call_args
+    assert k["metadata"].get("python_version") == platform.python_version()
+    assert k["metadata"].get("sdk_version") == __version__
 
 
 @pytest.mark.parametrize(

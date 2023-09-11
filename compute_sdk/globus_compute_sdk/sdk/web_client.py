@@ -24,6 +24,18 @@ def _get_packed_code(
     return serializer.pack_buffers([serializer.serialize(func)])
 
 
+class FunctionRegistrationMetadata:
+    def __init__(self, python_version: str, sdk_version: str):
+        self.python_version = python_version
+        self.sdk_version = sdk_version
+
+    def to_dict(self):
+        return {
+            "python_version": self.python_version,
+            "sdk_version": self.sdk_version,
+        }
+
+
 class FunctionRegistrationData:
     def __init__(
         self,
@@ -33,6 +45,7 @@ class FunctionRegistrationData:
         function_code: t.Optional[str] = None,
         container_uuid: t.Optional[UUID_LIKE_T] = None,
         description: t.Optional[str] = None,
+        metadata: t.Optional[FunctionRegistrationMetadata] = None,
         public: bool = False,
         group: t.Optional[str] = None,
         serializer: t.Optional[ComputeSerializer] = None,
@@ -53,6 +66,7 @@ class FunctionRegistrationData:
             str(container_uuid) if container_uuid is not None else container_uuid
         )
         self.description = description
+        self.metadata = metadata
         self.public = public
         self.group = group
 
@@ -62,6 +76,7 @@ class FunctionRegistrationData:
             "function_code": self.function_code,
             "container_uuid": self.container_uuid,
             "description": self.description,
+            "metadata": self.metadata.to_dict(),
             "public": self.public,
             "group": self.group,
         }

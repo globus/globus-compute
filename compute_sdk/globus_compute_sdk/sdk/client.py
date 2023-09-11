@@ -15,7 +15,10 @@ from globus_compute_sdk.errors import (
 from globus_compute_sdk.sdk._environments import get_web_service_url
 from globus_compute_sdk.sdk.utils import check_version
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
-from globus_compute_sdk.sdk.web_client import FunctionRegistrationData
+from globus_compute_sdk.sdk.web_client import (
+    FunctionRegistrationData,
+    FunctionRegistrationMetadata,
+)
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
 from globus_compute_sdk.version import __version__, compare_versions
 
@@ -559,6 +562,7 @@ class Client:
         function_name=None,
         container_uuid=None,
         description=None,
+        metadata: dict | None = None,
         public=False,
         group=None,
         searchable=None,
@@ -575,6 +579,8 @@ class Client:
             Container UUID from registration with Globus Compute
         description : str
             Description of the file
+        metadata : dict
+            Function metadata (E.g., Python version used when serializing the function)
         public : bool
             Whether or not the function is publicly accessible. Default = False
         group : str
@@ -600,6 +606,7 @@ class Client:
             function=function,
             container_uuid=container_uuid,
             description=description,
+            metadata=FunctionRegistrationMetadata(**metadata) if metadata else None,
             public=public,
             group=group,
             serializer=self.fx_serializer,
