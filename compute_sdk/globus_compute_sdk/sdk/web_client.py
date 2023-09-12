@@ -76,7 +76,7 @@ class FunctionRegistrationData:
             "function_code": self.function_code,
             "container_uuid": self.container_uuid,
             "description": self.description,
-            "metadata": self.metadata.to_dict(),
+            "metadata": self.metadata.to_dict() if self.metadata else None,
             "public": self.public,
             "group": self.group,
         }

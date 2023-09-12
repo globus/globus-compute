@@ -6,6 +6,10 @@ import pytest
 from globus_compute_sdk import ContainerSpec
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.utils import get_env_details
+from globus_compute_sdk.sdk.web_client import (
+    FunctionRegistrationData,
+    FunctionRegistrationMetadata,
+)
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 
@@ -278,6 +282,40 @@ def test_container_build_status_failure(mocker, login_manager):
         gcc.get_container_build_status("123-434")
 
     assert type(excinfo.value) is SystemError
+
+
+def test_register_function():
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
+
+    def funk():
+        return "Funky"
+
+    metadata = {"python_version": "3.11.3", "sdk_version": "2.3.3"}
+    gcc.register_function(funk, metadata=metadata)
+
+    a, _ = gcc.web_client.register_function.call_args
+    func_data = a[0]
+    assert isinstance(func_data, FunctionRegistrationData)
+    assert func_data.function_code is not None
+    assert isinstance(func_data.metadata, FunctionRegistrationMetadata)
+    assert func_data.metadata.python_version == metadata["python_version"]
+    assert func_data.metadata.sdk_version == metadata["sdk_version"]
+
+
+def test_register_function_no_metadata():
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
+
+    def funk():
+        return "Funky"
+
+    gcc.register_function(funk)
+
+    a, _ = gcc.web_client.register_function.call_args
+    func_data = a[0]
+    assert isinstance(func_data, FunctionRegistrationData)
+    assert func_data.metadata is None
 
 
 def test_delete_function():
