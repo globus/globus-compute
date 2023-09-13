@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Configuration using ``GlobusComputeEngine`` now properly serializes and
-  registers with the Globus Compute web services.
