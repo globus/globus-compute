@@ -1,4 +1,0 @@
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- A helpful message will be printed to the terminal in the event of an auth API error.
