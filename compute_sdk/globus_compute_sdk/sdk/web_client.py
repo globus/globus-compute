@@ -228,6 +228,9 @@ class WebClient(globus_sdk.BaseClient):
         )
         return self.post("/v2/functions", data=data)
 
+    def get_function(self, function_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
+        return self.get(f"/v2/functions/{function_id}")
+
     def get_whitelist(self, endpoint_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/endpoints/{endpoint_id}/whitelist")
 
