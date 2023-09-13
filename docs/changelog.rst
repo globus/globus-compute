@@ -3,6 +3,37 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.3.3:
+
+globus-compute-sdk & globus-compute-endpoint v2.3.3
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Teach the endpoint to include the Python and Dill versions, as metadata to Result objects, as well as other useful fields. If the task execution fails, the SDK will use the metadata to highlight differing versions as a possible cause.
+
+- The SDK now supports defining metadata (Python and SDK versions) when registering
+  a function. This information is automatically included when using the ``Executor``.
+
+- Added web service version information to the output of the ``self-diagnostic`` endpoint command.
+
+- A helpful message will be printed to the terminal in the event of an auth API error.
+
+- Added steps to the `self-diagnostic` endpoint command that print the local system's
+  OpenSSL version and attempt to establish SSL connections with the Globus Compute
+  web services.
+
+Bug Fixes
+^^^^^^^^^
+
+- Expired or unknown tasks queried using Client.get_batch_result() method will display the appropriate unknown response instead of producing a stack trace
+
+Security
+^^^^^^^^
+
+- Require requests >= 2.31.
+
 .. _changelog-2.3.2:
 
 globus-compute-sdk & globus-compute-endpoint v2.3.2
