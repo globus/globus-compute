@@ -1,0 +1,5 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added a ``Client.get_function`` method to submit a request for details about a registered
+  function, such as name, description, serialized source code, python version, etc.

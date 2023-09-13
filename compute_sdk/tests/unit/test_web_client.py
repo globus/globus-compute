@@ -113,6 +113,20 @@ def test_multi_tenant_post(client, multi_tenant):
         assert "multi_tenant" not in req_body
 
 
+def test_get_function(client: WebClient, randomstring: t.Callable):
+    func_uuid_str = str(uuid.uuid4())
+    expected_response = randomstring()
+    responses.add(
+        responses.GET,
+        f"https://api.funcx/v2/functions/{func_uuid_str}",
+        json={"some_key": expected_response},
+    )
+
+    res = client.get_function(func_uuid_str)
+
+    assert res["some_key"] == expected_response
+
+
 def test_delete_function(client: WebClient, randomstring: t.Callable):
     func_uuid_str = str(uuid.uuid4())
     expected_response = randomstring()

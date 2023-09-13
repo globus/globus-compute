@@ -318,6 +318,16 @@ def test_register_function_no_metadata():
     assert func_data.metadata is None
 
 
+def test_get_function():
+    func_uuid_str = str(uuid.uuid4())
+    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+    gcc.web_client = mock.MagicMock()
+
+    gcc.get_function(func_uuid_str)
+
+    assert gcc.web_client.get_function.called_with(func_uuid_str)
+
+
 def test_delete_function():
     func_uuid_str = str(uuid.uuid4())
     gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())

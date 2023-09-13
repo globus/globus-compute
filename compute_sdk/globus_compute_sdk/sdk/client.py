@@ -616,6 +616,24 @@ class Client:
         return r.data["function_uuid"]
 
     @requires_login
+    def get_function(self, function_id: UUID_LIKE_T):
+        """Submit a request for details about a registered function.
+
+        Parameters
+        ----------
+        function_id : UUID | str
+            UUID of the registered function
+
+        Returns
+        -------
+        dict
+            Information about the registered function, such as name, description,
+            serialized source code, python version, etc.
+        """
+        r = self.web_client.get_function(function_id)
+        return r.data
+
+    @requires_login
     def register_container(self, location, container_type, name="", description=""):
         """Register a container with the Globus Compute service.
 
