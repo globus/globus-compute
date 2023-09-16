@@ -358,36 +358,21 @@ def test_start_ep_incorrect_config_py(
     assert "modified incorrectly?" in res.stderr
 
 
-@mock.patch("globus_compute_endpoint.endpoint.config.utils._load_config_py")
-def test_start_ep_config_py_override(
+@mock.patch("globus_compute_endpoint.endpoint.config.utils._read_config_yaml")
+def test_start_ep_config_py_takes_precedence(
     read_config, run_line, mock_cli_state, make_endpoint_dir, ep_name
 ):
-    make_endpoint_dir()
-    mock_ep, mock_state = mock_cli_state
-    conf_py = mock_state.endpoint_config_dir / ep_name / "config.py"
+    ep_dir = make_endpoint_dir()
+    conf_py = ep_dir / "config.py"
+    mock_ep, *_ = mock_cli_state
     conf_py.write_text(
-        """
-from globus_compute_endpoint.endpoint.config import Config
-from globus_compute_endpoint.engines import HighThroughputEngine
-from parsl.providers import LocalProvider
-
-config = Config(
-    display_name=None,
-    executors=[
-        HighThroughputEngine(
-            provider=LocalProvider(
-                init_blocks=1,
-                min_blocks=0,
-                max_blocks=1,
-            ),
-        )
-    ],
-)
-        """
+        "from globus_compute_endpoint.endpoint.config import Config"
+        "\nconfig = Config()"
     )
 
-    run_line(f"start {ep_name}", assert_exit_code=1)
-    read_config.assert_called_once()
+    run_line(f"start {ep_name}")
+    assert mock_ep.start_endpoint.called
+    assert not read_config.called, "Key outcome: config.py takes precendence"
 
 
 @mock.patch("globus_compute_endpoint.endpoint.config.utils._load_config_py")
