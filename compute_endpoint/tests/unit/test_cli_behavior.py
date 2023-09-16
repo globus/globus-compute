@@ -96,10 +96,12 @@ def cli_runner():
 
 @pytest.fixture
 def run_line(cli_runner):
-    def func(argline, *, assert_exit_code: int | None = 0):
+    def func(argline, *, assert_exit_code: int | None = 0, stdin=None):
         args = shlex.split(argline) if isinstance(argline, str) else argline
 
-        result = cli_runner.invoke(app, args)
+        if stdin is None:
+            stdin = "{}"  # silence some logs; incurred by invoke's sys.stdin choice
+        result = cli_runner.invoke(app, args, input=stdin)
         if assert_exit_code is not None:
             assert result.exit_code == assert_exit_code, (result.stdout, result.stderr)
         return result
