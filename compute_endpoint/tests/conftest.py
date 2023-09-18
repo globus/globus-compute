@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import multiprocessing
 import random
 import signal
 import string
 import time
+import typing as t
 import uuid
 from queue import Queue
 
@@ -13,6 +13,7 @@ import globus_sdk
 import pytest
 import responses
 from globus_compute_endpoint import engines
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.sdk.web_client import WebClient
 
 
@@ -110,45 +111,34 @@ def engine_heartbeat() -> float:
 
 
 @pytest.fixture
-def proc_pool_engine(tmp_path, engine_heartbeat: float):
-    ep_id = uuid.uuid4()
-    queue = Queue()
+def engine_runner(tmp_path, engine_heartbeat) -> t.Callable:
+    engines_to_shutdown = []
 
-    engine = engines.ProcessPoolEngine(
-        heartbeat_period_s=engine_heartbeat, max_workers=2
-    )
-    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
+    def _runner(engine_type: t.Type[GlobusComputeEngineBase]):
+        ep_id = uuid.uuid4()
+        queue = Queue()
+        if engine_type is engines.ProcessPoolEngine:
+            k = dict(heartbeat_period_s=engine_heartbeat, max_workers=2)
+        elif engine_type is engines.ThreadPoolEngine:
+            k = dict(heartbeat_period_s=engine_heartbeat, max_workers=2)
+        elif engine_type is engines.GlobusComputeEngine:
+            k = dict(
+                address="127.0.0.1",
+                heartbeat_period_s=engine_heartbeat,
+                heartbeat_threshold=1,
+            )
+        else:
+            raise NotImplementedError(f"Unimplemented: {engine_type.__name__}")
+        engine = engine_type(**k)
+        engine.start(
+            endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue
+        )
+        engines_to_shutdown.append(engine)
+        return engine
 
-    yield engine
-    engine.shutdown()
-
-
-@pytest.fixture
-def thread_pool_engine(tmp_path, engine_heartbeat: float):
-    ep_id = uuid.uuid4()
-    queue = Queue()
-
-    engine = engines.ThreadPoolEngine(
-        heartbeat_period_s=engine_heartbeat, max_workers=2
-    )
-    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
-
-    yield engine
-    engine.shutdown()
-
-
-@pytest.fixture
-def gc_engine(tmp_path, engine_heartbeat: float):
-    ep_id = uuid.uuid4()
-    queue = multiprocessing.Queue()
-
-    engine = engines.GlobusComputeEngine(
-        address="127.0.0.1", heartbeat_period_s=engine_heartbeat, heartbeat_threshold=1
-    )
-    engine.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue)
-
-    yield engine
-    engine.shutdown()
+    yield _runner
+    for ngin in engines_to_shutdown:
+        ngin.shutdown()
 
 
 ###

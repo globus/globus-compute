@@ -8,20 +8,12 @@ from globus_compute_endpoint import engines
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.parametrize("engine_type", ["proc_pool", "thread_pool", "gc"])
-def test_status_reporting(
-    proc_pool_engine: engines.ProcessPoolEngine,
-    thread_pool_engine: engines.ThreadPoolEngine,
-    gc_engine: engines.GlobusComputeEngine,
-    engine_heartbeat: float,
-    engine_type: str,
-):
-    if engine_type == "proc_pool":
-        engine = proc_pool_engine
-    elif engine_type == "thread_pool":
-        engine = thread_pool_engine
-    else:
-        engine = gc_engine
+@pytest.mark.parametrize(
+    "engine_type",
+    (engines.ProcessPoolEngine, engines.ThreadPoolEngine, engines.GlobusComputeEngine),
+)
+def test_status_reporting(engine_type, engine_runner, engine_heartbeat: float):
+    engine = engine_runner(engine_type)
 
     report = engine.get_status_report()
     assert isinstance(report, EPStatusReport)

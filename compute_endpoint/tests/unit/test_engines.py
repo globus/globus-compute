@@ -13,6 +13,7 @@ from globus_compute_endpoint.engines import (
     ProcessPoolEngine,
     ThreadPoolEngine,
 )
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.executors.high_throughput.interchange import ManagerLost
 from tests.utils import double, ez_pack_function, slow_double
@@ -51,20 +52,12 @@ def test_result_message_packing():
     assert serializer.deserialize(unpacked.data) == result
 
 
-@pytest.mark.parametrize("engine_type", ["proc_pool", "thread_pool", "gc"])
-def test_engine_submit(
-    proc_pool_engine: ProcessPoolEngine,
-    thread_pool_engine: ThreadPoolEngine,
-    gc_engine: GlobusComputeEngine,
-    engine_type: str,
-):
+@pytest.mark.parametrize(
+    "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
+)
+def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
     """Test engine.submit with multiple engines"""
-    if engine_type == "proc_pool":
-        engine = proc_pool_engine
-    elif engine_type == "thread_pool":
-        engine = thread_pool_engine
-    else:
-        engine = gc_engine
+    engine = engine_runner(engine_type)
 
     param = random.randint(1, 100)
     future = engine._submit(double, param)
@@ -74,19 +67,11 @@ def test_engine_submit(
     assert future.result(timeout=5) == param * 2
 
 
-@pytest.mark.parametrize("engine_type", ["proc_pool", "thread_pool", "gc"])
-def test_engine_submit_internal(
-    proc_pool_engine: ProcessPoolEngine,
-    thread_pool_engine: ThreadPoolEngine,
-    gc_engine: GlobusComputeEngine,
-    engine_type: str,
-):
-    if engine_type == "proc_pool":
-        engine = proc_pool_engine
-    elif engine_type == "thread_pool":
-        engine = thread_pool_engine
-    else:
-        engine = gc_engine
+@pytest.mark.parametrize(
+    "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
+)
+def test_engine_submit_internal(engine_type: GlobusComputeEngineBase, engine_runner):
+    engine = engine_runner(engine_type)
 
     q = engine.results_passthrough
     task_id = uuid.uuid1()
@@ -142,10 +127,11 @@ def test_proc_pool_engine_not_started():
     assert "engine has not been started" in str(pyt_exc)
 
 
-def test_gc_engine_system_failure(gc_engine: GlobusComputeEngine):
+def test_gc_engine_system_failure(engine_runner):
     """Test behavior of engine failure killing task"""
+    engine = engine_runner(GlobusComputeEngine)
     param = random.randint(1, 100)
-    q = gc_engine.results_passthrough
+    q = engine.results_passthrough
     task_id = uuid.uuid1()
     serializer = ComputeSerializer()
     # We want the task to be running when we kill the manager
@@ -163,13 +149,13 @@ def test_gc_engine_system_failure(gc_engine: GlobusComputeEngine):
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = gc_engine.submit(str(task_id), task_message)
+    future = engine.submit(str(task_id), task_message)
 
     assert isinstance(future, concurrent.futures.Future)
     # Trigger a failure from managers scaling in.
-    gc_engine.executor.scale_in(blocks=1)
+    engine.executor.scale_in(blocks=1)
     # We need to scale out to make sure following tests will not be affected
-    gc_engine.executor.scale_out(blocks=1)
+    engine.executor.scale_out(blocks=1)
     with pytest.raises(ManagerLost):
         future.result()
 
