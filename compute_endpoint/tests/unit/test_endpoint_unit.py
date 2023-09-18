@@ -457,9 +457,6 @@ def test_endpoint_get_metadata(mocker):
     for k, v in mock_data.items():
         assert meta[k] == v
 
-    assert meta["ip_address"] is None
-    assert meta["sdk_version"] is None
-
     config = meta["config"]
     assert "funcx_service_address" in config
     assert len(config["executors"]) == 1

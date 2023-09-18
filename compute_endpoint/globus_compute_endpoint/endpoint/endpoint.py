@@ -781,18 +781,12 @@ class Endpoint:
 
     @staticmethod
     def get_metadata(config: Config) -> dict:
-        metadata: dict = {}
-
-        metadata["endpoint_version"] = __version__
-        metadata["hostname"] = socket.getfqdn()
-
-        # should be more accurate than `getpass.getuser()` in non-login situations
-        metadata["local_user"] = pwd.getpwuid(os.getuid()).pw_name
-
-        # the following are read from the HTTP request by the web service, but can be
-        # overridden here if desired:
-        metadata["ip_address"] = None
-        metadata["sdk_version"] = None
+        metadata: dict = {
+            "endpoint_version": __version__,
+            "hostname": socket.getfqdn(),
+            # should be more accurate than `getpass.getuser()` in non-login situations
+            "local_user": pwd.getpwuid(os.getuid()).pw_name,
+        }
 
         try:
             metadata["config"] = serialize_config(config)
