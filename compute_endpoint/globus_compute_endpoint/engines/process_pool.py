@@ -111,7 +111,7 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
     def status_polling_interval(self) -> int:
         return 30
 
-    def shutdown(self):
+    def shutdown(self, /, block=False, **kwargs) -> None:
         self._status_report_thread.stop()
         if self.executor:
-            self.executor.shutdown()
+            self.executor.shutdown(wait=block)

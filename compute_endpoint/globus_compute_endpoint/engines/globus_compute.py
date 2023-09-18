@@ -174,8 +174,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             task_statuses=task_status_deltas,
         )
 
-    def shutdown(self):
+    def shutdown(self, /, **kwargs) -> None:
         self._status_report_thread.stop()
         if self.strategy:
             self.strategy.close()
-        return self.executor.shutdown()
+        self.executor.shutdown()
