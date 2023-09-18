@@ -138,7 +138,7 @@ def engine_runner(tmp_path, engine_heartbeat) -> t.Callable:
 
     yield _runner
     for ngin in engines_to_shutdown:
-        ngin.shutdown()
+        ngin.shutdown(block=True)
 
 
 ###

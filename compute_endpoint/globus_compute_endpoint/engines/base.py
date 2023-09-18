@@ -185,3 +185,7 @@ class GlobusComputeEngineBase(ABC):
         future = self._submit(execute_task, task_id, packed_task)
         self._setup_future_done_callback(task_id, future)
         return future
+
+    @abstractmethod
+    def shutdown(self, /, **kwargs) -> None:
+        raise NotImplementedError()

@@ -817,7 +817,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
         return status
 
-    def shutdown(self, hub=True, targets="all", block=False):
+    def shutdown(self, /, hub=True, targets="all", block=False, **kwargs) -> None:
         """Shutdown the Engine, including all workers and controllers.
 
         This is not implemented.
@@ -844,7 +844,6 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                 if self.queue_proc.exitcode is None:
                     self.queue_proc.kill()
             log.info("Finished HighThroughputEngine shutdown attempt")
-        return True
 
     def cancel_task(self, task_id: uuid.UUID | str) -> bool:
         """
