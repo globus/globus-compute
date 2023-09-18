@@ -24,7 +24,7 @@ repos:
       # which settings to use based on a file's directory
       args: ["--settings-path", ".isort.cfg"]
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.10.1
+  rev: v3.11.0
   hooks:
     - id: pyupgrade
       args: ["--py36-plus"]
