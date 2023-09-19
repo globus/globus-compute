@@ -27,6 +27,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         address: t.Optional[str] = None,
         heartbeat_period_s: float = 30.0,
         strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
+        executor: t.Optional[HighThroughputExecutor] = None,
         **kwargs,
     ):
         self.address = address
@@ -37,10 +38,12 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         )
         super().__init__(*args, heartbeat_period_s=heartbeat_period_s, **kwargs)
         self.strategy = strategy
-        self.executor = HighThroughputExecutor(  # type: ignore
-            *args, address=address, **kwargs
-        )
         self.max_workers_per_node = 1
+        if executor is None:
+            executor = HighThroughputExecutor(  # type: ignore
+                *args, address=address, **kwargs
+            )
+        self.executor = executor
 
     def start(
         self,
