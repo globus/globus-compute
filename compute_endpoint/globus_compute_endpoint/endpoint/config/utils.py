@@ -292,21 +292,17 @@ def serialize_config(config: Config) -> dict:
         # We only want to include attributes that are
         # configurable as constructor arguments
         sig = inspect.signature(obj.__init__)
-        params = list(sig.parameters.keys())
 
-        for key in params:
-            val = getattr(obj, key, 0)
+        for param in sig.parameters.keys():
+            val = getattr(obj, param, 0)
             if val == 0:
                 continue
 
             if isinstance(val, (list, tuple)):
-                new_list = []
-                for item in val:
-                    new_list.append(_prep(item))
-                res[key] = new_list
+                res[param] = [_prep(item) for item in val]
 
             else:
-                res[key] = _prep(val)
+                res[param] = _prep(val)
 
         return res
 
