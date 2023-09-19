@@ -288,7 +288,6 @@ def serialize_config(config: Config) -> dict:
 
     def _to_dict(obj):
         res = {"type": type(obj).__name__}
-        obj_dict = vars(obj)
 
         # We only want to include attributes that are
         # configurable as constructor arguments
@@ -296,9 +295,8 @@ def serialize_config(config: Config) -> dict:
         params = list(sig.parameters.keys())
 
         for key in params:
-            try:
-                val = obj_dict[key]
-            except KeyError:
+            val = getattr(obj, key, 0)
+            if val == 0:
                 continue
 
             if isinstance(val, (list, tuple)):
