@@ -606,6 +606,17 @@ def test_serialize_config_field_types():
     ep_config.allowed_functions = ["a", "b", "c"]
     ep_config.heartbeat_threshold = float("inf")
 
+    class Foo:
+        def __init__(self, foo):
+            self._foo = foo
+
+        @property
+        def foo(self):
+            return self._foo
+
+    # Testing support for properties
+    ep_config.environment = Foo("bar")
+
     result = serialize_config(ep_config)
 
     # Objects with a __dict__ attr are expanded
@@ -620,6 +631,7 @@ def test_serialize_config_field_types():
     assert len(result["allowed_functions"]) == 3
     assert isinstance(result["heartbeat_period"], int)
     assert isinstance(result["detach_endpoint"], bool)
+    assert result["environment"]["foo"] == "bar"
 
     # Others should not
     assert isinstance(result["heartbeat_threshold"], str)
