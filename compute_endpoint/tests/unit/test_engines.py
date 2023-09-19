@@ -8,8 +8,11 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
+from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.engines import (
     GlobusComputeEngine,
+    HighThroughputEngine,
     ProcessPoolEngine,
     ThreadPoolEngine,
 )
@@ -172,3 +175,13 @@ def test_gc_engine_system_failure(engine_runner):
         assert result.error_details
         assert "ManagerLost" in result.data
         break
+
+
+@pytest.mark.parametrize("engine_type", (GlobusComputeEngine, HighThroughputEngine))
+def test_serialized_engine_config_has_provider(engine_type: GlobusComputeEngineBase):
+    ep_config = Config(executors=[engine_type()])
+
+    res = serialize_config(ep_config)
+    executor = res["executors"][0].get("executor") or res["executors"][0]
+
+    assert executor.get("provider")
