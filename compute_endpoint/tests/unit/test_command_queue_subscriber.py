@@ -9,7 +9,6 @@ from unittest import mock
 import globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber as cqs
 import pytest as pytest
 from pika.spec import Basic, BasicProperties
-from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber."
 
@@ -18,14 +17,18 @@ class MockedCommandQueueSubscriber(cqs.CommandQueueSubscriber):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._time_to_stop_mock = threading.Event()
+        self._test_mock_cqs_setup_complete = threading.Event()
 
     def start(self) -> None:
         super().start()
-        try_assert(lambda: self._connection is not None)
+        self._test_mock_cqs_setup_complete.wait(5)
+        assert self._test_mock_cqs_setup_complete.is_set()
 
     def run(self):
         self._connection = mock.MagicMock()
         self._channel = mock.MagicMock()
+
+        self._test_mock_cqs_setup_complete.set()  # let tests know they may continue
         self._time_to_stop_mock.wait()  # simulate thread work
 
     def join(self, timeout: float | None = None) -> None:
