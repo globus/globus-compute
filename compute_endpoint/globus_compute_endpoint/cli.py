@@ -27,8 +27,12 @@ from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
 try:
     from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
-except ImportError:
+except ImportError as _e:
     _has_multi_tenant = False
+    if "--debug" in sys.argv and sys.stderr.isatty():
+        # We haven't set up logging yet so manually print for now
+        print(f"(DEBUG) Failed to import from file: {__file__}", file=sys.stderr)
+        print(f"(DEBUG) [{type(_e).__name__}] {_e}", file=sys.stderr)
 else:
     _has_multi_tenant = True
 
