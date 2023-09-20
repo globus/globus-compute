@@ -485,7 +485,7 @@ def _do_start_endpoint(
         ep_config = get_config(ep_dir)
 
     if die_with_parent:
-        # The endpoint cannot die with it's parent if it
+        # The endpoint cannot die with its parent if it
         # doesn't have one :)
         ep_config.detach_endpoint = False
         log.debug("The --die-with-parent flag has set detach_endpoint to False")
@@ -495,7 +495,7 @@ def _do_start_endpoint(
             raise ClickException(
                 "multi-tenant endpoints are not supported on this system"
             )
-        epm = EndpointManager(ep_dir, endpoint_uuid, ep_config)
+        epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
         epm.start()
     else:
         get_cli_endpoint().start_endpoint(

@@ -60,6 +60,7 @@ class EndpointManager:
         conf_dir: pathlib.Path,
         endpoint_uuid: str | None,
         config: Config,
+        reg_info: dict | None = None,
     ):
         log.info("Endpoint Manager initialization")
 
@@ -78,31 +79,37 @@ class EndpointManager:
 
         endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(conf_dir, endpoint_uuid)
 
-        try:
-            client_options = {
-                "funcx_service_address": config.funcx_service_address,
-                "environment": config.environment,
-            }
+        if not reg_info:
+            try:
+                client_options = {
+                    "funcx_service_address": config.funcx_service_address,
+                    "environment": config.environment,
+                }
 
-            gcc = GC.Client(**client_options)
-            reg_info = gcc.register_endpoint(
-                conf_dir.name,
-                endpoint_uuid,
-                metadata=EndpointManager.get_metadata(config, conf_dir),
-                multi_tenant=True,
-            )
-        except GlobusAPIError as e:
-            if e.http_status == 409 or e.http_status == 423:
-                # RESOURCE_CONFLICT or RESOURCE_LOCKED
-                blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
-                print(blocked_msg)
-                log.warning(blocked_msg)
-                exit(os.EX_UNAVAILABLE)
-            raise
-        except NetworkError as e:
-            log.exception("Network error while registering multi-tenant endpoint")
-            log.critical(f"Network failure; unable to register endpoint: {e}")
-            exit(os.EX_TEMPFAIL)
+                gcc = GC.Client(**client_options)
+                reg_info = gcc.register_endpoint(
+                    conf_dir.name,
+                    endpoint_uuid,
+                    metadata=EndpointManager.get_metadata(config, conf_dir),
+                    multi_tenant=True,
+                )
+
+                # Mostly to appease mypy, but also a useful text if it ever
+                # *does* happen
+                assert reg_info is not None, "Empty response from Compute API"
+
+            except GlobusAPIError as e:
+                if e.http_status == 409 or e.http_status == 423:
+                    # RESOURCE_CONFLICT or RESOURCE_LOCKED
+                    blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
+                    print(blocked_msg)
+                    log.warning(blocked_msg)
+                    exit(os.EX_UNAVAILABLE)
+                raise
+            except NetworkError as e:
+                log.exception("Network error while registering multi-tenant endpoint")
+                log.critical(f"Network failure; unable to register endpoint: {e}")
+                exit(os.EX_TEMPFAIL)
 
         upstream_ep_uuid = reg_info.get("endpoint_id")
         if upstream_ep_uuid != endpoint_uuid:
