@@ -13,20 +13,26 @@ Installation
 
 The pre-requisites for the `Globus Compute endpoint` and the `Globus Compute client` are
 
-  1. Python3.7+
+  1. Python3.8+
   2. The machine must have outbound network access
 
-To check if you have the right Python version, run the following commands::
+The ``-V`` or ``--version`` arguments to the Python executable will return the version on the local system.  An example
+system:
 
-  >>> python3 --version
+.. code-block:: console
 
-This should return the Python version, for example: ``Python 3.8.10``.
+  $ python3 --version
+  Python 3.10.12
 
-To check if your endpoint/client has network access and can connect to the Globus Compute service, run::
+Use ``curl`` to verify that the host of the endpoint or client has network access and can connect to the Globus Compute
+service:
 
-  >>> curl https://compute.api.globus.org/v2/version
+.. code-block:: console
 
-This should return a version string, for example: ``"1.0.5"``
+  $ curl https://compute.api.globus.org/v2/version
+  "1.0.30"
+
+This should return a version string, for example: ``"1.0.30"``
 
 .. note:: The Globus Compute client is supported on MacOS, Linux, and Windows. The globus-compute-endpoint
    is only supported on Linux.
@@ -37,32 +43,42 @@ Installing Globus Compute in a Virtual Environment
 While ``pip`` and ``pip3`` can be used to install Globus Compute we suggest the following approach
 for reliable installation to avoid python package dependency conflicts.
 
-Install the Globus Compute client in its own `venv <https://docs.python.org/3/tutorial/venv.html>`_ environment::
-.................................................................................................................
+Install the Globus Compute client in its own `venv <https://docs.python.org/3/tutorial/venv.html>`_ environment
+...............................................................................................................
 
-    $ python3 -m venv path/to/globus_compute_venv
-    $ source path/to/globus_compute_venv/bin/activate
-    (globus_compute_venv) $ python3 -m pip install globus-compute-sdk
+.. code-block:: console
 
-  To update a previously installed Globus Compute to a newer version in the virtual environment, use::
+  $ python3 -m venv path/to/globus_compute_venv
+  $ source path/to/globus_compute_venv/bin/activate
+  (globus_compute_venv) $ python3 -m pip install globus-compute-sdk
 
-    (globus_compute_venv) $ python3 -m pip install -U globus-compute-sdk
+To update a previously installed Globus Compute to a newer version in the virtual environment, use:
+
+.. code-block:: console
+
+  (globus_compute_venv) $ python3 -m pip install -U globus-compute-sdk
 
 Installing the Globus Compute Endpoint (Optional)
 .................................................
-The Globus Compute endpoint can be installed using `Pipx <https://pypa.github.io/pipx/installation/>`_ or using pip in the venv::
+The Globus Compute endpoint can be installed using `Pipx <https://pypa.github.io/pipx/installation/>`_ or using pip in the venv:
 
-     $ python3 -m pipx install globus-compute-endpoint
+.. code-block:: console
 
-          or
+  $ python3 -m pipx install globus-compute-endpoint
 
-     (globus_compute_venv) $ python3 -m pip install globus-compute-endpoint
+or
+
+.. code-block:: console
+
+  (globus_compute_venv) $ python3 -m pip install globus-compute-endpoint
 
 Installing Jupyter for Tutorial notebooks (Optional)
 ....................................................
-Install Jupyter for Tutorial notebooks in the venv::
+Install Jupyter for Tutorial notebooks in the venv:
 
-     (globus_compute_venv) $ python3 -m pip install jupyter
+.. code-block:: console
+
+  (globus_compute_venv) $ python3 -m pip install jupyter
 
 
 .. note:: For more detailed info on setting up Jupyter with Python3.5 go `here <https://jupyter.readthedocs.io/en/latest/install.html>`_
@@ -80,14 +96,14 @@ easiest approach is typically from the command line:
 
 .. code-block:: python
 
-    >>> from globus_compute_sdk import Client
-    >>> Client()
-    Please authenticate with Globus here:
-    ------------------------------------
-    https://auth.globus.org/v2/oauth2/authorize?[...very...long...url]&prompt=login
-    ------------------------------------
+  >>> from globus_compute_sdk import Client
+  >>> Client()
+  Please authenticate with Globus here:
+  ------------------------------------
+  https://auth.globus.org/v2/oauth2/authorize?[...very...long...url]&prompt=login
+  ------------------------------------
 
-    Enter the resulting Authorization Code here:
+  Enter the resulting Authorization Code here:
 
 Globus Compute will then cache the credentials for future invocations, so this workflow
 will only be initiated once.
@@ -101,20 +117,20 @@ execution to available endpoints.  For most use-cases that will use the
 
 .. code-block:: python
 
-    from globus_compute_sdk import Executor
+  from globus_compute_sdk import Executor
 
-    # First, define the function ...
-    def add_func(a, b):
-        return a + b
+  # First, define the function ...
+  def add_func(a, b):
+      return a + b
 
-    tutorial_endpoint_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
-    # ... then create the executor, ...
-    with Executor(endpoint_id=tutorial_endpoint_id) as gce:
-        # ... then submit for execution, ...
-        future = gce.submit(add_func, 5, 10)
+  tutorial_endpoint_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df' # Public tutorial endpoint
+  # ... then create the executor, ...
+  with Executor(endpoint_id=tutorial_endpoint_id) as gce:
+      # ... then submit for execution, ...
+      future = gce.submit(add_func, 5, 10)
 
-        # ... and finally, wait for the result
-        print(future.result())
+      # ... and finally, wait for the result
+      print(future.result())
 
 .. note::
     Like most FaaS platforms, the function must be registered with the upstream
@@ -137,13 +153,14 @@ endpoint can be configured and started as follows. During the
 configuration process you will be prompted to authenticate
 following the same process as using the SDK.
 For more advanced deployments (e.g., on clouds and clusters) please
-refer to the `endpoints`_ documentation. ::
+refer to the `endpoints`_ documentation.
+
+.. code-block:: console
 
   $ python3 -m pip install globus-compute-endpoint
 
   $ globus-compute-endpoint configure
 
   $ globus-compute-endpoint start <ENDPOINT_NAME>
-
 
 .. _endpoints: endpoints.html
