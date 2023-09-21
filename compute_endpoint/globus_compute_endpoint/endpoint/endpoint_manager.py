@@ -18,6 +18,8 @@ import typing as t
 from datetime import datetime
 
 import globus_compute_sdk as GC
+from cachetools import TTLCache
+from pydantic import BaseModel
 
 try:
     import pyprctl
@@ -54,6 +56,29 @@ class InvalidUserError(Exception):
     pass
 
 
+class UserEndpointRecord(BaseModel):
+    ep_name: str
+    local_user_info: pwd.struct_passwd
+    arguments: str
+
+    @property
+    def uid(self) -> int:
+        return self.local_user_info.pw_uid
+
+    @property
+    def gid(self) -> int:
+        return self.local_user_info.pw_gid
+
+    @property
+    def uname(self) -> str:
+        return self.local_user_info.pw_name
+
+
+T_CMD_START_ARGS = t.Tuple[
+    pwd.struct_passwd, t.Optional[t.List[str]], t.Optional[t.Dict]
+]
+
+
 class EndpointManager:
     def __init__(
         self,
@@ -69,13 +94,18 @@ class EndpointManager:
         self._time_to_stop = False
         self._kill_event = threading.Event()
 
-        self._child_args: dict[int, tuple[int, int, str, str]] = {}
+        self._children: dict[int, UserEndpointRecord] = {}
+
         self._wait_for_child = False
 
         self._command_queue: queue.SimpleQueue[
             tuple[int, BasicProperties, bytes]
         ] = queue.SimpleQueue()
         self._command_stop_event = threading.Event()
+
+        self._cached_cmd_start_args: TTLCache[int, T_CMD_START_ARGS] = TTLCache(
+            maxsize=32768, ttl=config.mu_child_ep_grace_period_s
+        )
 
         endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(conf_dir, endpoint_uuid)
 
@@ -200,10 +230,18 @@ class EndpointManager:
                 except ValueError:
                     rc = -127  # invalid signal number
 
-                *_, proc_args = self._child_args.pop(pid, (None, None, None, None))
-                proc_args = f" [{proc_args}]" if proc_args else ""
+                try:
+                    uep_record = self._children.pop(pid)
+                except KeyError:
+                    log.exception(f"unknown child PID {pid}")
+                    uep_record = None
+
+                proc_args = f" [{uep_record.arguments}]" if uep_record else ""
                 if not rc:
                     log.info(f"Command stopped normally ({pid}){proc_args}")
+                    cmd_start_args = self._cached_cmd_start_args.pop(pid, None)
+                    if not self._time_to_stop and cmd_start_args is not None:
+                        self._revive_child(uep_record, cmd_start_args)
                 elif rc > 0:
                     log.warning(f"Command return code: {rc} ({pid}){proc_args}")
                 elif rc == -127:
@@ -212,12 +250,41 @@ class EndpointManager:
                     log.warning(
                         f"Command terminated by signal: {-rc} ({pid}){proc_args}"
                     )
+
                 pid, exit_status_ind = os.waitpid(-1, wait_flags)
 
         except ChildProcessError:
             pass
         except Exception as e:
             log.exception(f"Failed to wait for a child process: {e}")
+
+    def _revive_child(
+        self, uep_record: UserEndpointRecord | None, cmd_start_args: T_CMD_START_ARGS
+    ):
+        ep_name = uep_record.ep_name if uep_record else "<unknown>"
+        log.info(
+            "User EP stopped within grace period; using cached arguments "
+            f"to start a new instance (name: {ep_name})"
+        )
+
+        try:
+            cached_rec, args, kwargs = cmd_start_args
+            updated_rec = pwd.getpwuid(cached_rec.pw_uid)
+        except Exception as e:
+            log.warning(
+                "Unable to update local user information; user EP will not be revived."
+                f"  ({e.__class__.__name__}) {e}"
+            )
+            return
+
+        try:
+            self.cmd_start_endpoint(updated_rec, args, kwargs)
+        except Exception:
+            log.exception(
+                f"Unable to execute command: cmd_start_endpoint\n"
+                f"    args: {args}\n"
+                f"  kwargs: {kwargs}"
+            )
 
     def _install_signal_handlers(self):
         signal.signal(signal.SIGTERM, self.request_shutdown)
@@ -259,7 +326,8 @@ class EndpointManager:
             ("Signaling shutdown", signal.SIGTERM),
             ("Forcibly killing", signal.SIGKILL),
         ):
-            for pid, (uid, gid, uname, proc_args) in list(self._child_args.items()):
+            for pid, rec in self._children.items():
+                uid, gid, uname, proc_args = rec.uid, rec.gid, rec.uname, rec.arguments
                 proc_ident = f"PID: {pid}, UID: {uid}, GID: {gid}, User: {uname}"
                 log.info(f"{msg_prefix} of user endpoint ({proc_ident}) [{proc_args}]")
                 try:
@@ -275,7 +343,7 @@ class EndpointManager:
                     os.setresgid(proc_gid, proc_gid, -1)
 
             deadline = time.time() + 10
-            while self._child_args and time.time() < deadline:
+            while self._children and time.time() < deadline:
                 time.sleep(0.5)
                 self.wait_for_children()
 
@@ -373,6 +441,15 @@ class EndpointManager:
                 continue
 
             try:
+                local_user_rec = pwd.getpwnam(local_user)
+            except Exception as e:
+                log.warning(
+                    f"Invalid or unknown local username.  ({e.__class__.__name__}) {e}"
+                )
+                self._command.ack(d_tag)
+                continue
+
+            try:
                 if not (command and valid_method_name_re.match(command)):
                     raise InvalidCommandError(f"Unknown or invalid command: {command}")
 
@@ -380,7 +457,7 @@ class EndpointManager:
                 if not command_func:
                     raise InvalidCommandError(f"Unknown or invalid command: {command}")
 
-                command_func(local_user, command_args, command_kwargs)
+                command_func(local_user_rec, command_args, command_kwargs)
                 log.info(
                     f"Command process successfully forked for '{globus_username}'"
                     f" ('{globus_uuid}')."
@@ -399,7 +476,7 @@ class EndpointManager:
 
     def cmd_start_endpoint(
         self,
-        local_username: str,
+        local_user_rec: pwd.struct_passwd,
         args: list[str] | None,
         kwargs: dict | None,
     ):
@@ -412,9 +489,21 @@ class EndpointManager:
         if not ep_name:
             raise InvalidCommandError("Missing endpoint name")
 
-        pw_rec = pwd.getpwnam(local_username)
-        udir, uid, gid = pw_rec.pw_dir, pw_rec.pw_uid, pw_rec.pw_gid
-        uname = pw_rec.pw_name
+        for p, r in self._children.items():
+            if r.ep_name == ep_name:
+                log.info(
+                    f"User endpoint {ep_name} is already running (pid: {p}); "
+                    "caching arguments in case it's about to shut down"
+                )
+                self._cached_cmd_start_args[p] = (local_user_rec, args, kwargs)
+                return
+
+        udir, uid, gid, uname = (
+            local_user_rec.pw_dir,
+            local_user_rec.pw_uid,
+            local_user_rec.pw_gid,
+            local_user_rec.pw_name,
+        )
 
         if not self._allow_same_user:
             p_uname = self._mu_user.pw_name
@@ -445,7 +534,9 @@ class EndpointManager:
 
         if pid > 0:
             proc_args_s = f"({uname}, {ep_name}) {' '.join(proc_args)}"
-            self._child_args[pid] = (uid, gid, local_username, proc_args_s)
+            self._children[pid] = UserEndpointRecord(
+                ep_name=ep_name, local_user_info=local_user_rec, arguments=proc_args_s
+            )
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
 
