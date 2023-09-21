@@ -40,6 +40,8 @@ REQUIRES = [
     "pyyaml>=6.0,<7.0",
     "jinja2>=3.1.2,<3.2",
     "jsonschema>=4.19.0,<4.20",
+    "cachetools>=5.3.1",
+    "types-cachetools>=5.3.0.6",
 ]
 
 TEST_REQUIRES = [
