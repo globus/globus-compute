@@ -30,7 +30,7 @@ def get_web_service_url(envname: str | None = None) -> str:
 def get_amqp_service_host(env_name: str | None = None) -> str:
     env = env_name or _get_envname()
     hosts = {
-        "production": "amqps.funcx.org",
+        "production": "compute.amqps.globus.org",
         "dev": "amqps.dev.funcx.org",
         "preview": "compute.amqps.preview.globus.org",
         "local": "localhost",

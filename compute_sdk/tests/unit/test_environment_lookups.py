@@ -33,10 +33,10 @@ def test_web_service_url(monkeypatch):
 
 def test_get_amqp_service_host(monkeypatch):
     env_url_map = {
-        None: "amqps.funcx.org",
-        "production": "amqps.funcx.org",
+        None: "compute.amqps.globus.org",
+        "production": "compute.amqps.globus.org",
         "sandbox": "compute.amqps.sandbox.globuscs.info",
-        "invalid-env": "amqps.funcx.org",
+        "invalid-env": "compute.amqps.globus.org",
     }
 
     for env, url in env_url_map.items():
