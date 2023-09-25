@@ -3,6 +3,26 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.4.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.4.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added a ``Client.get_function`` method to submit a request for details about a registered
+  function, such as name, description, serialized source code, python version, etc.
+
+Bug Fixes
+^^^^^^^^^
+
+- Fix an innocuous bug during cleanup after having successfully shutdown an
+  Endpoint using the ``GlobusComputeEngine``.
+
+- Configuration using ``GlobusComputeEngine`` now properly serializes and
+  registers with the Globus Compute web services.
+
 .. _changelog-2.3.3:
 
 globus-compute-sdk & globus-compute-endpoint v2.3.3
