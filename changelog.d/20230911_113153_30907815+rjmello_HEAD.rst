@@ -1,5 +1,0 @@
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- The SDK now supports defining metadata (Python and SDK versions) when registering
-  a function. This information is automatically included when using the ``Executor``.
