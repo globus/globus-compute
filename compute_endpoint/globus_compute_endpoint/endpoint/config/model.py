@@ -80,6 +80,9 @@ class EngineModel(BaseConfigModel):
     provider: t.Optional[ProviderModel]
     strategy: t.Optional[StrategyModel]
     address: t.Optional[t.Union[str, AddressModel]]
+    worker_ports: t.Optional[t.Tuple[int, int]]
+    worker_port_range: t.Optional[t.Tuple[int, int]]
+    interchange_port_range: t.Optional[t.Tuple[int, int]]
 
     _validate_type = _validate_import("type", engines)
     _validate_provider = _validate_params("provider")
