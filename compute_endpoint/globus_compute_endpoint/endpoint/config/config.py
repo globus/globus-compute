@@ -88,8 +88,8 @@ class Config(RepresentationMixin):
         Optional path string to the top-level directory where logs should be written to.
         Default: None
 
-    multi_tenant : bool | None
-        Designates the endpoint as a multi-tenant endpoint
+    multi_user : bool | None
+        Designates the endpoint as a multi-user endpoint
         Default: None
 
     allowed_functions : list[str] | None
@@ -97,9 +97,9 @@ class Config(RepresentationMixin):
 
     force_mt_allow_same_user : bool
         If set, override the heuristic that determines whether the uid running the
-        multi-tenant endpoint may also run user endpoints.
+        multi-user endpoint may also run user endpoints.
 
-        Normally, the multi-tenant endpoint disallows starting user endpoints with
+        Normally, the multi-user endpoint disallows starting user endpoints with
         the same UID as the parent process unless the UID has no privileges.  That
         means that the UID is not 0 (root), or that the UID does *not* have (among
         many others) the capability to change the user (otherwise known as "drop
@@ -125,7 +125,7 @@ class Config(RepresentationMixin):
         # Connection info
         environment: str | None = None,
         funcx_service_address=None,
-        multi_tenant: bool | None = None,
+        multi_user: bool | None = None,
         allowed_functions: list[str] | None = None,
         # Tuning info
         heartbeat_period=30,
@@ -172,7 +172,7 @@ class Config(RepresentationMixin):
         self.environment = environment
         self.funcx_service_address = funcx_service_address
 
-        self.multi_tenant = multi_tenant is True
+        self.multi_user = multi_user is True
         self.force_mt_allow_same_user = force_mt_allow_same_user is True
         self.allowed_functions = allowed_functions
 

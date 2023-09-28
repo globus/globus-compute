@@ -102,15 +102,15 @@ def test_get_amqp_url(client, randomstring):
     assert res["some_key"] == expected_response
 
 
-@pytest.mark.parametrize("multi_tenant", [None, True, False])
-def test_multi_tenant_post(client, multi_tenant):
+@pytest.mark.parametrize("multi_user", [None, True, False])
+def test_multi_user_post(client, multi_user):
     responses.post(url="https://api.funcx/v2/endpoints")
-    resp = client.register_endpoint("ep_name", "ep_id", multi_tenant=multi_tenant)
+    resp = client.register_endpoint("ep_name", "ep_id", multi_user=multi_user)
     req_body = json.loads(resp._response.request.body)
-    if multi_tenant:
-        assert req_body["multi_tenant"] == multi_tenant
+    if multi_user:
+        assert req_body["multi_user"] == multi_user
     else:
-        assert "multi_tenant" not in req_body
+        assert "multi_user" not in req_body
 
 
 def test_get_function(client: WebClient, randomstring: t.Callable):

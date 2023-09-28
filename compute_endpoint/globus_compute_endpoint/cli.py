@@ -28,13 +28,13 @@ from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 try:
     from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
 except ImportError as _e:
-    _has_multi_tenant = False
+    _has_multi_user = False
     if "--debug" in sys.argv and sys.stderr.isatty():
         # We haven't set up logging yet so manually print for now
         print(f"(DEBUG) Failed to import from file: {__file__}", file=sys.stderr)
         print(f"(DEBUG) [{type(_e).__name__}] {_e}", file=sys.stderr)
 else:
-    _has_multi_tenant = True
+    _has_multi_user = True
 
 log = logging.getLogger(__name__)
 
@@ -224,11 +224,11 @@ def version_command():
 @app.command(name="configure", help="Configure an endpoint")
 @click.option("--endpoint-config", default=None, help="a template config to use")
 @click.option(
-    "--multi-tenant",
+    "--multi-user",
     is_flag=True,
     default=False,
     hidden=True,
-    help="Configure endpoint as multi-tenant capable",
+    help="Configure endpoint as multi-user capable",
 )
 @click.option(
     "--display-name",
@@ -240,7 +240,7 @@ def configure_endpoint(
     *,
     name: str,
     endpoint_config: str | None,
-    multi_tenant: bool,
+    multi_user: bool,
     display_name: str | None,
 ):
     """Configure an endpoint
@@ -253,12 +253,12 @@ def configure_endpoint(
     except ValueError as e:
         raise ClickException(str(e))
 
-    if multi_tenant and not _has_multi_tenant:
-        raise ClickException("multi-tenant endpoints are not supported on this system")
+    if multi_user and not _has_multi_user:
+        raise ClickException("multi-user endpoints are not supported on this system")
 
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
-    Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_tenant, display_name)
+    Endpoint.configure_endpoint(ep_dir, endpoint_config, multi_user, display_name)
 
 
 @app.command(name="start", help="Start an endpoint")
@@ -490,10 +490,10 @@ def _do_start_endpoint(
         ep_config.detach_endpoint = False
         log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
-    if ep_config.multi_tenant:
-        if not _has_multi_tenant:
+    if ep_config.multi_user:
+        if not _has_multi_user:
             raise ClickException(
-                "multi-tenant endpoints are not supported on this system"
+                "multi-user endpoints are not supported on this system"
             )
         epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
         epm.start()

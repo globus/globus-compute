@@ -60,34 +60,34 @@ class TestStart:
             manager.configure_endpoint(config_dir, None)
 
     @pytest.mark.parametrize("mt", [None, True, False])
-    def test_configure_multi_tenant_existing_config(self, mt):
+    def test_configure_multi_user_existing_config(self, mt):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = Endpoint._config_file_path(config_dir)
         config_copy = str(config_dir.parent / "config2.yaml")
 
-        # First, make an entry with multi_tenant
-        manager.configure_endpoint(config_dir, None, multi_tenant=True)
+        # First, make an entry with multi_user
+        manager.configure_endpoint(config_dir, None, multi_user=True)
         shutil.move(config_file, config_copy)
         shutil.rmtree(config_dir)
 
         # Then, modify it with new setting
-        manager.configure_endpoint(config_dir, config_copy, multi_tenant=mt)
+        manager.configure_endpoint(config_dir, config_copy, multi_user=mt)
 
         with open(config_file) as f:
             config_dict = yaml.safe_load(f)
-        assert "multi_tenant" in config_dict
+        assert "multi_user" in config_dict
 
         os.remove(config_copy)
 
     @pytest.mark.parametrize("mt", [None, True, False])
-    def test_configure_multi_tenant(self, mt):
+    def test_configure_multi_user(self, mt):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = config_dir / "config.yaml"
 
         if mt is not None:
-            manager.configure_endpoint(config_dir, None, multi_tenant=mt)
+            manager.configure_endpoint(config_dir, None, multi_user=mt)
         else:
             manager.configure_endpoint(config_dir, None)
 
@@ -96,9 +96,9 @@ class TestStart:
         with open(config_file) as f:
             config_dict = yaml.safe_load(f)
         if mt:
-            assert config_dict["multi_tenant"] == mt is True
+            assert config_dict["multi_user"] == mt is True
         else:
-            assert "multi_tenant" not in config_dict
+            assert "multi_user" not in config_dict
 
     @pytest.mark.skip(
         "This test needs to be re-written after endpoint_register is updated"

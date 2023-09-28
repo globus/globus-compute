@@ -170,7 +170,7 @@ class WebClient(globus_sdk.BaseClient):
         endpoint_id: UUID_LIKE_T,
         *,
         metadata: t.Optional[dict] = None,
-        multi_tenant: t.Optional[bool] = None,
+        multi_user: t.Optional[bool] = None,
         display_name: t.Optional[str] = None,
         allowed_functions: t.Optional[t.List[UUID_LIKE_T]] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
@@ -187,9 +187,9 @@ class WebClient(globus_sdk.BaseClient):
             data["display_name"] = display_name
 
         # Only send this param if True.  Will have to change to
-        # `if multi_tenant is not None` if we want to always pass it
-        if multi_tenant:
-            data["multi_tenant"] = multi_tenant
+        # `if multi_user is not None` if we want to always pass it
+        if multi_user:
+            data["multi_user"] = multi_user
 
         if metadata:
             data["metadata"] = metadata
