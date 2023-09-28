@@ -1,4 +1,4 @@
-# This is the default user-template provided with newly-configured Multi-user
+# This is the default user-template provided with newly-configured Multi-User
 # endpoints.  User endpoints generate a user-endpoint-specific configuration by
 # processing this YAML file as a Jinja template against user-provided
 # variables -- please modify this template to suit your site's requirements.

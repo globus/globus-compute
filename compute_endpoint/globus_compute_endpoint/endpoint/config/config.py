@@ -95,7 +95,7 @@ class Config(RepresentationMixin):
     allowed_functions : list[str] | None
         List of functions that are allowed to be run on the endpoint
 
-    force_mt_allow_same_user : bool
+    force_mu_allow_same_user : bool
         If set, override the heuristic that determines whether the uid running the
         multi-user endpoint may also run user endpoints.
 
@@ -135,7 +135,7 @@ class Config(RepresentationMixin):
         detach_endpoint=True,
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
-        force_mt_allow_same_user: bool = False,
+        force_mu_allow_same_user: bool = False,
         # Misc info
         display_name: str | None = None,
         # Logging info
@@ -173,7 +173,7 @@ class Config(RepresentationMixin):
         self.funcx_service_address = funcx_service_address
 
         self.multi_user = multi_user is True
-        self.force_mt_allow_same_user = force_mt_allow_same_user is True
+        self.force_mu_allow_same_user = force_mu_allow_same_user is True
         self.allowed_functions = allowed_functions
 
         # Tuning info
