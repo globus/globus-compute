@@ -962,13 +962,13 @@ def test_run_as_same_user_forced_warns(
     mock_uid, mock_gid = randomstring(), randomstring()
     mock_os.getuid.return_value = mock_uid
     mock_os.getgid.return_value = mock_gid
-    mock_conf.force_mt_allow_same_user = True
+    mock_conf.force_mu_allow_same_user = True
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     assert em._allow_same_user is True
     assert mock_warn.called
 
     a, _k = mock_warn.call_args
-    assert "`force_mt_allow_same_user` set to true" in a[0]
+    assert "`force_mu_allow_same_user` set to true" in a[0]
     assert "very dangerous override" in a[0]
     assert "Endpoint (UID, GID):" in a[0], "Expect process UID, GID in warning"
     assert f"({mock_uid}, {mock_gid})" in a[0], "Expect process UID, GID in warning"

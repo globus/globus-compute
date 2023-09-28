@@ -59,8 +59,8 @@ class TestStart:
         with pytest.raises(Exception, match="ConfigExists"):
             manager.configure_endpoint(config_dir, None)
 
-    @pytest.mark.parametrize("mt", [None, True, False])
-    def test_configure_multi_user_existing_config(self, mt):
+    @pytest.mark.parametrize("mu", [None, True, False])
+    def test_configure_multi_user_existing_config(self, mu):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = Endpoint._config_file_path(config_dir)
@@ -72,7 +72,7 @@ class TestStart:
         shutil.rmtree(config_dir)
 
         # Then, modify it with new setting
-        manager.configure_endpoint(config_dir, config_copy, multi_user=mt)
+        manager.configure_endpoint(config_dir, config_copy, multi_user=mu)
 
         with open(config_file) as f:
             config_dict = yaml.safe_load(f)
@@ -80,14 +80,14 @@ class TestStart:
 
         os.remove(config_copy)
 
-    @pytest.mark.parametrize("mt", [None, True, False])
-    def test_configure_multi_user(self, mt):
+    @pytest.mark.parametrize("mu", [None, True, False])
+    def test_configure_multi_user(self, mu):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = config_dir / "config.yaml"
 
-        if mt is not None:
-            manager.configure_endpoint(config_dir, None, multi_user=mt)
+        if mu is not None:
+            manager.configure_endpoint(config_dir, None, multi_user=mu)
         else:
             manager.configure_endpoint(config_dir, None)
 
@@ -95,8 +95,8 @@ class TestStart:
 
         with open(config_file) as f:
             config_dict = yaml.safe_load(f)
-        if mt:
-            assert config_dict["multi_user"] == mt is True
+        if mu:
+            assert config_dict["multi_user"] == mu is True
         else:
             assert "multi_user" not in config_dict
 

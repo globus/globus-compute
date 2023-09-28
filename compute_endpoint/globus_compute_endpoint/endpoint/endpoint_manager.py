@@ -132,18 +132,18 @@ class EndpointManager:
             )
             exit(os.EX_DATAERR)
 
-        self._mt_user = pwd.getpwuid(os.getuid())
-        if config.force_mt_allow_same_user:
+        self._mu_user = pwd.getpwuid(os.getuid())
+        if config.force_mu_allow_same_user:
             self._allow_same_user = True
             log.warning(
-                "Configuration item `force_mt_allow_same_user` set to true; this is"
+                "Configuration item `force_mu_allow_same_user` set to true; this is"
                 " considered a very dangerous override -- please use with care,"
                 " especially if allowing this endpoint to be utilized by multiple"
                 " users."
                 f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()}) "
             )
         else:
-            self._allow_same_user = not is_privileged(self._mt_user)
+            self._allow_same_user = not is_privileged(self._mu_user)
 
         # sanitize passwords in logs
         log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
@@ -173,8 +173,8 @@ class EndpointManager:
 
     @staticmethod
     def get_metadata(config: Config, conf_dir: pathlib.Path) -> dict:
-        # Piecemeal Config settings because for MT, most of the ST items are
-        # unrelated -- the MT (aka EndpointManager) does not execute tasks
+        # Piecemeal Config settings because for MU, most of the ST items are
+        # unrelated -- the MU (aka EndpointManager) does not execute tasks
         return {
             "endpoint_version": __version__,
             "hostname": socket.getfqdn(),
@@ -238,7 +238,7 @@ class EndpointManager:
         if msg_out:
             hl, r = "\033[104m", "\033[m"
             pld = f"{hl}{self._endpoint_uuid_str}{r}"
-            print(f"        >>> Multi-user Endpoint ID: {pld} <<<", file=msg_out)
+            print(f"        >>> Multi-User Endpoint ID: {pld} <<<", file=msg_out)
 
         self._install_signal_handlers()
 
@@ -417,14 +417,14 @@ class EndpointManager:
         uname = pw_rec.pw_name
 
         if not self._allow_same_user:
-            p_uname = self._mt_user.pw_name
+            p_uname = self._mu_user.pw_name
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
                     "Requested UID is same as multi-user UID, but configuration"
                     " has not been marked to allow the multi-user user to process"
                     " tasks.  To allow the same UID to also run user endpoints,"
                     " consider using a non-root user or removing privileges from UID."
-                    f"\n  MT Process UID: {self._mt_user.pw_uid} ({p_uname})"
+                    f"\n  MU Process UID: {self._mu_user.pw_uid} ({p_uname})"
                     f"\n  Requested UID:  {uid} ({uname})",
                 )
 
@@ -451,7 +451,7 @@ class EndpointManager:
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
 
-        import shutil  # in the child process; no need to load this in MTEP space
+        import shutil  # in the child process; no need to load this in MUEP space
 
         exit_code = 70
         try:
@@ -504,7 +504,7 @@ class EndpointManager:
                         "\n  Current user: %s (uid: %s, gid: %s)"
                         "\n  Attempted to initgroups to: %s (uid: %s, name: %s)",
                         os.getpid(),
-                        self._mt_user.pw_name,
+                        self._mu_user.pw_name,
                         os.getuid(),
                         os.getgid(),
                         gid,

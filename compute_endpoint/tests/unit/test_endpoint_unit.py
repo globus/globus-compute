@@ -539,7 +539,7 @@ def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
     ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
 
 
-def test_mt_endpoint_user_ep_yamls_world_readable(tmp_path):
+def test_mu_endpoint_user_ep_yamls_world_readable(tmp_path):
     ep_dir = tmp_path / "new_endpoint_dir"
     Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
 
@@ -553,7 +553,7 @@ def test_mt_endpoint_user_ep_yamls_world_readable(tmp_path):
     assert ep_dir.stat().st_mode & 0o111 == 0o111, "Minimum world executable"
 
 
-def test_mt_endpoint_user_ep_sensible_default(tmp_path):
+def test_mu_endpoint_user_ep_sensible_default(tmp_path):
     ep_dir = tmp_path / "new_endpoint_dir"
     Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
 
