@@ -1,0 +1,5 @@
+Bug Fixes
+^^^^^^^^^
+
+- Defining ``worker_ports``, ``worker_port_range``, or ``interchange_port_range``
+  in an endpoint's YAML config no longer raises an error.
