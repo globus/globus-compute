@@ -179,7 +179,7 @@ def test_sets_process_title(
     assert a[0].startswith(
         "Globus Compute Endpoint"
     ), "Expect easily identifiable process name"
-    assert "*(" in a[0], "Expected asterisk as subtle clue of 'multi-tenant'"
+    assert "*(" in a[0], "Expected asterisk as subtle clue of 'multi-user'"
     assert f"{ep_uuid}, {conf_dir.name}" in a[0], "Can find process by conf"
 
     if env:
@@ -224,7 +224,7 @@ def test_gracefully_exits_if_in_conflict_or_locked(
 
 def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
     ep_uuid, mock_gcc = mock_client
-    mock_conf.multi_tenant = True
+    mock_conf.multi_user = True
     EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert mock_gcc.register_endpoint.called
@@ -240,7 +240,7 @@ def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
 
     for key in (
         "type",
-        "multi_tenant",
+        "multi_user",
         "stdout",
         "stderr",
         "environment",
@@ -248,7 +248,7 @@ def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
     ):
         assert key in k["metadata"]["config"]
 
-    assert k["metadata"]["config"]["multi_tenant"] is True
+    assert k["metadata"]["config"]["multi_user"] is True
 
 
 def test_handles_network_error_scriptably(

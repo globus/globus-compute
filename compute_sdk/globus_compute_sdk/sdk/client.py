@@ -418,7 +418,7 @@ class Client:
         name,
         endpoint_id: UUID_LIKE_T,
         metadata: dict | None = None,
-        multi_tenant: bool | None = None,
+        multi_user: bool | None = None,
         display_name: str | None = None,
         allowed_functions: list[UUID_LIKE_T] | None = None,
     ):
@@ -432,7 +432,7 @@ class Client:
             The uuid of the endpoint
         metadata : dict | None
             Endpoint metadata
-        multi_tenant : bool | None
+        multi_user : bool | None
             Whether the endpoint supports multiple users
         display_name : str | None
             The display name of the endpoint
@@ -452,7 +452,7 @@ class Client:
             endpoint_name=name,
             endpoint_id=endpoint_id,
             metadata=metadata,
-            multi_tenant=multi_tenant,
+            multi_user=multi_user,
             display_name=display_name,
             allowed_functions=allowed_functions,
         )

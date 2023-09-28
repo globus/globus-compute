@@ -330,16 +330,16 @@ def test_register_endpoint_already_active(
         assert pytest_exc.value.code == -1
 
 
-@pytest.mark.parametrize("multi_tenant", [None, True, False])
+@pytest.mark.parametrize("multi_user", [None, True, False])
 @responses.activate
-def test_register_endpoint_is_not_multitenant(
+def test_register_endpoint_is_not_multiuser(
     mocker,
     fs,
     endpoint_uuid,
     register_endpoint_response,
     get_standard_compute_client,
     randomstring,
-    multi_tenant,
+    multi_user,
     mock_ep_data,
 ):
     mock_gcc = get_standard_compute_client()
@@ -351,8 +351,8 @@ def test_register_endpoint_is_not_multitenant(
     ep_id = str(uuid.uuid4())
 
     register_endpoint_response(endpoint_id=ep_id)
-    if multi_tenant is not None:
-        ep_conf.multi_tenant = multi_tenant
+    if multi_user is not None:
+        ep_conf.multi_user = multi_user
 
     ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
 
@@ -363,7 +363,7 @@ def test_register_endpoint_is_not_multitenant(
     assert ep_json_p.exists()
 
     request_body = json.loads(responses.calls[1].request.body)
-    assert "multi_tenant" not in request_body, "endpoint.py is single-tenant logic only"
+    assert "multi_user" not in request_body, "endpoint.py is single-user logic only"
 
 
 def test_list_endpoints_none_configured(mock_ep_buf):
@@ -541,7 +541,7 @@ def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
 
 def test_mt_endpoint_user_ep_yamls_world_readable(tmp_path):
     ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir, multi_tenant=True)
+    Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
 
     user_tmpl_path = Endpoint.user_config_template_path(ep_dir)
     user_env_path = Endpoint._user_environment_path(ep_dir)
@@ -555,7 +555,7 @@ def test_mt_endpoint_user_ep_yamls_world_readable(tmp_path):
 
 def test_mt_endpoint_user_ep_sensible_default(tmp_path):
     ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir, multi_tenant=True)
+    Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
 
     # Doesn't crash; loads yaml, jinja template has defaults
     render_config_user_template(ep_dir, {})

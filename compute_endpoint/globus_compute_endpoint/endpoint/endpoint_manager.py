@@ -91,7 +91,7 @@ class EndpointManager:
                     conf_dir.name,
                     endpoint_uuid,
                     metadata=EndpointManager.get_metadata(config, conf_dir),
-                    multi_tenant=True,
+                    multi_user=True,
                 )
 
                 # Mostly to appease mypy, but also a useful text if it ever
@@ -107,7 +107,7 @@ class EndpointManager:
                     exit(os.EX_UNAVAILABLE)
                 raise
             except NetworkError as e:
-                log.exception("Network error while registering multi-tenant endpoint")
+                log.exception("Network error while registering multi-user endpoint")
                 log.critical(f"Network failure; unable to register endpoint: {e}")
                 exit(os.EX_TEMPFAIL)
 
@@ -157,7 +157,7 @@ class EndpointManager:
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
 
-        # * == "multi-tenant"; not important until it is, so let it be subtle
+        # * == "multi-user"; not important until it is, so let it be subtle
         ptitle = f"Globus Compute Endpoint *({endpoint_uuid}, {conf_dir.name})"
         if config.environment:
             ptitle += f" - {config.environment}"
@@ -238,7 +238,7 @@ class EndpointManager:
         if msg_out:
             hl, r = "\033[104m", "\033[m"
             pld = f"{hl}{self._endpoint_uuid_str}{r}"
-            print(f"        >>> Multi-Tenant Endpoint ID: {pld} <<<", file=msg_out)
+            print(f"        >>> Multi-user Endpoint ID: {pld} <<<", file=msg_out)
 
         self._install_signal_handlers()
 
@@ -420,8 +420,8 @@ class EndpointManager:
             p_uname = self._mt_user.pw_name
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
-                    "Requested UID is same as multi-tenant UID, but configuration"
-                    " has not been marked to allow the multi-tenant user to process"
+                    "Requested UID is same as multi-user UID, but configuration"
+                    " has not been marked to allow the multi-user user to process"
                     " tasks.  To allow the same UID to also run user endpoints,"
                     " consider using a non-root user or removing privileges from UID."
                     f"\n  MT Process UID: {self._mt_user.pw_uid} ({p_uname})"
@@ -488,7 +488,7 @@ class EndpointManager:
 
             if (os.getuid(), os.getgid()) != (uid, gid):
                 # For multi-user systems, this is the expected path.  But for those
-                # who run the multi-tenant setup as a non-privileged user, there is
+                # who run the multi-user setup as a non-privileged user, there is
                 # no need to change the user: they're already executing _as that
                 # uid_!
                 try:

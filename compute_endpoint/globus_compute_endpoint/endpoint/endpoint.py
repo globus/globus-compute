@@ -69,7 +69,7 @@ class Endpoint:
     def update_config_file(
         original_path: pathlib.Path,
         target_path: pathlib.Path,
-        multi_tenant: bool,
+        multi_user: bool,
         display_name: str | None,
     ):
         config_text = original_path.read_text()
@@ -78,8 +78,8 @@ class Endpoint:
         if display_name:
             config_dict["display_name"] = display_name
 
-        if multi_tenant:
-            config_dict["multi_tenant"] = multi_tenant
+        if multi_user:
+            config_dict["multi_user"] = multi_user
 
         config_text = yaml.safe_dump(config_dict)
         target_path.write_text(config_text)
@@ -88,7 +88,7 @@ class Endpoint:
     def init_endpoint_dir(
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
-        multi_tenant=False,
+        multi_user=False,
         display_name: str | None = None,
     ):
         """Initialize a clean endpoint dir
@@ -96,7 +96,7 @@ class Endpoint:
         :param endpoint_dir: Path to the endpoint configuration dir
         :param endpoint_config: Path to a config file to be used instead of
             the Globus Compute default config file
-        :param multi_tenant: Whether the endpoint is a multi-user endpoint
+        :param multi_user: Whether the endpoint is a multi-user endpoint
         :param display_name: A display name to use, if desired
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
@@ -118,11 +118,11 @@ class Endpoint:
             Endpoint.update_config_file(
                 endpoint_config,
                 config_target_path,
-                multi_tenant,
+                multi_user,
                 display_name,
             )
 
-            if multi_tenant:
+            if multi_user:
                 # template must be readable by user-endpoint processes (see
                 # endpoint_manager.py)
                 world_readable = 0o0644 & ((0o0777 - user_umask) | 0o0444)
@@ -151,7 +151,7 @@ class Endpoint:
     def configure_endpoint(
         conf_dir: pathlib.Path,
         endpoint_config: str | None,
-        multi_tenant: bool = False,
+        multi_user: bool = False,
         display_name: str | None = None,
     ):
         ep_name = conf_dir.name
@@ -161,15 +161,13 @@ class Endpoint:
             raise Exception("ConfigExists")
 
         templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
-        Endpoint.init_endpoint_dir(
-            conf_dir, templ_conf_path, multi_tenant, display_name
-        )
+        Endpoint.init_endpoint_dir(conf_dir, templ_conf_path, multi_user, display_name)
         config_path = Endpoint._config_file_path(conf_dir)
-        if multi_tenant:
+        if multi_user:
             user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
             user_env_path = Endpoint._user_environment_path(conf_dir)
 
-            print(f"Created multi-tenant profile for endpoint named <{ep_name}>")
+            print(f"Created multi-user profile for endpoint named <{ep_name}>")
             print(
                 f"\n\tConfiguration file: {config_path}\n"
                 f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
@@ -375,7 +373,7 @@ class Endpoint:
                     endpoint_dir.name,
                     endpoint_uuid,
                     metadata=Endpoint.get_metadata(endpoint_config),
-                    multi_tenant=False,
+                    multi_user=False,
                     display_name=endpoint_config.display_name,
                     allowed_functions=endpoint_config.allowed_functions,
                 )
