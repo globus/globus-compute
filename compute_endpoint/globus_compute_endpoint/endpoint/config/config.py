@@ -95,6 +95,9 @@ class Config(RepresentationMixin):
     allowed_functions : list[str] | None
         List of functions that are allowed to be run on the endpoint
 
+    authentication_policy : str | None
+        Endpoint users are evaluated against this Globus authentication policy
+
     force_mu_allow_same_user : bool
         If set, override the heuristic that determines whether the uid running the
         multi-user endpoint may also run single-user endpoints.
@@ -127,6 +130,7 @@ class Config(RepresentationMixin):
         funcx_service_address=None,
         multi_user: bool | None = None,
         allowed_functions: list[str] | None = None,
+        authentication_policy: str | None = None,
         # Tuning info
         heartbeat_period=30,
         heartbeat_threshold=120,
@@ -175,6 +179,7 @@ class Config(RepresentationMixin):
         self.multi_user = multi_user is True
         self.force_mu_allow_same_user = force_mu_allow_same_user is True
         self.allowed_functions = allowed_functions
+        self.authentication_policy = authentication_policy
 
         # Tuning info
         self.heartbeat_period = heartbeat_period

@@ -421,6 +421,7 @@ class Client:
         multi_user: bool | None = None,
         display_name: str | None = None,
         allowed_functions: list[UUID_LIKE_T] | None = None,
+        auth_policy: UUID_LIKE_T | None = None,
     ):
         """Register an endpoint with the Globus Compute service.
 
@@ -438,6 +439,8 @@ class Client:
             The display name of the endpoint
         allowed_functions: list[str | UUID] | None
             List of functions that are allowed to be run on the endpoint
+        auth_policy: str | UUID | None
+            Endpoint users are evaluated against this Globus authentication policy
 
         Returns
         -------
@@ -455,6 +458,7 @@ class Client:
             multi_user=multi_user,
             display_name=display_name,
             allowed_functions=allowed_functions,
+            auth_policy=auth_policy,
         )
         return r.data
 
