@@ -71,12 +71,16 @@ class Endpoint:
         target_path: pathlib.Path,
         multi_user: bool,
         display_name: str | None,
+        auth_policy: str | None,
     ):
         config_text = original_path.read_text()
         config_dict = yaml.safe_load(config_text)
 
         if display_name:
             config_dict["display_name"] = display_name
+
+        if auth_policy:
+            config_dict["authentication_policy"] = auth_policy
 
         if multi_user:
             config_dict["multi_user"] = multi_user
@@ -90,6 +94,7 @@ class Endpoint:
         endpoint_config: pathlib.Path | None = None,
         multi_user=False,
         display_name: str | None = None,
+        auth_policy: str | None = None,
     ):
         """Initialize a clean endpoint dir
 
@@ -98,6 +103,7 @@ class Endpoint:
             the Globus Compute default config file
         :param multi_user: Whether the endpoint is a multi-user endpoint
         :param display_name: A display name to use, if desired
+        :param auth_policy: Globus authentication policy
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
         user_umask = os.umask(0o0077)
@@ -120,6 +126,7 @@ class Endpoint:
                 config_target_path,
                 multi_user,
                 display_name,
+                auth_policy,
             )
 
             if multi_user:
@@ -153,6 +160,7 @@ class Endpoint:
         endpoint_config: str | None,
         multi_user: bool = False,
         display_name: str | None = None,
+        auth_policy: str | None = None,
     ):
         ep_name = conf_dir.name
         if conf_dir.exists():
@@ -161,7 +169,9 @@ class Endpoint:
             raise Exception("ConfigExists")
 
         templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
-        Endpoint.init_endpoint_dir(conf_dir, templ_conf_path, multi_user, display_name)
+        Endpoint.init_endpoint_dir(
+            conf_dir, templ_conf_path, multi_user, display_name, auth_policy
+        )
         config_path = Endpoint._config_file_path(conf_dir)
         if multi_user:
             user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
@@ -376,6 +386,7 @@ class Endpoint:
                     multi_user=False,
                     display_name=endpoint_config.display_name,
                     allowed_functions=endpoint_config.allowed_functions,
+                    auth_policy=endpoint_config.authentication_policy,
                 )
 
             except GlobusAPIError as e:

@@ -172,6 +172,45 @@ def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_compute_client):
     assert called_data["allowed_functions"][1] == ep_conf.allowed_functions[1]
 
 
+def test_start_endpoint_auth_policy_passthrough(mocker, fs, patch_compute_client):
+    gcc_addy = "https://compute.api.globus.org"
+    gcc = globus_compute_sdk.Client(
+        funcx_service_address=gcc_addy,
+        do_version_check=False,
+        login_manager=mocker.Mock(),
+    )
+    gcwc = WebClient(base_url=gcc_addy)
+    gcwc.post = MagicMock()
+    gcc.web_client = gcwc
+    patch_compute_client.return_value = gcc
+
+    responses.add(
+        responses.GET,
+        gcc_addy + "/v2/version",
+        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        gcc_addy + "/v2/endpoints",
+        json={},
+        status=200,
+    )
+
+    ep_dir = pathlib.Path("/some/path/some_endpoint_name")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+
+    ep = endpoint.Endpoint()
+    ep_conf = Config()
+    ep_conf.authentication_policy = str(uuid.uuid4())
+
+    with pytest.raises(SystemExit):
+        ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+
+    called_data = gcc.web_client.post.call_args[1]["data"]
+    assert called_data["authentication_policy"] == ep_conf.authentication_policy
+
+
 def test_endpoint_logout(monkeypatch):
     # not forced, and no running endpoints
     logout_true = Mock(return_value=True)

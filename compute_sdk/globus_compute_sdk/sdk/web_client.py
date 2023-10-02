@@ -173,6 +173,7 @@ class WebClient(globus_sdk.BaseClient):
         multi_user: t.Optional[bool] = None,
         display_name: t.Optional[str] = None,
         allowed_functions: t.Optional[t.List[UUID_LIKE_T]] = None,
+        auth_policy: t.Optional[UUID_LIKE_T] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
         data: t.Dict[str, t.Any] = {
@@ -195,6 +196,8 @@ class WebClient(globus_sdk.BaseClient):
             data["metadata"] = metadata
         if allowed_functions:
             data["allowed_functions"] = allowed_functions
+        if auth_policy:
+            data["authentication_policy"] = auth_policy
         if additional_fields is not None:
             data.update(additional_fields)
         return self.post("/v2/endpoints", data=data)
