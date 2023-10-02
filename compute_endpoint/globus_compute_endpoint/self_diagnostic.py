@@ -8,7 +8,6 @@ import socket
 import ssl
 import subprocess
 import sys
-import textwrap
 from urllib.parse import urlparse
 
 import click
@@ -19,26 +18,31 @@ from globus_compute_sdk.sdk._environments import (
 from globus_compute_sdk.sdk.web_client import WebClient
 
 
-def cat(path: str, wildcard: bool = False, max_bytes: int | None = None):
+def cat(path: str, wildcard: bool = False, max_bytes: int = 0):
+    max_bytes = max(0, max_bytes)
+
+    full_path = os.path.expanduser(path)
+    if wildcard:
+        files = glob.glob(full_path)
+    else:
+        files = [full_path]
+
     def kernel() -> None:
-        full_path = os.path.expanduser(path)
-
-        if wildcard:
-            files = glob.glob(full_path)
-        else:
-            files = [full_path]
-
         for filename in files:
-            click.echo("cat " + filename)
+            cat_cmd = "cat " + filename
+            hline = "=" * len(cat_cmd)
+            click.echo(cat_cmd + "\n" + hline)
             if os.path.exists(filename):
                 with open(filename, "rb") as f:
                     if max_bytes:
                         file_size = os.fstat(f.fileno()).st_size
                         f.seek(max(file_size - max_bytes, 0))
-                    content = f.read().decode("utf-8")
-                click.echo(textwrap.indent(content, "  "))
+                    content = f.read().replace(b"\n", b"\n | ")
+                click.echo(b" | " + content)
             else:
                 click.secho(f"No file named {filename}\n", fg="red", bold=True)
+            hline = "-" * len(cat_cmd)
+            click.echo(hline + "\n")
 
     kernel.display_name = f"func:cat({path})"  # type: ignore
     return kernel
@@ -126,7 +130,7 @@ def _run_command(cmd: str):
         click.secho(f"Command failed: {e}\n", fg="red", bold=True)
 
 
-def run_self_diagnostic(log_bytes: int | None = None):
+def run_self_diagnostic(log_bytes: int = 0):
     web_svc_url = get_web_service_url()
     web_svc_host = urlparse(web_svc_url).netloc
     amqp_svc_host = get_amqp_service_host()
