@@ -9,7 +9,7 @@ jobs:
   smoke-test-dev:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: main
     - uses: actions/setup-python@v1
@@ -28,7 +28,7 @@ jobs:
   safety-check-sdk:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: main
     - uses: actions/setup-python@v1
@@ -43,7 +43,7 @@ jobs:
   safety-check-endpoint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: main
     - uses: actions/setup-python@v1
@@ -64,7 +64,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v2
       - run: python -m pip install -U requests
       - name: notify slack
