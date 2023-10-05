@@ -97,9 +97,9 @@ class Config(RepresentationMixin):
 
     force_mu_allow_same_user : bool
         If set, override the heuristic that determines whether the uid running the
-        multi-user endpoint may also run user endpoints.
+        multi-user endpoint may also run single-user endpoints.
 
-        Normally, the multi-user endpoint disallows starting user endpoints with
+        Normally, the multi-user endpoint disallows starting single-user endpoints with
         the same UID as the parent process unless the UID has no privileges.  That
         means that the UID is not 0 (root), or that the UID does *not* have (among
         many others) the capability to change the user (otherwise known as "drop
