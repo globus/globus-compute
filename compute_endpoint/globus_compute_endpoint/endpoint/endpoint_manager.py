@@ -421,9 +421,10 @@ class EndpointManager:
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
                     "Requested UID is same as multi-user UID, but configuration"
-                    " has not been marked to allow the multi-user user to process"
-                    " tasks.  To allow the same UID to also run user endpoints,"
-                    " consider using a non-root user or removing privileges from UID."
+                    " has not been marked to allow the multi-user UID to process"
+                    " tasks.  To allow the multi-user UID to also run single-user"
+                    " endpoints, consider using a non-root user or removing privileges"
+                    " from the UID."
                     f"\n  MU Process UID: {self._mu_user.pw_uid} ({p_uname})"
                     f"\n  Requested UID:  {uid} ({uname})",
                 )
