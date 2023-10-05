@@ -173,7 +173,7 @@ class EndpointManager:
 
     @staticmethod
     def get_metadata(config: Config, conf_dir: pathlib.Path) -> dict:
-        # Piecemeal Config settings because for MU, most of the ST items are
+        # Piecemeal Config settings because for MU, most of the SU items are
         # unrelated -- the MU (aka EndpointManager) does not execute tasks
         return {
             "endpoint_version": __version__,
