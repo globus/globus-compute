@@ -324,6 +324,34 @@ def test_handles_invalid_reg_info(
         EndpointManager(conf_dir, ep_uuid, mock_conf)
 
 
+def test_records_user_ep_as_running(successful_exec):
+    mock_os, *_, em = successful_exec
+    mock_os.fork.return_value = 1
+
+    em._event_loop()
+
+    uep_rec = em._children.pop(1)
+    assert uep_rec.ep_name == "some_ep_name"
+
+
+def test_caches_start_cmd_args_if_ep_already_running(successful_exec, mocker):
+    *_, em = successful_exec
+    child_pid = random.randrange(1, 32768 + 1)
+    mock_uep = mocker.MagicMock()
+    mock_uep.ep_name = "some_ep_name"
+    em._children[child_pid] = mock_uep
+
+    em._event_loop()
+
+    assert child_pid in em._children
+    cached_args = em._cached_cmd_start_args.pop(child_pid)
+    assert cached_args is not None
+    urec, args, kwargs = cached_args
+    assert urec == pwd.getpwnam(getpass.getuser())
+    assert args == []
+    assert kwargs == {"name": "some_ep_name", "user_opts": {"heartbeat": 10}}
+
+
 def test_writes_endpoint_uuid(epmanager):
     conf_dir, _mock_conf, mock_client, _em = epmanager
     _ep_uuid, mock_gcc = mock_client
@@ -435,6 +463,41 @@ def test_children_signaled_at_shutdown(
         assert setuid_call[0] == exp_args, "Signals only sent by _same_ user, NOT root"
     for killpg_call, exp_args in zip(killpg, killpg_expected_calls):
         assert killpg_call[0] == exp_args, "Expected SIGTERM, *then* SIGKILL"
+
+
+def test_restarts_running_endpoint_with_cached_args(epmanager, mocker):
+    *_, em = epmanager
+    child_pid = random.randrange(1, 32768 + 1)
+    args_tup = (
+        pwd.getpwnam(getpass.getuser()),
+        [],
+        {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
+    )
+
+    mock_os = mocker.patch(f"{_MOCK_BASE}os")
+    mock_os.waitpid.side_effect = [(child_pid, -1), (0, -1)]
+    mock_os.waitstatus_to_exitcode.return_value = 0
+
+    em._cached_cmd_start_args[child_pid] = args_tup
+    em.cmd_start_endpoint = mocker.Mock()
+
+    em.wait_for_children()
+
+    assert em.cmd_start_endpoint.call_args.args == args_tup
+
+
+def test_no_cached_args_means_no_restart(epmanager, mocker):
+    *_, em = epmanager
+    child_pid = random.randrange(1, 32768 + 1)
+
+    mock_os = mocker.patch(f"{_MOCK_BASE}os")
+    mock_os.waitpid.side_effect = [(child_pid, -1), (0, -1)]
+    mock_os.waitstatus_to_exitcode.return_value = -127
+    em.cmd_start_endpoint = mocker.Mock()
+
+    em.wait_for_children()
+
+    assert em.cmd_start_endpoint.call_count == 0
 
 
 def test_emits_endpoint_id_if_isatty(mocker, epmanager):
@@ -679,6 +742,37 @@ def test_handles_unknown_user_gracefully(mocker, epmanager):
     a = mock_log.warning.call_args[0][0]
     assert "Invalid or unknown user" in a
     assert "KeyError" in a, "Expected exception name in log line"
+    assert em._command.ack.called, "Command always ACKed"
+
+
+def test_handles_unknown_local_username_gracefully(mocker, epmanager):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    conf_dir, mock_conf, mock_client, em = epmanager
+
+    with open("local_user_lookup.json", "w") as f:
+        json.dump({"a": "a_user"}, f)
+
+    props = pika.BasicProperties(
+        content_type="application/json",
+        content_encoding="utf-8",
+        timestamp=round(time.time()),
+        expiration="10000",
+    )
+
+    pld = {
+        "globus_uuid": "a",
+        "globus_username": "a",
+    }
+    queue_item = (1, props, json.dumps(pld).encode())
+
+    mocker.patch(f"{_MOCK_BASE}pwd.getpwnam", side_effect=Exception())
+
+    em._command_queue = mocker.Mock()
+    em._command_stop_event.set()
+    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+    em._event_loop()
+    a = mock_log.warning.call_args[0][0]
+    assert "Invalid or unknown local user" in a
     assert em._command.ack.called, "Command always ACKed"
 
 
