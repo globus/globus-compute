@@ -397,7 +397,9 @@ def test_children_signaled_at_shutdown(
         uid, gid, pid = tuple(random.randint(1, 2**30) for _ in range(3))
         uname = randomstring()
         expected.append((uid, gid, uname, "some process command line"))
-        em._child_args[pid] = expected[-1]
+        mock_rec = mocker.MagicMock()
+        mock_rec.uid, mock_rec.gid = uid, gid
+        em._children[pid] = mock_rec
 
     gid_expected_calls = (
         a
@@ -417,8 +419,8 @@ def test_children_signaled_at_shutdown(
     )
 
     # test that SIGTERM, *then* SIGKILL sent
-    killpg_expected_calls = [(pid, signal.SIGTERM) for pid in em._child_args]
-    killpg_expected_calls.extend((pid, signal.SIGKILL) for pid in em._child_args)
+    killpg_expected_calls = [(pid, signal.SIGTERM) for pid in em._children]
+    killpg_expected_calls.extend((pid, signal.SIGKILL) for pid in em._children)
 
     em.start()
     assert em._event_loop.called, "Verify test setup"
@@ -705,6 +707,8 @@ def test_handles_invalid_command_gracefully(mocker, epmanager, cmd_name):
     }
     queue_item = (1, props, json.dumps(pld).encode())
 
+    mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
+
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -739,6 +743,8 @@ def test_handles_failed_command(mocker, epmanager):
         "user_opts": {"heartbeat": 10},
     }
     queue_item = (1, props, json.dumps(pld).encode())
+
+    mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
 
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
@@ -981,7 +987,7 @@ def test_run_as_same_user_fails_if_admin(successful_exec):
     em._allow_same_user = False
     kwargs = {"name": "some_endpoint_name"}
     with pytest.raises(InvalidUserError) as pyexc:
-        em.cmd_start_endpoint(pw_rec.pw_name, None, kwargs)
+        em.cmd_start_endpoint(pw_rec, None, kwargs)
 
     assert "UID is same as" in str(pyexc.value)
     assert "using a non-root user" in str(pyexc.value), "Expected suggested fix"
