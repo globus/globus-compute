@@ -1,6 +1,6 @@
 # single source of truth for package version,
 # see https://packaging.python.org/en/latest/single_source_version/
-__version__ = "2.4.0"
+__version__ = "2.5.0a0"
 
 VERSION = __version__
 
