@@ -119,6 +119,12 @@ class Config(RepresentationMixin):
 
     endpoint_teardown : str | None
         Command or commands to be run during the endpoint shutdown process.
+
+    mu_child_ep_grace_period_s : float
+        If a single-user endpoint dies, and then the multi-user endpoint receives a
+        start command for that single-user endpoint within this timeframe, the
+        single-user endpoint is started back up again.
+        Default: 30 seconds
     """
 
     def __init__(
@@ -140,6 +146,7 @@ class Config(RepresentationMixin):
         endpoint_setup: str | None = None,
         endpoint_teardown: str | None = None,
         force_mu_allow_same_user: bool = False,
+        mu_child_ep_grace_period_s: float = 30,
         # Misc info
         display_name: str | None = None,
         # Logging info
@@ -176,12 +183,16 @@ class Config(RepresentationMixin):
         self.environment = environment
         self.funcx_service_address = funcx_service_address
 
+        # Multi-user tuning
         self.multi_user = multi_user is True
         self.force_mu_allow_same_user = force_mu_allow_same_user is True
+        self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
+
+        # Auth
         self.allowed_functions = allowed_functions
         self.authentication_policy = authentication_policy
 
-        # Tuning info
+        # Single-user tuning
         self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.idle_heartbeats_soft = int(max(0, idle_heartbeats_soft))
