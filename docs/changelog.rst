@@ -3,6 +3,34 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.5.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.5.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Endpoint admins can now define a Globus authentication policy directly in an
+  endpoint's configuration or by using the ``--auth-policy`` flag when running
+  the ``globus-compute-endpoint configure`` command.
+
+  Users are evaluated against the policy when submitting tasks, retrieving endpoint
+  information, etc. For more information regarding Globus authentication policies,
+  visit https://docs.globus.org/api/auth/developer-guide/#authentication-policies.
+  Please note that we do not currently support HA policies.
+
+Bug Fixes
+^^^^^^^^^
+
+- Defining ``worker_ports``, ``worker_port_range``, or ``interchange_port_range``
+  in an endpoint's YAML config no longer raises an error.
+
+Security
+^^^^^^^^
+
+- Add a Dependabot config to keep GitHub action versions updated.
+
 .. _changelog-2.4.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.4.0
