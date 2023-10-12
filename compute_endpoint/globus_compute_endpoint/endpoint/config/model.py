@@ -3,12 +3,13 @@ from __future__ import annotations
 import typing as t
 from types import ModuleType
 
+import pydantic
 from globus_compute_endpoint import engines, strategies
 from parsl import addresses as parsl_addresses
 from parsl import channels as parsl_channels
 from parsl import launchers as parsl_launchers
 from parsl import providers as parsl_providers
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, FilePath, validator
 
 
 def _validate_import(field: str, package: ModuleType):
@@ -94,7 +95,7 @@ class EngineModel(BaseConfigModel):
 
 
 class ConfigModel(BaseConfigModel):
-    engine: EngineModel
+    engine: t.Optional[EngineModel]
     display_name: t.Optional[str]
     environment: t.Optional[str]
     funcx_service_address: t.Optional[str]
@@ -102,6 +103,7 @@ class ConfigModel(BaseConfigModel):
     allowed_functions: t.Optional[t.List[str]]
     heartbeat_period: t.Optional[int]
     heartbeat_threshold: t.Optional[int]
+    identity_mapping_config_path: t.Optional[FilePath]
     idle_heartbeats_soft: t.Optional[int]
     idle_heartbeats_hard: t.Optional[int]
     detach_endpoint: t.Optional[bool]
@@ -114,10 +116,26 @@ class ConfigModel(BaseConfigModel):
 
     _validate_engine = _validate_params("engine")
 
+    @pydantic.root_validator
+    @classmethod
+    def _validate(cls, values):
+        is_mt = values.get("multi_user") is True
+
+        if is_mt:
+            msg_engine = "no engine if multi-user"
+            msg_identity = "multi-user requires identity_mapping_config_path"
+        else:
+            msg_engine = "missing engine"
+            msg_identity = "identity_mapping_config_path should not be specified"
+        assert is_mt is not bool(values.get("engine")), msg_engine
+        assert is_mt is bool(values.get("identity_mapping_config_path")), msg_identity
+        return values
+
     def dict(self, *args, **kwargs):
         # Slight modification is needed here since we still
         # store the engine/executor in a list named executors
         ret = super().dict(*args, **kwargs)
-        executor = ret.pop("engine")
-        ret["executors"] = [executor]
+
+        engine = ret.pop("engine", None)
+        ret["executors"] = [engine] if engine else None
         return ret

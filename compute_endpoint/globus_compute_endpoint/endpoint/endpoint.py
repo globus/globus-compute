@@ -67,6 +67,12 @@ class Endpoint:
         return endpoint_dir / "user_environment.yaml"
 
     @staticmethod
+    def _example_identity_mapping_configuration_path(
+        endpoint_dir: pathlib.Path,
+    ) -> pathlib.Path:
+        return endpoint_dir / "example_identity_mapping_config.json"
+
+    @staticmethod
     def update_config_file(
         original_path: pathlib.Path,
         target_path: pathlib.Path,
@@ -85,6 +91,12 @@ class Endpoint:
 
         if multi_user:
             config_dict["multi_user"] = multi_user
+            config_dict.pop("engine", None)
+            config_dict["identity_mapping_config_path"] = str(
+                Endpoint._example_identity_mapping_configuration_path(
+                    target_path.parent
+                )
+            )
 
         config_text = yaml.safe_dump(config_dict)
         target_path.write_text(config_text)
@@ -133,6 +145,7 @@ class Endpoint:
             if multi_user:
                 # template must be readable by user-endpoint processes (see
                 # endpoint_manager.py)
+                owner_only = 0o0600
                 world_readable = 0o0644 & ((0o0777 - user_umask) | 0o0444)
                 world_executable = 0o0711 & ((0o0777 - user_umask) | 0o0111)
                 endpoint_dir.chmod(world_executable)
@@ -140,17 +153,25 @@ class Endpoint:
                 src_user_tmpl_path = package_dir / "config/user_config_template.yaml"
                 src_user_schem_path = package_dir / "config/user_config_schema.json"
                 src_user_env_path = package_dir / "config/user_environment.yaml"
+                src_example_idmap_path = (
+                    package_dir / "config/example_identity_mapping_config.json"
+                )
                 dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
                 dst_user_schem_path = Endpoint.user_config_schema_path(endpoint_dir)
                 dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
+                dst_idmap_conf_path = (
+                    Endpoint._example_identity_mapping_configuration_path(endpoint_dir)
+                )
 
                 shutil.copy(src_user_tmpl_path, dst_user_tmpl_path)
                 shutil.copy(src_user_schem_path, dst_user_schem_path)
                 shutil.copy(src_user_env_path, dst_user_env_path)
+                shutil.copy(src_example_idmap_path, dst_idmap_conf_path)
 
                 dst_user_tmpl_path.chmod(world_readable)
                 dst_user_schem_path.chmod(world_readable)
                 dst_user_env_path.chmod(world_readable)
+                dst_idmap_conf_path.chmod(owner_only)
 
         finally:
             os.umask(user_umask)
@@ -177,10 +198,14 @@ class Endpoint:
         if multi_user:
             user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
             user_env_path = Endpoint._user_environment_path(conf_dir)
+            idmap_ex_conf_path = Endpoint._example_identity_mapping_configuration_path(
+                conf_dir
+            )
 
             print(f"Created multi-user profile for endpoint named <{ep_name}>")
             print(
                 f"\n\tConfiguration file: {config_path}\n"
+                f"\n\tExample identity mapping configuration: {idmap_ex_conf_path}\n"
                 f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
                 f"\n\tUser endpoint environment variables: {user_env_path}"
                 "\n\nUse the `start` subcommand to run it:\n"

@@ -349,7 +349,7 @@ def test_start_ep_incorrect_config_yaml(
     conf.unlink()
     conf.write_text("asdf: asdf")
     res = run_line(f"start {ep_name}", assert_exit_code=1)
-    assert "field required" in res.stderr
+    assert "missing engine" in res.stderr, "Engine: specification required!"
 
 
 def test_start_ep_incorrect_config_py(
@@ -390,6 +390,36 @@ def test_start_ep_config_py_takes_precedence(
     assert not read_config.called, "Key outcome: config.py takes precendence"
 
 
+def test_single_user_requires_engine_configured(mock_command_ensure, ep_name, run_line):
+    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
+    ep_dir.mkdir(parents=True)
+    data = {"config": ""}
+
+    config = {}
+    data["config"] = yaml.safe_dump(config)
+    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
+    assert "validation error" in rc.stderr
+    assert "missing engine" in rc.stderr
+
+    config = {"multi_user": False}
+    data["config"] = yaml.safe_dump(config)
+    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
+    assert "validation error" in rc.stderr
+    assert "missing engine" in rc.stderr
+
+
+def test_multi_user_enforces_no_engine(mock_command_ensure, ep_name, run_line):
+    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
+    ep_dir.mkdir(parents=True)
+    data = {"config": ""}
+
+    config = {"engine": {"type": "ThreadPoolEngine"}, "multi_user": True}
+    data["config"] = yaml.safe_dump(config)
+    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
+    assert "validation error" in rc.stderr
+    assert "no engine if multi" in rc.stderr
+
+
 @mock.patch("globus_compute_endpoint.endpoint.config.utils._load_config_py")
 def test_delete_endpoint(read_config, run_line, mock_cli_state, ep_name):
     run_line(f"delete {ep_name} --yes")
@@ -407,10 +437,9 @@ def test_die_with_parent_detached(
 
     if die_with_parent:
         run_line(f"start {ep_name} --die-with-parent")
-        assert not config.detach_endpoint
     else:
         run_line(f"start {ep_name}")
-        assert config.detach_endpoint
+    assert config.detach_endpoint is (not die_with_parent)
 
 
 def test_self_diagnostic(

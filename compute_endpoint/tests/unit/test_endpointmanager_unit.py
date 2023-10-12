@@ -60,8 +60,15 @@ def conf_dir(fs):
 
 
 @pytest.fixture
-def mock_conf():
-    yield Config(executors=[])
+def identity_map_path(conf_dir):
+    im_path = conf_dir / "some_identity_mapping_configuration.json"
+    im_path.write_text("[]")
+    yield im_path
+
+
+@pytest.fixture
+def mock_conf(identity_map_path):
+    yield Config(executors=[], identity_mapping_config_path=identity_map_path)
 
 
 @pytest.fixture
@@ -101,17 +108,31 @@ def mock_client(mocker):
     yield ep_uuid, mock_gcc
 
 
+@pytest.fixture(autouse=True)
+def mock_pim(request):
+    if "no_mock_pim" in request.keywords:
+        yield
+        return
+
+    with mock.patch(f"{_MOCK_BASE}PosixIdentityMapper") as mock_pim:
+        mock_pim.return_value = mock_pim
+        yield mock_pim
+
+
 @pytest.fixture
-def epmanager(mocker, conf_dir, mock_conf, mock_client):
+def epmanager(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     ep_uuid, mock_gcc = mock_client
 
     # Needed to mock the pipe buffer size
     mocker.patch.object(fcntl, "fcntl", return_value=512)
+    mock_pim.map_identity.return_value = "an_account_that_doesnt_exist_abc123"
 
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     em._command = mocker.Mock()
 
     yield conf_dir, mock_conf, mock_client, em
+    em.identity_mapper.stop_watching()
+    em.request_shutdown(None, None)
 
 
 @pytest.fixture
@@ -129,11 +150,9 @@ def register_endpoint_failure_response():
 
 
 @pytest.fixture
-def successful_exec(mocker, epmanager, user_conf_template, fs):
-    # fs (pyfakefs) not used directly in this fixture, but is intentionally
-    # utilized in epmanager -> conf_dir.  It is *assumed* in this fixture,
-    # however (e.g., local_user_lookup.json), so make it an explicit detail.
+def successful_exec(mocker, epmanager, user_conf_template):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
+    mock_pwnam = mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
     conf_dir, mock_conf, mock_client, em = epmanager
 
     mock_os.fork.return_value = 0
@@ -141,8 +160,7 @@ def successful_exec(mocker, epmanager, user_conf_template, fs):
     mock_os.dup2.side_effect = [0, 1, 2]
     mock_os.open.return_value = 4
 
-    with open("local_user_lookup.json", "w") as f:
-        json.dump({"a": getpass.getuser()}, f)
+    mock_pwnam.return_value = pwd.getpwuid(os.getuid())
 
     props = pika.BasicProperties(
         content_type="application/json",
@@ -152,13 +170,15 @@ def successful_exec(mocker, epmanager, user_conf_template, fs):
     )
 
     pld = {
-        "globus_uuid": "a",
-        "globus_username": "a",
+        "globus_effective_identity": 1,
+        "globus_identity_set": ["a"],
         "command": "cmd_start_endpoint",
         "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
     }
     queue_item = (1, props, json.dumps(pld).encode())
 
+    em.identity_mapper = mocker.Mock()
+    em.identity_mapper.map_identity.return_value = "typicalglobusname@somehost.org"
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -574,19 +594,54 @@ def test_emits_endpoint_id_if_isatty(mocker, epmanager):
     assert not mock_sys.stderr.write.called
 
 
-def test_warns_of_no_local_lookup(mocker, epmanager):
+def test_fails_to_start_if_no_identity_mapper_configuration(mocker, conf_dir):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    mock_print = mocker.patch(f"{_MOCK_BASE}print")
 
-    em._time_to_stop = True
-    em._event_loop()
+    ep_uuid = str(uuid.uuid1())
+    with pytest.raises(SystemExit) as pyt_exc:
+        EndpointManager(conf_dir, ep_uuid, Config())
 
+    assert pyt_exc.value.code == os.EX_OSFILE
     assert mock_log.error.called
-    a = mock_log.error.call_args[0][0]
-    assert "FileNotFoundError" in a, "Expected class name in error output -- help dev!"
-    assert " unable to respond " in a
-    assert " restart " in a
-    assert f"{os.getpid()}" in a
+    assert mock_print.called
+    for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
+        assert "No identity mapping file specified" in a
+        assert "identity_mapping_config_path" in a, "Expected required config item"
+
+
+@pytest.mark.no_mock_pim
+def test_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf_dir):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_print = mocker.patch(f"{_MOCK_BASE}print")
+
+    ep_uuid = str(uuid.uuid1())
+    reg_info = {
+        "endpoint_id": ep_uuid,
+        "command_queue_info": {"connection_url": 1, "queue": 1},
+    }
+    conf_p = conf_dir / "idmap.json"
+    conf_p.touch(mode=0o000)
+    conf = Config(identity_mapping_config_path=conf_p)
+    with pytest.raises(SystemExit) as pyt_exc:
+        EndpointManager(conf_dir, ep_uuid, conf, reg_info)
+
+    assert pyt_exc.value.code == os.EX_NOPERM
+    assert mock_log.error.called
+    assert mock_print.called
+    for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
+        assert "PermissionError" in a
+
+    conf_p.chmod(mode=0o644)
+    conf_p.write_text("[{asfg")
+    with pytest.raises(SystemExit) as pyt_exc:
+        EndpointManager(conf_dir, ep_uuid, conf, reg_info)
+
+    assert pyt_exc.value.code == os.EX_CONFIG
+    assert mock_log.error.called
+    assert mock_print.called
+    for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
+        assert "Unable to read identity mapping" in a
 
 
 def test_iterates_even_if_no_commands(mocker, epmanager):
@@ -701,9 +756,6 @@ def test_ignores_stale_commands(mocker, epmanager):
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
-    with open("local_user_lookup.json", "w") as f:
-        json.dump({"a": "a_user"}, f)
-
     props = pika.BasicProperties(
         content_type="application/json",  # the test
         content_encoding="utf-8",
@@ -746,7 +798,7 @@ def test_handles_invalid_server_msg_gracefully(mocker, epmanager):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_handles_unknown_user_gracefully(mocker, epmanager):
+def test_handles_unknown_identity_gracefully(mocker, epmanager):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     conf_dir, mock_conf, mock_client, em = epmanager
 
@@ -757,59 +809,34 @@ def test_handles_unknown_user_gracefully(mocker, epmanager):
         expiration="10000",
     )
 
-    pld = {"globus_uuid": 1, "globus_username": 1}
+    pld = {"globus_effective_identity": 1, "globus_identity_set": []}
     queue_item = (1, props, json.dumps(pld).encode())
+    em.identity_mapper.map_identity.return_value = None
 
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
-    a = mock_log.warning.call_args[0][0]
-    assert "Invalid or unknown user" in a
-    assert "KeyError" in a, "Expected exception name in log line"
-    assert em._command.ack.called, "Command always ACKed"
-
-
-def test_handles_unknown_local_username_gracefully(mocker, epmanager):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
-
-    with open("local_user_lookup.json", "w") as f:
-        json.dump({"a": "a_user"}, f)
-
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
-
-    pld = {
-        "globus_uuid": "a",
-        "globus_username": "a",
-    }
-    queue_item = (1, props, json.dumps(pld).encode())
-
-    mocker.patch(f"{_MOCK_BASE}pwd.getpwnam", side_effect=Exception())
-
-    em._command_queue = mocker.Mock()
-    em._command_stop_event.set()
-    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
-    em._event_loop()
-    a = mock_log.warning.call_args[0][0]
-    assert "Invalid or unknown local user" in a
+    a = mock_log.error.call_args[0][0]
+    assert "Identity failed to map to a local user name" in a
+    assert "(LookupError)" in a, "Expected exception name in log line"
+    assert "Globus effective identity: " in a
+    assert "Globus identity set: " in a
+    assert str(pld["globus_effective_identity"]) in a
+    assert str(pld["globus_identity_set"]) in a
     assert em._command.ack.called, "Command always ACKed"
 
 
 @pytest.mark.parametrize(
     "cmd_name", ("", "_private", "9c", "valid_but_do_not_exist", " ", "a" * 101)
 )
-def test_handles_invalid_command_gracefully(mocker, epmanager, cmd_name):
+def test_handles_unknown_or_invalid_command_gracefully(mocker, epmanager, cmd_name):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     conf_dir, mock_conf, mock_client, em = epmanager
 
-    with open("local_user_lookup.json", "w") as f:
-        json.dump({"a": "a_user"}, f)
+    mocker.patch(f"{_MOCK_BASE}pwd")
+    em.identity_mapper = mocker.Mock()
+    em.identity_mapper.map_identity.return_value = "a"
 
     props = pika.BasicProperties(
         content_type="application/json",
@@ -819,8 +846,8 @@ def test_handles_invalid_command_gracefully(mocker, epmanager, cmd_name):
     )
 
     pld = {
-        "globus_uuid": "a",
-        "globus_username": "a",
+        "globus_effective_identity": "a",
+        "globus_identity_set": "a",
         "command": cmd_name,
         "user_opts": {"heartbeat": 10},
     }
@@ -834,7 +861,44 @@ def test_handles_invalid_command_gracefully(mocker, epmanager, cmd_name):
     em._event_loop()
     a = mock_log.error.call_args[0][0]
     assert "Unknown or invalid command" in a
+    assert "Globus effective identity: " in a
+    assert "Globus identity set: " in a
+    assert str(pld["globus_effective_identity"]) in a
+    assert str(pld["globus_identity_set"]) in a
+
     assert str(cmd_name) in a
+    assert em._command.ack.called, "Command always ACKed"
+
+
+def test_handles_local_user_not_found_gracefully(mocker, epmanager, randomstring):
+    invalid_user_name = "username_that_is_not_on_localhost6_" + randomstring()
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    conf_dir, mock_conf, mock_client, em = epmanager
+    em.identity_mapper = mocker.Mock()
+    em.identity_mapper.map_identity.return_value = invalid_user_name
+
+    props = pika.BasicProperties(
+        content_type="application/json",
+        content_encoding="utf-8",
+        timestamp=round(time.time()),
+        expiration="10000",
+    )
+
+    pld = {"globus_effective_identity": "a", "globus_identity_set": "a"}
+    queue_item = (1, props, json.dumps(pld).encode())
+
+    em._command_queue = mocker.Mock()
+    em._command_stop_event.set()
+    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+    em._event_loop()
+    a = mock_log.error.call_args[0][0]
+    assert "Identity mapped to a local user name, but local user does not exist" in a
+    assert f"Local user name: {invalid_user_name}" in a
+    assert "Globus effective identity: " in a
+    assert "Globus identity set: " in a
+    assert str(pld["globus_effective_identity"]) in a
+    assert str(pld["globus_identity_set"]) in a
+
     assert em._command.ack.called, "Command always ACKed"
 
 
@@ -845,8 +909,9 @@ def test_handles_failed_command(mocker, epmanager):
     )
     conf_dir, mock_conf, mock_client, em = epmanager
 
-    with open("local_user_lookup.json", "w") as f:
-        json.dump({"a": "a_user"}, f)
+    mocker.patch(f"{_MOCK_BASE}pwd")
+    em.identity_mapper = mocker.Mock()
+    em.identity_mapper.map_identity.return_value = "a"
 
     props = pika.BasicProperties(
         content_type="application/json",
@@ -856,8 +921,8 @@ def test_handles_failed_command(mocker, epmanager):
     )
 
     pld = {
-        "globus_uuid": "a",
-        "globus_username": "a",
+        "globus_effective_identity": "a",
+        "globus_identity_set": [],
         "command": "cmd_start_endpoint",
         "user_opts": {"heartbeat": 10},
     }
@@ -896,7 +961,7 @@ def test_handles_shutdown_signal(successful_exec, sig, reset_signals):
     assert not em._command_queue.get.called, " ... that we've now confirmed works"
 
 
-def test_environment_default_path(successful_exec, mocker):
+def test_environment_default_path(successful_exec):
     mock_os, *_, em = successful_exec
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
@@ -1019,7 +1084,9 @@ def test_start_endpoint_privileges_dropped(successful_exec):
     assert a == (expected_uid, expected_uid, expected_uid)
 
 
-def test_run_as_same_user_disabled_if_admin(mocker, conf_dir, mock_conf, mock_client):
+def test_run_as_same_user_disabled_if_admin(
+    mocker, conf_dir, mock_conf, mock_client, mock_pim
+):
     ep_uuid, mock_gcc = mock_client
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")

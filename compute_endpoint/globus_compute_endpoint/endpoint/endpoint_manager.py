@@ -20,6 +20,7 @@ from http import HTTPStatus
 
 import globus_compute_sdk as GC
 from cachetools import TTLCache
+from globus_compute_endpoint.endpoint.identity_mapper import PosixIdentityMapper
 from pydantic import BaseModel
 
 try:
@@ -114,6 +115,15 @@ class EndpointManager:
 
         endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(conf_dir, endpoint_uuid)
 
+        if not config.identity_mapping_config_path:
+            msg = (
+                "No identity mapping file specified; please specify"
+                " identity_mapping_config_path"
+            )
+            log.error(msg)
+            print(msg, file=sys.stderr)
+            exit(os.EX_OSFILE)
+
         if not reg_info:
             try:
                 client_options = {
@@ -188,10 +198,31 @@ class EndpointManager:
                 " considered a very dangerous override -- please use with care,"
                 " especially if allowing this endpoint to be utilized by multiple"
                 " users."
-                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()}) "
+                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()})"
             )
         else:
             self._allow_same_user = not is_privileged(self._mu_user)
+
+        try:
+            self.identity_mapper = PosixIdentityMapper(
+                config.identity_mapping_config_path, self._endpoint_uuid_str
+            )
+
+        except PermissionError as e:
+            msg = f"({type(e).__name__}) {e}"
+            log.error(msg)
+            print(msg, file=sys.stderr)
+            exit(os.EX_NOPERM)
+
+        except Exception as e:
+            msg = (
+                f"({type(e).__name__}) {e} -- Unable to read identity mapping"
+                f" configuration from: {config.identity_mapping_config_path}"
+            )
+            log.debug(msg, exc_info=e)
+            log.error(msg)
+            print(msg, file=sys.stderr)
+            exit(os.EX_CONFIG)
 
         # sanitize passwords in logs
         log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
@@ -337,6 +368,9 @@ class EndpointManager:
         self._command_stop_event.set()
         self._kill_event.set()
 
+        if self.identity_mapper:
+            self.identity_mapper.stop_watching()
+
         os.killpg(os.getpgid(0), signal.SIGTERM)
 
         proc_uid, proc_gid = os.getuid(), os.getgid()
@@ -373,19 +407,6 @@ class EndpointManager:
 
     def _event_loop(self):
         self._command.start()
-
-        local_user_lookup = {}
-        try:
-            with open("local_user_lookup.json") as f:
-                local_user_lookup = json.load(f)
-        except Exception as e:
-            msg = (
-                f"Unable to load local users ({e.__class__.__name__}) {e}\n"
-                "  Will be unable to respond to any commands; update the lookup file"
-                f" and either restart (stop, start) or SIGHUP ({os.getpid()}) this"
-                " endpoint."
-            )
-            log.error(msg)
 
         valid_method_name_re = re.compile(r"^cmd_[A-Za-z][0-9A-Za-z_]{0,99}$")
         max_skew_s = 180  # 3 minutes; ignore commands with out-of-date timestamp
@@ -444,25 +465,43 @@ class EndpointManager:
                 continue
 
             try:
-                globus_uuid = msg["globus_uuid"]
-                globus_username = msg["globus_username"]
+                effective_identity = msg["globus_effective_identity"]
+                identity_set = msg["globus_identity_set"]
             except Exception as e:
                 log.error(f"Invalid server command.  ({e.__class__.__name__}) {e}")
                 self._command.ack(d_tag)
                 continue
 
+            identity_for_log = (
+                f"\n  Globus effective identity: {effective_identity}"
+                f"\n  Globus identity set: {identity_set}"
+            )
             try:
-                local_user = local_user_lookup[globus_username]
+                local_username = self.identity_mapper.map_identity(identity_set)
+                if not local_username:
+                    raise LookupError()
+            except LookupError as e:
+                log.error(
+                    "Identity failed to map to a local user name."
+                    f"  ({e.__class__.__name__}) {e}{identity_for_log}"
+                )
+                self._command.ack(d_tag)
+                continue
             except Exception as e:
-                log.warning(f"Invalid or unknown user.  ({e.__class__.__name__}) {e}")
+                msg = "Unhandled error attempting to map user."
+                log.debug(f"{msg}{identity_for_log}", exc_info=e)
+                log.error(f"{msg}  ({e.__class__.__name__}) {e}{identity_for_log}")
                 self._command.ack(d_tag)
                 continue
 
             try:
-                local_user_rec = pwd.getpwnam(local_user)
+                local_user_rec = pwd.getpwnam(local_username)
+
             except Exception as e:
-                log.warning(
-                    f"Invalid or unknown local username.  ({e.__class__.__name__}) {e}"
+                log.error(
+                    f"({type(e).__name__}) {e}\n"
+                    "  Identity mapped to a local user name, but local user does not"
+                    f" exist.\n  Local user name: {local_username}{identity_for_log}"
                 )
                 self._command.ack(d_tag)
                 continue
@@ -477,24 +516,24 @@ class EndpointManager:
 
                 command_func(local_user_rec, command_args, command_kwargs)
                 log.info(
-                    f"Command process successfully forked for '{globus_username}'"
-                    f" ('{globus_uuid}')."
+                    f"Command process successfully forked for '{local_username}'"
+                    f" (Globus effective identity: {effective_identity})."
                 )
-            except (InvalidCommandError, InvalidUserError) as err:
-                log.error(str(err))
+            except (InvalidCommandError, InvalidUserError) as e:
+                log.error(f"({type(e).__name__}) {e}{identity_for_log}")
 
             except Exception:
                 log.exception(
                     f"Unable to execute command: {command}\n"
                     f"    args: {command_args}\n"
-                    f"  kwargs: {command_kwargs}"
+                    f"  kwargs: {command_kwargs}{identity_for_log}"
                 )
             finally:
                 self._command.ack(d_tag)
 
     def cmd_start_endpoint(
         self,
-        local_user_rec: pwd.struct_passwd,
+        user_record: pwd.struct_passwd,
         args: list[str] | None,
         kwargs: dict | None,
     ):
@@ -513,15 +552,11 @@ class EndpointManager:
                     f"User endpoint {ep_name} is already running (pid: {p}); "
                     "caching arguments in case it's about to shut down"
                 )
-                self._cached_cmd_start_args[p] = (local_user_rec, args, kwargs)
+                self._cached_cmd_start_args[p] = (user_record, args, kwargs)
                 return
 
-        udir, uid, gid, uname = (
-            local_user_rec.pw_dir,
-            local_user_rec.pw_uid,
-            local_user_rec.pw_gid,
-            local_user_rec.pw_name,
-        )
+        udir, uid, gid = user_record.pw_dir, user_record.pw_uid, user_record.pw_gid
+        uname = user_record.pw_name
 
         if not self._allow_same_user:
             p_uname = self._mu_user.pw_name
@@ -553,7 +588,7 @@ class EndpointManager:
         if pid > 0:
             proc_args_s = f"({uname}, {ep_name}) {' '.join(proc_args)}"
             self._children[pid] = UserEndpointRecord(
-                ep_name=ep_name, local_user_info=local_user_rec, arguments=proc_args_s
+                ep_name=ep_name, local_user_info=user_record, arguments=proc_args_s
             )
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
@@ -693,7 +728,7 @@ class EndpointManager:
 
             # fcntl.F_GETPIPE_SZ is not available in Python versions less than 3.10
             F_GETPIPE_SZ = 1032
-            # 256 - Allow some head room for multiple kernel-specific factors
+            # 256 - Allow some headroom for multiple kernel-specific factors
             max_buf_size = fcntl.fcntl(write_handle, F_GETPIPE_SZ) - 256
             stdin_data_size = len(stdin_data)
             if stdin_data_size > max_buf_size:
