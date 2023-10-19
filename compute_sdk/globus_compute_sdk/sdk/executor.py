@@ -120,6 +120,7 @@ class Executor(concurrent.futures.Executor):
         user_endpoint_config: dict[str, t.Any] | None = None,
         label: str = "",
         batch_size: int = 128,
+        amqp_port: int | None = None,
         **kwargs,
     ):
         """
@@ -140,6 +141,8 @@ class Executor(concurrent.futures.Executor):
         :param batch_interval: [DEPRECATED; unused] number of seconds to coalesce tasks
             before submitting upstream
         :param batch_enabled: [DEPRECATED; unused] whether to batch results
+        :param amqp_port: Port to use when connecting to results queue. Note that the
+            Compute web services only support 5671, 5672, and 443.
         """
         deprecated_kwargs = {"batch_interval", "batch_enabled"}
         for key in kwargs:
@@ -163,6 +166,9 @@ class Executor(concurrent.futures.Executor):
 
         self._task_group_id: uuid.UUID | None = None  # help mypy out
         self.task_group_id = task_group_id
+
+        self._amqp_port: int | None = None
+        self.amqp_port = amqp_port
 
         self.user_endpoint_config = user_endpoint_config
 
@@ -295,6 +301,19 @@ class Executor(concurrent.futures.Executor):
     @container_id.setter
     def container_id(self, c_id: UUID_LIKE_T | None):
         self._container_id = as_optional_uuid(c_id)
+
+    @property
+    def amqp_port(self) -> int | None:
+        """
+        The port to use when connecting to the result queue. Can be one of 443, 5671,
+        5672, or None. If None, the port is assigned by the Compute web services
+        (typically 5671).
+        """
+        return self._amqp_port
+
+    @amqp_port.setter
+    def amqp_port(self, p: int | None):
+        self._amqp_port = p
 
     def _fn_cache_key(self, fn: t.Callable):
         return fn, self.container_id
@@ -616,7 +635,7 @@ class Executor(concurrent.futures.Executor):
                             fut.set_exception(funcx_err)
 
             if pending:
-                self._result_watcher = _ResultWatcher(self)
+                self._result_watcher = _ResultWatcher(self, port=self.amqp_port)
                 self._result_watcher.watch_for_task_results(pending)
                 self._result_watcher.start()
         else:
@@ -748,14 +767,18 @@ class Executor(concurrent.futures.Executor):
                         ):
                             # Don't initialize the result watcher unless at least
                             # one batch has been sent
-                            self._result_watcher = _ResultWatcher(self)
+                            self._result_watcher = _ResultWatcher(
+                                self, port=self.amqp_port
+                            )
                             self._result_watcher.start()
                         try:
                             self._result_watcher.watch_for_task_results(to_watch)
                         except self._result_watcher.__class__.ShuttingDownError:
                             log.debug("Waiting for previous ResultWatcher to shutdown")
                             self._result_watcher.join()
-                            self._result_watcher = _ResultWatcher(self)
+                            self._result_watcher = _ResultWatcher(
+                                self, port=self.amqp_port
+                            )
                             self._result_watcher.start()
                             self._result_watcher.watch_for_task_results(to_watch)
 
@@ -944,6 +967,7 @@ class _ResultWatcher(threading.Thread):
         connect_attempt_limit=5,
         channel_close_window_s=10,
         channel_close_window_limit=3,
+        port: int | None = None,
     ):
         super().__init__()
         self.funcx_executor = funcx_executor
@@ -987,6 +1011,8 @@ class _ResultWatcher(threading.Thread):
         # how many times allowed to retry opening a channel in the above time
         # window before giving up and shutting down the thread
         self.channel_close_window_limit = channel_close_window_limit
+
+        self.port = port
 
     def __repr__(self):
         return "{}<{}; pid={}; fut={:,d}; res={:,d}; qp={}>".format(
@@ -1265,6 +1291,8 @@ class _ResultWatcher(threading.Thread):
             connection_url = res["connection_url"]
 
             pika_params = pika.URLParameters(connection_url)
+            if self.port is not None:
+                pika_params.port = self.port
             return pika.SelectConnection(
                 pika_params,
                 on_close_callback=self._on_connection_closed,

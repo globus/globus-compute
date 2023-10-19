@@ -1089,3 +1089,17 @@ def test_resultwatcher_amqp_acks_in_bulk():
     assert not mrw._to_ack
     assert mrw._channel.basic_ack.call_count == 1
     mrw.shutdown()
+
+
+def test_result_queue_watcher_custom_port(mocker, gc_executor):
+    gcc, gce = gc_executor
+    rw = _ResultWatcher(gce, port=1234)
+    gcc.get_result_amqp_url.return_value = {
+        "queue_prefix": "",
+        "connection_url": "amqp://some.address:1111",
+    }
+    connect = mocker.patch(f"{_MOCK_BASE}pika.SelectConnection")
+
+    rw._connect()
+
+    assert connect.call_args[0][0].port == 1234
