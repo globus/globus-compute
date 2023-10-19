@@ -1,0 +1,7 @@
+.. A new scriv changelog fragment.
+..
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The ``Executor`` can now be told which port to use to listen to AMQP results, via
+  either the ``amqp_port`` keyword argument or the ``amqp_port`` property.
