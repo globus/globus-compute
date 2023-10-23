@@ -10,6 +10,7 @@ but we don't have time to do that (even though it would be better (a lot better)
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import os
 import sys
@@ -86,6 +87,23 @@ def handle_auth_errors(f: t.Callable) -> t.Callable:
                 message:           {e.text}
                 """
             )
+
+            # This specific Auth error has a common cause
+            if e.http_status == 400 and e.code == "Error":
+                try:
+                    error_info = json.loads(e.text)
+                    if "invalid_grant" == error_info.get("error"):
+                        msg += (
+                            "\nGlobus Compute credentials may have expired."
+                            " Use `logout` to clear them.\n"
+                            "Note that Globus Connect (Transfer) credentials are"
+                            " managed via the `globus` command, separately from"
+                            " the Globus Compute ones."
+                        )
+                except Exception:
+                    # Shouldn't get here unless Globus Auth changes its response
+                    pass
+
             log.warning(msg)
             click.echo(msg)
             sys.exit(os.EX_NOPERM)
