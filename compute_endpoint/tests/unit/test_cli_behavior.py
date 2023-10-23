@@ -666,9 +666,11 @@ def test_get_endpoint_by_name_or_uuid_error_message(run_line, data):
 @pytest.mark.parametrize(
     "data",
     [
-        ("start", "start_endpoint"),
-        ("stop", "stop_endpoint"),
-        ("delete --yes", "delete_endpoint"),
+        ("start", "start_endpoint", '{"error":"invalid_grant"}'),
+        ("start", "start_endpoint", '{"error":"something else"}'),
+        ("start", "start_endpoint", ""),
+        ("stop", "stop_endpoint", "err_msg"),
+        ("delete --yes", "delete_endpoint", "err_msg"),
     ],
 )
 def test_handle_globus_auth_error(
@@ -679,15 +681,20 @@ def test_handle_globus_auth_error(
     ep_name,
     data: tuple[str, str],
 ):
-    cmd, ep_method = data
+    cmd, ep_method, auth_err_msg = data
     mock_ep, _ = mock_cli_state
     make_endpoint_dir()
 
     mock_log = mocker.patch("globus_compute_endpoint.exception_handling.log")
+    mock_resp = mock.MagicMock(
+        status_code=400,
+        reason="Bad Request",
+        text=auth_err_msg,
+    )
     mocker.patch.object(
         mock_ep,
         ep_method,
-        side_effect=globus_sdk.AuthAPIError(r=mock.MagicMock(status_code=400)),
+        side_effect=globus_sdk.AuthAPIError(r=mock_resp),
     )
 
     res = run_line(f"{cmd} {ep_name}", assert_exit_code=os.EX_NOPERM)
@@ -699,3 +706,9 @@ def test_handle_globus_auth_error(
     assert err_msg in a[0]
     assert "400" in res.stdout
     assert "400" in a[0]
+
+    additional_details = "credentials may have expired"
+    if "invalid_grant" in auth_err_msg:
+        assert additional_details in res.stdout
+    else:
+        assert additional_details not in res.stdout
