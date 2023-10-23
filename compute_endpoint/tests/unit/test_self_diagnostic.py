@@ -41,11 +41,12 @@ def test_cat_honors_max_bytes(fs, max_bytes):
     assert raw_file_size > (max_bytes or 0), "Verify test setup"
     fdata = expected_sentinel + os.urandom(raw_file_size)
     fdata = fdata.replace(b"\n", b"X")  # test splits on newline
-    bfile.write_bytes(expected_sentinel + fdata)
+    fdata = fdata.replace(b"\r", b"Y")  # test splits on newline
+    bfile.write_bytes(fdata)
 
     fsize = len(bfile.read_bytes())
     if max_bytes:
-        assert fsize > max_bytes, "Verify test setup: file size bigger than test"
+        assert fsize > max_bytes, "Verify test setup: file size bigger than test's max"
 
     with contextlib.redirect_stdout(io.BytesIO()) as f:
         if max_bytes is None:
@@ -56,8 +57,8 @@ def test_cat_honors_max_bytes(fs, max_bytes):
     payload = payload[3:]  # remove line header
 
     if max_bytes and max_bytes > 0:
-        assert len(payload) <= max_bytes
-        assert expected_sentinel not in payload
+        assert len(payload) <= max_bytes, fdata
+        assert expected_sentinel not in payload, fdata
     else:
-        assert len(payload) == fsize
-        assert expected_sentinel in payload
+        assert len(payload) == fsize, fdata
+        assert expected_sentinel in payload, fdata
