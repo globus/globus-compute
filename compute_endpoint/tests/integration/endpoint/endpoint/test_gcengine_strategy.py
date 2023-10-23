@@ -19,7 +19,7 @@ def gc_engine_scaling(tmp_path):
     ep_id = uuid.uuid4()
     engine = GlobusComputeEngine(
         address="127.0.0.1",
-        heartbeat_period_s=1,
+        heartbeat_period=1,
         heartbeat_threshold=1,
         provider=LocalProvider(
             init_blocks=0,
@@ -40,7 +40,7 @@ def gc_engine_non_scaling(tmp_path):
     ep_id = uuid.uuid4()
     engine = GlobusComputeEngine(
         address="127.0.0.1",
-        heartbeat_period_s=1,
+        heartbeat_period=1,
         heartbeat_threshold=1,
         provider=LocalProvider(
             init_blocks=1,

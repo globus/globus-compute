@@ -119,7 +119,7 @@ def test_engine_submit_internal(engine_type: GlobusComputeEngineBase, engine_run
 
 
 def test_proc_pool_engine_not_started():
-    engine = ProcessPoolEngine(heartbeat_period_s=1, max_workers=2)
+    engine = ProcessPoolEngine(heartbeat_period=1, max_workers=2)
 
     with pytest.raises(AssertionError) as pyt_exc:
         engine.submit(double, 10)
