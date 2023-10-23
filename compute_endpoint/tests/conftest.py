@@ -118,13 +118,13 @@ def engine_runner(tmp_path, engine_heartbeat) -> t.Callable:
         ep_id = uuid.uuid4()
         queue = Queue()
         if engine_type is engines.ProcessPoolEngine:
-            k = dict(heartbeat_period_s=engine_heartbeat, max_workers=2)
+            k = dict(heartbeat_period=engine_heartbeat, max_workers=2)
         elif engine_type is engines.ThreadPoolEngine:
-            k = dict(heartbeat_period_s=engine_heartbeat, max_workers=2)
+            k = dict(heartbeat_period=engine_heartbeat, max_workers=2)
         elif engine_type is engines.GlobusComputeEngine:
             k = dict(
                 address="127.0.0.1",
-                heartbeat_period_s=engine_heartbeat,
+                heartbeat_period=engine_heartbeat,
                 heartbeat_threshold=1,
             )
         else:

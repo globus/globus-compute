@@ -75,12 +75,12 @@ class GlobusComputeEngineBase(ABC):
     def __init__(
         self,
         *args: object,
-        heartbeat_period_s: float = 30.0,
+        heartbeat_period: float = 30.0,
         endpoint_id: t.Optional[uuid.UUID] = None,
         **kwargs: object,
     ):
         self._shutdown_event = threading.Event()
-        self._heartbeat_period_s = heartbeat_period_s
+        self._heartbeat_period = heartbeat_period
         self.endpoint_id = endpoint_id
 
         # remove these unused vars that we are adding to just keep
@@ -111,10 +111,8 @@ class GlobusComputeEngineBase(ABC):
         packed: bytes = messagepack.pack(status_report)
         self.results_passthrough.put({"message": packed})
 
-    def _status_report(
-        self, shutdown_event: threading.Event, heartbeat_period_s: float
-    ):
-        while not shutdown_event.wait(timeout=heartbeat_period_s):
+    def _status_report(self, shutdown_event: threading.Event, heartbeat_period: float):
+        while not shutdown_event.wait(timeout=heartbeat_period):
             status_report = self.get_status_report()
             packed = messagepack.pack(status_report)
             self.results_passthrough.put({"message": packed})
