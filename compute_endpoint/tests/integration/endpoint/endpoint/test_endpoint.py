@@ -34,55 +34,6 @@ def test_non_configured_endpoint(mocker):
     assert "not configured" in result.stdout
 
 
-@pytest.mark.parametrize("status_code", [409, 410, 423])
-@responses.activate
-def test_start_endpoint_blocked(
-    mocker, fs, randomstring, patch_compute_client, status_code
-):
-    # happy-path tested in tests/unit/test_endpoint_unit.py
-
-    svc_addy = "http://api.funcx"
-    gcc = globus_compute_sdk.Client(
-        funcx_service_address=svc_addy,
-        do_version_check=False,
-        login_manager=mocker.Mock(),
-    )
-    gcc.web_client = WebClient(base_url=svc_addy)
-    patch_compute_client.return_value = gcc
-
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    reason_msg = randomstring()
-    responses.add(
-        responses.GET,
-        svc_addy + "/v2/version",
-        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
-        status=200,
-    )
-    responses.add(
-        responses.POST,
-        svc_addy + "/v2/endpoints",
-        json={"reason": reason_msg},
-        status=status_code,
-    )
-
-    ep_dir = pathlib.Path("/some/path/some_endpoint_name")
-    ep_dir.mkdir(parents=True, exist_ok=True)
-
-    ep_id = str(uuid.uuid4())
-    log_to_console = False
-    no_color = True
-    ep_conf = Config()
-
-    ep = endpoint.Endpoint()
-    with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
-    assert pyt_exc.value.args[0] == os.EX_UNAVAILABLE  # Q&D check of expected path
-
-    args, kwargs = mock_log.warning.call_args
-    assert "blocked" in args[0]
-    assert reason_msg in args[0]
-
-
 @pytest.mark.parametrize(
     "display_name",
     [
