@@ -16,6 +16,7 @@ import threading
 import time
 import typing as t
 from datetime import datetime
+from http import HTTPStatus
 
 import globus_compute_sdk as GC
 from cachetools import TTLCache
@@ -129,12 +130,20 @@ class EndpointManager:
                 assert reg_info is not None, "Empty response from Compute API"
 
             except GlobusAPIError as e:
-                if e.http_status == 409 or e.http_status == 423:
-                    # RESOURCE_CONFLICT or RESOURCE_LOCKED
-                    blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
-                    print(blocked_msg)
-                    log.warning(blocked_msg)
+                blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
+                log.warning(blocked_msg)
+                print(blocked_msg)
+                if e.http_status in (
+                    HTTPStatus.CONFLICT,
+                    HTTPStatus.LOCKED,
+                    HTTPStatus.NOT_FOUND,
+                ):
                     exit(os.EX_UNAVAILABLE)
+                elif e.http_status in (
+                    HTTPStatus.BAD_REQUEST,
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                ):
+                    exit(os.EX_DATAERR)
                 raise
             except NetworkError as e:
                 log.exception("Network error while registering multi-user endpoint")
