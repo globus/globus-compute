@@ -1,0 +1,5 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Expand cases in which we return a meaningful exit code and message after endpoint
+  registration failures when calling ``globus-compute-endpoint start``.

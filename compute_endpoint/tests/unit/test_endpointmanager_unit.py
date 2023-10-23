@@ -1,5 +1,6 @@
 import fcntl
 import getpass
+import io
 import json
 import os
 import pathlib
@@ -15,6 +16,8 @@ import time
 import typing as t
 import uuid
 from collections import namedtuple
+from contextlib import redirect_stdout
+from http import HTTPStatus
 from unittest import mock
 
 import jinja2
@@ -190,8 +193,18 @@ def test_sets_process_title(
 
 
 @responses.activate
-@pytest.mark.parametrize("status_code", [409, 423, 418])
-def test_gracefully_exits_if_in_conflict_or_locked(
+@pytest.mark.parametrize(
+    "exit_code,status_code",
+    (
+        (os.EX_UNAVAILABLE, HTTPStatus.CONFLICT),
+        (os.EX_UNAVAILABLE, HTTPStatus.LOCKED),
+        (os.EX_UNAVAILABLE, HTTPStatus.NOT_FOUND),
+        (os.EX_DATAERR, HTTPStatus.BAD_REQUEST),
+        (os.EX_DATAERR, HTTPStatus.UNPROCESSABLE_ENTITY),
+        ("Error", 418),  # IM_A_TEAPOT
+    ),
+)
+def test_gracefully_exits_if_registration_blocked(
     mocker,
     register_endpoint_failure_response,
     conf_dir,
@@ -199,6 +212,7 @@ def test_gracefully_exits_if_in_conflict_or_locked(
     endpoint_uuid,
     randomstring,
     get_standard_compute_client,
+    exit_code,
     status_code,
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
@@ -208,15 +222,20 @@ def test_gracefully_exits_if_in_conflict_or_locked(
     some_err = randomstring()
     register_endpoint_failure_response(status_code, some_err)
 
-    with pytest.raises((GlobusAPIError, SystemExit)) as pyexc:
-        EndpointManager(conf_dir, endpoint_uuid, mock_conf)
+    f = io.StringIO()
+    with redirect_stdout(f):
+        with pytest.raises((GlobusAPIError, SystemExit)) as pyexc:
+            EndpointManager(conf_dir, endpoint_uuid, mock_conf)
+        stdout_msg = f.getvalue()
 
-    if status_code in (409, 423):
-        assert pyexc.value.code == os.EX_UNAVAILABLE, "Expecting meaningful exit code"
-        assert mock_log.warning.called
-        a, *_ = mock_log.warning.call_args
-        assert some_err in str(a), "Expected upstream response still shared"
-    else:
+    assert mock_log.warning.called
+    a, *_ = mock_log.warning.call_args
+    assert some_err in str(a), "Expected upstream response still shared"
+
+    assert some_err in stdout_msg, f"Expecting error message in stdout ({stdout_msg})"
+    assert pyexc.value.code == exit_code, "Expecting meaningful exit code"
+
+    if exit_code == "Error":
         # The other route tests SystemExit; nominally this route is an unhandled
         # traceback -- good.  We should _not_ blanket hide all exceptions.
         assert pyexc.value.http_status == status_code

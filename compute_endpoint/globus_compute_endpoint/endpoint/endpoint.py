@@ -13,6 +13,7 @@ import subprocess
 import sys
 import typing as t
 import uuid
+from http import HTTPStatus
 
 import daemon
 import daemon.pidfile
@@ -390,12 +391,20 @@ class Endpoint:
                 )
 
             except GlobusAPIError as e:
-                if e.http_status in (409, 410, 423):
-                    # CONFLICT, GONE or LOCKED
-                    blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
-                    print(blocked_msg)
-                    log.warning(blocked_msg)
+                blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
+                log.warning(blocked_msg)
+                print(blocked_msg)
+                if e.http_status in (
+                    HTTPStatus.CONFLICT,
+                    HTTPStatus.LOCKED,
+                    HTTPStatus.NOT_FOUND,
+                ):
                     exit(os.EX_UNAVAILABLE)
+                elif e.http_status in (
+                    HTTPStatus.BAD_REQUEST,
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                ):
+                    exit(os.EX_DATAERR)
                 raise
 
             except NetworkError as e:
