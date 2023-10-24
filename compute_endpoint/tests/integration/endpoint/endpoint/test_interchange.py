@@ -168,7 +168,7 @@ def test_no_idle_if_not_configured(mocker, endpoint_uuid, mock_spt):
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=0.01,
+        heartbeat_period=1,
         idle_heartbeats_soft=0,
     )
     ei = EndpointInterchange(
@@ -191,7 +191,7 @@ def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt):
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=0.1,
+        heartbeat_period=1,
         idle_heartbeats_soft=3,
     )
     ei = EndpointInterchange(
@@ -229,7 +229,7 @@ def test_hard_idle_honored(mocker, endpoint_uuid, mock_spt):
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=0.1,
+        heartbeat_period=1,
         idle_heartbeats_soft=1,
         idle_heartbeats_hard=3,
     )
@@ -265,7 +265,7 @@ def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt):
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=0.1,
+        heartbeat_period=1,
         idle_heartbeats_soft=1,
         idle_heartbeats_hard=3,
     )
@@ -302,7 +302,7 @@ def test_sends_final_status_message_on_shutdown(mocker, endpoint_uuid):
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=0.01,
+        heartbeat_period=1,
         idle_heartbeats_soft=1,
         idle_heartbeats_hard=2,
     )
@@ -327,7 +327,7 @@ def test_faithfully_handles_status_report_messages(mocker, endpoint_uuid, random
 
     conf = Config(
         executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=0.01,
+        heartbeat_period=1,
     )
     ei = EndpointInterchange(
         endpoint_id=endpoint_uuid,

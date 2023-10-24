@@ -26,7 +26,7 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         self,
         *args,
         label: str = "ProcessPoolEngine",
-        heartbeat_period: float = 30.0,
+        heartbeat_period: int = 30,
         **kwargs,
     ):
         self.label = label

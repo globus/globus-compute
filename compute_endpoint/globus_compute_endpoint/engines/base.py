@@ -75,7 +75,7 @@ class GlobusComputeEngineBase(ABC):
     def __init__(
         self,
         *args: object,
-        heartbeat_period: float = 30.0,
+        heartbeat_period: int = 30,
         endpoint_id: t.Optional[uuid.UUID] = None,
         **kwargs: object,
     ):
