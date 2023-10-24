@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
     "engine_type",
     (engines.ProcessPoolEngine, engines.ThreadPoolEngine, engines.GlobusComputeEngine),
 )
-def test_status_reporting(engine_type, engine_runner, engine_heartbeat: float):
+def test_status_reporting(engine_type, engine_runner, engine_heartbeat: int):
     engine = engine_runner(engine_type)
 
     report = engine.get_status_report()
@@ -28,7 +28,7 @@ def test_status_reporting(engine_type, engine_runner, engine_heartbeat: float):
 
     # Confirm heartbeats in regular intervals
     for _i in range(3):
-        q_msg = results_q.get(timeout=1)
+        q_msg = results_q.get(timeout=2)
         assert isinstance(q_msg, dict)
 
         message = q_msg["message"]
