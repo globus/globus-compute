@@ -19,6 +19,7 @@ from globus_compute_endpoint.engines import (
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.executors.high_throughput.interchange import ManagerLost
+from pytest_mock import MockFixture
 from tests.utils import double, ez_pack_function, slow_double
 
 logger = logging.getLogger(__name__)
@@ -185,3 +186,17 @@ def test_serialized_engine_config_has_provider(engine_type: GlobusComputeEngineB
     executor = res["executors"][0].get("executor") or res["executors"][0]
 
     assert executor.get("provider")
+
+
+def test_gcengine_pass_through_to_executor(mocker: MockFixture):
+    mock_executor = mocker.patch(
+        "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
+    )
+
+    args = ("arg1", 2)
+    kwargs = {"address": "127.0.0.1", "heartbeat_period": 10, "foo": "bar"}
+    GlobusComputeEngine(*args, **kwargs)
+
+    a, k = mock_executor.call_args
+    assert a == args
+    assert kwargs == k

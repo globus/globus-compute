@@ -106,8 +106,8 @@ def get_standard_compute_client():
 
 
 @pytest.fixture
-def engine_heartbeat() -> float:
-    return 0.1
+def engine_heartbeat() -> int:
+    return 1
 
 
 @pytest.fixture
