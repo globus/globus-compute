@@ -25,7 +25,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         *args,
         label: str = "GlobusComputeEngine",
         address: t.Optional[str] = None,
-        heartbeat_period: float = 30.0,
+        heartbeat_period: int = 30,
         strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         executor: t.Optional[HighThroughputExecutor] = None,
         **kwargs,
