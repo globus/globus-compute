@@ -1,0 +1,6 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for endpoint status reports when using ``GlobusComputeEngine``.
+  The report includes information such as the total number of active workers,
+  idle workers, and pending tasks.

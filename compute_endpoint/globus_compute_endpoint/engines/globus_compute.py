@@ -87,32 +87,83 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     def provider(self):
         return self.executor.provider
 
-    def get_outstanding_breakdown(self) -> t.List[t.Tuple[str, int, bool]]:
+    def get_connected_managers(self) -> t.List[t.Dict[str, t.Any]]:
         """
+        Returns
+        -------
+        List of dicts containing info for all connected managers
+        """
+        return self.executor.connected_managers()
+
+    def get_total_managers(self, managers: t.List[t.Dict[str, t.Any]]) -> int:
+        """
+        Parameters
+        ----------
+        managers: list[dict[str, Any]]
+            List of dicts containing info for all connected managers
+
+        Returns
+        -------
+        Total number of managers
+        """
+        return len(managers)
+
+    def get_total_active_managers(self, managers: t.List[t.Dict[str, t.Any]]) -> int:
+        """
+        Parameters
+        ----------
+        managers: list[dict[str, Any]]
+            List of dicts containing info for all connected managers
+
+        Returns
+        -------
+        Number of managers that have capacity for new tasks
+        """
+        return sum(1 for m in managers if m["active"])
+
+    def get_outstanding_breakdown(
+        self, managers: t.Optional[t.List[t.Dict[str, t.Any]]] = None
+    ) -> t.List[t.Tuple[str, int, bool]]:
+        """
+        Parameters
+        ----------
+        managers: list[dict[str, Any]] | None
+            List of dicts containing info for all connected managers
 
         Returns
         -------
         List of tuples of the form (component, # of tasks on component, active?)
         """
+        if managers is None:
+            managers = self.get_connected_managers()
         total_task_count = self.executor.outstanding
-        manager_info: t.List[t.Dict[str, t.Any]] = self.executor.connected_managers()
-        breakdown = [(m["manager"], m["tasks"], m["active"]) for m in manager_info]
-        total_count_managers = sum([m["tasks"] for m in manager_info])
+        breakdown = [(m["manager"], m["tasks"], m["active"]) for m in managers]
+        total_count_managers = sum([m["tasks"] for m in managers])
         task_count_interchange = total_task_count - total_count_managers
         breakdown = [("interchange", task_count_interchange, True)] + breakdown
         return breakdown
 
-    def get_total_tasks_outstanding(self):
+    def get_total_tasks_outstanding(self) -> dict:
         """
+        Returns
+        -------
+        Dict of type {str_task_type: count_tasks}
+        """
+        return {"RAW": self.executor.outstanding}
+
+    def get_total_tasks_pending(self, managers: t.List[t.Dict[str, t.Any]]) -> int:
+        """
+        Parameters
+        ----------
+        managers: list[dict[str, Any]]
+            List of dicts containing info for all connected managers
 
         Returns
         -------
-        Returns a dict of type {str_task_type: count_tasks}
-
+        Total number of pending tasks
         """
-        outstanding = self.get_outstanding_breakdown()
-        total = sum([component[1] for component in outstanding])
-        return {"RAW": total}
+        outstanding = self.get_outstanding_breakdown(managers=managers)
+        return outstanding[0][1]  # Queued in interchange
 
     def provider_status(self):
         status = []
@@ -122,10 +173,40 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             status = self.provider.status(job_ids=job_ids)
         return status
 
-    def get_total_live_workers(self) -> int:
-        manager_info: t.List[dict[str, t.Any]] = self.executor.connected_managers()
-        worker_count = sum([mgr["worker_count"] for mgr in manager_info])
-        return worker_count
+    def get_total_live_workers(
+        self, managers: t.Optional[t.List[t.Dict[str, t.Any]]] = None
+    ) -> int:
+        """
+        Parameters
+        ----------
+        managers: list[dict[str, Any]]
+            List of dicts containing info for all connected managers
+
+        Returns
+        -------
+        Total number of live workers
+        """
+        if managers is None:
+            managers = self.get_connected_managers()
+        return sum([mgr["worker_count"] for mgr in managers])
+
+    def get_total_idle_workers(self, managers: t.List[t.Dict[str, t.Any]]) -> int:
+        """
+        Parameters
+        ----------
+        managers: list[dict[str, Any]]
+            List of dicts containing info for all connected managers
+
+        Returns
+        -------
+        Total number of workers that are not actively running tasks
+        """
+        idle_workers = 0
+        for mgr in managers:
+            workers = mgr["worker_count"]
+            tasks = mgr["tasks"]
+            idle_workers += max(0, workers - tasks)
+        return idle_workers
 
     def scale_out(self, blocks: int):
         logger.info(f"Scaling out {blocks} blocks")
@@ -135,41 +216,46 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         logger.info(f"Scaling in {blocks} blocks")
         return self.executor.scale_in(blocks=blocks)
 
+    @property
+    def scaling_enabled(self) -> bool:
+        """Indicates whether scaling is possible"""
+        max_blocks = self.executor.provider.max_blocks
+        return max_blocks > 0
+
     def get_status_report(self) -> EPStatusReport:
         """
-        endpoint_id: uuid.UUID
-        ep_status_report: t.Dict[str, t.Any]
-        task_statuses: t.Dict[str, t.List[TaskTransition]]
         Returns
         -------
+        Object containing info on the current status of the endpoint
         """
+        managers = self.get_connected_managers()
         executor_status: t.Dict[str, t.Any] = {
-            "task_id": -2,
+            "task_id": -2,  # Deprecated
             "info": {
-                "total_cores": 0,
-                "total_mem": 0,
-                "new_core_hrs": 0,
-                "total_core_hrs": 0,
-                "managers": 0,
-                "active_managers": 0,
-                "total_workers": 0,
-                "idle_workers": 0,
-                "pending_tasks": 0,
-                "outstanding_tasks": 0,
-                "worker_mode": 0,
-                "scheduler_mode": 0,
-                "scaling_enabled": False,
-                "mem_per_worker": 0,
-                "cores_per_worker": 0,
-                "prefetch_capacity": 0,
-                "max_blocks": 1,
-                "min_blocks": 1,
-                "max_workers_per_node": 0,
-                "nodes_per_block": 1,
+                "total_cores": 0,  # TODO
+                "total_mem": 0,  # TODO
+                "new_core_hrs": 0,  # TODO
+                "total_core_hrs": 0,  # TODO
+                "managers": self.get_total_managers(managers=managers),
+                "active_managers": self.get_total_active_managers(managers=managers),
+                "total_workers": self.get_total_live_workers(managers=managers),
+                "idle_workers": self.get_total_idle_workers(managers=managers),
+                "pending_tasks": self.get_total_tasks_pending(managers=managers),
+                "outstanding_tasks": self.get_total_tasks_outstanding()["RAW"],
+                "worker_mode": 0,  # Deprecated
+                "scheduler_mode": 0,  # Deprecated
+                "scaling_enabled": self.scaling_enabled,
+                "mem_per_worker": self.executor.mem_per_worker,
+                "cores_per_worker": self.executor.cores_per_worker,
+                "prefetch_capacity": self.executor.prefetch_capacity,
+                "max_blocks": self.executor.provider.max_blocks,
+                "min_blocks": self.executor.provider.min_blocks,
+                "max_workers_per_node": self.executor.max_workers,
+                "nodes_per_block": self.executor.provider.nodes_per_block,
                 "heartbeat_period": self._heartbeat_period,
             },
         }
-        task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}
+        task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}  # TODO
         return EPStatusReport(
             endpoint_id=self.endpoint_id,
             global_state=executor_status,
