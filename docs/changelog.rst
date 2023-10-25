@@ -3,6 +3,38 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.6.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.6.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Expand cases in which we return a meaningful exit code and message after endpoint
+  registration failures when calling ``globus-compute-endpoint start``.
+
+Bug Fixes
+^^^^^^^^^
+
+- The ``GlobusComputeEngine``, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
+  now respect the ``heartbeat_period`` variable, as defined in ``config.yaml``.
+
+- The ``GlobusComputeEngine`` has been updated to fully support the
+  ``heartbeat_period`` parameter.
+
+Changed
+^^^^^^^
+
+- Renamed the ``heartbeat_period_s`` attribute to ``heartbeat_period`` for
+  ``GlobusComputeEngine``, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
+  to maintain parity with the ``HighThroughputEngine`` and Parsl's
+  ``HighThroughputExecutor``.
+
+- Changed ``heartbeat_period`` type from float to int for ``GlobusComputeEngine``,
+  ``ProcessPoolEngine``, and ``ThreadPoolEngine`` to maintain parity with the
+  ``HighThroughputEngine`` and Parsl's ``HighThroughputExecutor``.
+
 .. _changelog-2.5.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.5.0
