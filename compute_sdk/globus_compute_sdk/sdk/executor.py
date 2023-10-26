@@ -678,7 +678,15 @@ class Executor(concurrent.futures.Executor):
         class SubmitGroup(t.NamedTuple):
             task_group_uuid: uuid.UUID | None
             endpoint_uuid: uuid.UUID
-            user_endpoint_config: str
+            user_endpoint_config: dict | None
+
+            def __hash__(self):
+                key = (
+                    self.task_group_uuid,
+                    self.endpoint_uuid,
+                    json.dumps(self.user_endpoint_config, sort_keys=True),
+                )
+                return hash(key)
 
         SubmitGroupFutures = t.Dict[
             SubmitGroup,
@@ -704,8 +712,7 @@ class Executor(concurrent.futures.Executor):
                         submit_group = SubmitGroup(
                             task.task_group_uuid,
                             task.endpoint_uuid,
-                            # dict type is unhashable
-                            json.dumps(task.user_endpoint_config, sort_keys=True),
+                            task.user_endpoint_config,
                         )
                         tasks[submit_group].append(task)
                         futs[submit_group].append(fut)
@@ -723,9 +730,6 @@ class Executor(concurrent.futures.Executor):
                     fut_list = futs[submit_group]
 
                     tg_uuid, ep_uuid, uep_config = submit_group
-                    uep_config = json.loads(uep_config)
-                    # Needed for mypy
-                    assert uep_config is None or isinstance(uep_config, dict)
                     log.info(
                         f"Submitting tasks for Task Group {tg_uuid} to"
                         f" Endpoint {ep_uuid}: {len(task_list):,}"
