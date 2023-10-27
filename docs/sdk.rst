@@ -211,13 +211,13 @@ This also applies when starting a Globus Compute endpoint.
 
 .. _login manager:
 
-Using a Custom LoginManager
----------------------------
+Using a Existing Tokens
+-----------------------
 
-To programmatically create a Client from tokens and remove the need to perform a Native App login flow you can use a custom *LoginManager*.
-The LoginManager is responsible for serving tokens to the Client as needed. Typically, this would perform a Native App login flow, store tokens, and return them as needed.
+To programmatically create a Client from tokens and remove the need to perform a Native App login flow you can use the *AuthorizerLoginManager*.
+The AuthorizerLoginManager is responsible for serving tokens to the Client as needed and can be instantiated using existing tokens.
 
-A custom LoginManager can be used to simply return static tokens and enable programmatic use of the Client.
+The AuthorizerLoginManager can be used to simply return static tokens and enable programmatic use of the Client.
 
 .. note::
     To access the funcX API the scope that needs to be requested from
@@ -235,46 +235,27 @@ More details on the Globus Compute login manager prototcol are available `here. 
 
   import globus_sdk
   from globus_sdk.scopes import AuthScopes
-  from globus_compute_sdk.sdk.login_manager import LoginManager
-  from globus_compute_sdk.sdk.web_client import WebClient
-  from globus_compute_sdk import Client
 
-  class LoginManager:
-    """
-    Implements the globus_compute_sdk.sdk.login_manager.protocol.LoginManagerProtocol class.
-    """
+  from globus_compute_sdk import Executor, Client
+  from globus_compute_sdk.sdk.login_manager import AuthorizerLoginManager
+  from globus_compute_sdk.sdk.login_manager.manager import ComputeScopeBuilder
 
-    def __init__(self, authorizers: dict[str, globus_sdk.RefreshTokenAuthorizer]):
-        self.authorizers = authorizers
+  ComputeScopes = ComputeScopeBuilder()
 
-    def get_auth_client(self) -> globus_sdk.AuthClient:
-        return globus_sdk.AuthClient(
-            authorizer=self.authorizers[AuthScopes.openid]
-        )
+  # Create Authorizers from the Compute and Auth tokens
+  compute_auth = globus_sdk.AccessTokenAuthorizer(tokens[ComputeScopes.resource_server]['access_token'])
+  openid_auth = globus_sdk.AccessTokenAuthorizer(tokens[AuthScopes.openid]['access_token'])
 
-    def get_web_client(self, *, base_url: str) -> WebClient:
-        return WebClient(
-            base_url=base_url,
-            authorizer=self.authorizers[Client.FUNCX_SCOPE],
-        )
-
-    def ensure_logged_in(self):
-        return True
-
-    def logout(self):
-        log.warning("logout cannot be invoked from here!")
-
-  # Create authorizers from existing tokens
-  compute_auth = globus_sdk.AccessTokenAuthorizer(compute_token)
-  openid_auth = globus_sdk.AccessTokenAuthorizer(openid_token)
-
-  # Create a new login manager and use it to create a client
-  compute_login_manager = LoginManager(
-      authorizers={Client.FUNCX_SCOPE: compute_auth,
-                   AuthScopes.openid: openid_auth}
+  # Create a Compute Client from these authorizers
+  compute_login_manager = AuthorizerLoginManager(
+      authorizers={ComputeScopes.resource_server: compute_auth,
+                   AuthScopes.resource_server: openid_auth}
   )
+  compute_login_manager.ensure_logged_in()
 
-  fx = Client(login_manager=compute_login_manager)
+  gc = Client(login_manager=compute_login_manager)
+  gce = Executor(endpoint_id=tutorial_endpoint, funcx_client=gc)
+
 
 Specifying a Serialization Strategy
 -----------------------------------
