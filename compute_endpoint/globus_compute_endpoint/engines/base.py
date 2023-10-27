@@ -21,6 +21,7 @@ from globus_compute_endpoint.exception_handling import (
 )
 
 logger = logging.getLogger(__name__)
+_EXC_HISTORY_TMPL = "+" * 68 + "\nTraceback from attempt: {ndx}\n{exc}\n" + "-" * 68
 
 
 class ReportingThread:
@@ -76,11 +77,13 @@ class GlobusComputeEngineBase(ABC):
         self,
         *args: object,
         endpoint_id: t.Optional[uuid.UUID] = None,
+        max_retries_on_system_failure: int = 0,
         **kwargs: object,
     ):
         self._shutdown_event = threading.Event()
         self.endpoint_id = endpoint_id
-
+        self.max_retries_on_system_failure = max_retries_on_system_failure
+        self._retry_table: t.Dict[str, t.Dict] = {}
         # remove these unused vars that we are adding to just keep
         # endpoint interchange happy
         self.container_type: t.Optional[str] = None
@@ -115,6 +118,53 @@ class GlobusComputeEngineBase(ABC):
             packed = messagepack.pack(status_report)
             self.results_passthrough.put({"message": packed})
 
+    def _handle_task_exception(
+        self,
+        task_id: str,
+        execution_begin: TaskTransition,
+        exception: BaseException,
+    ) -> bytes:
+        """Repackage task exception to messagepack'ed bytes
+        Parameters
+        ----------
+        task_id: str
+        execution_begin: TaskTransition
+        exception: Exception object from the task failure
+
+        Returns
+        -------
+        bytes
+        """
+        code, user_message = get_result_error_details(exception)
+        error_details = {"code": code, "user_message": user_message}
+        execution_end = TaskTransition(
+            timestamp=time.time_ns(),
+            actor=ActorName.INTERCHANGE,
+            state=TaskState.EXEC_END,
+        )
+        exception_string = ""
+        for index, prev_exc in enumerate(
+            self._retry_table[task_id]["exception_history"]
+        ):
+            templated_history = _EXC_HISTORY_TMPL.format(
+                ndx=index + 1, exc=get_error_string(exc=prev_exc)
+            )
+            exception_string += templated_history
+
+        final = _EXC_HISTORY_TMPL.format(
+            ndx="final attempt", exc=get_error_string(exc=exception)
+        )
+        exception_string += final
+
+        result_message = dict(
+            task_id=task_id,
+            data=exception_string,
+            exception=exception_string,
+            error_details=error_details,
+            task_statuses=[execution_begin, execution_end],  # only timings we have
+        )
+        return messagepack.pack(Result(**result_message))
+
     def _setup_future_done_callback(self, task_id: str, future: Future) -> None:
         """
         Set up the done() callback for the provided future.
@@ -133,27 +183,18 @@ class GlobusComputeEngineBase(ABC):
         )
 
         def _done_cb(f: Future):
-            if f.exception():
-                exc = f.exception()
-                code, user_message = get_result_error_details(exc)
-                error_details = {"code": code, "user_message": user_message}
-                exec_end = TaskTransition(
-                    timestamp=time.time_ns(),
-                    actor=ActorName.INTERCHANGE,
-                    state=TaskState.EXEC_END,
-                )
-                result_message = dict(
-                    task_id=task_id,
-                    data=get_error_string(exc=exc),
-                    exception=get_error_string(exc=exc),
-                    error_details=error_details,
-                    task_statuses=[exec_beg, exec_end],  # only transition info we have
-                )
-                packed = messagepack.pack(Result(**result_message))
-            else:
+            try:
                 packed = f.result()
+            except Exception as exception:
+                packed = self._handle_task_exception(
+                    task_id=task_id, execution_begin=exec_beg, exception=exception
+                )
 
-            self.results_passthrough.put({"task_id": task_id, "message": packed})
+            if packed:
+                # _handle_task_exception can return empty bytestring
+                # when it retries task, indicating there's no task status update
+                self.results_passthrough.put({"task_id": task_id, "message": packed})
+                self._retry_table.pop(task_id, None)
 
         future.add_done_callback(_done_cb)
 
@@ -178,6 +219,12 @@ class GlobusComputeEngineBase(ABC):
         future
         """
 
+        if task_id not in self._retry_table:
+            self._retry_table[task_id] = {
+                "retry_count": 0,
+                "packed_task": packed_task,
+                "exception_history": [],
+            }
         future = self._submit(execute_task, task_id, packed_task)
         self._setup_future_done_callback(task_id, future)
         return future
