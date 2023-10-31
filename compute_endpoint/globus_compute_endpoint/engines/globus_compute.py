@@ -133,8 +133,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def scale_in(self, blocks: int):
         logger.info(f"Scaling in {blocks} blocks")
-        to_kill = list(self.executor.blocks.values())[:blocks]
-        return self.provider.cancel(to_kill)
+        return self.executor.scale_in(blocks=blocks)
 
     def get_status_report(self) -> EPStatusReport:
         """
