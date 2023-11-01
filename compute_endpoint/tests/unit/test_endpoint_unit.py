@@ -127,6 +127,15 @@ def umask():
     os.umask(orig_umask)
 
 
+@pytest.fixture
+def mock_reg_info():
+    yield {
+        "endpoint_id": str(uuid.uuid4()),
+        "task_queue_info": {"connection_url": "amqp://some.domain:1234"},
+        "result_queue_info": {"connection_url": "amqp://some.domain"},
+    }
+
+
 @responses.activate
 def test_start_endpoint(
     mocker,
@@ -490,7 +499,9 @@ def test_endpoint_get_metadata(mocker):
 
 
 @pytest.mark.parametrize("env", [None, "blar", "local", "production"])
-def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env):
+def test_endpoint_sets_process_title(
+    mocker, fs, randomstring, mock_ep_data, env, mock_reg_info
+):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
     ep_conf.environment = env
@@ -498,7 +509,7 @@ def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env
     orig_proc_title = randomstring()
 
     mock_gcc = mocker.Mock()
-    mock_gcc.register_endpoint.return_value = {"endpoint_id": ep_id}
+    mock_gcc.register_endpoint.return_value = {**mock_reg_info, "endpoint_id": ep_id}
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_gcc)
 
     mock_spt = mocker.patch(f"{_mock_base}setproctitle")
@@ -520,19 +531,48 @@ def test_endpoint_sets_process_title(mocker, fs, randomstring, mock_ep_data, env
     assert a[0].endswith(f"[{orig_proc_title}]"), "Save original cmdline for debugging"
 
 
-def test_endpoint_needs_no_client_if_reg_info(mocker, fs, randomstring, mock_ep_data):
+@pytest.mark.parametrize("port", [random.randint(0, 65535)])
+def test_endpoint_respects_port(mocker, fs, mock_ep_data, port):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_id = str(uuid.uuid4())
+    ep_conf.amqp_port = port
+
+    tq_url = "amqp://some.domain:1234"
+    rq_url = "amqp://some.domain"
+
+    mock_reg_info = {
+        "endpoint_id": ep_id,
+        "task_queue_info": {"connection_url": tq_url},
+        "result_queue_info": {"connection_url": rq_url},
+    }
+
+    mock_update_url_port = mocker.patch(f"{_mock_base}update_url_port")
+    mock_update_url_port.side_effect = (None, StopIteration("Sentinel"))
+
+    with pytest.raises(StopIteration, match="Sentinel"):
+        ep.start_endpoint(
+            ep_dir, ep_id, ep_conf, log_to_console, no_color, mock_reg_info
+        )
+
+    assert mock_update_url_port.call_args_list[0] == ((tq_url, port),)
+    assert mock_update_url_port.call_args_list[1] == ((rq_url, port),)
+
+
+def test_endpoint_needs_no_client_if_reg_info(
+    mocker, fs, randomstring, mock_ep_data, mock_reg_info
+):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
 
     mock_gcc = mocker.Mock()
-    mock_gcc.register_endpoint.return_value = {"endpoint_id": ep_id}
+    mock_gcc.register_endpoint.return_value = {**mock_reg_info, "endpoint_id": ep_id}
     mock_get_compute_client = mocker.patch(
         f"{_mock_base}Endpoint.get_funcx_client", return_value=mock_gcc
     )
     mock_daemon = mocker.patch(f"{_mock_base}daemon")
     mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
 
-    reg_info = {"endpoint_id": ep_id}
+    reg_info = {**mock_reg_info, "endpoint_id": ep_id}
     ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
 
     assert mock_epinterchange.called, "Has registration, should start."
@@ -586,7 +626,7 @@ def test_mu_endpoint_user_ep_sensible_default(tmp_path):
     render_config_user_template(ep_dir, {})
 
 
-def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data):
+def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data, mock_reg_info):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
 
@@ -598,7 +638,7 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data):
 
     expected_text = f"Starting endpoint; registered ID: {ep_id}"
 
-    reg_info = {"endpoint_id": ep_id}
+    reg_info = {**mock_reg_info, "endpoint_id": ep_id}
 
     mock_sys.stdout.isatty.return_value = True
     ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)

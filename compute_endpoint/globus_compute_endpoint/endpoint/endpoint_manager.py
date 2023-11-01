@@ -39,7 +39,11 @@ from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
     CommandQueueSubscriber,
 )
-from globus_compute_endpoint.endpoint.utils import _redact_url_creds, is_privileged
+from globus_compute_endpoint.endpoint.utils import (
+    _redact_url_creds,
+    is_privileged,
+    update_url_port,
+)
 from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:
@@ -170,6 +174,11 @@ class EndpointManager:
                 f" ({e.__class__.__name__}) {e}"
             )
             exit(os.EX_DATAERR)
+
+        if config.amqp_port:
+            cq_info["connection_url"] = update_url_port(
+                cq_info["connection_url"], config.amqp_port
+            )
 
         self._mu_user = pwd.getpwuid(os.getuid())
         if config.force_mu_allow_same_user:
