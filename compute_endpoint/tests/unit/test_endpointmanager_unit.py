@@ -500,8 +500,11 @@ def test_restarts_running_endpoint_with_cached_args(epmanager, mocker):
     em._cached_cmd_start_args[child_pid] = args_tup
     em.cmd_start_endpoint = mocker.Mock()
 
-    em.wait_for_children()
+    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        em.wait_for_children()
 
+    a, _k = mock_log.info.call_args
+    assert "using cached arguments to start" in a[0]
     assert em.cmd_start_endpoint.call_args.args == args_tup
 
 

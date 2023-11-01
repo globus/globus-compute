@@ -1,9 +1,9 @@
 import json
-import logging
 import os
 import pathlib
+import random
 import uuid
-from unittest.mock import MagicMock, Mock, patch
+from unittest import mock
 
 import globus_compute_sdk.sdk.client
 import globus_compute_sdk.sdk.login_manager
@@ -22,11 +22,26 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_sdk.sdk.web_client import WebClient
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
+_SVC_ADDY = "http://api.funcx.fqdn"  # something clearly not correct
 
 
 @pytest.fixture(autouse=True)
 def patch_compute_client(mocker):
-    return mocker.patch(f"{_MOCK_BASE}Client")
+    responses.add(
+        responses.GET,
+        _SVC_ADDY + "/v2/version",
+        json={"api": "1.2.0", "min_ep_version": "2.0.0", "min_sdk_version": "1.0.0a6"},
+        status=200,
+    )
+
+    gcc = globus_compute_sdk.Client(
+        funcx_service_address=_SVC_ADDY,
+        do_version_check=False,
+        login_manager=mock.Mock(),
+    )
+    gcc.web_client = WebClient(base_url=_SVC_ADDY)
+
+    yield mocker.patch(f"{_MOCK_BASE}Client", return_value=gcc)
 
 
 def test_non_configured_endpoint(mocker):
@@ -43,27 +58,9 @@ def test_non_configured_endpoint(mocker):
         "😎 Great display/.name",
     ],
 )
-def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_name):
-    svc_addy = "http://api.funcx"
-    gcc = globus_compute_sdk.Client(
-        funcx_service_address=svc_addy,
-        do_version_check=False,
-        login_manager=mocker.Mock(),
-    )
-    gcc.web_client = WebClient(base_url=svc_addy)
-    patch_compute_client.return_value = gcc
-
-    responses.add(
-        responses.GET,
-        svc_addy + "/v2/version",
-        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
-        status=200,
-    )
-    responses.add(
-        responses.POST,
-        svc_addy + "/v2/endpoints",
-        json={},
-        status=404,  # we are verifying the POST, not the response
+def test_start_endpoint_display_name(mocker, fs, display_name):
+    responses.add(  # 404 == we are verifying the POST, not the response
+        responses.POST, _SVC_ADDY + "/v2/endpoints", json={}, status=404
     )
 
     ep = endpoint.Endpoint()
@@ -74,8 +71,8 @@ def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_n
 
     with pytest.raises(SystemExit) as pyt_exc:
         ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
-    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE
     req = pyt_exc.value.__cause__._underlying_response.request
     req_json = json.loads(req.body)
     if display_name is not None:
@@ -84,29 +81,9 @@ def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_n
         assert "display_name" not in req_json
 
 
-def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_compute_client):
-    gcc_addy = "http://api.funcx"
-    gcc = globus_compute_sdk.Client(
-        funcx_service_address=gcc_addy,
-        do_version_check=False,
-        login_manager=mocker.Mock(),
-    )
-    gcwc = WebClient(base_url=gcc_addy)
-    gcwc.post = MagicMock()
-    gcc.web_client = gcwc
-    patch_compute_client.return_value = gcc
-
-    responses.add(
-        responses.GET,
-        gcc_addy + "/v2/version",
-        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
-        status=200,
-    )
-    responses.add(
-        responses.POST,
-        gcc_addy + "/v2/endpoints",
-        json={},
-        status=200,
+def test_start_endpoint_allowlist_passthrough(mocker, fs):
+    responses.add(  # 404 == we are verifying the POST, not the response
+        responses.POST, _SVC_ADDY + "/v2/endpoints", json={}, status=404
     )
 
     ep = endpoint.Endpoint()
@@ -115,37 +92,19 @@ def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_compute_client):
     ep_dir.mkdir(parents=True, exist_ok=True)
     ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as pyt_exc:
         ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
-    called_data = gcc.web_client.post.call_args[1]["data"]
-    assert len(called_data["allowed_functions"]) == 2
-    assert called_data["allowed_functions"][1] == ep_conf.allowed_functions[1]
+    req = pyt_exc.value.__cause__._underlying_response.request
+    req_json = json.loads(req.body)
+    assert len(req_json["allowed_functions"]) == 2
+    assert req_json["allowed_functions"][1] == ep_conf.allowed_functions[1]
 
 
-def test_start_endpoint_auth_policy_passthrough(mocker, fs, patch_compute_client):
-    gcc_addy = "https://compute.api.globus.org"
-    gcc = globus_compute_sdk.Client(
-        funcx_service_address=gcc_addy,
-        do_version_check=False,
-        login_manager=mocker.Mock(),
-    )
-    gcwc = WebClient(base_url=gcc_addy)
-    gcwc.post = MagicMock()
-    gcc.web_client = gcwc
-    patch_compute_client.return_value = gcc
-
-    responses.add(
-        responses.GET,
-        gcc_addy + "/v2/version",
-        json={"api": "1.0.5", "min_ep_version": "1.0.5", "min_sdk_version": "0.0.2a0"},
-        status=200,
-    )
-    responses.add(
-        responses.POST,
-        gcc_addy + "/v2/endpoints",
-        json={},
-        status=200,
+def test_start_endpoint_auth_policy_passthrough(mocker, fs):
+    responses.add(  # 404 == we are verifying the POST, not the response
+        responses.POST, _SVC_ADDY + "/v2/endpoints", json={}, status=404
     )
 
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
@@ -155,17 +114,20 @@ def test_start_endpoint_auth_policy_passthrough(mocker, fs, patch_compute_client
     ep_conf = Config()
     ep_conf.authentication_policy = str(uuid.uuid4())
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as pyt_exc:
         ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
-    called_data = gcc.web_client.post.call_args[1]["data"]
-    assert called_data["authentication_policy"] == ep_conf.authentication_policy
+    req = pyt_exc.value.__cause__._underlying_response.request
+    req_json = json.loads(req.body)
+
+    assert req_json["authentication_policy"] == ep_conf.authentication_policy
 
 
 def test_endpoint_logout(monkeypatch):
     # not forced, and no running endpoints
-    logout_true = Mock(return_value=True)
-    logout_false = Mock(return_value=False)
+    logout_true = mock.Mock(return_value=True)
+    logout_false = mock.Mock(return_value=False)
     monkeypatch.setattr(
         globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
     )
@@ -203,19 +165,23 @@ def test_endpoint_logout(monkeypatch):
     assert success
 
 
-@patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
-@patch("globus_compute_endpoint.cli.get_config")
-@patch(f"{_MOCK_BASE}Client.stop_endpoint")
+@mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
+@mock.patch("globus_compute_endpoint.cli.get_config")
+@mock.patch(f"{_MOCK_BASE}Client.stop_endpoint")
 def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
     ep_dir = pathlib.Path("some_ep_dir") / "abc-endpoint"
 
     _do_stop_endpoint(ep_dir=ep_dir, remote=False)
     assert not mock_stop_endpoint.called
+
+    path = f"/v2/endpoints/{mock_stop_endpoint.return_value}/lock"
+    responses.add(responses.POST, _SVC_ADDY + path, json={}, status=200)
+
     _do_stop_endpoint(ep_dir=ep_dir, remote=True)
     assert mock_stop_endpoint.called
 
 
-@patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
+@mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
 @pytest.mark.parametrize(
     "cur_config",
     [
@@ -315,41 +281,46 @@ def test_endpoint_update_funcx(mock_get_id, mocker, fs, cur_config, randomstring
             raise AssertionError(f"Unexpected exception: ({type(e).__name__}) {e}")
 
 
-def test_endpoint_setup_execution(mocker, tmp_path, randomstring, caplog):
+def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
     mocker.patch(f"{_MOCK_BASE}Endpoint.check_pidfile", return_value={"exists": False})
 
     tmp_file_content = randomstring()
     tmp_file = tmp_path / "random.txt"
     tmp_file.write_text(tmp_file_content)
 
-    command = f"""\
-cat {tmp_file}
-exit 1  # exit early to avoid the rest of endpoint setup
-    """
+    exit_code = random.randint(1, 255)  # == avoid rest of endpoint setup
+    command = f"cat {tmp_file}\nexit {exit_code}"
 
     endpoint_dir = None
     endpoint_uuid = None
     endpoint_config = Config(endpoint_setup=command)
-    log_to_console = None
-    no_color = None
-    reg_info = None
+    log_to_console = False
+    no_color = True
+    reg_info = {}
 
     ep = endpoint.Endpoint()
-    with caplog.at_level(logging.INFO), pytest.raises(SystemExit) as e:
-        ep.start_endpoint(
-            endpoint_dir,
-            endpoint_uuid,
-            endpoint_config,
-            log_to_console,
-            no_color,
-            reg_info,
-        )
+    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        with pytest.raises(SystemExit) as e:
+            ep.start_endpoint(
+                endpoint_dir,
+                endpoint_uuid,
+                endpoint_config,
+                log_to_console,
+                no_color,
+                reg_info,
+            )
 
     assert e.value.code == os.EX_CONFIG
-    assert tmp_file_content in caplog.text
+
+    a, _k = mock_log.error.call_args
+    assert "endpoint_setup failed" in a[0]
+    assert f"exit code {exit_code}" in a[0]
+
+    info_txt = "\n".join(a[0] for a, _k in mock_log.info.call_args_list)
+    assert tmp_file_content in info_txt
 
 
-def test_endpoint_teardown_execution(mocker, tmp_path, randomstring, caplog):
+def test_endpoint_teardown_execution(mocker, tmp_path, randomstring):
     mocker.patch(
         f"{_MOCK_BASE}Endpoint.check_pidfile",
         return_value={"exists": True, "active": True},
@@ -359,19 +330,21 @@ def test_endpoint_teardown_execution(mocker, tmp_path, randomstring, caplog):
     tmp_file = tmp_path / "random.txt"
     tmp_file.write_text(tmp_file_content)
 
-    command = f"""\
-cat {tmp_file}
-exit 1  # exit early to avoid the rest of endpoint teardown
-    """
+    exit_code = random.randint(1, 255)  # == avoid rest of endpoint setup
+    command = f"cat {tmp_file}\nexit {exit_code}"
 
     endpoint_dir = tmp_path
     endpoint_config = Config(endpoint_teardown=command)
 
-    with caplog.at_level(logging.INFO), pytest.raises(SystemExit) as e:
-        endpoint.Endpoint.stop_endpoint(
-            endpoint_dir,
-            endpoint_config,
-        )
+    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        with pytest.raises(SystemExit) as e:
+            endpoint.Endpoint.stop_endpoint(endpoint_dir, endpoint_config)
 
     assert e.value.code == os.EX_CONFIG
-    assert tmp_file_content in caplog.text
+
+    a, _k = mock_log.error.call_args
+    assert "endpoint_teardown failed" in a[0]
+    assert f"exit code {exit_code}" in a[0]
+
+    info_txt = "\n".join(a[0] for a, _k in mock_log.info.call_args_list)
+    assert tmp_file_content in info_txt

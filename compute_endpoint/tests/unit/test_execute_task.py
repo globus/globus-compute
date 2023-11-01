@@ -1,5 +1,6 @@
 import logging
 import uuid
+from unittest import mock
 
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines.helper import execute_task
@@ -7,6 +8,8 @@ from globus_compute_sdk.serialize import ComputeSerializer
 from tests.utils import ez_pack_function
 
 logger = logging.getLogger(__name__)
+
+_MOCK_BASE = "globus_compute_endpoint.engines.helper."
 
 
 def divide(x, y):
@@ -56,7 +59,13 @@ def test_execute_task_with_exception():
         )
     )
 
-    packed_result = execute_task(task_id, task_message)
+    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        packed_result = execute_task(task_id, task_message)
+
+    assert mock_log.exception.called
+    a, _k = mock_log.exception.call_args
+    assert "while executing user function" in a[0]
+
     assert isinstance(packed_result, bytes)
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)

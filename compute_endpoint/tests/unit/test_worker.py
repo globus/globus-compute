@@ -9,6 +9,8 @@ from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_endpoint.engines.high_throughput.messages import Task
 from globus_compute_endpoint.engines.high_throughput.worker import Worker
 
+_MOCK_BASE = "globus_compute_endpoint.engines.high_throughput.worker."
+
 
 def hello_world():
     return "hello world"
@@ -39,9 +41,7 @@ def reset_signals_auto(reset_signals):
 
 @pytest.fixture
 def test_worker():
-    with mock.patch(
-        "globus_compute_endpoint.engines.high_throughput.worker.zmq.Context"
-    ) as mock_context:
+    with mock.patch(f"{_MOCK_BASE}zmq.Context") as mock_context:
         # the worker will receive tasks and send messages on this mock socket
         mock_socket = mock.Mock()
         mock_context.return_value.socket.return_value = mock_socket
@@ -97,13 +97,17 @@ def test_execute_failing_function(test_worker):
     task_body = test_worker.serializer.serialize((failing_function, (), {}))
     task_message = Task(task_id, "RAW", task_body).pack()
 
-    result = test_worker._worker_execute_task(str(task_id), task_message)
+    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        result = test_worker._worker_execute_task(str(task_id), task_message)
     assert isinstance(result, dict)
     assert "data" in result
 
     result = messagepack.unpack(result["data"])
     assert isinstance(result, messagepack.message_types.Result)
     assert result.task_id == task_id
+
+    a, _k = mock_log.exception.call_args
+    assert "Failed to execute task" in a[0]
 
     # error string contains the KeyError which failed
     assert "KeyError" in result.data
@@ -129,7 +133,8 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
         messagepack.message_types.Task(task_id=task_id, task_buffer=payload)
     )
 
-    s_result = execute_task(task_id, task_body, result_size_limit=return_size - 2)
+    with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
+        s_result = execute_task(task_id, task_body, result_size_limit=return_size - 2)
     result = messagepack.unpack(s_result)
 
     assert isinstance(result, messagepack.message_types.Result)
@@ -137,6 +142,7 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
     assert result.task_id == task_id
     assert result.error_details
     assert result.error_details.code == "MaxResultSizeExceeded"
+    assert mock_log.exception.called
 
 
 def sleeper(t):
@@ -156,10 +162,12 @@ def test_app_timeout(test_worker):
         messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
     )
 
-    with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
-        packed_result = execute_task(task_id, task_body)
+    with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
+        with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
+            packed_result = execute_task(task_id, task_body)
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
     assert result.task_id == task_id
     assert "AppTimeout" in result.data
+    assert mock_log.exception.called
