@@ -1,4 +1,5 @@
 import random
+from unittest import mock
 
 import pytest
 from globus_compute_endpoint.endpoint.config import Config
@@ -7,10 +8,11 @@ from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 _mock_base = "globus_compute_endpoint.endpoint.interchange."
 
 
-def test_main_exception_always_quiesces(mocker, fs, reset_signals):
+def test_main_exception_always_quiesces(mocker, fs, randomstring, reset_signals):
     num_iterations = random.randint(1, 10)
+    exc_text = f"Woot {randomstring()}"
 
-    # [False, False] * num because _kill_event and _quiesce_event are the same mock;
+    # [False, ...] * num because _kill_event and _quiesce_event are the same mock;
     #  .is_set() is called twice per loop
     is_set_returns = [False, False, False] * num_iterations + [True]
     false_true_g = iter(is_set_returns)
@@ -26,9 +28,13 @@ def test_main_exception_always_quiesces(mocker, fs, reset_signals):
     )
     ei._task_puller_proc = mocker.MagicMock()
     ei._start_threads_and_main = mocker.MagicMock()
-    ei._start_threads_and_main.side_effect = Exception("Woot")
+    ei._start_threads_and_main.side_effect = Exception(exc_text)
     ei._kill_event.is_set = false_true
-    ei.start()
+    with mock.patch(f"{_mock_base}log") as mock_log:
+        ei.start()
+    assert mock_log.error.call_count == num_iterations
+    a, _k = mock_log.error.call_args
+    assert exc_text in a[0], "Expect exception text shared in logs"
 
     assert ei._quiesce_event.set.called
     assert ei._quiesce_event.set.call_count == num_iterations

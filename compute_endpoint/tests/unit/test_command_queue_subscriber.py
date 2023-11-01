@@ -204,18 +204,35 @@ def test_cqs_connection_closed_stops_loop(mock_cqs):
     assert mcqs._connection.ioloop.stop.called
 
 
-def test_cqs_channel_closed_retries_then_shuts_down(mock_cqs):
-    exc = Exception("some pika reason")
+def test_cqs_channel_closed_retries_then_shuts_down(mock_cqs, randomstring):
+    exc_text = f"some pika reason {randomstring()}"
+    exc = Exception(exc_text)
     *_, mcqs = mock_cqs
 
-    for i in range(1, mcqs.channel_close_window_limit):
-        mcqs._connection.ioloop.call_later.reset_mock()
-        mcqs._on_channel_closed(mcqs._connection, exc)
-        assert len(mcqs._channel_closes) == i
-    mcqs._on_channel_closed(mcqs._connection, exc)
+    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        for i in range(1, mcqs.channel_close_window_limit):
+            mcqs._connection.ioloop.call_later.reset_mock()
+            mcqs._on_channel_closed(mcqs._channel, exc)
+            assert len(mcqs._channel_closes) == i
+            a, _k = mock_log.warning.call_args
+            assert " Channel closed " in a[0]
+            assert exc_text in a[0], "Expect exception text in logs"
+        assert mock_log.debug.call_count == i
+        assert mock_log.warning.call_count == i
+        assert not mock_log.error.called
 
-    # and finally, no error if called "too many" times
-    mcqs._on_channel_closed(mcqs._connection, exc)
+        mcqs._on_channel_closed(mcqs._connection, exc)
+        assert mock_log.error.called
+        a, _k = mock_log.error.call_args
+        assert " Unable to sustain channel " in a[0], "Expect error log after attempts"
+        assert exc_text in a[0], "Expect exception text in logs"
+
+        # and finally, no error if called "too many" times
+        mcqs._on_channel_closed(mcqs._connection, exc)
+        assert mock_log.error.call_count == 2
+
+    assert mock_log.debug.call_count == i, "After attempts, should be only errors"
+    assert mock_log.warning.call_count == i, "After attempts, should be only errors"
 
 
 def test_cqs_stable_connection_resets_fail_counter(mocker, mock_cqs):

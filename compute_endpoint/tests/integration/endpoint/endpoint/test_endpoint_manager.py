@@ -5,7 +5,7 @@ import pathlib
 import shutil
 import uuid
 from importlib.machinery import SourceFileLoader
-from unittest.mock import ANY
+from unittest.mock import ANY, patch
 
 import globus_compute_endpoint.endpoint
 import pytest
@@ -16,6 +16,7 @@ from globus_sdk import GlobusAPIError
 
 logger = logging.getLogger("mock_funcx")
 
+_MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
 DEF_CONFIG_DIR = (
     pathlib.Path(globus_compute_endpoint.endpoint.config.__file__).resolve().parent
 )
@@ -104,7 +105,7 @@ class TestStart:
         "This test needs to be re-written after endpoint_register is updated"
     )
     def test_start(self, mocker):
-        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
+        mock_client = mocker.patch(f"{_MOCK_BASE}Client")
         reg_info = {
             "endpoint_id": "abcde12345",
             "address": "localhost",
@@ -130,17 +131,13 @@ class TestStart:
 
         mock_daemon = mocker.patch.object(Endpoint, "daemon_launch", return_value=None)
 
-        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch(f"{_MOCK_BASE}uuid.uuid4")
         mock_uuid.return_value = 123456
 
-        mock_pidfile = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
-        )
+        mock_pidfile = mocker.patch(f"{_MOCK_BASE}daemon.pidfile.PIDLockFile")
         mock_pidfile.return_value = None
 
-        mock_results_ack_handler = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.ResultsAckHandler"
-        )
+        mock_results_ack_handler = mocker.patch(f"{_MOCK_BASE}ResultsAckHandler")
 
         manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
@@ -189,11 +186,9 @@ class TestStart:
         being asserted against because this zmq setup happens before registration
         occurs.
         """
-        mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
+        mocker.patch(f"{_MOCK_BASE}Client")
 
-        mock_register_endpoint = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.register_endpoint"
-        )
+        mock_register_endpoint = mocker.patch(f"{_MOCK_BASE}register_endpoint")
         mock_register_endpoint.side_effect = GlobusAPIError(
             _fake_http_response(status=400, method="POST")
         )
@@ -206,15 +201,13 @@ class TestStart:
             return_value=(b"12345abcde", b"12345abcde"),
         )
 
-        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch(f"{_MOCK_BASE}uuid.uuid4")
         mock_uuid.return_value = 123456
 
-        mock_pidfile = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
-        )
+        mock_pidfile = mocker.patch(f"{_MOCK_BASE}daemon.pidfile.PIDLockFile")
         mock_pidfile.return_value = None
 
-        mocker.patch("globus_compute_endpoint.endpoint.endpoint.ResultsAckHandler")
+        mocker.patch(f"{_MOCK_BASE}ResultsAckHandler")
 
         manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
@@ -247,11 +240,9 @@ class TestStart:
         own. mock_zmq_create and mock_zmq_load are being asserted against because this
         zmq setup happens before registration occurs.
         """
-        mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
+        mocker.patch(f"{_MOCK_BASE}Client")
 
-        mock_register_endpoint = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.register_endpoint"
-        )
+        mock_register_endpoint = mocker.patch(f"{_MOCK_BASE}register_endpoint")
         mock_register_endpoint.side_effect = GlobusAPIError(
             _fake_http_response(status=500, method="POST")
         )
@@ -274,17 +265,13 @@ class TestStart:
 
         mock_daemon = mocker.patch.object(Endpoint, "daemon_launch", return_value=None)
 
-        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch(f"{_MOCK_BASE}uuid.uuid4")
         mock_uuid.return_value = 123456
 
-        mock_pidfile = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.daemon.pidfile.PIDLockFile"
-        )
+        mock_pidfile = mocker.patch(f"{_MOCK_BASE}daemon.pidfile.PIDLockFile")
         mock_pidfile.return_value = None
 
-        mock_results_ack_handler = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.ResultsAckHandler"
-        )
+        mock_results_ack_handler = mocker.patch(f"{_MOCK_BASE}ResultsAckHandler")
 
         manager = Endpoint(funcx_dir=os.getcwd())
         config_dir = os.path.join(manager.funcx_dir, "mock_endpoint")
@@ -328,7 +315,7 @@ class TestStart:
         )
 
     def test_start_without_executors(self, mocker):
-        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
+        mock_client = mocker.patch(f"{_MOCK_BASE}Client")
         mock_client.return_value.register_endpoint.return_value = {
             "endpoint_id": "abcde12345",
             "address": "localhost",
@@ -365,9 +352,7 @@ class TestStart:
 
     @pytest.mark.skip("This test doesn't make much sense")
     def test_daemon_launch(self, mocker):
-        mock_interchange = mocker.patch(
-            "globus_compute_endpoint.endpoint.endpoint.EndpointInterchange"
-        )
+        mock_interchange = mocker.patch(f"{_MOCK_BASE}EndpointInterchange")
         mock_interchange.return_value.start.return_value = None
         mock_interchange.return_value.stop.return_value = None
 
@@ -456,7 +441,7 @@ class TestStart:
         )
 
     def test_get_or_create_endpoint_uuid_no_json_no_uuid(self, mocker):
-        mock_uuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.uuid.uuid4")
+        mock_uuid = mocker.patch(f"{_MOCK_BASE}uuid.uuid4")
         mock_uuid.return_value = 123456
 
         config_dir = pathlib.Path("/some/path/mock_endpoint")
@@ -481,15 +466,15 @@ class TestStart:
 
         assert "abcde12345" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
 
-    @pytest.mark.parametrize("dir_exists", [True, False])
-    @pytest.mark.parametrize("web_svc_ok", [True, False])
-    @pytest.mark.parametrize("force", [True, False])
+    @pytest.mark.parametrize("dir_exists", (True, False))
+    @pytest.mark.parametrize("web_svc_ok", (True, False))
+    @pytest.mark.parametrize("force", (True, False))
     def test_delete_endpoint(self, mocker, dir_exists, web_svc_ok, force):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         ep_uuid_str = str(uuid.uuid4())
 
-        mock_client = mocker.patch("globus_compute_endpoint.endpoint.endpoint.Client")
+        mock_client = mocker.patch(f"{_MOCK_BASE}Client")
         mock_stop_endpoint = mocker.patch.object(Endpoint, "stop_endpoint")
         mock_rmtree = mocker.patch.object(shutil, "rmtree")
         mocker.patch.object(Endpoint, "get_endpoint_id", return_value=ep_uuid_str)
@@ -508,11 +493,13 @@ class TestStart:
             mock_client.return_value.delete_endpoint.side_effect = exc
 
             if not force:
-                with pytest.raises(SystemExit):
+                with pytest.raises(SystemExit), patch(f"{_MOCK_BASE}log") as mock_log:
                     manager.delete_endpoint(config_dir, None, force)
+                a, _k = mock_log.critical.call_args
+                assert "without deleting the endpoint" in a[0], "expected notice"
 
-                mock_stop_endpoint.assert_not_called()
-                mock_rmtree.assert_not_called()
+                assert not mock_stop_endpoint.called
+                assert not mock_rmtree.called
                 return
 
         manager.delete_endpoint(config_dir, None, force)

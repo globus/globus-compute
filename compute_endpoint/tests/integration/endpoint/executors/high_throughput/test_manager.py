@@ -2,10 +2,13 @@ import os
 import pickle
 import queue
 import shutil
+import subprocess
 
 import pytest
 from globus_compute_endpoint.engines.high_throughput.manager import Manager
 from globus_compute_endpoint.engines.high_throughput.messages import Task
+
+_MOCK_BASE = "globus_compute_endpoint.engines.high_throughput.manager."
 
 
 class TestManager:
@@ -17,9 +20,7 @@ class TestManager:
 
     def test_remove_worker_init(self, mocker):
         # zmq is being mocked here because it was making tests hang
-        mocker.patch(
-            "globus_compute_endpoint.engines.high_throughput.manager.zmq.Context"  # noqa: E501
-        )
+        mocker.patch(f"{_MOCK_BASE}zmq.Context")  # noqa: E501
 
         manager = Manager(logdir="./", uid="mock_uid")
         manager.worker_map.to_die_count["RAW"] = 0
@@ -33,19 +34,13 @@ class TestManager:
 
     def test_poll_funcx_task_socket(self, mocker):
         # zmq is being mocked here because it was making tests hang
-        mocker.patch(
-            "globus_compute_endpoint.engines.high_throughput.manager.zmq.Context"  # noqa: E501
-        )
-
-        mock_worker_map = mocker.patch(
-            "globus_compute_endpoint.engines.high_throughput.manager.WorkerMap"
-        )
+        mocker.patch(f"{_MOCK_BASE}zmq.Context")  # noqa: E501
+        mock_worker_map = mocker.patch(f"{_MOCK_BASE}WorkerMap")
 
         manager = Manager(logdir="./", uid="mock_uid")
         manager.task_queues["RAW"] = queue.Queue()
-        manager.logdir = "./"
         manager.worker_type = "RAW"
-        manager.worker_procs["0"] = "proc"
+        manager.worker_procs["0"] = mocker.Mock(spec=subprocess.Popen)
 
         manager.funcx_task_socket.recv_multipart.return_value = (
             b"0",

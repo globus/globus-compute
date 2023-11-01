@@ -285,9 +285,11 @@ class EndpointInterchange:
             except pika.exceptions.ProbableAuthenticationError as e:
                 log.error(f"Unable to connect to AMQP service: {e}")
                 self._kill_event.set()
-            except Exception:
-                log.error("Unhandled exception in main kernel.")
-                log.debug("Unhandled exception in main kernel.", exc_info=True)
+            except Exception as e:
+                log.error(
+                    f"Unhandled exception in main kernel: ({type(e).__name__}) {e}"
+                )
+                log.debug("Unhandled exception in main kernel.", exc_info=e)
             finally:
                 if not self._kill_event.is_set():
                     self._reconnect_fail_counter += 1
