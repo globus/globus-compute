@@ -125,6 +125,12 @@ class Config(RepresentationMixin):
         start command for that single-user endpoint within this timeframe, the
         single-user endpoint is started back up again.
         Default: 30 seconds
+
+    amqp_port : int | None
+        Port to use for AMQP connections. Note that only 5671, 5672, and 443 are
+        supported by the Compute web services. If None, the port is assigned by the
+        services (typically 5671).
+        Default: None
     """
 
     def __init__(
@@ -137,6 +143,7 @@ class Config(RepresentationMixin):
         multi_user: bool | None = None,
         allowed_functions: list[str] | None = None,
         authentication_policy: str | None = None,
+        amqp_port: int | None = None,
         # Tuning info
         heartbeat_period=30,
         heartbeat_threshold=120,
@@ -191,6 +198,8 @@ class Config(RepresentationMixin):
         # Auth
         self.allowed_functions = allowed_functions
         self.authentication_policy = authentication_policy
+
+        self.amqp_port = amqp_port
 
         # Single-user tuning
         self.heartbeat_period = heartbeat_period

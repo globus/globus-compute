@@ -110,6 +110,7 @@ class ConfigModel(BaseConfigModel):
     log_dir: t.Optional[str]
     stdout: t.Optional[str]
     stderr: t.Optional[str]
+    amqp_port: t.Optional[int]
 
     _validate_engine = _validate_params("engine")
 

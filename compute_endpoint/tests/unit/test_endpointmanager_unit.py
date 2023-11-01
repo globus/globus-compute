@@ -1450,3 +1450,15 @@ def test_load_user_config_schema(
         assert mock_log.error.called
         a, *_ = mock_log.error.call_args
         assert "user config schema is not valid JSON" in str(a)
+
+
+@pytest.mark.parametrize("port", [random.randint(0, 65535)])
+def test_port_is_respected(mocker, mock_client, mock_conf, conf_dir, port):
+    ep_uuid, _ = mock_client
+    mock_conf.amqp_port = port
+
+    mock_update_url_port = mocker.patch(f"{_MOCK_BASE}update_url_port")
+
+    EndpointManager(conf_dir, ep_uuid, mock_conf)
+
+    assert mock_update_url_port.call_args[0][1] == port

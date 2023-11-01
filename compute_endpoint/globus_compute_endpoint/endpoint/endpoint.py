@@ -26,7 +26,7 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
-from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.endpoint.utils import _redact_url_creds, update_url_port
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.client import Client
 from globus_sdk import AuthAPIError, GlobusAPIError, NetworkError
@@ -436,6 +436,21 @@ class Endpoint:
         except KeyError:
             log.error("Invalid credential structure")
             exit(os.EX_DATAERR)
+
+        try:
+            tq_info, rq_info = (
+                reg_info["task_queue_info"],
+                reg_info["result_queue_info"],
+            )
+        except KeyError:
+            log.error("Invalid credential structure")
+            exit(os.EX_DATAERR)
+
+        if endpoint_config.amqp_port is not None:
+            for q_info in tq_info, rq_info:
+                q_info["connection_url"] = update_url_port(
+                    q_info["connection_url"], endpoint_config.amqp_port
+                )
 
         # sanitize passwords in logs
         log_reg_info = _redact_url_creds(repr(reg_info))

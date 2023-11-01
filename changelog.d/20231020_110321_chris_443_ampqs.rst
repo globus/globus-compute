@@ -5,3 +5,6 @@ New Functionality
 
 - The ``Executor`` can now be told which port to use to listen to AMQP results, via
   either the ``amqp_port`` keyword argument or the ``amqp_port`` property.
+
+- Endpoints can be configured to talk to RMQ over a different port via the ``amqp_port``
+  configuration option.

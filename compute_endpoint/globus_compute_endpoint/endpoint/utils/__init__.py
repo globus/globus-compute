@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import os as _os
 import pwd as _pwd
 import re as _re
 import typing as t
+import urllib.parse
 
 try:
     import pyprctl as _pyprctl
@@ -90,3 +93,13 @@ def is_privileged(posix_user=None):
     has_privileges |= posix_user.pw_name == "root"
     has_privileges |= any(c in proc_caps.effective for c in _MULTI_USER_CAPS)
     return has_privileges
+
+
+def update_url_port(url_string: str, new_port: int | str) -> str:
+    c_url = urllib.parse.urlparse(url_string)
+    if c_url.port:
+        netloc = c_url.netloc.replace(f":{c_url.port}", f":{new_port}")
+    else:
+        netloc = c_url.netloc + f":{new_port}"
+    c_url = c_url._replace(netloc=netloc)
+    return urllib.parse.urlunparse(c_url)
