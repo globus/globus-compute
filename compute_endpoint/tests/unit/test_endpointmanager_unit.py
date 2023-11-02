@@ -511,12 +511,15 @@ def test_no_cached_args_means_no_restart(epmanager, mocker):
 
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.waitpid.side_effect = [(child_pid, -1), (0, -1)]
-    mock_os.waitstatus_to_exitcode.return_value = -127
+    mock_os.waitstatus_to_exitcode.return_value = 0
     em.cmd_start_endpoint = mocker.Mock()
 
-    em.wait_for_children()
+    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
+        em.wait_for_children()
+    a, _k = mock_log.info.call_args
+    assert "stopped normally" in a[0], "Verify happy path"
 
-    assert em.cmd_start_endpoint.call_count == 0
+    assert not em.cmd_start_endpoint.called
 
 
 def test_emits_endpoint_id_if_isatty(mocker, epmanager):
