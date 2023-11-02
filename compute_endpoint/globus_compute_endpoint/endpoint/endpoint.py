@@ -399,12 +399,12 @@ class Endpoint:
                     HTTPStatus.LOCKED,
                     HTTPStatus.NOT_FOUND,
                 ):
-                    exit(os.EX_UNAVAILABLE)
+                    raise SystemExit(os.EX_UNAVAILABLE) from e
                 elif e.http_status in (
                     HTTPStatus.BAD_REQUEST,
                     HTTPStatus.UNPROCESSABLE_ENTITY,
                 ):
-                    exit(os.EX_DATAERR)
+                    raise SystemExit(os.EX_DATAERR) from e
                 raise
 
             except NetworkError as e:

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import pathlib
@@ -49,9 +50,7 @@ def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_n
         do_version_check=False,
         login_manager=mocker.Mock(),
     )
-    gcwc = WebClient(base_url=svc_addy)
-    gcwc.post = MagicMock()
-    gcc.web_client = gcwc
+    gcc.web_client = WebClient(base_url=svc_addy)
     patch_compute_client.return_value = gcc
 
     responses.add(
@@ -64,7 +63,7 @@ def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_n
         responses.POST,
         svc_addy + "/v2/endpoints",
         json={},
-        status=200,
+        status=404,  # we are verifying the POST, not the response
     )
 
     ep = endpoint.Endpoint()
@@ -73,15 +72,16 @@ def test_start_endpoint_display_name(mocker, fs, patch_compute_client, display_n
     ep_dir.mkdir(parents=True, exist_ok=True)
     ep_conf.display_name = display_name
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as pyt_exc:
         ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
 
-    called_data = gcc.web_client.post.call_args[1]["data"]
-
+    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE
+    req = pyt_exc.value.__cause__._underlying_response.request
+    req_json = json.loads(req.body)
     if display_name is not None:
-        assert display_name == called_data["display_name"]
+        assert display_name == req_json["display_name"]
     else:
-        assert "display_name" not in called_data
+        assert "display_name" not in req_json
 
 
 def test_start_endpoint_allowlist_passthrough(mocker, fs, patch_compute_client):
