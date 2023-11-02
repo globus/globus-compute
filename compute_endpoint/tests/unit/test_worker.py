@@ -142,7 +142,10 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
 def sleeper(t):
     import time
 
-    time.sleep(t)
+    now = start = time.monotonic()
+    while now - start < t:
+        time.sleep(0.0001)
+        now = time.monotonic()
     return True
 
 
@@ -153,7 +156,7 @@ def test_app_timeout(test_worker):
         messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
     )
 
-    with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.1"}):
+    with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
         packed_result = execute_task(task_id, task_body)
 
     result = messagepack.unpack(packed_result)
