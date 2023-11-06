@@ -194,7 +194,12 @@ def test_gcengine_pass_through_to_executor(mocker: MockFixture):
     )
 
     args = ("arg1", 2)
-    kwargs = {"address": "127.0.0.1", "heartbeat_period": 10, "foo": "bar"}
+    kwargs = {
+        "label": "VroomEngine",
+        "address": "127.0.0.1",
+        "heartbeat_period": 10,
+        "foo": "bar",
+    }
     GlobusComputeEngine(*args, **kwargs)
 
     a, k = mock_executor.call_args

@@ -41,7 +41,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.max_workers_per_node = 1
         if executor is None:
             executor = HighThroughputExecutor(  # type: ignore
-                *args, address=address, heartbeat_period=heartbeat_period, **kwargs
+                *args,
+                label=label,
+                address=address,
+                heartbeat_period=heartbeat_period,
+                **kwargs,
             )
         self.executor = executor
 
