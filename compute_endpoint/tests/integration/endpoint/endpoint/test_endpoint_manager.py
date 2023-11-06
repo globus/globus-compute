@@ -42,6 +42,7 @@ class TestStart:
         fs.add_real_file(DEF_CONFIG_DIR / "user_config_template.yaml")
         fs.add_real_file(DEF_CONFIG_DIR / "user_config_schema.json")
         fs.add_real_file(DEF_CONFIG_DIR / "user_environment.yaml")
+        fs.add_real_file(DEF_CONFIG_DIR / "example_identity_mapping_config.json")
 
         yield
 
@@ -98,6 +99,9 @@ class TestStart:
             config_dict = yaml.safe_load(f)
         if mu:
             assert config_dict["multi_user"] == mu is True
+            assert "engine" not in config_dict
+            assert "identity_mapping_config_path" in config_dict
+            assert pathlib.Path(config_dict["identity_mapping_config_path"]).exists()
         else:
             assert "multi_user" not in config_dict
 

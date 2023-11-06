@@ -1,0 +1,18 @@
+[
+  {
+    "comment": "For more examples, see: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/",
+    "DATA_TYPE": "external_identity_mapping#1.0.0",
+    "command": ["/bin/false", "--some", "flag", "-a", "-b", "-c"]
+  },
+  {
+    "comment": "For more examples, see: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/",
+    "DATA_TYPE": "expression_identity_mapping#1.0.0",
+    "mappings": [
+      {
+        "source": "{username}",
+        "match": "(.*)@example.com",
+        "output": "{0}"
+      }
+    ]
+  }
+]

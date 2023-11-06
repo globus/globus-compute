@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import inspect
+import os
+import pathlib
 import warnings
 
 from globus_compute_endpoint.engines import HighThroughputEngine
@@ -147,6 +149,7 @@ class Config(RepresentationMixin):
         # Tuning info
         heartbeat_period=30,
         heartbeat_threshold=120,
+        identity_mapping_config_path: os.PathLike | None = None,
         idle_heartbeats_soft=0,
         idle_heartbeats_hard=5760,  # Two days, divided by `heartbeat_period`
         detach_endpoint=True,
@@ -194,6 +197,11 @@ class Config(RepresentationMixin):
         self.multi_user = multi_user is True
         self.force_mu_allow_same_user = force_mu_allow_same_user is True
         self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
+        self.identity_mapping_config_path = identity_mapping_config_path
+        if self.identity_mapping_config_path:
+            _p = pathlib.Path(self.identity_mapping_config_path)
+            if not _p.exists():
+                warnings.warn(f"Identity mapping config path not found ({_p})")
 
         # Auth
         self.allowed_functions = allowed_functions

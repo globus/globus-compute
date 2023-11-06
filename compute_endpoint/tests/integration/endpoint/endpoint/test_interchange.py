@@ -37,6 +37,7 @@ def mock_spt(mocker):
 def test_endpoint_id_conveyed_to_executor(funcx_dir):
     manager = Endpoint()
     config_dir = funcx_dir / "mock_endpoint"
+    expected_ep_id = str(uuid.uuid1())
 
     manager.configure_endpoint(config_dir, None)
 
@@ -46,11 +47,11 @@ def test_endpoint_id_conveyed_to_executor(funcx_dir):
     ic = EndpointInterchange(
         endpoint_config,
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
-        endpoint_id="mock_endpoint_id",
+        endpoint_id=expected_ep_id,
     )
     ic.executor = engines.ThreadPoolEngine()  # test does not need a child process
     ic.start_engine()
-    assert ic.executor.endpoint_id == "mock_endpoint_id"
+    assert ic.executor.endpoint_id == expected_ep_id
     ic.executor.shutdown()
 
 
