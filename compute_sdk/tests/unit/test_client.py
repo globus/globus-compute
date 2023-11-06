@@ -325,7 +325,7 @@ def test_get_function():
 
     gcc.get_function(func_uuid_str)
 
-    assert gcc.web_client.get_function.called_with(func_uuid_str)
+    gcc.web_client.get_function.assert_called_with(func_uuid_str)
 
 
 def test_delete_function():
@@ -335,7 +335,7 @@ def test_delete_function():
 
     gcc.delete_function(func_uuid_str)
 
-    assert gcc.web_client.delete_function.called_with(func_uuid_str)
+    gcc.web_client.delete_function.assert_called_with(func_uuid_str)
 
 
 def test_missing_task_info(mocker, login_manager):
