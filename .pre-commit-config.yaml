@@ -12,7 +12,12 @@ repos:
   rev: 0.27.1
   hooks:
     - id: check-github-workflows
-- repo: https://github.com/psf/black
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.15.0
+  hooks:
+    - id: pyupgrade
+      args: ["--py37-plus"]
+- repo: https://github.com/psf/black-pre-commit-mirror
   rev: 23.10.1
   hooks:
     - id: black
@@ -23,11 +28,6 @@ repos:
       # explicitly pass settings file so that isort does not try to deduce
       # which settings to use based on a file's directory
       args: ["--settings-path", ".isort.cfg"]
-- repo: https://github.com/asottile/pyupgrade
-  rev: v3.15.0
-  hooks:
-    - id: pyupgrade
-      args: ["--py36-plus"]
 - repo: https://github.com/PyCQA/flake8
   rev: 6.1.0
   hooks:
