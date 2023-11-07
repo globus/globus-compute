@@ -1,8 +1,11 @@
 import concurrent.futures
 import logging
+import pathlib
 import random
 import time
 import uuid
+from queue import Queue
+from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
@@ -205,3 +208,25 @@ def test_gcengine_pass_through_to_executor(mocker: MockFixture):
     a, k = mock_executor.call_args
     assert a == args
     assert kwargs == k
+
+
+def test_gcengine_start_pass_through_to_executor(
+    mocker: MockFixture, tmp_path: pathlib.Path
+):
+    mock_executor = mocker.patch(
+        "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
+    )
+    mock_executor.provider = mock.MagicMock()
+
+    run_dir = tmp_path
+    scripts_dir = str(tmp_path / "submit_scripts")
+    engine = GlobusComputeEngine(executor=mock_executor)
+
+    assert mock_executor.run_dir != run_dir
+    assert mock_executor.provider.script_dir != scripts_dir
+
+    engine.start(endpoint_id=uuid.uuid4(), run_dir=run_dir, results_passthrough=Queue())
+    engine.shutdown()
+
+    assert mock_executor.run_dir == run_dir
+    assert mock_executor.provider.script_dir == scripts_dir

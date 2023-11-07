@@ -1,0 +1,5 @@
+Bug Fixes
+^^^^^^^^^
+
+- The `GlobusComputeEngine` worker logs will appear in the `~/.globus_compute`
+  directory rather than the current working directory.
