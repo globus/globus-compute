@@ -53,12 +53,12 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         results_passthrough: t.Optional[queue.Queue] = None,
         **kwargs,
     ):
-        assert run_dir, "GCExecutor requires kwarg:run_dir at start"
         assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
+        assert run_dir, "GCExecutor requires kwarg:run_dir at start"
 
         self.endpoint_id = endpoint_id
-        self.run_dir = os.path.join(os.getcwd(), run_dir)
-        self.executor.run_dir = run_dir
+        self.run_dir = run_dir
+        self.executor.run_dir = self.run_dir
         script_dir = os.path.join(self.run_dir, "submit_scripts")
         self.executor.provider.script_dir = script_dir
         if (
