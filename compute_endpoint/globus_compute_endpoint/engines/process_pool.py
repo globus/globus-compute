@@ -26,7 +26,6 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         self,
         *args,
         label: str = "ProcessPoolEngine",
-        heartbeat_period: int = 30,
         **kwargs,
     ):
         self.label = label
@@ -34,9 +33,10 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         self._executor_args = args
         self._executor_kwargs = kwargs
         self._status_report_thread = ReportingThread(
-            target=self.report_status, args=[], reporting_period=heartbeat_period
+            target=self.report_status,
+            args=[],
         )
-        super().__init__(*args, heartbeat_period=heartbeat_period, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def start(
         self,
@@ -86,7 +86,6 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
                 "min_blocks": 1,
                 "max_workers_per_node": self.executor._max_workers,  # type: ignore
                 "nodes_per_block": 1,
-                "heartbeat_period": self._heartbeat_period,
             },
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}
