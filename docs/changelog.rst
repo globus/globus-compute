@@ -6,6 +6,7 @@ Changelog
 .. _changelog-2.7.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.7.0
+---------------------------------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
