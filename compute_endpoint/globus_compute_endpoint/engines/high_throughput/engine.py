@@ -709,6 +709,21 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
     def _submit(self, func: t.Callable, *args: t.Any, **kwargs: t.Any) -> Future:
         raise RuntimeError("Invalid attempt to _submit()")
 
+    def _get_container_location(self, packed_task: bytes) -> str:
+        """Unpack the task message to get the container location."""
+        task_msg = messagepack.unpack(packed_task)
+        if not isinstance(task_msg, messagepack.message_types.Task):
+            raise messagepack.InvalidMessageError()
+
+        container_loc = "RAW"
+        if task_msg.container:
+            for img in task_msg.container.images:
+                if img.image_type == self.container_type:
+                    container_loc = img.location
+                    break
+
+        return container_loc
+
     def submit(self, task_id: str, packed_task: bytes) -> HTEXFuture:
         """Submits a messagepacked.Task for execution
 
@@ -729,8 +744,9 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         future = HTEXFuture(self, task_id)
         self.tasks[task_id] = future
 
+        container_loc = self._get_container_location(packed_task)
         ser = serializer.serialize((execute_task, [task_id, packed_task], {}))
-        payload = Task(task_id, "RAW", ser).pack()
+        payload = Task(task_id, container_loc, ser).pack()
         assert self.outgoing_q  # Placate mypy
         self.outgoing_q.put(payload)
 
