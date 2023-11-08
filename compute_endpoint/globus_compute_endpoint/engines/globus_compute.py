@@ -32,10 +32,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.address = address
         self.run_dir = os.getcwd()
         self.label = label
-        self._status_report_thread = ReportingThread(
-            target=self.report_status,
-            args=[],
-        )
+        self._status_report_thread = ReportingThread(target=self.report_status, args=[])
         super().__init__(*args, **kwargs)
         self.strategy = strategy
         self.max_workers_per_node = 1
