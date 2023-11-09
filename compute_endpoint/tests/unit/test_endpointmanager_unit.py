@@ -1293,7 +1293,7 @@ def test_render_user_config(data):
             assert "Missing required" in str(e)
 
 
-def test_able_to_render_user_config_sc8888(successful_exec, conf_dir):
+def test_able_to_render_user_config_sc28360(successful_exec, conf_dir):
     def _remove_user_config_template(*args, **kwargs):
         shutil.rmtree(conf_dir)
 
