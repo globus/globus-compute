@@ -596,10 +596,18 @@ class EndpointManager:
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
 
-        import shutil  # in the child process; no need to load this in MUEP space
-
         exit_code = 70
         try:
+            # in the child process; no need to load this in MUEP space
+            import shutil
+
+            from globus_compute_endpoint.endpoint.config.utils import (
+                load_user_config_template,
+            )
+
+            # load prior to dropping privileges
+            template_str, user_config_schema = load_user_config_template(self.conf_dir)
+
             pybindir = pathlib.Path(sys.executable).parent
             default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
             env: dict[str, str] = {"PATH": ":".join(map(str, default_path))}
@@ -609,9 +617,9 @@ class EndpointManager:
                     log.debug("Load default environment variables from: %s", env_path)
                     env_text = env_path.read_text()
                     if env_text:
-                        env.update(
-                            {k: str(v) for k, v in yaml.safe_load(env_text).items()}
-                        )
+                        env_data = yaml.safe_load(env_text)
+                        if env_data:
+                            env.update({k: str(v) for k, v in env_data.items()})
 
             except Exception as e:
                 log.warning(
@@ -622,7 +630,10 @@ class EndpointManager:
                     type(e).__name__,
                     e,
                 )
-            env.update({"HOME": udir, "USER": uname})
+            user_home = {"HOME": udir, "USER": uname}
+            env.update(user_home)
+            os.environ.update(user_home)
+
             if not os.path.isdir(udir):
                 udir = "/"
 
@@ -696,6 +707,9 @@ class EndpointManager:
             log.debug("Changing directory to '%s'", wd)
             os.chdir(wd)
             exit_code += 1
+
+            os.environ["PWD"] = wd
+            os.environ["CWD"] = wd
             env["PWD"] = wd
             env["CWD"] = wd
 
@@ -708,9 +722,12 @@ class EndpointManager:
             (gc_dir / ep_name).mkdir(mode=0o700, parents=True, exist_ok=True)
 
             user_opts = kwargs.get("user_opts", {})
+            user_config = render_config_user_template(
+                template_str, user_config_schema, user_opts
+            )
             stdin_data_dict = {
                 "amqp_creds": kwargs.get("amqp_creds"),
-                "config": render_config_user_template(self.conf_dir, user_opts),
+                "config": user_config,
             }
             stdin_data = json.dumps(stdin_data_dict)
             exit_code += 1

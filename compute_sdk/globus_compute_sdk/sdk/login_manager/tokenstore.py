@@ -35,7 +35,7 @@ def invalidate_old_config() -> None:
             os.remove(token_file)
 
 
-def ensure_compute_dir() -> pathlib.Path:
+def ensure_compute_dir(home: os.PathLike | None = None) -> pathlib.Path:
     legacy_dirname = _home() / ".funcx"
     dirname = _home() / ".globus_compute"
 

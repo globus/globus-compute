@@ -10,6 +10,7 @@ import random
 import re
 import resource
 import shlex
+import shutil
 import signal
 import sys
 import time
@@ -55,8 +56,13 @@ _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
 @pytest.fixture
 def conf_dir(fs):
     conf_dir = pathlib.Path("/some/path/mock_endpoint")
-    conf_dir.mkdir(parents=True, exist_ok=True)
+    conf_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    g_and_o_perms = (conf_dir.stat().st_mode | 0o00) & 0o77  # get G and O perms
+    assert g_and_o_perms == 0, "Tests should work with protective permissions"
     yield conf_dir
+    if conf_dir.exists():
+        g_and_o_perms = (conf_dir.stat().st_mode | 0o00) & 0o77  # get G and O perms
+        assert g_and_o_perms == 0, "Code should not change permissions"
 
 
 @pytest.fixture
@@ -1273,35 +1279,43 @@ def test_pipe_size_limit(mocker, successful_exec, conf_size):
         (False, {"foo": "bar"}),
     ],
 )
-def test_render_user_config(conf_dir: pathlib.Path, data):
+def test_render_user_config(data):
     is_valid, user_opts = data
-
-    template = Endpoint.user_config_template_path(conf_dir)
-    template.write_text("heartbeat_period: {{ heartbeat }}")
+    template = "heartbeat_period: {{ heartbeat }}"
 
     if is_valid:
-        rendered = render_config_user_template(conf_dir, user_opts)
+        rendered = render_config_user_template(template, {}, user_opts)
         rendered_dict = yaml.safe_load(rendered)
         assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
     else:
         with pytest.raises(jinja2.exceptions.UndefinedError) as e:
-            render_config_user_template(conf_dir, user_opts)
+            render_config_user_template(template, {}, user_opts)
             assert "Missing required" in str(e)
 
 
-def test_render_user_config_escape_strings(conf_dir: pathlib.Path):
-    template = Endpoint.user_config_template_path(conf_dir)
-    template.write_text(
-        """
+def test_able_to_render_user_config_sc8888(successful_exec, conf_dir):
+    def _remove_user_config_template(*args, **kwargs):
+        shutil.rmtree(conf_dir)
+
+    mock_os, *_, em = successful_exec
+
+    # simulate no-permission-access to root-owned directory by removing entire dir
+    mock_os.setresuid.side_effect = _remove_user_config_template
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+
+
+def test_render_user_config_escape_strings():
+    template = """
 endpoint_setup: {{ setup }}
 engine:
     type: {{ engine.type }}
     accelerators:
         {%- for a in engine.accelerators %}
         - {{ a }}
-        {% endfor %}
-        """
-    )
+        {% endfor %}"""
 
     user_opts = {
         "setup": f"my-setup\nallowed_functions:\n    - {uuid.uuid4()}",
@@ -1310,7 +1324,7 @@ engine:
             "accelerators": [f"{uuid.uuid4()}\n    mem_per_worker: 100"],
         },
     }
-    rendered = render_config_user_template(conf_dir, user_opts)
+    rendered = render_config_user_template(template, {}, user_opts)
     rendered_dict = yaml.safe_load(rendered)
 
     assert len(rendered_dict) == 2
@@ -1337,19 +1351,16 @@ engine:
         (False, locals),
     ],
 )
-def test_render_user_config_option_types(conf_dir: pathlib.Path, data):
+def test_render_user_config_option_types(data):
     is_valid, val = data
-
-    template = Endpoint.user_config_template_path(conf_dir)
-    template.write_text("foo: {{ foo }}")
-
+    template = "foo: {{ foo }}"
     user_opts = {"foo": val}
 
     if is_valid:
-        render_config_user_template(conf_dir, user_opts)
+        render_config_user_template(template, {}, user_opts)
     else:
         with pytest.raises(ValueError) as pyt_exc:
-            render_config_user_template(conf_dir, user_opts)
+            render_config_user_template(template, {}, user_opts)
         assert "not a valid user config option type" in pyt_exc.exconly()
 
 
@@ -1361,14 +1372,9 @@ def test_render_user_config_option_types(conf_dir: pathlib.Path, data):
         ("{{ foo._priv }}", type("Foo", (object,), {"_priv": "secret"})()),
     ],
 )
-def test_render_user_config_sandbox(
-    mocker: MockFixture, conf_dir: pathlib.Path, data: t.Tuple[str, t.Any]
-):
+def test_render_user_config_sandbox(mocker: MockFixture, data: t.Tuple[str, t.Any]):
     jinja_op, val = data
-
-    template = Endpoint.user_config_template_path(conf_dir)
-    template.write_text(f"foo: {jinja_op}")
-
+    template = f"foo: {jinja_op}"
     user_opts = {"foo": val}
     mocker.patch(
         "globus_compute_endpoint.endpoint.config.utils._sanitize_user_opts",
@@ -1376,7 +1382,7 @@ def test_render_user_config_sandbox(
     )
 
     with pytest.raises(jinja2.exceptions.SecurityError):
-        render_config_user_template(conf_dir, user_opts)
+        render_config_user_template(template, {}, user_opts)
 
 
 @pytest.mark.parametrize(
@@ -1398,16 +1404,11 @@ def test_render_user_config_sandbox(
         (False, "10"),
     ],
 )
-def test_render_user_config_shell_escape(
-    conf_dir: pathlib.Path, data: t.Tuple[bool, t.Any]
-):
+def test_render_user_config_shell_escape(data: t.Tuple[bool, t.Any]):
     is_valid, option = data
-
-    template = Endpoint.user_config_template_path(conf_dir)
-    template.write_text("option: {{ option|shell_escape }}")
-
+    template = "option: {{ option|shell_escape }}"
     user_opts = {"option": option}
-    rendered = render_config_user_template(conf_dir, user_opts)
+    rendered = render_config_user_template(template, {}, user_opts)
     rendered_dict = yaml.safe_load(rendered)
 
     assert len(rendered_dict) == 1
@@ -1420,11 +1421,9 @@ def test_render_user_config_shell_escape(
 
 
 @pytest.mark.parametrize("schema_exists", [True, False])
-def test_render_user_config_apply_schema(
-    mocker: MockFixture, conf_dir: pathlib.Path, schema_exists: bool
-):
-    template = Endpoint.user_config_template_path(conf_dir)
-    template.write_text("foo: {{ foo }}")
+def test_render_user_config_apply_schema(mocker: MockFixture, schema_exists: bool):
+    template = "foo: {{ foo }}"
+    schema = {}
     if schema_exists:
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1433,13 +1432,11 @@ def test_render_user_config_apply_schema(
                 "foo": {"type": "string"},
             },
         }
-        schema_path = Endpoint.user_config_schema_path(conf_dir)
-        schema_path.write_text(json.dumps(schema))
 
     mock_validate = mocker.patch.object(jsonschema, "validate")
 
     user_opts = {"foo": "bar"}
-    render_config_user_template(conf_dir, user_opts)
+    render_config_user_template(template, schema, user_opts)
 
     if schema_exists:
         assert mock_validate.called

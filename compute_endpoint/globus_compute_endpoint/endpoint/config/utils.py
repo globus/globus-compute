@@ -230,24 +230,42 @@ def _shell_escape_filter(val):
     return json.dumps(shlex.quote(loaded))
 
 
-def render_config_user_template(endpoint_dir: pathlib.Path, user_opts: dict) -> str:
-    import jinja2  # Only load package when called by EP manager
+def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | None]:
+    # Reminder: this method _reads from the filesystem_, so will need appropriate
+    # priviliges.  Per sc-28360, separate out from the rendering so that we can
+    # load the file data into a string before dropping privileges.
     from globus_compute_endpoint.endpoint.endpoint import Endpoint
-    from jinja2.sandbox import SandboxedEnvironment
+
+    user_config_path = Endpoint.user_config_template_path(endpoint_dir)
+    template_str = _read_config_yaml(user_config_path)
 
     user_config_schema = load_user_config_schema(endpoint_dir)
-    if user_config_schema:
-        _validate_user_opts(user_opts, user_config_schema)
-    user_opts = _sanitize_user_opts(user_opts)
-    user_config_path = Endpoint.user_config_template_path(endpoint_dir)
 
-    template_str = _read_config_yaml(user_config_path)
+    return template_str, user_config_schema
+
+
+def render_config_user_template(
+    user_config_template: str,
+    user_config_schema: dict | None = None,
+    user_opts: dict | None = None,
+) -> str:
+    # N.B. Performing rendering, a mildly complicated action, *after*
+    # having dropped privileges.  Take security seriously ...
+
+    import jinja2  # Only load package when called by EP manager
+    from jinja2.sandbox import SandboxedEnvironment
+
+    _user_opts = user_opts or {}
+    if user_config_schema:
+        _validate_user_opts(_user_opts, user_config_schema)
+    _user_opts = _sanitize_user_opts(_user_opts)
+
     environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
     environment.filters["shell_escape"] = _shell_escape_filter
-    template = environment.from_string(template_str)
+    template = environment.from_string(user_config_template)
 
     try:
-        return template.render(**user_opts)
+        return template.render(**_user_opts)
     except jinja2.exceptions.UndefinedError as e:
         log.debug(f"Missing required user option(s): {e}")
         raise
