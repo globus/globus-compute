@@ -35,7 +35,7 @@ class ReportingThread:
         target: Target function to be invoked to get report and post to queue
         args: args to be passed to target fn
         kwargs: kwargs to be passed to target fn
-        reporting_period
+        reporting_period: float, defaults to 30.0s
         """
         self.status: Future = Future()
         self._shutdown_event = threading.Event()
@@ -75,12 +75,10 @@ class GlobusComputeEngineBase(ABC):
     def __init__(
         self,
         *args: object,
-        heartbeat_period: int = 30,
         endpoint_id: t.Optional[uuid.UUID] = None,
         **kwargs: object,
     ):
         self._shutdown_event = threading.Event()
-        self._heartbeat_period = heartbeat_period
         self.endpoint_id = endpoint_id
 
         # remove these unused vars that we are adding to just keep

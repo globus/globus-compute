@@ -25,7 +25,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         *args,
         label: str = "GlobusComputeEngine",
         address: t.Optional[str] = None,
-        heartbeat_period: int = 30,
         strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         executor: t.Optional[HighThroughputExecutor] = None,
         **kwargs,
@@ -33,10 +32,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.address = address
         self.run_dir = os.getcwd()
         self.label = label
-        self._status_report_thread = ReportingThread(
-            target=self.report_status, args=[], reporting_period=heartbeat_period
-        )
-        super().__init__(*args, heartbeat_period=heartbeat_period, **kwargs)
+        self._status_report_thread = ReportingThread(target=self.report_status, args=[])
+        super().__init__(*args, **kwargs)
         self.strategy = strategy
         self.max_workers_per_node = 1
         if executor is None:
@@ -44,7 +41,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 *args,
                 label=label,
                 address=address,
-                heartbeat_period=heartbeat_period,
                 **kwargs,
             )
         self.executor = executor
@@ -258,7 +254,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 "min_blocks": self.executor.provider.min_blocks,
                 "max_workers_per_node": self.executor.max_workers,
                 "nodes_per_block": self.executor.provider.nodes_per_block,
-                "heartbeat_period": self._heartbeat_period,
+                "heartbeat_period": self.executor.heartbeat_period,
             },
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}  # TODO

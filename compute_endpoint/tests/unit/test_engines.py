@@ -123,7 +123,7 @@ def test_engine_submit_internal(engine_type: GlobusComputeEngineBase, engine_run
 
 
 def test_proc_pool_engine_not_started():
-    engine = ProcessPoolEngine(heartbeat_period=1, max_workers=2)
+    engine = ProcessPoolEngine(max_workers=2)
 
     with pytest.raises(AssertionError) as pyt_exc:
         engine.submit(double, 10)
@@ -183,7 +183,7 @@ def test_gc_engine_system_failure(engine_runner):
 
 @pytest.mark.parametrize("engine_type", (GlobusComputeEngine, HighThroughputEngine))
 def test_serialized_engine_config_has_provider(engine_type: GlobusComputeEngineBase):
-    ep_config = Config(executors=[engine_type()])
+    ep_config = Config(executors=[engine_type(address="127.0.0.1")])
 
     res = serialize_config(ep_config)
     executor = res["executors"][0].get("executor") or res["executors"][0]
@@ -200,7 +200,6 @@ def test_gcengine_pass_through_to_executor(mocker: MockFixture):
     kwargs = {
         "label": "VroomEngine",
         "address": "127.0.0.1",
-        "heartbeat_period": 10,
         "foo": "bar",
     }
     GlobusComputeEngine(*args, **kwargs)

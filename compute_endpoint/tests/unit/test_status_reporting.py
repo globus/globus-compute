@@ -14,15 +14,13 @@ logger = logging.getLogger(__name__)
     "engine_type",
     (engines.ProcessPoolEngine, engines.ThreadPoolEngine, engines.GlobusComputeEngine),
 )
-def test_status_reporting(engine_type, engine_runner, engine_heartbeat: int):
+def test_status_reporting(engine_type, engine_runner):
     engine = engine_runner(engine_type)
 
     report = engine.get_status_report()
     assert isinstance(report, EPStatusReport)
 
     results_q = engine.results_passthrough
-
-    assert engine._status_report_thread.reporting_period == engine_heartbeat
 
     # Flush queue to start
     while not results_q.empty():
@@ -88,4 +86,4 @@ def test_gcengine_status_report(mocker: MockFixture, engine_runner: callable):
     assert info["min_blocks"] == engine.executor.provider.min_blocks
     assert info["max_workers_per_node"] == engine.executor.max_workers
     assert info["nodes_per_block"] == engine.executor.provider.nodes_per_block
-    assert info["heartbeat_period"] == engine._heartbeat_period
+    assert info["heartbeat_period"] == engine.executor.heartbeat_period

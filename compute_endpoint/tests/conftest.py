@@ -111,16 +111,16 @@ def engine_heartbeat() -> int:
 
 
 @pytest.fixture
-def engine_runner(tmp_path, engine_heartbeat) -> t.Callable:
+def engine_runner(tmp_path, engine_heartbeat, reporting_period=0.1) -> t.Callable:
     engines_to_shutdown = []
 
     def _runner(engine_type: t.Type[GlobusComputeEngineBase]):
         ep_id = uuid.uuid4()
         queue = Queue()
         if engine_type is engines.ProcessPoolEngine:
-            k = dict(heartbeat_period=engine_heartbeat, max_workers=2)
+            k = dict(max_workers=2)
         elif engine_type is engines.ThreadPoolEngine:
-            k = dict(heartbeat_period=engine_heartbeat, max_workers=2)
+            k = dict(max_workers=2)
         elif engine_type is engines.GlobusComputeEngine:
             k = dict(
                 address="127.0.0.1",
@@ -130,6 +130,7 @@ def engine_runner(tmp_path, engine_heartbeat) -> t.Callable:
         else:
             raise NotImplementedError(f"Unimplemented: {engine_type.__name__}")
         engine = engine_type(**k)
+        engine._status_report_thread.reporting_period = reporting_period
         engine.start(
             endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue
         )
