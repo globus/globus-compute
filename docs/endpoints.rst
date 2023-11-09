@@ -32,9 +32,9 @@ You will be required to authenticate the first time you run ``globus-compute-end
 If you have authenticated previously, the endpoint will cache access tokens in
 the local configuration file.
 
-Globus Compute requires authentication in order to associate
-endpoints with users and ensure only authorized users can run tasks on that endpoint. As part of this step,
-we request access to your identity and Globus Groups.
+Globus Compute requires authentication in order to associate endpoints with
+users and that ensure only the authorized user can run tasks on that endpoint.
+As part of this step, we request access to your identity and Globus Groups.
 
 To get started, you will first want to configure a new endpoint.  ::
 

@@ -31,7 +31,7 @@ Compute, you must first authenticate using one of hundreds of supported
 identity provides (e.g., your institution, ORCID, or Google). As part of
 the authentication process you must grant permission for Globus Compute
 to access your identity information (to retrieve your email address) and
-Globus Groups management access (to share endpoints).
+Globus Groups management access (for sharing functions).
 
 .. code:: python
 
