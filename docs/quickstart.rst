@@ -143,6 +143,9 @@ use, it is hosted on a small VM with limited CPU and memory, intentionally
 underpowered.  As it is a shared resource, please be conscientious with the
 size and number of functions you send to this endpoint.
 
+This endpoint has been made public by the Globus Compute team for the purposes
+of this tutorial, but endpoints created by users can not be shared publicly.
+
 Deploying an endpoint
 ----------------------
 
