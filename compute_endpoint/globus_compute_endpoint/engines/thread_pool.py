@@ -22,18 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class ThreadPoolEngine(GlobusComputeEngineBase):
-    def __init__(
-        self,
-        *args,
-        label: str = "ThreadPoolEngine",
-        **kwargs,
-    ):
+    def __init__(self, *args, label: str = "ThreadPoolEngine", **kwargs):
         self.label = label
         self.executor = NativeExecutor(*args, **kwargs)
-        self._status_report_thread = ReportingThread(
-            target=self.report_status,
-            args=[],
-        )
+        self._status_report_thread = ReportingThread(target=self.report_status, args=[])
         super().__init__(*args, **kwargs)
 
     def start(
