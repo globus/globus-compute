@@ -24,12 +24,10 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self,
         *args,
         label: str = "GlobusComputeEngine",
-        address: t.Optional[str] = None,
         strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         executor: t.Optional[HighThroughputExecutor] = None,
         **kwargs,
     ):
-        self.address = address
         self.run_dir = os.getcwd()
         self.label = label
         self._status_report_thread = ReportingThread(target=self.report_status, args=[])
@@ -38,10 +36,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.max_workers_per_node = 1
         if executor is None:
             executor = HighThroughputExecutor(  # type: ignore
-                *args,
-                label=label,
-                address=address,
-                **kwargs,
+                *args, label=label, **kwargs
             )
         self.executor = executor
 
