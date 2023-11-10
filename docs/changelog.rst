@@ -15,6 +15,12 @@ New Functionality
   existing tokens.  This removes the need to implement a custom login manager
   to create a client from authorizers.
 
+- The ``Executor`` can now be told which port to use to listen to AMQP results, via
+  either the ``amqp_port`` keyword argument or the ``amqp_port`` property.
+
+- Endpoints can be configured to talk to RMQ over a different port via the ``amqp_port``
+  configuration option.
+
 - Added support for endpoint status reports when using ``GlobusComputeEngine``.
   The report includes information such as the total number of active workers,
   idle workers, and pending tasks.
