@@ -14,6 +14,9 @@ clusters with batch schedulers (e.g., Slurm, PBS), Kubernetes, or on a
 local PC. After configuring an endpoint you can use it in this tutorial
 by simply setting the ``endpoint_id`` below.
 
+Note that although the tutorial endpoint has been made public by the Globus
+Compute team, endpoints created by users can not be shared publicly.
+
 Globus Compute Python SDK
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
