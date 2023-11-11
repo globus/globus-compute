@@ -29,7 +29,7 @@ It also provides group and profile management for user accounts.
 As part of the authentication process, Globus Compute will request access
 to your identity (to retrieve your email address) and Globus Groups. Globus Compute uses
 Groups to facilitate sharing and to make authorization decisions.
-Globus Compute allows endpoints and functions to be shared by associating a Globus Group.
+Globus Compute allows functions to be shared by associating a Globus Group.
 
 .. note:: Globus Compute internally caches function, endpoint, and authorization lookups. Caches are based on user authentication tokens. To force refresh cached
           entries, you can re-authenticate your client with ``force_login=True``.

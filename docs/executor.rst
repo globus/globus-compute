@@ -38,9 +38,12 @@ you have access.
 .. note::
     A friendly FYI: the tutorial endpoint is public -- available for any
     (authenticated) user.  You are welcome to use it, but please limit the size
-    and number of functions you send to this endpoint as it is a shared
-    resource that is (intentionally) not very powerful.  It's primary intended
-    purpose is for an introduction to the Globus Compute toolset.
+    and number of functions you send to this endpoint.  It is hosted on a small
+    VM with limited CPU and memory, intentionally underpowered.   Its primary
+    intended purpose is for an introduction to the Globus Compute toolset.
+
+    This endpoint has been made public by the Globus Compute team for tutorial
+    use, but endpoints created by users can not be shared publicly.
 
 Second, the waiting -- or "blocking" -- for a result is automatic.  The
 |.submit()|_ call returns a |Future|_ immediately; the actual HTTP call to the

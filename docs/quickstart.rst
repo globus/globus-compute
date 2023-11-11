@@ -139,9 +139,12 @@ execution to available endpoints.  For most use-cases that will use the
     documentation), the above workflow will automatically handle registration.
 
 A word on the above example: while the tutorial endpoint is open for anyone to
-use, it is hosted on a small Kubernetes cluster -- somewhat intentionally
-underpowered.  As it is a shared (and tiny) resource, please be conscientious
-with the size and number of functions you send to this endpoint.
+use, it is hosted on a small VM with limited CPU and memory, intentionally
+underpowered.  As it is a shared resource, please be conscientious with the
+size and number of functions you send to this endpoint.
+
+This endpoint has been made public by the Globus Compute team for the purposes
+of this tutorial, but endpoints created by users can not be shared publicly.
 
 Deploying an endpoint
 ----------------------

@@ -14,6 +14,9 @@ clusters with batch schedulers (e.g., Slurm, PBS), Kubernetes, or on a
 local PC. After configuring an endpoint you can use it in this tutorial
 by simply setting the ``endpoint_id`` below.
 
+Note that although the tutorial endpoint has been made public by the Globus
+Compute team, endpoints created by users can not be shared publicly.
+
 Globus Compute Python SDK
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -31,7 +34,7 @@ Compute, you must first authenticate using one of hundreds of supported
 identity provides (e.g., your institution, ORCID, or Google). As part of
 the authentication process you must grant permission for Globus Compute
 to access your identity information (to retrieve your email address) and
-Globus Groups management access (to share endpoints).
+Globus Groups management access (for sharing functions).
 
 .. code:: python
 
