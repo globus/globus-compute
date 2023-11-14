@@ -4,8 +4,11 @@ import uuid
 
 import pytest
 import responses
+from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.version import __version__
+
+_BASE_URL = "https://api.gc"
 
 
 @pytest.fixture(autouse=True)
@@ -25,7 +28,7 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return WebClient(base_url="https://api.funcx", transport_params={"max_retries": 0})
+    return WebClient(base_url=_BASE_URL, transport_params={"max_retries": 0})
 
 
 def test_web_client_can_set_explicit_base_url():
@@ -46,7 +49,7 @@ def test_get_version_service_param(client, service_param):
     # to match on querystring and URL
     responses.add(
         responses.GET,
-        "https://api.funcx/v2/version",
+        f"{_BASE_URL}/v2/version",
         json={"version": 100},
         match=[responses.matchers.query_param_matcher({"service": expect_param})],
     )
@@ -61,7 +64,7 @@ def test_get_version_service_param(client, service_param):
 def test_app_name_from_constructor(user_app_name):
     client = WebClient(
         # use the same fake URL and disable retries as in the default test case
-        base_url="https://api.funcx",
+        base_url=_BASE_URL,
         transport_params={"max_retries": 0},
         # and also pass in the app_name
         app_name=user_app_name,
@@ -94,7 +97,7 @@ def test_get_amqp_url(client, randomstring):
     expected_response = randomstring()
     responses.add(
         responses.GET,
-        "https://api.funcx/v2/get_amqp_result_connection_url",
+        f"{_BASE_URL}/v2/get_amqp_result_connection_url",
         json={"some_key": expected_response},
     )
 
@@ -103,9 +106,21 @@ def test_get_amqp_url(client, randomstring):
 
 
 @pytest.mark.parametrize("multi_user", [None, True, False])
-def test_multi_user_post(client, multi_user):
-    responses.post(url="https://api.funcx/v2/endpoints")
-    resp = client.register_endpoint("ep_name", "ep_id", multi_user=multi_user)
+def test_multi_user_post(client: Client, multi_user):
+    responses.post(url=f"{_BASE_URL}/v3/endpoints")
+    resp = client.register_endpoint("ep_name", None, multi_user=multi_user)
+    req_body = json.loads(resp._response.request.body)
+    if multi_user:
+        assert req_body["multi_user"] == multi_user
+    else:
+        assert "multi_user" not in req_body
+
+
+@pytest.mark.parametrize("multi_user", [None, True, False])
+def test_multi_user_put(client: Client, multi_user):
+    ep_uuid = uuid.uuid4()
+    responses.put(url=f"{_BASE_URL}/v3/endpoints/{ep_uuid}")
+    resp = client.register_endpoint("ep_name", ep_uuid, multi_user=multi_user)
     req_body = json.loads(resp._response.request.body)
     if multi_user:
         assert req_body["multi_user"] == multi_user
@@ -118,7 +133,7 @@ def test_get_function(client: WebClient, randomstring: t.Callable):
     expected_response = randomstring()
     responses.add(
         responses.GET,
-        f"https://api.funcx/v2/functions/{func_uuid_str}",
+        f"{_BASE_URL}/v2/functions/{func_uuid_str}",
         json={"some_key": expected_response},
     )
 
@@ -132,10 +147,33 @@ def test_delete_function(client: WebClient, randomstring: t.Callable):
     expected_response = randomstring()
     responses.add(
         responses.DELETE,
-        f"https://api.funcx/v2/functions/{func_uuid_str}",
+        f"{_BASE_URL}/v2/functions/{func_uuid_str}",
         json={"some_key": expected_response},
     )
 
     res = client.delete_function(func_uuid_str)
 
     assert res["some_key"] == expected_response
+
+
+@pytest.mark.parametrize("ep_uuid", [uuid.uuid4(), None])
+def test_register_endpoint_post_put(client: WebClient, ep_uuid: t.Optional[uuid.UUID]):
+    post_response = {"post": "response"}
+    put_response = {"put": "response"}
+    responses.add(
+        responses.PUT,
+        f"{_BASE_URL}/v3/endpoints/{ep_uuid}",
+        json=put_response,
+    )
+    responses.add(
+        responses.POST,
+        f"{_BASE_URL}/v3/endpoints",
+        json=post_response,
+    )
+
+    res = client.register_endpoint("MyEP", ep_uuid)
+
+    if ep_uuid:
+        assert res.data == put_response
+    else:
+        assert res.data == post_response

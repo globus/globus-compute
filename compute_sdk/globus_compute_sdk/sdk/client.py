@@ -416,7 +416,7 @@ class Client:
     def register_endpoint(
         self,
         name,
-        endpoint_id: UUID_LIKE_T,
+        endpoint_id: UUID_LIKE_T | None,
         metadata: dict | None = None,
         multi_user: bool | None = None,
         display_name: str | None = None,
@@ -429,7 +429,7 @@ class Client:
         ----------
         name : str
             Name of the endpoint
-        endpoint_id : str | UUID
+        endpoint_id : str | UUID | None
             The uuid of the endpoint
         metadata : dict | None
             Endpoint metadata
