@@ -142,11 +142,22 @@ def epmanager(mocker, conf_dir, mock_conf, mock_client, mock_pim):
 
 
 @pytest.fixture
-def register_endpoint_failure_response():
-    def create_response(status_code: int = 200, err_msg: str = "some error msg"):
+def register_endpoint_failure_response(endpoint_uuid: uuid.UUID):
+    def create_response(
+        endpoint_id: uuid.UUID = endpoint_uuid,
+        status_code: int = 200,
+        err_msg: str = "some error msg",
+    ):
         responses.add(
             method=responses.POST,
-            url="https://compute.api.globus.org/v2/endpoints",
+            url="https://compute.api.globus.org/v3/endpoints",
+            headers={"Content-Type": "application/json"},
+            json={"error": err_msg},
+            status=status_code,
+        )
+        responses.add(
+            method=responses.PUT,
+            url=f"https://compute.api.globus.org/v3/endpoints/{endpoint_id}",
             headers={"Content-Type": "application/json"},
             json={"error": err_msg},
             status=status_code,
@@ -246,7 +257,7 @@ def test_gracefully_exits_if_registration_blocked(
     mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
 
     some_err = randomstring()
-    register_endpoint_failure_response(status_code, some_err)
+    register_endpoint_failure_response(endpoint_uuid, status_code, some_err)
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -265,6 +276,36 @@ def test_gracefully_exits_if_registration_blocked(
         # The other route tests SystemExit; nominally this route is an unhandled
         # traceback -- good.  We should _not_ blanket hide all exceptions.
         assert pyexc.value.http_status == status_code
+
+
+def test_handles_provided_endpoint_id_no_json(
+    mock_client: t.Tuple[uuid.UUID, mock.Mock],
+    conf_dir: pathlib.Path,
+    mock_conf: Config,
+):
+    ep_uuid, mock_gcc = mock_client
+
+    EndpointManager(conf_dir, ep_uuid, mock_conf)
+
+    _a, k = mock_gcc.register_endpoint.call_args
+    assert k["endpoint_id"] == ep_uuid
+
+
+def test_handles_provided_endpoint_id_with_json(
+    mock_client: t.Tuple[uuid.UUID, mock.Mock],
+    conf_dir: pathlib.Path,
+    mock_conf: Config,
+):
+    ep_uuid, mock_gcc = mock_client
+    provided_ep_uuid_str = str(uuid.uuid4())
+
+    ep_json = conf_dir / "endpoint.json"
+    ep_json.write_text(json.dumps({"endpoint_id": str(ep_uuid)}))
+
+    EndpointManager(conf_dir, provided_ep_uuid_str, mock_conf)
+
+    _a, k = mock_gcc.register_endpoint.call_args
+    assert k["endpoint_id"] == ep_uuid
 
 
 def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):

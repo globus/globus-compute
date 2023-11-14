@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import pathlib
@@ -443,32 +442,6 @@ class TestStart:
             results_ack_handler=None,
             **mock_optionals,
         )
-
-    def test_get_or_create_endpoint_uuid_no_json_no_uuid(self, mocker):
-        mock_uuid = mocker.patch(f"{_MOCK_BASE}uuid.uuid4")
-        mock_uuid.return_value = 123456
-
-        config_dir = pathlib.Path("/some/path/mock_endpoint")
-        manager = Endpoint()
-        manager.configure_endpoint(config_dir, None)
-        assert "123456" == manager.get_or_create_endpoint_uuid(config_dir, None)
-
-    def test_get_or_create_endpoint_uuid_no_json_given_uuid(self):
-        config_dir = pathlib.Path("/some/path/mock_endpoint")
-        manager = Endpoint()
-        manager.configure_endpoint(config_dir, None)
-        assert "234567" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
-
-    def test_get_or_create_endpoint_uuid_given_json(self):
-        config_dir = pathlib.Path("/some/path/mock_endpoint")
-        manager = Endpoint()
-        manager.configure_endpoint(config_dir, None)
-
-        mock_dict = {"endpoint_id": "abcde12345"}
-        with open(os.path.join(config_dir, "endpoint.json"), "w") as fd:
-            json.dump(mock_dict, fd)
-
-        assert "abcde12345" == manager.get_or_create_endpoint_uuid(config_dir, "234567")
 
     @pytest.mark.parametrize("dir_exists", (True, False))
     @pytest.mark.parametrize("web_svc_ok", (True, False))
