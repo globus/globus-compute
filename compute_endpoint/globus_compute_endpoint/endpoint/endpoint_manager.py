@@ -113,7 +113,7 @@ class EndpointManager:
             maxsize=32768, ttl=config.mu_child_ep_grace_period_s
         )
 
-        endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(conf_dir, endpoint_uuid)
+        endpoint_uuid = Endpoint.get_endpoint_id(conf_dir) or endpoint_uuid
 
         if not config.identity_mapping_config_path:
             msg = (
@@ -133,8 +133,8 @@ class EndpointManager:
 
                 gcc = GC.Client(**client_options)
                 reg_info = gcc.register_endpoint(
-                    conf_dir.name,
-                    endpoint_uuid,
+                    name=conf_dir.name,
+                    endpoint_id=endpoint_uuid,
                     metadata=EndpointManager.get_metadata(config, conf_dir),
                     multi_user=True,
                 )
@@ -165,14 +165,14 @@ class EndpointManager:
                 exit(os.EX_TEMPFAIL)
 
         upstream_ep_uuid = reg_info.get("endpoint_id")
-        if upstream_ep_uuid != endpoint_uuid:
+        if endpoint_uuid and upstream_ep_uuid != endpoint_uuid:
             log.error(
                 "Unexpected response from server: mismatched endpoint id."
                 f"\n  Expected: {endpoint_uuid}, received: {upstream_ep_uuid}"
             )
             exit(os.EX_SOFTWARE)
 
-        self._endpoint_uuid_str = upstream_ep_uuid
+        self._endpoint_uuid_str = str(upstream_ep_uuid)
 
         try:
             cq_info = reg_info["command_queue_info"]

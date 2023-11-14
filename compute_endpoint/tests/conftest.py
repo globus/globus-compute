@@ -77,7 +77,7 @@ class FakeLoginManager:
 
     def get_web_client(self, *, base_url: str | None = None) -> WebClient:
         return WebClient(
-            base_url="https://compute.api.globus.org/v2/",
+            base_url="https://compute.api.globus.org",
             authorizer=globus_sdk.NullAuthorizer(),
         )
 

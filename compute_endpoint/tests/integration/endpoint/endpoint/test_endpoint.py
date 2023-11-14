@@ -60,7 +60,7 @@ def test_non_configured_endpoint(mocker):
 )
 def test_start_endpoint_display_name(mocker, fs, display_name):
     responses.add(  # 404 == we are verifying the POST, not the response
-        responses.POST, _SVC_ADDY + "/v2/endpoints", json={}, status=404
+        responses.POST, _SVC_ADDY + "/v3/endpoints", json={}, status=404
     )
 
     ep = endpoint.Endpoint()
@@ -70,7 +70,7 @@ def test_start_endpoint_display_name(mocker, fs, display_name):
     ep_conf.display_name = display_name
 
     with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={})
     assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
     req = pyt_exc.value.__cause__._underlying_response.request
@@ -83,7 +83,7 @@ def test_start_endpoint_display_name(mocker, fs, display_name):
 
 def test_start_endpoint_allowlist_passthrough(mocker, fs):
     responses.add(  # 404 == we are verifying the POST, not the response
-        responses.POST, _SVC_ADDY + "/v2/endpoints", json={}, status=404
+        responses.POST, _SVC_ADDY + "/v3/endpoints", json={}, status=404
     )
 
     ep = endpoint.Endpoint()
@@ -93,7 +93,7 @@ def test_start_endpoint_allowlist_passthrough(mocker, fs):
     ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
 
     with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={})
     assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
     req = pyt_exc.value.__cause__._underlying_response.request
@@ -104,7 +104,7 @@ def test_start_endpoint_allowlist_passthrough(mocker, fs):
 
 def test_start_endpoint_auth_policy_passthrough(mocker, fs):
     responses.add(  # 404 == we are verifying the POST, not the response
-        responses.POST, _SVC_ADDY + "/v2/endpoints", json={}, status=404
+        responses.POST, _SVC_ADDY + "/v3/endpoints", json={}, status=404
     )
 
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
@@ -115,7 +115,7 @@ def test_start_endpoint_auth_policy_passthrough(mocker, fs):
     ep_conf.authentication_policy = str(uuid.uuid4())
 
     with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, str(uuid.uuid4()), ep_conf, False, True, reg_info={})
+        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={})
     assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
     req = pyt_exc.value.__cause__._underlying_response.request

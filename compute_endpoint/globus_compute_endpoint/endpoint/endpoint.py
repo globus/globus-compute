@@ -12,7 +12,6 @@ import socket
 import subprocess
 import sys
 import typing as t
-import uuid
 from http import HTTPStatus
 
 import daemon
@@ -303,15 +302,6 @@ class Endpoint:
         return None
 
     @staticmethod
-    def get_or_create_endpoint_uuid(
-        endpoint_dir: pathlib.Path, endpoint_uuid: str | None
-    ) -> str:
-        ep_id = Endpoint.get_endpoint_id(endpoint_dir)
-        if not ep_id:
-            ep_id = endpoint_uuid or str(uuid.uuid4())
-        return ep_id
-
-    @staticmethod
     def get_funcx_client(config: Config | None) -> Client:
         if config:
             funcx_client_options = {
@@ -399,15 +389,13 @@ class Endpoint:
         # place registration after everything else so that the endpoint will
         # only be registered if everything else has been set up successfully
         if not reg_info:
-            endpoint_uuid = Endpoint.get_or_create_endpoint_uuid(
-                endpoint_dir, endpoint_uuid
-            )
+            endpoint_uuid = Endpoint.get_endpoint_id(endpoint_dir) or endpoint_uuid
             log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
             try:
                 fx_client = Endpoint.get_funcx_client(endpoint_config)
                 reg_info = fx_client.register_endpoint(
-                    endpoint_dir.name,
-                    endpoint_uuid,
+                    name=endpoint_dir.name,
+                    endpoint_id=endpoint_uuid,
                     metadata=Endpoint.get_metadata(endpoint_config),
                     multi_user=False,
                     display_name=endpoint_config.display_name,
@@ -449,7 +437,7 @@ class Endpoint:
                 exit(os.EX_TEMPFAIL)
 
             ret_ep_uuid = reg_info.get("endpoint_id")
-            if ret_ep_uuid != endpoint_uuid:
+            if endpoint_uuid and ret_ep_uuid != endpoint_uuid:
                 log.error(
                     "Unexpected response from server: mismatched endpoint id."
                     f"\n  Expected: {endpoint_uuid}, received: {ret_ep_uuid}"

@@ -51,7 +51,18 @@ def setup_register_endpoint_response(
 
         responses.add(
             method=responses.POST,
-            url="https://compute.api.globus.org/v2/endpoints",
+            url="https://compute.api.globus.org/v3/endpoints",
+            headers={"Content-Type": "application/json"},
+            json={
+                "endpoint_id": endpoint_uuid,
+                "task_queue_info": task_queue_info,
+                "result_queue_info": rq_info,
+            },
+        )
+
+        responses.add(
+            method=responses.PUT,
+            url=f"https://compute.api.globus.org/v3/endpoints/{endpoint_uuid}",
             headers={"Content-Type": "application/json"},
             json={
                 "endpoint_id": endpoint_uuid,

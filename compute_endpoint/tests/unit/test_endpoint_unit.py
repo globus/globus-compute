@@ -53,24 +53,33 @@ def register_endpoint_response(endpoint_uuid):
         creds = ""
         if username and password:
             creds = f"{username}:{password}@"
+
+        res_body = {
+            "endpoint_id": endpoint_id,
+            "task_queue_info": {
+                "exchange_name": "tasks",
+                "connection_url": f"amqp://{creds}{rmq_fqdn}",
+                "args": queue_kwargs,
+            },
+            "result_queue_info": {
+                "exchange_name": "results",
+                "connection_url": f"amqp://{creds}{rmq_fqdn}",
+                "args": queue_kwargs,
+                "routing_key": f"{endpoint_uuid}.results",
+            },
+        }
+
         responses.add(
             method=responses.POST,
-            url="https://compute.api.globus.org/v2/endpoints",
+            url="https://compute.api.globus.org/v3/endpoints",
             headers={"Content-Type": "application/json"},
-            json={
-                "endpoint_id": endpoint_id,
-                "task_queue_info": {
-                    "exchange_name": "tasks",
-                    "connection_url": f"amqp://{creds}{rmq_fqdn}",
-                    "args": queue_kwargs,
-                },
-                "result_queue_info": {
-                    "exchange_name": "results",
-                    "connection_url": f"amqp://{creds}{rmq_fqdn}",
-                    "args": queue_kwargs,
-                    "routing_key": f"{endpoint_uuid}.results",
-                },
-            },
+            json=res_body,
+        )
+        responses.add(
+            method=responses.PUT,
+            url=f"https://compute.api.globus.org/v3/endpoints/{endpoint_id}",
+            headers={"Content-Type": "application/json"},
+            json=res_body,
         )
 
     return create_response
@@ -81,7 +90,14 @@ def register_endpoint_failure_response(endpoint_uuid):
     def create_response(endpoint_id=endpoint_uuid, status_code=200, msg="Error Msg"):
         responses.add(
             method=responses.POST,
-            url="https://compute.api.globus.org/v2/endpoints",
+            url="https://compute.api.globus.org/v3/endpoints",
+            headers={"Content-Type": "application/json"},
+            json={"error": msg},
+            status=status_code,
+        )
+        responses.add(
+            method=responses.PUT,
+            url=f"https://compute.api.globus.org/v3/endpoints/{endpoint_id}",
             headers={"Content-Type": "application/json"},
             json={"error": msg},
             status=status_code,
@@ -261,7 +277,13 @@ def test_register_endpoint_invalid_response(
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
 
-    register_endpoint_response(endpoint_id=other_endpoint_id)
+    responses.add(
+        method=responses.PUT,
+        url=f"https://compute.api.globus.org/v3/endpoints/{endpoint_uuid}",
+        headers={"Content-Type": "application/json"},
+        json={"endpoint_id": other_endpoint_id},
+    )
+
     with pytest.raises(SystemExit) as pytest_exc:
         ep.start_endpoint(
             ep_dir, endpoint_uuid, ep_conf, log_to_console, no_color, reg_info={}
@@ -768,3 +790,74 @@ def test_get_endpoint_dir_by_uuid(tmp_path, name, uuid, exists):
         assert result is not None
     else:
         assert result is None
+
+
+@pytest.mark.parametrize("json_exists", [True, False])
+def test_get_endpoint_id(tmp_path: pathlib.Path, json_exists: bool):
+    ep_uuid_str = str(uuid.uuid4())
+    if json_exists:
+        ep_json = tmp_path / "endpoint.json"
+        ep_json.write_text(json.dumps({"endpoint_id": ep_uuid_str}))
+
+    ret = Endpoint.get_endpoint_id(endpoint_dir=tmp_path)
+
+    if json_exists:
+        assert ret == ep_uuid_str
+    else:
+        assert ret is None
+
+
+def test_handles_provided_endpoint_id_no_json(
+    mocker: MockFixture,
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+    mock_reg_info: dict,
+):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_uuid_str = str(uuid.uuid4())
+
+    mocker.patch(f"{_mock_base}daemon")
+    mocker.patch(f"{_mock_base}EndpointInterchange")
+
+    mock_gcc = mocker.Mock()
+    mock_gcc.register_endpoint.return_value = {
+        **mock_reg_info,
+        "endpoint_id": ep_uuid_str,
+    }
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+
+    ep.start_endpoint(
+        ep_dir, ep_uuid_str, ep_conf, log_to_console, no_color, reg_info={}
+    )
+
+    _a, k = mock_gcc.register_endpoint.call_args
+    assert k["endpoint_id"] == ep_uuid_str
+
+
+def test_handles_provided_endpoint_id_with_json(
+    mocker: MockFixture,
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+    mock_reg_info: dict,
+):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+    ep_uuid_str = str(uuid.uuid4())
+    provided_ep_uuid_str = str(uuid.uuid4())
+
+    ep_json = ep_dir / "endpoint.json"
+    ep_json.write_text(json.dumps({"endpoint_id": ep_uuid_str}))
+
+    mocker.patch(f"{_mock_base}daemon")
+    mocker.patch(f"{_mock_base}EndpointInterchange")
+
+    mock_gcc = mocker.Mock()
+    mock_gcc.register_endpoint.return_value = {
+        **mock_reg_info,
+        "endpoint_id": ep_uuid_str,
+    }
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+
+    ep.start_endpoint(
+        ep_dir, provided_ep_uuid_str, ep_conf, log_to_console, no_color, reg_info={}
+    )
+
+    _a, k = mock_gcc.register_endpoint.call_args
+    assert k["endpoint_id"] == ep_uuid_str
