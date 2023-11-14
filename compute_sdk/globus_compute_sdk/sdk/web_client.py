@@ -167,7 +167,7 @@ class WebClient(globus_sdk.BaseClient):
     def register_endpoint(
         self,
         endpoint_name: str,
-        endpoint_id: UUID_LIKE_T,
+        endpoint_id: t.Optional[UUID_LIKE_T] = None,
         *,
         metadata: t.Optional[dict] = None,
         multi_user: t.Optional[bool] = None,
@@ -176,10 +176,7 @@ class WebClient(globus_sdk.BaseClient):
         auth_policy: t.Optional[UUID_LIKE_T] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
-        data: t.Dict[str, t.Any] = {
-            "endpoint_name": endpoint_name,
-            "endpoint_uuid": str(endpoint_id),
-        }
+        data: t.Dict[str, t.Any] = {"endpoint_name": endpoint_name}
 
         # Only populate if not None.  "" is valid and will be included
         # No value or a 'None' on an existing endpoint will leave
@@ -200,7 +197,11 @@ class WebClient(globus_sdk.BaseClient):
             data["authentication_policy"] = auth_policy
         if additional_fields is not None:
             data.update(additional_fields)
-        return self.post("/v2/endpoints", data=data)
+
+        if endpoint_id:
+            return self.put(f"/v3/endpoints/{endpoint_id}", data=data)
+        else:
+            return self.post("/v3/endpoints", data=data)
 
     def get_result_amqp_url(self) -> globus_sdk.GlobusHTTPResponse:
         return self.get("/v2/get_amqp_result_connection_url")
