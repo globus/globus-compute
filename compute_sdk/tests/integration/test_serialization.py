@@ -5,7 +5,8 @@ from unittest.mock import patch
 
 import globus_compute_sdk.serialize.concretes as concretes
 import pytest
-from globus_compute_sdk.serialize.base import SerializationError, SerializationStrategy
+from globus_compute_sdk.errors import SerializationError
+from globus_compute_sdk.serialize.base import SerializationStrategy
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 
 # length of serializer identifier

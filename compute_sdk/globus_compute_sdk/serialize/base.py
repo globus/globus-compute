@@ -1,5 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
+from globus_compute_sdk.errors import DeserializationError
+
 
 class SerializationStrategy(metaclass=ABCMeta):
     """A SerializationStrategy is in charge of converting function source code or
@@ -33,19 +35,3 @@ class SerializationStrategy(metaclass=ABCMeta):
     @abstractmethod
     def deserialize(self, payload):
         raise NotImplementedError("Concrete class did not implement deserialize")
-
-
-class SerializationError(Exception):
-    def __init__(self, reason):
-        self.reason = reason
-
-    def __repr__(self):
-        return f"Serialization failed due to {self.reason}"
-
-
-class DeserializationError(Exception):
-    def __init__(self, reason):
-        self.reason = reason
-
-    def __repr__(self):
-        return f"Deserialization failed due to {self.reason}"

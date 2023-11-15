@@ -21,14 +21,28 @@ class VersionMismatch(ComputeError):
         return f"Globus Compute Versioning Issue: {self.version_message}"
 
 
-class SerializationError(ComputeError):
-    """Something failed during serialization or deserialization."""
+class SerdeError(ComputeError):
+    """Base class for SerializationError and DeserializationError"""
 
-    def __init__(self, message):
-        self.message = message
+
+class SerializationError(SerdeError):
+    """Something failed during serialization."""
+
+    def __init__(self, reason):
+        self.reason = reason
 
     def __repr__(self):
-        return f"Serialization Error during: {self.message}"
+        return f"Serialization failed due to {self.reason}"
+
+
+class DeserializationError(SerdeError):
+    """Something failed during deserialization."""
+
+    def __init__(self, reason):
+        self.reason = reason
+
+    def __repr__(self):
+        return f"Deserialization failed due to {self.reason}"
 
 
 class TaskPending(ComputeError):

@@ -8,11 +8,8 @@ import typing as t
 from collections import OrderedDict
 
 import dill
-from globus_compute_sdk.serialize.base import (
-    DeserializationError,
-    SerializationError,
-    SerializationStrategy,
-)
+from globus_compute_sdk.errors import DeserializationError, SerializationError
+from globus_compute_sdk.serialize.base import SerializationStrategy
 
 logger = logging.getLogger(__name__)
 
