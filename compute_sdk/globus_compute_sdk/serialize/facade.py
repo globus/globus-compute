@@ -3,11 +3,8 @@ from __future__ import annotations
 import logging
 import typing as t
 
-from globus_compute_sdk.serialize.base import (
-    DeserializationError,
-    SerializationError,
-    SerializationStrategy,
-)
+from globus_compute_sdk.errors import DeserializationError, SerializationError
+from globus_compute_sdk.serialize.base import SerializationStrategy
 from globus_compute_sdk.serialize.concretes import (
     DEFAULT_STRATEGY_CODE,
     DEFAULT_STRATEGY_DATA,
