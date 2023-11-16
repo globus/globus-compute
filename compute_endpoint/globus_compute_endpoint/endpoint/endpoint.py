@@ -196,6 +196,7 @@ class Endpoint:
         config_path = Endpoint._config_file_path(conf_dir)
         if multi_user:
             user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
+            user_conf_schema_path = Endpoint.user_config_schema_path(conf_dir)
             user_env_path = Endpoint._user_environment_path(conf_dir)
             idmap_ex_conf_path = Endpoint._example_identity_mapping_configuration_path(
                 conf_dir
@@ -206,6 +207,7 @@ class Endpoint:
                 f"\n\tConfiguration file: {config_path}\n"
                 f"\n\tExample identity mapping configuration: {idmap_ex_conf_path}\n"
                 f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
+                f"\n\tUser endpoint configuration schema: {user_conf_schema_path}"
                 f"\n\tUser endpoint environment variables: {user_env_path}"
                 "\n\nUse the `start` subcommand to run it:\n"
                 f"\n\t$ globus-compute-endpoint start {ep_name}"
