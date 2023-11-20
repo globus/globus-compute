@@ -134,7 +134,7 @@ execution to available endpoints.  For most use-cases that will use the
 
 .. note::
     Like most FaaS platforms, the function must be registered with the upstream
-    web services before it can be executed on a remote endopint.  While one can
+    web services before it can be executed on a remote endpoint.  While one can
     manually register a function (see the Client or Executor API
     documentation), the above workflow will automatically handle registration.
 
