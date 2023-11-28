@@ -9,6 +9,8 @@ prod:
 	tox
 dev:
 	tox -e localdeps -- --compute-config dev
+test:
+	tox -e localdeps -- --compute-config test
 local_with_dev_sdk:
 	@if [ -z "${COMPUTE_LOCAL_ENDPOINT_ID}" ]; then echo "Missing exported COMPUTE_LOCAL_ENDPOINT_ID"; exit 1; fi
 	tox -e localdeps -- --compute-config local

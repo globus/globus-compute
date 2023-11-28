@@ -25,6 +25,16 @@ _LOCAL_ENDPOINT_ID = os.getenv("COMPUTE_LOCAL_ENDPOINT_ID")
 _LOCAL_FUNCTION_ID = os.getenv("COMPUTE_LOCAL_KNOWN_FUNCTION_ID")
 
 _CONFIGS = {
+    "test": {
+        "client_args": {"environment": "test"},
+        # assert versions are as expected on dev
+        "forwarder_min_version": "0.3.5",
+        "api_min_version": "0.3.5",
+        # This fn is public
+        "public_hello_fn_uuid": "a63186e0-b036-4934-8063-8f2305f76cd9",
+        # Lei local EP for test env
+        "endpoint_uuid": "44d93cf7-506d-491b-bcaa-6d043ecdcb81",
+    },
     "dev": {
         "client_args": {"environment": "dev"},
         # assert versions are as expected on dev
