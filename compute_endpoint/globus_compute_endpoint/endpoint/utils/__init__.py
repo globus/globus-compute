@@ -62,6 +62,21 @@ if has_pyprctl:
         _pyprctl.Cap.WAKE_ALARM,
     }
 
+    # list of targeted "you can change user" CAPs.  Some of the CAPs in
+    # _MULTI_USER_CAPS might be given legitimately to a process (e.g.,
+    # BPF, NET_BIND_SERVICE); just in case, separate out the ones that are
+    # very, very likely of interest for changing the UID
+    _USER_CHANGE_CAPS = {
+        _pyprctl.Cap.CHOWN,
+        _pyprctl.Cap.DAC_OVERRIDE,
+        _pyprctl.Cap.DAC_READ_SEARCH,
+        _pyprctl.Cap.FOWNER,
+        _pyprctl.Cap.FSETID,
+        _pyprctl.Cap.SETGID,
+        _pyprctl.Cap.SETFCAP,
+        _pyprctl.Cap.SETUID,
+    }
+
 
 def _redact_url_creds(raw: _T, redact_user=True, repl="***", count=0) -> _T:
     """
@@ -84,14 +99,15 @@ def _redact_url_creds(raw: _T, redact_user=True, repl="***", count=0) -> _T:
     return _urlb_user_pass_re.sub(repl=repl.encode(), string=raw, count=count)
 
 
-def is_privileged(posix_user=None):
+def is_privileged(posix_user=None, user_privs_only=False) -> bool:
     if not posix_user:
         posix_user = _pwd.getpwuid(_os.getuid())
 
+    caps_to_check = user_privs_only and _USER_CHANGE_CAPS or _MULTI_USER_CAPS
     proc_caps = _pyprctl.CapState.get_current()
     has_privileges = posix_user.pw_uid == 0
     has_privileges |= posix_user.pw_name == "root"
-    has_privileges |= any(c in proc_caps.effective for c in _MULTI_USER_CAPS)
+    has_privileges |= any(c in proc_caps.effective for c in caps_to_check)
     return has_privileges
 
 

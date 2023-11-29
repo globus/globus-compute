@@ -123,12 +123,12 @@ class ConfigModel(BaseConfigModel):
 
         if is_mt:
             msg_engine = "no engine if multi-user"
-            msg_identity = "multi-user requires identity_mapping_config_path"
         else:
             msg_engine = "missing engine"
             msg_identity = "identity_mapping_config_path should not be specified"
         assert is_mt is not bool(values.get("engine")), msg_engine
-        assert is_mt is bool(values.get("identity_mapping_config_path")), msg_identity
+        if not is_mt:
+            assert not bool(values.get("identity_mapping_config_path")), msg_identity
         return values
 
     def dict(self, *args, **kwargs):
