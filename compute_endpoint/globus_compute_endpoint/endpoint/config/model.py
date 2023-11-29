@@ -119,16 +119,15 @@ class ConfigModel(BaseConfigModel):
     @pydantic.root_validator
     @classmethod
     def _validate(cls, values):
-        is_mt = values.get("multi_user") is True
+        is_mu = values.get("multi_user") is True
 
-        if is_mt:
+        if is_mu:
             msg_engine = "no engine if multi-user"
         else:
             msg_engine = "missing engine"
             msg_identity = "identity_mapping_config_path should not be specified"
-        assert is_mt is not bool(values.get("engine")), msg_engine
-        if not is_mt:
             assert not bool(values.get("identity_mapping_config_path")), msg_identity
+        assert is_mu is not bool(values.get("engine")), msg_engine
         return values
 
     def dict(self, *args, **kwargs):

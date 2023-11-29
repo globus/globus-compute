@@ -93,7 +93,7 @@ class EndpointManager:
         config: Config,
         reg_info: dict | None = None,
     ):
-        log.info("Endpoint Manager initialization")
+        log.debug("Endpoint Manager initialization")
 
         self.conf_dir = conf_dir
         self._config = config
@@ -182,7 +182,8 @@ class EndpointManager:
             )
             exit(os.EX_SOFTWARE)
 
-        self._endpoint_uuid_str = str(upstream_ep_uuid)
+        endpoint_uuid = str(upstream_ep_uuid)  # convenience
+        self._endpoint_uuid_str = endpoint_uuid
 
         self.identity_mapper: PosixIdentityMapper | None = None
         if not is_privileged(user_privs_only=True):
@@ -452,17 +453,15 @@ class EndpointManager:
                     parent_identities,
                 )
                 del gcc, client_options, ids
+                if not parent_identities:
+                    # Not a privileged user -- we require at least one identity
+                    # against which to match start endpoint requests.
+                    raise LookupError("No authorized identities found")
+
             except Exception as exc:
                 msg = "Failed to determine identity set; try `whoami` command?"
                 log.error(f"({type(exc).__name__}) {exc}\n    {msg}")
                 log.debug("Stopping; failed to determine identities", exc_info=exc)
-                self._time_to_stop = True
-                return
-
-            if not parent_identities:
-                # Not a privileged user -- we require a known identity to match
-                # start endpoint requests against.
-                log.error("Failed to determine identity set; try `whoami` command")
                 self._time_to_stop = True
                 return
 
@@ -503,7 +502,7 @@ class EndpointManager:
                 command_kwargs = msg.get("kwargs", {})
             except Exception as e:
                 log.error(
-                    f"Unable to deserialize Globus Compute services command."
+                    "Unable to deserialize Globus Compute services command."
                     f"  ({e.__class__.__name__}) {e}"
                 )
                 continue
@@ -523,23 +522,28 @@ class EndpointManager:
             try:
                 effective_identity = msg["globus_effective_identity"]
                 identity_set = msg["globus_identity_set"]
+                globus_username = msg["globus_username"]
             except Exception as e:
                 log.error(f"Invalid server command.  ({e.__class__.__name__}) {e}")
                 continue
 
             identity_for_log = (
                 f"\n  Globus effective identity: {effective_identity}"
-                f"\n  Globus identity set: {identity_set}"
+                f"\n  Globus username: {globus_username}"
             )
 
             local_user_rec = None
             local_username = None
             if not self.identity_mapper or parent_identities:
-                # we are not a privileged user, so allow _only_ the identity of the
-                # parent process auth'd to run tasks
+                # we are not a privileged user, so *only* allow the identity (or
+                # linked identities) of the parent process auth'd to run tasks
 
-                if not parent_identities.intersection(identity_set):
-                    log.error("Ignoring start request for untrusted identity.")
+                cmd_identities = {ident["sub"] for ident in identity_set}
+                if not parent_identities.intersection(cmd_identities):
+                    log.error(
+                        "Ignoring start request for untrusted identity."
+                        f"{identity_for_log}"
+                    )
                     continue
                 local_user_rec = self._mu_user
                 local_username = self._mu_user.pw_name

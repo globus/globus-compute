@@ -203,6 +203,7 @@ def successful_exec_from_mocked_root(mocker, epmanager_as_root, user_conf_templa
     }
 
     pld = {
+        "globus_username": "a@example.com",
         "globus_effective_identity": 1,
         "globus_identity_set": [ident],
         "command": "cmd_start_endpoint",
@@ -985,7 +986,11 @@ def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root):
         expiration="10000",
     )
 
-    pld = {"globus_effective_identity": 1, "globus_identity_set": []}
+    pld = {
+        "globus_username": "a",
+        "globus_effective_identity": 1,
+        "globus_identity_set": [],
+    }
     queue_item = (1, props, json.dumps(pld).encode())
     em.identity_mapper.map_identity.return_value = None
 
@@ -998,9 +1003,7 @@ def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root):
     assert "Identity failed to map to a local user name" in a
     assert "(LookupError)" in a, "Expected exception name in log line"
     assert "Globus effective identity: " in a
-    assert "Globus identity set: " in a
     assert str(pld["globus_effective_identity"]) in a
-    assert str(pld["globus_identity_set"]) in a
     assert em._command.ack.called, "Command always ACKed"
 
 
@@ -1026,6 +1029,7 @@ def test_handles_unknown_or_invalid_command_gracefully(
     )
 
     pld = {
+        "globus_username": "a",
         "globus_effective_identity": "a",
         "globus_identity_set": "a",
         "command": cmd_name,
@@ -1042,9 +1046,7 @@ def test_handles_unknown_or_invalid_command_gracefully(
     a = mock_log.error.call_args[0][0]
     assert "Unknown or invalid command" in a
     assert "Globus effective identity: " in a
-    assert "Globus identity set: " in a
     assert str(pld["globus_effective_identity"]) in a
-    assert str(pld["globus_identity_set"]) in a
 
     assert str(cmd_name) in a
     assert em._command.ack.called, "Command always ACKed"
@@ -1069,7 +1071,11 @@ def test_handles_local_user_not_found_gracefully(
         expiration="10000",
     )
 
-    pld = {"globus_effective_identity": "a", "globus_identity_set": "a"}
+    pld = {
+        "globus_username": "a",
+        "globus_effective_identity": "a",
+        "globus_identity_set": "a",
+    }
     queue_item = (1, props, json.dumps(pld).encode())
 
     em._command_queue = mocker.Mock()
@@ -1080,9 +1086,7 @@ def test_handles_local_user_not_found_gracefully(
     assert "Identity mapped to a local user name, but local user does not exist" in a
     assert f"Local user name: {invalid_user_name}" in a
     assert "Globus effective identity: " in a
-    assert "Globus identity set: " in a
     assert str(pld["globus_effective_identity"]) in a
-    assert str(pld["globus_identity_set"]) in a
 
     assert em._command.ack.called, "Command always ACKed"
 
@@ -1107,6 +1111,7 @@ def test_handles_failed_command(mocker, epmanager_as_root):
     )
 
     pld = {
+        "globus_username": "a",
         "globus_effective_identity": "a",
         "globus_identity_set": [],
         "command": "cmd_start_endpoint",
