@@ -71,14 +71,6 @@ def test_mu_config_enforces_no_engine(config_dict_mu):
     assert "no engine if multi-user" in str(pyt_exc), pyt_exc
 
 
-def test_mu_config_requires_identity_mapping(config_dict_mu):
-    del config_dict_mu["identity_mapping_config_path"]
-    with pytest.raises(ValidationError) as pyt_exc:
-        ConfigModel(**config_dict_mu)
-
-    assert "requires identity_mapping_config_path" in str(pyt_exc.value)
-
-
 def test_mu_config_requires_identity_mapping_exists(config_dict_mu, tmp_path):
     config_dict_mu["identity_mapping_config_path"] = tmp_path / "not exists file"
     with pytest.raises(ValidationError) as pyt_exc:

@@ -93,9 +93,10 @@ class EndpointManager:
         config: Config,
         reg_info: dict | None = None,
     ):
-        log.info("Endpoint Manager initialization")
+        log.debug("Endpoint Manager initialization")
 
         self.conf_dir = conf_dir
+        self._config = config
         self._reload_requested = False
         self._time_to_stop = False
         self._kill_event = threading.Event()
@@ -115,14 +116,23 @@ class EndpointManager:
 
         endpoint_uuid = Endpoint.get_endpoint_id(conf_dir) or endpoint_uuid
 
-        if not config.identity_mapping_config_path:
+        self._mu_user = pwd.getpwuid(os.getuid())
+        privileged = is_privileged(self._mu_user)
+
+        self._allow_same_user = not privileged
+        if config.force_mu_allow_same_user:
+            self._allow_same_user = True
+            _warn_str = privileged and "privileged process" or "unprivileged process"
             msg = (
-                "No identity mapping file specified; please specify"
-                " identity_mapping_config_path"
+                "Configuration item `force_mu_allow_same_user` set to `true`; this is"
+                " considered a very dangerous override -- please use with care,"
+                " especially if allowing this endpoint to be utilized by multiple"
+                " users."
+                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()}) {_warn_str}"
             )
-            log.error(msg)
-            print(msg, file=sys.stderr)
-            exit(os.EX_OSFILE)
+            log.warning(msg)
+            if sys.stderr.isatty():
+                print(f"\033[31;1;40m{msg}\033[0m")  # Red bold on black
 
         if not reg_info:
             try:
@@ -172,7 +182,58 @@ class EndpointManager:
             )
             exit(os.EX_SOFTWARE)
 
-        self._endpoint_uuid_str = str(upstream_ep_uuid)
+        endpoint_uuid = str(upstream_ep_uuid)  # convenience
+        self._endpoint_uuid_str = endpoint_uuid
+
+        self.identity_mapper: PosixIdentityMapper | None = None
+        if not is_privileged(user_privs_only=True):
+            # Test for uid-change privileges only because we don't want to enable
+            # identity mapping unless the process UID has specifically these
+            # privileges; else an unrelated permission (e.g., NET_BIND) would
+            # allow identity mapping.
+            if config.identity_mapping_config_path:
+                msg = (
+                    "`identity_mapping_config_path` specified, but process is not"
+                    " privileged (e.g., not `root`) -- identity mapping configuration"
+                    " will be ignored; only requests from identities that match the"
+                    " identity that registered this endpoint will be honored."
+                    f"\n    (ignored) '{config.identity_mapping_config_path}'"
+                )
+                log.warning(msg)
+        else:
+            if not config.identity_mapping_config_path:
+                msg = (
+                    "No identity mapping file specified; please specify"
+                    " identity_mapping_config_path"
+                )
+                log.error(msg)
+                print(msg, file=sys.stderr)
+                exit(os.EX_OSFILE)
+
+            # Only map identities if possibility of *changing* uid; otherwise
+            # we enforce that the identity of UEPs must match the
+            # parent-process' authorization -- we do not want to allow an open
+            # endpoint by a non-power user.
+            try:
+                self.identity_mapper = PosixIdentityMapper(
+                    config.identity_mapping_config_path, self._endpoint_uuid_str
+                )
+
+            except PermissionError as e:
+                msg = f"({type(e).__name__}) {e}"
+                log.error(msg)
+                print(msg, file=sys.stderr)
+                exit(os.EX_NOPERM)
+
+            except Exception as e:
+                msg = (
+                    f"({type(e).__name__}) {e} -- Unable to read identity mapping"
+                    f" configuration from: {config.identity_mapping_config_path}"
+                )
+                log.debug(msg, exc_info=e)
+                log.error(msg)
+                print(msg, file=sys.stderr)
+                exit(os.EX_CONFIG)
 
         try:
             cq_info = reg_info["command_queue_info"]
@@ -189,40 +250,6 @@ class EndpointManager:
             cq_info["connection_url"] = update_url_port(
                 cq_info["connection_url"], config.amqp_port
             )
-
-        self._mu_user = pwd.getpwuid(os.getuid())
-        if config.force_mu_allow_same_user:
-            self._allow_same_user = True
-            log.warning(
-                "Configuration item `force_mu_allow_same_user` set to true; this is"
-                " considered a very dangerous override -- please use with care,"
-                " especially if allowing this endpoint to be utilized by multiple"
-                " users."
-                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()})"
-            )
-        else:
-            self._allow_same_user = not is_privileged(self._mu_user)
-
-        try:
-            self.identity_mapper = PosixIdentityMapper(
-                config.identity_mapping_config_path, self._endpoint_uuid_str
-            )
-
-        except PermissionError as e:
-            msg = f"({type(e).__name__}) {e}"
-            log.error(msg)
-            print(msg, file=sys.stderr)
-            exit(os.EX_NOPERM)
-
-        except Exception as e:
-            msg = (
-                f"({type(e).__name__}) {e} -- Unable to read identity mapping"
-                f" configuration from: {config.identity_mapping_config_path}"
-            )
-            log.debug(msg, exc_info=e)
-            log.error(msg)
-            print(msg, file=sys.stderr)
-            exit(os.EX_CONFIG)
 
         # sanitize passwords in logs
         log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
@@ -408,6 +435,36 @@ class EndpointManager:
     def _event_loop(self):
         self._command.start()
 
+        parent_identities = set()
+        if not is_privileged():
+            client_options = {
+                "funcx_service_address": self._config.funcx_service_address,
+                "environment": self._config.environment,
+            }
+            log.debug("Ascertaining user identity set (%s)", client_options)
+
+            gcc = GC.Client(**client_options)
+            try:
+                userinfo = gcc.login_manager.get_auth_client().userinfo()
+                ids = userinfo["identity_set"]
+                parent_identities.update(ident["sub"] for ident in ids)
+                log.debug(
+                    "User-endpoint start requests are valid from identites: %s",
+                    parent_identities,
+                )
+                del gcc, client_options, ids
+                if not parent_identities:
+                    # Not a privileged user -- we require at least one identity
+                    # against which to match start endpoint requests.
+                    raise LookupError("No authorized identities found")
+
+            except Exception as exc:
+                msg = "Failed to determine identity set; try `whoami` command?"
+                log.error(f"({type(exc).__name__}) {exc}\n    {msg}")
+                log.debug("Stopping; failed to determine identities", exc_info=exc)
+                self._time_to_stop = True
+                return
+
         valid_method_name_re = re.compile(r"^cmd_[A-Za-z][0-9A-Za-z_]{0,99}$")
         max_skew_s = 180  # 3 minutes; ignore commands with out-of-date timestamp
         while not self._time_to_stop:
@@ -445,7 +502,7 @@ class EndpointManager:
                 command_kwargs = msg.get("kwargs", {})
             except Exception as e:
                 log.error(
-                    f"Unable to deserialize Globus Compute services command."
+                    "Unable to deserialize Globus Compute services command."
                     f"  ({e.__class__.__name__}) {e}"
                 )
                 continue
@@ -465,40 +522,60 @@ class EndpointManager:
             try:
                 effective_identity = msg["globus_effective_identity"]
                 identity_set = msg["globus_identity_set"]
+                globus_username = msg["globus_username"]
             except Exception as e:
                 log.error(f"Invalid server command.  ({e.__class__.__name__}) {e}")
                 continue
 
             identity_for_log = (
                 f"\n  Globus effective identity: {effective_identity}"
-                f"\n  Globus identity set: {identity_set}"
+                f"\n  Globus username: {globus_username}"
             )
-            try:
-                local_username = self.identity_mapper.map_identity(identity_set)
-                if not local_username:
-                    raise LookupError()
-            except LookupError as e:
-                log.error(
-                    "Identity failed to map to a local user name."
-                    f"  ({e.__class__.__name__}) {e}{identity_for_log}"
-                )
-                continue
-            except Exception as e:
-                msg = "Unhandled error attempting to map user."
-                log.debug(f"{msg}{identity_for_log}", exc_info=e)
-                log.error(f"{msg}  ({e.__class__.__name__}) {e}{identity_for_log}")
-                continue
 
-            try:
-                local_user_rec = pwd.getpwnam(local_username)
+            local_user_rec = None
+            local_username = None
+            if not self.identity_mapper or parent_identities:
+                # we are not a privileged user, so *only* allow the identity (or
+                # linked identities) of the parent process auth'd to run tasks
 
-            except Exception as e:
-                log.error(
-                    f"({type(e).__name__}) {e}\n"
-                    "  Identity mapped to a local user name, but local user does not"
-                    f" exist.\n  Local user name: {local_username}{identity_for_log}"
-                )
-                continue
+                cmd_identities = {ident["sub"] for ident in identity_set}
+                if not parent_identities.intersection(cmd_identities):
+                    log.error(
+                        "Ignoring start request for untrusted identity."
+                        f"{identity_for_log}"
+                    )
+                    continue
+                local_user_rec = self._mu_user
+                local_username = self._mu_user.pw_name
+
+            else:
+                try:
+                    local_username = self.identity_mapper.map_identity(identity_set)
+                    if not local_username:
+                        raise LookupError()
+                except LookupError as e:
+                    log.error(
+                        "Identity failed to map to a local user name."
+                        f"  ({e.__class__.__name__}) {e}{identity_for_log}"
+                    )
+                    continue
+                except Exception as e:
+                    msg = "Unhandled error attempting to map user."
+                    log.debug(f"{msg}{identity_for_log}", exc_info=e)
+                    log.error(f"{msg}  ({e.__class__.__name__}) {e}{identity_for_log}")
+                    continue
+
+                try:
+                    local_user_rec = pwd.getpwnam(local_username)
+
+                except Exception as e:
+                    log.error(
+                        f"({type(e).__name__}) {e}\n"
+                        "  Identity mapped to a local user name, but local user does"
+                        " not exist."
+                        f"\n  Local user name: {local_username}{identity_for_log}"
+                    )
+                    continue
 
             try:
                 if not (command and valid_method_name_re.match(command)):
@@ -786,6 +863,7 @@ class EndpointManager:
             exit_code += 1  # type: ignore
         except Exception as e:
             log.error(f"Unable to exec for {uname} - ({e.__class__.__name__}) {e}")
+            log.debug(f"Failed to exec for {uname}", exc_info=e)
         finally:
             # Only executed if execvpe fails (or isn't reached)
             exit(exit_code)

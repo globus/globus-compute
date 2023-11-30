@@ -1,5 +1,4 @@
 import fcntl
-import getpass
 import io
 import json
 import os
@@ -51,6 +50,21 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
+
+_mock_rootuser_rec = pwd.struct_passwd(
+    ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
+)
+_mock_localuser_rec = pwd.struct_passwd(
+    (
+        "a_local_user",
+        "",
+        12345,
+        67890,
+        "Mock Regular User",
+        "/usr/home/...",
+        "/bin/false",
+    )
+)
 
 
 @pytest.fixture
@@ -126,19 +140,84 @@ def mock_pim(request):
 
 
 @pytest.fixture
-def epmanager(mocker, conf_dir, mock_conf, mock_client, mock_pim):
+def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
+    mock_os = mocker.patch(f"{_MOCK_BASE}os")
+    mock_os.getuid.return_value = 0
+    mock_os.getgid.return_value = 0
+
+    mock_os.fork.return_value = 0
+    mock_os.pipe.return_value = 40, 41
+    mock_os.dup2.side_effect = [0, 1, 2]
+    mock_os.open.return_value = 4
+
+    mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
+    mock_pwd.getpwnam.side_effect = (
+        _mock_localuser_rec,
+        AssertionError("getpwnam: Test whoops!"),
+    )
+    mock_pwd.getpwuid.side_effect = (
+        _mock_rootuser_rec,
+        _mock_localuser_rec,
+        _mock_localuser_rec,
+        AssertionError("getpwuid: Test whoops!"),
+    )
+
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
+
     ep_uuid, mock_gcc = mock_client
 
     # Needed to mock the pipe buffer size
     mocker.patch.object(fcntl, "fcntl", return_value=512)
     mock_pim.map_identity.return_value = "an_account_that_doesnt_exist_abc123"
 
+    ident = "epmanager_some_identity"
+    _, mock_gcc = mock_client
+    mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
+        "identity_set": [{"sub": ident}]
+    }
+
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     em._command = mocker.Mock()
 
-    yield conf_dir, mock_conf, mock_client, em
-    em.identity_mapper.stop_watching()
+    yield conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em
+    if em.identity_mapper:
+        em.identity_mapper.stop_watching()
     em.request_shutdown(None, None)
+
+
+@pytest.fixture
+def successful_exec_from_mocked_root(mocker, epmanager_as_root, user_conf_template):
+    conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_root
+
+    props = pika.BasicProperties(
+        content_type="application/json",
+        content_encoding="utf-8",
+        timestamp=round(time.time()),
+        expiration="10000",
+    )
+
+    ident = "successful_exec_some_identity"
+    _, mock_gcc = mock_client
+    mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
+        "identity_set": [{"sub": ident}]
+    }
+
+    pld = {
+        "globus_username": "a@example.com",
+        "globus_effective_identity": 1,
+        "globus_identity_set": [ident],
+        "command": "cmd_start_endpoint",
+        "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
+    }
+    queue_item = (1, props, json.dumps(pld).encode())
+
+    em.identity_mapper = mocker.Mock()
+    em.identity_mapper.map_identity.return_value = "typicalglobusname@somehost.org"
+    em._command_queue = mocker.Mock()
+    em._command_stop_event.set()
+    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+
+    yield mock_os, conf_dir, mock_conf, mock_client, mock_pwd, em
 
 
 @pytest.fixture
@@ -164,43 +243,6 @@ def register_endpoint_failure_response(endpoint_uuid: uuid.UUID):
         )
 
     return create_response
-
-
-@pytest.fixture
-def successful_exec(mocker, epmanager, user_conf_template):
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
-    mock_pwnam = mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
-    conf_dir, mock_conf, mock_client, em = epmanager
-
-    mock_os.fork.return_value = 0
-    mock_os.pipe.return_value = 40, 41
-    mock_os.dup2.side_effect = [0, 1, 2]
-    mock_os.open.return_value = 4
-
-    mock_pwnam.return_value = pwd.getpwuid(os.getuid())
-
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
-
-    pld = {
-        "globus_effective_identity": 1,
-        "globus_identity_set": ["a"],
-        "command": "cmd_start_endpoint",
-        "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
-    }
-    queue_item = (1, props, json.dumps(pld).encode())
-
-    em.identity_mapper = mocker.Mock()
-    em.identity_mapper.map_identity.return_value = "typicalglobusname@somehost.org"
-    em._command_queue = mocker.Mock()
-    em._command_stop_event.set()
-    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
-
-    yield mock_os, conf_dir, mock_conf, mock_client, em
 
 
 @pytest.mark.parametrize("env", [None, "blar", "local", "production"])
@@ -410,8 +452,8 @@ def test_handles_invalid_reg_info(
         EndpointManager(conf_dir, ep_uuid, mock_conf)
 
 
-def test_records_user_ep_as_running(successful_exec):
-    mock_os, *_, em = successful_exec
+def test_records_user_ep_as_running(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     mock_os.fork.return_value = 1
 
     em._event_loop()
@@ -420,8 +462,10 @@ def test_records_user_ep_as_running(successful_exec):
     assert uep_rec.ep_name == "some_ep_name"
 
 
-def test_caches_start_cmd_args_if_ep_already_running(successful_exec, mocker):
-    *_, em = successful_exec
+def test_caches_start_cmd_args_if_ep_already_running(
+    successful_exec_from_mocked_root, mocker
+):
+    *_, em = successful_exec_from_mocked_root
     child_pid = random.randrange(1, 32768 + 1)
     mock_uep = mocker.MagicMock()
     mock_uep.ep_name = "some_ep_name"
@@ -433,13 +477,13 @@ def test_caches_start_cmd_args_if_ep_already_running(successful_exec, mocker):
     cached_args = em._cached_cmd_start_args.pop(child_pid)
     assert cached_args is not None
     urec, args, kwargs = cached_args
-    assert urec == pwd.getpwnam(getpass.getuser())
+    assert urec == _mock_localuser_rec
     assert args == []
     assert kwargs == {"name": "some_ep_name", "user_opts": {"heartbeat": 10}}
 
 
-def test_writes_endpoint_uuid(epmanager):
-    conf_dir, _mock_conf, mock_client, _em = epmanager
+def test_writes_endpoint_uuid(epmanager_as_root):
+    conf_dir, _mock_conf, mock_client, *_ = epmanager_as_root
     _ep_uuid, mock_gcc = mock_client
 
     returned_uuid = mock_gcc.register_endpoint.return_value["endpoint_id"]
@@ -451,9 +495,9 @@ def test_writes_endpoint_uuid(epmanager):
     assert ep_data["endpoint_id"] == returned_uuid
 
 
-def test_log_contains_sentinel_lines(mocker, epmanager, noop, reset_signals):
+def test_log_contains_sentinel_lines(mocker, epmanager_as_root, noop, reset_signals):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
 
     mocker.patch(f"{_MOCK_BASE}os")
     em._event_loop = noop
@@ -474,9 +518,9 @@ def test_log_contains_sentinel_lines(mocker, epmanager, noop, reset_signals):
 
 
 def test_title_changes_for_shutdown(
-    mocker, epmanager, noop, mock_setproctitle, reset_signals
+    mocker, epmanager_as_root, noop, mock_setproctitle, reset_signals
 ):
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
     mock_spt, orig_proc_title = mock_setproctitle
 
     em._event_loop = noop
@@ -493,9 +537,9 @@ def test_title_changes_for_shutdown(
 
 
 def test_children_signaled_at_shutdown(
-    mocker, epmanager, randomstring, noop, reset_signals
+    mocker, epmanager_as_root, randomstring, noop, reset_signals
 ):
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
 
     em._event_loop = mocker.Mock()
     em.wait_for_children = noop
@@ -551,16 +595,15 @@ def test_children_signaled_at_shutdown(
         assert killpg_call[0] == exp_args, "Expected SIGTERM, *then* SIGKILL"
 
 
-def test_restarts_running_endpoint_with_cached_args(epmanager, mocker):
-    *_, em = epmanager
+def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mocker):
+    *_, mock_os, _mock_pwd, em = epmanager_as_root
     child_pid = random.randrange(1, 32768 + 1)
     args_tup = (
-        pwd.getpwnam(getpass.getuser()),
+        _mock_localuser_rec,
         [],
         {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
     )
 
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.waitpid.side_effect = [(child_pid, -1), (0, -1)]
     mock_os.waitstatus_to_exitcode.return_value = 0
 
@@ -575,8 +618,8 @@ def test_restarts_running_endpoint_with_cached_args(epmanager, mocker):
     assert em.cmd_start_endpoint.call_args.args == args_tup
 
 
-def test_no_cached_args_means_no_restart(epmanager, mocker):
-    *_, em = epmanager
+def test_no_cached_args_means_no_restart(epmanager_as_root, mocker):
+    *_, em = epmanager_as_root
     child_pid = random.randrange(1, 32768 + 1)
 
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
@@ -592,9 +635,9 @@ def test_no_cached_args_means_no_restart(epmanager, mocker):
     assert not em.cmd_start_endpoint.called
 
 
-def test_emits_endpoint_id_if_isatty(mocker, epmanager):
+def test_emits_endpoint_id_if_isatty(mocker, epmanager_as_root):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    *_, em = epmanager
+    *_, em = epmanager_as_root
 
     mocker.patch.object(em, "_install_signal_handlers", side_effect=Exception)
 
@@ -641,11 +684,14 @@ def test_emits_endpoint_id_if_isatty(mocker, epmanager):
     assert not mock_sys.stderr.write.called
 
 
-def test_fails_to_start_if_no_identity_mapper_configuration(mocker, conf_dir):
+def test_as_root_and_no_identity_mapper_configuration_fails(
+    mocker, mock_client, conf_dir
+):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
 
-    ep_uuid = str(uuid.uuid1())
+    ep_uuid, _ = mock_client
     with pytest.raises(SystemExit) as pyt_exc:
         EndpointManager(conf_dir, ep_uuid, Config())
 
@@ -657,10 +703,92 @@ def test_fails_to_start_if_no_identity_mapper_configuration(mocker, conf_dir):
         assert "identity_mapping_config_path" in a, "Expected required config item"
 
 
+def test_no_identity_mapper_if_unprivileged(mocker, conf_dir, mock_conf, mock_client):
+    mock_privilege = mocker.patch(f"{_MOCK_BASE}is_privileged")
+    mock_privilege.return_value = True
+
+    em = EndpointManager(conf_dir, None, mock_conf)
+    assert em.identity_mapper is not None
+    em.identity_mapper.stop_watching()
+
+    mock_privilege.return_value = False
+    em = EndpointManager(conf_dir, None, mock_conf)
+    assert em.identity_mapper is None
+
+
+def test_unprivileged_warns_if_identity_conf_specified(
+    mocker, conf_dir, mock_conf, mock_client
+):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
+
+    em = EndpointManager(conf_dir, None, mock_conf)
+    assert em.identity_mapper is None
+
+    a, _ = mock_log.warning.call_args
+    assert "specified, but process is not privileged" in a[0]
+    assert "identity mapping configuration will be ignored" in a[0]
+
+    mock_log.reset_mock()
+    mock_conf.identity_mapping_config_path = None
+
+    em = EndpointManager(conf_dir, None, mock_conf)
+    assert em.identity_mapper is None
+    assert not mock_log.warning.called
+
+
+def test_quits_if_not_privileged_and_no_identity_set(
+    mocker, mock_client, epmanager_as_root
+):
+    *_, em = epmanager_as_root
+    ep_uuid, mock_gcc = mock_client
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
+        "identity_set": []
+    }
+    assert em._time_to_stop is False, "Verify test setup"
+    em._event_loop()
+
+    assert em._time_to_stop
+    a, _ = mock_log.error.call_args
+    assert "Failed to determine identity set" in a[0]
+    assert "try `whoami` command" in a[0], "Expected suggested action"
+
+
+def test_clean_exit_on_identity_collection_error(
+    mocker, mock_client, epmanager_as_root
+):
+    *_, em = epmanager_as_root
+    ep_uuid, mock_gcc = mock_client
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
+        "not_identity_set": None
+    }
+    assert em._time_to_stop is False, "Verify test setup"
+    em._event_loop()
+
+    # handle potential Python version differences
+    ke = KeyError("identity_set")
+    expected_exc_text = f"({type(ke).__name__}) {ke}"
+
+    assert em._time_to_stop
+    a, _ = mock_log.error.call_args
+    assert expected_exc_text in a[0]
+    assert "Failed to determine identity set" in a[0]
+    assert "try `whoami` command" in a[0], "Expected suggested action"
+
+    a, k = mock_log.debug.call_args
+    assert "failed to determine identities" in a[0]
+    assert "exc_info" in k
+
+
 @pytest.mark.no_mock_pim
-def test_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf_dir):
+def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf_dir):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
 
     ep_uuid = str(uuid.uuid1())
     reg_info = {
@@ -691,9 +819,8 @@ def test_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf_dir):
         assert "Unable to read identity mapping" in a
 
 
-def test_iterates_even_if_no_commands(mocker, epmanager):
-    conf_dir, mock_conf, mock_client, em = epmanager
-    mocker.patch(f"{_MOCK_BASE}log")  # silence logs
+def test_iterates_even_if_no_commands(mocker, epmanager_as_root):
+    *_, em = epmanager_as_root
 
     em._command_stop_event.set()
     em._event_loop()  # subtest is that it iterates and doesn't block
@@ -706,9 +833,9 @@ def test_iterates_even_if_no_commands(mocker, epmanager):
     assert em._command_queue.get.called
 
 
-def test_emits_command_requested_debug(mocker, epmanager):
+def test_emits_command_requested_debug(mocker, epmanager_as_root):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
@@ -744,9 +871,11 @@ def test_emits_command_requested_debug(mocker, epmanager):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_emitted_debug_command_credentials_removed(mocker, epmanager, randomstring):
+def test_emitted_debug_command_credentials_removed(
+    mocker, epmanager_as_root, randomstring
+):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
@@ -774,9 +903,9 @@ def test_emitted_debug_command_credentials_removed(mocker, epmanager, randomstri
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_command_verifies_content_type(mocker, epmanager):
+def test_command_verifies_content_type(mocker, epmanager_as_root):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
@@ -797,9 +926,9 @@ def test_command_verifies_content_type(mocker, epmanager):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_ignores_stale_commands(mocker, epmanager):
+def test_ignores_stale_commands(mocker, epmanager_as_root):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
@@ -822,9 +951,9 @@ def test_ignores_stale_commands(mocker, epmanager):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_handles_invalid_server_msg_gracefully(mocker, epmanager):
+def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
 
     props = pika.BasicProperties(
         content_type="application/json",
@@ -845,9 +974,10 @@ def test_handles_invalid_server_msg_gracefully(mocker, epmanager):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_handles_unknown_identity_gracefully(mocker, epmanager):
+def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root):
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
 
     props = pika.BasicProperties(
         content_type="application/json",
@@ -856,30 +986,36 @@ def test_handles_unknown_identity_gracefully(mocker, epmanager):
         expiration="10000",
     )
 
-    pld = {"globus_effective_identity": 1, "globus_identity_set": []}
+    pld = {
+        "globus_username": "a",
+        "globus_effective_identity": 1,
+        "globus_identity_set": [],
+    }
     queue_item = (1, props, json.dumps(pld).encode())
     em.identity_mapper.map_identity.return_value = None
 
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+
     em._event_loop()
     a = mock_log.error.call_args[0][0]
     assert "Identity failed to map to a local user name" in a
     assert "(LookupError)" in a, "Expected exception name in log line"
     assert "Globus effective identity: " in a
-    assert "Globus identity set: " in a
     assert str(pld["globus_effective_identity"]) in a
-    assert str(pld["globus_identity_set"]) in a
     assert em._command.ack.called, "Command always ACKed"
 
 
 @pytest.mark.parametrize(
     "cmd_name", ("", "_private", "9c", "valid_but_do_not_exist", " ", "a" * 101)
 )
-def test_handles_unknown_or_invalid_command_gracefully(mocker, epmanager, cmd_name):
+def test_handles_unknown_or_invalid_command_gracefully(
+    mocker, epmanager_as_root, cmd_name
+):
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
 
     mocker.patch(f"{_MOCK_BASE}pwd")
     em.identity_mapper = mocker.Mock()
@@ -893,6 +1029,7 @@ def test_handles_unknown_or_invalid_command_gracefully(mocker, epmanager, cmd_na
     )
 
     pld = {
+        "globus_username": "a",
         "globus_effective_identity": "a",
         "globus_identity_set": "a",
         "command": cmd_name,
@@ -909,20 +1046,23 @@ def test_handles_unknown_or_invalid_command_gracefully(mocker, epmanager, cmd_na
     a = mock_log.error.call_args[0][0]
     assert "Unknown or invalid command" in a
     assert "Globus effective identity: " in a
-    assert "Globus identity set: " in a
     assert str(pld["globus_effective_identity"]) in a
-    assert str(pld["globus_identity_set"]) in a
 
     assert str(cmd_name) in a
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_handles_local_user_not_found_gracefully(mocker, epmanager, randomstring):
-    invalid_user_name = "username_that_is_not_on_localhost6_" + randomstring()
+def test_handles_local_user_not_found_gracefully(
+    mocker, epmanager_as_root, randomstring
+):
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, mock_pwd, em = epmanager_as_root
+
+    invalid_user_name = "username_that_is_not_on_localhost6_" + randomstring()
     em.identity_mapper = mocker.Mock()
     em.identity_mapper.map_identity.return_value = invalid_user_name
+    mock_pwd.getpwnam.side_effect = KeyError(invalid_user_name)
 
     props = pika.BasicProperties(
         content_type="application/json",
@@ -931,7 +1071,11 @@ def test_handles_local_user_not_found_gracefully(mocker, epmanager, randomstring
         expiration="10000",
     )
 
-    pld = {"globus_effective_identity": "a", "globus_identity_set": "a"}
+    pld = {
+        "globus_username": "a",
+        "globus_effective_identity": "a",
+        "globus_identity_set": "a",
+    }
     queue_item = (1, props, json.dumps(pld).encode())
 
     em._command_queue = mocker.Mock()
@@ -942,19 +1086,18 @@ def test_handles_local_user_not_found_gracefully(mocker, epmanager, randomstring
     assert "Identity mapped to a local user name, but local user does not exist" in a
     assert f"Local user name: {invalid_user_name}" in a
     assert "Globus effective identity: " in a
-    assert "Globus identity set: " in a
     assert str(pld["globus_effective_identity"]) in a
-    assert str(pld["globus_identity_set"]) in a
 
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_handles_failed_command(mocker, epmanager):
+def test_handles_failed_command(mocker, epmanager_as_root):
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(
         f"{_MOCK_BASE}EndpointManager.cmd_start_endpoint", side_effect=Exception()
     )
-    conf_dir, mock_conf, mock_client, em = epmanager
+    *_, em = epmanager_as_root
 
     mocker.patch(f"{_MOCK_BASE}pwd")
     em.identity_mapper = mocker.Mock()
@@ -968,6 +1111,7 @@ def test_handles_failed_command(mocker, epmanager):
     )
 
     pld = {
+        "globus_username": "a",
         "globus_effective_identity": "a",
         "globus_identity_set": [],
         "command": "cmd_start_endpoint",
@@ -990,8 +1134,8 @@ def test_handles_failed_command(mocker, epmanager):
 
 
 @pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGINT, signal.SIGQUIT])
-def test_handles_shutdown_signal(successful_exec, sig, reset_signals):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_handles_shutdown_signal(successful_exec_from_mocked_root, sig, reset_signals):
+    mock_os, *_, em = successful_exec_from_mocked_root
 
     with mock.patch.object(em, "_install_signal_handlers") as mock_install:
         mock_install.side_effect = Exception()
@@ -1008,8 +1152,8 @@ def test_handles_shutdown_signal(successful_exec, sig, reset_signals):
     assert not em._command_queue.get.called, " ... that we've now confirmed works"
 
 
-def test_environment_default_path(successful_exec):
-    mock_os, *_, em = successful_exec
+def test_environment_default_path(mocker, successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
@@ -1024,8 +1168,8 @@ def test_environment_default_path(successful_exec):
         assert expected_dir == found_dir, "Expected sane default path order"
 
 
-def test_loads_user_environment(successful_exec, randomstring):
-    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_loads_user_environment(successful_exec_from_mocked_root, randomstring):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
 
     sentinel_key = randomstring()
     expected_env = {sentinel_key: randomstring()}
@@ -1040,8 +1184,10 @@ def test_loads_user_environment(successful_exec, randomstring):
     assert env[sentinel_key] == expected_env[sentinel_key]
 
 
-def test_handles_invalid_user_environment_file_gracefully(successful_exec, mocker):
-    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_handles_invalid_user_environment_file_gracefully(
+    successful_exec_from_mocked_root, mocker
+):
+    _mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
     mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
 
     env_path = conf_dir / "user_environment.yaml"
@@ -1055,8 +1201,10 @@ def test_handles_invalid_user_environment_file_gracefully(successful_exec, mocke
     assert "ScannerError" in a, "Expected exception name in warning"
 
 
-def test_environment_default_path_set_if_not_specified(successful_exec):
-    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_environment_default_path_set_if_not_specified(
+    successful_exec_from_mocked_root,
+):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
 
     expected_env = {"some_env_var": "some value"}
     (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
@@ -1069,8 +1217,8 @@ def test_environment_default_path_set_if_not_specified(successful_exec):
     assert "PATH" in env, "Expected PATH is always set"
 
 
-def test_warns_if_executable_not_found(successful_exec, mocker):
-    mock_os, conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_warns_if_executable_not_found(successful_exec_from_mocked_root, mocker):
+    _mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
     mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
 
     expected_env = {"PATH": "/some/typoed:/path:/here"}
@@ -1086,8 +1234,8 @@ def test_warns_if_executable_not_found(successful_exec, mocker):
     assert expected_env["PATH"] in a[0]
 
 
-def test_start_endpoint_children_die_with_parent(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_start_endpoint_children_die_with_parent(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
@@ -1095,11 +1243,11 @@ def test_start_endpoint_children_die_with_parent(successful_exec):
     a, k = mock_os.execvpe.call_args
     assert a[0] == "globus-compute-endpoint", "Sanity check"
     assert k["args"][0] == a[0], "Expect transparency for admin"
-    assert k["args"][-1] == "--die-with-parent"  # trust flag to do the hard work
+    assert any("--die-with-parent" == i for i in k["args"]), "trust flag does the work"
 
 
-def test_start_endpoint_children_have_own_session(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_start_endpoint_children_have_own_session(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
@@ -1107,16 +1255,16 @@ def test_start_endpoint_children_have_own_session(successful_exec):
     assert mock_os.setsid.called
 
 
-def test_start_endpoint_privileges_dropped(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_start_endpoint_privileges_dropped(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
     assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
 
-    expected_user = getpass.getuser()
-    expected_gid = os.getgid()  # "cheating"; exploit knowledge of test setup
-    expected_uid = os.getuid()  # "cheating"; exploit knowledge of test setup
+    expected_user = _mock_localuser_rec.pw_name
+    expected_gid = _mock_localuser_rec.pw_gid
+    expected_uid = _mock_localuser_rec.pw_uid
     assert mock_os.initgroups.called
     (uname, gid), _ = mock_os.initgroups.call_args
     assert uname == expected_user
@@ -1179,15 +1327,18 @@ def test_run_as_same_user_enabled_if_not_admin(
     assert em._allow_same_user is True, "If not privileged, can only runas same user"
 
 
+@pytest.mark.parametrize("isatty", (True, False))
 def test_run_as_same_user_forced_warns(
-    mocker, conf_dir, mock_conf, mock_client, randomstring
+    mocker, isatty, conf_dir, mock_conf, mock_client, randomstring
 ):
     # spot-check a couple of capabilities: if set, then same user is *disallowed*
     ep_uuid, mock_gcc = mock_client
 
     mocker.patch(f"{_MOCK_BASE}pwd")
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
+    mock_os.stderr.isatty.return_value = isatty
     mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
+    mocker.patch(f"{_MOCK_BASE}print")
 
     _test_mock_base = "globus_compute_endpoint.endpoint.utils."
     mocker.patch(f"{_test_mock_base}_pwd")
@@ -1196,41 +1347,53 @@ def test_run_as_same_user_forced_warns(
     mock_prctl.CapState.get_current.return_value.effective = {pyprctl.Cap.SYS_ADMIN}
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     assert em._allow_same_user is False, "Verify test setup"
-    assert not mock_warn.called, "Verify test setup"
+    assert not any(
+        "force_mu_allow_same_user" in a[0] for a, _ in mock_warn.call_args_list
+    ), "Verify test setup"
 
     mock_uid, mock_gid = randomstring(), randomstring()
     mock_os.getuid.return_value = mock_uid
     mock_os.getgid.return_value = mock_gid
     mock_conf.force_mu_allow_same_user = True
+    mock_warn.reset_mock()
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     assert em._allow_same_user is True
     assert mock_warn.called
 
     a, _k = mock_warn.call_args
-    assert "`force_mu_allow_same_user` set to true" in a[0]
-    assert "very dangerous override" in a[0]
-    assert "Endpoint (UID, GID):" in a[0], "Expect process UID, GID in warning"
-    assert f"({mock_uid}, {mock_gid})" in a[0], "Expect process UID, GID in warning"
+    a = next(
+        a[0] for a, _ in mock_warn.call_args_list if "force_mu_allow_same_user" in a[0]
+    )
+    assert "`force_mu_allow_same_user` set to `true`" in a
+    assert "very dangerous override" in a
+    assert "Endpoint (UID, GID):" in a, "Expect process UID, GID in warning"
+    assert f"({mock_uid}, {mock_gid})" in a, "Expect process UID, GID in warning"
+    if isatty:
+        a = next(a[0] for a, _ in mock_warn.call_args_list if "dangerous" in a[0])
+        assert a is not None, "Superfluous assert: ensure warning printed for human eye"
+        assert "`force_mu_allow_same_user` set to `true`" in a
+        assert "very dangerous override" in a
+        assert "Endpoint (UID, GID):" in a, "Expect process UID, GID in warning"
+        assert f"({mock_uid}, {mock_gid})" in a, "Expect process UID, GID in warning"
 
 
-def test_run_as_same_user_fails_if_admin(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_run_as_same_user_fails_if_admin(successful_exec_from_mocked_root):
+    *_, em = successful_exec_from_mocked_root
 
-    pw_rec = pwd.getpwuid(os.getuid())
-    em._allow_same_user = False
+    em._allow_same_user = False  # just to be explicit
     kwargs = {"name": "some_endpoint_name"}
     with pytest.raises(InvalidUserError) as pyexc:
-        em.cmd_start_endpoint(pw_rec, None, kwargs)
+        em.cmd_start_endpoint(em._mu_user, None, kwargs)
 
     assert "UID is same as" in str(pyexc.value)
     assert "using a non-root user" in str(pyexc.value), "Expected suggested fix"
     assert "removing privileges" in str(pyexc.value), "Expected suggested fix"
 
 
-def test_run_as_same_user_does_not_change_uid(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
-    mock_os.getuid.return_value = os.getuid()
-    mock_os.getgid.return_value = os.getgid()
+def test_run_as_same_user_does_not_change_uid(successful_exec_from_mocked_root):
+    mock_os, *_, mock_pwd, em = successful_exec_from_mocked_root
+    mock_pwd.getpwnam.return_value = em._mu_user
+    mock_pwd.getpwnam.side_effect = None
 
     em._allow_same_user = True
     with pytest.raises(SystemExit) as pyexc:
@@ -1243,8 +1406,8 @@ def test_run_as_same_user_does_not_change_uid(successful_exec):
     assert not mock_os.setresgid.called
 
 
-def test_default_to_secure_umask(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_default_to_secure_umask(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
@@ -1255,19 +1418,20 @@ def test_default_to_secure_umask(successful_exec):
     assert umask == 0o77
 
 
-def test_start_from_user_dir(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_start_from_user_dir(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
     assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
 
-    ud = mock_os.chdir.call_args[0][0]
-    assert ud == str(pathlib.Path.home())  # "cheating"; exploit knowledge of test setup
+    udir = mock_os.chdir.call_args[0][0]
+    expected_udir = _mock_localuser_rec.pw_dir
+    assert udir == expected_udir
 
 
-def test_all_files_closed(successful_exec):
-    mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_all_files_closed(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
@@ -1286,8 +1450,8 @@ def test_all_files_closed(successful_exec):
 
 
 @pytest.mark.parametrize("conf_size", [10, 222, 223, 300])
-def test_pipe_size_limit(mocker, successful_exec, conf_size):
-    _mock_os, _conf_dir, _mock_conf, _mock_client, em = successful_exec
+def test_pipe_size_limit(mocker, successful_exec_from_mocked_root, conf_size):
+    *_, em = successful_exec_from_mocked_root
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
     conf_str = "$" * conf_size
@@ -1334,11 +1498,11 @@ def test_render_user_config(data):
             assert "Missing required" in str(e)
 
 
-def test_able_to_render_user_config_sc28360(successful_exec, conf_dir):
+def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, conf_dir):
     def _remove_user_config_template(*args, **kwargs):
         shutil.rmtree(conf_dir)
 
-    mock_os, *_, em = successful_exec
+    mock_os, *_, em = successful_exec_from_mocked_root
 
     # simulate no-permission-access to root-owned directory by removing entire dir
     mock_os.setresuid.side_effect = _remove_user_config_template
