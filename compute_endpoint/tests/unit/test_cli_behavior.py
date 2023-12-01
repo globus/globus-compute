@@ -18,6 +18,7 @@ from globus_compute_endpoint.cli import app, init_config_dir
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.web_client import WebClient
 from pyfakefs import fake_filesystem as fakefs
 from pytest_mock import MockFixture
@@ -425,6 +426,19 @@ def test_delete_endpoint(read_config, run_line, mock_cli_state, ep_name):
     run_line(f"delete {ep_name} --yes")
     mock_ep, _ = mock_cli_state
     mock_ep.delete_endpoint.assert_called_once()
+
+
+@mock.patch("globus_compute_endpoint.endpoint.endpoint.Endpoint.get_funcx_client")
+def test_delete_endpoint_with_malformed_config_sc28515(
+    mock_func, fs, run_line, ep_name
+):
+    compute_dir = ensure_compute_dir()
+    conf_dir = compute_dir / ep_name
+    conf_dir.mkdir()
+    (conf_dir / "config.yaml").write_text("Gobble ty: gook\nnonsense: 1")
+    assert conf_dir.exists() and conf_dir.is_dir()
+    run_line(f"delete {ep_name} --yes --force")
+    assert not conf_dir.exists()
 
 
 @pytest.mark.parametrize("die_with_parent", [True, False])

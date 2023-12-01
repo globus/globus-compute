@@ -593,13 +593,26 @@ def list_endpoints():
 @handle_auth_errors
 def delete_endpoint(*, ep_dir: pathlib.Path, force: bool, yes: bool):
     """Deletes an endpoint and its config."""
+
+    ep_conf = None
+    try:
+        ep_conf = get_config(ep_dir)
+    except Exception as e:
+        print(f"({type(e).__name__}) {e}\n")
+        if not yes:
+            yes = click.confirm(
+                f"Failed to read configuration from {ep_dir}/\n"
+                f"  Are you sure you want to delete endpoint <{ep_dir.name}>?",
+                abort=True,
+            )
+
     if not yes:
-        click.confirm(
-            f"Are you sure you want to delete the endpoint named <{ep_dir.name}>?",
+        yes = click.confirm(
+            f"Are you sure you want to delete endpoint <{ep_dir.name}>?",
             abort=True,
         )
 
-    Endpoint.delete_endpoint(ep_dir, get_config(ep_dir), force=force)
+    Endpoint.delete_endpoint(ep_dir, ep_conf, force=force)
 
 
 @app.command("self-diagnostic")
