@@ -24,6 +24,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self,
         *args,
         label: str = "GlobusComputeEngine",
+        max_retries_on_system_failure: int = 0,
         strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         executor: t.Optional[HighThroughputExecutor] = None,
         **kwargs,
@@ -31,12 +32,16 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.run_dir = os.getcwd()
         self.label = label
         self._status_report_thread = ReportingThread(target=self.report_status, args=[])
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            *args, max_retries_on_system_failure=max_retries_on_system_failure, **kwargs
+        )
         self.strategy = strategy
         self.max_workers_per_node = 1
         if executor is None:
             executor = HighThroughputExecutor(  # type: ignore
-                *args, label=label, **kwargs
+                *args,
+                label=label,
+                **kwargs,
             )
         self.executor = executor
 
@@ -212,6 +217,26 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     def scale_in(self, blocks: int):
         logger.info(f"Scaling in {blocks} blocks")
         return self.executor.scale_in(blocks=blocks)
+
+    def _handle_task_exception(
+        self,
+        task_id: str,
+        execution_begin: TaskTransition,
+        exception: BaseException,
+    ) -> bytes:
+        result_bytes = b""
+        retry_info = self._retry_table[task_id]
+        if retry_info["retry_count"] < self.max_retries_on_system_failure:
+            retry_info["retry_count"] += 1
+            retry_info["exception_history"].append(exception)
+            self.submit(task_id, retry_info["packed_task"])
+        else:
+            # This is a terminal state
+            result_bytes = super()._handle_task_exception(
+                task_id=task_id, execution_begin=execution_begin, exception=exception
+            )
+
+        return result_bytes
 
     @property
     def scaling_enabled(self) -> bool:
