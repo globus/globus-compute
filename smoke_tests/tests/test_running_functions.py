@@ -96,7 +96,7 @@ def test_executor(compute_client, endpoint, tutorial_function_id):
     num_tasks = 10
     submit_count = 2  # we've had at least one bug that prevented executor re-use
 
-    with Executor(endpoint_id=endpoint, funcx_client=compute_client) as gce:
+    with Executor(endpoint_id=endpoint, client=compute_client) as gce:
         for _ in range(submit_count):
             futures = [
                 gce.submit_to_registered_function(tutorial_function_id)

@@ -16,7 +16,7 @@ from tests.utils import try_assert
 def test_resultwatcher_graceful_shutdown():
     service_url = os.environ["COMPUTE_INTEGRATION_TEST_WEB_URL"]
     gcc = Client(funcx_service_address=service_url)
-    gce = Executor(funcx_client=gcc)
+    gce = Executor(client=gcc)
     rw = _ResultWatcher(gce)
     rw._start_consuming = mock.Mock()
     rw.start()
@@ -38,12 +38,12 @@ def test_executor_atexit_handler_catches_all_instances(tmp_path):
         from globus_compute_sdk import Executor
         from globus_compute_sdk.sdk.executor import _REGISTERED_FXEXECUTORS
 
-        gcc = " a fake funcx_client"
+        gcc = " a fake client"
         num_executors = random.randrange(1, 10)
         for i in range(num_executors):
-            Executor(funcx_client=gcc)  # start N threads, none shutdown
-        gce = Executor(funcx_client=gcc)  # intentionally overwritten
-        gce = Executor(funcx_client=gcc)
+            Executor(client=gcc)  # start N threads, none shutdown
+        gce = Executor(client=gcc)  # intentionally overwritten
+        gce = Executor(client=gcc)
 
         num_executors += 2
         assert len(_REGISTERED_FXEXECUTORS) == num_executors, (

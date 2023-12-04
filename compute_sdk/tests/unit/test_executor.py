@@ -36,7 +36,7 @@ def noop():
 
 class MockedExecutor(Executor):
     def __init__(self, *args, **kwargs):
-        kwargs.update({"funcx_client": mock.Mock(spec=Client)})
+        kwargs.update({"client": mock.Mock(spec=Client)})
         super().__init__(*args, **kwargs)
         self._test_paused = threading.Event()
         self._time_to_stop_mock = threading.Event()
@@ -76,7 +76,7 @@ class MockedResultWatcher(_ResultWatcher):
 @pytest.fixture
 def gc_executor(mocker):
     gcc = mock.MagicMock()
-    gce = Executor(funcx_client=gcc)
+    gce = Executor(client=gcc)
     watcher = mocker.patch(f"{_MOCK_BASE}_ResultWatcher", autospec=True)
 
     def create_mock_watcher(*args, **kwargs):
@@ -136,10 +136,10 @@ def test_task_submission_info_stringification(tg_id, fn_id, ep_id, uep_config):
 def test_deprecated_args_warned(argname, mocker):
     mock_warn = mocker.patch(f"{_MOCK_BASE}warnings")
     gcc = mock.Mock(spec=Client)
-    Executor(funcx_client=gcc).shutdown()
+    Executor(client=gcc).shutdown()
     mock_warn.warn.assert_not_called()
 
-    Executor(funcx_client=gcc, **{argname: 1}).shutdown()
+    Executor(client=gcc, **{argname: 1}).shutdown()
     mock_warn.warn.assert_called()
 
 
@@ -645,7 +645,7 @@ def test_task_submitter_stops_executor_on_upstream_error_response(randomstring):
     gce = MockedExecutor()
 
     upstream_error = Exception(f"Upstream error {randomstring}!!")
-    gce.funcx_client.batch_run.side_effect = upstream_error
+    gce.client.batch_run.side_effect = upstream_error
     gce.task_group_id = uuid.uuid4()
     tsi = _TaskSubmissionInfo(
         task_num=12345,
@@ -931,7 +931,7 @@ def test_resultwatcher_match_sets_exception(randomstring):
     res = Result(task_id=fut.task_id, error_details=err_details, data=payload)
 
     mrw = MockedResultWatcher(mock.Mock())
-    mrw.funcx_executor.funcx_client.fx_serializer.deserialize = fxs.deserialize
+    mrw.funcx_executor.client.fx_serializer.deserialize = fxs.deserialize
     mrw._received_results[fut.task_id] = (mock.Mock(timestamp=5), res)
     mrw.watch_for_task_results([fut])
     mrw.start()
@@ -949,7 +949,7 @@ def test_resultwatcher_match_sets_result(randomstring):
     res = Result(task_id=fut.task_id, data=fxs.serialize(payload))
 
     mrw = MockedResultWatcher(mock.Mock())
-    mrw.funcx_executor.funcx_client.fx_serializer.deserialize = fxs.deserialize
+    mrw.funcx_executor.client.fx_serializer.deserialize = fxs.deserialize
     mrw._received_results[fut.task_id] = (None, res)
     mrw.watch_for_task_results([fut])
     mrw.start()
@@ -966,7 +966,7 @@ def test_resultwatcher_match_handles_deserialization_error():
     res = Result(task_id=fut.task_id, data=invalid_payload)
 
     mrw = MockedResultWatcher(mock.Mock())
-    mrw.funcx_executor.funcx_client.fx_serializer.deserialize = fxs.deserialize
+    mrw.funcx_executor.client.fx_serializer.deserialize = fxs.deserialize
     mrw._received_results[fut.task_id] = (None, res)
     mrw.watch_for_task_results([fut])
     mrw.start()
