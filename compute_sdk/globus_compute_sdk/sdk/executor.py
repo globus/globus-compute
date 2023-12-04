@@ -115,20 +115,20 @@ class Executor(concurrent.futures.Executor):
         self,
         endpoint_id: UUID_LIKE_T | None = None,
         container_id: UUID_LIKE_T | None = None,
-        funcx_client: Client | None = None,
+        client: Client | None = None,
         task_group_id: UUID_LIKE_T | None = None,
         user_endpoint_config: dict[str, t.Any] | None = None,
         label: str = "",
         batch_size: int = 128,
+        funcx_client: Client | None = None,
         amqp_port: int | None = None,
         **kwargs,
     ):
         """
         :param endpoint_id: id of the endpoint to which to submit tasks
         :param container_id: id of the container in which to execute tasks
-        :param funcx_client: instance of Client to be used by the
-            executor.  If not provided, the executor will instantiate one with default
-            arguments.
+        :param client: instance of Client to be used by the executor.  If not provided,
+            the executor will instantiate one with default arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
             one will be instantiated.
         :param user_endpoint_config: User endpoint configuration values as described
@@ -138,6 +138,7 @@ class Executor(concurrent.futures.Executor):
             logging and advanced needs with multiple executors.
         :param batch_size: the maximum number of tasks to coalesce before
             sending upstream [min: 1, default: 128]
+        :param funcx_client: [DEPRECATED] alias for client.
         :param batch_interval: [DEPRECATED; unused] number of seconds to coalesce tasks
             before submitting upstream
         :param batch_enabled: [DEPRECATED; unused] whether to batch results
@@ -148,16 +149,24 @@ class Executor(concurrent.futures.Executor):
         for key in kwargs:
             if key in deprecated_kwargs:
                 warnings.warn(
-                    f"`{key}` is not utilized and will be removed in a future release",
+                    f"'{key}' is not utilized and will be removed in a future release",
                     DeprecationWarning,
                 )
                 continue
             msg = f"'{key}' is an invalid argument for {self.__class__.__name__}"
             raise TypeError(msg)
 
-        if not funcx_client:
-            funcx_client = Client()
-        self.funcx_client = funcx_client
+        if funcx_client:
+            warnings.warn(
+                "'funcx_client' is superseded by 'client'"
+                " and will be removed in a future release",
+                DeprecationWarning,
+            )
+
+        if not client:
+            client = funcx_client if funcx_client else Client()
+
+        self.client = client
 
         self.endpoint_id = endpoint_id
 
@@ -380,7 +389,7 @@ class Executor(concurrent.futures.Executor):
         reg_kwargs.update(func_register_kwargs)
 
         try:
-            func_reg_id = self.funcx_client.register_function(fn, **reg_kwargs)
+            func_reg_id = self.client.register_function(fn, **reg_kwargs)
         except Exception:
             log.error(f"Unable to register function: {fn.__name__}")
             self.shutdown(wait=False, cancel_futures=True)
@@ -579,7 +588,7 @@ class Executor(concurrent.futures.Executor):
         assert task_group_id is not None  # mypy: we _just_ proved this
 
         # step 2: from server, acquire list of related task ids and make futures
-        r = self.funcx_client.web_client.get_taskgroup_tasks(task_group_id)
+        r = self.client.web_client.get_taskgroup_tasks(task_group_id)
         if r["taskgroup_id"] != str(task_group_id):
             msg = (
                 "Server did not respond with requested TaskGroup Tasks.  "
@@ -595,7 +604,7 @@ class Executor(concurrent.futures.Executor):
         if task_ids:
             # Complete the futures that already have results.
             pending: list[ComputeFuture] = []
-            deserialize = self.funcx_client.fx_serializer.deserialize
+            deserialize = self.client.fx_serializer.deserialize
             chunk_size = 1024
             num_chunks = len(task_ids) // chunk_size + 1
             for chunk_no, id_chunk in enumerate(
@@ -611,7 +620,7 @@ class Executor(concurrent.futures.Executor):
                         len(id_chunk),
                     )
 
-                res = self.funcx_client.web_client.get_batch_status(id_chunk)
+                res = self.client.web_client.get_batch_status(id_chunk)
                 for task_id, task in res.data.get("results", {}).items():
                     fut = ComputeFuture(task_id)
                     futures.append(fut)
@@ -850,7 +859,7 @@ class Executor(concurrent.futures.Executor):
         if taskgroup_uuid is None and self.task_group_id:
             taskgroup_uuid = self.task_group_id
 
-        batch = self.funcx_client.create_batch(
+        batch = self.client.create_batch(
             taskgroup_uuid, user_endpoint_config, create_websocket_queue=True
         )
         submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
@@ -863,7 +872,7 @@ class Executor(concurrent.futures.Executor):
             log.debug("Added task to Globus Compute batch: %s", task)
 
         try:
-            batch_response = self.funcx_client.batch_run(endpoint_uuid, batch)
+            batch_response = self.client.batch_run(endpoint_uuid, batch)
         except Exception as e:
             log.exception(f"Error submitting {len(tasks)} tasks to Globus Compute")
             for fut_list in submitted_futs_by_fn.values():
@@ -1163,7 +1172,7 @@ class _ResultWatcher(threading.Thread):
         This method will set the _open_futures_empty event if there are no open
         futures *at the time of processing*.
         """
-        deserialize = self.funcx_executor.funcx_client.fx_serializer.deserialize
+        deserialize = self.funcx_executor.client.fx_serializer.deserialize
         with self._new_futures_lock:
             futures_to_complete = [
                 self._open_futures.pop(tid)
@@ -1290,7 +1299,7 @@ class _ResultWatcher(threading.Thread):
 
     def _connect(self) -> pika.SelectConnection:
         with self._new_futures_lock:
-            res = self.funcx_executor.funcx_client.get_result_amqp_url()
+            res = self.funcx_executor.client.get_result_amqp_url()
             self._queue_prefix = res["queue_prefix"]
             connection_url = res["connection_url"]
 

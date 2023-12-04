@@ -254,7 +254,7 @@ More details on the Globus Compute login manager prototcol are available `here. 
   compute_login_manager.ensure_logged_in()
 
   gc = Client(login_manager=compute_login_manager)
-  gce = Executor(endpoint_id=tutorial_endpoint, funcx_client=gc)
+  gce = Executor(endpoint_id=tutorial_endpoint, client=gc)
 
 
 Specifying a Serialization Strategy
@@ -281,7 +281,7 @@ another serializer, use the ``code_serialization_strategy`` and
     code_serialization_strategy=CombinedCode(),
     data_serialization_strategy=DillDataBase64()
   )
-  gcx = Executor('4b116d3c-1703-4f8f-9f6f-39921e5864df', funcx_client=gcc)
+  gcx = Executor('4b116d3c-1703-4f8f-9f6f-39921e5864df', client=gcc)
 
   # do something with gcx
 
