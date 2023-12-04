@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import textwrap
 import time
 
@@ -70,10 +71,30 @@ class MaxResultSizeExceeded(Exception):
         )
 
 
+SERDE_TASK_EXECUTION_FAILED_HELP_MESSAGE = """
+
+This appears to be an error with serialization. If it is, using a different
+serialization strategy from globus_compute_sdk.serialize might resolve the issue. For
+example, to use globus_compute_sdk.serialize.CombinedCode:
+
+    from globus_compute_sdk import Client, Executor
+    from globus_compute_sdk.serialize import CombinedCode
+
+    gcc = Client(code_serialization_strategy=CombinedCode())
+    with Executor('<your-endpoint-id>', client=gcc) as gcx:
+        # do something with gcx
+
+For more information, see:
+    https://globus-compute.readthedocs.io/en/latest/sdk.html#specifying-a-serialization-strategy
+"""
+
+
 class TaskExecutionFailed(Exception):
     """
     Error result from the remote end, wrapped as an exception object
     """
+
+    SERDE_REGEX = re.compile("dill|pickle|serializ", re.IGNORECASE)
 
     def __init__(
         self,
@@ -87,4 +108,8 @@ class TaskExecutionFailed(Exception):
         self.completion_t = completion_t or str(time.time())
 
     def __str__(self) -> str:
-        return "\n" + textwrap.indent(self.remote_data, " ")
+        remote_data = textwrap.indent(self.remote_data, " ")
+        message = "\n" + remote_data
+        if re.search(TaskExecutionFailed.SERDE_REGEX, remote_data):
+            message += SERDE_TASK_EXECUTION_FAILED_HELP_MESSAGE
+        return message
