@@ -152,18 +152,6 @@ using the ``PBSProProvider``. This configuration assumes that the script is bein
    :language: yaml
 
 
-Cori (NERSC)
-^^^^^^^^^^^^
-
-.. image:: _static/images/Cori-NERSC.png
-
-The following snippet shows an example configuration for accessing NERSC's **Cori** supercomputer. This example uses the ``HighThroughputEngine`` and connects to Cori's Slurm scheduler.
-It is configured to request 2 nodes configured with 1 TaskBlock per node. Finally, it includes override information to request a particular node type (Haswell) and to configure a specific Python environment on the worker nodes using Anaconda.
-
-.. literalinclude:: configs/cori.yaml
-   :language: yaml
-
-
 Perlmutter (NERSC)
 ^^^^^^^^^^^^^^^^^^
 
