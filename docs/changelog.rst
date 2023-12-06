@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.9.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.9.0
+---------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed an error that prevented some misconfigured endpoints from being deleted even
+  when using the ``--force`` flag
+
+
 .. _changelog-2.7.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.7.0
