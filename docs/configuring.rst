@@ -158,10 +158,7 @@ Perlmutter (NERSC)
 .. image:: _static/images/Nersc9-image-compnew-sizer7-group-type-4-1.jpg
 
 The following snippet shows an example configuration for accessing NERSC's **Perlmutter** supercomputer. This example uses the ``HighThroughputEngine`` and connects to Perlmutters's Slurm scheduler.
-It is configured to request 2 nodes configured with 1 TaskBlock per node. Finally, it includes override information to request a particular node type (Haswell) and to configure a specific Python environment on the worker nodes using Anaconda.
-
-.. note:: Please run ``module load cgpu`` prior to executing ``globus-compute-endpoint start <endpoint_name>``
-          on the Cori login nodes to access the Perlmutter queues.
+It is configured to request 2 nodes configured with 1 TaskBlock per node. Finally, it includes override information to request a particular node type (GPU) and to configure a specific Python environment on the worker nodes using Anaconda.
 
 .. literalinclude:: configs/perlmutter.yaml
    :language: yaml
