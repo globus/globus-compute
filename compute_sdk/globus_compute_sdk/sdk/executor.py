@@ -196,7 +196,7 @@ class Executor(concurrent.futures.Executor):
         self._shutdown_lock = threading.RLock()
         self._result_watcher: _ResultWatcher | None = None
 
-        log.debug("%s: initiated on thread: %s", self, threading.get_ident())
+        log.debug("%r: initiated on thread: %s", self, threading.get_ident())
         self._task_submitter = threading.Thread(
             target=self._task_submitter_impl, name="TaskSubmitter"
         )
@@ -661,10 +661,10 @@ class Executor(concurrent.futures.Executor):
 
     def shutdown(self, wait=True, *, cancel_futures=False):
         thread_id = threading.get_ident()
-        log.debug("%s: initiating shutdown (thread: %s)", self, thread_id)
+        log.debug("%r: initiating shutdown (thread: %s)", self, thread_id)
         if self._task_submitter.is_alive():
             log.debug(
-                "%s: %s still alive; sending poison pill",
+                "%r: %s still alive; sending poison pill",
                 self,
                 self._task_submitter.name,
             )
@@ -686,7 +686,7 @@ class Executor(concurrent.futures.Executor):
             # that scenario by adding a slight delay on the *main* thread.
             time.sleep(0.1)
         _REGISTERED_FXEXECUTORS.pop(id(self), None)
-        log.debug("%s: shutdown complete (thread: %s)", self, thread_id)
+        log.debug("%r: shutdown finished (thread: %s)", self, thread_id)
 
     def _task_submitter_impl(self) -> None:
         """
@@ -701,7 +701,7 @@ class Executor(concurrent.futures.Executor):
         in the queue.  (See ``shutdown()``.)
         """
         log.debug(
-            "%s: task submission thread started (%s)", self, threading.get_ident()
+            "%r: task submission thread started (%s)", self, threading.get_ident()
         )
         to_send = self._tasks_to_send  # cache lookup
 
@@ -815,7 +815,7 @@ class Executor(concurrent.futures.Executor):
             self._stopped = True
             self._stopped_in_error = True
             log.debug(
-                "%s: task submission thread encountered error ([%s] %s)",
+                "%r: task submission thread encountered error ([%s] %s)",
                 self,
                 exc.__class__.__name__,
                 exc,
@@ -825,7 +825,7 @@ class Executor(concurrent.futures.Executor):
                 self.shutdown(wait=False, cancel_futures=True)
                 self._shutdown_lock.release()
 
-            log.debug("%s: task submission thread dies", self)
+            log.debug("%r: task submission thread dies", self)
             raise
         finally:
             if sys.exc_info() != (None, None, None):
@@ -840,7 +840,7 @@ class Executor(concurrent.futures.Executor):
                     self._tasks_to_send.task_done()
             except ValueError:
                 pass
-            log.debug("%s: task submission thread complete", self)
+            log.debug("%r: task submission thread complete", self)
 
     def _submit_tasks(
         self,
