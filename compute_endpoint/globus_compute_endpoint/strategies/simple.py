@@ -5,7 +5,7 @@ import math
 import time
 
 from globus_compute_endpoint.strategies.base import BaseStrategy
-from parsl.providers.base import JobState
+from parsl.jobs.states import JobState
 
 log = logging.getLogger(__name__)
 
