@@ -700,9 +700,8 @@ class Executor(concurrent.futures.Executor):
         This thread stops when it receives a poison-pill of ``(None, None)``
         in the queue.  (See ``shutdown()``.)
         """
-        log.debug(
-            "%r: task submission thread started (%s)", self, threading.get_ident()
-        )
+        _tid = threading.get_ident()
+        log.debug("%r: task submission thread started (%s)", self, _tid)
         to_send = self._tasks_to_send  # cache lookup
 
         # Alias types -- this awkward typing is all about the dict we use
@@ -738,6 +737,7 @@ class Executor(concurrent.futures.Executor):
                 tasks: SubmitGroupTasks = defaultdict(list)
                 task_count = 0
                 try:
+                    log.debug("%r (tid:%s): await tasks to send upstream", self, _tid)
                     fut, task = to_send.get()  # Block; wait for first result ...
                     task_count += 1
                     bs = max(1, self.batch_size)  # May have changed while waiting
@@ -758,7 +758,7 @@ class Executor(concurrent.futures.Executor):
                     pass
 
                 if not tasks:
-                    continue
+                    continue  # fut and task are None; "single point of exit"
 
                 for submit_group, task_list in tasks.items():
                     fut_list = futs[submit_group]
@@ -793,7 +793,12 @@ class Executor(concurrent.futures.Executor):
                         try:
                             self._result_watcher.watch_for_task_results(to_watch)
                         except self._result_watcher.__class__.ShuttingDownError:
-                            log.debug("Waiting for previous ResultWatcher to shutdown")
+                            log.debug(
+                                "%r (tid:%s): Waiting for previous ResultWatcher"
+                                " to shutdown",
+                                self,
+                                _tid,
+                            )
                             self._result_watcher.join()
                             self._result_watcher = _ResultWatcher(
                                 self, port=self.amqp_port
@@ -815,8 +820,9 @@ class Executor(concurrent.futures.Executor):
             self._stopped = True
             self._stopped_in_error = True
             log.debug(
-                "%r: task submission thread encountered error ([%s] %s)",
+                "%r (tid:%s): task submission thread encountered error ([%s] %s)",
                 self,
+                _tid,
                 exc.__class__.__name__,
                 exc,
             )
@@ -825,7 +831,7 @@ class Executor(concurrent.futures.Executor):
                 self.shutdown(wait=False, cancel_futures=True)
                 self._shutdown_lock.release()
 
-            log.debug("%r: task submission thread dies", self)
+            log.debug("%r (tid:%s): task submission thread dies", self, _tid)
             raise
         finally:
             if sys.exc_info() != (None, None, None):
@@ -840,7 +846,7 @@ class Executor(concurrent.futures.Executor):
                     self._tasks_to_send.task_done()
             except ValueError:
                 pass
-            log.debug("%r: task submission thread complete", self)
+            log.debug("%r (tid:%s): task submission thread complete", self, _tid)
 
     def _submit_tasks(
         self,
@@ -862,6 +868,7 @@ class Executor(concurrent.futures.Executor):
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
+        _tid = threading.get_ident()
         if taskgroup_uuid is None and self.task_group_id:
             taskgroup_uuid = self.task_group_id
 
@@ -877,8 +884,10 @@ class Executor(concurrent.futures.Executor):
             batch.add(f_uuid_str, task.args, task.kwargs)
             log.debug("Added task to Globus Compute batch: %s", task)
 
+        log.debug("%r (%s): sending batch (task count: %s)", self, _tid, len(tasks))
         try:
             batch_response = self.client.batch_run(endpoint_uuid, batch)
+            log.debug("%r (%s): received response from batch submission", self, _tid)
         except Exception as e:
             log.exception(f"Error submitting {len(tasks)} tasks to Globus Compute")
             for fut_list in submitted_futs_by_fn.values():
@@ -905,7 +914,9 @@ class Executor(concurrent.futures.Executor):
         batch_count = sum(len(x) for x in received_tasks_by_fn.values())
         self.task_count_submitted += batch_count
         log.debug(
-            "Batch submitted to task_group: %s - %s (total: %s)",
+            "%r (tid:%s): Batch submitted to task_group: %s - %s (total: %s)",
+            self,
+            _tid,
             self.task_group_id,
             batch_count,
             self.task_count_submitted,
