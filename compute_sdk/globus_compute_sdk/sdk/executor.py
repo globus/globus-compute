@@ -362,8 +362,7 @@ class Executor(concurrent.futures.Executor):
             registration upstream
         """
         if self._stopped:
-            err_fmt = "%s is shutdown; refusing to register function"
-            raise RuntimeError(err_fmt % repr(self))
+            raise RuntimeError(f"{self!r} is shutdown; refusing to register function")
 
         fn_cache_key = self._fn_cache_key(fn)
         if fn_cache_key in self._function_registry:
@@ -427,8 +426,8 @@ class Executor(concurrent.futures.Executor):
             a ``.result()`` when the Globus Compute web services receive and stream it.
         """
         if self._stopped:
-            err_fmt = "%s is shutdown; no new functions may be executed"
-            raise RuntimeError(err_fmt % repr(self))
+            err = f"{self!r} is shutdown; no new functions may be executed"
+            raise RuntimeError(err)
 
         fn_cache_key = self._fn_cache_key(fn)
         if fn_cache_key not in self._function_registry:
@@ -494,8 +493,8 @@ class Executor(concurrent.futures.Executor):
             when the Globus Compute web services receive and stream it.
         """
         if self._stopped:
-            err_fmt = "%s is shutdown; no new functions may be executed"
-            raise RuntimeError(err_fmt % repr(self))
+            err = f"{self!r} is shutdown; no new functions may be executed"
+            raise RuntimeError(err)
 
         if not self.endpoint_id:
             msg = (
@@ -545,9 +544,16 @@ class Executor(concurrent.futures.Executor):
 
         Raises
         ------
+        RuntimeError
+          if called after shutdown, otherwise, ...
+
         NotImplementedError
-          always raised
+          ... always raised
         """  # noqa
+        if self._stopped:
+            err = f"{self!r} is shutdown; no new functions may be executed"
+            raise RuntimeError(err)
+
         raise NotImplementedError()
 
     def reload_tasks(
