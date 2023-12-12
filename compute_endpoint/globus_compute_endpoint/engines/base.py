@@ -112,12 +112,6 @@ class GlobusComputeEngineBase(ABC):
         packed: bytes = messagepack.pack(status_report)
         self.results_passthrough.put({"message": packed})
 
-    def _status_report(self, shutdown_event: threading.Event, heartbeat_period: float):
-        while not shutdown_event.wait(timeout=heartbeat_period):
-            status_report = self.get_status_report()
-            packed = messagepack.pack(status_report)
-            self.results_passthrough.put({"message": packed})
-
     def _handle_task_exception(
         self,
         task_id: str,
