@@ -10,7 +10,7 @@ import globus_compute_endpoint.endpoint
 import pytest
 import requests
 import yaml
-from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.endpoint import Config, Endpoint
 from globus_sdk import GlobusAPIError
 
 logger = logging.getLogger("mock_funcx")
@@ -333,24 +333,17 @@ class TestStart:
 
         mock_context.return_value.pidfile.path = ""
 
-        class mock_executors:
-            executors = None
-
-        mock_config = mock_executors()
+        config = Config(executors=[], detach_endpoint=False)
 
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
 
         manager.configure_endpoint(config_dir, None)
-        with pytest.raises(
-            Exception,
-            match=f"Endpoint config file at {config_dir} is "
-            "missing executor definitions",
-        ):
+        with pytest.raises(ValueError, match="has no executors defined"):
             log_to_console = False
             no_color = True
             manager.start_endpoint(
-                config_dir, None, mock_config, log_to_console, no_color, reg_info={}
+                config_dir, None, config, log_to_console, no_color, reg_info={}
             )
 
     @pytest.mark.skip("This test doesn't make much sense")

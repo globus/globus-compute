@@ -3,7 +3,6 @@
   "type": "object",
   "properties": {
     "endpoint_setup": { "type": "string" },
-    "endpoint_init": { "type": "string" },
     "worker_init": { "type": "string" }
   },
   "additionalProperties": true

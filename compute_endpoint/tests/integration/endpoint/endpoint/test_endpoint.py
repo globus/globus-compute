@@ -44,10 +44,12 @@ def patch_compute_client(mocker):
     yield mocker.patch(f"{_MOCK_BASE}Client", return_value=gcc)
 
 
-def test_non_configured_endpoint(mocker):
-    result = CliRunner().invoke(app, ["start", "newendpoint"])
-    assert "newendpoint" in result.stdout
-    assert "not configured" in result.stdout
+def test_non_configured_endpoint(mocker, tmp_path):
+    env = {"GLOBUS_COMPUTE_USER_DIR": str(tmp_path)}
+    with mock.patch.dict(os.environ, env):
+        result = CliRunner().invoke(app, ["start", "newendpoint"])
+        assert "newendpoint" in result.stdout
+        assert "not configured" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -293,7 +295,7 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
 
     endpoint_dir = None
     endpoint_uuid = None
-    endpoint_config = Config(endpoint_setup=command)
+    endpoint_config = Config(endpoint_setup=command, detach_endpoint=False)
     log_to_console = False
     no_color = True
     reg_info = {}

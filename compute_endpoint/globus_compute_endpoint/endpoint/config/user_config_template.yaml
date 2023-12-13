@@ -21,6 +21,8 @@
 # There are a number of example configurations available in the documentation:
 #    https://globus-compute.readthedocs.io/en/stable/endpoints.html#example-configurations
 
+endpoint_setup: {{ endpoint_setup|default() }}
+
 engine:
   type: HighThroughputEngine
   max_workers_per_node: 1
@@ -32,8 +34,6 @@ engine:
     max_blocks: 1
     init_blocks: 1
 
-    endpoint_setup: {{ endpoint_setup|default() }}
-    endpoint_init: {{ endpoint_init|default() }}
     worker_init: {{ worker_init|default() }}
 
 # Endpoints will be restarted when a user submits new tasks to the

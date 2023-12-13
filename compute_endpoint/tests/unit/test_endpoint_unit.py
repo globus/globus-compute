@@ -215,6 +215,7 @@ def test_start_endpoint_network_error(
     mock_log = mocker.patch(f"{_mock_base}log")
 
     f = io.StringIO()
+    f.isatty = lambda: True
     with redirect_stdout(f):
         with pytest.raises(SystemExit) as pytest_exc:
             ep.start_endpoint(
@@ -324,7 +325,6 @@ def test_register_endpoint_blocked(
     mock_log = mocker.patch(f"{_mock_base}log")
     mock_gcc = get_standard_compute_client()
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
-    f = io.StringIO()
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
@@ -335,6 +335,8 @@ def test_register_endpoint_blocked(
         msg=some_err,
     )
 
+    f = io.StringIO()
+    f.isatty = lambda: True
     with redirect_stdout(f):
         with pytest.raises((GlobusAPIError, SystemExit)) as pytexc:
             ep.start_endpoint(
@@ -374,10 +376,10 @@ def test_register_endpoint_already_active(
     mocker.patch(f"{_mock_base}Endpoint.check_pidfile").return_value = pid_active
 
     f = io.StringIO()
+    f.isatty = lambda: True
 
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
     ep_id = str(uuid.uuid4())
-    # register_endpoint_failure_response(endpoint_id=ep_id, status_code=409)
     with redirect_stdout(f):
         with pytest.raises(SystemExit) as pytest_exc:
             ep.start_endpoint(
