@@ -23,6 +23,8 @@ from globus_compute_sdk.sdk.web_client import WebClient
 from pyfakefs import fake_filesystem as fakefs
 from pytest_mock import MockFixture
 
+_MOCK_BASE = "globus_compute_endpoint.cli."
+
 
 @pytest.fixture
 def funcx_dir_path(tmp_path):
@@ -36,7 +38,7 @@ def ep_name(randomstring):
 
 @pytest.fixture
 def mock_command_ensure(funcx_dir_path):
-    with mock.patch("globus_compute_endpoint.cli.CommandState.ensure") as m_state:
+    with mock.patch(f"{_MOCK_BASE}CommandState.ensure") as m_state:
         mock_state = mock.Mock()
         mock_state.endpoint_config_dir = funcx_dir_path
         m_state.return_value = mock_state
@@ -46,7 +48,7 @@ def mock_command_ensure(funcx_dir_path):
 
 @pytest.fixture
 def mock_cli_state(funcx_dir_path, mock_command_ensure, ep_name):
-    with mock.patch("globus_compute_endpoint.cli.Endpoint") as mock_ep:
+    with mock.patch(f"{_MOCK_BASE}Endpoint") as mock_ep:
         mock_ep.return_value = mock_ep
         mock_ep.get_endpoint_by_name_or_uuid.return_value = (
             mock_command_ensure.endpoint_config_dir / ep_name
@@ -211,13 +213,13 @@ def test_start_ep_reads_stdin(
 ):
     data_is_valid, data = stdin_data
 
-    mock_load_conf = mocker.patch("globus_compute_endpoint.cli.load_config_yaml")
+    mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
     mock_load_conf.return_value = Config()
-    mock_get_config = mocker.patch("globus_compute_endpoint.cli.get_config")
+    mock_get_config = mocker.patch(f"{_MOCK_BASE}get_config")
     mock_get_config.return_value = Config()
 
-    mock_log = mocker.patch("globus_compute_endpoint.cli.log")
-    mock_sys = mocker.patch("globus_compute_endpoint.cli.sys")
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_sys = mocker.patch(f"{_MOCK_BASE}sys")
     mock_sys.stdin.closed = False
     mock_sys.stdin.isatty.return_value = False
     mock_sys.stdin.read.return_value = data
@@ -247,7 +249,7 @@ def test_start_ep_reads_stdin(
         assert reg_info_found == {}
 
 
-@mock.patch("globus_compute_endpoint.cli.get_config")
+@mock.patch(f"{_MOCK_BASE}get_config")
 def test_stop_endpoint(
     get_config, run_line, mock_cli_state, make_endpoint_dir, ep_name
 ):
@@ -442,7 +444,7 @@ def test_delete_endpoint_with_malformed_config_sc28515(
 
 
 @pytest.mark.parametrize("die_with_parent", [True, False])
-@mock.patch("globus_compute_endpoint.cli.get_config")
+@mock.patch(f"{_MOCK_BASE}get_config")
 def test_die_with_parent_detached(
     mock_get_config, run_line, mock_cli_state, die_with_parent, ep_name
 ):
@@ -672,9 +674,7 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
         # dummy config.yaml so that Endpoint._get_ep_dirs finds this
         (ep_conf_dir / "config.yaml").write_text("")
 
-    mock__do_start_endpoint = mocker.patch(
-        "globus_compute_endpoint.cli._do_start_endpoint"
-    )
+    mock__do_start_endpoint = mocker.patch(f"{_MOCK_BASE}_do_start_endpoint")
 
     run_line(f"-c {gc_conf_dir} start {name}")
     run_line(f"-c {gc_conf_dir} start {uuid}")
