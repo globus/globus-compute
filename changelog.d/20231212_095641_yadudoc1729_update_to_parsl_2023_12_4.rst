@@ -1,4 +1,0 @@
-Changed
-^^^^^^^
-
-- Parsl version requirements updated from ``2023.7.3`` to ``2023.12.4``
