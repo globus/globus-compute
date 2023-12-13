@@ -3,6 +3,36 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.9.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.9.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- ``GlobusComputeEngine`` can now be configured to automatically retry task failures when
+  node failures (e.g nodes are lost due to batch job reaching walltime) occur. This option
+  is set to 0 by default to avoid unintentional resource wastage from retrying tasks.
+  Traceback history from all prior attempts is supplied if the last retry attempt fails.
+  Here's a snippet from config.yaml:
+
+.. code-block:: yaml
+
+   engine:
+      type: GlobusComputeEngine
+      max_retries_on_system_failure: 2
+
+Deprecated
+^^^^^^^^^^
+
+- The ``funcx_client`` argument to the ``Executor`` has been deprecated and replaced with ``client``.
+
+Changed
+^^^^^^^
+
+- Parsl version requirements updated from ``2023.7.3`` to ``2023.12.4``
+
 .. _changelog-2.7.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.7.0
