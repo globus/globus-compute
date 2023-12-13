@@ -198,7 +198,7 @@ class Executor(concurrent.futures.Executor):
 
         log.debug("%r: initiated on thread: %s", self, threading.get_ident())
         self._task_submitter = threading.Thread(
-            target=self._task_submitter_impl, name="TaskSubmitter"
+            target=self._task_submitter_impl, name="TaskSubmitter", daemon=True
         )
         self._task_submitter.start()
         _REGISTERED_FXEXECUTORS[id(self)] = self
@@ -670,8 +670,13 @@ class Executor(concurrent.futures.Executor):
             )
             self._tasks_to_send.put((None, None))
             if wait and self._task_submitter.ident != thread_id:
-                while self._task_submitter.is_alive():
-                    self._task_submitter.join(0.1)
+                self._task_submitter.join(2)
+                if self._task_submitter.is_alive():
+                    log.warning(
+                        "Task submission thread did not stop in a timely fashion; an"
+                        " HTTP request may yet be outstanding.  Attempting to shutdown"
+                        " Executor anyway"
+                    )
 
         with self._shutdown_lock:
             self._stopped = True

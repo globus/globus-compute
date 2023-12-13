@@ -23,7 +23,7 @@ from tests.utils import try_assert, try_for_timeout
 _MOCK_BASE = "globus_compute_sdk.sdk.executor."
 
 
-def _is_stopped(thread: threading.Thread | None) -> bool:
+def _is_stopped(thread: threading.Thread | None) -> t.Callable[..., bool]:
     def _wrapped():
         return not (thread and thread.is_alive())
 
@@ -102,6 +102,11 @@ def gc_executor(mocker):
         )
 
 
+@pytest.fixture
+def mock_log(mocker):
+    yield mocker.patch(f"{_MOCK_BASE}log", autospec=True)
+
+
 @pytest.mark.parametrize(
     "tg_id, fn_id, ep_id, uep_config",
     (
@@ -174,6 +179,22 @@ def test_executor_context_manager(gc_executor):
         pass
     assert _is_stopped(gce._task_submitter)
     assert _is_stopped(gce._result_watcher)
+
+
+def test_executor_stuck_submitter_doesnt_hold_shutdown(gc_executor, mock_log):
+    gcc, gce = gc_executor
+    gce._task_submitter = mock.Mock(spec=threading.Thread)
+    gce._task_submitter.join.side_effect = lambda *a, **kw: None
+    gce._task_submitter.is_alive.return_value = True
+
+    assert not gce._task_submitter.join.called, "Verify test setup"
+    gce.shutdown()
+    assert gce._task_submitter.join.called, "Verify test setup"
+
+    gce._task_submitter.is_alive.return_value = False  # allow test cleanup
+
+    warn_log, _ = mock_log.warning.call_args
+    assert "did not stop in a timely fashion" in warn_log[0]
 
 
 def test_multiple_register_function_fails(gc_executor):
@@ -382,10 +403,8 @@ def test_reload_tasks_sets_passed_task_group_id(gc_executor):
 
 
 @pytest.mark.parametrize("num_tasks", [0, 1, 2, 10])
-def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
+def test_reload_tasks_none_completed(gc_executor, mock_log, num_tasks):
     gcc, gce = gc_executor
-
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
@@ -411,10 +430,8 @@ def test_reload_tasks_none_completed(gc_executor, mocker, num_tasks):
 
 
 @pytest.mark.parametrize("num_tasks", [1, 2, 10])
-def test_reload_tasks_some_completed(gc_executor, mocker, num_tasks):
+def test_reload_tasks_some_completed(gc_executor, mock_log, num_tasks):
     gcc, gce = gc_executor
-
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
@@ -840,9 +857,8 @@ def test_resultwatcher_cancels_futures_on_unexpected_stop(mocker):
     assert "thread quit" in str(fut.exception())
 
 
-def test_resultwatcher_gracefully_handles_unexpected_exception(mocker):
+def test_resultwatcher_gracefully_handles_unexpected_exception(mocker, mock_log):
     mocker.patch(f"{_MOCK_BASE}time")
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     gce = mock.Mock(spec=Executor)
     rw = _ResultWatcher(gce)
     rw._connect = mock.Mock(return_value=mock.Mock(spec=pika.SelectConnection))
@@ -1006,9 +1022,7 @@ def test_resultwatcher_onmessage_sets_check_results_flag():
 
 
 @pytest.mark.parametrize("exc", (MemoryError("some description"), "some description"))
-def test_resultwatcher_stops_loop_on_open_failure(mocker, exc):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log", autospec=True)
-
+def test_resultwatcher_stops_loop_on_open_failure(mock_log, exc):
     mrw = MockedResultWatcher(mock.Mock())
     mrw.start()
     assert not mrw._connection.ioloop.stop.called, "Test setup verification"
