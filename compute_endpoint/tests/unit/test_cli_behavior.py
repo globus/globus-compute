@@ -363,9 +363,13 @@ def test_start_ep_incorrect_config_py(
     conf = mock_state.endpoint_config_dir / ep_name / "config.py"
 
     conf.write_text("asa asd df = 5")  # fail the import
-    with mock.patch("globus_compute_endpoint.endpoint.config.utils.log") as mock_log:
-        res = run_line(f"start {ep_name}", assert_exit_code=1)
-        assert "might be out of date" in mock_log.exception.call_args[0][0]
+    with mock.patch(f"{_MOCK_BASE}log"):
+        with mock.patch(
+            "globus_compute_endpoint.endpoint.config.utils.log"
+        ) as mock_util_log:
+            res = run_line(f"start {ep_name}", assert_exit_code=1)
+    a, _ = mock_util_log.exception.call_args
+    assert "might be out of date" in a[0]
     assert isinstance(res.exception, SyntaxError)
 
     # `coverage` demands a valid syntax file.  FBOW, then, the ordering and

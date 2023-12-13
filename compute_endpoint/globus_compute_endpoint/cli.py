@@ -490,10 +490,24 @@ def _do_start_endpoint(
             exc_type = e.__class__.__name__
             log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
 
-    if config_str is not None:
-        ep_config = load_config_yaml(config_str)
-    else:
-        ep_config = get_config(ep_dir)
+    try:
+        if config_str is not None:
+            ep_config = load_config_yaml(config_str)
+        else:
+            ep_config = get_config(ep_dir)
+    except Exception as e:
+        if isinstance(e, ClickException):
+            raise
+
+        # We've likely not exported to the log, so at least put _something_ in the
+        # logs for the human to debug; motivated by SC-28607
+        exc_type = type(e).__name__
+        msg = (
+            "Failed to find or parse endpoint configuration.  Endpoint will not"
+            f" start. ({exc_type}) {e}"
+        )
+        log.critical(msg)
+        raise
 
     if die_with_parent:
         # The endpoint cannot die with its parent if it

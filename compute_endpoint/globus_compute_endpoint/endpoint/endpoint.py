@@ -325,39 +325,6 @@ class Endpoint:
         reg_info: dict,
         die_with_parent: bool = False,
     ):
-        # This is to ensure that at least 1 executor is defined
-        if not endpoint_config.executors:
-            raise Exception(
-                f"Endpoint config file at {endpoint_dir} is missing "
-                "executor definitions"
-            )
-
-        pid_check = Endpoint.check_pidfile(endpoint_dir)
-        # if the pidfile exists, we should return early because we don't
-        # want to attempt to create a new daemon when one is already
-        # potentially running with the existing pidfile
-        if pid_check["exists"]:
-            if pid_check["active"]:
-                endpoint_name = endpoint_dir.name
-                if endpoint_config.display_name:
-                    endpoint_name = endpoint_config.display_name
-                active_msg = f"Endpoint '{endpoint_name}' is already active"
-                print(active_msg)
-                log.info(active_msg)
-                sys.exit(-1)
-            else:
-                log.info(
-                    "A prior Endpoint instance appears to have been terminated without "
-                    "proper cleanup. Cleaning up now."
-                )
-                Endpoint.pidfile_cleanup(endpoint_dir)
-
-        if endpoint_config.endpoint_setup:
-            Endpoint._run_command("endpoint_setup", endpoint_config.endpoint_setup)
-
-        result_store = ResultStore(endpoint_dir=endpoint_dir)
-
-        # Create a daemon context
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
         if endpoint_config.detach_endpoint:
@@ -370,6 +337,52 @@ class Endpoint:
         else:
             stdout = sys.stdout
             stderr = sys.stderr
+
+        ostream = None
+        if sys.stdout.isatty():
+            ostream = sys.stdout
+        elif sys.stderr.isatty():
+            ostream = sys.stderr
+
+        # This is to ensure that at least 1 executor is defined
+        if not endpoint_config.executors:
+            msg = (
+                "Endpoint configuration has no executors defined.  Endpoint will not"
+                " start."
+            )
+            log.critical(msg)
+            raise ValueError(msg)
+
+        pid_check = Endpoint.check_pidfile(endpoint_dir)
+        # if the pidfile exists, we should return early because we don't
+        # want to attempt to create a new daemon when one is already
+        # potentially running with the existing pidfile
+        if pid_check["exists"]:
+            if pid_check["active"]:
+                endpoint_name = endpoint_dir.name
+                if endpoint_config.display_name:
+                    endpoint_name = endpoint_config.display_name
+                active_msg = f"Endpoint '{endpoint_name}' is already active"
+                log.info(active_msg)
+                if ostream:
+                    print(active_msg, file=ostream)
+                sys.exit(-1)
+            else:
+                log.info(
+                    "A prior Endpoint instance appears to have been terminated without "
+                    "proper cleanup. Cleaning up now."
+                )
+                Endpoint.pidfile_cleanup(endpoint_dir)
+
+        if endpoint_config.endpoint_setup:
+            Endpoint._run_command("endpoint_setup", endpoint_config.endpoint_setup)
+
+        try:
+            result_store = ResultStore(endpoint_dir=endpoint_dir)
+        except Exception as e:
+            exc_type = type(e).__name__
+            log.critical(f"Failed to initialize the result storage.  ({exc_type}) {e}")
+            raise
 
         try:
             pid_file = endpoint_dir / "daemon.pid"
@@ -408,7 +421,8 @@ class Endpoint:
             except GlobusAPIError as e:
                 blocked_msg = f"Endpoint registration blocked.  [{e.text}]"
                 log.warning(blocked_msg)
-                print(blocked_msg)
+                if ostream:
+                    print(blocked_msg, file=ostream)
                 if e.http_status in (
                     HTTPStatus.CONFLICT,
                     HTTPStatus.LOCKED,
@@ -434,8 +448,9 @@ class Endpoint:
                     "Please ensure the Globus Compute service address is reachable, "
                     "then attempt restarting the endpoint."
                 )
-                print(msg)
                 log.critical(msg)
+                if ostream:
+                    print(msg, file=ostream)
                 exit(os.EX_TEMPFAIL)
 
             ret_ep_uuid = reg_info.get("endpoint_id")
@@ -502,11 +517,6 @@ class Endpoint:
             self.debug,
         )
 
-        ostream = None
-        if sys.stdout.isatty():
-            ostream = sys.stdout
-        elif sys.stderr.isatty():
-            ostream = sys.stderr
         if ostream:
             msg = f"Starting endpoint; registered ID: {endpoint_uuid}"
             if log_to_console:
@@ -523,7 +533,9 @@ class Endpoint:
             # On any other system, this should make no difference (same file!)
             with open(os.devnull) as nullf:
                 if os.dup2(nullf.fileno(), 0) != 0:
-                    raise Exception("Unable to close stdin")
+                    msg = "Unable to close stdin; endpoint will not start."
+                    log.critical(msg)
+                    raise Exception(msg)
 
             setup_logging(
                 logfile=logfile,
