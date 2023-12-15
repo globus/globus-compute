@@ -1,9 +1,12 @@
 import json
 import pathlib
+import random
 import threading
+import uuid
 
 import pytest
 from globus_compute_endpoint.endpoint.identity_mapper import PosixIdentityMapper
+from globus_identity_mapping.mappers import ExternalIdentityMapping
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.identity_mapper."
@@ -183,3 +186,24 @@ def test_map_identity_returns_first_found_identity(conf_p, expected, idset):
     conf_p.write_text(_expression_identity_mapper_conf())
     with NoWaitPosixIdentityMapper(conf_p, "some_id", poll_interval_s=0.001) as pim:
         assert pim.map_identity(idset) == expected
+
+
+def test_map_identity_error_logs_show_type_and_sub(mocker, conf_p):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    idset = tuple({"sub": str(uuid.uuid4())} for _ in range(random.randint(1, 10)))
+
+    ext_conf = json.loads(_external_identity_mapper_conf())
+    ext_conf.extend(ext_conf[0] for _ in range(random.randint(0, 5)))
+    conf_p.write_text(json.dumps(ext_conf))
+    with NoWaitPosixIdentityMapper(conf_p, "some_id", poll_interval_s=0.001) as pim:
+        pim.map_identity(idset)
+
+    num_idents = len(idset)
+    num_mappers = len(ext_conf)
+    mapper_name = ExternalIdentityMapping.__name__
+    log_iter = iter(mock_log.warning.call_args_list)
+    for m_i, _conf in enumerate(ext_conf, start=1):
+        for id_i, ident in enumerate(idset, start=1):
+            a, _ = next(log_iter)
+            assert f"failed for mapper {m_i} [of {num_mappers}] ({mapper_name}" in a[0]
+            assert f"with identity {id_i} [of {num_idents}] ({ident['sub']})" in a[0]
