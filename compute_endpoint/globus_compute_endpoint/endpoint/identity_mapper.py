@@ -202,13 +202,22 @@ class PosixIdentityMapper:
     def identity_mappings(self):
         self.identity_mappings = None
 
-    def map_identity(self, identity_set: t.Iterable[t.Mapping[str, str]]) -> str | None:
-        for mapper in self.identity_mappings:
-            for identity_data in identity_set:
+    def map_identity(
+        self, identity_set: t.Collection[t.Mapping[str, str]]
+    ) -> str | None:
+        num_mappers = len(self.identity_mappings)
+        num_idents = len(identity_set)
+        for m_i, mapper in enumerate(self.identity_mappings, start=1):
+            for id_i, ident_data in enumerate(identity_set, start=1):
                 try:
-                    identity = mapper.map_identity(identity_data)
+                    identity = mapper.map_identity(ident_data)
                 except Exception as e:
-                    log.warning(f"Identity mapper failed -- ({type(e).__name__}) {e}")
+                    sub = ident_data.get("sub")
+                    log.warning(
+                        f"Identity mapper failed for mapper {m_i} [of {num_mappers}]"
+                        f" ({type(mapper).__name__}) with identity {id_i}"
+                        f" [of {num_idents}] ({sub}) -- ({type(e).__name__}) {e}"
+                    )
                     continue
                 if identity:
                     return identity
