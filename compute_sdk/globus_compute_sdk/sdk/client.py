@@ -13,6 +13,7 @@ from globus_compute_sdk.errors import (
     TaskPending,
 )
 from globus_compute_sdk.sdk._environments import get_web_service_url
+from globus_compute_sdk.sdk.hardware_report import run_hardware_report
 from globus_compute_sdk.sdk.utils import check_version
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.sdk.web_client import (
@@ -816,3 +817,21 @@ class Client:
             The response of the request
         """
         return self.web_client.delete_function(function_id)
+
+    @requires_login
+    def get_worker_hardware_details(self, endpoint_id: UUID_LIKE_T) -> str:
+        """
+        Run a function to get hardware details. Returns a task ID; when that task is
+        finished, the result of the run will be a string containing hardware
+        information on the nodes that the endpoint workers are running on. For
+        example::
+
+            from globus_compute_sdk import Client
+            gcc = Client()
+            task_id = gcc.get_worker_hardware_details(ep_uuid)
+            # wait some time...
+            print(gcc.get_result(task_id))
+        """
+
+        function_id = self.register_function(run_hardware_report)
+        return self.run(endpoint_id=endpoint_id, function_id=function_id)

@@ -15,6 +15,8 @@ import uuid
 import warnings
 from collections import defaultdict
 
+from globus_compute_sdk.sdk.hardware_report import run_hardware_report
+
 if sys.version_info >= (3, 8):
     from concurrent.futures import InvalidStateError
 else:
@@ -692,6 +694,18 @@ class Executor(concurrent.futures.Executor):
             time.sleep(0.1)
         _REGISTERED_FXEXECUTORS.pop(id(self), None)
         log.debug("%r: shutdown finished (thread: %s)", self, thread_id)
+
+    def get_worker_hardware_details(self) -> str:
+        """
+        Retrieve hardware information about worker nodes for the endpoint associated
+        with this Executor. For example::
+
+            from globus_compute_sdk import Executor
+            with Executor(ep_uuid) as gcx:
+                print(gcx.get_worker_hardware_details())
+        """
+
+        return self.submit(run_hardware_report).result()
 
     def _task_submitter_impl(self) -> None:
         """
