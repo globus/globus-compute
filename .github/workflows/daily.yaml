@@ -5,8 +5,12 @@ on:
     - cron: '0 4 * * *'
   workflow_dispatch:
 
+env:
+  TARGET_PYTHON_VERSION: '3.11'
+
 jobs:
   smoke-test-dev:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -14,14 +18,17 @@ jobs:
         ref: main
     - uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
-    - run: python -m pip install -U pip setuptools
-    - run: python -m pip install 'tox'
+        python-version: '${{ env.TARGET_PYTHON_VERSION }}'
+    - run: |
+        python -m venv .venv
+        .venv/bin/python -m pip install --upgrade pip setuptools wheel
+        .venv/bin/python -m pip install tox
     - name: run smoke tests (dev)
       env:
         FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
         FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
       run: |
+        source .venv/bin/activate
         cd smoke_tests
         make dev
 
@@ -32,13 +39,16 @@ jobs:
       with:
         ref: main
     - uses: actions/setup-python@v4
+      with:
+        python-version: '${{ env.TARGET_PYTHON_VERSION }}'
     - name: install requirements
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        python -m pip install './compute_sdk'
-        python -m pip install safety
+        python -m venv .venv
+        .venv/bin/python -m pip install --upgrade pip setuptools wheel
+        .venv/bin/python -m pip install './compute_sdk'
+        .venv/bin/python -m pip install safety
     - name: run safety check
-      run: safety check
+      run: .venv/bin/safety check
 
   safety-check-endpoint:
     runs-on: ubuntu-latest
@@ -47,13 +57,16 @@ jobs:
       with:
         ref: main
     - uses: actions/setup-python@v4
+      with:
+        python-version: '${{ env.TARGET_PYTHON_VERSION }}'
     - name: install requirements
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        python -m pip install './compute_endpoint'
-        python -m pip install safety
+        python -m venv .venv
+        .venv/bin/python -m pip install --upgrade pip setuptools wheel
+        .venv/bin/python -m pip install './compute_endpoint'
+        .venv/bin/python -m pip install safety
     - name: run safety check
-      run: safety check
+      run: .venv/bin/safety check
 
   slack-notify:
     needs:
@@ -66,7 +79,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
-      - run: python -m pip install -U requests
+        with:
+          python-version: '${{ env.TARGET_PYTHON_VERSION }}'
+      - run: python -m pip install --upgrade requests
       - name: notify slack
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
