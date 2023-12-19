@@ -211,6 +211,14 @@ and uses the ``SrunLauncher`` to launch workers.
 .. literalinclude:: configs/stampede2.yaml
    :language: yaml
 
+FASTER (TAMU)
+
+The following snippet shows an example configuration for accessing the FASTER system at Texas A & M (TAMU).
+The configuration below assumes that the user is running on a login node, uses the ``SlurmProvider`` to interface with the scheduler,
+and uses the ``SrunLauncher`` to launch workers.
+
+.. literalinclude:: configs/faster.yaml
+   :language: yaml
 
 Pinning Workers to devices
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
