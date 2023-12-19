@@ -17,7 +17,7 @@ engine:
 
         launcher:
             type: SrunLauncher
-        
+
         scheduler_options: {{ OPTIONS }}
 
         worker_init: {{ COMMAND }}
