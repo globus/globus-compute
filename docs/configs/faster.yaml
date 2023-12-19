@@ -1,0 +1,35 @@
+engine:
+    type: HighThroughputEngine
+    worker_debug: False
+
+    strategy:
+        type: SimpleStrategy
+        max_idletime: 90
+
+    address:
+        type: address_by_interface
+        ifname: eno8303
+
+    provider:
+        type: SlurmProvider
+        partition: cpu
+        mem_per_node: 128
+
+        launcher:
+            type: SrunLauncher
+        
+        scheduler_options: {{ OPTIONS }}
+
+        worker_init: {{ COMMAND }}
+
+        # increase the command timeouts
+        cmd_timeout: 120
+
+        # Scale between 0-1 blocks with 1 nodes per block
+        nodes_per_block: 1
+        init_blocks: 0
+        min_blocks: 0
+        max_blocks: 1
+
+        # Hold blocks for 10 minutes
+        walltime: 00:10:00
