@@ -18,11 +18,11 @@ repos:
     - id: pyupgrade
       args: ["--py37-plus"]
 - repo: https://github.com/psf/black-pre-commit-mirror
-  rev: 23.11.0
+  rev: 23.12.1
   hooks:
     - id: black
 - repo: https://github.com/PyCQA/isort
-  rev: 5.13.0
+  rev: 5.13.2
   hooks:
     - id: isort
       # explicitly pass settings file so that isort does not try to deduce
