@@ -1,0 +1,5 @@
+Bug Fixes
+^^^^^^^^^
+
+- Improved handling of communication issues related to receiving tasks
+  from the Compute web services.
