@@ -174,12 +174,12 @@ class TaskQueueSubscriber(multiprocessing.Process):
                     "ownership by an active endpoint"
                 )
                 logger.warning("Channel will close without connection retry")
-                self.status = SubscriberProcessStatus.closing
-                self.quiesce_event.set()
         elif isinstance(exception, pika.exceptions.ChannelClosedByClient):
             logger.debug("Detected channel closed by client")
         else:
             logger.exception("Channel closed by unhandled exception.")
+        self.status = SubscriberProcessStatus.closing
+        self.quiesce_event.set()
         logger.debug("marking channel as closed")
         self._channel_closed.set()
 

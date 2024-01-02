@@ -160,15 +160,20 @@ def test_perf_combined_pub_sub_throughput(
         assert messages_per_second > 500
 
 
-def test_graceful_shutdown_if_connection_closed_unexpectedly(mocker, task_queue_info):
+@pytest.mark.parametrize("pathway", ["connection", "channel"])
+def test_graceful_shutdown_if_closed_unexpectedly(
+    mocker, task_queue_info, ensure_task_queue, pathway: str
+):
     def _run_it():
         def _stop_connection_now(tqs: TaskQueueSubscriber):
             _now = time.monotonic()
             while not tqs._channel and time.monotonic() - _now < 3:
                 time.sleep(0.05)
             tqs.status = -123  # Just something that's not the sentinel
-            tqs._connection.close()
+            attr = f"_{pathway}"
+            getattr(tqs, attr).close()
 
+        ensure_task_queue(queue_opts={"queue": task_queue_info["queue"]})
         tqs = TaskQueueSubscriber(
             endpoint_id="abc",
             queue_info=task_queue_info,
