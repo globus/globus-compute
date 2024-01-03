@@ -3,6 +3,30 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.10.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.10.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Improved handling of communication issues related to receiving tasks
+  from the Compute web services.
+
+Changed
+^^^^^^^
+
+- Pin Parsl version requirement to ``2023.12.18``.
+
+Development
+^^^^^^^^^^^
+
+-   Update the ``daily`` workflow.
+    -   Add a timeout to the smoke test job.
+    -   Use virtual environments to isolate dependencies that Safety is checking.
+    -   Enforce a singular Python version across all configured jobs.
+
 .. _changelog-2.9.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.9.0
