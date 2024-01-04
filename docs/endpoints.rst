@@ -262,6 +262,27 @@ following:
    $ sudo systemctl restart my-globus-compute-endpoint.service
 
 
+AMQP Port
+---------
+
+Endpoints receive tasks and communicate task results via the AMQP messaging protocol.
+As of v2.11.0, newly configured endpoints use AMQP over port 443 by default, since
+firewall rules usually leave that port open. In case 443 is not open on a particular
+cluster, the port to use can be changed in the endpoint config via the ``amqp_port``
+option, like so:
+
+.. code-block:: yaml
+
+  amqp_port: 5671
+  display_name: My Endpoint
+  engine: ...
+
+Note that only ports 5671, 5672, and 443 are supported with the Compute hosted services.
+Also note that when ``amqp_port`` is omitted from the config, the port is based on the
+connection URL the endpoint receives after registering itself with the services, which
+typically means port 5671.
+
+
 Example configurations
 ----------------------
 
