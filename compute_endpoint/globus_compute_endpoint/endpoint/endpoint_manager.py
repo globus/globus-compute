@@ -162,17 +162,17 @@ class EndpointManager:
                     HTTPStatus.LOCKED,
                     HTTPStatus.NOT_FOUND,
                 ):
-                    exit(os.EX_UNAVAILABLE)
+                    sys.exit(os.EX_UNAVAILABLE)
                 elif e.http_status in (
                     HTTPStatus.BAD_REQUEST,
                     HTTPStatus.UNPROCESSABLE_ENTITY,
                 ):
-                    exit(os.EX_DATAERR)
+                    sys.exit(os.EX_DATAERR)
                 raise
             except NetworkError as e:
                 log.exception("Network error while registering multi-user endpoint")
                 log.critical(f"Network failure; unable to register endpoint: {e}")
-                exit(os.EX_TEMPFAIL)
+                sys.exit(os.EX_TEMPFAIL)
 
         upstream_ep_uuid = reg_info.get("endpoint_id")
         if endpoint_uuid and upstream_ep_uuid != endpoint_uuid:
@@ -180,7 +180,7 @@ class EndpointManager:
                 "Unexpected response from server: mismatched endpoint id."
                 f"\n  Expected: {endpoint_uuid}, received: {upstream_ep_uuid}"
             )
-            exit(os.EX_SOFTWARE)
+            sys.exit(os.EX_SOFTWARE)
 
         endpoint_uuid = str(upstream_ep_uuid)  # convenience
         self._endpoint_uuid_str = endpoint_uuid
@@ -208,7 +208,7 @@ class EndpointManager:
                 )
                 log.error(msg)
                 print(msg, file=sys.stderr)
-                exit(os.EX_OSFILE)
+                sys.exit(os.EX_OSFILE)
 
             # Only map identities if possibility of *changing* uid; otherwise
             # we enforce that the identity of UEPs must match the
@@ -223,7 +223,7 @@ class EndpointManager:
                 msg = f"({type(e).__name__}) {e}"
                 log.error(msg)
                 print(msg, file=sys.stderr)
-                exit(os.EX_NOPERM)
+                sys.exit(os.EX_NOPERM)
 
             except Exception as e:
                 msg = (
@@ -233,7 +233,7 @@ class EndpointManager:
                 log.debug(msg, exc_info=e)
                 log.error(msg)
                 print(msg, file=sys.stderr)
-                exit(os.EX_CONFIG)
+                sys.exit(os.EX_CONFIG)
 
         try:
             cq_info = reg_info["command_queue_info"]
@@ -244,7 +244,7 @@ class EndpointManager:
                 "Invalid or unexpected registration data structure:"
                 f" ({e.__class__.__name__}) {e}"
             )
-            exit(os.EX_DATAERR)
+            sys.exit(os.EX_DATAERR)
 
         if config.amqp_port:
             cq_info["connection_url"] = update_url_port(
@@ -866,4 +866,4 @@ class EndpointManager:
             log.debug(f"Failed to exec for {uname}", exc_info=e)
         finally:
             # Only executed if execvpe fails (or isn't reached)
-            exit(exit_code)
+            sys.exit(exit_code)
