@@ -496,10 +496,10 @@ class EndpointManager:
                 if props.content_type != "application/json":
                     raise ValueError("Invalid message type; expecting JSON")
 
-                msg = json.loads(body)
-                command = msg.get("command")
-                command_args = msg.get("args", [])
-                command_kwargs = msg.get("kwargs", {})
+                cmd_msg = json.loads(body)
+                command = cmd_msg.get("command")
+                command_args = cmd_msg.get("args", [])
+                command_kwargs = cmd_msg.get("kwargs", {})
             except Exception as e:
                 log.error(
                     "Unable to deserialize Globus Compute services command."
@@ -511,20 +511,22 @@ class EndpointManager:
             if abs(now - server_cmd_ts) > max_skew_s:
                 server_pp_ts = datetime.fromtimestamp(server_cmd_ts).strftime("%c")
                 endp_pp_ts = datetime.fromtimestamp(now).strftime("%c")
-                log.warning(
+                msg = (
                     "Ignoring command from server"
                     "\nCommand too old or skew between system clocks is too large."
-                    f"\n  Command timestamp:  {server_cmd_ts:,} ({server_pp_ts})"
-                    f"\n  Endpoint timestamp: {now:,} ({endp_pp_ts})"
+                    f"\n  Command timestamp:  {server_cmd_ts} ({server_pp_ts})"
+                    f"\n  Endpoint timestamp: {now} ({endp_pp_ts})"
                 )
+                log.warning(msg)
                 continue
 
             try:
-                effective_identity = msg["globus_effective_identity"]
-                identity_set = msg["globus_identity_set"]
-                globus_username = msg["globus_username"]
+                effective_identity = cmd_msg["globus_effective_identity"]
+                identity_set = cmd_msg["globus_identity_set"]
+                globus_username = cmd_msg["globus_username"]
             except Exception as e:
-                log.error(f"Invalid server command.  ({e.__class__.__name__}) {e}")
+                msg = f"Invalid server command.  ({e.__class__.__name__}) {e}"
+                log.error(msg)
                 continue
 
             identity_for_log = (
@@ -540,10 +542,11 @@ class EndpointManager:
 
                 cmd_identities = {ident["sub"] for ident in identity_set}
                 if not parent_identities.intersection(cmd_identities):
-                    log.error(
+                    msg = (
                         "Ignoring start request for untrusted identity."
                         f"{identity_for_log}"
                     )
+                    log.error(msg)
                     continue
                 local_user_rec = self._mu_user
                 local_username = self._mu_user.pw_name
@@ -554,13 +557,14 @@ class EndpointManager:
                     if not local_username:
                         raise LookupError()
                 except LookupError as e:
-                    log.error(
+                    msg = (
                         "Identity failed to map to a local user name."
                         f"  ({e.__class__.__name__}) {e}{identity_for_log}"
                     )
+                    log.error(msg)
                     continue
                 except Exception as e:
-                    msg = "Unhandled error attempting to map user."
+                    msg = "Unhandled error attempting to map to a local user name."
                     log.debug(f"{msg}{identity_for_log}", exc_info=e)
                     log.error(f"{msg}  ({e.__class__.__name__}) {e}{identity_for_log}")
                     continue
@@ -569,12 +573,13 @@ class EndpointManager:
                     local_user_rec = pwd.getpwnam(local_username)
 
                 except Exception as e:
-                    log.error(
-                        f"({type(e).__name__}) {e}\n"
+                    exc_type = type(e).__name__
+                    msg = (
                         "  Identity mapped to a local user name, but local user does"
                         " not exist."
                         f"\n  Local user name: {local_username}{identity_for_log}"
                     )
+                    log.error(f"({type(e).__name__}) {e}\n{msg}")
                     continue
 
             try:
@@ -591,13 +596,17 @@ class EndpointManager:
                     f" (Globus effective identity: {effective_identity})."
                 )
             except (InvalidCommandError, InvalidUserError) as e:
-                log.error(f"({type(e).__name__}) {e}{identity_for_log}")
+                exc_type = type(e).__name__
+                log.error(f"({exc_type}) {e}{identity_for_log}")
 
             except Exception:
+                msg_a = _redact_url_creds(str(command_args), redact_user=False)
+                msg_kw = _redact_url_creds(str(command_kwargs), redact_user=False)
+
                 log.exception(
                     f"Unable to execute command: {command}\n"
-                    f"    args: {command_args}\n"
-                    f"  kwargs: {command_kwargs}{identity_for_log}"
+                    f"    args: {msg_a}\n"
+                    f"  kwargs: {msg_kw}{identity_for_log}"
                 )
 
     def cmd_start_endpoint(
@@ -862,7 +871,11 @@ class EndpointManager:
             # not executed, except perhaps in testing
             exit_code += 1  # type: ignore
         except Exception as e:
-            log.error(f"Unable to exec for {uname} - ({e.__class__.__name__}) {e}")
+            msg = (
+                f"Unable to start user endpoint process for {uname}"
+                f" [exit code: {exit_code}; ({e.__class__.__name__}) {e}]"
+            )
+            log.error(msg)
             log.debug(f"Failed to exec for {uname}", exc_info=e)
         finally:
             # Only executed if execvpe fails (or isn't reached)
