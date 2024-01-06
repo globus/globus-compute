@@ -379,9 +379,10 @@ class EndpointManager:
             msg_out = sys.stderr
 
         if msg_out:
-            hl, r = "\033[104m", "\033[m"
+            # hide cursor, highlight color, reset
+            hc, hl, r = "\033[?25l", "\033[104m", "\033[m"
             pld = f"{hl}{self._endpoint_uuid_str}{r}"
-            print(f"        >>> Multi-User Endpoint ID: {pld} <<<", file=msg_out)
+            print(f"{hc}        >>> Multi-User Endpoint ID: {pld} <<<", file=msg_out)
 
         self._install_signal_handlers()
 
@@ -431,6 +432,9 @@ class EndpointManager:
             "Shutdown complete."
             f"\n---------- Endpoint Manager ends: {self._endpoint_uuid_str}\n\n"
         )
+        if msg_out:
+            # re-enable cursor visibility
+            print("\033[?25h", end="", file=msg_out)
 
     def _event_loop(self):
         self._command.start()
@@ -486,9 +490,8 @@ class EndpointManager:
                 if self._command_stop_event.is_set():
                     self._time_to_stop = True
                 if sys.stderr.isatty():
-                    print(
-                        f"\r{time.strftime('%c')}", end="", flush=True, file=sys.stderr
-                    )
+                    time_fmt = time.strftime("%c")
+                    print(f"  ----> {time_fmt}\r", end="", flush=True, file=sys.stderr)
                 continue
 
             try:
