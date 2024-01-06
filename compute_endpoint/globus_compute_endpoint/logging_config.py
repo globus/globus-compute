@@ -22,30 +22,32 @@ DEFAULT_FORMAT = (
     "%(message)s"
 )
 
+_und = "\033[4m"
 _ital = "\033[3m"
-_redb = "\033[41m"
-_teal = "\033[32m"
-_yel = "\033[33m"
+_green = "\033[32m"
+_bblack = "\033[1;30m"
 _byel = "\033[93m"
-_yelb = "\033[43m"
 _purp = "\033[35m"
 _cyan = "\033[36m"
 _gray = "\033[37m"
-_grayonb = "\033[37;40m"
+_bredonb = "\033[91;40m"
+_yelonb = "\033[33;40m"
+_grayonb = "\033[2;37;40m"
 _r = "\033[m"
-_C_BASE = (
-    f"{_yel}%(asctime)s{_r} {_ital}%(levelname)s{_r}"
-    " %(processName)s-%(process)d %(threadName)s-%(thread)d"
-    f" %(name)s:{_cyan}%(lineno)d{_r} {_purp}%(funcName)s{_r}"
+_C_FMT = (
+    f"{_und}%(asctime)s{_r} {_ital}{{LEVEL_COLOR}}%(levelname)s{_r}"
+    f" %(processName)s-%(process)d {_green}%(threadName)s-%(thread)d{_r}"
+    f" {_bblack}%(name)s{_r}:{_cyan}%(lineno)d{_r} {_purp}%(funcName)s{_r}"
+    f" {{LEVEL_COLOR}}%(message)s{_r}"
 )
-COLOR_ERROR = _redb
-COLOR_WARNING = _yelb
-COLOR_INFO = _gray
-COLOR_DEBUG = _grayonb
-C_ERROR_FMT = _C_BASE + f" {COLOR_ERROR}%(message)s{_r}"
-C_WARNING_FMT = _C_BASE + f" {COLOR_WARNING}%(message)s{_r}"
-C_INFO_FMT = _C_BASE + f" {COLOR_INFO}%(message)s{_r}"
-C_DEBUG_FMT = _C_BASE + f" {COLOR_DEBUG}%(message)s{_r}"
+_COL_E = _bredonb
+_COL_W = _yelonb
+_COL_D = _grayonb
+_COL_I = _gray
+C_E_FMT = _C_FMT.format(LEVEL_COLOR=_COL_E)
+C_W_FMT = _C_FMT.format(LEVEL_COLOR=_COL_W)
+C_I_FMT = _C_FMT.format(LEVEL_COLOR=_COL_I)
+C_D_FMT = _C_FMT.format(LEVEL_COLOR=_COL_D)
 
 
 class DatetimeFormatter(logging.Formatter):
@@ -86,12 +88,7 @@ class ComputeConsoleFormatter(logging.Formatter):
         if fmt:
             d_fmt, i_fmt, w_fmt, e_fmt = fmt, fmt, fmt, fmt
         else:
-            d_fmt, i_fmt, w_fmt, e_fmt = (
-                C_DEBUG_FMT,
-                C_INFO_FMT,
-                C_WARNING_FMT,
-                C_ERROR_FMT,
-            )
+            d_fmt, i_fmt, w_fmt, e_fmt = C_D_FMT, C_I_FMT, C_W_FMT, C_E_FMT
 
         if not self.use_color:
             ansi_re = re.compile("\033.*?m")
@@ -115,13 +112,13 @@ class ComputeConsoleFormatter(logging.Formatter):
         if self.use_color:
             # Highlight all UUIDs
             if record.levelno > logging.WARNING:
-                end_coloring = COLOR_ERROR
+                end_coloring = _COL_E
             elif record.levelno > logging.INFO:
-                end_coloring = COLOR_WARNING
+                end_coloring = _COL_W
             elif record.levelno > logging.DEBUG:
-                end_coloring = COLOR_INFO
+                end_coloring = _COL_I
             else:
-                end_coloring = COLOR_DEBUG
+                end_coloring = _COL_D
 
             repl = f"{_byel}\\1{_r}{end_coloring}"
             try:
