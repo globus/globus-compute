@@ -140,6 +140,59 @@ def mock_pim(request):
 
 
 @pytest.fixture
+def mock_props():
+    yield pika.BasicProperties(
+        content_type="application/json",
+        content_encoding="utf-8",
+        timestamp=round(time.time()),
+        expiration="10000",
+    )
+
+
+@pytest.fixture
+def mock_unprivileged_epmanager(mocker, conf_dir, mock_client, mock_conf):
+    mock_os = mocker.patch(f"{_MOCK_BASE}os")
+    mock_os.getuid.return_value = 123456
+    mock_os.getgid.side_effect = (
+        AssertionError("getgid: unprivileged should not care"),
+    )
+
+    mock_os.fork.return_value = 0
+    mock_os.pipe.return_value = 40, 41
+    mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
+    mock_os.open.return_value = 4
+
+    mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
+    mock_pwd.getpwnam.side_effect = AssertionError(
+        "getpwnam: unprivileged should not care"
+    )
+    mock_pwd.getpwuid.side_effect = (
+        _mock_localuser_rec,  # Initial "who am I?"
+        _mock_localuser_rec,  # Registration's get_metadata()
+        AssertionError("getpwuid: should not request user in event loop!"),
+    )
+
+    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
+
+    ep_uuid, mock_gcc = mock_client
+    ident = "some_identity_uuid"
+    mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
+        "identity_set": [{"sub": ident}]
+    }
+
+    mock_conf.identity_mapping_config_path = None
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    assert em.identity_mapper is None
+
+    em._command_queue = mocker.Mock()
+    em._command_stop_event.set()
+
+    yield conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em
+    assert em.identity_mapper is None
+    em.request_shutdown(None, None)
+
+
+@pytest.fixture
 def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = 0
@@ -147,7 +200,7 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
 
     mock_os.fork.return_value = 0
     mock_os.pipe.return_value = 40, 41
-    mock_os.dup2.side_effect = [0, 1, 2]
+    mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.return_value = 4
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
@@ -171,7 +224,6 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     mock_pim.map_identity.return_value = "an_account_that_doesnt_exist_abc123"
 
     ident = "epmanager_some_identity"
-    _, mock_gcc = mock_client
     mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
         "identity_set": [{"sub": ident}]
     }
@@ -186,15 +238,10 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
 
 
 @pytest.fixture
-def successful_exec_from_mocked_root(mocker, epmanager_as_root, user_conf_template):
+def successful_exec_from_mocked_root(
+    mocker, epmanager_as_root, user_conf_template, mock_props
+):
     conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_root
-
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
 
     ident = "successful_exec_some_identity"
     _, mock_gcc = mock_client
@@ -209,7 +256,7 @@ def successful_exec_from_mocked_root(mocker, epmanager_as_root, user_conf_templa
         "command": "cmd_start_endpoint",
         "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
     }
-    queue_item = (1, props, json.dumps(pld).encode())
+    queue_item = (1, mock_props, json.dumps(pld).encode())
 
     em.identity_mapper = mocker.Mock()
     em.identity_mapper.map_identity.return_value = "typicalglobusname@somehost.org"
@@ -443,10 +490,10 @@ def test_handles_invalid_reg_info(
     if not should_succeed:
         with pytest.raises(SystemExit) as pyexc:
             EndpointManager(conf_dir, ep_uuid, mock_conf)
-            assert pyexc.value.code == os.EX_DATAERR, "Expected meaningful exit code"
-            assert mock_log.error.called
-            a = mock_log.error.call_args[0][0]
-            assert "Invalid or unexpected" in a
+        assert pyexc.value.code == os.EX_DATAERR, "Expected meaningful exit code"
+        assert mock_log.error.called
+        a = mock_log.error.call_args[0][0]
+        assert "Invalid or unexpected" in a
     else:
         # "null" test
         EndpointManager(conf_dir, ep_uuid, mock_conf)
@@ -833,31 +880,24 @@ def test_iterates_even_if_no_commands(mocker, epmanager_as_root):
     assert em._command_queue.get.called
 
 
-def test_emits_command_requested_debug(mocker, epmanager_as_root):
+def test_emits_command_requested_debug(mocker, epmanager_as_root, mock_props):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
-
-    queue_item = [1, props, json.dumps({"asdf": 123}).encode()]
+    queue_item = [1, mock_props, json.dumps({"asdf": 123}).encode()]
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
     assert not mock_log.warning.called
 
-    props.headers = {"debug": False}
+    mock_props.headers = {"debug": False}
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._time_to_stop = False
     em._event_loop()
     assert not mock_log.warning.called
 
-    props.headers = {"debug": True}
+    mock_props.headers = {"debug": True}
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._time_to_stop = False
     em._event_loop()
@@ -872,24 +912,18 @@ def test_emits_command_requested_debug(mocker, epmanager_as_root):
 
 
 def test_emitted_debug_command_credentials_removed(
-    mocker, epmanager_as_root, randomstring
+    mocker, epmanager_as_root, randomstring, mock_props
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-        headers={"debug": True},
-    )
+    mock_props.headers = {"debug": True}
 
     pword = randomstring()
     pld = {"creds": f"scheme://user:{pword}@some.fqdn:1234/some/path"}
-    queue_item = [1, props, json.dumps(pld).encode()]
+    queue_item = [1, mock_props, json.dumps(pld).encode()]
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
     assert mock_log.warning.called
@@ -903,20 +937,15 @@ def test_emitted_debug_command_credentials_removed(
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_command_verifies_content_type(mocker, epmanager_as_root):
+def test_command_verifies_content_type(mocker, epmanager_as_root, mock_props):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
-    props = pika.BasicProperties(
-        content_type="asdfasdfasdfasd",  # the test
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
+    mock_props.content_type = "asdfasdfasdfasd"  # the test
 
-    queue_item = [1, props, json.dumps({"asdf": 123}).encode()]
+    queue_item = [1, mock_props, json.dumps({"asdf": 123}).encode()]
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
     assert mock_log.error.called
@@ -926,20 +955,15 @@ def test_command_verifies_content_type(mocker, epmanager_as_root):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_ignores_stale_commands(mocker, epmanager_as_root):
+def test_ignores_stale_commands(mocker, epmanager_as_root, mock_props):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
-    props = pika.BasicProperties(
-        content_type="application/json",  # the test
-        content_encoding="utf-8",
-        timestamp=round(time.time()) + 10 * 60,  # ten-minute clock skew, "apparently"
-        expiration="10000",
-    )
+    mock_props.timestamp = round(time.time()) + 10 * 60  # ten-minute clock skew
 
-    queue_item = [1, props, json.dumps({"asdf": 123}).encode()]
+    queue_item = [1, mock_props, json.dumps({"asdf": 123}).encode()]
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
     assert mock_log.warning.called
@@ -951,18 +975,11 @@ def test_ignores_stale_commands(mocker, epmanager_as_root):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root):
+def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root, mock_props):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
 
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
-
-    queue_item = (1, props, json.dumps({"asdf": 123}).encode())
+    queue_item = (1, mock_props, json.dumps({"asdf": 123}).encode())
 
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
@@ -974,24 +991,71 @@ def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root):
-    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
+@pytest.mark.parametrize(
+    "is_invalid,idset",
+    (
+        (True, None),
+        (True, 123),
+        (True, "some_ident"),
+        (True, [{"a": "123"}]),
+        (False, ""),
+        (False, ()),
+    ),
+)
+def test_unprivileged_handles_identity_set_robustly(
+    mocker, mock_props, mock_unprivileged_epmanager, is_invalid, idset
+):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    cmd_payload = {
+        "globus_effective_identity": "abc",
+        "globus_identity_set": idset,
+        "globus_username": "a@b.com",
+    }
+    queue_item = (1, mock_props, json.dumps(cmd_payload).encode())
+
+    *_, em = mock_unprivileged_epmanager
+    em._command_queue.get.side_effect = (queue_item, queue.Empty())
+    em._event_loop()
+
+    if is_invalid:
+        a, _k = mock_log.debug.call_args
+        assert "Invalid identity set" in a[0]
+    a, _k = mock_log.error.call_args
+    assert "Ignoring start request for untrusted identity" in a[0]
+
+
+def test_unprivileged_happy_path(
+    mocker, mock_props, mock_unprivileged_epmanager, mock_client
+):
+    *_, mock_client, mock_os, _, em = mock_unprivileged_epmanager
+    _, mock_gcc = mock_client
+    ident_rv = mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value
+
+    mocker.patch(f"{_MOCK_BASE}log")
+    cmd_payload = {
+        "globus_effective_identity": "abc",
+        "globus_identity_set": ident_rv["identity_set"],
+        "globus_username": "a@b.com",
+        "command": "cmd_start_endpoint",
+    }
+    queue_item = (1, mock_props, json.dumps(cmd_payload).encode())
+
+    em._command_queue.get.side_effect = (queue_item, queue.Empty())
+    em.cmd_start_endpoint = mocker.Mock(spec=em.cmd_start_endpoint)
+    em._event_loop()
+    assert em.cmd_start_endpoint.called
+
+
+def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root, mock_props):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
-
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
 
     pld = {
         "globus_username": "a",
         "globus_effective_identity": 1,
         "globus_identity_set": [],
     }
-    queue_item = (1, props, json.dumps(pld).encode())
+    queue_item = (1, mock_props, json.dumps(pld).encode())
     em.identity_mapper.map_identity.return_value = None
 
     em._command_queue = mocker.Mock()
@@ -1004,29 +1068,48 @@ def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root):
     assert "(LookupError)" in a, "Expected exception name in log line"
     assert "Globus effective identity: " in a
     assert str(pld["globus_effective_identity"]) in a
-    assert em._command.ack.called, "Command always ACKed"
+
+
+def test_gracefully_handles_identity_mapping_error(
+    mocker, epmanager_as_root, randomstring, mock_props
+):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    *_, em = epmanager_as_root
+
+    pld = {
+        "globus_username": "a",
+        "globus_effective_identity": randomstring(),
+        "globus_identity_set": [],
+    }
+    exc_text = "Test engineered: " + randomstring()
+    queue_item = (1, mock_props, json.dumps(pld).encode())
+    em.identity_mapper.map_identity.side_effect = MemoryError(exc_text)
+
+    em._command_queue = mocker.Mock()
+    em._command_stop_event.set()
+    em._command_queue.get.side_effect = [queue_item, queue.Empty()]
+
+    em._event_loop()
+    a = mock_log.error.call_args[0][0]
+    assert "Unhandled error attempting to map to a local user name" in a
+    assert "(MemoryError)" in a, "Expected exception name in log line"
+    assert exc_text in a
+    assert "Globus effective identity: " in a
+    assert str(pld["globus_effective_identity"]) in a
 
 
 @pytest.mark.parametrize(
     "cmd_name", ("", "_private", "9c", "valid_but_do_not_exist", " ", "a" * 101)
 )
 def test_handles_unknown_or_invalid_command_gracefully(
-    mocker, epmanager_as_root, cmd_name
+    mocker, epmanager_as_root, cmd_name, mock_props
 ):
-    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
 
     mocker.patch(f"{_MOCK_BASE}pwd")
     em.identity_mapper = mocker.Mock()
     em.identity_mapper.map_identity.return_value = "a"
-
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
 
     pld = {
         "globus_username": "a",
@@ -1035,7 +1118,7 @@ def test_handles_unknown_or_invalid_command_gracefully(
         "command": cmd_name,
         "user_opts": {"heartbeat": 10},
     }
-    queue_item = (1, props, json.dumps(pld).encode())
+    queue_item = (1, mock_props, json.dumps(pld).encode())
 
     mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
 
@@ -1053,9 +1136,8 @@ def test_handles_unknown_or_invalid_command_gracefully(
 
 
 def test_handles_local_user_not_found_gracefully(
-    mocker, epmanager_as_root, randomstring
+    mocker, epmanager_as_root, randomstring, mock_props
 ):
-    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, mock_pwd, em = epmanager_as_root
 
@@ -1064,19 +1146,12 @@ def test_handles_local_user_not_found_gracefully(
     em.identity_mapper.map_identity.return_value = invalid_user_name
     mock_pwd.getpwnam.side_effect = KeyError(invalid_user_name)
 
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
-
     pld = {
         "globus_username": "a",
         "globus_effective_identity": "a",
         "globus_identity_set": "a",
     }
-    queue_item = (1, props, json.dumps(pld).encode())
+    queue_item = (1, mock_props, json.dumps(pld).encode())
 
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
@@ -1088,11 +1163,8 @@ def test_handles_local_user_not_found_gracefully(
     assert "Globus effective identity: " in a
     assert str(pld["globus_effective_identity"]) in a
 
-    assert em._command.ack.called, "Command always ACKed"
 
-
-def test_handles_failed_command(mocker, epmanager_as_root):
-    mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
+def test_handles_failed_command(mocker, epmanager_as_root, mock_props):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(
         f"{_MOCK_BASE}EndpointManager.cmd_start_endpoint", side_effect=Exception()
@@ -1103,13 +1175,6 @@ def test_handles_failed_command(mocker, epmanager_as_root):
     em.identity_mapper = mocker.Mock()
     em.identity_mapper.map_identity.return_value = "a"
 
-    props = pika.BasicProperties(
-        content_type="application/json",
-        content_encoding="utf-8",
-        timestamp=round(time.time()),
-        expiration="10000",
-    )
-
     pld = {
         "globus_username": "a",
         "globus_effective_identity": "a",
@@ -1117,7 +1182,7 @@ def test_handles_failed_command(mocker, epmanager_as_root):
         "command": "cmd_start_endpoint",
         "user_opts": {"heartbeat": 10},
     }
-    queue_item = (1, props, json.dumps(pld).encode())
+    queue_item = (1, mock_props, json.dumps(pld).encode())
 
     mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
 
@@ -1484,7 +1549,7 @@ def test_pipe_size_limit(mocker, successful_exec_from_mocked_root, conf_size):
         (False, {"foo": "bar"}),
     ],
 )
-def test_render_user_config(data):
+def test_render_user_config(mocker, data):
     is_valid, user_opts = data
     template = "heartbeat_period: {{ heartbeat }}"
 
@@ -1493,9 +1558,11 @@ def test_render_user_config(data):
         rendered_dict = yaml.safe_load(rendered)
         assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
     else:
-        with pytest.raises(jinja2.exceptions.UndefinedError) as e:
+        mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+        with pytest.raises(jinja2.exceptions.UndefinedError):
             render_config_user_template(template, {}, user_opts)
-            assert "Missing required" in str(e)
+        a, _k = mock_log.debug.call_args
+        assert "Missing required" in a[0]
 
 
 def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, conf_dir):

@@ -540,7 +540,17 @@ class EndpointManager:
                 # we are not a privileged user, so *only* allow the identity (or
                 # linked identities) of the parent process auth'd to run tasks
 
-                cmd_identities = {ident["sub"] for ident in identity_set}
+                try:
+                    cmd_identities = {ident["sub"] for ident in identity_set}
+                except Exception as e:
+                    log.debug(
+                        "Invalid identity set: %s [({%s}) %s]",
+                        identity_set,
+                        type(e).__name__,
+                        e,
+                    )
+                    cmd_identities = set()
+
                 if not parent_identities.intersection(cmd_identities):
                     msg = (
                         "Ignoring start request for untrusted identity."
@@ -566,7 +576,7 @@ class EndpointManager:
                 except Exception as e:
                     msg = "Unhandled error attempting to map to a local user name."
                     log.debug(f"{msg}{identity_for_log}", exc_info=e)
-                    log.error(f"{msg}  ({e.__class__.__name__}) {e}{identity_for_log}")
+                    log.error(f"{msg}  ({type(e).__name__}) {e}{identity_for_log}")
                     continue
 
                 try:

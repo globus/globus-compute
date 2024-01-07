@@ -267,10 +267,10 @@ def render_config_user_template(
     try:
         return template.render(**_user_opts)
     except jinja2.exceptions.UndefinedError as e:
-        log.debug(f"Missing required user option(s): {e}")
+        log.debug("Missing required user option: %s", e)
         raise
     except jinja2.exceptions.SecurityError as e:
-        log.debug(f"Template tried accessing insecure code: {e}")
+        log.debug("Template tried accessing insecure code: %s", e)
         raise
 
 
