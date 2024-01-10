@@ -9,11 +9,11 @@ function execution on existing infrastructure including clouds, clusters, and su
 .. |licence| image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
    :target: https://github.com/funcx-faas/funcX/blob/master/LICENSE
    :alt: Apache Licence V2.0
-.. |build-status| image:: https://travis-ci.com/funcx-faas/funcX.svg?branch=master
-   :target: https://travis-ci.com/funcx-faas/funcX
+.. |build-status| image:: https://github.com/funcx-faas/funcX/actions/workflows/ci.yaml/badge.svg?branch=main
+   :target: https://github.com/funcx-faas/funcX/actions/workflows/ci.yaml
    :alt: Build status
-.. |docs| image:: https://readthedocs.org/projects/funcx/badge/?version=latest
-   :target: https://funcx.readthedocs.io/en/latest/
+.. |docs| image:: https://readthedocs.org/projects/globus-compute/badge/?version=latest
+   :target: https://globus-compute.readthedocs.io/en/latest/
    :alt: Documentation Status
 .. |NSF-2004894| image:: https://img.shields.io/badge/NSF-2004894-blue.svg
    :target: https://nsf.gov/awardsearch/showAward?AWD_ID=2004894
@@ -24,10 +24,10 @@ function execution on existing infrastructure including clouds, clusters, and su
 
 
 .. image:: docs/_static/images/globus-300x300-blue.png
-  :target: https://www.funcx.org
+  :target: https://www.globus.org/compute
   :width: 200
 
-Website: https://www.funcx.org
+Website: https://www.globus.org/compute
 
 Documentation: https://globus-compute.readthedocs.io/en/latest/
 
@@ -54,5 +54,5 @@ To use our example notebooks you will need Jupyter.::
 Documentation
 =============
 
-Complete documentation for Globus Compute is available `here <https://funcx.readthedocs.io>`_
+Complete documentation for Globus Compute is available `here <https://globus-compute.readthedocs.io>`_
 
