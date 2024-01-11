@@ -25,14 +25,40 @@ _LOCAL_ENDPOINT_ID = os.getenv("COMPUTE_LOCAL_ENDPOINT_ID")
 _LOCAL_FUNCTION_ID = os.getenv("COMPUTE_LOCAL_KNOWN_FUNCTION_ID")
 
 _CONFIGS = {
-    "dev": {
-        "client_args": {"environment": "dev"},
-        # assert versions are as expected on dev
+    "test": {
+        "client_args": {"environment": "test"},
         "forwarder_min_version": "0.3.5",
         "api_min_version": "0.3.5",
-        # This fn is public
-        "public_hello_fn_uuid": "f84351f9-6f82-45d8-8eca-80d8f73645be",
-        "endpoint_uuid": "2238617a-8756-4030-a8ab-44ffb1446092",
+        "public_hello_fn_uuid": "232966fe-0b32-4434-8cd0-0ca217f8173c",
+        "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
+    },
+    "sandbox": {
+        "client_args": {"environment": "sandbox"},
+        "forwarder_min_version": "0.3.5",
+        "api_min_version": "0.3.5",
+        "public_hello_fn_uuid": "3bf4b413-d288-46b7-9808-0cad38db7dec",
+        "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
+    },
+    "preview": {
+        "client_args": {"environment": "preview"},
+        "forwarder_min_version": "0.3.5",
+        "api_min_version": "0.3.5",
+        "public_hello_fn_uuid": "566dfa52-4938-4c01-b6f5-eba4cb9898aa",
+        "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
+    },
+    "integration": {
+        "client_args": {"environment": "integration"},
+        "forwarder_min_version": "0.3.5",
+        "api_min_version": "0.3.5",
+        "public_hello_fn_uuid": "9815b262-b51c-48d5-8687-712f9616b9f1",
+        "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
+    },
+    "staging": {
+        "client_args": {"environment": "staging"},
+        "forwarder_min_version": "0.3.5",
+        "api_min_version": "0.3.5",
+        "public_hello_fn_uuid": "1e840c9d-1ff2-4e45-bf09-248f717df584",
+        "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
     },
     "prod": {
         # By default tests are against production, which means we do not need to pass
