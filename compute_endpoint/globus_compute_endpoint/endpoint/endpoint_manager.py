@@ -43,6 +43,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import 
 from globus_compute_endpoint.endpoint.utils import (
     _redact_url_creds,
     is_privileged,
+    send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
 from globus_sdk import GlobusAPIError, NetworkError
@@ -64,20 +65,20 @@ class InvalidUserError(Exception):
 
 class UserEndpointRecord(BaseModel):
     ep_name: str
-    local_user_info: pwd.struct_passwd
+    local_user_info: t.Optional[pwd.struct_passwd]
     arguments: str
 
     @property
     def uid(self) -> int:
-        return self.local_user_info.pw_uid
+        return self.local_user_info.pw_uid if self.local_user_info else -1
 
     @property
     def gid(self) -> int:
-        return self.local_user_info.pw_gid
+        return self.local_user_info.pw_gid if self.local_user_info else -1
 
     @property
     def uname(self) -> str:
-        return self.local_user_info.pw_name
+        return self.local_user_info.pw_name if self.local_user_info else ""
 
 
 T_CMD_START_ARGS = t.Tuple[
@@ -306,11 +307,7 @@ class EndpointManager:
                 except ValueError:
                     rc = -127  # invalid signal number
 
-                try:
-                    uep_record = self._children.pop(pid)
-                except KeyError:
-                    log.exception(f"unknown child PID {pid}")
-                    uep_record = None
+                uep_record = self._children.pop(pid, None)
 
                 proc_args = f" [{uep_record.arguments}]" if uep_record else ""
                 if not rc:
@@ -521,6 +518,7 @@ class EndpointManager:
                     f"\n  Endpoint timestamp: {now} ({endp_pp_ts})"
                 )
                 log.warning(msg)
+                self.cmd_send_failure(command_kwargs, msg=msg)
                 continue
 
             try:
@@ -530,6 +528,7 @@ class EndpointManager:
             except Exception as e:
                 msg = f"Invalid server command.  ({e.__class__.__name__}) {e}"
                 log.error(msg)
+                self.cmd_send_failure(command_kwargs, msg=msg)
                 continue
 
             identity_for_log = (
@@ -560,6 +559,9 @@ class EndpointManager:
                         f"{identity_for_log}"
                     )
                     log.error(msg)
+                    self.cmd_send_failure(
+                        command_kwargs, msg=msg, user_ident=identity_for_log
+                    )
                     continue
                 local_user_rec = self._mu_user
                 local_username = self._mu_user.pw_name
@@ -572,14 +574,22 @@ class EndpointManager:
                 except LookupError as e:
                     msg = (
                         "Identity failed to map to a local user name."
-                        f"  ({e.__class__.__name__}) {e}{identity_for_log}"
+                        f"  ({type(e).__name__}) {e}{identity_for_log}"
                     )
                     log.error(msg)
+                    self.cmd_send_failure(
+                        command_kwargs, msg=msg, user_ident=identity_for_log
+                    )
                     continue
                 except Exception as e:
                     msg = "Unhandled error attempting to map to a local user name."
                     log.debug(f"{msg}{identity_for_log}", exc_info=e)
                     log.error(f"{msg}  ({type(e).__name__}) {e}{identity_for_log}")
+
+                    fail_msg = f"{msg}{identity_for_log}"
+                    self.cmd_send_failure(
+                        command_kwargs, msg=fail_msg, user_ident=identity_for_log
+                    )
                     continue
 
                 try:
@@ -592,7 +602,11 @@ class EndpointManager:
                         " not exist."
                         f"\n  Local user name: {local_username}{identity_for_log}"
                     )
-                    log.error(f"({type(e).__name__}) {e}\n{msg}")
+                    log.error(f"({exc_type}) {e}\n{msg}")
+                    fail_msg = f"({exc_type})\n{msg}"
+                    self.cmd_send_failure(
+                        command_kwargs, msg=fail_msg, user_ident=identity_for_log
+                    )
                     continue
 
             try:
@@ -611,6 +625,15 @@ class EndpointManager:
             except (InvalidCommandError, InvalidUserError) as e:
                 exc_type = type(e).__name__
                 log.error(f"({exc_type}) {e}{identity_for_log}")
+                msg = (
+                    f"({exc_type}) unexpected error; this is due to either an endpoint"
+                    " misconfiguration or a programming error.  If you are able to"
+                    " recreate this error message at will, consider reaching out to the"
+                    " endpoint administrator or the Globus Compute team."
+                )
+                self.cmd_send_failure(
+                    command_kwargs, msg=msg, user_ident=identity_for_log
+                )
 
             except Exception:
                 msg_a = _redact_url_creds(str(command_args), redact_user=False)
@@ -621,6 +644,63 @@ class EndpointManager:
                     f"    args: {msg_a}\n"
                     f"  kwargs: {msg_kw}{identity_for_log}"
                 )
+                self.cmd_send_failure(command_kwargs, user_ident=identity_for_log)
+
+    def cmd_send_failure(
+        self,
+        kwargs: dict,
+        msg: str | None = None,
+        user_ident: str = "",
+        fork: bool = True,
+    ):
+        """
+        Given a set of AMQP credentials, send a message to the Compute web services
+        that the given endpoint has failed to start up.
+
+        This method conditionally forks (if ``fork == True``), but always exits.  The
+        exit is always "clean" (exit code of 0) -- this is true even if their is an
+        unhandled error as the assumption is that this is a last-ditch effort to be
+        kind to the user (better UX).  If it fails, "oh well," and then it is time for
+        the administrator to investigate the logs.
+
+        :param kwargs: A structure containing an ``amqps_creds`` key.  This should
+            match the structure as the web-service sends for a user-endpoint start
+            command.  The credentials will be utilized to send a message to the AMQP
+            service.
+
+        :param msg: This parameter will be presented to the user via the SDK as the
+            reason for failure (finishing any outstanding futures), so be mindful of
+            values passed to this parameter (e.g., sensitive information).  If ``None``
+            (as opposed to the empty string), then a default message will be sent.
+
+        :param user_ident: utilized for logging purposes for the admin for when the
+            forked process quits immediately after sending the message.
+        """
+        if fork:
+            try:
+                pid = os.fork()
+            except Exception as e:
+                log.error(f"Unable to fork child process: ({type(e).__name__}) {e}")
+                raise
+
+            if pid > 0:
+                uep_info = [f"User endpoint name: {kwargs.get('name')}"]
+                if user_ident:
+                    uep_info.extend(i.strip() for i in user_ident.strip().split("\n"))
+                info = "; ".join(uep_info)
+                args = f"Temporary process to send failure message ({info})"
+                self._children[pid] = UserEndpointRecord(
+                    ep_name=f"{pid}", local_user_info=None, arguments=args
+                )
+
+                return
+
+        try:
+            send_endpoint_startup_failure_to_amqp(kwargs["amqp_creds"], msg=msg)
+        except Exception:
+            log.exception("Unable to send user endpoint start up failure")
+        finally:
+            sys.exit()
 
     def cmd_start_endpoint(
         self,
@@ -886,10 +966,11 @@ class EndpointManager:
         except Exception as e:
             msg = (
                 f"Unable to start user endpoint process for {uname}"
-                f" [exit code: {exit_code}; ({e.__class__.__name__}) {e}]"
+                f" [exit code: {exit_code}; ({type(e).__name__}) {e}]"
             )
             log.error(msg)
             log.debug(f"Failed to exec for {uname}", exc_info=e)
+            self.cmd_send_failure(kwargs, msg=msg, fork=False)
         finally:
             # Only executed if execvpe fails (or isn't reached)
             sys.exit(exit_code)

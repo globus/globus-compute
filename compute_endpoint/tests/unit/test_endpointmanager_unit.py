@@ -886,6 +886,7 @@ def test_emits_command_requested_debug(mocker, epmanager_as_root, mock_props):
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
+    mock_props.content_type = "asdfasdf"  # quit loop early b/c test is satisfied
     queue_item = [1, mock_props, json.dumps({"asdf": 123}).encode()]
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
@@ -919,6 +920,7 @@ def test_emitted_debug_command_credentials_removed(
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
 
+    mock_props.content_type = "asdfasdf"  # quit early in loop b/c test is satisfied
     mock_props.headers = {"debug": True}
 
     pword = randomstring()
@@ -955,17 +957,23 @@ def test_command_verifies_content_type(mocker, epmanager_as_root, mock_props):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_ignores_stale_commands(mocker, epmanager_as_root, mock_props):
+def test_ignores_stale_commands(mocker, epmanager_as_root, mock_props, randomstring):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    *_, em = epmanager_as_root
+    *_, mock_os, _, em = epmanager_as_root
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
+
+    ep_name = randomstring()
+    child_pid = random.randint(2, 1000000)
+    mock_os.fork.return_value = child_pid  # remain the parent process
 
     mock_props.timestamp = round(time.time()) + 10 * 60  # ten-minute clock skew
 
-    queue_item = [1, mock_props, json.dumps({"asdf": 123}).encode()]
+    queue_item = [1, mock_props, json.dumps({"kwargs": {"name": ep_name}}).encode()]
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
+
     assert mock_log.warning.called
     a = mock_log.warning.call_args[0][0]
     assert "Ignoring command from server" in a
@@ -974,10 +982,98 @@ def test_ignores_stale_commands(mocker, epmanager_as_root, mock_props):
     assert "Endpoint timestamp: " in a
     assert em._command.ack.called, "Command always ACKed"
 
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert k["msg"] == a
+
+
+@pytest.mark.parametrize("should_fork", (True, False, None))
+def test_cmd_send_failure_conditionally_forks(mocker, epmanager_as_root, should_fork):
+    mocker.patch(f"{_MOCK_BASE}log")
+    *_, mock_os, _, em = epmanager_as_root
+
+    kw = {}
+    if should_fork is not None:
+        kw = {"fork": should_fork}
+    with pytest.raises(SystemExit) as pyt_exc:
+        em.cmd_send_failure({}, **kw)
+
+    assert pyt_exc.value.code is None, "Should always 'happy exit'"
+    assert mock_os.fork.called is (should_fork is None or should_fork)
+
+
+def test_cmd_send_failure_gracefully_ignores_malformed_kwargs(
+    mocker, epmanager_as_root
+):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    *_, em = epmanager_as_root
+
+    with pytest.raises(SystemExit) as pyt_exc:
+        em.cmd_send_failure({}, fork=False)
+
+    assert pyt_exc.value.code is None, "Should always 'happy exit'"
+    assert mock_log.exception.called
+
+
+def test_cmd_send_failure_populates_children_structure(epmanager_as_root, randomstring):
+    *_, mock_os, _, em = epmanager_as_root
+
+    ep_name = randomstring()
+    child_pid = random.randint(2, 1000000)
+    mock_os.fork.return_value = child_pid  # remain the parent process
+
+    kw = {"name": ep_name}
+    user_info = [randomstring(), randomstring()]
+    em.cmd_send_failure(kw, "", "\n   ".join(user_info))
+
+    assert child_pid in em._children
+    fork_args = em._children[child_pid].arguments
+    assert "Temporary process" in fork_args
+    assert ep_name in fork_args
+    assert all(ui in fork_args for ui in user_info)
+
+
+def test_cmd_send_failure_sends_message(mocker, epmanager_as_root, randomstring):
+    mock_send = mocker.patch(f"{_MOCK_BASE}send_endpoint_startup_failure_to_amqp")
+    *_, mock_os, _, em = epmanager_as_root
+    mock_os.fork.return_value = 0  # test the child process path
+
+    err_msg = randomstring()
+    kw = {"amqp_creds": {"some": "structure"}}
+    with pytest.raises(SystemExit) as pyt_exc:
+        em.cmd_send_failure(kw, msg=err_msg)
+
+    assert pyt_exc.value.code is None
+    assert mock_send.called
+
+    a, k = mock_send.call_args
+    assert a[0] is kw["amqp_creds"]
+    assert "msg" in k
+    assert k["msg"] is err_msg
+
+
+def test_cmd_send_failure_fails_to_send(mocker, epmanager_as_root, randomstring):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    *_, mock_os, _, em = epmanager_as_root
+    mock_os.fork.return_value = 0  # test the child process path
+
+    kw = None  # will produce TypeError
+    with pytest.raises(SystemExit) as pyt_exc:
+        em.cmd_send_failure(kw)
+
+    assert pyt_exc.value.code is None
+
+    assert mock_log.exception.called
+
+    a, k = mock_log.exception.call_args
+    assert "Unable to send user endpoint start up failure" in a[0]
+
 
 def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root, mock_props):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
 
     queue_item = (1, mock_props, json.dumps({"asdf": 123}).encode())
 
@@ -989,6 +1085,11 @@ def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root, mock_p
     assert "Invalid server command" in a
     assert "KeyError" in a, "Expected exception name in log line"
     assert em._command.ack.called, "Command always ACKed"
+
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert k["msg"] == a
 
 
 @pytest.mark.parametrize(
@@ -1003,17 +1104,18 @@ def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root, mock_p
     ),
 )
 def test_unprivileged_handles_identity_set_robustly(
-    mocker, mock_props, mock_unprivileged_epmanager, is_invalid, idset
+    mocker, mock_props, mock_unprivileged_epmanager, is_invalid, idset, randomstring
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     cmd_payload = {
-        "globus_effective_identity": "abc",
+        "globus_effective_identity": f"abc{randomstring()}",
         "globus_identity_set": idset,
-        "globus_username": "a@b.com",
+        "globus_username": f"a{randomstring()}@b.com",
     }
     queue_item = (1, mock_props, json.dumps(cmd_payload).encode())
 
     *_, em = mock_unprivileged_epmanager
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
     em._command_queue.get.side_effect = (queue_item, queue.Empty())
     em._event_loop()
 
@@ -1022,6 +1124,14 @@ def test_unprivileged_handles_identity_set_robustly(
         assert "Invalid identity set" in a[0]
     a, _k = mock_log.error.call_args
     assert "Ignoring start request for untrusted identity" in a[0]
+
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert k["msg"] == a[0]
+    assert "user_ident" in k
+    assert cmd_payload["globus_effective_identity"] in k["user_ident"]
+    assert cmd_payload["globus_username"] in k["user_ident"]
 
 
 def test_unprivileged_happy_path(
@@ -1046,18 +1156,21 @@ def test_unprivileged_happy_path(
     assert em.cmd_start_endpoint.called
 
 
-def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root, mock_props):
+def test_handles_unknown_identity_gracefully(
+    mocker, epmanager_as_root, mock_props, randomstring
+):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
 
     pld = {
-        "globus_username": "a",
-        "globus_effective_identity": 1,
+        "globus_username": "a" + randomstring(),
+        "globus_effective_identity": "abc" + randomstring(),
         "globus_identity_set": [],
     }
     queue_item = (1, mock_props, json.dumps(pld).encode())
-    em.identity_mapper.map_identity.return_value = None
 
+    em.identity_mapper.map_identity.return_value = None
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -1069,6 +1182,14 @@ def test_handles_unknown_identity_gracefully(mocker, epmanager_as_root, mock_pro
     assert "Globus effective identity: " in a
     assert str(pld["globus_effective_identity"]) in a
 
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert k["msg"] == a
+    assert "user_ident" in k
+    assert pld["globus_effective_identity"] in k["user_ident"]
+    assert pld["globus_username"] in k["user_ident"]
+
 
 def test_gracefully_handles_identity_mapping_error(
     mocker, epmanager_as_root, randomstring, mock_props
@@ -1077,14 +1198,15 @@ def test_gracefully_handles_identity_mapping_error(
     *_, em = epmanager_as_root
 
     pld = {
-        "globus_username": "a",
+        "globus_username": randomstring(),
         "globus_effective_identity": randomstring(),
         "globus_identity_set": [],
     }
     exc_text = "Test engineered: " + randomstring()
     queue_item = (1, mock_props, json.dumps(pld).encode())
-    em.identity_mapper.map_identity.side_effect = MemoryError(exc_text)
 
+    em.identity_mapper.map_identity.side_effect = MemoryError(exc_text)
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -1095,14 +1217,22 @@ def test_gracefully_handles_identity_mapping_error(
     assert "(MemoryError)" in a, "Expected exception name in log line"
     assert exc_text in a
     assert "Globus effective identity: " in a
-    assert str(pld["globus_effective_identity"]) in a
+    assert pld["globus_effective_identity"] in a
+
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert len(k["msg"]) > 2, "Expected a call site-specific message"
+    assert "user_ident" in k
+    assert pld["globus_effective_identity"] in k["user_ident"]
+    assert pld["globus_username"] in k["user_ident"]
 
 
 @pytest.mark.parametrize(
     "cmd_name", ("", "_private", "9c", "valid_but_do_not_exist", " ", "a" * 101)
 )
 def test_handles_unknown_or_invalid_command_gracefully(
-    mocker, epmanager_as_root, cmd_name, mock_props
+    mocker, epmanager_as_root, cmd_name, mock_props, randomstring
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
@@ -1112,8 +1242,8 @@ def test_handles_unknown_or_invalid_command_gracefully(
     em.identity_mapper.map_identity.return_value = "a"
 
     pld = {
-        "globus_username": "a",
-        "globus_effective_identity": "a",
+        "globus_username": randomstring(),
+        "globus_effective_identity": randomstring(),
         "globus_identity_set": "a",
         "command": cmd_name,
         "user_opts": {"heartbeat": 10},
@@ -1122,6 +1252,7 @@ def test_handles_unknown_or_invalid_command_gracefully(
 
     mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
 
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -1130,9 +1261,17 @@ def test_handles_unknown_or_invalid_command_gracefully(
     assert "Unknown or invalid command" in a
     assert "Globus effective identity: " in a
     assert str(pld["globus_effective_identity"]) in a
-
     assert str(cmd_name) in a
-    assert em._command.ack.called, "Command always ACKed"
+
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert "unexpected error" in k["msg"]
+    assert "misconfiguration or a programming error" in k["msg"]
+    assert "or the Globus Compute team" in k["msg"]
+    assert "user_ident" in k
+    assert pld["globus_effective_identity"] in k["user_ident"]
+    assert pld["globus_username"] in k["user_ident"]
 
 
 def test_handles_local_user_not_found_gracefully(
@@ -1147,12 +1286,13 @@ def test_handles_local_user_not_found_gracefully(
     mock_pwd.getpwnam.side_effect = KeyError(invalid_user_name)
 
     pld = {
-        "globus_username": "a",
-        "globus_effective_identity": "a",
+        "globus_username": randomstring(),
+        "globus_effective_identity": randomstring(),
         "globus_identity_set": "a",
     }
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -1163,29 +1303,35 @@ def test_handles_local_user_not_found_gracefully(
     assert "Globus effective identity: " in a
     assert str(pld["globus_effective_identity"]) in a
 
+    assert em.cmd_send_failure.called
 
-def test_handles_failed_command(mocker, epmanager_as_root, mock_props):
+    _, k = em.cmd_send_failure.call_args
+    assert len(k["msg"]) > 2, "Expected a call site-specific message"
+    assert "user_ident" in k
+    assert pld["globus_effective_identity"] in k["user_ident"]
+    assert pld["globus_username"] in k["user_ident"]
+
+
+def test_handles_failed_command(mocker, epmanager_as_root, mock_props, randomstring):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
     mocker.patch(
         f"{_MOCK_BASE}EndpointManager.cmd_start_endpoint", side_effect=Exception()
     )
     *_, em = epmanager_as_root
 
-    mocker.patch(f"{_MOCK_BASE}pwd")
-    em.identity_mapper = mocker.Mock()
-    em.identity_mapper.map_identity.return_value = "a"
-
     pld = {
-        "globus_username": "a",
-        "globus_effective_identity": "a",
+        "globus_username": randomstring(),
+        "globus_effective_identity": randomstring(),
         "globus_identity_set": [],
         "command": "cmd_start_endpoint",
         "user_opts": {"heartbeat": 10},
     }
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
-    mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
-
+    em.identity_mapper = mocker.Mock()
+    em.identity_mapper.map_identity.return_value = "a"
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
     em._command_queue = mocker.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -1195,7 +1341,14 @@ def test_handles_failed_command(mocker, epmanager_as_root, mock_props):
     assert pld["command"] in a, "Expected debugging help in log"
     assert "   args: " in a, "Expected debugging help in log"
     assert " kwargs: " in a, "Expected debugging help in log"
-    assert em._command.ack.called, "Command always ACKed"
+
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert "msg" not in k, "Expect a general message for unknown exception"
+    assert "user_ident" in k
+    assert pld["globus_effective_identity"] in k["user_ident"]
+    assert pld["globus_username"] in k["user_ident"]
 
 
 @pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGINT, signal.SIGQUIT])
@@ -1282,21 +1435,44 @@ def test_environment_default_path_set_if_not_specified(
     assert "PATH" in env, "Expected PATH is always set"
 
 
-def test_warns_if_executable_not_found(successful_exec_from_mocked_root, mocker):
-    _mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
-    mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
+def test_warns_if_executable_not_found(
+    successful_exec_from_mocked_root, mocker, randomstring
+):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
+    exc_text = f"Some error: {randomstring()}"
+    mock_os.execvpe.side_effect = Exception(exc_text)
+    em.cmd_send_failure = mocker.Mock(spec=em.cmd_send_failure)
+
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
 
     expected_env = {"PATH": "/some/typoed:/path:/here"}
     (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as pyt_exc:
         em._event_loop()
 
-    assert mock_warn.called
-    a, k = mock_warn.call_args
+    assert mock_os.execvpe.called, "Expect that exec attempted, even after warning"
+    ec = pyt_exc.value.code
+
+    assert mock_log.warning.called
+    a, _k = mock_log.warning.call_args
     assert "Unable to find executable" in a[0], "Expected precise problem in warning"
     assert "(not found):" in a[0]
     assert "globus-compute-endpoint" in a[0], "Share the precise thing not-found"
     assert expected_env["PATH"] in a[0]
+
+    assert mock_log.error.called
+    a, _k = mock_log.error.call_args
+    assert (
+        "Unable to start user endpoint" in a[0]
+    ), "Expect attempt to log, even if fds closed"
+    assert f" [exit code: {ec};" in a[0], "Expect exit code for debugging"
+    assert exc_text in a[0]
+
+    assert em.cmd_send_failure.called
+
+    _, k = em.cmd_send_failure.call_args
+    assert k["msg"] is a[0], "Expected a real error message clue-to-user"
+    assert not k.get("fork", True)
 
 
 def test_start_endpoint_children_die_with_parent(successful_exec_from_mocked_root):
