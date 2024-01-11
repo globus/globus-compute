@@ -156,8 +156,16 @@ attempts to execute that function using that worker will result in an error.
 In HPC contexts, the endpoint process - which receives tasks from the Compute central
 services and queues them up for execution - generally runs on a separate node from the
 workers which actually do the computation. As a result, it's often necessary to load in
-some kind of pre-initialized environment, such as a ``conda`` environment or ``venv``,
-when starting workers. This can be achieved using the |worker_init|_ config option:
+some kind of pre-initialized environment. In general there are two solutions here:
+
+1. Python based environment isolation such as ``conda`` environment or ``venv``,
+2. Containers: containerization with ``docker`` or ``apptainer`` (``singularity``)
+
+
+Python based environment isolation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To use python based environment management, use the |worker_init|_ config option:
 
 .. code-block:: yaml
 
@@ -189,29 +197,52 @@ Similarly, artifacts created by ``endpoint_setup`` can be cleaned up with
   endpoint_teardown: |
     conda remove -n my-conda-env --all
 
+Containerized Environments
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Container behaviors and routing
--------------------------------
+Container support is limited to ``GlobusComputeEngine`` on the ``globus-compute-endpoint``. To
+configure the endpoint the following options are now supported:
 
-The Globus Compute endpoint can run functions using independent Python processes or optionally
-inside containers. Globus Compute supports various container technologies (e.g., docker and singularity)
-and different routing mechanisms for different use cases.
+* `container_type` : Specify container type from one of ``('docker', 'apptainer', 'singularity', 'custom', 'None')``
+* `container_uri`: Specify container uri, or file path if specifying sif files
+* `container_cmd_options`: Specify custom command options to pass to the container launch command, such as filesystem mount paths, network options etc.
 
-Raw worker processes (``worker_mode=no_container``):
+.. code-block:: yaml
 
-* Hard routing: All worker processes are of the same type "RAW". It this case, the Globus Compute endpoint simply routes tasks to any available worker processes. This is the default mode of a Globus Compute endpoint.
-* Soft routing: It is the same as hard routing.
+    display_name: Docker
+    engine:
+      type: GlobusComputeEngine
+      container_type: docker
+      container_uri: funcx/kube-endpoint:main-3.10
+      container_cmd_options: -v /tmp:/tmp
+      provider:
+        init_blocks: 1
+        max_blocks: 1
+        min_blocks: 0
+        type: LocalProvider
 
-Kubernetes (docker):
+For more custom use-cases where either an unsupported container technology is required
+or building the container string programmatically is preferred use ``container_type='custom'``
+In this case, `container_cmd_options` is treated as a string template, in which the following
+two strings are expected:
 
-* Hard routing: Both the manager and the worker are deployed within a pod and thus the manager cannot change the type of worker container. In this case, a set of managers are deployed with specific container images and the Globus Compute endpoint simply routes tasks to corresponding managers (matching their types).
-* Soft routing: NOT SUPPORTED.
+* `{EXECUTOR_RUNDIR}` : Used to specify mounting of the RUNDIR to share logs
+* `{EXECUTOR_LAUNCH_CMD}` : Used to specify the worker launch command within the container.
 
-Native container support (docker, singularity, shifter):
+Here's an example:
 
-* Hard routing: In this case, each manager (on a compute node) can only launch worker containers of a specific type and thus each manager can serve only one type of function.
-* Soft routing: When receiving a task for a specific container type, the Globus Compute endpoint attempts to send the task to a manager that has a suitable warm container to minimize the total number of container cold starts. If there are not any warmed containers in any connected managers, the Globus Compute endpoint chooses one manager randomly to dispatch the task.
+.. code-block:: yaml
 
+    display_name: Docker Custom
+    engine:
+      type: GlobusComputeEngine
+      container_type: custom
+      container_cmd_options: docker run -v {EXECUTOR_RUNDIR}:{EXECUTOR_RUNDIR} funcx/kube-endpoint:main-3.10 {EXECUTOR_LAUNCH_CMD}
+      provider:
+        init_blocks: 1
+        max_blocks: 1
+        min_blocks: 0
+        type: LocalProvider
 
 Restarting endpoint when machine restarts
 -----------------------------------------
