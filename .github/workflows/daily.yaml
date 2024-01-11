@@ -9,7 +9,7 @@ env:
   TARGET_PYTHON_VERSION: '3.11'
 
 jobs:
-  smoke-test-dev:
+  smoke-test-staging:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
@@ -23,14 +23,14 @@ jobs:
         python -m venv .venv
         .venv/bin/python -m pip install --upgrade pip setuptools wheel
         .venv/bin/python -m pip install tox
-    - name: run smoke tests (dev)
+    - name: run smoke tests (ECS staging)
       env:
         FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
         FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
       run: |
         source .venv/bin/activate
         cd smoke_tests
-        make dev
+        make staging
 
   safety-check-sdk:
     runs-on: ubuntu-latest
@@ -70,7 +70,7 @@ jobs:
 
   slack-notify:
     needs:
-      - smoke-test-dev
+      - smoke-test-staging
       - safety-check-sdk
       - safety-check-endpoint
     if: always()
@@ -87,6 +87,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_CHANNEL: '#commits'
-          SLACK_MESSAGE_TITLE: 'Daily Smoke Tests'
-          SLACK_FAILURE_MESSAGE: 'Daily test failed'
-        run: ./.github/_support/github-slack-notify.py ${{ needs.smoke-test-dev.result }}
+          SLACK_MESSAGE_TITLE: 'Daily Smoke Tests on Staging'
+          SLACK_FAILURE_MESSAGE: 'Daily test failed on staging'
+        run: ./.github/_support/github-slack-notify.py ${{ needs.smoke-test-staging.result }}

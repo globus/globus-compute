@@ -14,18 +14,18 @@ To run tests on prod:
 
     make prod
 
-To run tests on dev:
+To run tests on ECS staging:
 
-    make dev
+    make staging
 
 To run using local dependency versions (install SDK and endpoint from the
 repo):
 
     tox -e localdeps
 
-You can also run `localdeps` against dev with
+You can also run `localdeps` against ECS staging with
 
-    tox -e localdeps -- --compute-config dev
+    tox -e localdeps -- --compute-config staging
 
 One can also run tests against a local webservice setup.  Use the make targets
 `local_with_published_sdk` and `local_with_dev_sdk` to run tests with published
