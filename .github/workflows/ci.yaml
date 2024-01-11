@@ -10,6 +10,7 @@ on:
 
 jobs:
   lint:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +32,7 @@ jobs:
 
   # ensure docs can build, imitating the RTD build as best we can
   check-docs:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +43,7 @@ jobs:
         run: make docs
 
   safety-check-endpoint:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +60,7 @@ jobs:
         run: safety check
 
   test-sdk:
+    timeout-minutes: 5
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -76,6 +80,7 @@ jobs:
           tox -e py
 
   test-endpoint:
+    timeout-minutes: 8
     runs-on: ubuntu-latest
     services:
       rabbitmq:
