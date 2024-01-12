@@ -26,7 +26,7 @@ jobs:
     - name: run smoke tests (ECS staging)
       env:
         FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
-        FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
+        FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET_STAGING }}
       run: |
         source .venv/bin/activate
         cd smoke_tests
