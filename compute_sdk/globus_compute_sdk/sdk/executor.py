@@ -193,6 +193,7 @@ class Executor(concurrent.futures.Executor):
         ] = queue.Queue()
         self._function_registry: dict[tuple[t.Callable, str | None], str] = {}
 
+        self._submitter_thread_exception_captured = False
         self._stopped = False
         self._stopped_in_error = False
         self._shutdown_lock = threading.RLock()
@@ -851,7 +852,8 @@ class Executor(concurrent.futures.Executor):
                 self._shutdown_lock.release()
 
             log.debug("%r (tid:%s): task submission thread dies", self, _tid)
-            raise
+            if not self._submitter_thread_exception_captured:
+                raise
         finally:
             if sys.exc_info() != (None, None, None):
                 time.sleep(0.1)  # give any in-flight Futures a chance to be .put() ...
@@ -908,22 +910,32 @@ class Executor(concurrent.futures.Executor):
             batch_response = self.client.batch_run(endpoint_uuid, batch)
             log.debug("%r (%s): received response from batch submission", self, _tid)
         except Exception as e:
-            log.exception(f"Error submitting {len(tasks)} tasks to Globus Compute")
+            # No sense in clogging the log pipes unnecessarily, since the exception
+            # is directly shared via the futures.  If we need to debug a case for a
+            # user, we can ask them to enable debug logs -- but hopefully they'll be
+            # aware of the exception in their futures.
+            log.debug(
+                f"Error submitting {len(tasks)} tasks to Globus Compute"
+                f" [({type(e).__name__}) {e}]"
+            )
             for fut_list in submitted_futs_by_fn.values():
                 for fut in fut_list:
                     fut.set_exception(e)
+            self._submitter_thread_exception_captured = True
             raise
 
         try:
             received_tasks_by_fn: dict[str, list[str]] = batch_response["tasks"]
             new_tg_id: str = batch_response["task_group_id"]
         except Exception as e:
-            log.exception(
+            log.debug(
                 f"Server response ({batch_response}) missing an expected field"
+                f" [({type(e).__name__}) {e}]"
             )
             for fut_list in submitted_futs_by_fn.values():
                 for fut in fut_list:
                     fut.set_exception(e)
+            self._submitter_thread_exception_captured = True
             raise
 
         if str(self.task_group_id) != new_tg_id:
