@@ -688,6 +688,7 @@ def test_task_submitter_stops_executor_on_upstream_error_response(
     try_assert(lambda: gce._stopped)
     try_assert(lambda: gce._test_task_submitter_done, "Expect graceful shutdown")
     assert cf.exception() is upstream_error
+    assert gce._test_task_submitter_exception is None, "handled by future"
 
 
 def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(mocker, gc_executor):
