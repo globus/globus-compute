@@ -132,9 +132,9 @@ def test_die_with_parent_refuses_to_start_if_not_parent(mocker):
         parent_pid=os.getpid(),  # _not_ ppid; that's the test.
     )
     mock_warn = mocker.patch.object(log, "warning")
-    assert not ei._kill_event.is_set()
+    assert not ei.time_to_quit, "Verify test setup"
     ei.start()
-    assert ei._kill_event.is_set()
+    assert ei.time_to_quit
 
     warn_msg = str(list(a[0] for a, _ in mock_warn.call_args_list))
     assert "refusing to start" in warn_msg
@@ -154,9 +154,9 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker):
     )
     ei.executors = {"mock_executor": mocker.Mock()}
     mock_warn = mocker.patch.object(log, "warning")
-    assert not ei._kill_event.is_set()
+    assert not ei.time_to_quit, "Verify test setup"
     ei.start()
-    assert ei._kill_event.is_set()
+    assert ei.time_to_quit
 
     warn_msg = str(list(a[0] for a, _ in mock_warn.call_args_list))
     assert "refusing to start" not in warn_msg

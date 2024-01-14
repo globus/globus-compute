@@ -105,7 +105,6 @@ class EndpointInterchange:
         self._reconnect_fail_counter = 0
         self.reconnect_attempt_limit = max(1, reconnect_attempt_limit)
         self._quiesce_event = multiprocessing.Event()
-        self._kill_event = multiprocessing.Event()
         self._parent_pid = parent_pid
 
         if result_store is None:
@@ -197,9 +196,9 @@ class EndpointInterchange:
         """Prepare the interchange for shutdown"""
         log.info("Shutting down EndpointInterchange")
 
-        # kill_event must be set before quiesce_event because we need to guarantee that
-        # once the quiesce is complete, the interchange will not try to start again
-        self._kill_event.set()
+        # set `time_to_quit` prior to `quiesce_event` to ensure that the interchange
+        # will not start again after quiesce completes
+        self.time_to_quit = True
         self._quiesce_event.set()
 
     def cleanup(self):
@@ -218,6 +217,11 @@ class EndpointInterchange:
 
     def start(self):
         """Start the Interchange"""
+        if self.time_to_quit:
+            # Reminder to the dev: create afresh, don't reuse
+            log.debug("Interchange object has stopped; it cannot be restarted")
+            return
+
         signal.signal(signal.SIGHUP, self.handle_sigterm)
         signal.signal(signal.SIGQUIT, self.handle_sigterm)  # hint: Ctrl+\
         signal.signal(signal.SIGTERM, self.handle_sigterm)
@@ -225,7 +229,6 @@ class EndpointInterchange:
         # warrant Python's default developer-friendly Ctrl+C handling
 
         self._quiesce_event.clear()
-        self._kill_event.clear()
 
         if self._parent_pid:
             if self._parent_pid != os.getppid():
@@ -255,7 +258,7 @@ class EndpointInterchange:
         # the endpoint is waiting for reconnection
         self.start_engine()
 
-        while not self._kill_event.is_set():
+        while not self.time_to_quit:
             if self._reconnect_fail_counter >= self.reconnect_attempt_limit:
                 log.critical(
                     f"Failed {self._reconnect_fail_counter} consecutive times."
@@ -284,14 +287,14 @@ class EndpointInterchange:
                 log.warning(f"AMQP service closed connection: {e}")
             except pika.exceptions.ProbableAuthenticationError as e:
                 log.error(f"Unable to connect to AMQP service: {e}")
-                self._kill_event.set()
+                self.time_to_quit = True
             except Exception as e:
                 log.error(
                     f"Unhandled exception in main kernel: ({type(e).__name__}) {e}"
                 )
                 log.debug("Unhandled exception in main kernel.", exc_info=e)
             finally:
-                if not self._kill_event.is_set():
+                if not self.time_to_quit:
                     self._reconnect_fail_counter += 1
                     log.info(
                         "Reconnection count: %s (of %s)",
