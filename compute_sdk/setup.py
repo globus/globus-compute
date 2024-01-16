@@ -26,8 +26,8 @@ REQUIRES = [
     "texttable>=1.6.7",
 ]
 DOCS_REQUIRES = [
-    "sphinx<5",
-    "furo==2021.09.08",
+    "sphinx",
+    "furo==2023.9.10",
 ]
 
 TEST_REQUIRES = [
