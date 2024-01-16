@@ -30,7 +30,7 @@ jobs:
       run: |
         source .venv/bin/activate
         cd smoke_tests
-        make staging
+        GLOBUS_SDK_ENVIRONMENT=staging make staging
 
   safety-check-sdk:
     runs-on: ubuntu-latest
