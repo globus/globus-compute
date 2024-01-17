@@ -543,8 +543,7 @@ def _do_start_endpoint(
 
         if reg_info:
             # We're quitting anyway, so just let any exceptions bubble
-            exc_type = type(e).__name__
-            msg = f"Failed to start or unexpected error:\n  ({exc_type}) {e}"
+            msg = f"Failed to start or unexpected error:\n  ({type(e).__name__}) {e}"
             send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
 
         raise

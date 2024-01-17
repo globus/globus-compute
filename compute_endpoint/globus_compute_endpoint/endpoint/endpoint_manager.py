@@ -518,7 +518,7 @@ class EndpointManager:
                     f"\n  Endpoint timestamp: {now} ({endp_pp_ts})"
                 )
                 log.warning(msg)
-                self.cmd_send_failure(command_kwargs, msg=msg)
+                self.send_failure_notice(command_kwargs, msg=msg)
                 continue
 
             try:
@@ -528,7 +528,7 @@ class EndpointManager:
             except Exception as e:
                 msg = f"Invalid server command.  ({e.__class__.__name__}) {e}"
                 log.error(msg)
-                self.cmd_send_failure(command_kwargs, msg=msg)
+                self.send_failure_notice(command_kwargs, msg=msg)
                 continue
 
             identity_for_log = (
@@ -559,7 +559,7 @@ class EndpointManager:
                         f"{identity_for_log}"
                     )
                     log.error(msg)
-                    self.cmd_send_failure(
+                    self.send_failure_notice(
                         command_kwargs, msg=msg, user_ident=identity_for_log
                     )
                     continue
@@ -577,7 +577,7 @@ class EndpointManager:
                         f"  ({type(e).__name__}) {e}{identity_for_log}"
                     )
                     log.error(msg)
-                    self.cmd_send_failure(
+                    self.send_failure_notice(
                         command_kwargs, msg=msg, user_ident=identity_for_log
                     )
                     continue
@@ -587,7 +587,7 @@ class EndpointManager:
                     log.error(f"{msg}  ({type(e).__name__}) {e}{identity_for_log}")
 
                     fail_msg = f"{msg}{identity_for_log}"
-                    self.cmd_send_failure(
+                    self.send_failure_notice(
                         command_kwargs, msg=fail_msg, user_ident=identity_for_log
                     )
                     continue
@@ -604,7 +604,7 @@ class EndpointManager:
                     )
                     log.error(f"({exc_type}) {e}\n{msg}")
                     fail_msg = f"({exc_type})\n{msg}"
-                    self.cmd_send_failure(
+                    self.send_failure_notice(
                         command_kwargs, msg=fail_msg, user_ident=identity_for_log
                     )
                     continue
@@ -631,7 +631,7 @@ class EndpointManager:
                     " recreate this error message at will, consider reaching out to the"
                     " endpoint administrator or the Globus Compute team."
                 )
-                self.cmd_send_failure(
+                self.send_failure_notice(
                     command_kwargs, msg=msg, user_ident=identity_for_log
                 )
 
@@ -644,9 +644,9 @@ class EndpointManager:
                     f"    args: {msg_a}\n"
                     f"  kwargs: {msg_kw}{identity_for_log}"
                 )
-                self.cmd_send_failure(command_kwargs, user_ident=identity_for_log)
+                self.send_failure_notice(command_kwargs, user_ident=identity_for_log)
 
-    def cmd_send_failure(
+    def send_failure_notice(
         self,
         kwargs: dict,
         msg: str | None = None,
@@ -658,7 +658,7 @@ class EndpointManager:
         that the given endpoint has failed to start up.
 
         This method conditionally forks (if ``fork == True``), but always exits.  The
-        exit is always "clean" (exit code of 0) -- this is true even if their is an
+        exit is always "clean" (exit code of 0) -- this is true even if there is an
         unhandled error as the assumption is that this is a last-ditch effort to be
         kind to the user (better UX).  If it fails, "oh well," and then it is time for
         the administrator to investigate the logs.
@@ -970,7 +970,7 @@ class EndpointManager:
             )
             log.error(msg)
             log.debug(f"Failed to exec for {uname}", exc_info=e)
-            self.cmd_send_failure(kwargs, msg=msg, fork=False)
+            self.send_failure_notice(kwargs, msg=msg, fork=False)
         finally:
             # Only executed if execvpe fails (or isn't reached)
             sys.exit(exit_code)
