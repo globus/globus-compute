@@ -21,7 +21,6 @@ from globus_compute_endpoint.endpoint.utils import send_endpoint_startup_failure
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
-from globus_compute_endpoint.version import DEPRECATION_FUNCX_ENDPOINT
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
@@ -684,22 +683,6 @@ def self_diagnostic(compress: bool, log_kb: int):
 
 def cli_run():
     """Entry point for setuptools to point to"""
-    app()
-
-
-def cli_run_funcx():
-    """Entry point that prints a custom message. i.e. deprecation warnings"""
-    fmt = DEPRECATION_FUNCX_ENDPOINT
-
-    # Colorized notice to be a bit more visible
-    fmt = "{title}DEPRECATION NOTICE{rs}\n{body}" + fmt + "{rs}"
-    title = frs = body = rs = ""
-    if sys.stderr.isatty():
-        title = "\033[37;41m"  # White FG, Red BG
-        body = "\033[33m"  # Yellow FG
-        rs = "\033[0m"  # Reset colors
-
-    print(fmt.format(title=title, body=body, frs=frs, rs=rs), file=sys.stderr)
     app()
 
 
