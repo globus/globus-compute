@@ -3,6 +3,26 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.11.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.11.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``Executor.get_worker_hardware_details`` helper function to retrieve
+  information on the hardware an endpoint is running on
+
+  - Added ``Client.get_worker_hardware_details`` for the same functionality on the
+    Client
+
+Changed
+^^^^^^^
+
+- Newly created endpoints now use 443 by default for communicating via AMQPS; this can
+  be changed via the ``amqp_port`` config option.
+
 .. _changelog-2.10.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.10.0
