@@ -542,11 +542,11 @@ def test_reload_tasks_cancels_existing_futures(gc_executor, randomstring):
     def mock_data():
         return {
             "taskgroup_id": str(gce.task_group_id),
-            "tasks": [{"id": uuid.uuid4()} for i in range(random.randint(0, 20))],
+            "tasks": [{"id": uuid.uuid4()} for _ in range(random.randint(1, 20))],
         }
 
     md = mock_data()
-    bs = {t["id"]: {} for t in md["tasks"]}
+    bs = {_t["id"]: {} for _t in md["tasks"]}
     gcc.web_client.get_taskgroup_tasks.return_value = md
     gcc.web_client.get_batch_status.return_value = mock.Mock(data={"results": bs})
 
