@@ -197,6 +197,11 @@ def compute_test_config(pytestconfig, compute_test_config_name):
     if api_uri:
         client_args["funcx_service_address"] = api_uri
 
+    # Manually add the env here in case the GH actions yaml doesn't pick it up
+    sdk_env = client_args.get("environment")
+    if sdk_env:
+        os.environ["GLOBUS_SDK_ENVIRONMENT"] = sdk_env
+
     if api_client_id and api_client_secret:
         _add_args_for_client_creds_login(api_client_id, api_client_secret, client_args)
 
