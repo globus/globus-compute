@@ -27,10 +27,11 @@ jobs:
       env:
         FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
         FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET_STAGING }}
+        GLOBUS_SDK_ENVIRONMENT: "staging"
       run: |
         source .venv/bin/activate
         cd smoke_tests
-        GLOBUS_SDK_ENVIRONMENT=staging make staging
+        make staging
 
   safety-check-sdk:
     runs-on: ubuntu-latest
