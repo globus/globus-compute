@@ -759,3 +759,55 @@ def test_handle_globus_auth_error(
         assert additional_details in res.stdout
     else:
         assert additional_details not in res.stdout
+
+
+@pytest.mark.parametrize("exit_exc", (None, SystemExit(), SystemExit(0)))
+def test_happy_path_exit_no_amqp_msg(
+    mocker,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+    exit_exc,
+):
+    mock_ep, _ = mock_cli_state
+    mock_send = mocker.patch(f"{_MOCK_BASE}send_endpoint_startup_failure_to_amqp")
+    make_endpoint_dir()
+
+    stdin = json.dumps({"amqp_creds": {"some": "data"}})
+    if exit_exc is not None:
+        mock_ep.start_endpoint.side_effect = exit_exc
+    run_line(f"start {ep_name}", assert_exit_code=0, stdin=stdin)
+    assert mock_ep.start_endpoint.called
+    assert not mock_send.called
+
+
+@pytest.mark.parametrize(
+    "ec,exit_exc",
+    (
+        (1, SystemExit("Death!")),
+        (5, SystemExit(5)),
+        (1, RuntimeError("fool!")),
+        (1, MemoryError("Oh no!")),
+        (1, AssertionError("mistake")),
+        (1, Exception("Generally no good.")),
+    ),
+)
+def test_fail_exit_sends_amqp_msg(
+    mocker,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+    ec,
+    exit_exc,
+):
+    mock_ep, _ = mock_cli_state
+    mock_send = mocker.patch(f"{_MOCK_BASE}send_endpoint_startup_failure_to_amqp")
+    make_endpoint_dir()
+
+    stdin = json.dumps({"amqp_creds": {"some": "data"}})
+    mock_ep.start_endpoint.side_effect = exit_exc
+    run_line(f"start {ep_name}", assert_exit_code=ec, stdin=stdin)
+    assert mock_ep.start_endpoint.called
+    assert mock_send.called

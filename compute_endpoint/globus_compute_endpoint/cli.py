@@ -17,6 +17,7 @@ import click
 from click import ClickException
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.utils import send_endpoint_startup_failure_to_amqp
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
@@ -491,47 +492,61 @@ def _do_start_endpoint(
             log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
 
     try:
-        if config_str is not None:
-            ep_config = load_config_yaml(config_str)
-        else:
-            ep_config = get_config(ep_dir)
-    except Exception as e:
-        if isinstance(e, ClickException):
+        try:
+            if config_str is not None:
+                ep_config = load_config_yaml(config_str)
+            else:
+                ep_config = get_config(ep_dir)
+        except Exception as e:
+            if isinstance(e, ClickException):
+                raise
+
+            # We've likely not exported to the log, so at least put _something_ in the
+            # logs for the human to debug; motivated by SC-28607
+            exc_type = type(e).__name__
+            msg = (
+                "Failed to find or parse endpoint configuration.  Endpoint will not"
+                f" start. ({exc_type}) {e}"
+            )
+            log.critical(msg)
             raise
 
-        # We've likely not exported to the log, so at least put _something_ in the
-        # logs for the human to debug; motivated by SC-28607
-        exc_type = type(e).__name__
-        msg = (
-            "Failed to find or parse endpoint configuration.  Endpoint will not"
-            f" start. ({exc_type}) {e}"
-        )
-        log.critical(msg)
-        raise
+        if die_with_parent:
+            # The endpoint cannot die with its parent if it
+            # doesn't have one :)
+            ep_config.detach_endpoint = False
+            log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
-    if die_with_parent:
-        # The endpoint cannot die with its parent if it
-        # doesn't have one :)
-        ep_config.detach_endpoint = False
-        log.debug("The --die-with-parent flag has set detach_endpoint to False")
-
-    if ep_config.multi_user:
-        if not _has_multi_user:
-            raise ClickException(
-                "multi-user endpoints are not supported on this system"
+        if ep_config.multi_user:
+            if not _has_multi_user:
+                raise ClickException(
+                    "multi-user endpoints are not supported on this system"
+                )
+            epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
+            epm.start()
+        else:
+            get_cli_endpoint().start_endpoint(
+                ep_dir,
+                endpoint_uuid,
+                ep_config,
+                state.log_to_console,
+                state.no_color,
+                reg_info,
+                die_with_parent,
             )
-        epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
-        epm.start()
-    else:
-        get_cli_endpoint().start_endpoint(
-            ep_dir,
-            endpoint_uuid,
-            ep_config,
-            state.log_to_console,
-            state.no_color,
-            reg_info,
-            die_with_parent,
-        )
+
+    except (SystemExit, Exception) as e:
+        if isinstance(e, SystemExit):
+            if e.code in (0, None):
+                # normal, system exit
+                raise
+
+        if reg_info:
+            # We're quitting anyway, so just let any exceptions bubble
+            msg = f"Failed to start or unexpected error:\n  ({type(e).__name__}) {e}"
+            send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
+
+        raise
 
 
 @app.command("stop")

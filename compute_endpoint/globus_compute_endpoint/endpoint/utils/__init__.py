@@ -119,3 +119,39 @@ def update_url_port(url_string: str, new_port: int | str) -> str:
         netloc = c_url.netloc + f":{new_port}"
     c_url = c_url._replace(netloc=netloc)
     return urllib.parse.urlunparse(c_url)
+
+
+def send_endpoint_startup_failure_to_amqp(amqp_creds: dict, msg: str | None = None):
+    """
+    Does not handle any exceptions.
+
+    Non-exhaustive possible exceptions:
+      - ``ImportError`` - for example, expects ``pika``
+      - ``KeyError`` - If the ``amqp_creds`` data structure does not match; see, for
+           example, ``endpoint_manager.py`` for the expected data structure.
+      - pika connection errors, if unable to open a connection or send a message
+    """
+    import pika
+    from globus_compute_common import messagepack
+    from globus_compute_common.messagepack.message_types import EPStatusReport
+
+    if msg is None:
+        msg = "General or unknown failure starting user endpoint"
+
+    result_q_info = amqp_creds["result_queue_info"]
+    publish_kw = result_q_info["queue_publish_kwargs"]
+    urlp = pika.URLParameters(result_q_info["connection_url"])
+    status_report = EPStatusReport(
+        endpoint_id=amqp_creds["endpoint_id"],
+        global_state={"error": msg, "heartbeat_period": 3},
+        task_statuses={},
+    )
+    payload = messagepack.pack(status_report)
+    with pika.BlockingConnection(urlp) as mq_conn:
+        with mq_conn.channel() as mq_chan:
+            mq_chan.basic_publish(
+                exchange=publish_kw["exchange"],
+                routing_key=publish_kw["routing_key"],
+                body=payload,
+                mandatory=True,
+            )
