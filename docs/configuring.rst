@@ -212,10 +212,12 @@ and uses the ``SrunLauncher`` to launch workers.
    :language: yaml
 
 FASTER (TAMU)
+^^^^^^^^^^^^^
 
-The following snippet shows an example configuration for accessing the FASTER system at Texas A & M (TAMU).
-The configuration below assumes that the user is running on a login node, uses the ``SlurmProvider`` to interface with the scheduler,
-and uses the ``SrunLauncher`` to launch workers.
+The following snippet shows an example configuration for accessing the FASTER system at
+Texas |nbsp| A |nbsp| & |nbsp| M |nbsp| (TAMU).  The configuration below assumes that
+the user is running on a login node, uses the ``SlurmProvider`` to interface with the
+scheduler, and uses the ``SrunLauncher`` to launch workers.
 
 .. literalinclude:: configs/faster.yaml
    :language: yaml
@@ -233,3 +235,6 @@ will have the following environment variables set to the worker specific identit
 
 .. literalinclude:: configs/worker_pinning.yaml
    :language: yaml
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
