@@ -15,6 +15,7 @@ from globus_compute_sdk import Client, Executor, __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.executor import _ResultWatcher, _TaskSubmissionInfo
+from globus_compute_sdk.sdk.utils import chunk_by
 from globus_compute_sdk.sdk.utils.uuid_like import as_optional_uuid, as_uuid
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize.facade import ComputeSerializer
@@ -22,6 +23,7 @@ from pytest_mock import MockerFixture
 from tests.utils import try_assert, try_for_timeout
 
 _MOCK_BASE = "globus_compute_sdk.sdk.executor."
+_chunk_size = 1024
 
 
 def _is_stopped(thread: threading.Thread | None) -> t.Callable[..., bool]:
@@ -503,6 +505,69 @@ def test_reload_tasks_all_completed(gc_executor):
     assert len(client_futures) == num_tasks
     assert sum(1 for fut in client_futures if fut.done()) == num_tasks
     assert gce._result_watcher is None, "Should NOT start watcher: all tasks done!"
+
+
+@pytest.mark.parametrize(
+    "num_tasks",
+    (
+        0,
+        1,
+        3,
+        500,
+        1 * _chunk_size + -1,
+        1 * _chunk_size + 0,
+        1 * _chunk_size + 1,
+        2 * _chunk_size + -1,
+        2 * _chunk_size + 0,
+        2 * _chunk_size + 1,
+        3 * _chunk_size + -1,
+        3 * _chunk_size + 0,
+        3 * _chunk_size + 1,
+    ),
+)
+def test_reload_chunks_tasks_requested(mock_log, gc_executor, num_tasks):
+    gcc, gce = gc_executor
+
+    exp_num_chunks = num_tasks // _chunk_size
+    exp_num_chunks += num_tasks % _chunk_size > 0
+
+    gce.task_group_id = uuid.uuid4()
+    mock_data = {
+        "taskgroup_id": str(gce.task_group_id),
+        "tasks": [
+            {
+                "id": uuid.uuid4(),
+                "completion_t": 25,
+                "status": "success",
+                "result": "abc",
+            }
+            for _ in range(num_tasks)
+        ],
+    }
+
+    mock_batch_result = mock.Mock(data={"results": {}})
+
+    gbs: mock.Mock = gcc.web_client.get_batch_status  # convenience
+    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gbs.return_value = mock_batch_result
+
+    gce.reload_tasks()
+
+    assert gbs.call_count == exp_num_chunks
+    expected_chunks = chunk_by(mock_data["tasks"], _chunk_size)
+    for expected_chunk, (a, _k) in zip(expected_chunks, gbs.call_args_list):
+        assert tuple(_t["id"] for _t in expected_chunk) == a[0]
+
+    if exp_num_chunks > 1:
+        dbgs = [
+            a
+            for a, _ in mock_log.debug.call_args_list
+            if a[0].startswith("Large task group")
+        ]
+        assert len(dbgs) == exp_num_chunks
+        assert all(a[1] == num_tasks for a in dbgs)
+        assert all(a[2] == exp_num_chunks for a in dbgs)
+        assert all(a[3] == chunk_num for chunk_num, a in enumerate(dbgs, start=1))
 
 
 def test_reload_starts_new_watcher(gc_executor):

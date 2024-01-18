@@ -615,7 +615,8 @@ class Executor(concurrent.futures.Executor):
             pending: list[ComputeFuture] = []
             deserialize = self.client.fx_serializer.deserialize
             chunk_size = 1024
-            num_chunks = len(task_ids) // chunk_size + 1
+            num_chunks = len(task_ids) // chunk_size
+            num_chunks += len(task_ids) % chunk_size > 0
             for chunk_no, id_chunk in enumerate(
                 chunk_by(task_ids, chunk_size), start=1
             ):
