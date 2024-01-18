@@ -109,30 +109,26 @@ def test_client_init_sets_addresses_by_env(
         "abc123",  # string, but not valid JSON
     ],
 )
-def test_update_task_table_on_invalid_data(api_data):
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-
+def test_update_task_table_on_invalid_data(gcc, api_data):
     with pytest.raises(ValueError):
         gcc._update_task_table(api_data, "task-id-foo")
 
 
-def test_update_task_table_on_exception():
+def test_update_task_table_on_exception(gcc):
     api_data = {
         "status": "success",
         "exception": "foo-bar-baz",
         "completion_t": "1.1",
         "task_id": "task-id-foo",
     }
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
 
     with pytest.raises(TaskExecutionFailed) as excinfo:
         gcc._update_task_table(api_data, "task-id-foo")
     assert "foo-bar-baz" in str(excinfo.value)
 
 
-def test_update_task_table_simple_object(randomstring):
+def test_update_task_table_simple_object(gcc, randomstring):
     serde = ComputeSerializer()
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     task_id = "some_task_id"
 
     payload = randomstring()
@@ -145,12 +141,11 @@ def test_update_task_table_simple_object(randomstring):
     assert "exception" not in st
 
 
-def test_pending_tasks_always_fetched():
+def test_pending_tasks_always_fetched(gcc):
     should_fetch_01 = str(uuid.uuid4())
     should_fetch_02 = str(uuid.uuid4())
     no_fetch = str(uuid.uuid4())
 
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     gcc.web_client = mock.MagicMock()
     gcc._task_status_table.update(
         {
@@ -183,12 +178,10 @@ def test_pending_tasks_always_fetched():
 
 
 @pytest.mark.parametrize("create_result_queue", [True, False, None])
-def test_batch_created_websocket_queue(create_result_queue):
+def test_batch_created_websocket_queue(gcc, create_result_queue):
     eid = str(uuid.uuid4())
     fid = str(uuid.uuid4())
 
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
-    gcc.web_client = mock.MagicMock()
     if create_result_queue is None:
         batch = gcc.create_batch()
     else:
@@ -208,12 +201,8 @@ def test_batch_created_websocket_queue(create_result_queue):
 @pytest.mark.parametrize(
     "strategy", [s for s in SELECTABLE_STRATEGIES if not s._for_code]
 )
-def test_batch_respects_serialization_strategy(strategy):
-    gcc = gc.Client(
-        data_serialization_strategy=strategy(),
-        do_version_check=False,
-        login_manager=mock.Mock(),
-    )
+def test_batch_respects_serialization_strategy(gcc, strategy):
+    gcc.fx_serializer = ComputeSerializer(strategy_data=strategy())
 
     fn_id = str(uuid.uuid4())
     args = (1, 2, 3)
