@@ -5,6 +5,7 @@ import globus_compute_sdk as gc
 import pytest
 from globus_compute_sdk import ContainerSpec
 from globus_compute_sdk.errors import TaskExecutionFailed
+from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
@@ -17,6 +18,16 @@ from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 @pytest.fixture(autouse=True)
 def _clear_sdk_env(monkeypatch):
     monkeypatch.delenv("FUNCX_SDK_ENVIRONMENT", raising=False)
+
+
+@pytest.fixture
+def gcc():
+    _gcc = gc.Client(
+        do_version_check=False,
+        login_manager=mock.Mock(spec=LoginManager),
+    )
+
+    yield _gcc
 
 
 @pytest.mark.parametrize(
@@ -218,65 +229,63 @@ def test_batch_respects_serialization_strategy(strategy):
     assert tasks == expected
 
 
-def test_build_container(mocker, login_manager):
-    mock_data = mocker.Mock()
-    mock_data.data = {"container_id": "123-456"}
-    login_manager.get_web_client.post = mocker.Mock(return_value=mock_data)
-    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+def test_build_container(mocker, gcc, randomstring):
+    expected_container_id = randomstring()
+    mock_data = mocker.Mock(data={"container_id": expected_container_id})
+    gcc.web_client.post.return_value = mock_data
     spec = ContainerSpec(
         name="MyContainer",
-        pip=[
-            "matplotlib==3.5.1",
-            "numpy==1.18.5",
-        ],
+        pip=["matplotlib==3.5.1", "numpy==1.18.5"],
         python_version="3.8",
         payload_url="https://github.com/funcx-faas/funcx-container-service.git",
     )
 
     container_id = gcc.build_container(spec)
-    assert container_id == "123-456"
-    login_manager.get_web_client.post.assert_called()
-    calls = login_manager.get_web_client.post.call_args
-    assert calls[0][0] == "/v2/containers/build"
-    assert calls[1] == {"data": spec.to_json()}
+
+    assert container_id == expected_container_id
+    assert gcc.web_client.post.called
+    a, k = gcc.web_client.post.call_args
+    assert a[0] == "/v2/containers/build"
+    assert k == {"data": spec.to_json()}
 
 
-def test_container_build_status(mocker, login_manager, randomstring):
+def test_container_build_status(gcc, randomstring):
     expected_status = randomstring()
 
     class MockData(dict):
         def __init__(self):
+            super().__init__()
             self["status"] = expected_status
             self.http_status = 200
 
-    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
-    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc.web_client.get.return_value = MockData()
     status = gcc.get_container_build_status("123-434")
     assert status == expected_status
 
 
-def test_container_build_status_not_found(mocker, login_manager):
+def test_container_build_status_not_found(gcc, randomstring):
     class MockData(dict):
         def __init__(self):
+            super().__init__()
             self.http_status = 404
 
-    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
-    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc.web_client.get.return_value = MockData()
 
+    look_for = randomstring()
     with pytest.raises(ValueError) as excinfo:
-        gcc.get_container_build_status("123-434")
+        gcc.get_container_build_status(look_for)
 
-    assert excinfo.value.args[0] == "Container ID 123-434 not found"
+    assert excinfo.value.args[0] == f"Container ID {look_for} not found"
 
 
-def test_container_build_status_failure(mocker, login_manager):
+def test_container_build_status_failure(gcc):
     class MockData(dict):
         def __init__(self):
+            super().__init__()
             self.http_status = 500
             self.http_reason = "This is a reason"
 
-    login_manager.get_web_client.get = mocker.Mock(return_value=MockData())
-    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc.web_client.get.return_value = MockData()
 
     with pytest.raises(SystemError) as excinfo:
         gcc.get_container_build_status("123-434")
@@ -284,8 +293,7 @@ def test_container_build_status_failure(mocker, login_manager):
     assert type(excinfo.value) is SystemError
 
 
-def test_register_function():
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+def test_register_function(gcc):
     gcc.web_client = mock.MagicMock()
 
     def funk():
@@ -303,8 +311,7 @@ def test_register_function():
     assert func_data.metadata.sdk_version == metadata["sdk_version"]
 
 
-def test_register_function_no_metadata():
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
+def test_register_function_no_metadata(gcc):
     gcc.web_client = mock.MagicMock()
 
     def funk():
@@ -318,9 +325,8 @@ def test_register_function_no_metadata():
     assert func_data.metadata is None
 
 
-def test_get_function():
+def test_get_function(gcc):
     func_uuid_str = str(uuid.uuid4())
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     gcc.web_client = mock.MagicMock()
 
     gcc.get_function(func_uuid_str)
@@ -328,9 +334,8 @@ def test_get_function():
     gcc.web_client.get_function.assert_called_with(func_uuid_str)
 
 
-def test_delete_function():
+def test_delete_function(gcc):
     func_uuid_str = str(uuid.uuid4())
-    gcc = gc.Client(do_version_check=False, login_manager=mock.Mock())
     gcc.web_client = mock.MagicMock()
 
     gcc.delete_function(func_uuid_str)
@@ -338,10 +343,9 @@ def test_delete_function():
     gcc.web_client.delete_function.assert_called_with(func_uuid_str)
 
 
-def test_missing_task_info(mocker, login_manager):
-    tid1 = str(uuid.uuid4())
+def test_missing_task_info(gcc):
+    tid1, tid2 = str(uuid.uuid4()), str(uuid.uuid4())
     tid1_reason = "XYZ tid1"
-    tid2 = str(uuid.uuid4())
 
     mock_resp = {
         "response": "batch",
@@ -357,11 +361,9 @@ def test_missing_task_info(mocker, login_manager):
             },
         },
     }
-    login_manager.get_web_client.get_batch_status = mocker.Mock(return_value=mock_resp)
-    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc.web_client.get_batch_status.return_value = mock_resp
 
-    gcc.web_client.base_url = "https://a.g.org"
-    res = gcc.get_batch_result([tid1, tid2])
+    res = gcc.get_batch_result([tid1, tid2])  # dev note: gcc.gbr, not gcc.web_client
 
     assert tid1 in res
     assert res[tid1]["pending"] is False
@@ -380,9 +382,7 @@ def test_missing_task_info(mocker, login_manager):
         ["000.dill", "1.2.3"],
     ],
 )
-def test_version_mismatch_from_details(
-    mocker, login_manager, mock_response, dill_python
-):
+def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
     worker_dill, worker_python = dill_python
 
     # Returned env same as client by default
@@ -413,10 +413,7 @@ def test_version_mismatch_from_details(
 
     mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
 
-    login_manager.get_web_client.get_task = mocker.Mock(
-        return_value=mock_response(200, returned_task)
-    )
-    gcc = gc.Client(do_version_check=False, login_manager=login_manager)
+    gcc.web_client.get_task.return_value = mock_response(200, returned_task)
 
     with pytest.raises(TaskExecutionFailed) as exc_info:
         gcc.get_task(tid)

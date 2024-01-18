@@ -63,10 +63,3 @@ def compute_client_args(pytestconfig):
 def compute_client(compute_client_args):
     gcc = Client(**compute_client_args)
     return gcc
-
-
-@pytest.fixture
-def login_manager(mocker):
-    mock_login_manager = mocker.Mock()
-    mock_login_manager.get_web_client = mocker.Mock
-    return mock_login_manager
