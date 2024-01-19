@@ -307,8 +307,11 @@ def test_user_endpoint_config(gc_executor, is_valid: bool, uep_config):
         gce.user_endpoint_config = uep_config
         assert gce.user_endpoint_config == uep_config
     else:
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError) as pyt_e:
             gce.user_endpoint_config = uep_config
+        if isinstance(uep_config, dict):
+            # Ensure we retain original exception
+            assert isinstance(pyt_e.value.__cause__, TypeError)
         assert gce.user_endpoint_config is None
 
 
