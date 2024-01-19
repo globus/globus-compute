@@ -280,8 +280,8 @@ class Executor(concurrent.futures.Executor):
                 )
             try:
                 json.dumps(val)
-            except TypeError:
-                raise TypeError("Configuration must be JSON-serializable")
+            except Exception as e:
+                raise TypeError("Configuration must be JSON-serializable") from e
         self._user_endpoint_config = val
 
     @property
