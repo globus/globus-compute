@@ -1067,6 +1067,24 @@ def test_resultwatcher_match_handles_deserialization_error():
     mrw.shutdown()
 
 
+def test_resultwatcher_match_calls_log_version_mismatch(randomstring):
+    payload = randomstring()
+    fxs = ComputeSerializer()
+    fut = ComputeFuture(task_id=str(uuid.uuid4()))
+    res = Result(task_id=fut.task_id, data=fxs.serialize(payload))
+
+    mrw = MockedResultWatcher()
+    mrw.funcx_executor.client.fx_serializer.deserialize = fxs.deserialize
+    mrw._received_results[fut.task_id] = (None, res)
+    mrw.watch_for_task_results([fut])
+    mrw.start()
+    mrw._event_watcher()
+
+    assert fut.result() == payload
+    assert mrw.funcx_executor.client._log_version_mismatch.called
+    mrw.shutdown()
+
+
 @pytest.mark.parametrize("unpacked", ("not_a_Result", Exception))
 def test_resultwatcher_onmessage_verifies_result_type(mocker, unpacked):
     mock_unpack = mocker.patch(f"{_MOCK_BASE}messagepack.unpack")

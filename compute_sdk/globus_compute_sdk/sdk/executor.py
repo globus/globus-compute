@@ -1274,6 +1274,7 @@ class _ResultWatcher(threading.Thread):
         for fut in futures_to_complete:
             props, res = self._received_results.pop(fut.task_id)
 
+            self.funcx_executor.client._log_version_mismatch(res.details)
             if res.is_error:
                 fut.set_exception(
                     TaskExecutionFailed(res.data, str(props.timestamp or 0))

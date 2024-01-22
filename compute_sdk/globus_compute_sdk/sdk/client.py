@@ -146,6 +146,8 @@ class Client:
 
         self.funcx_service_address = funcx_service_address
 
+        self._version_mismatch_already_warned_eps: t.Set[str | None] = set()
+
         if do_version_check:
             self.version_check()
 
@@ -169,16 +171,23 @@ class Client:
         """Remove credentials from your local system"""
         self.login_manager.logout()
 
-    @staticmethod
-    def _log_version_mismatch(worker_details: dict | None):
+    def _log_version_mismatch(self, worker_details: dict | None) -> None:
         """
         If worker environment details was returned from the endpoint
         and an exception was encountered, we will log/print to console
         the mismatch information
         """
+        if not worker_details:
+            return
+
+        worker_ep_id = worker_details.get("endpoint_id")
+        if worker_ep_id in self._version_mismatch_already_warned_eps:
+            return
+
         check_result = check_version(worker_details)
         if check_result is not None:
             logger.warning(check_result)
+            self._version_mismatch_already_warned_eps.add(worker_ep_id)
 
     def _update_task_table(
         self,
@@ -216,18 +225,17 @@ class Client:
                 raise ValueError(err_msg)
 
             completion_t = r_dict.get("completion_t", "unknown")
+            self._log_version_mismatch(r_dict.get("details"))
             if "result" not in r_dict and "exception" not in r_dict:
                 status["reason"] = r_dict.get("reason", "unknown")
             elif "result" in r_dict:
                 try:
                     r_obj = self.fx_serializer.deserialize(r_dict["result"])
                 except Exception:
-                    self._log_version_mismatch(r_dict.get("details"))
                     raise SerializationError("Result Object Deserialization")
                 else:
                     status.update({"result": r_obj, "completion_t": completion_t})
             elif "exception" in r_dict:
-                self._log_version_mismatch(r_dict.get("details"))
                 raise TaskExecutionFailed(r_dict["exception"], completion_t)
             else:
                 raise NotImplementedError("unreachable")

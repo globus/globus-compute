@@ -382,12 +382,12 @@ def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
         response_details["python_version"] = worker_python
 
     tid = str(uuid.uuid4())
-    stack_trace = "Some Stack Trace\n  Line 40 stack trace"
+    result = "some data"
     returned_task = {
         "task_id": tid,
         "status": "success",
+        "result": gcc.fx_serializer.serialize(result),
         "completion_t": "1677183605.212898",
-        "exception": stack_trace,
         "details": {
             "os": "Linux-5.19.0-1025-aws-x86_64-with-glibc2.35",
             "python_version": response_details["python_version"],
@@ -401,13 +401,10 @@ def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
     }
 
     mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
-
     gcc.web_client.get_task.return_value = mock_response(200, returned_task)
 
-    with pytest.raises(TaskExecutionFailed) as exc_info:
-        gcc.get_task(tid)
+    assert gcc.get_result(tid) == result
 
-    assert "Some Stack Trace" in str(exc_info)
     should_warn = worker_dill is not None or worker_python is not None
     assert mock_log.warning.called == should_warn
     if worker_dill or worker_python:
@@ -419,3 +416,96 @@ def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
             assert f"but worker used {worker_python}" in a[0]
         if worker_dill:
             assert f"/{worker_dill} (OS" in a[0]
+
+
+@pytest.mark.parametrize("should_fail", [True, False])
+def test_version_mismatch_warns_on_failure_and_success(
+    mocker, gcc, mock_response, should_fail
+):
+    tid = str(uuid.uuid4())
+    result = "some data"
+    stack_trace = "Some Stack Trace\n  Line 40 stack trace"
+    returned_task = {
+        "task_id": tid,
+        "status": "success",
+        "completion_t": "1677183605.212898",
+        "details": {
+            "os": "Linux-5.19.0-1025-aws-x86_64-with-glibc2.35",
+            "python_version": "python-bad-version",
+            "dill_version": "dill-bad-version",
+            "globus_compute_sdk_version": "2.3.2",
+            "task_transitions": {
+                "execution-start": 1692742841.843334,
+                "execution-end": 1692742846.123456,
+            },
+        },
+    }
+    if should_fail:
+        returned_task["exception"] = stack_trace
+    else:
+        returned_task["result"] = gcc.fx_serializer.serialize(result)
+
+    mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
+    gcc.web_client.get_task.return_value = mock_response(200, returned_task)
+
+    if should_fail:
+        with pytest.raises(TaskExecutionFailed) as exc_info:
+            gcc.get_task(tid)
+        assert "Some Stack Trace" in str(exc_info)
+    else:
+        task_res = gcc.get_result(tid)
+        assert task_res == result
+
+    assert mock_log.warning.called
+    assert "Warning:  Client SDK uses" in mock_log.warning.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    "ep_ids",
+    [
+        [
+            "00000000-1111-2222-3333-444444444444",
+            "00000000-1111-2222-3333-444444444444",
+        ],
+        [
+            "00000000-1111-2222-3333-444444444444",
+            "00000000-1111-2222-3333-444444444444",
+            "00000000-1111-2222-3333-555555555555",
+        ],
+        [
+            "00000000-1111-2222-3333-444444444444",
+            "00000000-1111-2222-3333-555555555555",
+            "00000000-1111-2222-3333-666666666666",
+        ],
+    ],
+)
+def test_version_mismatch_only_warns_once_per_ep(mocker, gcc, mock_response, ep_ids):
+    result = "some data"
+    returned_task = {
+        "status": "success",
+        "result": gcc.fx_serializer.serialize(result),
+        "completion_t": "1677183605.212898",
+        "exception": "Some Stack Trace\n  Line 40 stack trace",
+        "details": {
+            "os": "Linux-5.19.0-1025-aws-x86_64-with-glibc2.35",
+            "python_version": "python-bad-version",
+            "dill_version": "dill-bad-version",
+            "globus_compute_sdk_version": "2.3.2",
+            "task_transitions": {
+                "execution-start": 1692742841.843334,
+                "execution-end": 1692742846.123456,
+            },
+        },
+    }
+
+    mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
+
+    for ep_id in ep_ids:
+        tid = str(uuid.uuid4())
+        returned_task["task_id"] = tid
+        returned_task["details"]["endpoint_id"] = ep_id
+        gcc.web_client.get_task.return_value = mock_response(200, returned_task)
+
+        assert gcc.get_result(tid) == result
+
+    assert mock_log.warning.call_count == len(set(ep_ids))
