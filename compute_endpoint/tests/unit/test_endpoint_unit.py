@@ -26,6 +26,7 @@ from globus_compute_endpoint.endpoint.config.utils import (
     serialize_config,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_sdk.sdk.login_manager.manager import LoginManager
 from globus_sdk import GlobusAPIError, NetworkError
 from pytest_mock import MockFixture
 
@@ -863,3 +864,12 @@ def test_handles_provided_endpoint_id_with_json(
 
     _a, k = mock_gcc.register_endpoint.call_args
     assert k["endpoint_id"] == ep_uuid_str
+
+
+def test_create_auth_policy_happy():
+    mock.patch(f"{_mock_base}LoginManager.get_auth_client")
+    mock.patch(f"{_mock_base}LoginManager", autospec=LoginManager)
+    # mock_login.get_auth_client.return_value = mock_ac
+    mock.patch(f"{_mock_base}Endpoint.create_or_choose_auth_project")
+
+    pass

@@ -25,10 +25,16 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
-from globus_compute_endpoint.endpoint.utils import _redact_url_creds, update_url_port
+from globus_compute_endpoint.endpoint.utils import (
+    _redact_url_creds,
+    update_url_port,
+    user_input_select,
+)
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.client import Client
-from globus_sdk import AuthAPIError, GlobusAPIError, NetworkError
+from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_sdk import AuthAPIError, AuthClient, GlobusAPIError, NetworkError
+from globus_sdk.utils import MISSING
 
 log = logging.getLogger(__name__)
 
@@ -110,7 +116,7 @@ class Endpoint:
         endpoint_config: pathlib.Path | None = None,
         multi_user=False,
         display_name: str | None = None,
-        auth_policy: str | None = None,
+        auth_policy_id: str | None = None,
         subscription_id: str | None = None,
     ):
         """Initialize a clean endpoint dir
@@ -144,7 +150,7 @@ class Endpoint:
                 config_target_path,
                 multi_user,
                 display_name,
-                auth_policy,
+                auth_policy_id,
                 subscription_id,
             )
 
@@ -183,13 +189,104 @@ class Endpoint:
             os.umask(user_umask)
 
     @staticmethod
+    def create_or_choose_auth_project(ac: AuthClient) -> str:
+        """
+        Lets the user choose from one of their existing projects, or
+        prompt for a description and creates one for them
+        """
+        projects = ac.get_projects().data.get("projects", [])
+        if projects:
+            options = []
+            for proj in projects:
+                options.append(f'id: {proj["id"]}, name: {proj["display_name"]}')
+            proj_selected = user_input_select(options, "a Project")
+            if proj_selected:
+                return proj_selected.split()[1]
+
+        project_desc = input(
+            "Please enter a new project name to be created or Ctrl-C to abort: "
+        )
+        project_email = input("Please enter the contact email for this project: ")
+        admin_ids = input(
+            "Please enter a comma separated list of admin ids for this project: "
+        )
+        admin_id_list = admin_ids.split(",") if admin_ids else []
+        group_ids = input(
+            "Please enter a comma separated list of group ids as project admins: "
+        )
+        group_id_list = group_ids.split(",") if group_ids else []
+
+        try:
+            resp = ac.create_project(
+                project_desc,
+                project_email,
+                admin_ids=admin_id_list,
+                admin_group_ids=group_id_list,
+            )
+            return resp["project"]["id"]
+        except GlobusAPIError as e:
+            log.warning(f"Error creating a new auth project: [{e.text}]")
+            exit(os.EX_UNAVAILABLE)
+
+    @staticmethod
+    def create_or_update_auth_policy(
+        policy_details: dict,
+        policy_id: str | None = None,
+    ) -> str:
+        """
+        Uses the Globus SDK to create or update an auth policy and returns
+        the policy_id after creation
+        """
+        login_manager = LoginManager()
+        login_manager.ensure_logged_in()
+        ac = login_manager.get_auth_client()
+
+        project_id = policy_details.get("project_id")
+        if not project_id:
+            project_id = Endpoint.create_or_choose_auth_project(ac)
+
+        include_domains = policy_details.get("allowed_domains_list", MISSING)
+        exclude_domains = policy_details.get("exclude_domains_list", MISSING)
+        timeout = policy_details.get("timeout", MISSING)
+        desc = policy_details.get("description")
+        if not desc:
+            desc = "Globus Compute created authentication policy"
+
+        try:
+            if policy_id:
+                # Currently this update path is disallowed in cli.py
+                ac.update_policy(
+                    policy_id,
+                    project_id=project_id,
+                    description=desc,
+                    authentication_assurance_timeout=timeout,
+                    domain_constraints_include=include_domains,
+                    domain_constraints_exclude=exclude_domains,
+                )
+            else:
+                resp = ac.create_policy(
+                    project_id=project_id,
+                    description=desc,
+                    authentication_assurance_timeout=timeout,
+                    domain_constraints_include=include_domains,
+                    domain_constraints_exclude=exclude_domains,
+                )
+                policy_id = resp["policy"]["id"]
+        except GlobusAPIError as e:
+            log.warning(f"Error creating/updating authentication policy: [{e.text}]")
+            exit(os.EX_UNAVAILABLE)
+
+        return policy_id
+
+    @staticmethod
     def configure_endpoint(
         conf_dir: pathlib.Path,
         endpoint_config: str | None,
         multi_user: bool = False,
         display_name: str | None = None,
-        auth_policy: str | None = None,
+        auth_policy_id: str | None = None,
         subscription_id: str | None = None,
+        policy_details: dict | None = None,
     ):
         ep_name = conf_dir.name
         if conf_dir.exists():
@@ -197,13 +294,20 @@ class Endpoint:
             print(f"config dir <{ep_name}> already exists")
             raise Exception("ConfigExists")
 
+        if auth_policy_id:
+            if policy_details:
+                # Endpoint.create_or_update_auth_policy(policy_details, auth_policy_id)
+                raise Exception("Updating auth policies not supported at this time")
+        elif policy_details:
+            auth_policy_id = Endpoint.create_or_update_auth_policy(policy_details)
+
         templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
         Endpoint.init_endpoint_dir(
             conf_dir,
             templ_conf_path,
             multi_user,
             display_name,
-            auth_policy,
+            auth_policy_id,
             subscription_id,
         )
         config_path = Endpoint._config_file_path(conf_dir)

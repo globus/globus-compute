@@ -826,3 +826,38 @@ def test_fail_exit_sends_amqp_msg(
     run_line(f"start {ep_name}", assert_exit_code=ec, stdin=stdin)
     assert mock_ep.start_endpoint.called
     assert mock_send.called
+
+
+def test_configure_ep_policy_parameters(
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+):
+    params = "--auth-policy=123 --allowed_domains=xyz.com"
+    res = run_line(f"configure {params} {ep_name}", assert_exit_code=1)
+    assert "specified but not both" in res.stderr
+
+
+@mock.patch(f"{_MOCK_BASE}Endpoint.configure_endpoint")
+def test_configure_ep_auth_param_parse(
+    mock_configure,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+):
+    params = [
+        "--allowed_domains=xyz.com,example.org",
+        "--excluded_domains=nope.com",
+        "--auth_timeout=30",
+        "--auth_policy_project_id=p123",
+        "--auth_policy_description='proj desc'",
+    ]
+    run_line(f'configure {" ".join(params)} {ep_name}')
+    policy_params = mock_configure.call_args.args[-1]
+    assert ["xyz.com", "example.org"] == policy_params["allowed_domain_list"]
+    assert ["nope.com"] == policy_params["excluded_domain_list"]
+    assert 30 == policy_params["timeout"]
+    assert "proj desc" == policy_params["description"]
+    assert "p123" == policy_params["project_id"]

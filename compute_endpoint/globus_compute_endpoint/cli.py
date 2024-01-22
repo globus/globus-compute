@@ -243,8 +243,34 @@ def version_command():
     ),
 )
 @click.option("--subscription-id", help="Associate endpoint with a subscription")
+@click.option(
+    "--allowed_domains",
+    help=("a list of comma separated allowed domains, for the authentication policy"),
+    default=None,
+)
+@click.option(
+    "--excluded_domains",
+    help=("a list of comma separated excluded domains, for the authentication policy"),
+    default=None,
+)
+@click.option(
+    "--auth_policy_project_id",
+    help=("A Globus Auth project UUID to associate the authentication policy with"),
+    default=None,
+)
+@click.option(
+    "--auth_policy_description",
+    help=("A description for the authentication policy to be created"),
+    default=None,
+)
+@click.option(
+    "--auth_timeout",
+    help="An timeout value in (integer) seconds for the authentication policy",
+    default=None,
+)
 @name_arg
 @common_options
+@handle_auth_errors
 def configure_endpoint(
     *,
     name: str,
@@ -253,6 +279,11 @@ def configure_endpoint(
     display_name: str | None,
     auth_policy: str | None,
     subscription_id: str | None,
+    allowed_domains: str | None,
+    excluded_domains: str | None,
+    auth_policy_project_id: str | None,
+    auth_policy_description: str | None,
+    auth_timeout: int | None,
 ):
     """Configure an endpoint
 
@@ -267,6 +298,27 @@ def configure_endpoint(
     if multi_user and not _has_multi_user:
         raise ClickException("multi-user endpoints are not supported on this system")
 
+    policy_details = None
+
+    if allowed_domains or excluded_domains or auth_policy_project_id or auth_timeout:
+        if auth_policy:
+            # We disallow it for now, but can add the update route if desired
+            raise ClickException(
+                "Updating an existing auth policy is not supported at this time. "
+                "Either auth_policy or policy parameters can be specified but not both."
+            )
+        policy_details = {}
+
+        # Construct the auth policy dict to and let configure do the work
+        if allowed_domains:
+            policy_details["allowed_domain_list"] = allowed_domains.split(",")
+        if excluded_domains:
+            policy_details["excluded_domain_list"] = excluded_domains.split(",")
+        policy_details["project_id"] = auth_policy_project_id
+        policy_details["description"] = auth_policy_description
+        if auth_timeout:
+            policy_details["timeout"] = int(auth_timeout)
+
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
     Endpoint.configure_endpoint(
@@ -276,6 +328,7 @@ def configure_endpoint(
         display_name,
         auth_policy,
         subscription_id,
+        policy_details,
     )
 
 
