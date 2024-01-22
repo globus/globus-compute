@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class GlobusComputeEngine(GlobusComputeEngineBase):
+    """GlobusComputeEngine is a wrapper over Parsl's HighThroughputExecutor"""
+
     def __init__(
         self,
         *args,
@@ -29,6 +31,33 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         executor: t.Optional[HighThroughputExecutor] = None,
         **kwargs,
     ):
+        """The ``GlobusComputeEngine`` is a shim over `Parsl's HighThroughputExecutor
+        <parslhtex_>`_, almost all of arguments are passed along, unfettered.
+        Consequently, please reference `Parsl's HighThroughputExecutor <parslhtex_>`_
+        documentation for a complete list of arguments; we list below only the
+        arguments specific to the ``GlobusComputeEngine``.
+
+        .. _parslhtex: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.HighThroughputExecutor.html
+
+        Parameters
+        ----------
+
+        label: str
+           Label used to name engine log directories and batch jobs
+           default: "GlobusComputeEngine"
+
+        max_retries_on_system_failure: int
+           Set the number of retries for functions that fail due to
+           system failures such as node failure/loss. Since functions
+           can fail after partial runs, consider additional cleanup
+           logic before enabling this functionality
+           default: 0
+
+        strategy: Stategy object
+           Specify scaling strategy.
+           default: SimpleStrategy
+
+        """  # noqa: E501
         self.run_dir = os.getcwd()
         self.label = label
         self._status_report_thread = ReportingThread(target=self.report_status, args=[])

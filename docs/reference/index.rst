@@ -1,4 +1,5 @@
 .. module:: globus_compute_sdk
+.. module:: globus_compute_endpoint
 
 Globus Compute SDK
 ==================
@@ -7,3 +8,10 @@ Globus Compute SDK
 
     executor
     client
+
+Globus Compute Endpoint
+=======================
+
+.. toctree::
+
+    engine
