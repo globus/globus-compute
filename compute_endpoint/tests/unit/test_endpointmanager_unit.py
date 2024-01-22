@@ -98,7 +98,7 @@ def user_conf_template(conf_dir):
         """
 heartbeat_period: {{ heartbeat }}
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     provider:
         type: LocalProvider
         init_blocks: 1

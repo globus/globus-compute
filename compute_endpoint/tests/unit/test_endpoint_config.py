@@ -8,7 +8,7 @@ from pydantic.error_wrappers import ValidationError
 
 @pytest.fixture
 def config_dict():
-    return {"engine": {"type": "HighThroughputEngine"}}
+    return {"engine": {"type": "GlobusComputeEngine"}}
 
 
 @pytest.fixture
@@ -34,11 +34,11 @@ def test_config_model_tuple_conversions(config_dict: dict, data: t.Tuple[str, t.
 
     config_dict["engine"][field] = expected_val
     model = ConfigModel(**config_dict)
-    assert getattr(model.engine, field) == expected_val
+    assert getattr(model.engine.executor, field) == expected_val
 
     config_dict["engine"][field] = list(expected_val)
     model = ConfigModel(**config_dict)
-    assert getattr(model.engine, field) == expected_val
+    assert getattr(model.engine.executor, field) == expected_val
 
     config_dict["engine"][field] = 50000
     with pytest.raises(ValueError):
