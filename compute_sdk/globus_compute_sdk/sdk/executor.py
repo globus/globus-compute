@@ -216,6 +216,47 @@ class Executor(concurrent.futures.Executor):
         return f"{name}<{label}{ep_id}{c_id}{tg_id}{bs}>"
 
     @property
+    def endpoint_id(self):
+        """
+        The ID of the endpoint currently associated with this instance.  This
+        determines where tasks are sent for execution, and since tasks have to go
+        somewhere, the Executor will not run unless it has an endpoint_id set.
+
+        Must be a UUID, valid uuid-like string, or None.  Set by simple assignment::
+
+            >>> import uuid
+            >>> from globus_compute_sdk import Executor
+            >>> ep_id = uuid.uuid4()  # IRL: some *known* endpoint id
+            >>> gce = Executor(endpoint_id=ep_id)
+
+            # Alternatively, may use a stringified uuid:
+            >>> gce = Executor(endpoint_id=str(ep_id))
+
+            # May also alter after construction:
+            >>> gce.endpoint_id = ep_id
+            >>> gce.endpoint_id = str(ep_id)
+
+            # Internally, it is always stored as a UUID (or None):
+            >>> gce.endpoint_id
+            UUID('11111111-2222-4444-8888-000000000000')
+
+            # Executors only run if they have an endpoint_id set:
+            >>> gce = Executor(endpoint_id=None)
+            Traceback (most recent call last):
+                ...
+            ValueError: No endpoint_id set.  Did you forget to set it at construction?
+              Hint:
+
+                gce = Executor(endpoint_id=<ep_id>)
+                gce.endpoint_id = <ep_id>    # alternative
+        """
+        return self._endpoint_id
+
+    @endpoint_id.setter
+    def endpoint_id(self, endpoint_id: UUID_LIKE_T | None):
+        self._endpoint_id = as_optional_uuid(endpoint_id)
+
+    @property
     def task_group_id(self):
         """
         The Task Group with which this instance is currently associated.  New tasks will
