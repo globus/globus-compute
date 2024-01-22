@@ -5,10 +5,10 @@ import os
 import pathlib
 import warnings
 
-from globus_compute_endpoint.engines import HighThroughputEngine
+from globus_compute_endpoint.engines import GlobusComputeEngine
 from parsl.utils import RepresentationMixin
 
-_DEFAULT_EXECUTORS = [HighThroughputEngine()]
+_DEFAULT_EXECUTORS = [GlobusComputeEngine()]
 
 
 class Config(RepresentationMixin):
@@ -20,7 +20,7 @@ class Config(RepresentationMixin):
     executors : list of Executors
         A list of executors which serve as the backend for function execution.
         As of 0.2.2, this list should contain only one executor.
-        Default: [HighThroughputEngine()]
+        Default: [GlobusComputeEngine()]
 
     environment: str
         Environment the endpoint should connect to. Sets funcx_service_address and

@@ -24,7 +24,7 @@
 endpoint_setup: {{ endpoint_setup|default() }}
 
 engine:
-  type: HighThroughputEngine
+  type: GlobusComputeEngine
   max_workers_per_node: 1
 
   provider:

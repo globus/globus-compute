@@ -208,13 +208,13 @@ def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
         [
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.engines import HighThroughputEngine\n"
+                "from funcx_endpoint.engines import GlobusComputeEngine\n"
                 "from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "from parsl.providers import LocalProvider\n"
                 "\n"
                 "config = Config(\n"
                 "    executors=[\n"
-                "        HighThroughputEngine(\n"
+                "        GlobusComputeEngine(\n"
                 "            provider=LocalProvider(\n"
                 "                init_blocks=1,\n"
                 "                min_blocks=0,\n"
@@ -228,7 +228,7 @@ def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
         [
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.engines import HighThroughputEngine\n"
+                "from funcx_endpoint.engines import GlobusComputeEngine\n"
                 "from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "from parsl.providers import LocalProvider\n"
             ),
@@ -239,7 +239,7 @@ def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
         [
             (
                 "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.engines import HighThroughputEngine\n"
+                "from funcx_endpoint.engines import GlobusComputeEngine\n"
                 "from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "from parsl.providers import LocalProvider\n"
             ),
@@ -251,7 +251,7 @@ def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
             (
                 "def abc():"
                 "    from funcx_endpoint.endpoint.utils.config import Config\n"
-                "    from funcx_endpoint.engines import HighThroughputEngine\n"
+                "    from funcx_endpoint.engines import GlobusComputeEngine\n"
                 "    from funcx_endpoint.executors import HighThroughputExecutor\n"
                 "    from parsl.providers import LocalProvider\n"
                 "    return 'hello'\n"

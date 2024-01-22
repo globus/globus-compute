@@ -1,7 +1,7 @@
 amqp_port: 443
 display_name: null
 engine:
-  type: HighThroughputEngine
+  type: GlobusComputeEngine
   provider:
     type: LocalProvider
     init_blocks: 1

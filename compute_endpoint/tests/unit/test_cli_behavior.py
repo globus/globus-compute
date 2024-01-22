@@ -67,7 +67,7 @@ def make_endpoint_dir(mock_command_ensure, ep_name):
             """
 display_name: null
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     provider:
         type: LocalProvider
         init_blocks: 1
@@ -79,7 +79,7 @@ engine:
             """
 heartbeat_period: {{ heartbeat }}
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     provider:
         type: LocalProvider
         init_blocks: 1

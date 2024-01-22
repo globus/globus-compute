@@ -1,11 +1,11 @@
 from globus_compute_endpoint.endpoint.config import Config
-from globus_compute_endpoint.engines import HighThroughputEngine
+from globus_compute_endpoint.engines import GlobusComputeEngine
 from parsl.providers import LocalProvider
 
 config = Config(
     display_name=None,  # If None, defaults to the endpoint name
     executors=[
-        HighThroughputEngine(
+        GlobusComputeEngine(
             provider=LocalProvider(
                 init_blocks=1,
                 min_blocks=0,

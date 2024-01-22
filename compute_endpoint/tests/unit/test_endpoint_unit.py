@@ -519,8 +519,8 @@ def test_endpoint_get_metadata(mocker):
     config = meta["config"]
     assert "funcx_service_address" in config
     assert len(config["executors"]) == 1
-    assert config["executors"][0]["type"] == "HighThroughputEngine"
-    assert config["executors"][0]["provider"]["type"] == "LocalProvider"
+    assert config["executors"][0]["type"] == "GlobusComputeEngine"
+    assert config["executors"][0]["executor"]["provider"]["type"] == "LocalProvider"
 
 
 @pytest.mark.parametrize("env", [None, "blar", "local", "production"])
@@ -711,7 +711,7 @@ def test_serialize_config_field_types():
     result = serialize_config(ep_config)
 
     # Objects with a __dict__ attr are expanded
-    assert "type" in result["executors"][0]["provider"]
+    assert "type" in result["executors"][0]["executor"]["provider"]
 
     # Only constructor parameters should be included
     assert "_hidden_attr" not in result
