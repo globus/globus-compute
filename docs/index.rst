@@ -68,13 +68,15 @@ Deploying an endpoint
 
 A Globus Compute endpoint can be created by installing the Globus Compute endpoint software
 and configuring it for the target resources. The following steps show
-how to download and configure an endpoint for local (multi-process) execution. ::
+how to download and configure an endpoint for local (multi-process) execution:
 
-  $ python3 -m pipx install globus-compute-endpoint
+.. code-block:: console
 
-  $ globus-compute-endpoint configure
+   $ python3 -m pipx install globus-compute-endpoint
 
-  $ globus-compute-endpoint start <ENDPOINT_NAME>
+   $ globus-compute-endpoint configure
+
+   $ globus-compute-endpoint start <ENDPOINT_NAME>
 
 
 

@@ -13,9 +13,11 @@ The Globus Compute Endpoint package `is available on PyPI <https://pypi.org/proj
 (and thus available via ``pip``). However, *we strongly recommend installing the
 Globus Compute endpoint into an isolated virtual environment*.
 `Pipx <https://pypa.github.io/pipx/installation/>`_ automatically manages
-package-specific virtual environments for command line applications, so install Globus Compute endpoint via::
+package-specific virtual environments for command line applications, so install Globus Compute endpoint via:
 
-     $ python3 -m pipx install globus-compute-endpoint
+.. code-block:: console
+
+   $ python3 -m pipx install globus-compute-endpoint
 
 .. note::
 
@@ -36,15 +38,19 @@ Globus Compute requires authentication in order to associate endpoints with
 users and that ensure only the authorized user can run tasks on that endpoint.
 As part of this step, we request access to your identity and Globus Groups.
 
-To get started, you will first want to configure a new endpoint.  ::
+To get started, you will first want to configure a new endpoint:
 
-  $ globus-compute-endpoint configure
+.. code-block:: console
+
+   $ globus-compute-endpoint configure
 
 Once you've run this command, a directory will be created at ``$HOME/.globus_compute`` and a set of default configuration files will be generated.
 
-You can also set up auto-completion for the ``globus-compute-endpoint`` commands in your shell, by using the command ::
+You can also set up auto-completion for the ``globus-compute-endpoint`` commands in your shell, by using the command:
 
-  $ globus-compute-endpoint --install-completion [zsh bash fish ...]
+.. code-block:: console
+
+   $ globus-compute-endpoint --install-completion [zsh bash fish ...]
 
 
 Configuring an Endpoint
@@ -58,9 +64,11 @@ Globus Compute provides a Python class-based configuration model that allows you
 resources (number of nodes, number of cores per worker, walltime, etc.) as well as allowing you to place
 limits on how Globus Compute may scale the resources in response to changing workload demands.
 
-To generate the appropriate directories and default configuration template, run the following command::
+To generate the appropriate directories and default configuration template, run the following command:
 
-  $ globus-compute-endpoint configure <ENDPOINT_NAME>
+.. code-block:: console
+
+   $ globus-compute-endpoint configure <ENDPOINT_NAME>
 
 This command will create a profile for your endpoint in ``$HOME/.globus_compute/<ENDPOINT_NAME>/`` and will instantiate a
 ``config.yaml`` file. This file should be updated with the appropriate configurations for the computational system you are
@@ -76,9 +84,11 @@ see the :class:`~compute_endpoint.endpoint.utils.config.Config` class documentat
 Starting an Endpoint
 --------------------
 
-To start a new endpoint run the following command::
+To start a new endpoint run the following command:
 
-  $ globus-compute-endpoint start <ENDPOINT_NAME>
+.. code-block:: console
+
+   $ globus-compute-endpoint start <ENDPOINT_NAME>
 
 .. note:: If the ENDPOINT_NAME is not specified, a default endpoint named "default" is started.
 
@@ -104,9 +114,11 @@ environment variables. This is explained in detail in :ref:`client credentials w
 Stopping an Endpoint
 --------------------
 
-To stop an endpoint, run the following command::
+To stop an endpoint, run the following command:
 
-  $ globus-compute-endpoint stop <ENDPOINT_NAME>
+.. code-block:: console
+
+   $ globus-compute-endpoint stop <ENDPOINT_NAME>
 
 If the endpoint is not running and was stopped correctly previously, this command does nothing.
 
@@ -120,18 +132,20 @@ can be started cleanly again.
 Listing Endpoints
 -----------------
 
-To list available endpoints on the current system, run::
+To list available endpoints on the current system, run:
 
-  $ globus-compute-endpoint list
-  +---------------+-------------+--------------------------------------+
-  | Endpoint Name |   Status    |             Endpoint ID              |
-  +===============+=============+======================================+
-  | default       | Active      | 1e999502-b434-49a2-a2e0-d925383d2dd4 |
-  +---------------+-------------+--------------------------------------+
-  | KNL_test      | Inactive    | 8c01d13c-cfc1-42d9-96d2-52c51784ea16 |
-  +---------------+-------------+--------------------------------------+
-  | gpu_cluster   | Initialized | None                                 |
-  +---------------+-------------+--------------------------------------+
+.. code-block:: console
+
+   $ globus-compute-endpoint list
+   +---------------+-------------+--------------------------------------+
+   | Endpoint Name |   Status    |             Endpoint ID              |
+   +===============+=============+======================================+
+   | default       | Active      | 1e999502-b434-49a2-a2e0-d925383d2dd4 |
+   +---------------+-------------+--------------------------------------+
+   | KNL_test      | Inactive    | 8c01d13c-cfc1-42d9-96d2-52c51784ea16 |
+   +---------------+-------------+--------------------------------------+
+   | gpu_cluster   | Initialized | None                                 |
+   +---------------+-------------+--------------------------------------+
 
 Endpoints can be the following states:
 
@@ -221,7 +235,7 @@ systemd service can be configured to run the endpoint.
 
 1. Ensure the endpoint isn't running:
 
-   .. code-block:: shell
+   .. code-block:: console
 
       $ globus-compute-endpoint stop <my-endpoint-name>
 
@@ -249,14 +263,14 @@ systemd service can be configured to run the endpoint.
 
 4. Enable the service and start the endpoint:
 
-   .. code-block:: shell
+   .. code-block:: console
 
       $ sudo systemctl enable my-globus-compute-endpoint.service --now
 
 To edit an existing systemd service, make changes to the service file and then run the
 following:
 
-.. code-block:: shell
+.. code-block:: console
 
    $ sudo systemctl daemon-reload
    $ sudo systemctl restart my-globus-compute-endpoint.service
