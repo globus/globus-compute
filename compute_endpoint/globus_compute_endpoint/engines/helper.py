@@ -24,7 +24,10 @@ serializer = ComputeSerializer()
 
 
 def execute_task(
-    task_id: uuid.UUID, task_body: bytes, result_size_limit: int = 10 * 1024 * 1024
+    task_id: uuid.UUID,
+    task_body: bytes,
+    endpoint_id: t.Optional[uuid.UUID],
+    result_size_limit: int = 10 * 1024 * 1024,
 ) -> bytes:
     """Execute task is designed to enable any executor to execute a Task payload
     and return a Result payload, where the payload follows the globus-compute protocols
@@ -33,6 +36,7 @@ def execute_task(
     ----------
     task_id: uuid string
     task_body: packed message as bytes
+    endpoint_id: uuid string or None
     result_size_limit: result size in bytes
     Returns
     -------
@@ -66,6 +70,7 @@ def execute_task(
             error_details=error_details,
         )
 
+    env_details["endpoint_id"] = endpoint_id
     result_message["details"] = env_details
 
     exec_end = TaskTransition(

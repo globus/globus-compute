@@ -127,6 +127,7 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
     return_size = 10
 
     task_id = uuid.uuid1()
+    ep_id = uuid.uuid1()
 
     payload = ez_pack_function(test_worker.serializer, large_result, (return_size,), {})
     task_body = messagepack.pack(
@@ -134,7 +135,9 @@ def test_execute_function_exceeding_result_size_limit(test_worker):
     )
 
     with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
-        s_result = execute_task(task_id, task_body, result_size_limit=return_size - 2)
+        s_result = execute_task(
+            task_id, task_body, ep_id, result_size_limit=return_size - 2
+        )
     result = messagepack.unpack(s_result)
 
     assert isinstance(result, messagepack.message_types.Result)
@@ -157,6 +160,7 @@ def sleeper(t):
 
 def test_app_timeout(test_worker):
     task_id = uuid.uuid1()
+    ep_id = uuid.uuid1()
     task_body = ez_pack_function(test_worker.serializer, sleeper, (1,), {})
     task_body = messagepack.pack(
         messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
@@ -164,7 +168,7 @@ def test_app_timeout(test_worker):
 
     with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
         with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
-            packed_result = execute_task(task_id, task_body)
+            packed_result = execute_task(task_id, task_body, ep_id)
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
