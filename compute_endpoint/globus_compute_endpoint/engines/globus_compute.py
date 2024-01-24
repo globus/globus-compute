@@ -1,6 +1,7 @@
 import logging
 import os
 import queue
+import shlex
 import typing as t
 import uuid
 from concurrent.futures import Future
@@ -17,6 +18,10 @@ from globus_compute_endpoint.strategies import SimpleStrategy
 from parsl.executors.high_throughput.executor import HighThroughputExecutor
 
 logger = logging.getLogger(__name__)
+DOCKER_CMD_TEMPLATE = "docker run {options} -v {rundir}:{rundir} -t {image} {command}"
+APPTAINER_CMD_TEMPLATE = "apptainer run {options} {image} {command}"
+SINGULARITY_CMD_TEMPLATE = "singularity run {options} {image} {command}"
+VALID_CONTAINER_TYPES = ("docker", "singularity", "apptainer", "custom", None)
 
 
 class GlobusComputeEngine(GlobusComputeEngineBase):
@@ -29,6 +34,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         max_retries_on_system_failure: int = 0,
         strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         executor: t.Optional[HighThroughputExecutor] = None,
+        container_type: t.Literal[VALID_CONTAINER_TYPES] = None,  # type: ignore
+        container_uri: t.Optional[str] = None,
+        container_cmd_options: t.Optional[str] = None,
         **kwargs,
     ):
         """The ``GlobusComputeEngine`` is a shim over `Parsl's HighThroughputExecutor
@@ -66,6 +74,14 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         )
         self.strategy = strategy
         self.max_workers_per_node = 1
+
+        self.container_type = container_type
+        assert (
+            self.container_type in VALID_CONTAINER_TYPES
+        ), f"{self.container_type} is not a valid container_type"
+        self.container_uri = container_uri
+        self.container_cmd_options = container_cmd_options
+
         if executor is None:
             executor = HighThroughputExecutor(  # type: ignore
                 *args,
@@ -73,6 +89,46 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 **kwargs,
             )
         self.executor = executor
+
+    def containerized_launch_cmd(self) -> str:
+        """Recompose executor's launch_cmd to launch with containers
+
+        Returns
+        -------
+        str launch_cmd
+        """
+        launch_cmd = self.executor.launch_cmd
+        # Adding assert here since mypy can't figure out launch_cmd's type
+        assert launch_cmd
+        if self.container_type == "docker":
+            launch_cmd = DOCKER_CMD_TEMPLATE.format(
+                image=self.container_uri,
+                rundir=self.run_dir,
+                command=launch_cmd,
+                options=self.container_cmd_options or "",
+            )
+        elif self.container_type == "apptainer":
+            launch_cmd = APPTAINER_CMD_TEMPLATE.format(
+                image=self.container_uri,
+                command=launch_cmd,
+                options=self.container_cmd_options or "",
+            )
+        elif self.container_type == "singularity":
+            launch_cmd = SINGULARITY_CMD_TEMPLATE.format(
+                image=self.container_uri,
+                command=launch_cmd,
+                options=self.container_cmd_options or "",
+            )
+        elif self.container_type == "custom":
+            assert (
+                self.container_cmd_options
+            ), "GCE.container_cmd_options is required for GCE.container_type=custom"
+            template = self.container_cmd_options.replace(
+                "{EXECUTOR_RUNDIR}", str(self.run_dir)
+            )
+            launch_cmd = template.replace("{EXECUTOR_LAUNCH_CMD}", launch_cmd)
+
+        return launch_cmd
 
     def start(
         self,
@@ -90,6 +146,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.executor.run_dir = self.run_dir
         script_dir = os.path.join(self.run_dir, "submit_scripts")
         self.executor.provider.script_dir = script_dir
+        if self.container_type:
+            containerized_launch_cmd = self.containerized_launch_cmd()
+            self.executor.launch_cmd = shlex.join(shlex.split(containerized_launch_cmd))
+            logger.info(
+                f"Containerized launch cmd template: {self.executor.launch_cmd}"
+            )
+
         if (
             self.executor.provider.channel
             and not self.executor.provider.channel.script_dir
