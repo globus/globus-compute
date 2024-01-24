@@ -55,12 +55,17 @@ def check_version(task_details: dict | None) -> str | None:
         worker_py = task_details.get("python_version", "UnknownPy")
         worker_dill = task_details.get("dill_version", "UnknownDill")
         worker_os = task_details.get("os", "UnknownOS")
+        worker_epid = task_details.get("endpoint_id", "<unknown>")
+        worker_sdk = task_details.get("globus_compute_sdk_version", "UnknownSDK")
         client_details = get_env_details()
         sdk_py = client_details["python_version"]
         sdk_dill = client_details["dill_version"]
         if (sdk_py, sdk_dill) != (worker_py, worker_dill):
             return (
-                f"Warning:  Client SDK uses Python {sdk_py}/Dill {sdk_dill} "
-                f"but worker used {worker_py}/{worker_dill} (OS: {worker_os})"
+                "Warning - dependency versions are mismatched between local SDK "
+                f"and remote worker on endpoint {worker_epid}: "
+                f"local SDK uses Python {sdk_py}/Dill {sdk_dill} "
+                f"but worker used {worker_py}/{worker_dill}\n"
+                f"(worker SDK version: {worker_sdk}; worker OS: {worker_os})"
             )
     return None
