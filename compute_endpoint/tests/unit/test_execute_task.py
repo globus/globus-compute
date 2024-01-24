@@ -18,6 +18,7 @@ def divide(x, y):
 
 def test_execute_task():
     serializer = ComputeSerializer()
+    ep_id = uuid.uuid1()
     task_id = uuid.uuid1()
     input, output = (10, 2), 5
     task_body = ez_pack_function(serializer, divide, input, {})
@@ -28,7 +29,7 @@ def test_execute_task():
         )
     )
 
-    packed_result = execute_task(task_id, task_message)
+    packed_result = execute_task(task_id, task_message, ep_id)
     assert isinstance(packed_result, bytes)
 
     result = messagepack.unpack(packed_result)
@@ -37,11 +38,13 @@ def test_execute_task():
     assert "os" in result.details
     assert "python_version" in result.details
     assert "dill_version" in result.details
+    assert "endpoint_id" in result.details
     assert serializer.deserialize(result.data) == output
 
 
 def test_execute_task_with_exception():
     serializer = ComputeSerializer()
+    ep_id = uuid.uuid1()
     task_id = uuid.uuid1()
     task_body = ez_pack_function(
         serializer,
@@ -60,7 +63,7 @@ def test_execute_task_with_exception():
     )
 
     with mock.patch(f"{_MOCK_BASE}log") as mock_log:
-        packed_result = execute_task(task_id, task_message)
+        packed_result = execute_task(task_id, task_message, ep_id)
 
     assert mock_log.exception.called
     a, _k = mock_log.exception.call_args
@@ -72,5 +75,6 @@ def test_execute_task_with_exception():
     assert result.error_details
     assert "python_version" in result.details
     assert "os" in result.details
-    assert result.details["dill_version"]
+    assert "dill_version" in result.details
+    assert "endpoint_id" in result.details
     assert "ZeroDivisionError" in result.data
