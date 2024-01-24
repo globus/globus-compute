@@ -409,13 +409,13 @@ def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
     assert mock_log.warning.called == should_warn
     if worker_dill or worker_python:
         a, *_ = mock_log.warning.call_args
-        assert "Warning:  Client SDK uses" in a[0]
+        assert "Warning - dependency versions are mismatched" in a[0]
         if worker_dill and worker_python:
             assert f"but worker used {worker_python}/{worker_dill}" in a[0]
         if worker_python:
             assert f"but worker used {worker_python}" in a[0]
         if worker_dill:
-            assert f"/{worker_dill} (OS" in a[0]
+            assert f"/{worker_dill}\n(worker SDK version" in a[0]
 
 
 @pytest.mark.parametrize("should_fail", [True, False])
@@ -457,7 +457,10 @@ def test_version_mismatch_warns_on_failure_and_success(
         assert task_res == result
 
     assert mock_log.warning.called
-    assert "Warning:  Client SDK uses" in mock_log.warning.call_args[0][0]
+    assert (
+        "Warning - dependency versions are mismatched"
+        in mock_log.warning.call_args[0][0]
+    )
 
 
 @pytest.mark.parametrize(
