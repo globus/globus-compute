@@ -106,9 +106,9 @@ class EndpointManager:
 
         self._wait_for_child = False
 
-        self._command_queue: queue.SimpleQueue[
-            tuple[int, BasicProperties, bytes]
-        ] = queue.SimpleQueue()
+        self._command_queue: queue.SimpleQueue[tuple[int, BasicProperties, bytes]] = (
+            queue.SimpleQueue()
+        )
         self._command_stop_event = threading.Event()
 
         self._cached_cmd_start_args: TTLCache[int, T_CMD_START_ARGS] = TTLCache(

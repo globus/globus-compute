@@ -949,9 +949,9 @@ class Interchange:
                         )
                         b_messages = b_messages[1:]
                         mdata["last"] = time.time()
-                        self.container_switch_count[
-                            manager
-                        ] = manager_report.container_switch_count
+                        self.container_switch_count[manager] = (
+                            manager_report.container_switch_count
+                        )
                         log.info(
                             "Got container switch count: %s",
                             self.container_switch_count,
