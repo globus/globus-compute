@@ -91,9 +91,9 @@ class GlobusComputeEngineBase(ABC):
         self.run_dir: t.Optional[str] = None
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
-        self.results_passthrough: queue.Queue[
-            dict[str, bytes | str | None]
-        ] = queue.Queue()
+        self.results_passthrough: queue.Queue[dict[str, bytes | str | None]] = (
+            queue.Queue()
+        )
 
     @abstractmethod
     def start(

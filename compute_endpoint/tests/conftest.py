@@ -66,11 +66,9 @@ def tod_session_num():
 
 
 class FakeLoginManager:
-    def ensure_logged_in(self) -> None:
-        ...
+    def ensure_logged_in(self) -> None: ...
 
-    def logout(self) -> bool:
-        ...
+    def logout(self) -> bool: ...
 
     def get_auth_client(self) -> globus_sdk.AuthClient:
         return globus_sdk.AuthClient(authorizer=globus_sdk.NullAuthorizer())

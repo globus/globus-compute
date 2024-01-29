@@ -1,6 +1,7 @@
 """
 This module contains logging configuration for the globus-compute-endpoint application.
 """
+
 from __future__ import annotations
 
 import copy

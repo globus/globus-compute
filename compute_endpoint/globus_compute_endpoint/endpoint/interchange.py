@@ -127,9 +127,9 @@ class EndpointInterchange:
         }
         log.info(f"Platform info: {self.current_platform}")
 
-        self.results_passthrough: queue.Queue[
-            dict[str, bytes | str | None]
-        ] = queue.Queue()
+        self.results_passthrough: queue.Queue[dict[str, bytes | str | None]] = (
+            queue.Queue()
+        )
         # Rename self.executor -> self.engine in second round
         self.executor: GlobusComputeEngineBase = self.config.executors[0]
         self._test_start = False

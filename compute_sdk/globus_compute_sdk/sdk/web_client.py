@@ -5,6 +5,7 @@ Globus Compute web service.
 It also implements data helpers for building complex payloads. Most notably,
 `FunctionRegistrationData` which can be constructed from an arbitrary callable.
 """
+
 import json
 import typing as t
 
