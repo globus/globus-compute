@@ -106,7 +106,7 @@ jobs:
           tox -e py -- --log-cli-level=ERROR
       - name: Collect Docker Logs
         if: failure()
-        uses: jwalton/gh-docker-logs@v2.2.1
+        uses: jwalton/gh-docker-logs@v2.2.2
 
 
   publish:
