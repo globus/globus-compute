@@ -3,6 +3,42 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.12.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.12.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Implement ability to launch workers in containerized environments, with support for
+  Docker, Singularity, and Apptainer.  Use by setting ``container_type``, ``container_uri``
+  and  additional options may be specified via ``container_cmd_options``.
+  Sample configuration:
+
+  .. code-block:: yaml
+
+    display_name: Docker
+    engine:
+      type: GlobusComputeEngine
+      container_type: docker
+      container_uri: funcx/kube-endpoint:main-3.10
+      container_cmd_options: -v /tmp:/tmp
+
+Removed
+^^^^^^^
+
+- Remove the funcx-* wrappers, per rebrand-to-Globus-Compute deprecation in
+  Apr, 2024.
+
+Changed
+^^^^^^^
+
+- Changed the default engine type for new endpoints to `GlobusComputeEngine`, which
+  utilizes the Parsl `HighThroughputExecutor` under the hood.
+
+- Pin Parsl version requirement to ``2024.01.22``.
+
 .. _changelog-2.11.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.11.0
