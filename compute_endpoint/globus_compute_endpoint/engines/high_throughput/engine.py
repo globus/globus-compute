@@ -19,6 +19,7 @@ from multiprocessing import Process
 
 import dill
 from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
 from globus_compute_endpoint.endpoint.messages_compat import convert_ep_status_report
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_endpoint.engines.helper import execute_task
@@ -31,6 +32,7 @@ from globus_compute_endpoint.engines.high_throughput.messages import (
     Task,
     TaskCancel,
 )
+from globus_compute_endpoint.exception_handling import get_result_error_details
 from globus_compute_endpoint.strategies.simple import SimpleStrategy
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.errors import ConfigurationError
@@ -593,7 +595,11 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
                             # we are only interested in actual task ids here, not
                             # identifiers for other message types
                             sent_task_id = tid if isinstance(tid, str) else None
-                            packed_result = self._convert_result_to_outgoing(msg)
+                            packed_result = self._convert_result_to_outgoing(
+                                sent_task_id, msg
+                            )
+                            if packed_result is None:
+                                continue
                             task_result = {
                                 "task_id": sent_task_id,
                                 "message": packed_result,
@@ -639,11 +645,25 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
         log.info("queue management worker finished")
 
-    def _convert_result_to_outgoing(self, msg: dict[str, t.Union[str, bytes]]) -> bytes:
+    def _convert_result_to_outgoing(
+        self, task_id: str | None, msg: dict[str, t.Union[str, bytes]]
+    ) -> bytes | None:
         """The messagepacked result should be in the result dict in the data field"""
-        # The data body already is packed on the worker
-        assert isinstance(msg["data"], bytes)
-        return msg["data"]
+        try:
+            # The data body already is packed on the worker
+            assert isinstance(msg["data"], bytes)
+            return msg["data"]
+        except (KeyError, AssertionError) as e:
+            log.debug(f"Invalid result message: {msg}", exc_info=e)
+            if task_id is None:
+                return None
+            err_code, err_msg = get_result_error_details()
+            failed_result = Result(
+                task_id=task_id,
+                data=f"Task {task_id} failed to run on endpoint {self.endpoint_id}",
+                error_details=ResultErrorDetails(code=err_code, user_message=err_msg),
+            )
+            return messagepack.pack(failed_result)
 
     # When the engine gets lost, the weakref callback will wake up
     # the queue management thread.

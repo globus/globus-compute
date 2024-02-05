@@ -1,0 +1,4 @@
+Bug Fixes
+^^^^^^^^^
+
+- Improved handling of unexpected errors in the `HighThroughputEngine`.
