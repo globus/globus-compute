@@ -6,7 +6,14 @@ interface to allow functions to be used in a `Globus Flow <https://www.globus.or
 
 The Globus Compute Action Provider interface uses:
 
-* ``ActionUrl`` -- 'https://compute.actions.globus.org'
+* ``ActionUrl`` -- 'https://compute.actions.globus.org'  *Updated Apr 2023* [1]_
+
+.. [1] The previous version of the Action Provider, deprecated April 2023,
+   had an ActionUrl of https://dev.funcx.org/automate along with
+   a required ``ActionScope``.  The current Action Provider is backwards
+   compatible, provided the ``ActionUrl`` is updated to the new URL and the
+   ``ActionScope`` removed.  (The ActionScope is now populated from the
+   Action Provider's metadata URL)
 
 
 Action Input Schema
