@@ -173,6 +173,7 @@ def test_gcengine_pass_through_to_executor(mocker: MockFixture):
     kwargs = {
         "label": "VroomEngine",
         "address": "127.0.0.1",
+        "encrypted": False,
         "foo": "bar",
     }
     GlobusComputeEngine(*args, **kwargs)
@@ -202,3 +203,17 @@ def test_gcengine_start_pass_through_to_executor(
 
     assert mock_executor.run_dir == run_dir
     assert mock_executor.provider.script_dir == scripts_dir
+
+
+@pytest.mark.parametrize("encrypted", (True, False))
+def test_gcengine_encrypted(encrypted: bool, engine_runner):
+    engine: GlobusComputeEngine = engine_runner(
+        GlobusComputeEngine, encrypted=encrypted
+    )
+    assert engine.encrypted is engine.executor.encrypted is encrypted
+
+    with pytest.raises(AttributeError):
+        engine.encrypted = not encrypted
+
+    engine.executor.encrypted = not encrypted
+    assert engine.encrypted is not encrypted

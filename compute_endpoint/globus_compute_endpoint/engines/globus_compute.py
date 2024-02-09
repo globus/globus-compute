@@ -37,6 +37,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         container_type: t.Literal[VALID_CONTAINER_TYPES] = None,  # type: ignore
         container_uri: t.Optional[str] = None,
         container_cmd_options: t.Optional[str] = None,
+        encrypted: bool = True,
         **kwargs,
     ):
         """The ``GlobusComputeEngine`` is a shim over `Parsl's HighThroughputExecutor
@@ -65,6 +66,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
            Specify scaling strategy.
            default: SimpleStrategy
 
+        encrypted: bool
+            Flag to enable/disable encryption (CurveZMQ). Default is True.
+
         """  # noqa: E501
         self.run_dir = os.getcwd()
         self.label = label
@@ -86,9 +90,14 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             executor = HighThroughputExecutor(  # type: ignore
                 *args,
                 label=label,
+                encrypted=encrypted,
                 **kwargs,
             )
         self.executor = executor
+
+    @property
+    def encrypted(self):
+        return self.executor.encrypted
 
     def containerized_launch_cmd(self) -> str:
         """Recompose executor's launch_cmd to launch with containers

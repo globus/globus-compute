@@ -112,7 +112,7 @@ def engine_heartbeat() -> int:
 def engine_runner(tmp_path, engine_heartbeat, reporting_period=0.1) -> t.Callable:
     engines_to_shutdown = []
 
-    def _runner(engine_type: t.Type[GlobusComputeEngineBase]):
+    def _runner(engine_type: t.Type[GlobusComputeEngineBase], **kwargs):
         ep_id = uuid.uuid4()
         queue = Queue()
         if engine_type is engines.ProcessPoolEngine:
@@ -127,6 +127,7 @@ def engine_runner(tmp_path, engine_heartbeat, reporting_period=0.1) -> t.Callabl
             )
         else:
             raise NotImplementedError(f"Unimplemented: {engine_type.__name__}")
+        k.update(**kwargs)
         engine = engine_type(**k)
         engine._status_report_thread.reporting_period = reporting_period
         engine.start(
