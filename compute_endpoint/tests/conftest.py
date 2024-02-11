@@ -123,7 +123,7 @@ def engine_runner(tmp_path, engine_heartbeat, reporting_period=0.1) -> t.Callabl
             k = dict(
                 address="127.0.0.1",
                 heartbeat_period=engine_heartbeat,
-                heartbeat_threshold=1,
+                heartbeat_threshold=2,
             )
         else:
             raise NotImplementedError(f"Unimplemented: {engine_type.__name__}")
