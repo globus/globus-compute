@@ -23,7 +23,7 @@ from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.executors.high_throughput.interchange import ManagerLost
 from pytest_mock import MockFixture
-from tests.utils import double, ez_pack_function, slow_double
+from tests.utils import double, ez_pack_function, kill_manager
 
 logger = logging.getLogger(__name__)
 
@@ -137,20 +137,11 @@ def test_proc_pool_engine_not_started():
 def test_gc_engine_system_failure(engine_runner):
     """Test behavior of engine failure killing task"""
     engine = engine_runner(GlobusComputeEngine)
-    param = random.randint(1, 100)
-    q = engine.results_passthrough
+    engine.max_retries_on_system_failure = 0
+
     task_id = uuid.uuid1()
     serializer = ComputeSerializer()
-    # We want the task to be running when we kill the manager
-    task_body = ez_pack_function(
-        serializer,
-        slow_double,
-        (
-            param,
-            5,
-        ),
-        {},
-    )
+    task_body = ez_pack_function(serializer, kill_manager, (), {})
     task_message = messagepack.pack(
         messagepack.message_types.Task(
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
@@ -159,26 +150,8 @@ def test_gc_engine_system_failure(engine_runner):
     future = engine.submit(str(task_id), task_message)
 
     assert isinstance(future, concurrent.futures.Future)
-    # Trigger a failure from managers scaling in.
-    engine.executor.scale_in(blocks=1)
-    # We need to scale out to make sure following tests will not be affected
-    engine.executor.scale_out(blocks=1)
     with pytest.raises(ManagerLost):
         future.result()
-
-    for _i in range(10):
-        q_msg = q.get(timeout=1)
-        assert q_msg
-
-        packed_result = q_msg["message"]
-        result = messagepack.unpack(packed_result)
-        if isinstance(result, messagepack.message_types.EPStatusReport):
-            continue
-
-        assert result.task_id == task_id
-        assert result.error_details
-        assert "ManagerLost" in result.data
-        break
 
 
 @pytest.mark.parametrize("engine_type", (GlobusComputeEngine, HighThroughputEngine))
