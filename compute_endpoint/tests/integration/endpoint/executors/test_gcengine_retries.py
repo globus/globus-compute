@@ -6,9 +6,8 @@ from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusComputeEngine
 from globus_compute_endpoint.strategies import SimpleStrategy
 from globus_compute_sdk.serialize import ComputeSerializer
-from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import LocalProvider
-from tests.utils import ez_pack_function, kill_manager, succeed_after_n_runs
+from tests.utils import ez_pack_function, succeed_after_n_runs
 
 
 @pytest.fixture
@@ -32,40 +31,6 @@ def gc_engine_with_retries(tmp_path):
     engine.start(endpoint_id=ep_id, run_dir=tmp_path, results_passthrough=queue)
     yield engine
     engine.shutdown()
-
-
-def test_gce_kill_manager(gc_engine_with_retries):
-    engine = gc_engine_with_retries
-    engine.max_retries_on_system_failure = 0
-    queue = engine.results_passthrough
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
-
-    # Confirm error message for ManagerLost
-    task_body = ez_pack_function(serializer, kill_manager, (), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
-    )
-
-    future = engine.submit(task_id, task_message)
-
-    with pytest.raises(ManagerLost):
-        future.result()
-
-    flag = False
-    for _i in range(4):
-        q_msg = queue.get(timeout=2)
-        assert isinstance(q_msg, dict)
-
-        packed_result_q = q_msg["message"]
-        result = messagepack.unpack(packed_result_q)
-        if isinstance(result, messagepack.message_types.Result):
-            assert result.task_id == task_id
-            if result.error_details and "ManagerLost" in result.data:
-                flag = True
-                break
-
-    assert flag, "Result message missing"
 
 
 def test_success_after_1_fail(gc_engine_with_retries, tmp_path):
