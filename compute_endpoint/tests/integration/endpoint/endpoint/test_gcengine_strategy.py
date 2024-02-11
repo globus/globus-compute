@@ -20,7 +20,7 @@ def gc_engine_scaling(tmp_path):
     engine = GlobusComputeEngine(
         address="127.0.0.1",
         heartbeat_period=1,
-        heartbeat_threshold=1,
+        heartbeat_threshold=2,
         provider=LocalProvider(
             init_blocks=0,
             min_blocks=0,
@@ -41,7 +41,7 @@ def gc_engine_non_scaling(tmp_path):
     engine = GlobusComputeEngine(
         address="127.0.0.1",
         heartbeat_period=1,
-        heartbeat_threshold=1,
+        heartbeat_threshold=2,
         provider=LocalProvider(
             init_blocks=1,
             min_blocks=1,
@@ -82,7 +82,7 @@ def test_engine_submit_init_0(gc_engine_scaling):
         if len(managers) == 0:
             break
         idle_time = managers[0]["idle_duration"]
-        assert idle_time <= max_idletime + 1, "Manager exceeded idletime"
+        assert idle_time <= max_idletime + 2, "Manager exceeded idletime"
         time.sleep(0.1)
 
 

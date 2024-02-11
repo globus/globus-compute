@@ -23,7 +23,7 @@ def htex():
     executor = HighThroughputEngine(
         address="127.0.0.1",
         heartbeat_period=1,
-        heartbeat_threshold=1,
+        heartbeat_threshold=2,
         worker_debug=True,
     )
     q = queue.Queue()
