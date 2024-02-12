@@ -175,6 +175,11 @@ some kind of pre-initialized environment. In general there are two solutions her
 1. Python based environment isolation such as ``conda`` environment or ``venv``,
 2. Containers: containerization with ``docker`` or ``apptainer`` (``singularity``)
 
+.. note::
+   Please note that worker environment is required to have the ``globus-compute-endpoint`` python
+   module installed. We recommend matching the Python version and ``globus-compute-endpoint`` module
+   version on the worker environment to that on the endpoint itself.
+
 
 Python based environment isolation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
