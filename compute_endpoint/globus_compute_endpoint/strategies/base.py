@@ -118,17 +118,6 @@ class BaseStrategy:
             else:
                 print("Sleeping a bit more")
 
-    def notify(self, event_id: t.Any):
-        """Let the FlowControl system know that there is an event.
-
-        This method is to be called from the Interchange to notify the flowcontrol
-        """
-        self._event_buffer.extend([event_id])
-        self._event_count += 1
-        if self._event_count >= self.threshold:
-            log.debug("Eventcount >= threshold")
-            self.make_callback(kind="event")
-
     def make_callback(self, kind=None):
         """Makes the callback and resets the timer.
 
