@@ -254,7 +254,8 @@ class EndpointManager:
             _ = rq_info["connection_url"], rq_info["queue"]
             _ = rq_info["queue_publish_kwargs"]
         except Exception as e:
-            log.debug("%s", reg_info)
+            log_reg_info = _redact_url_creds(str(reg_info))
+            log.debug("%s", log_reg_info)
             log.error(
                 "Invalid or unexpected registration data structure:"
                 f" ({e.__class__.__name__}) {e}"
@@ -267,7 +268,7 @@ class EndpointManager:
             )
 
         # sanitize passwords in logs
-        log_reg_info = re.subn(r"://.*?@", r"://***:***@", repr(reg_info))
+        log_reg_info = _redact_url_creds(repr(reg_info))
         log.debug(f"Registration information: {log_reg_info}")
 
         json_file = conf_dir / "endpoint.json"
