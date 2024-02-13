@@ -16,6 +16,7 @@ import time
 import typing as t
 import uuid
 from collections import namedtuple
+from concurrent.futures import Future
 from contextlib import redirect_stdout
 from http import HTTPStatus
 from unittest import mock
@@ -26,6 +27,8 @@ import pika
 import pytest as pytest
 import responses
 import yaml
+from globus_compute_common.messagepack import unpack
+from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import (
     _validate_user_opts,
@@ -33,6 +36,10 @@ from globus_compute_endpoint.endpoint.config.utils import (
     render_config_user_template,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.rabbit_mq import (
+    CommandQueueSubscriber,
+    ResultPublisher,
+)
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
 from globus_sdk import GlobusAPIError, NetworkError
 from pytest_mock import MockFixture
@@ -44,6 +51,7 @@ except AttributeError:
 else:
     # these imports also import pyprctl later
     from globus_compute_endpoint.endpoint.endpoint_manager import (
+        _MINIMUM_HEARTBEAT,
         EndpointManager,
         InvalidUserError,
     )
@@ -117,15 +125,29 @@ def mock_setproctitle(mocker, randomstring):
 
 
 @pytest.fixture
-def mock_client(mocker):
-    ep_uuid = str(uuid.uuid1())
-    mock_gcc = mocker.Mock()
-    mock_gcc.register_endpoint.return_value = {
-        "endpoint_id": ep_uuid,
+def mock_ep_uuid() -> str:
+    yield str(uuid.uuid4())
+
+
+@pytest.fixture
+def mock_reg_info(mock_ep_uuid) -> str:
+    yield {
+        "endpoint_id": mock_ep_uuid,
         "command_queue_info": {"connection_url": "", "queue": ""},
+        "result_queue_info": {
+            "connection_url": "",
+            "queue": "",
+            "queue_publish_kwargs": {},
+        },
     }
+
+
+@pytest.fixture
+def mock_client(mocker, mock_ep_uuid, mock_reg_info):
+    mock_gcc = mocker.Mock()
+    mock_gcc.register_endpoint.return_value = mock_reg_info
     mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
-    yield ep_uuid, mock_gcc
+    yield mock_ep_uuid, mock_gcc
 
 
 @pytest.fixture(autouse=True)
@@ -229,7 +251,8 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     }
 
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
-    em._command = mocker.Mock()
+    em._command = mocker.Mock(spec=CommandQueueSubscriber)
+    em._heartbeat_publisher = mocker.Mock(spec=ResultPublisher)
 
     yield conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em
     if em.identity_mapper:
@@ -473,10 +496,28 @@ def test_mismatched_id_gracefully_exits(
 @pytest.mark.parametrize(
     "received_data",
     (
-        [False, {"command_queue_info": {"connection_url": ""}}],
-        [False, {"command_queue_info": {"queue": ""}}],
-        [False, {"typo-ed_cqi": {"connection_url": "", "queue": ""}}],
-        [True, {"command_queue_info": {"connection_url": "", "queue": ""}}],
+        (False, {"command_queue_info": {"connection_url": ""}}),
+        (False, {"command_queue_info": {"queue": ""}}),
+        (False, {"result_queue_info": {"connection_url": ""}}),
+        (False, {"result_queue_info": {"queue": ""}}),
+        (
+            False,
+            {
+                "typo-ed_cqi": {"connection_url": "", "queue": ""},
+                "result_queue_info": {"connection_url": "", "queue": ""},
+            },
+        ),
+        (
+            True,
+            {
+                "command_queue_info": {"connection_url": "", "queue": ""},
+                "result_queue_info": {
+                    "connection_url": "",
+                    "queue": "",
+                    "queue_publish_kwargs": {},
+                },
+            },
+        ),
     ),
 )
 def test_handles_invalid_reg_info(
@@ -878,6 +919,113 @@ def test_iterates_even_if_no_commands(mocker, epmanager_as_root):
     em._event_loop()
 
     assert em._command_queue.get.called
+
+
+@pytest.mark.parametrize("hb", (-100, -5, 0, 0.1, 4, 7, 11, None))
+def test_heartbeat_period_minimum(mocker, conf_dir, hb, mock_ep_uuid, mock_reg_info):
+    conf = Config(executors=[])
+    if hb is not None:
+        conf.heartbeat_period = hb
+    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
+    exp_hb = 30.0 if hb is None else max(_MINIMUM_HEARTBEAT, hb)
+    assert exp_hb == em._heartbeat_period, "Expected a reasonable minimum heartbeat"
+
+
+def test_send_heartbeat_verifies_thread(mocker, conf_dir, mock_ep_uuid, mock_reg_info):
+    conf = Config(executors=[])
+    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
+    f = em.send_heartbeat()
+    exc = f.exception()
+    assert "publisher is not running" in str(exc)
+
+
+def test_send_heartbeat_honors_shutdown(mocker, conf_dir, mock_ep_uuid, mock_reg_info):
+    conf = Config(executors=[])
+    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
+    em._heartbeat_period = random.randint(1, 10000)
+    em._heartbeat_publisher = mocker.Mock(spec=ResultPublisher)
+
+    em.send_heartbeat()
+    a, _ = em._heartbeat_publisher.publish.call_args
+    epsr: EPStatusReport = unpack(a[0])
+    assert epsr.global_state["heartbeat_period"] == em._heartbeat_period
+
+    em.send_heartbeat(shutting_down=True)
+    a, _ = em._heartbeat_publisher.publish.call_args
+    epsr: EPStatusReport = unpack(a[0])
+    assert epsr.global_state["heartbeat_period"] == 0
+
+
+def test_send_heartbeat_shares_exception(
+    mocker, conf_dir, mock_ep_uuid, mock_reg_info, randomstring
+):
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+
+    exc_text = randomstring()
+    conf = Config(executors=[])
+    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
+    em._heartbeat_publisher = mocker.Mock(spec=ResultPublisher)
+    em._heartbeat_publisher.publish.return_value = Future()
+    f = em.send_heartbeat()
+    mock_log.error.reset_mock()
+    f.set_exception(MemoryError(exc_text))
+
+    assert mock_log.error.called
+    a, _ = mock_log.error.call_args
+    assert exc_text in str(a[0])
+
+
+def test_sends_heartbeat_at_shutdown(mocker, epmanager_as_root, noop, reset_signals):
+    *_, em = epmanager_as_root
+    em.send_heartbeat = mocker.Mock(spec=EndpointManager.send_heartbeat)
+    em._event_loop = noop
+    em.start()
+
+    assert em.send_heartbeat.called
+    _, k = em.send_heartbeat.call_args
+
+    assert k["shutting_down"] is True
+
+
+def test_heartbeat_publisher_stopped_at_shutdown(
+    mocker, epmanager_as_root, noop, reset_signals
+):
+    *_, em = epmanager_as_root
+    em._event_loop = noop
+    em.start()
+
+    assert em._heartbeat_publisher.stop.called
+    assert em._heartbeat_publisher.join.called
+
+
+@pytest.mark.parametrize("num_iterations", (random.randint(3, 20),))
+def test_heartbeat_sent_periodically(
+    mocker, epmanager_as_root, reset_signals, num_iterations
+):
+    *_, em = epmanager_as_root
+    last_time = time.monotonic()  # anything greater than em._heartbeat_period will do
+    iteration_count = 0
+
+    mock_monotonic = mocker.patch(f"{_MOCK_BASE}time.monotonic")
+
+    def mock_q_get(*a, **k):
+        nonlocal iteration_count, num_iterations
+        iteration_count += 1
+        if iteration_count >= num_iterations:
+            em._time_to_stop = True
+        raise queue.Empty()
+
+    def increase_time_by_hb(*a, **k):
+        nonlocal last_time
+        last_time += em._heartbeat_period + 1
+        return last_time
+
+    em.send_heartbeat = mocker.Mock(spec=EndpointManager.send_heartbeat)
+    em._command_queue = mocker.Mock(spec=queue.SimpleQueue)
+    em._command_queue.get.side_effect = mock_q_get
+    mock_monotonic.side_effect = increase_time_by_hb
+    em._event_loop()
+    assert em.send_heartbeat.call_count == num_iterations
 
 
 def test_emits_command_requested_debug(mocker, epmanager_as_root, mock_props):

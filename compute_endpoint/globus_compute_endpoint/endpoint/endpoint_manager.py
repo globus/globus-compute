@@ -15,6 +15,8 @@ import sys
 import threading
 import time
 import typing as t
+import uuid
+from concurrent.futures import Future
 from datetime import datetime
 from http import HTTPStatus
 
@@ -29,6 +31,8 @@ except AttributeError as e:
     raise ImportError("pyprctl is not supported on this system") from e
 import setproctitle
 import yaml
+from globus_compute_common.messagepack import pack
+from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import (
@@ -37,8 +41,9 @@ from globus_compute_endpoint.endpoint.config.utils import (
     serialize_config,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber import (
+from globus_compute_endpoint.endpoint.rabbit_mq import (
     CommandQueueSubscriber,
+    ResultPublisher,
 )
 from globus_compute_endpoint.endpoint.utils import (
     _redact_url_creds,
@@ -53,6 +58,8 @@ if t.TYPE_CHECKING:
 
 
 log = logging.getLogger(__name__)
+
+_MINIMUM_HEARTBEAT: float = 5.0
 
 
 class InvalidCommandError(Exception):
@@ -101,6 +108,8 @@ class EndpointManager:
         self._reload_requested = False
         self._time_to_stop = False
         self._kill_event = threading.Event()
+
+        self._heartbeat_period: float = max(_MINIMUM_HEARTBEAT, config.heartbeat_period)
 
         self._children: dict[int, UserEndpointRecord] = {}
 
@@ -183,7 +192,8 @@ class EndpointManager:
             )
             sys.exit(os.EX_SOFTWARE)
 
-        endpoint_uuid = str(upstream_ep_uuid)  # convenience
+        endpoint_uuid = str(upstream_ep_uuid)  # convenience, and satisfy mypy
+        self._endpoint_uuid = uuid.UUID(endpoint_uuid)
         self._endpoint_uuid_str = endpoint_uuid
 
         self.identity_mapper: PosixIdentityMapper | None = None
@@ -239,6 +249,10 @@ class EndpointManager:
         try:
             cq_info = reg_info["command_queue_info"]
             _ = cq_info["connection_url"], cq_info["queue"]
+
+            rq_info = reg_info["result_queue_info"]
+            _ = rq_info["connection_url"], rq_info["queue"]
+            _ = rq_info["queue_publish_kwargs"]
         except Exception as e:
             log.debug("%s", reg_info)
             log.error(
@@ -277,6 +291,7 @@ class EndpointManager:
             stop_event=self._command_stop_event,
             thread_name="CQS",
         )
+        self._heartbeat_publisher = ResultPublisher(queue_info=rq_info)
 
     @staticmethod
     def get_metadata(config: Config, conf_dir: pathlib.Path) -> dict:
@@ -366,6 +381,32 @@ class EndpointManager:
 
         signal.signal(signal.SIGCHLD, self.set_child_died)
 
+    def send_heartbeat(self, shutting_down=False) -> Future[None]:
+        if not self._heartbeat_publisher.is_alive():
+            _w = RuntimeWarning("Heartbeat requested, but publisher is not running")
+            f: Future[None] = Future()
+            f.set_exception(_w)
+            return f
+
+        def _heart_publish_done(pub_fut: Future):
+            e = f.exception()
+            if e:
+                log.error(
+                    f"Failed to send heartbeat to web-services"
+                    f" -- ({type(e).__name__}) {e}"
+                )
+
+        global_state = {"heartbeat_period": self._heartbeat_period}
+        if shutting_down:
+            global_state["heartbeat_period"] = 0  # 0 == "shutting down now"
+
+        message = EPStatusReport(
+            endpoint_id=self._endpoint_uuid, global_state=global_state, task_statuses={}
+        )
+        f = self._heartbeat_publisher.publish(pack(message))
+        f.add_done_callback(_heart_publish_done)
+        return f
+
     def start(self):
         log.info(f"\n\n========== Endpoint Manager begins: {self._endpoint_uuid_str}")
 
@@ -383,6 +424,9 @@ class EndpointManager:
 
         self._install_signal_handlers()
 
+        self._command.start()
+        self._heartbeat_publisher.start()
+
         try:
             self._event_loop()
         except Exception:
@@ -396,6 +440,13 @@ class EndpointManager:
         if self.identity_mapper:
             self.identity_mapper.stop_watching()
 
+        try:
+            f = self.send_heartbeat(shutting_down=True)
+            f.result()  # Ensure heartbeat sent prior to thread shutdown
+        except Exception as e:
+            log.warning(f"Unable to send final heartbeat -- ({type(e).__name__}) {e}")
+
+        self._heartbeat_publisher.stop(block=False)
         os.killpg(os.getpgid(0), signal.SIGTERM)
 
         proc_uid, proc_gid = os.getuid(), os.getgid()
@@ -425,6 +476,7 @@ class EndpointManager:
                 self.wait_for_children()
 
         self._command.join(5)
+        self._heartbeat_publisher.join(5)
         log.info(
             "Shutdown complete."
             f"\n---------- Endpoint Manager ends: {self._endpoint_uuid_str}\n\n"
@@ -434,8 +486,6 @@ class EndpointManager:
             print("\033[?25h", end="", file=msg_out)
 
     def _event_loop(self):
-        self._command.start()
-
         parent_identities = set()
         if not is_privileged():
             client_options = {
@@ -466,11 +516,16 @@ class EndpointManager:
                 self._time_to_stop = True
                 return
 
+        last_heartbeat = 0
         valid_method_name_re = re.compile(r"^cmd_[A-Za-z][0-9A-Za-z_]{0,99}$")
         max_skew_s = 180  # 3 minutes; ignore commands with out-of-date timestamp
         while not self._time_to_stop:
             if self._wait_for_child:
                 self.wait_for_children()
+
+            if time.monotonic() - last_heartbeat >= self._heartbeat_period:
+                self.send_heartbeat()
+                last_heartbeat = time.monotonic()
 
             try:
                 d_tag, props, body = self._command_queue.get(timeout=1.0)
