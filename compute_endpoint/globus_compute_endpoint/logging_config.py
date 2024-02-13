@@ -4,7 +4,6 @@ This module contains logging configuration for the globus-compute-endpoint appli
 
 from __future__ import annotations
 
-import copy
 import logging
 import logging.config
 import logging.handlers
@@ -12,7 +11,7 @@ import os
 import pathlib
 import re
 import sys
-import uuid
+from collections import defaultdict
 from datetime import datetime
 
 log = logging.getLogger(__name__)
@@ -98,55 +97,46 @@ class ComputeConsoleFormatter(logging.Formatter):
             w_fmt = ansi_re.sub("", w_fmt)
             e_fmt = ansi_re.sub("", e_fmt)
 
+        line_colors = {
+            logging.ERROR: _COL_E,
+            logging.WARNING: _COL_W,
+            logging.INFO: _COL_I,
+            logging.DEBUG: _COL_D,
+        }
+        self._level_colors = defaultdict(lambda: _COL_D, line_colors)
+
+        w_formatter = DatetimeFormatter(fmt=w_fmt, **kwargs)
+        formatters = {
+            logging.ERROR: w_formatter,
+            logging.WARNING: w_formatter,
+            logging.INFO: DatetimeFormatter(fmt="> %(message)s"),
+            logging.DEBUG: w_formatter,
+        }
+        self._formatters = defaultdict(lambda: w_formatter, formatters)
         if debug:
-            self._error_formatter = DatetimeFormatter(fmt=e_fmt, **kwargs)
-            self._warning_formatter = DatetimeFormatter(fmt=w_fmt, **kwargs)
-            self._debug_formatter = DatetimeFormatter(fmt=d_fmt, **kwargs)
-            self._info_formatter = DatetimeFormatter(fmt=i_fmt, **kwargs)
-        else:
-            self._info_formatter = DatetimeFormatter(fmt="> %(message)s")
-            self._warning_formatter = DatetimeFormatter(fmt=w_fmt, **kwargs)
-            self._error_formatter = self._warning_formatter
-            self._debug_formatter = self._warning_formatter
+            d_formatter = DatetimeFormatter(fmt=d_fmt, **kwargs)
+            formatters = {
+                logging.ERROR: DatetimeFormatter(fmt=e_fmt, **kwargs),
+                logging.WARNING: DatetimeFormatter(fmt=w_fmt, **kwargs),
+                logging.INFO: DatetimeFormatter(fmt=i_fmt, **kwargs),
+                logging.DEBUG: d_formatter,
+            }
+            self._formatters = defaultdict(lambda: d_formatter, formatters)
 
     def format(self, record: logging.LogRecord):
+        ll = self._formatters[record.levelno].format(record)
+
         if self.use_color:
             # Highlight all UUIDs
-            if record.levelno > logging.WARNING:
-                end_coloring = _COL_E
-            elif record.levelno > logging.INFO:
-                end_coloring = _COL_W
-            elif record.levelno > logging.DEBUG:
-                end_coloring = _COL_I
-            else:
-                end_coloring = _COL_D
+            end_coloring = self._level_colors[record.levelno]
 
             repl = f"{_byel}\\1{_r}{end_coloring}"
             try:
-                record.msg = self.uuid_re.sub(repl, record.msg)
-                if isinstance(record.args, dict):
-                    record.args = copy.deepcopy(record.args)
-                    for k, v in record.args.items():
-                        if isinstance(v, (str, uuid.UUID)):
-                            record.args[k] = self.uuid_re.sub(repl, str(v))
-                elif record.args:
-                    uu_sub = self.uuid_re.sub
-                    args = tuple(
-                        uu_sub(repl, str(a)) if isinstance(a, (str, uuid.UUID)) else a
-                        for a in record.args
-                    )
-                    record.args = args
+                ll = self.uuid_re.sub(repl, ll)
             except Exception as exc:
                 # Basically, inform, but ignore
                 print(f"Unable to colorize log message: {exc}")
-
-        if record.levelno > logging.WARNING:
-            return self._error_formatter.format(record)
-        elif record.levelno > logging.INFO:
-            return self._warning_formatter.format(record)
-        elif record.levelno > logging.DEBUG:
-            return self._info_formatter.format(record)
-        return self._debug_formatter.format(record)
+        return ll
 
 
 def _get_file_dict_config(
