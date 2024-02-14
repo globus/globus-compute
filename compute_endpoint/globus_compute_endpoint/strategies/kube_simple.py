@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 import time
@@ -12,29 +14,19 @@ log: ComputeLogger = logging.getLogger(__name__)  # type: ignore
 class KubeSimpleStrategy(BaseStrategy):
     """Implements the simple strategy for Kubernetes"""
 
-    def __init__(self, *args, threshold=20, interval=1, max_idletime=60):
+    def __init__(self, *args, interval: float = 1.0, max_idletime: float = 60.0):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
 
-        Parameters
-        ----------
-        threshold:(int)
-          Tasks after which the callback is triggered
-
-        interval (int)
-          seconds after which timer expires
-
-        max_idletime: (int)
-          maximum idle time(seconds) allowed for resources after which strategy will
-          try to kill them.
-          default: 60s
-
+        :param interval: seconds after which timer expires
+        :param max_idletime: maximum idle time(seconds) allowed for resources after
+            which strategy will try to kill them.  Default: 60s
         """
-        super().__init__(*args, threshold=threshold, interval=interval)
+        super().__init__(*args, interval=interval)
         self.max_idletime = max_idletime
-        self.executors_idle_since = {}
-        self._task_type_status_msg = defaultdict(str)
+        self.executors_idle_since: dict[str, float | None] = {}
+        self._task_type_status_msg: dict[str, str] = defaultdict(str)
         log.info(f"KubeSimpleStrategy Initialized; max idle time: {max_idletime}s")
 
     def strategize(self, *args, **kwargs):

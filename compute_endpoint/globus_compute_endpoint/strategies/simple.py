@@ -13,33 +13,17 @@ log = logging.getLogger(__name__)
 class SimpleStrategy(BaseStrategy):
     """Implements the simple strategy"""
 
-    def __init__(
-        self,
-        *args,
-        threshold: int = 20,
-        interval: float = 1.0,
-        max_idletime: float = 60.0,
-    ):
+    def __init__(self, *args, interval: float = 1.0, max_idletime: float = 60.0):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
 
-        Parameters
-        ----------
-        threshold:(int)
-          Tasks after which the callback is triggered
-
-        interval (float)
-          seconds after which timer expires
-
-        max_idletime: (float)
-          maximum idle time(seconds) allowed for resources after which strategy will
-          try to kill them.
-          default: 60s
-
+        :param interval: seconds after which timer expires
+        :param max_idletime: maximum idle seconds allowed for resources after which
+            strategy will try to kill them.  Default: 60s
         """
         log.info("SimpleStrategy Initialized")
-        super().__init__(*args, threshold=threshold, interval=interval)
+        super().__init__(*args, interval=interval)
         self.max_idletime = max_idletime
         self.executors = {"idle_since": None}
 
@@ -53,7 +37,6 @@ class SimpleStrategy(BaseStrategy):
             self._strategize(*args, **kwargs)
         except Exception as e:
             log.exception(f"Caught error in strategize : {e}")
-            pass
 
     def _strategize(self, *args, **kwargs):
         task_breakdown = self.interchange.get_outstanding_breakdown()
@@ -119,16 +102,17 @@ class SimpleStrategy(BaseStrategy):
             else:
                 # We want to make sure that max_idletime is reached
                 # before killing off resources
+                _now = time.monotonic()
                 if not self.executors["idle_since"]:
                     log.debug(
                         "Endpoint has 0 active tasks; starting kill timer "
                         "(if idle time exceeds %s seconds, resources will be removed)",
                         self.max_idletime,
                     )
-                    self.executors["idle_since"] = time.time()
+                    self.executors["idle_since"] = _now
 
                 idle_since = self.executors["idle_since"]
-                if (time.time() - idle_since) > self.max_idletime:
+                if _now - idle_since > self.max_idletime:
                     # We have resources idle for the max duration,
                     # we have to scale_in now.
                     log.debug(
@@ -140,9 +124,6 @@ class SimpleStrategy(BaseStrategy):
 
                 else:
                     pass
-                    # log.debug(
-                    #     "Strategy: Case.1b. Waiting for timer : %s", idle_since
-                    # )
 
         # Case 2
         # More tasks than the available slots.

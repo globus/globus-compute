@@ -48,8 +48,7 @@ class MockInterchange:
 if __name__ == "__main__":
     print("Starting")
     mock = MockInterchange()
-    # strategy = BaseStrategy(mock, threshold=2, interval=1)
-    strategy = SimpleStrategy(mock, threshold=2, interval=1)
+    strategy = SimpleStrategy(mock, interval=1)
     print(strategy)
     for i in range(10):
         if i < 3:
