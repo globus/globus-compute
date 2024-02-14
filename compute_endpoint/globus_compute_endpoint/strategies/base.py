@@ -1,13 +1,16 @@
 import logging
 import threading
-import time
 import typing as t
+from abc import abstractmethod
+
+if t.TYPE_CHECKING:
+    from globus_compute_endpoint.engines import GlobusComputeEngine
 
 log = logging.getLogger(__name__)
 
 
 class BaseStrategy:
-    """Implements threshold-interval based flow control.
+    """Implements interval based flow control.
 
     The overall goal is to trap the flow of apps from the
     workflow, measure it and redirect it the appropriate executors for
@@ -40,60 +43,49 @@ class BaseStrategy:
     from a duplicate logger being added by the thread.
     """
 
-    def __init__(self, *args, threshold: int = 20, interval: float = 5.0):
+    def __init__(self, *args, interval: float = 5.0):
         """Initialize the flowcontrol object.
 
         We start the timer thread here
-        Parameters
-        ----------
-        - threshold (int) : Tasks after which the callback is triggered
-        - interval (int) : seconds after which timer expires
 
+        :param interval: how often (in seconds) to invoke self.strategy
         """
-        self.interchange = None
-        self.threshold = threshold
+        self.interchange: t.Optional[GlobusComputeEngine] = None
         self.interval = interval
 
         self.cb_args = args
-        self.callback = self.strategize
         self._handle = None
-        self._event_count = 0
-        self._event_buffer: t.List[t.Any] = []
-        self._wake_up_time = time.time() + 1
         self._kill_event = threading.Event()
         self._thread: t.Optional[threading.Thread] = None
 
-    def start(self, interchange):
+    def start(self, engine: "GlobusComputeEngine"):
         """Actually start the strategy
-        Parameters
-        ----------
-        interchange:
-         globus_compute_endpoint.executors.high_throughput.interchange.Interchange
-            Interchange to bind the strategy to
+
+        :param engine: Engine to which this strategy is bound
         """
         # This thread is created here to ensure a new thread is created whenever start
         # is called. This is to avoid errors from tests reusing strategy objects which
         # would attempt to restart stopped threads.
         self._thread = threading.Thread(
-            target=self._wake_up_timer, args=(self._kill_event,), name="Base-Strategy"
+            target=self._wake_up_timer, name="Base-Strategy", daemon=True
         )
-        self._thread.daemon = True
-        self.interchange = interchange
-        if hasattr(interchange, "provider"):
+        self.interchange = engine
+        if hasattr(engine, "provider"):
             log.debug(
                 "Strategy bounds-> init:{}, min:{}, max:{}".format(
-                    interchange.provider.init_blocks,
-                    interchange.provider.min_blocks,
-                    interchange.provider.max_blocks,
+                    engine.provider.init_blocks,
+                    engine.provider.min_blocks,
+                    engine.provider.max_blocks,
                 )
             )
         self._thread.start()
 
+    @abstractmethod
     def strategize(self, *args, **kwargs):
-        """Strategize is called everytime the threshold or the interval is hit"""
-        log.debug(f"Strategize called with {args} {kwargs}")
+        """Strategize is called everytime he interval is hit"""
+        ...
 
-    def _wake_up_timer(self, kill_event):
+    def _wake_up_timer(self):
         """
         Internal. This is the function that the thread will execute.
         waits on an event so that the thread can make a quick exit when close() is
@@ -103,35 +95,15 @@ class BaseStrategy:
             - kill_event (threading.Event) : Event to wait on
         """
 
-        while True:
-            prev = self._wake_up_time
+        while not self._kill_event.wait(self.interval):
+            self.make_callback()
 
-            # Waiting for the event returns True only when the event
-            # is set, usually by the parent thread
-            time_to_die = kill_event.wait(float(max(prev - time.time(), 0)))
+    def make_callback(self):
+        self.strategize()
 
-            if time_to_die:
-                return
-
-            if prev == self._wake_up_time:
-                self.make_callback(kind="timer")
-            else:
-                print("Sleeping a bit more")
-
-    def make_callback(self, kind=None):
-        """Makes the callback and resets the timer.
-
-        KWargs:
-               - kind (str): Default=None, used to pass information on what
-                 triggered the callback
-        """
-        self._wake_up_time = time.time() + self.interval
-        self.callback(tasks=self._event_buffer, kind=kind)
-        self._event_buffer = []
-
-    def close(self):
+    def close(self, timeout: t.Optional[float] = 0.1):
         """Merge the threads and terminate."""
         if self._thread is None:
             return
         self._kill_event.set()
-        self._thread.join(timeout=0.1)
+        self._thread.join(timeout=timeout)
