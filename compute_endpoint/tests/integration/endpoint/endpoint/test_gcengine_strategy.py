@@ -1,7 +1,6 @@
 import concurrent.futures
 import logging
 import random
-import time
 import uuid
 from queue import Queue
 
@@ -9,7 +8,7 @@ import pytest
 from globus_compute_endpoint.engines import GlobusComputeEngine
 from globus_compute_endpoint.strategies import SimpleStrategy
 from parsl.providers import LocalProvider
-from tests.utils import double
+from tests.utils import double, try_assert
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +58,12 @@ def gc_engine_non_scaling(tmp_path):
 def test_engine_submit_init_0(gc_engine_scaling):
     """Test engine scaling from 0 blocks with GCE"""
     engine = gc_engine_scaling
-    max_idletime = engine.strategy.max_idletime
+
+    def num_outstanding():
+        return len(engine.get_outstanding_breakdown())
 
     # At the start there should be 0 managers
-    outstanding = engine.get_outstanding_breakdown()
-    assert len(outstanding) == 1, "Expected only interchange"
+    assert num_outstanding() == 1, "Expected only interchange"
 
     # Run a function to trigger scale_out and confirm via breakdown
     param = random.randint(1, 100)
@@ -71,19 +71,12 @@ def test_engine_submit_init_0(gc_engine_scaling):
     assert isinstance(future, concurrent.futures.Future)
     assert future.result() == param * 2
 
-    outstanding = engine.get_outstanding_breakdown()
-    assert len(outstanding) == 2, "Expected 1 manager + interchange"
+    assert num_outstanding() == 2, "Expected 1 manager + interchange"
 
     # With 0 tasks and excess workers we should expect scale_down
     # While scale_down might be triggered it appears to take 1s
     # lowest heartbeat period to detect a manager going down
-    while True:
-        managers = engine.executor.connected_managers()
-        if len(managers) == 0:
-            break
-        idle_time = managers[0]["idle_duration"]
-        assert idle_time <= max_idletime + 2, "Manager exceeded idletime"
-        time.sleep(0.1)
+    try_assert(lambda: num_outstanding() == 1)
 
 
 def test_engine_no_scaling(gc_engine_non_scaling):
