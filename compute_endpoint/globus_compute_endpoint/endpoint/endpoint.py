@@ -78,6 +78,7 @@ class Endpoint:
         multi_user: bool,
         display_name: str | None,
         auth_policy: str | None,
+        subscription_id: str | None,
     ):
         config_text = original_path.read_text()
         config_dict = yaml.safe_load(config_text)
@@ -97,6 +98,9 @@ class Endpoint:
                 )
             )
 
+        if subscription_id:
+            config_dict["subscription_id"] = subscription_id
+
         config_text = yaml.safe_dump(config_dict)
         target_path.write_text(config_text)
 
@@ -107,6 +111,7 @@ class Endpoint:
         multi_user=False,
         display_name: str | None = None,
         auth_policy: str | None = None,
+        subscription_id: str | None = None,
     ):
         """Initialize a clean endpoint dir
 
@@ -116,6 +121,7 @@ class Endpoint:
         :param multi_user: Whether the endpoint is a multi-user endpoint
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
+        :param subscription_id: Subscription ID to associate endpoint with
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
         user_umask = os.umask(0o0077)
@@ -139,6 +145,7 @@ class Endpoint:
                 multi_user,
                 display_name,
                 auth_policy,
+                subscription_id,
             )
 
             if multi_user:
@@ -182,6 +189,7 @@ class Endpoint:
         multi_user: bool = False,
         display_name: str | None = None,
         auth_policy: str | None = None,
+        subscription_id: str | None = None,
     ):
         ep_name = conf_dir.name
         if conf_dir.exists():
@@ -191,7 +199,12 @@ class Endpoint:
 
         templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
         Endpoint.init_endpoint_dir(
-            conf_dir, templ_conf_path, multi_user, display_name, auth_policy
+            conf_dir,
+            templ_conf_path,
+            multi_user,
+            display_name,
+            auth_policy,
+            subscription_id,
         )
         config_path = Endpoint._config_file_path(conf_dir)
         if multi_user:
@@ -416,6 +429,7 @@ class Endpoint:
                     display_name=endpoint_config.display_name,
                     allowed_functions=endpoint_config.allowed_functions,
                     auth_policy=endpoint_config.authentication_policy,
+                    subscription_id=endpoint_config.subscription_id,
                 )
 
             except GlobusAPIError as e:

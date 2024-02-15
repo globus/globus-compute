@@ -317,6 +317,21 @@ def test_configure_ep_auth_policy_in_config(
     assert conf_dict["authentication_policy"] == auth_policy
 
 
+def test_configure_ep_subscription_id_in_config(
+    run_line, mock_command_ensure, make_endpoint_dir
+):
+    ep_name = "my-ep"
+    subscription_id = str(uuid.uuid4())
+    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+
+    run_line(f"configure {ep_name} --subscription-id {subscription_id}")
+
+    with open(conf) as f:
+        conf_dict = yaml.safe_load(f)
+
+    assert conf_dict["subscription_id"] == subscription_id
+
+
 @pytest.mark.parametrize("display_name", [None, "None"])
 def test_config_yaml_display_none(
     run_line, mock_command_ensure, make_endpoint_dir, display_name
