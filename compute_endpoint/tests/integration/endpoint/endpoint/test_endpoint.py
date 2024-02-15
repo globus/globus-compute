@@ -142,6 +142,28 @@ def test_start_endpoint_auth_policy_passthrough(mocker, fs):
     assert req_json["authentication_policy"] == ep_conf.authentication_policy
 
 
+def test_start_endpoint_subscription_id_passthrough(mocker, fs):
+    responses.add(  # 404 == we are verifying the POST, not the response
+        responses.POST, _SVC_ADDY + "/v3/endpoints", json={}, status=404
+    )
+
+    ep_dir = pathlib.Path("/some/path/some_endpoint_name")
+    ep_dir.mkdir(parents=True, exist_ok=True)
+
+    ep = endpoint.Endpoint()
+    ep_conf = Config()
+    ep_conf.subscription_id = str(uuid.uuid4())
+
+    with pytest.raises(SystemExit) as pyt_exc:
+        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={})
+    assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
+
+    req = pyt_exc.value.__cause__._underlying_response.request
+    req_json = json.loads(req.body)
+
+    assert req_json["subscription_uuid"] == ep_conf.subscription_id
+
+
 def test_endpoint_logout(monkeypatch):
     # not forced, and no running endpoints
     logout_true = mock.Mock(return_value=True)

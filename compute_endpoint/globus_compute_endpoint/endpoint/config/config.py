@@ -100,6 +100,9 @@ class Config(RepresentationMixin):
     authentication_policy : str | None
         Endpoint users are evaluated against this Globus authentication policy
 
+    subscription_id : str | None
+        Subscription ID associated with this endpoint
+
     force_mu_allow_same_user : bool
         If set, override the heuristic that determines whether the uid running the
         multi-user endpoint may also run single-user endpoints.
@@ -145,6 +148,7 @@ class Config(RepresentationMixin):
         multi_user: bool | None = None,
         allowed_functions: list[str] | None = None,
         authentication_policy: str | None = None,
+        subscription_id: str | None = None,
         amqp_port: int | None = None,
         # Tuning info
         heartbeat_period=30,
@@ -206,6 +210,7 @@ class Config(RepresentationMixin):
         # Auth
         self.allowed_functions = allowed_functions
         self.authentication_policy = authentication_policy
+        self.subscription_id = subscription_id
 
         self.amqp_port = amqp_port
 
