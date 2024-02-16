@@ -1,0 +1,5 @@
+Bug Fixes
+^^^^^^^^^
+
+- Fixed ``Skipping analyzing "globus_compute_sdk"`` error when running ``mypy`` on
+  code dependent on ``globus_compute_sdk``
