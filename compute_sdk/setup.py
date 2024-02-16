@@ -69,6 +69,7 @@ setup(
     packages=find_namespace_packages(
         include=["globus_compute_sdk", "globus_compute_sdk.*"]
     ),
+    package_data={"globus_compute_sdk": ["py.typed"]},
     description="Globus Compute: High Performance Function Serving for Science",
     long_description=long_description,
     long_description_content_type="text/markdown",
