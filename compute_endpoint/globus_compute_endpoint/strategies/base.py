@@ -82,7 +82,7 @@ class BaseStrategy:
 
     @abstractmethod
     def strategize(self, *args, **kwargs):
-        """Strategize is called everytime he interval is hit"""
+        """Strategize is called everytime the interval is hit"""
         ...
 
     def _wake_up_timer(self):
