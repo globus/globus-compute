@@ -54,7 +54,7 @@ For those who just want to use the tool:
    key point is to be able to take a Globus Auth Identity set, and map it to a
    local username _on this resource_&nbsp;&mdash;&nbsp;this resulting username
    will be passed to
-   [`getpwname(3)`](https://www.man7.org/linux/man-pages/man3/getpwnam.3.html)
+   [`getpwnam(3)`](https://www.man7.org/linux/man-pages/man3/getpwnam.3.html)
    to ascertain a UID for the user.  This file is linked in `config.yaml` (from
    the previous step's output), and, per initial configuration, is set to
    `example_identity_mapping_config.json`.  This file has a valid
@@ -200,7 +200,7 @@ The workflow for a task sent to an MEP roughly follows these steps:
    username.
 
 1. The MEP ascertains the host-specific UID based on a
-   [`getpwname(3)`](https://www.man7.org/linux/man-pages/man3/getpwnam.3.html)
+   [`getpwnam(3)`](https://www.man7.org/linux/man-pages/man3/getpwnam.3.html)
    call with the local username from the previous step.
 
 1. The MEP starts a UEP as the UID from the previous step.
