@@ -3,6 +3,42 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.13.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.13.0
+------------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Upgraded Parsl to version ``2024.02.05`` to enable encryption for the ``GlobusComputeEngine``.
+  Under the hood, Parsl uses CurveZMQ to encrypt all communication channels between the engine
+  and related nodes.
+
+  We enable encryption by default, but users can disable it by setting the ``encrypted``
+  configuration variable under the ``engine`` stanza to ``false``.
+
+  E.g.,
+
+  .. code-block:: yaml
+
+    engine:
+      type: GlobusComputeEngine
+      encrypted: false
+
+  Depending on the installation, encryption might noticeably degrade throughput performance.
+  If this is an issue for your workflow, please refer to `Parsl's documentation on encryption
+  performance <https://parsl.readthedocs.io/en/stable/userguide/execution.html#encryption-performance>`_
+  before disabling encryption.
+
+Bug Fixes
+^^^^^^^^^
+
+- Improved handling of unexpected errors in the `HighThroughputEngine`.
+
+- Fixed ``Skipping analyzing "globus_compute_sdk"`` error when running ``mypy`` on
+  code dependent on ``globus_compute_sdk``
+
 .. _changelog-2.12.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.12.0
