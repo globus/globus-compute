@@ -3,6 +3,26 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.14.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.14.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for the new Globus subscription management service. An endpoint can be
+  associated with a subscription group via the ``--subscription-id`` flag to
+  ``globus-compute-endpoint configure``, or via the ``subscription_id`` option in
+  ``config.yaml``:
+
+  .. code-block:: yaml
+
+    subscription_id: 12345678-9012-3456-7890-123456789012
+    engine:
+      type: GlobusComputeEngine
+      ...
+
 .. _changelog-2.13.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.13.0
