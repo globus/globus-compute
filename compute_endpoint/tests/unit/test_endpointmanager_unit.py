@@ -99,7 +99,7 @@ def mock_conf(identity_map_path):
     yield Config(executors=[], identity_mapping_config_path=identity_map_path)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def user_conf_template(conf_dir):
     template = Endpoint.user_config_template_path(conf_dir)
     template.write_text(
@@ -432,6 +432,7 @@ def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
         "hostname",
         "local_user",
         "config",
+        "user_config_template",
         "user_config_schema",
     ):
         assert key in k["metadata"], "Expected minimal metadata"
