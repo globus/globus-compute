@@ -36,7 +36,7 @@ from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import (
-    load_user_config_schema,
+    load_user_config_template,
     render_config_user_template,
     serialize_config,
 )
@@ -304,12 +304,14 @@ class EndpointManager:
     def get_metadata(config: Config, conf_dir: pathlib.Path) -> dict:
         # Piecemeal Config settings because for MU, most of the SU items are
         # unrelated -- the MU (aka EndpointManager) does not execute tasks
+        user_config_template, user_config_schema = load_user_config_template(conf_dir)
         return {
             "endpoint_version": __version__,
             "hostname": socket.getfqdn(),
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
             "config": serialize_config(config),
-            "user_config_schema": load_user_config_schema(conf_dir),
+            "user_config_template": user_config_template,
+            "user_config_schema": user_config_schema,
         }
 
     def request_shutdown(self, sig_num, curr_stack_frame):
@@ -839,9 +841,6 @@ class EndpointManager:
             # beyond subtle pid: MainProcess-12345 --> UserEnd...(PreExec)-23456
             current_process().name = "UserEndpointProcess_Bootstrap(PreExec)"
 
-            from globus_compute_endpoint.endpoint.config.utils import (
-                load_user_config_template,
-            )
             from globus_compute_endpoint.logging_config import setup_logging
 
             # after dropping privileges, any log.* calls may not be able to access
