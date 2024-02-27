@@ -3,6 +3,7 @@ import logging
 import pathlib
 import random
 import time
+import typing as t
 import uuid
 from queue import Queue
 from unittest import mock
@@ -174,6 +175,7 @@ def test_gcengine_pass_through_to_executor(mocker: MockFixture):
         "label": "VroomEngine",
         "address": "127.0.0.1",
         "encrypted": False,
+        "max_workers": 1,
         "foo": "bar",
     }
     GlobusComputeEngine(*args, **kwargs)
@@ -217,3 +219,20 @@ def test_gcengine_encrypted(encrypted: bool, engine_runner):
 
     engine.executor.encrypted = not encrypted
     assert engine.encrypted is not encrypted
+
+
+@pytest.mark.parametrize("max_workers_per_node", (1, 2, None))
+@pytest.mark.parametrize("max_workers", (3, 4, 5))
+def test_gcengine_max_workers_per_node(
+    engine_runner, max_workers_per_node: t.Union[int, None], max_workers: int
+):
+    engine: GlobusComputeEngine = engine_runner(
+        GlobusComputeEngine,
+        max_workers_per_node=max_workers_per_node,
+        max_workers=max_workers,
+    )
+
+    if max_workers_per_node:
+        assert engine.executor.max_workers == max_workers_per_node
+    else:
+        assert engine.executor.max_workers == max_workers
