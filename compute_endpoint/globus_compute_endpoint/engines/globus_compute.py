@@ -77,7 +77,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             *args, max_retries_on_system_failure=max_retries_on_system_failure, **kwargs
         )
         self.strategy = strategy
-        self.max_workers_per_node = 1
 
         self.container_type = container_type
         assert (
@@ -85,6 +84,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         ), f"{self.container_type} is not a valid container_type"
         self.container_uri = container_uri
         self.container_cmd_options = container_cmd_options
+
+        # We can remove this code once we rename the max_workers attribute on
+        # the Parsl HTEX to max_workers_per_node, which is more explicit.
+        max_workers_per_node = kwargs.pop("max_workers_per_node", None)
+        max_workers = max_workers_per_node or kwargs.get("max_workers", float("inf"))
+        kwargs["max_workers"] = max_workers
+        self.max_workers_per_node = max_workers
 
         if executor is None:
             executor = HighThroughputExecutor(  # type: ignore
