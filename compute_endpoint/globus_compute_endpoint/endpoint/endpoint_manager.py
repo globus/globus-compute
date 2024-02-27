@@ -443,7 +443,7 @@ class EndpointManager:
 
         try:
             f = self.send_heartbeat(shutting_down=True)
-            f.result()  # Ensure heartbeat sent prior to thread shutdown
+            f.result(10)  # Ensure heartbeat sent prior to thread shutdown
         except Exception as e:
             log.warning(f"Unable to send final heartbeat -- ({type(e).__name__}) {e}")
 
