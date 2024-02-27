@@ -977,11 +977,16 @@ def test_send_heartbeat_shares_exception(
 
 def test_sends_heartbeat_at_shutdown(mocker, epmanager_as_root, noop, reset_signals):
     *_, em = epmanager_as_root
+    hb_fut = mocker.Mock(spec=Future)
     em.send_heartbeat = mocker.Mock(spec=EndpointManager.send_heartbeat)
+    em.send_heartbeat.return_value = hb_fut
     em._event_loop = noop
     em.start()
 
-    assert em.send_heartbeat.called
+    assert hb_fut.result.called
+    a, _ = hb_fut.result.call_args
+    assert isinstance(a[0], int), "Expected *some* timeout value for sending a HB"
+
     _, k = em.send_heartbeat.call_args
 
     assert k["shutting_down"] is True
