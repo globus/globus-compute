@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import queue
@@ -14,14 +16,20 @@ from globus_compute_endpoint.engines.base import (
     GlobusComputeEngineBase,
     ReportingThread,
 )
-from globus_compute_endpoint.strategies import SimpleStrategy
 from parsl.executors.high_throughput.executor import HighThroughputExecutor
+from parsl.jobs.job_status_poller import JobStatusPoller
 
 logger = logging.getLogger(__name__)
 DOCKER_CMD_TEMPLATE = "docker run {options} -v {rundir}:{rundir} -t {image} {command}"
 APPTAINER_CMD_TEMPLATE = "apptainer run {options} {image} {command}"
 SINGULARITY_CMD_TEMPLATE = "singularity run {options} {image} {command}"
 VALID_CONTAINER_TYPES = ("docker", "singularity", "apptainer", "custom", None)
+
+
+class JobStatusPollerKwargs(t.TypedDict, total=False):
+    strategy: str | None
+    max_idletime: float
+    strategy_period: float | int
 
 
 class GlobusComputeEngine(GlobusComputeEngineBase):
@@ -32,12 +40,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         *args,
         label: str = "GlobusComputeEngine",
         max_retries_on_system_failure: int = 0,
-        strategy: t.Optional[SimpleStrategy] = SimpleStrategy(),
         executor: t.Optional[HighThroughputExecutor] = None,
         container_type: t.Literal[VALID_CONTAINER_TYPES] = None,  # type: ignore
         container_uri: t.Optional[str] = None,
         container_cmd_options: t.Optional[str] = None,
         encrypted: bool = True,
+        strategy: str | None = None,
+        job_status_kwargs: t.Optional[JobStatusPollerKwargs] = None,
         **kwargs,
     ):
         """The ``GlobusComputeEngine`` is a shim over `Parsl's HighThroughputExecutor
@@ -47,6 +56,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         arguments specific to the ``GlobusComputeEngine``.
 
         .. _parslhtex: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.HighThroughputExecutor.html
+        .. _parslstrategy: https://parsl.readthedocs.io/en/stable/stubs/parsl.jobs.strategy.Strategy.html
+        .. _parsljobstatuspoller: https://parsl.readthedocs.io/en/stable/stubs/parsl.jobs.job_status_poller.JobStatusPoller.html
 
         Parameters
         ----------
@@ -62,9 +73,14 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
            logic before enabling this functionality
            default: 0
 
-        strategy: Stategy object
-           Specify scaling strategy.
-           default: SimpleStrategy
+        strategy: str | None
+            Specify which scaling strategy to use; this is eventually given to
+            `Parsl's Strategy <parslstrategy_>`_.  [Deprecated; use
+            ``job_status_kwargs``]
+
+        job_status_kwargs: dict | None
+            Keyword arguments to be passed through to `Parsl's JobStatusPoller
+            <parsljobstatuspoller_>`_ class that drives strategy to do auto-scaling.
 
         encrypted: bool
             Flag to enable/disable encryption (CurveZMQ). Default is True.
@@ -93,6 +109,16 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 **kwargs,
             )
         self.executor = executor
+        if strategy is None:
+            strategy = "simple"
+
+        # Set defaults for JobStatusPoller
+        self._job_status_kwargs: JobStatusPollerKwargs = {
+            "max_idletime": 120.0,
+            "strategy": strategy,
+            "strategy_period": 5.0,
+        }
+        self._job_status_kwargs.update(job_status_kwargs or {})
 
     @property
     def max_workers_per_node(self):
@@ -179,9 +205,10 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             # a queue is passed in
             self.results_passthrough = results_passthrough
         self.executor.start()
-        if self.strategy:
-            self.strategy.start(self)
         self._status_report_thread.start()
+        # Add executor to poller *after* executor has started
+        self.job_status_poller = JobStatusPoller(dfk=None, **self._job_status_kwargs)
+        self.job_status_poller.add_executors([self.executor])
 
     def _submit(
         self,
@@ -390,8 +417,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             task_statuses=task_status_deltas,
         )
 
+    @property
+    def executor_exception(self) -> t.Optional[Exception]:
+        return self.executor.executor_exception
+
     def shutdown(self, /, **kwargs) -> None:
         self._status_report_thread.stop()
-        if self.strategy:
-            self.strategy.close()
+        self.job_status_poller.close()
         self.executor.shutdown()

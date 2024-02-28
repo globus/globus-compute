@@ -5,6 +5,7 @@ import random
 import threading
 import typing as t
 import uuid
+from unittest import mock
 
 import pytest
 from globus_compute_common.messagepack import pack, unpack
@@ -126,6 +127,32 @@ def test_start_requires_pre_registered(mocker, funcx_dir):
             reg_info=None,
             endpoint_id="mock_endpoint_id",
         )
+
+
+@pytest.mark.parametrize("num_iters", (1, 2, 5, 10))
+def test_detects_bad_executor_when_no_tasks(
+    mocker, mock_log, num_iters, ep_ix, mock_ex, randomstring
+):
+    expected_iters = num_iters
+    exc_text = randomstring()
+
+    def update_executor_exception(*_a, **_k):
+        nonlocal num_iters
+        num_iters -= 1
+        if not num_iters:
+            mock_ex.executor_exception = Exception(exc_text)
+        raise queue.Empty
+
+    with mock.patch.object(ep_ix, "pending_task_queue") as ptq:
+        ptq.get.side_effect = update_executor_exception
+
+        mocker.patch(f"{_MOCK_BASE}ResultPublisher", spec=ResultPublisher)
+        ep_ix._main_loop()
+
+        assert ep_ix.time_to_quit, "Sanity check"
+        assert ep_ix.pending_task_queue.get.call_count == expected_iters
+    a, _k = mock_log.exception.call_args
+    assert exc_text in str(a[0]), "Expected faithful sharing of executor exception"
 
 
 def test_die_with_parent_refuses_to_start_if_not_parent(mocker, ep_ix_factory):

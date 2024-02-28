@@ -127,7 +127,8 @@ def test_proc_pool_engine_not_started():
     engine = ProcessPoolEngine(max_workers=2)
 
     with pytest.raises(AssertionError) as pyt_exc:
-        engine.submit(double, 10)
+        future = engine.submit(double, 10)
+        future.result()
     assert "engine has not been started" in str(pyt_exc)
 
     with pytest.raises(AssertionError):
@@ -192,6 +193,7 @@ def test_gcengine_start_pass_through_to_executor(
         "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
     )
     mock_executor.provider = mock.MagicMock()
+    mock_executor.status_polling_interval = 5
 
     run_dir = tmp_path
     scripts_dir = str(tmp_path / "submit_scripts")
@@ -236,3 +238,48 @@ def test_gcengine_max_workers_per_node(
         assert engine.executor.max_workers == max_workers_per_node
     else:
         assert engine.executor.max_workers == max_workers
+
+
+def test_gcengine_new_executor_not_exceptional():
+    gce = GlobusComputeEngine()
+    assert gce.executor_exception is None, "Expect no exception from fresh Executor"
+
+
+def test_gcengine_executor_exception_passthrough(randomstring):
+    gce = GlobusComputeEngine()
+    exc_text = randomstring()
+    gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
+    assert isinstance(gce.executor_exception, ZeroDivisionError)
+    assert exc_text in str(gce.executor_exception)
+
+
+def test_gcengine_bad_state_futures_failed_immediately(randomstring):
+    gce = GlobusComputeEngine()
+    exc_text = randomstring()
+    gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
+
+    taskb = b"some packed task bytes"
+    futs = [gce.submit(task_id=str(uuid.uuid4()), packed_task=taskb) for _ in range(5)]
+
+    assert all(f.done() for f in futs), "Expect immediate completion for failed state"
+    assert all(exc_text in str(f.exception()) for f in futs)
+
+
+def test_gcengine_exception_report_from_bad_state():
+    gce = GlobusComputeEngine()
+    gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
+
+    task_id = uuid.uuid4()
+    gce.submit(task_id=str(task_id), packed_task=b"MOCK_PACKED_TASK")
+
+    result = None
+    for _i in range(10):
+        q_msg = gce.results_passthrough.get(timeout=5)
+        packed_result_q = q_msg["message"]
+        result = messagepack.unpack(packed_result_q)
+        if isinstance(result, messagepack.message_types.Result):
+            break
+
+    assert result.task_id == task_id
+    assert result.error_details.code == "RemoteExecutionError"
+    assert "ZeroDivisionError" in result.data
