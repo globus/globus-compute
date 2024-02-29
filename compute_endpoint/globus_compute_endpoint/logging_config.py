@@ -7,7 +7,6 @@ from __future__ import annotations
 import logging
 import logging.config
 import logging.handlers
-import os
 import pathlib
 import re
 import sys
@@ -140,11 +139,28 @@ class ComputeConsoleFormatter(logging.Formatter):
 
 
 def _get_file_dict_config(
-    logfile: str, console_enabled: bool, debug: bool, no_color: bool
+    logpath: pathlib.Path, console_enabled: bool, debug: bool, no_color: bool
 ) -> dict:
     # ensure that the logdir exists
-    logdir = os.path.dirname(logfile)
-    os.makedirs(logdir, exist_ok=True)
+    logpath.parent.mkdir(parents=True, exist_ok=True)
+
+    # sc-30480: If the log file isn't rotatable (e.g., /dev/stdout)
+    # then don't set up the rotation handler
+    file_handler = {
+        "class": "logging.handlers.RotatingFileHandler",
+        "level": "DEBUG",
+        "filename": str(logpath),
+        "formatter": "filefmt",
+        "maxBytes": 100 * 1024 * 1024,
+        "backupCount": 1,
+    }
+    if logpath.exists():
+        with open(logpath, "a") as f:
+            if not f.seekable():
+                file_handler["class"] = "logging.FileHandler"
+                file_handler.pop("maxBytes", None)
+                file_handler.pop("backupCount", None)
+
     log_handlers = ["logfile"]
     if console_enabled:
         log_handlers.append("console")
@@ -170,14 +186,7 @@ def _get_file_dict_config(
                 "level": "DEBUG",
                 "formatter": "streamfmt",
             },
-            "logfile": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "level": "DEBUG",
-                "filename": logfile,
-                "formatter": "filefmt",
-                "maxBytes": 100 * 1024 * 1024,
-                "backupCount": 1,
-            },
+            "logfile": file_handler,
         },
         "loggers": {
             "globus_compute_endpoint": {
@@ -244,7 +253,8 @@ def setup_logging(
     no_color: bool = False,
 ) -> None:
     if logfile is not None:
-        config = _get_file_dict_config(str(logfile), console_enabled, debug, no_color)
+        logp = pathlib.Path(logfile)
+        config = _get_file_dict_config(logp, console_enabled, debug, no_color)
     else:
         config = _get_stream_dict_config(debug, no_color)
 
