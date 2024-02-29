@@ -1601,6 +1601,7 @@ def test_warns_if_executable_not_found(
     em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
 
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
 
     expected_env = {"PATH": "/some/typoed:/path:/here"}
     (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
@@ -1675,6 +1676,20 @@ def test_start_endpoint_privileges_dropped(successful_exec_from_mocked_root):
     assert mock_os.setresuid.called, "Do NOT save uid; truly change user"
     a, _ = mock_os.setresuid.call_args
     assert a == (expected_uid, expected_uid, expected_uid)
+
+
+def test_start_endpoint_logs_to_std(mocker, successful_exec_from_mocked_root):
+    *_, em = successful_exec_from_mocked_root
+    mock_logging = mocker.patch("globus_compute_endpoint.logging_config.logging")
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    log_config = mock_logging.config.dictConfig.call_args[0][0]
+    handlers = log_config["handlers"]
+    assert "console" in handlers, "Test setup: verify expected structure"
+    assert "logfile" not in handlers, "Expect only use stdout or stderr"
 
 
 def test_run_as_same_user_disabled_if_admin(
@@ -1851,6 +1866,7 @@ def test_all_files_closed(successful_exec_from_mocked_root):
 def test_pipe_size_limit(mocker, successful_exec_from_mocked_root, conf_size):
     *_, em = successful_exec_from_mocked_root
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
 
     conf_str = "$" * conf_size
 

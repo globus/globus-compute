@@ -833,10 +833,21 @@ class EndpointManager:
         try:
             # in the child process; no need to load this in MUEP space
             import shutil
+            from multiprocessing.process import current_process
+
+            # hack to work with logging module; distinguish fork()ed process
+            # beyond subtle pid: MainProcess-12345 --> UserEnd...(PreExec)-23456
+            current_process().name = "UserEndpointProcess_Bootstrap(PreExec)"
 
             from globus_compute_endpoint.endpoint.config.utils import (
                 load_user_config_template,
             )
+            from globus_compute_endpoint.logging_config import setup_logging
+
+            # after dropping privileges, any log.* calls may not be able to access
+            # the parent's logging file.  We'll rely on stderr in that case, and fall
+            # back to the exit_code in the worst case.
+            setup_logging(logfile=None, debug=log.getEffectiveLevel() <= logging.DEBUG)
 
             # load prior to dropping privileges
             template_str, user_config_schema = load_user_config_template(self.conf_dir)
