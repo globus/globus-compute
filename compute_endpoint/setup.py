@@ -8,7 +8,7 @@ REQUIRES = [
     "globus-sdk",  # version will be bounded by `globus-compute-sdk`
     "globus-compute-sdk==2.14.0",
     "globus-compute-common==0.3.0",
-    "globus-identity-mapping==0.2.0",
+    "globus-identity-mapping==0.3.0",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
     # although psutil does not declare itself to use semver, it appears to offer
