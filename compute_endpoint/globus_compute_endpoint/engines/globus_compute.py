@@ -143,6 +143,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             )
             launch_cmd = template.replace("{EXECUTOR_LAUNCH_CMD}", launch_cmd)
 
+        # Remove extra whitespace between tokens
+        launch_cmd = " ".join(shlex.split(launch_cmd))
         return launch_cmd
 
     def start(
@@ -162,8 +164,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         script_dir = os.path.join(self.run_dir, "submit_scripts")
         self.executor.provider.script_dir = script_dir
         if self.container_type:
-            containerized_launch_cmd = self.containerized_launch_cmd()
-            self.executor.launch_cmd = shlex.join(shlex.split(containerized_launch_cmd))
+            self.executor.launch_cmd = self.containerized_launch_cmd()
             logger.info(
                 f"Containerized launch cmd template: {self.executor.launch_cmd}"
             )

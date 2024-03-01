@@ -13,6 +13,7 @@ def platinfo():
 
 def test_docker(tmp_path):
     gce = GlobusComputeEngine(
+        worker_debug=True,
         address="127.0.0.1",
         label="GCE_TEST",
         container_type="docker",
@@ -23,7 +24,7 @@ def test_docker(tmp_path):
     container_launch_cmd = gce.executor.launch_cmd
     expected = (
         "docker run --FABRICATED -v /tmp:/tmp -t "
-        "funcx/kube-endpoint:main-3.10 process_worker_pool.py"
+        "funcx/kube-endpoint:main-3.10 process_worker_pool.py --debug"
     )
     assert container_launch_cmd.startswith(expected)
 
@@ -32,6 +33,7 @@ def test_docker(tmp_path):
 
 def test_apptainer(tmp_path):
     gce = GlobusComputeEngine(
+        worker_debug=True,
         address="127.0.0.1",
         label="GCE_TEST",
         container_type="apptainer",
@@ -40,7 +42,9 @@ def test_apptainer(tmp_path):
     )
     gce.start(endpoint_id=uuid.uuid4(), run_dir="/tmp")
     container_launch_cmd = gce.executor.launch_cmd
-    expected = "apptainer run --FABRICATED APPTAINER_PATH process_worker_pool.py"
+    expected = (
+        "apptainer run --FABRICATED APPTAINER_PATH process_worker_pool.py --debug"
+    )
     assert container_launch_cmd.startswith(expected)
 
     gce.shutdown()
@@ -48,6 +52,7 @@ def test_apptainer(tmp_path):
 
 def test_singularity(tmp_path):
     gce = GlobusComputeEngine(
+        worker_debug=True,
         address="127.0.0.1",
         max_workers=1,
         label="GCE_TEST",
@@ -59,7 +64,7 @@ def test_singularity(tmp_path):
     container_launch_cmd = gce.executor.launch_cmd
     expected = (
         "singularity run /home/yadunand/kube-endpoint.py3.9.sif"
-        " process_worker_pool.py"
+        " process_worker_pool.py --debug"
     )
     assert container_launch_cmd.startswith(expected)
 
