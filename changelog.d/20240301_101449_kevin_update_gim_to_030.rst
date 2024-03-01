@@ -1,0 +1,4 @@
+Changed
+^^^^^^^
+
+- Update globus-identity-mapping to v0.3.0
