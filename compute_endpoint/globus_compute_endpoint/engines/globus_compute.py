@@ -85,13 +85,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.container_uri = container_uri
         self.container_cmd_options = container_cmd_options
 
-        # We can remove this code once we rename the max_workers attribute on
-        # the Parsl HTEX to max_workers_per_node, which is more explicit.
-        max_workers_per_node = kwargs.pop("max_workers_per_node", None)
-        max_workers = max_workers_per_node or kwargs.get("max_workers", float("inf"))
-        kwargs["max_workers"] = max_workers
-        self.max_workers_per_node = max_workers
-
         if executor is None:
             executor = HighThroughputExecutor(  # type: ignore
                 *args,
@@ -100,6 +93,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 **kwargs,
             )
         self.executor = executor
+
+    @property
+    def max_workers_per_node(self):
+        # Needed for strategies (e.g., SimpleStrategy)
+        return self.executor.max_workers_per_node
 
     @property
     def encrypted(self):
@@ -380,7 +378,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 "prefetch_capacity": self.executor.prefetch_capacity,
                 "max_blocks": self.executor.provider.max_blocks,
                 "min_blocks": self.executor.provider.min_blocks,
-                "max_workers_per_node": self.executor.max_workers,
+                "max_workers_per_node": self.executor.max_workers_per_node,
                 "nodes_per_block": self.executor.provider.nodes_per_block,
                 "heartbeat_period": self.executor.heartbeat_period,
             },
