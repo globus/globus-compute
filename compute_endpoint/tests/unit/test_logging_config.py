@@ -1,8 +1,11 @@
+import logging.config
 import os
 import pathlib
+import typing as t
 
 import pytest
 from globus_compute_endpoint.logging_config import _get_file_dict_config, setup_logging
+from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.logging_config."
 
@@ -61,3 +64,18 @@ def test_file_config_does_not_rotate_unrotatable_sc30480(anon_pipe):
 
     file_handler = conf["handlers"]["logfile"]
     assert "Rotating" not in file_handler["class"], "Expected a non-rotating handler"
+
+
+@pytest.mark.parametrize("logfile", ("/path/to/logfile", None))
+def test_include_correct_loggers(logfile: t.Optional[str], mocker: MockFixture, fs):
+    mock_dictConfig = mocker.patch.object(logging.config, "dictConfig")
+
+    setup_logging(logfile=logfile)
+
+    expected = {
+        "globus_compute_endpoint",
+        "globus_compute_sdk",
+        "parsl",
+    }
+    loggers = mock_dictConfig.call_args[0][0]["loggers"]
+    assert set(loggers) == expected, "Time to update this test?"
