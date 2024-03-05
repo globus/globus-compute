@@ -193,9 +193,12 @@ def _get_file_dict_config(
                 "level": "DEBUG" if debug else "INFO",
                 "handlers": log_handlers,
             },
-            # configure for the Globus Compute SDK as well
             "globus_compute_sdk": {
                 "level": "DEBUG" if debug else "WARNING",
+                "handlers": log_handlers,
+            },
+            "parsl": {
+                "level": "DEBUG" if debug else "INFO",
                 "handlers": log_handlers,
             },
         },
@@ -225,9 +228,12 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
                 "level": "DEBUG",
                 "handlers": ["console"],
             },
-            # configure for the Globus Compute SDK as well
             "globus_compute_sdk": {
                 "level": "DEBUG" if debug else "WARNING",
+                "handlers": ["console"],
+            },
+            "parsl": {
+                "level": "DEBUG" if debug else "INFO",
                 "handlers": ["console"],
             },
         },
