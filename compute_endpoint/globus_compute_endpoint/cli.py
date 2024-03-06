@@ -22,6 +22,7 @@ from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
 from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_compute_sdk.sdk.login_manager.client_login import is_client_login
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 
@@ -312,6 +313,16 @@ def start_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     )
 
 
+@app.command(name="login", help="Manually log in with Globus")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Log in even if already logged in",
+)
+def login(force: bool):
+    _do_login(force)
+
+
 @app.command(name="logout", help="Logout from all endpoints")
 @click.option(
     "--force",
@@ -342,6 +353,24 @@ def whoami(linked_identities: bool) -> None:
         print_whoami_info(linked_identities)
     except ValueError as ve:
         raise ClickException(str(ve))
+
+
+def _do_login(force: bool) -> None:
+    try:
+        assert not is_client_login()
+    except Exception as e:
+        if isinstance(e, AssertionError):
+            log.info("Don't need to log in when client credentials are present")
+            return
+        else:
+            raise ClickException(str(e))
+
+    lm = LoginManager()
+    if force or lm._token_storage.get_by_resource_server().keys() != lm.SCOPES.keys():
+        # if not forced, only run login flow if any tokens are missing
+        lm.run_login_flow()
+    else:
+        log.info("Already logged in. Use --force to run login flow anyway")
 
 
 def _do_logout_endpoints(
