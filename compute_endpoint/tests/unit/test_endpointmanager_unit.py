@@ -420,13 +420,22 @@ def test_handles_provided_endpoint_id_with_json(
     assert k["endpoint_id"] == ep_uuid
 
 
-def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
+def test_sends_data_during_registration(conf_dir, mock_conf, mock_client):
     ep_uuid, mock_gcc = mock_client
     mock_conf.multi_user = True
     EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert mock_gcc.register_endpoint.called
     _a, k = mock_gcc.register_endpoint.call_args
+    for key in (
+        "name",
+        "endpoint_id",
+        "display_name",
+        "metadata",
+        "multi_user",
+    ):
+        assert key in k, "Expected minimal top-level fields"
+
     for key in (
         "endpoint_version",
         "hostname",
@@ -447,6 +456,7 @@ def test_sends_metadata_during_registration(conf_dir, mock_conf, mock_client):
     ):
         assert key in k["metadata"]["config"]
 
+    assert k["multi_user"] is True
     assert k["metadata"]["config"]["multi_user"] is True
 
 
