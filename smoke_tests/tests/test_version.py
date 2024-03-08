@@ -1,4 +1,3 @@
-import pytest
 from packaging.version import Version
 
 
@@ -31,9 +30,6 @@ def test_simple_function(compute_client):
     assert func_uuid is not None, "Invalid function uuid returned"
 
 
-@pytest.mark.skip(
-    "Skipping as of 2024-01-11 while we wait for MU tutorial to show as 'online'"
-)
 def test_ep_status(compute_client, endpoint):
     """Test whether the tutorial EP is online and reporting status"""
     response = compute_client.get_endpoint_status(endpoint)
