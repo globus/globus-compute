@@ -432,6 +432,7 @@ class Client:
         allowed_functions: list[UUID_LIKE_T] | None = None,
         auth_policy: UUID_LIKE_T | None = None,
         subscription_id: UUID_LIKE_T | None = None,
+        public: bool | None = None,
     ):
         """Register an endpoint with the Globus Compute service.
 
@@ -453,6 +454,8 @@ class Client:
             Endpoint users are evaluated against this Globus authentication policy
         subscription_id : str | UUID | None
             Subscription ID to associate endpoint with
+        public : bool | None
+            Indicates if all users can discover the multi-user endpoint.
 
         Returns
         -------
@@ -472,6 +475,7 @@ class Client:
             allowed_functions=allowed_functions,
             auth_policy=auth_policy,
             subscription_id=subscription_id,
+            public=public,
         )
         return r.data
 

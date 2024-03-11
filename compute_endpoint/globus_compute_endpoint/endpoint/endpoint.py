@@ -430,6 +430,7 @@ class Endpoint:
                     allowed_functions=endpoint_config.allowed_functions,
                     auth_policy=endpoint_config.authentication_policy,
                     subscription_id=endpoint_config.subscription_id,
+                    public=endpoint_config.public,
                 )
 
             except GlobusAPIError as e:
