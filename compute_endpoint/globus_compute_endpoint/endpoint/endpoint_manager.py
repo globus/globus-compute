@@ -158,6 +158,7 @@ class EndpointManager:
                     metadata=EndpointManager.get_metadata(config, conf_dir),
                     display_name=config.display_name,
                     multi_user=True,
+                    public=config.public,
                 )
 
                 # Mostly to appease mypy, but also a useful text if it ever

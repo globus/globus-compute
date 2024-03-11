@@ -420,9 +420,13 @@ def test_handles_provided_endpoint_id_with_json(
     assert k["endpoint_id"] == ep_uuid
 
 
-def test_sends_data_during_registration(conf_dir, mock_conf, mock_client):
+@pytest.mark.parametrize("public", (True, False))
+def test_sends_data_during_registration(
+    conf_dir, mock_conf: Config, mock_client, public: bool
+):
     ep_uuid, mock_gcc = mock_client
     mock_conf.multi_user = True
+    mock_conf.public = public
     EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert mock_gcc.register_endpoint.called
@@ -433,6 +437,7 @@ def test_sends_data_during_registration(conf_dir, mock_conf, mock_client):
         "display_name",
         "metadata",
         "multi_user",
+        "public",
     ):
         assert key in k, "Expected minimal top-level fields"
 
@@ -456,6 +461,7 @@ def test_sends_data_during_registration(conf_dir, mock_conf, mock_client):
     ):
         assert key in k["metadata"]["config"]
 
+    assert k["public"] is mock_conf.public
     assert k["multi_user"] is True
     assert k["metadata"]["config"]["multi_user"] is True
 

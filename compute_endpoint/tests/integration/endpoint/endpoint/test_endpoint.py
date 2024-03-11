@@ -111,6 +111,7 @@ def test_start_endpoint_data_passthrough(fs):
     ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
     ep_conf.authentication_policy = str(uuid.uuid4())
     ep_conf.subscription_id = str(uuid.uuid4())
+    ep_conf.public = True
 
     with pytest.raises(SystemExit) as pyt_exc:
         ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={})
@@ -123,6 +124,7 @@ def test_start_endpoint_data_passthrough(fs):
     assert req_json["allowed_functions"][1] == ep_conf.allowed_functions[1]
     assert req_json["authentication_policy"] == ep_conf.authentication_policy
     assert req_json["subscription_uuid"] == ep_conf.subscription_id
+    assert req_json["public"] is ep_conf.public
 
 
 def test_endpoint_logout(monkeypatch):

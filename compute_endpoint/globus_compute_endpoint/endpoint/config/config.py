@@ -82,7 +82,7 @@ class Config(RepresentationMixin):
         Default: ./interchange.stderr
 
     detach_endpoint : Bool
-        Should the endpoint deamon be run as a detached process? This is good for
+        Should the endpoint daemon be run as a detached process? This is good for
         a real edge node, but an anti-pattern for kubernetes pods
         Default: True
 
@@ -92,6 +92,12 @@ class Config(RepresentationMixin):
 
     multi_user : bool | None
         Designates the endpoint as a multi-user endpoint
+        Default: None
+
+    public : bool | None
+        Indicates if all users can discover the multi-user endpoint via our web UI and
+        API. This field is only supported on multi-user endpoints and does not control
+        access to the endpoint; therefore, it should not be used as a security feature.
         Default: None
 
     allowed_functions : list[str] | None
@@ -146,6 +152,7 @@ class Config(RepresentationMixin):
         environment: str | None = None,
         funcx_service_address=None,
         multi_user: bool | None = None,
+        public: bool | None = None,
         allowed_functions: list[str] | None = None,
         authentication_policy: str | None = None,
         subscription_id: str | None = None,
@@ -217,6 +224,7 @@ class Config(RepresentationMixin):
             _p = pathlib.Path(self.identity_mapping_config_path)
             if not _p.exists():
                 warnings.warn(f"Identity mapping config path not found ({_p})")
+        self.public = public is True
 
         # Auth
         self.allowed_functions = allowed_functions

@@ -91,3 +91,9 @@ def test_config_warns_bad_identity_mapping_path(mocker, config_dict_mu, tmp_path
     assert "Identity mapping config" in warn_a
     assert "path not found" in warn_a
     assert str(conf_p) in warn_a, "expect include location of file in warning"
+
+
+@pytest.mark.parametrize("public", (None, True, False, "a", 1))
+def test_public(public: t.Any):
+    c = Config(public=public)
+    assert c.public is (public is True)
