@@ -81,17 +81,7 @@ def test_wait_on_new_hello_world_func(compute_client, endpoint):
 def test_executor(compute_client, endpoint, tutorial_function_id):
     """Test using Executor to retrieve results."""
     res = compute_client.web_client.get_version()
-    url = res._response.url
-
     assert res.http_status == 200, f"Received {res.http_status} instead!"
-    server_version = Version(res.data["api"])
-    if server_version.release < (1, 0, 5):
-        pytest.skip(
-            "Server too old (use `tox -- -v` for details)"
-            "\n  Executor test requires the server to be at least v1.0.5."
-            f"\n          Request: {url}"
-            f"\n    Found version: v{server_version.public}"
-        )
 
     num_tasks = 10
     submit_count = 2  # we've had at least one bug that prevented executor re-use
