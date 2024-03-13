@@ -1,4 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Logs from ``parsl`` (providers, etc.) are now showing in ``endpoint.log``.
