@@ -3,6 +3,39 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.15.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.15.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed a bug that caused errors on containerized endpoints when certain
+  configuration fields (e.g., ``address_probe_timeout``) were not defined.
+
+- Logs from ``parsl`` (providers, etc.) are now showing in ``endpoint.log``.
+
+Changed
+^^^^^^^
+
+- Update ``globus-identity-mapping`` dependency to v0.3.0
+
+- Update ``globus-sdk`` dependency to at least 3.28.0
+
+- Bumped parsl pinned version from ``2024.02.05`` to ``2024.3.4``
+  This version bump brings in following fixes:
+
+  - HTEX to support `max_workers_per_node` as a kwarg
+  - Better stdout/err reporting from failed tasks
+  - Support for detecting MISSING jobs
+  - Better HTEX interchange shutdown logic to avoid hung processes
+
+Security
+^^^^^^^^
+
+- Bump ``jinja2`` dependency to 3.1.3
+
 .. _changelog-2.14.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.14.0
