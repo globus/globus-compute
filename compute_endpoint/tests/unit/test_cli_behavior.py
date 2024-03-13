@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import logging
 import os
 import pathlib
 import shlex
@@ -14,7 +15,7 @@ import pytest
 import yaml
 from click import ClickException
 from click.testing import CliRunner
-from globus_compute_endpoint.cli import app, init_config_dir
+from globus_compute_endpoint.cli import _do_login, app, init_config_dir
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
@@ -826,3 +827,39 @@ def test_fail_exit_sends_amqp_msg(
     run_line(f"start {ep_name}", assert_exit_code=ec, stdin=stdin)
     assert mock_ep.start_endpoint.called
     assert mock_send.called
+
+
+@pytest.mark.parametrize("force", [True, False], ids=["forced", "unforced"])
+@pytest.mark.parametrize("is_client", [True, False], ids=["client", "noclient"])
+@pytest.mark.parametrize("logged_in", [True, False], ids=["authd", "unauthd"])
+def test_endpoint_login(mocker, caplog, force, is_client, logged_in):
+    mocker.patch(f"{_MOCK_BASE}is_client_login", return_value=is_client)
+    mock_lm_class = mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_lm = mock_lm_class.return_value
+    mock_lm.SCOPES = {"scope": "token"}
+    if logged_in:
+        mock_lm._token_storage.get_by_resource_server.return_value = {"scope": "token"}
+    caplog.set_level(logging.INFO)
+
+    _do_login(force)
+
+    if is_client:
+        assert not mock_lm_class.called
+        assert "client credentials" in caplog.text
+        return
+
+    assert mock_lm_class.called
+    if force or not logged_in:
+        assert mock_lm.run_login_flow.called
+        assert not caplog.text
+    else:
+        assert "Already logged in" in caplog.text
+
+
+@pytest.mark.parametrize("env_var", ["FUNCX_SDK_CLIENT_ID", "FUNCX_SDK_CLIENT_SECRET"])
+@pytest.mark.parametrize("force", [True, False], ids=["forced", "unforced"])
+def test_endpoint_login_handles_partial_client_login_state(monkeypatch, env_var, force):
+    monkeypatch.setenv(env_var, "some_uuid")
+    with pytest.raises(ClickException) as e:
+        _do_login(force)
+    assert "both environment variables" in str(e)

@@ -156,6 +156,7 @@ class EndpointManager:
                     name=conf_dir.name,
                     endpoint_id=endpoint_uuid,
                     metadata=EndpointManager.get_metadata(config, conf_dir),
+                    display_name=config.display_name,
                     multi_user=True,
                 )
 
