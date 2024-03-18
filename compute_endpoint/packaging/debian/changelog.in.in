@@ -1,0 +1,8 @@
+globus-compute-endpoint (@VERSION@.@distro@) @distro@; urgency=low
+
+  * Initial release as a Debian package
+
+  * Includes support for multi-user Globus Compute Endpoints; see
+    https://globus-compute.readthedocs.io/ for more information.
+
+ -- Maintainer: Globus Support <support@globus.org>  Wed, 21 Feb 2024 14:01:30 -0500
