@@ -15,9 +15,13 @@ from datetime import datetime
 
 import click
 from click import ClickException
+from click_option_group import optgroup
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.utils import send_endpoint_startup_failure_to_amqp
+from globus_compute_endpoint.endpoint.utils import (
+    send_endpoint_startup_failure_to_amqp,
+    user_input_select,
+)
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
@@ -25,6 +29,7 @@ from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.client_login import is_client_login
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
+from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
 
 try:
     from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
@@ -38,6 +43,10 @@ else:
     _has_multi_user = True
 
 log = logging.getLogger(__name__)
+
+
+_AUTH_POLICY_DEFAULT_NAME = "Globus Compute Authentication Policy"
+_AUTH_POLICY_DEFAULT_DESC = "This policy was created automatically by Globus Compute."
 
 
 class CommandState:
@@ -243,9 +252,55 @@ def version_command():
         "https://docs.globus.org/api/auth/developer-guide/#authentication-policies."
     ),
 )
+@optgroup.group(
+    "Authentication Policy Creation",
+    help=(
+        "Options for creating an auth policy. If any of these options are specified, "
+        "the endpoint will be associated with an auth policy configured per those "
+        "options and users will be evaluated against that policy."
+    ),
+)
+@optgroup.option(
+    "--auth-policy-project-id",
+    help=(
+        "The Globus Auth Project this policy should belong to "
+        "(will prompt to create one if not given)"
+    ),
+    default=None,
+)
+@optgroup.option(
+    "--auth-policy-display-name",
+    default=_AUTH_POLICY_DEFAULT_NAME,
+    show_default=True,
+)
+@optgroup.option(
+    "--auth-policy-description",
+    default=_AUTH_POLICY_DEFAULT_DESC,
+    show_default=True,
+)
+@optgroup.option(
+    "--allowed-domains",
+    help="A comma separated list of domains to include (ex: globus.org,*.edu)",
+    default=None,
+)
+@optgroup.option(
+    "--excluded-domains",
+    help="A comma separated list of domains to exclude (ex: globus.org,*.edu)",
+    default=None,
+)
+@optgroup.option(
+    "--auth-timeout",
+    help=(
+        "How old (in seconds) a login session can be and still be compliant. "
+        "Makes the auth policy high assurance"
+    ),
+    type=click.IntRange(min=0),
+    default=None,
+)
 @click.option("--subscription-id", help="Associate endpoint with a subscription")
 @name_arg
 @common_options
+@handle_auth_errors
 def configure_endpoint(
     *,
     name: str,
@@ -253,6 +308,12 @@ def configure_endpoint(
     multi_user: bool,
     display_name: str | None,
     auth_policy: str | None,
+    auth_policy_project_id: str | None,
+    auth_policy_display_name: str,
+    auth_policy_description: str,
+    allowed_domains: str | None,
+    excluded_domains: str | None,
+    auth_timeout: int | None,
     subscription_id: str | None,
 ):
     """Configure an endpoint
@@ -267,6 +328,45 @@ def configure_endpoint(
 
     if multi_user and not _has_multi_user:
         raise ClickException("multi-user endpoints are not supported on this system")
+
+    if (
+        auth_policy_project_id is not None
+        or auth_policy_display_name != _AUTH_POLICY_DEFAULT_NAME
+        or auth_policy_description != _AUTH_POLICY_DEFAULT_DESC
+        or allowed_domains is not None
+        or excluded_domains is not None
+        or auth_timeout is not None
+    ):
+        if auth_policy:
+            raise ClickException(
+                "Cannot specify an existing auth policy and "
+                "create a new one at the same time"
+            )
+
+        login_manager = LoginManager()
+        login_manager.ensure_logged_in()
+        ac = login_manager.get_auth_client()
+
+        if not auth_policy_project_id:
+            auth_policy_project_id = create_or_choose_auth_project(ac)
+
+        # mypy is confused
+        include_domain_list: list[str] | MissingType = (
+            allowed_domains.split(",") if allowed_domains else MISSING
+        )
+        exclude_domain_list: list[str] | MissingType = (
+            excluded_domains.split(",") if excluded_domains else MISSING
+        )
+
+        auth_policy = create_auth_policy(
+            ac=ac,
+            project_id=auth_policy_project_id,
+            display_name=auth_policy_display_name,
+            description=auth_policy_description,
+            include_domains=include_domain_list,
+            exclude_domains=exclude_domain_list,
+            timeout=auth_timeout or MISSING,
+        )
 
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
@@ -715,6 +815,98 @@ def self_diagnostic(compress: bool, log_kb: int):
                 run_self_diagnostic(log_bytes=log_bytes)
 
         click.echo(f"Successfully created {filename}")
+
+
+def create_or_choose_auth_project(ac: AuthClient) -> str:
+    """
+    Lets the user choose from one of their existing projects, or
+    prompt for a description and creates one for them
+    """
+    projects = ac.get_projects()
+    if any(projects):
+        proj_selected = user_input_select(
+            (
+                "Please select a project to contain new auth policy "
+                "(leave blank to create a new one):"
+            ),
+            [f'id: {proj["id"]}, name: {proj["display_name"]}' for proj in projects],
+        )
+        if proj_selected:
+            return proj_selected.split()[1][:-1]
+
+    print("Creating a new auth project.")
+
+    try:
+        while True:
+            display_name = input("Enter a name for this project: ")
+            contact_email = input("Enter the contact email for this project: ")
+
+            admin_ids_input = input(
+                "Enter a comma separated list of admin IDs for this project: "
+            )
+            admin_ids = admin_ids_input.split(",") if admin_ids_input else []
+
+            admin_gps_input = input(
+                "Enter a comma separated list of group IDs as project admins: "
+            )
+            admin_group_ids = admin_gps_input.split(",") if admin_gps_input else []
+
+            cont = input(
+                "Create this auth project? "
+                "(Y/y to confirm, Q/q to quit, otherwise start over): "
+            ).lower()
+            if cont == "y":
+                break
+            elif cont == "q":
+                raise KeyboardInterrupt
+            else:
+                print()
+                continue
+    except KeyboardInterrupt:
+        print("\nCanceled.")
+        sys.exit(0)
+
+    try:
+        print("Creating project...")
+        resp = ac.create_project(
+            display_name=display_name,
+            contact_email=contact_email,
+            admin_ids=admin_ids,
+            admin_group_ids=admin_group_ids,
+        )
+        print("Project created.")
+        return resp["project"]["id"]
+    except GlobusAPIError as e:
+        raise ClickException(f"Unable to create auth project: [{e.text}]")
+
+
+def create_auth_policy(
+    ac: AuthClient,
+    project_id: str,
+    display_name: str,
+    description: str,
+    include_domains: list[str] | MissingType,
+    exclude_domains: list[str] | MissingType,
+    timeout: int | MissingType,
+) -> str:
+    """
+    Uses the Globus SDK to create an auth policy and returns
+    the policy_id after creation
+    """
+
+    try:
+        resp = ac.create_policy(
+            project_id=project_id,
+            display_name=display_name,
+            description=description,
+            domain_constraints_include=include_domains,
+            domain_constraints_exclude=exclude_domains,
+            high_assurance=bool(timeout),
+            authentication_assurance_timeout=timeout,
+        )
+        return resp["policy"]["id"]
+    except GlobusAPIError as e:
+        raise ClickException(f"Unable to create authentication policy: [{e.text}]")
 
 
 def cli_run():

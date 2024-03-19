@@ -3,6 +3,7 @@ from __future__ import annotations
 import os as _os
 import pwd as _pwd
 import re as _re
+import sys
 import typing as t
 import urllib.parse
 
@@ -155,3 +156,32 @@ def send_endpoint_startup_failure_to_amqp(amqp_creds: dict, msg: str | None = No
                 body=payload,
                 mandatory=True,
             )
+
+
+def user_input_select(prompt: str, options: list[str]) -> str | None:
+    """
+    Prompt the user to select from a list of options, and returns the item or
+    None if the user declines to select one
+    """
+    assert options, "Options list must not be empty"
+
+    if not (sys.stdin and not sys.stdin.closed):
+        raise EOFError("No input (stdin closed); cannot collect user input")
+
+    if not sys.stdin.isatty():
+        print("Reading batch data from stdin ...", file=sys.stderr)
+
+    print(prompt)
+    for idx, option_text in enumerate(options, start=1):
+        print(f"  [{idx}]: {option_text}")
+
+    while True:
+        input_raw = input("\nChoice: ")
+        if not input_raw.strip():
+            return None
+        else:
+            if input_raw.isdigit():
+                input_num = int(input_raw)
+                if 0 < input_num <= len(options):
+                    return options[input_num - 1]
+            print(f"Invalid choice: {input_raw}")
