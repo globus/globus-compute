@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import pathlib
+import random
 import shlex
 import typing as t
 import uuid
@@ -15,12 +16,20 @@ import pytest
 import yaml
 from click import ClickException
 from click.testing import CliRunner
-from globus_compute_endpoint.cli import _do_login, app, init_config_dir
+from globus_compute_endpoint.cli import (
+    _AUTH_POLICY_DEFAULT_DESC,
+    _AUTH_POLICY_DEFAULT_NAME,
+    _do_login,
+    app,
+    create_or_choose_auth_project,
+    init_config_dir,
+)
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.web_client import WebClient
+from globus_sdk import MISSING, AuthClient
 from pyfakefs import fake_filesystem as fakefs
 from pytest_mock import MockFixture
 
@@ -863,3 +872,185 @@ def test_endpoint_login_handles_partial_client_login_state(monkeypatch, env_var,
     with pytest.raises(ClickException) as e:
         _do_login(force)
     assert "both environment variables" in str(e)
+
+
+@pytest.mark.parametrize("ap_project_id", [None, "foo"])
+@pytest.mark.parametrize("ap_display_name", [None, "foo"])
+@pytest.mark.parametrize("ap_description", [None, "foo"])
+@pytest.mark.parametrize("ap_allowed", [None, "foo"])
+@pytest.mark.parametrize("ap_exclude", [None, "foo"])
+@pytest.mark.parametrize("ap_timeout", [None, "1"])
+def test_configure_ep_auth_policy_mutually_exclusive(
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+    ap_project_id,
+    ap_display_name,
+    ap_description,
+    ap_allowed,
+    ap_exclude,
+    ap_timeout,
+):
+    params = "--auth-policy=foo"
+    expected_exit_code = 0
+    if ap_project_id:
+        params += f" --auth-policy-project-id={ap_project_id}"
+        expected_exit_code = 1
+    if ap_display_name:
+        params += f" --auth-policy-display-name={ap_display_name}"
+        expected_exit_code = 1
+    if ap_description:
+        params += f" --auth-policy-description={ap_description}"
+        expected_exit_code = 1
+    if ap_allowed:
+        params += f" --allowed-domains={ap_allowed}"
+        expected_exit_code = 1
+    if ap_exclude:
+        params += f" --excluded-domains={ap_exclude}"
+        expected_exit_code = 1
+    if ap_timeout:
+        params += f" --auth-timeout={ap_timeout}"
+        expected_exit_code = 1
+
+    res = run_line(f"configure {params} {ep_name}", assert_exit_code=expected_exit_code)
+
+    if expected_exit_code == 1:
+        assert "at the same time" in res.stderr
+
+
+def test_configure_ep_auth_policy_defaults(
+    mocker,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+):
+    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_create_auth_policy = mocker.patch(f"{_MOCK_BASE}create_auth_policy")
+
+    run_line(f"configure --auth-policy-project-id=foo {ep_name}")
+
+    assert mock_create_auth_policy.call_args.kwargs == {
+        "ac": mock_login_manager.return_value.get_auth_client.return_value,
+        "project_id": "foo",
+        "display_name": _AUTH_POLICY_DEFAULT_NAME,
+        "description": _AUTH_POLICY_DEFAULT_DESC,
+        "include_domains": MISSING,
+        "exclude_domains": MISSING,
+        "timeout": MISSING,
+    }
+
+
+def test_configure_ep_auth_param_parse(
+    mocker,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+):
+    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_create_auth_policy = mocker.patch(f"{_MOCK_BASE}create_auth_policy")
+    params = " ".join(
+        [
+            "--auth-policy-project-id=p123",
+            "--auth-policy-display-name='my awesome policy'",
+            "--auth-policy-description='policy desc'",
+            "--allowed-domains=xyz.com,example.org",
+            "--excluded-domains=nope.com",
+            "--auth-timeout=30",
+        ]
+    )
+
+    run_line(f"configure {params} {ep_name}")
+
+    assert mock_create_auth_policy.call_args.kwargs == {
+        "ac": mock_login_manager.return_value.get_auth_client.return_value,
+        "project_id": "p123",
+        "display_name": "my awesome policy",
+        "description": "policy desc",
+        "include_domains": ["xyz.com", "example.org"],
+        "exclude_domains": ["nope.com"],
+        "timeout": 30,
+    }
+
+
+def test_choose_auth_project(
+    mocker,
+    randomstring,
+):
+    mock_user_input_select = mocker.patch(f"{_MOCK_BASE}user_input_select")
+    mock_user_input_select.side_effect = lambda _p, o: random.choice(o)
+
+    get_projects_response = [
+        {"id": str(uuid.uuid4()), "display_name": randomstring()} for _ in range(5)
+    ]
+    mock_ac = mocker.Mock(spec=AuthClient)
+    mock_ac.get_projects.return_value = get_projects_response
+
+    proj_id = create_or_choose_auth_project(mock_ac)
+
+    assert uuid.UUID(proj_id)
+    assert proj_id in [p["id"] for p in get_projects_response]
+
+
+@pytest.mark.parametrize("has_projects", [True, False])
+def test_configure_ep_auth_policy_creates_or_chooses_project(
+    mocker,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+    randomstring,
+    has_projects,
+):
+    class StopTest(Exception):
+        pass
+
+    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_ac = mock_login_manager.return_value.get_auth_client.return_value
+
+    if has_projects:
+        mock_ac.get_projects.return_value = [
+            {"id": str(uuid.uuid4()), "display_name": randomstring()} for _ in range(5)
+        ]
+        # stop test when choosing a project
+        mocker.patch(f"{_MOCK_BASE}user_input_select", side_effect=StopTest)
+    else:
+        mock_ac.get_projects.return_value = []
+        mock_input = mocker.patch("builtins.input")
+        mock_input.return_value = "y"  # break out of interact loop asap
+        # stop test when creating a project
+        mock_ac.create_project.side_effect = StopTest
+
+    res = run_line(
+        f"configure --auth-policy-display-name=foo {ep_name}", assert_exit_code=1
+    )
+
+    assert isinstance(res.exception, StopTest)
+
+
+@pytest.mark.parametrize("timeout", [None] + list(range(5)))
+def test_configure_ep_auth_policy_timeout_sets_ha(
+    mocker,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+    timeout,
+):
+    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_ac = mock_login_manager.return_value.get_auth_client.return_value
+    create_policy = mock_ac.create_policy
+
+    if timeout is None:
+        line = f"configure --auth-policy-project-id=bar {ep_name}"
+    else:
+        line = (
+            f"configure --auth-policy-project-id=bar --auth-timeout={timeout} {ep_name}"
+        )
+
+    run_line(line)
+
+    assert create_policy.called
+    assert create_policy.call_args.kwargs["high_assurance"] == bool(timeout)

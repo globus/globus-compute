@@ -23,6 +23,7 @@ REQUIRES = [
     "python-daemon>=2,<3",
     # CLI parsing
     "click>=8,<9",
+    "click-option-group>=0.5.6,<1",
     # disallow use of 22.3.0; the whl package on some platforms causes ZMQ issues
     #
     # NOTE: 22.3.0 introduced a patched version of libzmq.so to the wheel packaging
