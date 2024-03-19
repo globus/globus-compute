@@ -58,7 +58,7 @@ class LoginManager:
 
     SCOPES: dict[str, list[str]] = {
         ComputeScopes.resource_server: [ComputeScopes.all],
-        AuthScopes.resource_server: [AuthScopes.openid],
+        AuthScopes.resource_server: [AuthScopes.openid, AuthScopes.manage_projects],
     }
 
     def __init__(self, *, environment: str | None = None) -> None:
@@ -128,8 +128,9 @@ class LoginManager:
         with self._access_lock:
             data = self._token_storage.get_by_resource_server()
 
-        for server, _scopes in self.login_requirements:
-            if server not in data:
+        for server, scopes in self.login_requirements:
+            tok = data.get(server)
+            if not tok or any(scope not in tok["scope"] for scope in scopes):
                 self.run_login_flow()
                 break
 

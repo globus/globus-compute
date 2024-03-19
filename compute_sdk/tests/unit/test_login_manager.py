@@ -236,7 +236,7 @@ def test_get_authorizer(mocker, logman):
 
 @pytest.mark.parametrize(
     "missing_keys",
-    list(
+    set(
         chain(
             combinations(LoginManager.SCOPES, 1),
             combinations(LoginManager.SCOPES, 2),
@@ -245,13 +245,27 @@ def test_get_authorizer(mocker, logman):
         )
     ),
 )
-def test_ensure_logged_in(mocker, logman, missing_keys):
-    needs_login = bool(missing_keys)
+@pytest.mark.parametrize(
+    "missing_scopes",
+    set(
+        chain(
+            combinations(chain(*LoginManager.SCOPES.values()), 1),
+            combinations(chain(*LoginManager.SCOPES.values()), 2),
+            combinations(chain(*LoginManager.SCOPES.values()), 3),
+            [()],
+        )
+    ),
+)
+def test_ensure_logged_in(mocker, logman, missing_keys, missing_scopes):
+    needs_login = bool(missing_keys) or bool(missing_scopes)
 
     def _get_data():
-        token_data = dict(LoginManager.SCOPES)
-        for k in missing_keys:
-            token_data.pop(k, None)
+        token_data = {}
+        for key, scope_list in LoginManager.SCOPES.items():
+            if key in missing_keys:
+                continue
+            scope_str = " ".join(s for s in scope_list if s not in missing_scopes)
+            token_data[key] = {"scope": scope_str}
         return token_data
 
     logman._token_storage.get_by_resource_server = _get_data
