@@ -1,24 +1,29 @@
-PYTHON3 = $(shell [ -x /opt/globus-python/bin/python3 ] && echo /opt/globus-python/bin/python3 || python3)
+.DEFAULT: help
 
-PY_FULL_VERSION := $$($(PYTHON3) -V | awk '{print $$2}' | sed -e 's/-//')
+PYTHON3 := $(shell which /opt/globus-python/bin/python3 python3 | head -1)
+
+PY_FULL_VERSION := $$($(PYTHON3) -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
 PY_MAJOR_VERSION := $(shell echo $(PY_FULL_VERSION) | cut -d . -f1 )
 PY_MINOR_VERSION := $(shell echo $(PY_FULL_VERSION) | cut -d . -f2 )
 PY_VERSION := $(PY_MAJOR_VERSION)$(PY_MINOR_VERSION)
-PKG_VERSION := $(shell cd ../; python3 setup.py --version | tr '-' '~')
-PKG_NAME := $(shell cd ../; python3 setup.py --name | tr '-' '_')
-
-PREREQS_TARBALL_NAME := $(PKG_NAME)-prereqs-py$(PY_VERSION)-$(PKG_VERSION).tar.xz
-PKG_WHEEL := $(PKG_NAME)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
 
 VIRTUALENV := venv-$(PY_VERSION)
 VENV_PIP := $(VIRTUALENV)/bin/pip
 VENV_PY := $(shell pwd)/$(VIRTUALENV)/bin/python
 
+# This if conditional before the PKG_ variables, so as to ensure we have setuptools;
+# not so ideal, but at the moment, I don't know how to do better.  Hmm.
+ifeq ($(wildcard $(VENV_PY)),)
+	_DUMMY := $(shell $(PYTHON3) -mvenv "$(VIRTUALENV)")
+	_DUMMY := $(shell $(VENV_PY) -mpip install -U pip setuptools)
+endif
+
+PKG_VERSION := $(shell cd ../; $(VENV_PY) setup.py --version | tr '-' '~')
+PKG_NAME := $(shell cd ../; $(VENV_PY) setup.py --name | tr '-' '_')
+PKG_WHEEL = $(PKG_NAME)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
+PREREQS_TARBALL_NAME = $(PKG_NAME)-prereqs-py$(PY_VERSION)-$(PKG_VERSION).tar.xz
+
 OS_CODENAME := $(shell test -f /etc/os-release && . /etc/os-release; echo $${VERSION_CODENAME:-focal})
-
-.PHONY: $(PKG_WHEEL) $(VENV_PY) show_vars
-
-.DEFAULT: help
 
 # with thanks to https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 # header text == hash-hash-H
@@ -36,7 +41,7 @@ help:  ##-(This command) show description of each target
 	@sed -ne "/@sed/!s/.*##F//p" $(MAKEFILE_LIST)
 
 .PHONY: show_vars
-show_vars: $(VENV_PY)    ##-For debugging, show the Makefile variables; will install a venv
+show_vars:   ##-For debugging, show the Makefile variables; will install a venv
 	@echo
 	@echo "OS_CODENAME          : $(OS_CODENAME)"
 	@echo "PYTHON3              : $(PYTHON3)"
@@ -51,16 +56,17 @@ show_vars: $(VENV_PY)    ##-For debugging, show the Makefile variables; will ins
 	@echo "PKG_VERSION          : $(PKG_VERSION)"
 	@echo "PREREQS_TARBALL_NAME : $(PREREQS_TARBALL_NAME)"
 	@echo "PKG_WHEEL            : $(PKG_WHEEL)"
-	@echo "\n  Override python with PYTHON3 variable:"
+	@echo
+	@echo "  Override python path with PYTHON3 variable:"
 	@echo "    $(MAKE) PYTHON3=/path/to/python target(s)"
 
 .PHONY: clean
 clean:  ##-Remove the venv, build/ dist/, prereqs tarball, and the package wheel
-	rm -rf "$(VIRTUALENV)" build/ dist/ "$(PREREQS_TARBALL_NAME)" "$(PKG_WHEEL)"
+	rm -rf -- "$(VIRTUALENV)" build/ dist/ "$(PREREQS_TARBALL_NAME)" "$(PKG_WHEEL)"
 
 .PHONY: distclean
 distclean: clean  ##-Run `clean` target, then additionally remove venv-*, *tar.xz, *whl
-	rm -rf venv-* "$(PKG_NAME)"-*tar.xz "$(PKG_NAME)"-*whl
+	rm -rf -- venv-* "$(PKG_NAME)"-*tar.xz "$(PKG_NAME)"-*whl
 
 .PHONY: $(VENV_PY)
 $(VENV_PY):
@@ -72,9 +78,9 @@ $(VENV_PY):
 	fi
 	$(PYTHON3) -mvenv $(VIRTUALENV)
 	. $(VIRTUALENV)/bin/activate
-	@$(VENV_PY) -m pip install -U pip
+	@$(VENV_PY) -m pip install -U pip setuptools
 
-$(PKG_WHEEL): $(PYTHON)
+$(PKG_WHEEL): $(VENV_PY)
 	(   rm -rf build/ \
 	 && git clone ../../ build/ \
 	 && cd build/compute_endpoint/ \
@@ -90,7 +96,7 @@ $(PKG_WHEEL): $(PYTHON)
 wheel: $(PKG_WHEEL)  ##-Make the wheel (note that this does *not* include dependencies)
 
 $(PREREQS_TARBALL_NAME): $(VENV_PY) $(PKG_WHEEL)
-	bash create-prereqs-tarball.sh ./build/compute_endpoint/ > "$(PREREQS_TARBALL_NAME)"
+	PYTHON_BIN="$(VENV_PY)" bash create-prereqs-tarball.sh ./build/compute_endpoint/ > "$(PREREQS_TARBALL_NAME)"
 
 prereq_tarball: $(PREREQS_TARBALL_NAME)  ##-Make a tarball of wheel dependencies
 
@@ -99,7 +105,12 @@ dist: $(PREREQS_TARBALL_NAME)  ##-Make the dist/ directory with prereqs and whee
 	  && mkdir dist/ \
 	  && cp $(PREREQS_TARBALL_NAME) $(PKG_WHEEL) dist/
 
-deb: dist  ##-Build a Debian package of the Globus Compute Endpoint (.deb)
+deb_build_needs:  ##-Check that necessary executables are available before starting the build.
+	@echo "\033[36;1;40mChecking build dependencies before starting build\033[39;49m ...\n"
+	@[ -x "$$(which dpkg-checkbuilddeps)" ] || { echo "Missing 'dpkg-dev' package"; exit 1; }
+	@dpkg-checkbuilddeps
+
+deb: deb_build_needs dist  ##-Build a Debian package of the Globus Compute Endpoint (.deb)
 	(   cd dist/ \
 	 && rm -rf debbuild/ \
 	 && mkdir -p debbuild/globus-compute-endpoint/wheels/ \
