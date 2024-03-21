@@ -122,9 +122,10 @@ class ComputeSerializer:
             deserialized = self.deserialize(current)
             unpacked.extend([deserialized])
 
-        assert len(unpacked) == 3, "Unpack expects 3 buffers, got {}".format(
-            len(unpacked)
-        )
+        # The following is added for backward compatibility with
+        # older SDK's that do not ship resource_specification
+        if len(unpacked) == 3:
+            unpacked.extend([{}])
 
         return unpacked
 

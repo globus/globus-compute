@@ -132,7 +132,7 @@ def _call_user_function(
     Returns serialized result or throws exception.
     """
     GC_TASK_TIMEOUT = max(0.0, float(os.environ.get("GC_TASK_TIMEOUT", 0.0)))
-    f, args, kwargs = serializer.unpack_and_deserialize(task_buffer)
+    f, args, kwargs, _res_spec = serializer.unpack_and_deserialize(task_buffer)
     if GC_TASK_TIMEOUT > 0.0:
         log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
         f = timeout(f, GC_TASK_TIMEOUT)

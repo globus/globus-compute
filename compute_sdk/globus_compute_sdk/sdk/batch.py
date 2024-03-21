@@ -62,9 +62,11 @@ class Batch:
             args = ()
         if kwargs is None:
             kwargs = {}
+        # todo: do we remove the resource_specification from kwargs?
+        ser_res_spec = self._serde.serialize(kwargs.get("resource_specification", {}))
         ser_args = self._serde.serialize(args)
         ser_kwargs = self._serde.serialize(kwargs)
-        payload = self._serde.pack_buffers([ser_args, ser_kwargs])
+        payload = self._serde.pack_buffers([ser_args, ser_kwargs, ser_res_spec])
 
         self.tasks[str(function_id)].append(payload)
 

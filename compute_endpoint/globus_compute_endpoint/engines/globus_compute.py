@@ -213,10 +213,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     def _submit(
         self,
         func: t.Callable,
+        resource_specification: dict,
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
-        return self.executor.submit(func, {}, *args, **kwargs)
+        return self.executor.submit(func, resource_specification, *args, **kwargs)
 
     @property
     def provider(self):
