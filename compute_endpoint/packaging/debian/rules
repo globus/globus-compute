@@ -1,0 +1,86 @@
+#!/usr/bin/make -f
+
+# output every command that modifies files on the build system.
+export DH_VERBOSE = 1
+
+# see EXAMPLES in dpkg-buildflags(1) and read /usr/share/dpkg/*
+DPKG_EXPORT_BUILDFLAGS = 1
+
+include /usr/share/dpkg/default.mk
+
+DEB_BUILD_OPTIONS += noautodbgsym
+export DEB_BUILD_OPTIONS
+
+# see FEATURE AREAS in dpkg-buildflags(1)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+name := globus-compute-endpoint
+versionedname := $(name)
+VIRTUAL_ENV := /opt/globus
+TMP_BUILD_DIR := debian/$(name)-tmp
+TMP_VIRTUAL_ENV := $(TMP_BUILD_DIR)$(VIRTUAL_ENV)
+DEST_ROOT := debian/$(versionedname)
+DEST_VIRTUAL_ENV := $(DEST_ROOT)$(VIRTUAL_ENV)
+
+_sysconfdir=/etc
+_sbindir=/usr/sbin
+_mandir=/usr/share/man
+_var=/var
+_unitdir=/lib/systemd/system
+_docdir=/usr/share/doc
+_httpd_confdir=$(_sysconfdir)/apache2/conf-available
+_completion_dir="${_sysconfdir}/bash_completion.d"
+
+.PHONY: override_dh_auto_configure
+override_dh_auto_configure:
+	/opt/globus-python/bin/python3 -mvenv $${PWD}/$(TMP_VIRTUAL_ENV)
+	. "$(TMP_VIRTUAL_ENV)/bin/activate"; \
+	set -x; \
+	python3 -mpip install --no-index --no-cache-dir -I --compile -U wheels/pip-*.whl; \
+	python3 -mpip install --no-index --no-cache-dir -I --pre --compile --find-links=file://$${PWD}/wheels/ $(name)
+
+.PHONY: override_dh_auto_clean
+override_dh_auto_clean:
+	rm -rf $(TMP_BUILD_DIR) build dist
+
+.PHONY: override_dh_shlibdeps
+override_dh_shlibdeps:    # empty == we're ignoring it for our purposes.
+
+.PHONY: override_dh_auto_install
+override_dh_auto_install:
+	set -ex; \
+	. "$(TMP_VIRTUAL_ENV)/bin/activate"; \
+	/opt/globus-python/bin/python3 -mvenv $${PWD}/$(TMP_VIRTUAL_ENV) ; \
+	install -d -m 755 \
+	  "$(DEST_VIRTUAL_ENV)" \
+	  "$(DEST_ROOT)$(_sbindir)" \
+	  "$(DEST_ROOT)$(_mandir)" \
+	  "$(DEST_ROOT)$(_unitdir)"; \
+	tar -C $(TMP_VIRTUAL_ENV) -cf - . | tar -C $(DEST_VIRTUAL_ENV) -xf -; \
+	set +x; \
+	for script in "$(DEST_VIRTUAL_ENV)"/bin/*; do \
+	    if [ ! -L "$$script" ] && [ -f "$$script" ]; then \
+	        shbang="$$(head -2c "$$script")"; \
+	        if [ "$$shbang" = "#!" ]; then \
+	            sed -i "$$script" -e "1,2s|$${PWD}/$(TMP_VIRTUAL_ENV)|$(VIRTUAL_ENV)|g"; \
+	        fi; \
+	    fi; \
+	done; \
+	set -x; \
+	rm -rf $(DEST_VIRTUAL_ENV)/systemd \
+	  $(DEST_VIRTUAL_ENV)/lib/python*/site-packages/tests; \
+	sed -i "$(DEST_VIRTUAL_ENV)/bin/activate" -e "s|^VIRTUAL_ENV=.*|VIRTUAL_ENV=$(VIRTUAL_ENV)|"; \
+	ln -s "python$$(/opt/globus-python/bin/python3 -c 'import sys,platform; sys.stdout.write(".".join(platform.python_version_tuple()[:2]))')" "$(DEST_VIRTUAL_ENV)/lib/python"; \
+	ln -s ../../$(VIRTUAL_ENV)/bin/globus-compute-endpoint $(DEST_ROOT)/usr/sbin/globus-compute-endpoint; \
+	:
+
+.PHONY: override_dh_python3
+override_dh_python3:
+	dh_python3 --shebang=/opt/globus/bin/python
+
+.PHONY: override_dh_builddeb
+override_dh_builddeb:
+	dh_builddeb -- -Zxz
+
+%:
+	dh $@ --with python3 --with systemd

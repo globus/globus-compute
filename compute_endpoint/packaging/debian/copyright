@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: globus-compute-endpoint
+Source: https://github.com/funcx-faas/funcX/tree/main/compute_endpoint
+
+Files: *
+Copyright: © University of Chicago, Argonne National Laboratory
+License: Apache-2
