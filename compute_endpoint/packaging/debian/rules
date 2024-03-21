@@ -15,25 +15,20 @@ export DEB_BUILD_OPTIONS
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 name := globus-compute-endpoint
-versionedname := $(name)
-VIRTUAL_ENV := /opt/globus
+VIRTUAL_ENV := /opt/$(name)/venv-py39
 TMP_BUILD_DIR := debian/$(name)-tmp
 TMP_VIRTUAL_ENV := $(TMP_BUILD_DIR)$(VIRTUAL_ENV)
-DEST_ROOT := debian/$(versionedname)
+DEST_ROOT := debian/$(name)
 DEST_VIRTUAL_ENV := $(DEST_ROOT)$(VIRTUAL_ENV)
+PYTHON3 := /opt/globus-python/bin/python3
 
 _sysconfdir=/etc
 _sbindir=/usr/sbin
-_mandir=/usr/share/man
-_var=/var
 _unitdir=/lib/systemd/system
-_docdir=/usr/share/doc
-_httpd_confdir=$(_sysconfdir)/apache2/conf-available
-_completion_dir="${_sysconfdir}/bash_completion.d"
 
 .PHONY: override_dh_auto_configure
 override_dh_auto_configure:
-	/opt/globus-python/bin/python3 -mvenv $${PWD}/$(TMP_VIRTUAL_ENV)
+	$(PYTHON3) -mvenv $${PWD}/$(TMP_VIRTUAL_ENV)
 	. "$(TMP_VIRTUAL_ENV)/bin/activate"; \
 	set -x; \
 	python3 -mpip install --no-index --no-cache-dir -I --compile -U wheels/pip-*.whl; \
@@ -50,11 +45,10 @@ override_dh_shlibdeps:    # empty == we're ignoring it for our purposes.
 override_dh_auto_install:
 	set -ex; \
 	. "$(TMP_VIRTUAL_ENV)/bin/activate"; \
-	/opt/globus-python/bin/python3 -mvenv $${PWD}/$(TMP_VIRTUAL_ENV) ; \
+	$(PYTHON3) -mvenv $${PWD}/$(TMP_VIRTUAL_ENV) ; \
 	install -d -m 755 \
 	  "$(DEST_VIRTUAL_ENV)" \
 	  "$(DEST_ROOT)$(_sbindir)" \
-	  "$(DEST_ROOT)$(_mandir)" \
 	  "$(DEST_ROOT)$(_unitdir)"; \
 	install -m 755 "$${PWD}/package_shim.sh" "$(DEST_ROOT)$(_sbindir)/$(name)"
 	sed -i "$(DEST_ROOT)$(_sbindir)/$(name)" -e "s|@VIRTUAL_ENV@|$(VIRTUAL_ENV)|"
@@ -72,12 +66,12 @@ override_dh_auto_install:
 	rm -rf $(DEST_VIRTUAL_ENV)/systemd \
 	  $(DEST_VIRTUAL_ENV)/lib/python*/site-packages/tests; \
 	sed -i "$(DEST_VIRTUAL_ENV)/bin/activate" -e "s|^VIRTUAL_ENV=.*|VIRTUAL_ENV=$(VIRTUAL_ENV)|"; \
-	ln -s "python$$(/opt/globus-python/bin/python3 -c 'import sys,platform; sys.stdout.write(".".join(platform.python_version_tuple()[:2]))')" "$(DEST_VIRTUAL_ENV)/lib/python"; \
+	ln -s "python$$($(PYTHON3) -c 'import sys; print("{}.{}".format(*sys.version_info))')" "$(DEST_VIRTUAL_ENV)/lib/python"; \
 	:
 
 .PHONY: override_dh_python3
 override_dh_python3:
-	dh_python3 --shebang=/opt/globus/bin/python
+	dh_python3 --shebang=$(PYTHON3)
 
 .PHONY: override_dh_builddeb
 override_dh_builddeb:

@@ -1,0 +1,118 @@
+Name:           @PACKAGE_NAME@
+%define         _build_id_links         none
+%global         debug_package           %{nil}
+%global         version                 @VERSION@
+%global         pythonversion           py39
+%global         VIRTUAL_ENV             /opt/%{name}/venv-%{pythonversion}
+%global         src_dir                 %{_sourcedir}/%{name}
+%global         wheels                  %{src_dir}/wheels
+%global         package_executable      %{name}
+%global         globus_python3_version  3.9
+%global         __python                /opt/globus-python/bin/python3
+
+# We don't put our bits in the standard locations, so python_provides generation
+# is not useful (and super slow anyway!)
+%global __python_provides %{nil}
+
+# Don't generate automatic library requires/depends, since those shouldn't be visible
+# outside of this package
+%global __requires_exclude_from ^%{VIRTUAL_ENV}/.*$
+
+# Do not check .so files in an application-specific library directory
+# or any files in the application's data directory for provides
+%global __provides_exclude_from ^%{VIRTUAL_ENV}/.*\\.so.*$
+
+Version:        @VERSION@
+Release:        1%{?dist}
+Vendor:         %{?vendor}%{!?vendor:Unknown}
+Summary:        Globus Compute Endpoint agent for system-level installs
+
+Conflicts:      %{name} < %{version}
+Requires:       globus-python >= %{globus_python3_version}
+Requires(pre):  /usr/sbin/useradd, /usr/bin/getent
+Requires(postun): /usr/sbin/userdel
+
+Group:          System Environment/Daemons
+
+License:        Apache 2.0
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
+
+BuildRequires:  globus-python >= %{globus_python3_version}
+BuildRequires:  file
+
+%description
+An agent to receive tasks as sent from the Globus Compute SDK.
+This module is intended for system administrators; end-users will most-likely
+want to install the `%{name}` directly from PyPI.
+
+%prep
+%global DEST_VIRTUAL_ENV "$PWD/TMP_RPM_BUILD_ROOT%{VIRTUAL_ENV}"
+
+[ -f %{wheels}/@PACKAGE_WHEEL@ ] || {
+    C="" R=""
+    [ -t 2 ] && { C="\033[91;1;40m"; R="\033[m"; }
+    >&2 echo -e "${C}Main source wheel not found.  Reminder: the Makefile sets that up.  (Hint: make rpm)${R}";
+    exit 1
+}
+
+rm -rf "%{DEST_VIRTUAL_ENV}"
+%__python -mvenv "%{DEST_VIRTUAL_ENV}"
+
+%build
+. "%{DEST_VIRTUAL_ENV}/bin/activate"
+python3 -mpip uninstall -y pip
+unzip -d "%{DEST_VIRTUAL_ENV}"/lib/python*/site-packages %{wheels}/pip-*-py3-none-any.whl
+deactivate
+
+%install
+. "%{DEST_VIRTUAL_ENV}/bin/activate"
+python3 -mpip install --pre --compile --no-index --no-cache-dir -I --find-links=file://%{wheels} %{name}
+
+tar -C "${PWD}/TMP_RPM_BUILD_ROOT" -cf - . | tar -C "${RPM_BUILD_ROOT}" -xf -
+
+# Rewrite shbang or exec lines that refer to our build root
+for script in "${RPM_BUILD_ROOT}%{VIRTUAL_ENV}/bin/"*; do
+    if [ ! -L "$script" ] && [ -f "$script" ]; then
+        shbang="$(head -2c "$script")"
+        if [ "$shbang" = "#!" ]; then
+            sed -i "$script" -e "1,2s|${PWD}/TMP_RPM_BUILD_ROOT||"
+        fi
+    fi
+done
+
+deactivate
+sed -i "${RPM_BUILD_ROOT}%{VIRTUAL_ENV}/bin/activate" \
+    -e "s|^VIRTUAL_ENV=.*|VIRTUAL_ENV=%{VIRTUAL_ENV}|"
+
+rm -f $RPM_BUILD_ROOT%{VIRTUAL_ENV}/lib/python
+ln -s "python%{globus_python3_version}" "$RPM_BUILD_ROOT%{VIRTUAL_ENV}/lib/python"
+
+install -d -m 755 ${RPM_BUILD_ROOT}%{_sbindir}
+install -m 755 %{src_dir}/package_shim.sh "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}"
+sed -i "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}" -e "s|@VIRTUAL_ENV@|%{VIRTUAL_ENV}|"
+
+rm -rf ${RPM_BUILD_ROOT}%{VIRTUAL_ENV}%{_sysconfdir} ${RPM_BUILD_ROOT}%{VIRTUAL_ENV}%{_var}
+
+%pre
+
+%post
+
+%preun
+
+%postun
+
+%posttrans
+
+%files
+
+%defattr(-,root,root,-)
+%dir %{VIRTUAL_ENV}
+%{VIRTUAL_ENV}/*
+%{_sbindir}/%{package_executable}
+
+%changelog
+* Mon Apr 08 2024 Globus Support <support@globus.org> - @VERSION@-%{release}
+  * Initial release as an RPM package
+
+  * Includes support for multi-user Globus Compute Endpoints; see
+    https://globus-compute.readthedocs.io/ for more information.

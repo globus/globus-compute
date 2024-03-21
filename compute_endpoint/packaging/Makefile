@@ -3,8 +3,8 @@
 PYTHON3 := $(shell which /opt/globus-python/bin/python3 python3 | head -1)
 
 PY_FULL_VERSION := $$($(PYTHON3) -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
-PY_MAJOR_VERSION := $(shell echo $(PY_FULL_VERSION) | cut -d . -f1 )
-PY_MINOR_VERSION := $(shell echo $(PY_FULL_VERSION) | cut -d . -f2 )
+PY_MAJOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f1 )
+PY_MINOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f2 )
 PY_VERSION := $(PY_MAJOR_VERSION)$(PY_MINOR_VERSION)
 
 VIRTUALENV := venv-$(PY_VERSION)
@@ -15,13 +15,16 @@ VENV_PY := $(shell pwd)/$(VIRTUALENV)/bin/python
 # not so ideal, but at the moment, I don't know how to do better.  Hmm.
 ifeq ($(wildcard $(VENV_PY)),)
 	_DUMMY := $(shell $(PYTHON3) -mvenv "$(VIRTUALENV)")
-	_DUMMY := $(shell $(VENV_PY) -mpip install -U pip setuptools)
+	_DUMMY := $(shell $(VENV_PY) -mpip install -U pip -U setuptools)
 endif
 
+# "package name - dash" and "package name - underscore"
+PKG_NAME_D := $(shell cd ../; $(VENV_PY) setup.py --name)
+PKG_NAME_U := $(shell echo -n $(PKG_NAME_D) | tr '-' '_')
+
 PKG_VERSION := $(shell cd ../; $(VENV_PY) setup.py --version | tr '-' '~')
-PKG_NAME := $(shell cd ../; $(VENV_PY) setup.py --name | tr '-' '_')
-PKG_WHEEL = $(PKG_NAME)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
-PREREQS_TARBALL_NAME = $(PKG_NAME)-prereqs-py$(PY_VERSION)-$(PKG_VERSION).tar.xz
+PKG_WHEEL = $(PKG_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
+PREREQS_TARBALL_NAME = $(PKG_NAME_U)-prereqs-py$(PY_VERSION)-$(PKG_VERSION).tar.xz
 
 OS_CODENAME := $(shell test -f /etc/os-release && . /etc/os-release; echo $${VERSION_CODENAME:-focal})
 
@@ -52,7 +55,8 @@ show_vars:   ##-For debugging, show the Makefile variables; will install a venv
 	@echo "VIRTUALENV           : $(VIRTUALENV)"
 	@echo "VENV_PY              : $(VENV_PY)"
 	@echo "VENV_PIP             : $(VENV_PIP)"
-	@echo "PKG_NAME             : $(PKG_NAME)"
+	@echo "PKG_NAME_D           : $(PKG_NAME_D)"
+	@echo "PKG_NAME_U           : $(PKG_NAME_U)"
 	@echo "PKG_VERSION          : $(PKG_VERSION)"
 	@echo "PREREQS_TARBALL_NAME : $(PREREQS_TARBALL_NAME)"
 	@echo "PKG_WHEEL            : $(PKG_WHEEL)"
@@ -66,10 +70,18 @@ clean:  ##-Remove the venv, build/ dist/, prereqs tarball, and the package wheel
 
 .PHONY: distclean
 distclean: clean  ##-Run `clean` target, then additionally remove venv-*, *tar.xz, *whl
-	rm -rf -- venv-* "$(PKG_NAME)"-*tar.xz "$(PKG_NAME)"-*whl
+	rm -rf -- venv-* "$(PKG_NAME_U)"-*tar.xz "$(PKG_NAME_U)"-*whl
+
+_build_needs:
+	@/bin/echo -e "\033[36;1;40mChecking build dependencies before starting build\033[m ...\n"
+	@[ -x "$$(which git)" ] || { echo "'git' not found; missing 'git' package?"; exit 1; }
+	@[ -x "$$(which xz)" ] || { echo "'xz' not found; missing 'xz' package?"; exit 1; }
+	@[ -x "$$(which sed)" ] || { echo "'sed' not found; missing 'sed' package?"; exit 1; }
+	@[ -x "$$(which tar)" ] || { echo "'tar' not found; missing 'tar' package?"; exit 1; }
+	@[ -x "$(PYTHON3)" ] || { echo "Python interpreter not found ('$(PYTHON3)'); try 'make show_vars' for insight?"; exit 1; }
 
 .PHONY: $(VENV_PY)
-$(VENV_PY):
+$(VENV_PY): _build_needs
 	@if [ "$(PY_MAJOR_VERSION)" -ne 3 ] || [ "$(PY_MINOR_VERSION)" -lt 9 ]; then \
 		echo "Unsupported python version $(PY_FULL_VERSION). At least 3.9 is required."; \
 		echo "To override python path, use the following"; \
@@ -78,7 +90,7 @@ $(VENV_PY):
 	fi
 	$(PYTHON3) -mvenv $(VIRTUALENV)
 	. $(VIRTUALENV)/bin/activate
-	@$(VENV_PY) -m pip install -U pip setuptools
+	@$(VENV_PY) -m pip install -U pip -U setuptools -U build
 
 $(PKG_WHEEL): $(VENV_PY)
 	(   rm -rf build/ \
@@ -86,10 +98,9 @@ $(PKG_WHEEL): $(VENV_PY)
 	 && cd build/compute_endpoint/ \
 	 && echo -n "    Git Tag: " \
 	 && if ! git describe --tags --exact-match; then \
-	   { echo "\nBUILD COMPUTE FROM A RELEASE TAG (current branch: $$(git branch --show-current))"; exit 1; } \
+	   { /bin/echo -e "\nBUILD COMPUTE FROM A RELEASE TAG (current branch: $$(git branch --show-current))"; exit 1; } \
 	    fi \
 	 && rm -rf tests/ \
-	 && $(VENV_PY) -m pip install build \
 	 && $(VENV_PY) -m build --wheel -o ../../ \
 	)
 
@@ -105,23 +116,46 @@ dist: $(PREREQS_TARBALL_NAME)  ##-Make the dist/ directory with prereqs and whee
 	  && mkdir dist/ \
 	  && cp $(PREREQS_TARBALL_NAME) $(PKG_WHEEL) dist/
 
-deb_build_needs:  ##-Check that necessary executables are available before starting the build.
-	@echo "\033[36;1;40mChecking build dependencies before starting build\033[39;49m ...\n"
-	@[ -x "$$(which dpkg-checkbuilddeps)" ] || { echo "Missing 'dpkg-dev' package"; exit 1; }
+deb_build_needs:  ##-Check that necessary executables are available before starting the DEB build.
+	@[ -x "$$(which dpkg-checkbuilddeps)" ] || { echo "'dpkg-checkbuilddeps' not found; missing 'dpkg-dev' package?"; exit 1; }
 	@dpkg-checkbuilddeps
 
 deb: deb_build_needs dist  ##-Build a Debian package of the Globus Compute Endpoint (.deb)
 	(   cd dist/ \
 	 && rm -rf debbuild/ \
-	 && mkdir -p debbuild/globus-compute-endpoint/wheels/ \
-	 && tar -C debbuild/globus-compute-endpoint/wheels/ --strip 1 -xf "$(PREREQS_TARBALL_NAME)" \
-	 && cp -R ../debian debbuild/globus-compute-endpoint/ \
-	 && cp $(PKG_WHEEL) debbuild/globus-compute-endpoint/wheels/ \
-	 && cp ../package_shim.sh debbuild/globus-compute-endpoint/ \
-	 && cd debbuild/globus-compute-endpoint/ \
+	 && mkdir -p debbuild/$(PKG_NAME_D)/wheels/ \
+	 && tar -C debbuild/$(PKG_NAME_D)/wheels/ -xf "$(PREREQS_TARBALL_NAME)" \
+	 && cp $(PKG_WHEEL) debbuild/$(PKG_NAME_D)/wheels/ \
+	 && cp -R ../debian debbuild/$(PKG_NAME_D)/ \
+	 && cp ../package_shim.sh debbuild/$(PKG_NAME_D)/ \
+	 && cd debbuild/$(PKG_NAME_D)/ \
 	 && mv debian/changelog.in.in debian/changelog \
-	 && sed -i -e "s/@VERSION@/$(PKG_VERSION)/g" -e "s/@distro@/$(OS_CODENAME)/g" debian/changelog \
+	 && sed -i debian/changelog \
+	    -e "s/@VERSION@/$(PKG_VERSION)/g" \
+	    -e "s/@distro@/$(OS_CODENAME)/g" \
 	 && dpkg-buildpackage -uc -us \
 	)
 	@echo "\nDEB package successfully built:"
 	@ls -lh dist/debbuild/*deb
+
+rpm_build_needs:  ##-Check that necessary executables are available before starting the RPM build.
+	@[ -x "$$(which rpmbuild)" ] || { echo "'rpmbuild' not found; missing 'rpmdevtools' package?"; exit 1; }
+
+
+rpm: rpm_build_needs dist  ##-Build an RPM package of the Globus Compute Endpoint (.rpm)
+	(   cd dist/ \
+	 && pwd && ls \
+	 && rm -rf rpmbuild/ \
+	 && mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SPECS,SRPMS} rpmbuild/SOURCES/$(PKG_NAME_D)/wheels \
+	 && tar -C rpmbuild/SOURCES/$(PKG_NAME_D)/wheels -xf "$(PREREQS_TARBALL_NAME)" \
+	 && cp $(PKG_WHEEL) rpmbuild/SOURCES/$(PKG_NAME_D)/wheels/ \
+	 && cp ../package_shim.sh rpmbuild/SOURCES/$(PKG_NAME_D)/ \
+	 && sed \
+	    -e "s/@VERSION@/$(PKG_VERSION)/g" \
+	    -e "s/@PACKAGE_NAME@/$(PKG_NAME_D)/g" \
+	    -e "s/@PACKAGE_WHEEL@/$(PKG_WHEEL)/g" \
+	    < ../fedora/$(PKG_NAME_D).spec.in > ./$(PKG_NAME_D).spec \
+	 && HOME="$$(pwd)" rpmbuild -ba ./$(PKG_NAME_D).spec \
+	)
+	@echo -e "\nRPM package successfully built:"
+	@ls -lh dist/rpmbuild/RPMS/**/*rpm

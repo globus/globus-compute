@@ -58,7 +58,7 @@ shift 1
 
 # RPM and DEB packages don't understand -prerelease bits from semver spec, so
 # replace with ~ that works almost the same
-py_full_version=$(python3 -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
+py_full_version=$("$PYTHON_BIN" -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
 [[ -z $py_version ]] && py_version="$(echo "$py_full_version" | cut -d . -f1,2 | tr -d '.')"
 [[ -z $pkg_version ]] && pkg_version="$(cd "$src_dir"; "$PYTHON_BIN" setup.py --version | tr '-' '~')"
 [[ -z $pkg_name ]] && pkg_name="$(cd "$src_dir"; "$PYTHON_BIN" setup.py --name | tr '-' '_')"
@@ -90,15 +90,12 @@ done > dependent-prereqs.txt
 
 modified_time="$(TZ=UTC0 date --rfc-3339=seconds)"
 
-(find "$download_dir/" -print0 | TZ=UTC0 tar --format=posix \
+TZ=UTC0 tar -C "$download_dir/" --format=posix \
   --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime,delete=mtime \
-  --null \
   --mtime="$modified_time" \
   --numeric-owner \
   --owner=0 \
   --group=0 \
   --mode="go-rwx,u+rw" \
-  --files-from - \
-  -cf - \
+  -cf - . \
   | xz -9
-)
