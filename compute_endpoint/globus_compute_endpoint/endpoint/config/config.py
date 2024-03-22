@@ -23,25 +23,14 @@ class Config(RepresentationMixin):
         Default: [GlobusComputeEngine()]
 
     environment: str
-        Environment the endpoint should connect to. Sets funcx_service_address and
-        results_ws_uri unless they are also specified. If not specified, the endpoint
+        Environment the endpoint should connect to. If not specified, the endpoint
         connects to production.
         Default: None
 
-    funcx_service_address: str | None
-        URL address string of the Globus Compute service to which the Endpoint
-        should connect.
+    local_compute_services: bool
+        Point the endpoint to a local instance of the Compute services (for Compute
+        developers).
         Default: None
-
-    results_ws_uri: str | None
-        URL address string of the Globus Compute websocket service passed to the
-        Globus Compute client.
-        Default: None
-
-    warn_about_url_mismatch: Bool
-        Log a warning if funcx_service_address and results_ws_uri appear to point to
-        different environments.
-        Default: False
 
     heartbeat_period: int (seconds)
         The interval at which heartbeat messages are sent from the endpoint to the
@@ -150,7 +139,7 @@ class Config(RepresentationMixin):
         executors: list = _DEFAULT_EXECUTORS,
         # Connection info
         environment: str | None = None,
-        funcx_service_address=None,
+        local_compute_services: bool = False,
         multi_user: bool | None = None,
         public: bool | None = None,
         allowed_functions: list[str] | None = None,
@@ -176,16 +165,6 @@ class Config(RepresentationMixin):
         stderr="./endpoint.log",
         **kwargs,
     ):
-        for deprecated_name in ("results_ws_uri", "warn_about_url_mismatch"):
-            if deprecated_name in kwargs:
-                caller_filename = inspect.stack()[1].filename
-                msg = (
-                    f"The '{deprecated_name}' argument is deprecated.  It will"
-                    f" be removed in a future release.  Found in: {caller_filename}"
-                )
-                warnings.warn(msg)
-                del kwargs[deprecated_name]
-
         # A temporary measure; at some point in the near future, we'll split out
         # multi-user from single-user configs.  At that point, this particular stanza
         # will be incorporated more naturally into the multi-user handling.  Meanwhile,
@@ -213,7 +192,7 @@ class Config(RepresentationMixin):
 
         # Connection info
         self.environment = environment
-        self.funcx_service_address = funcx_service_address
+        self.local_compute_services = local_compute_services
 
         # Multi-user tuning
         self.multi_user = multi_user is True

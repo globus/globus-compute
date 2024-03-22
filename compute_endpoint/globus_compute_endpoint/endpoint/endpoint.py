@@ -319,12 +319,10 @@ class Endpoint:
     @staticmethod
     def get_funcx_client(config: Config | None) -> Client:
         if config:
-            funcx_client_options = {
-                "funcx_service_address": config.funcx_service_address,
-                "environment": config.environment,
-            }
-
-            return Client(**funcx_client_options)
+            return Client(
+                local_compute_services=config.local_compute_services,
+                environment=config.environment,
+            )
         else:
             return Client()
 

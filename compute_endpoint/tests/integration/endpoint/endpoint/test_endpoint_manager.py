@@ -157,7 +157,7 @@ class TestStart:
         mock_zmq_load.assert_called_with("public/key/file")
 
         funcx_client_options = {
-            "funcx_service_address": endpoint_config.config.funcx_service_address,
+            "local_compute_services": endpoint_config.config.local_compute_services,
         }
 
         mock_daemon.assert_called_with(
@@ -292,7 +292,7 @@ class TestStart:
         mock_zmq_load.assert_called_with("public/key/file")
 
         funcx_client_options = {
-            "funcx_service_address": endpoint_config.config.funcx_service_address,
+            "local_compute_services": endpoint_config.config.local_compute_services,
         }
 
         # We should expect reg_info in this test to be None when passed into

@@ -99,7 +99,6 @@ class ConfigModel(BaseConfigModel):
     engine: t.Optional[EngineModel]
     display_name: t.Optional[str]
     environment: t.Optional[str]
-    funcx_service_address: t.Optional[str]
     multi_user: t.Optional[bool]
     allowed_functions: t.Optional[t.List[str]]
     heartbeat_period: t.Optional[int]

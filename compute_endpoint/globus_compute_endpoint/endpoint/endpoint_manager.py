@@ -146,12 +146,10 @@ class EndpointManager:
 
         if not reg_info:
             try:
-                client_options = {
-                    "funcx_service_address": config.funcx_service_address,
-                    "environment": config.environment,
-                }
-
-                gcc = GC.Client(**client_options)
+                gcc = GC.Client(
+                    local_compute_services=config.local_compute_services,
+                    environment=config.environment,
+                )
                 reg_info = gcc.register_endpoint(
                     name=conf_dir.name,
                     endpoint_id=endpoint_uuid,
@@ -500,7 +498,7 @@ class EndpointManager:
         parent_identities = set()
         if not is_privileged():
             client_options = {
-                "funcx_service_address": self._config.funcx_service_address,
+                "local_compute_services": self._config.local_compute_services,
                 "environment": self._config.environment,
             }
             log.debug("Ascertaining user identity set (%s)", client_options)

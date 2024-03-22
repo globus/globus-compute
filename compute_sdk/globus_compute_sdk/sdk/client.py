@@ -49,7 +49,7 @@ class Client:
         funcx_home=None,
         environment: str | None = None,
         task_group_id: t.Union[None, uuid.UUID, str] = None,
-        funcx_service_address: str | None = None,
+        local_compute_services: bool = False,
         do_version_check: bool = True,
         *,
         code_serialization_strategy: SerializationStrategy | None = None,
@@ -72,8 +72,7 @@ class Client:
             DEPRECATED - was never used
 
         environment: str
-            For internal use only. The name of the environment to use. Sets
-            funcx_service_address appropriately, unless already set.
+            For internal use only. The name of the environment to use.
 
         task_group_id: str|uuid.UUID
             Set the TaskGroup ID (a UUID) for this Client instance.
@@ -83,8 +82,8 @@ class Client:
 
             DEPRECATED - use create_batch or the executor instead
 
-        funcx_service_address: str
-            For internal use only. The address of the web service.
+        local_compute_services: str
+            For internal use only. TODO
 
         do_version_check: bool
             Set to ``False`` to skip the version compatibility check on client
@@ -122,8 +121,9 @@ class Client:
             )
             warnings.warn(msg)
 
-        if funcx_service_address is None:
-            funcx_service_address = get_web_service_url(environment)
+        self.web_service_address = get_web_service_url(
+            "local" if local_compute_services else environment
+        )
 
         self._task_status_table: dict[str, dict] = {}
 
@@ -137,14 +137,12 @@ class Client:
             self.login_manager.ensure_logged_in()
 
         self.web_client = self.login_manager.get_web_client(
-            base_url=funcx_service_address
+            base_url=self.web_service_address
         )
         self.fx_serializer = ComputeSerializer(
             strategy_code=code_serialization_strategy,
             strategy_data=data_serialization_strategy,
         )
-
-        self.funcx_service_address = funcx_service_address
 
         self._version_mismatch_already_warned_eps: t.Set[str | None] = set()
 
