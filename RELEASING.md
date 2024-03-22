@@ -19,21 +19,15 @@ You will also need the following credentials:
 - pypi credentials for use with `twine` (e.g. a token in `~/.pypirc`) valid for
     publishing `globus-compute-sdk` and `globus-compute-endpoint`
 
-##
+## Procedure
 
-Easy copy for editing all the version files:
+1. Bump versions of both packages to a new latest version number.  This is
+   the next higher alpha version number like 2.16.0a1 if 2.16.0a0 already
+   exists, or <X>.<Y+1>.<Z>a0 if this will be the first alpha release for an
+   upcoming production release when the existing PyPI version is <X>.<Y>.<Z>
 
 ```bash
 $EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
-```
-
-## Procedure
-
-1. Bump versions of both packages to a new latest version number by removing
-   the `-dev` suffix
-
-```bash
-$EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
 ```
 
 2. Update the changelog by running `scriv collect --edit`
