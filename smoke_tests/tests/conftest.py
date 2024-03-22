@@ -109,12 +109,9 @@ def pytest_addoption(parser):
         "--endpoint", metavar="endpoint", help="Specify an active endpoint UUID"
     )
     parser.addoption(
-        "--service-address",
-        metavar="service-address",
-        help="Specify a Globus Compute service address",
-    )
-    parser.addoption(
-        "--ws-uri", metavar="ws-uri", help="WebSocket URI to get task results"
+        "--local-compute-services",
+        action="store_true",
+        help="Point smoke tests to local instance of the Compute services",
     )
 
 
@@ -186,16 +183,13 @@ def compute_test_config(pytestconfig, compute_test_config_name):
 
     # set URIs if passed
     client_args = config["client_args"]
-    ws_uri = pytestconfig.getoption("--ws-uri")
-    api_uri = pytestconfig.getoption("--service-address")
+    local_compute_services = pytestconfig.getoption("--local-compute-services")
 
     # env vars to allow use of client creds in GitHub Actions
     api_client_id = os.getenv("FUNCX_SMOKE_CLIENT_ID")
     api_client_secret = os.getenv("FUNCX_SMOKE_CLIENT_SECRET")
-    if ws_uri:
-        client_args["results_ws_uri"] = ws_uri
-    if api_uri:
-        client_args["funcx_service_address"] = api_uri
+    if local_compute_services:
+        client_args["local_compute_services"] = local_compute_services
 
     # Manually add the env here in case the GH actions yaml doesn't pick it up
     sdk_env = client_args.get("environment")

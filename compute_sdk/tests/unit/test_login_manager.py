@@ -298,7 +298,7 @@ def test_requires_login_decorator(mocker, logman):
 
     class MockClient:
         login_manager = logman
-        funcx_service_address = "127.0.0.1"
+        web_service_address = "127.0.0.1"
         upstream_call = requires_login(mock_method)
 
     mock_client = MockClient()

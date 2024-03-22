@@ -457,7 +457,6 @@ def test_sends_data_during_registration(
         "stdout",
         "stderr",
         "environment",
-        "funcx_service_address",
     ):
         assert key in k["metadata"]["config"]
 

@@ -87,7 +87,6 @@ class GlobusComputeEngineBase(ABC):
         # remove these unused vars that we are adding to just keep
         # endpoint interchange happy
         self.container_type: t.Optional[str] = None
-        self.funcx_service_address: t.Optional[str] = None
         self.run_dir: t.Optional[str] = None
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.

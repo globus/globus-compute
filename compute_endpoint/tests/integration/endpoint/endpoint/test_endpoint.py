@@ -36,10 +36,10 @@ def patch_compute_client(mocker):
     )
 
     gcc = globus_compute_sdk.Client(
-        funcx_service_address=_SVC_ADDY,
         do_version_check=False,
         login_manager=mock.Mock(),
     )
+    gcc.web_service_address = _SVC_ADDY
     gcc.web_client = WebClient(base_url=_SVC_ADDY)
 
     yield mocker.patch(f"{_MOCK_BASE}Client", return_value=gcc)

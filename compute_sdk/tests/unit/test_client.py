@@ -42,7 +42,7 @@ def test_client_warns_on_unknown_kwargs(kwargs):
     known_kwargs = [
         "funcx_home",
         "environment",
-        "funcx_service_address",
+        "local_compute_services",
         "do_version_check",
         "code_serialization_strategy",
         "data_serialization_strategy",
@@ -60,9 +60,8 @@ def test_client_warns_on_unknown_kwargs(kwargs):
 
 @pytest.mark.parametrize("env", [None, "local", "dev", "production"])
 @pytest.mark.parametrize("usage_method", ["env_var", "param"])
-@pytest.mark.parametrize("explicit_params", [None, "web"])
 def test_client_init_sets_addresses_by_env(
-    monkeypatch, env, usage_method, explicit_params, randomstring
+    monkeypatch, env, usage_method, randomstring
 ):
     if env in (None, "production"):
         web_uri = "https://compute.api.globus.org"
@@ -87,18 +86,10 @@ def test_client_init_sets_addresses_by_env(
     else:
         raise NotImplementedError
 
-    # create the client, either with just the input env or with explicit parameters
-    # for explicit params, alter the expected URI(s)
-    if not explicit_params:
-        client = gc.Client(**kwargs)
-    elif explicit_params == "web":
-        web_uri = f"http://{randomstring()}.fqdn:1234/{randomstring()}"
-        client = gc.Client(funcx_service_address=web_uri, **kwargs)
-    else:
-        raise NotImplementedError
+    client = gc.Client(**kwargs)
 
     # finally, confirm that the address was set correctly
-    assert client.funcx_service_address == web_uri
+    assert client.web_service_address == web_uri
 
 
 @pytest.mark.parametrize(
