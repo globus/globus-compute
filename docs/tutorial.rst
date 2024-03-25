@@ -146,7 +146,7 @@ Functions with dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to execute a function on a remote endpoint, Globus Compute
-requires that functions explictly state all dependencies within the
+requires that functions explicitly state all dependencies within the
 function body. It also requires that any dependencies (e.g., libraries,
 modules) are available on the endpoint on which the function will
 execute. For example, in the following function, we explicitly import
@@ -179,6 +179,48 @@ command.
     future = gce.submit(echo, "World")
 
     print("Echo output: ", future.result())
+
+Running Parsl workflows
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Globus Compute enables remote execution of `Parsl workflows
+<https://parsl.readthedocs.io/en/stable/1-parsl-introduction.html#Composing-a-workflow>`_,
+which utilize `Parsl Apps <https://parsl.readthedocs.io/en/stable/1-parsl-introduction.html#Apps>`_.
+
+The recommended setup is to run your Globus Compute endpoint with
+default configuration on a login node, then allow Parsl to handle
+provider configuration, etc.
+
+Below is a simple example. Note that we are returning a result, not
+a ``Future``. The latter will cause serialization issues.
+
+.. code:: python
+
+    def workflow(n1, n2):
+        import parsl
+        from parsl.app.app import python_app, join_app
+
+        # First call clear() to avoid conflicts with existing
+        # global config variables
+        parsl.clear()
+        parsl.load()
+
+        @python_app
+        def add(n1, n2):
+            return n1 + n2
+
+        @python_app
+        def double(n):
+            return n*2
+
+        @join_app
+        def calc(n1, n2):
+            return double(add(n1, n2))
+
+        # Returning a Future will cause serialization issues
+        return calc(n1, n2).result()
+
+    f = gce.submit(workflow, 1, 2)
 
 Running functions many times
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
