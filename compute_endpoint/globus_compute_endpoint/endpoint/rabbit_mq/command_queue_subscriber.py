@@ -27,7 +27,7 @@ class CommandQueueSubscriber(threading.Thread):
         command_queue: queue.SimpleQueue[tuple[int, BasicProperties, bytes]],
         stop_event: threading.Event,
         poll_period_s: float = 0.5,
-        connect_attempt_limit: int = 3,
+        connect_attempt_limit: int = 7200,
         channel_close_window_s: int = 10,
         channel_close_window_limit: int = 3,
         thread_name: str | None = None,
@@ -115,11 +115,21 @@ class CommandQueueSubscriber(threading.Thread):
             self._connection_tries += 1
             try:
                 log.debug(
-                    "%s Opening connection to AMQP service.  Attempt: %s (of %s)",
+                    "%r Opening connection to AMQP service.  Attempt: %s (of %s)",
                     self,
                     self._connection_tries,
                     self.connect_attempt_limit,
                 )
+                if not log.isEnabledFor(logging.DEBUG):
+                    if self._connection_tries == 1:
+                        log.info(f"{self!r} Opening connection to AMQP service.")
+                    elif self._connection_tries == 2:
+                        log.info(
+                            f"{self!r} Opening connection to AMQP service (second"
+                            " attempt).  Will continue for up to"
+                            f" {self.connect_attempt_limit} attempts.  To log all"
+                            f" attempts, use `--debug`."
+                        )
                 self._connection = self._connect()
                 self._event_watcher()
                 self._connection.ioloop.start()
@@ -142,20 +152,28 @@ class CommandQueueSubscriber(threading.Thread):
         pid = f"(pid: {os.getpid()})"
         exc_text = f"Failed to open connection - ({exc.__class__.__name__}) {exc}"
         msg = f"{count} {pid} {exc_text}"
-        log.debug("%s %s", self, msg)
+        log.debug("%r %s", self, msg)
+        if self._connection_tries == 1:
+            log.warning(f"{self!r} {msg}")
 
         if not (self._connection_tries < self.connect_attempt_limit):
             self._stop_event.set()
-            log.warning("%s %s", self, msg)
+            log.error(f"{self!r} {msg}")
         mq_conn.ioloop.stop()
 
     def _on_connection_closed(self, mq_conn: pika.BaseConnection, exc: Exception):
-        log.debug("%s Connection closed: %s", self, exc)
+        msg_fmt = "%r Connection closed: %s"
+        log.debug(msg_fmt, self, exc)
+        if self._connection_tries == 1:
+            # if 1, then we've not been stable for more than 60s (see _event_watcher)
+            log.info(msg_fmt, self, exc)
+            log.warning(f"{self!r} Unable to sustain connection; retrying ...")
+
         self._consumer_tag = None
         mq_conn.ioloop.stop()
 
     def _on_connection_open(self, _mq_conn: pika.BaseConnection):
-        log.debug("%s Connection established; creating channel", self)
+        log.debug("%r Connection established; creating channel", self)
         self._open_channel()
 
     def _open_channel(self):
@@ -169,7 +187,7 @@ class CommandQueueSubscriber(threading.Thread):
         mq_chan.add_on_cancel_callback(self._on_consumer_cancelled)
 
         log.debug(
-            "%s Channel %s opened (%s)",
+            "%r Channel %s opened (%s)",
             self,
             mq_chan.channel_number,
             mq_chan.connection.params,
@@ -216,7 +234,8 @@ class CommandQueueSubscriber(threading.Thread):
             )
             self._stop_ioloop()
         else:
-            log.debug("%s Awaiting messages", self)
+            qname = self.queue_info["queue"]
+            log.info(f"{self!r} Awaiting messages from queue: {qname}")
 
     def _on_message(
         self,
@@ -287,7 +306,7 @@ class CommandQueueSubscriber(threading.Thread):
     def _event_watcher(self):
         """Polls the stop_event periodically to trigger a shutdown"""
         if self._stop_event.is_set():
-            log.debug("%s Shutting down per stop event", self)
+            log.debug("%r Shutting down per stop event", self)
             self._stop_ioloop()
             return
 
@@ -296,6 +315,9 @@ class CommandQueueSubscriber(threading.Thread):
             if time.time() - self._connected_at > 60:
                 # ... and connection stable for 60s; good to reset connection tries
                 self._connection_tries = 0
+                log.debug(
+                    "%r Connection deemed stable; resetting connection tally", self
+                )
 
         delivery_tags = []
         try:
@@ -307,6 +329,6 @@ class CommandQueueSubscriber(threading.Thread):
             delivery_tags.sort()  # nominally a no-op
             latest_msg_id = delivery_tags[-1]
             self._channel.basic_ack(latest_msg_id, multiple=True)
-            log.debug("%s Acknowledged through message: %s", self, latest_msg_id)
+            log.debug("%r Acknowledged through message: %s", self, latest_msg_id)
 
         self._connection.ioloop.call_later(self._poll_period_s, self._event_watcher)

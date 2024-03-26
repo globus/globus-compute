@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import random
+import threading
 from concurrent.futures import Future
 from unittest import mock
 
@@ -10,7 +13,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 )
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.rabbit_mq.result_publisher."
-q_info = {"queue_publish_kwargs": {}}
+q_info = {"queue_publish_kwargs": {"exchange": "results"}, "exchange": "results"}
 
 
 @pytest.fixture
@@ -43,6 +46,32 @@ def test_rp_verifies_queue(randomstring):
     _a, k = mock_channel.queue_declare.call_args
     assert k["passive"] is True, "endpoint should not create queue"
     assert k["queue"] == queue_info["queue"]
+
+
+@pytest.mark.parametrize("attempt_limit", (random.randint(2, 50),))
+def test_rp_stops_if_unable_to_connect(mocker, randomstring, attempt_limit):
+    mock_rnd = mocker.patch(f"{_MOCK_BASE}random", spec=random)
+    mock_rnd.uniform.return_value = 0  # don't wait during test
+    mock_stop = mock.Mock(spec=threading.Event)
+    mock_stop.is_set.return_value = False
+    mock_stop.wait.return_value = None
+    queue_info = {"queue": randomstring(), **q_info}
+
+    rp = ResultPublisher(queue_info=queue_info, connect_attempt_limit=attempt_limit)
+    rp._connect = mock.Mock(spec=ResultPublisher._connect)
+    rp._stop_event = mock_stop
+    rp.run()
+    assert mock_rnd.uniform.call_count == attempt_limit - 1, "Random idle"
+    assert rp._connection_tries >= attempt_limit
+    assert rp._stop_event.wait.call_count == attempt_limit, "Should idle"
+
+
+def test_rp_connect_limit_very_high_sc30467(randomstring):
+    queue_info = {"queue": randomstring(), **q_info}
+    rp = ResultPublisher(queue_info=queue_info)
+    assert (
+        rp.connect_attempt_limit >= 5000
+    ), "Some very high limit as RMQ can be down for awhile; SC-30467"
 
 
 def test_rp_new_channel_resets_delivery_index():
@@ -217,3 +246,33 @@ def test_rp_publish_enqueues_message(randomstring):
     res = randomstring()
     f_enqueued.set_result(res)
     assert f.result() == res
+
+
+@pytest.mark.parametrize("attempt_limit", (random.randint(3, 50),))
+def test_rp_on_connection_closed_logs(mock_log, attempt_limit):
+    assert attempt_limit > 2, "At least 3 states tested"
+
+    exc = pika.exceptions.ChannelClosedByClient(200, "Some text")
+    cq = ResultPublisher(queue_info={**q_info})
+    mock_conn = mock.Mock(spec=pika.BaseConnection)
+    assert not mock_log.debug.called, "Verify test setup"
+    cq._on_connection_closed(mock_conn, exc)
+
+    assert mock_log.debug.called
+    assert not mock_log.info.called, "Healthy shutdown not concerning"
+    assert not mock_log.warning.called, "Healthy shutdown not concerning"
+
+    mock_log.reset_mock()
+    cq._connection_tries += 1  # now at == 1
+    cq._on_connection_closed(mock_conn, exc)
+    assert mock_log.debug.called, "Debug always emitted"
+    assert mock_log.info.called, "Inform user after unexpected close"
+    assert mock_log.warning.called, "Inform user can't sustain connection"
+
+    for _i in range(attempt_limit - 2):
+        mock_log.reset_mock()
+        cq._connection_tries += 1  # now at > 1
+        cq._on_connection_closed(mock_conn, exc)
+        assert mock_log.debug.called, "Debug always emitted"
+        assert not mock_log.info.called, "Log informed; don't spam it"
+        assert not mock_log.warning.called, "Log informed; don't spam it"

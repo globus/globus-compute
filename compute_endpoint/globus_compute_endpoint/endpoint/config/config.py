@@ -165,16 +165,6 @@ class Config(RepresentationMixin):
         stderr="./endpoint.log",
         **kwargs,
     ):
-        # A temporary measure; at some point in the near future, we'll split out
-        # multi-user from single-user configs.  At that point, this particular stanza
-        # will be incorporated more naturally into the multi-user handling.  Meanwhile,
-        # `cqs_kwargs` and `rp_kwargs` are interfaces to internal class instantiations
-        # for the multi-user endpoint; for now, I intend these to be "hidden" keys (or
-        # at least not advertised, and will change, and will eat your cat if you touch
-        # them).
-        _internal = kwargs.pop("_internal", {})
-        self._cqs_kwargs = _internal.pop("cqs_kwargs", None)
-        self._rp_kwargs = _internal.pop("rp_kwargs", None)
 
         for unknown_arg in kwargs:
             # Calculated multiple times, but only in errant case -- nominally

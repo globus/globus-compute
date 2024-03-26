@@ -35,7 +35,7 @@ class ResultPublisher(threading.Thread):
         *,
         queue_info: dict,
         poll_period_s: float = 0.5,
-        connect_attempt_limit: int = 5,
+        connect_attempt_limit: int = 7200,
         channel_close_window_s: int = 10,
         channel_close_window_limit: int = 3,
     ):
@@ -131,6 +131,17 @@ class ResultPublisher(threading.Thread):
                     self._connection_tries,
                     self.connect_attempt_limit,
                 )
+                if self._connection_tries == 1:
+                    log.info(f"{self!r} Opening connection to AMQP service.")
+                elif self._connection_tries == 2 and not log.isEnabledFor(
+                    logging.DEBUG
+                ):
+                    log.info(
+                        f"{self!r} Opening connection to AMQP service (second"
+                        " attempt).  Will continue for up to"
+                        f" {self.connect_attempt_limit} attempts.  To log all attempts,"
+                        " use `--debug`."
+                    )
                 self._connected_at = None
                 self._mq_conn = self._connect()
                 self._event_watcher()
@@ -160,26 +171,32 @@ class ResultPublisher(threading.Thread):
             on_open_error_callback=self._on_open_failed,
         )
 
-    def _on_open_failed(self, _mq_conn: pika.BaseConnection, exc: str | Exception):
-        assert self._mq_conn is not None, "Strictly called _by_ ioloop"
+    def _on_open_failed(self, mq_conn: pika.BaseConnection, exc: str | Exception):
         count = f"[attempt {self._connection_tries} (of {self.connect_attempt_limit})]"
         pid = f"(pid: {os.getpid()})"
         exc_text = f"Failed to open connection - ({exc.__class__.__name__}) {exc}"
         msg = f"{count} {pid} {exc_text}"
-        log.debug(msg)
+        log.debug("%r, %s", self, msg)
+        if self._connection_tries == 1:
+            log.warning(f"{self!r} {msg}")
 
         if not (self._connection_tries < self.connect_attempt_limit):
-            log.warning(msg)
+            log.error(msg)
             if not isinstance(exc, Exception):
                 exc = Exception(str(exc))
             self._cancellation_reason = exc
-        self._mq_conn.ioloop.stop()
+        mq_conn.ioloop.stop()
 
-    def _on_connection_closed(self, _mq_conn: pika.BaseConnection, exc: Exception):
-        assert self._mq_conn is not None, "Strictly called _by_ ioloop"
-        log.debug("%r Connection closed: %s", self, exc)
+    def _on_connection_closed(self, mq_conn: pika.BaseConnection, exc: Exception):
+        msg_fmt = "%r Connection closed: %s"
+        log.debug(msg_fmt, self, exc)
+        if self._connection_tries == 1:
+            # if 1, then we've not been stable for more than 60s (see _event_watcher)
+            log.info(msg_fmt, self, exc)
+            log.warning(f"{self!r} Unable to sustain connection; retrying ...")
+
         self.status = RabbitPublisherStatus.closed
-        self._mq_conn.ioloop.stop()
+        mq_conn.ioloop.stop()
 
     def _on_connection_open(self, _mq_conn: pika.BaseConnection):
         log.debug("%r Connection established; creating channel", self)
@@ -247,6 +264,8 @@ class ResultPublisher(threading.Thread):
         self._mq_chan.confirm_delivery(self._on_delivery)
         self.status = RabbitPublisherStatus.connected
         self._connected_at = time.time()
+        exch = self.queue_info["exchange"]
+        log.info(f"{self!r} Ready to send results to exchange: {exch}")
 
     def _on_delivery(self, frame: Method):
         """
@@ -283,7 +302,7 @@ class ResultPublisher(threading.Thread):
 
     def _event_watcher(self):
         if self._stop_event.is_set():
-            log.info("%r Shutting down due to stop event set.")
+            log.debug("%r Shutting down due to stop event set.", self)
             self._stop_ioloop()
             return
 
@@ -292,11 +311,13 @@ class ResultPublisher(threading.Thread):
             if time.time() - self._connected_at > 60:
                 # ... and connection stable for 60s; good to reset connection tries
                 self._connection_tries = 0
-                log.debug("%r Connection deemed stable; resetting connection tally")
+                log.debug(
+                    "%r Connection deemed stable; resetting connection tally", self
+                )
 
         try:
             if self.status != RabbitPublisherStatus.connected:
-                log.debug("%r not yet connected; holding enqueued messages")
+                log.debug("%r not yet connected; holding enqueued messages", self)
                 raise queue.Empty()
 
             while True:

@@ -7,6 +7,8 @@ import threading
 from unittest import mock
 
 import globus_compute_endpoint.endpoint.rabbit_mq.command_queue_subscriber as cqs
+import pika
+import pika.exceptions
 import pytest as pytest
 from pika.spec import Basic, BasicProperties
 
@@ -34,6 +36,9 @@ class MockedCommandQueueSubscriber(cqs.CommandQueueSubscriber):
     def join(self, timeout: float | None = None) -> None:
         if self._stop_event.is_set():  # important to identify bugs
             self._time_to_stop_mock.set()
+        else:
+            raise AssertionError("Expect that CQS thread always stops when test done")
+
         super().join(timeout=timeout)
 
 
@@ -52,10 +57,13 @@ def mock_rnd(mocker):
 @pytest.fixture
 def mock_cqs():
     q = {"queue": None}
+    cal = random.randint(3, 10)
     mq = mock.Mock(spec=queue.SimpleQueue)
     se = threading.Event()
 
-    mcqs = MockedCommandQueueSubscriber(queue_info=q, command_queue=mq, stop_event=se)
+    mcqs = MockedCommandQueueSubscriber(
+        queue_info=q, command_queue=mq, stop_event=se, connect_attempt_limit=cal
+    )
     mcqs.start()
 
     yield q, mq, se, mcqs
@@ -79,19 +87,33 @@ def test_cqs_repr():
     assert f"pid={os.getpid()}" in repr(cq)
 
 
-def test_cqs_stops_if_unable_to_connect(mock_rnd):
+@pytest.mark.parametrize("attempt_limit", (random.randint(1, 50),))
+def test_cqs_stops_if_unable_to_connect(mock_rnd, attempt_limit):
     mock_stop = mock.Mock(spec=threading.Event)
     mock_stop.is_set.return_value = False
     mock_stop.wait.return_value = None
+
     cq = cqs.CommandQueueSubscriber(
-        queue_info=None, command_queue=None, stop_event=mock_stop
+        queue_info=None,
+        command_queue=None,
+        stop_event=mock_stop,
+        connect_attempt_limit=attempt_limit,
     )
-    cq._connect = mock.Mock()
+    cq._connect = mock.Mock(spec=cqs.CommandQueueSubscriber._connect)
 
     cq.run()
-    assert mock_rnd.uniform.call_count == cq.connect_attempt_limit - 1, "Random idle"
-    assert cq._connection_tries >= cq.connect_attempt_limit
-    assert cq._stop_event.wait.call_count == cq.connect_attempt_limit, "Should idle"
+    assert mock_rnd.uniform.call_count == attempt_limit - 1, "Random idle"
+    assert cq._connection_tries >= attempt_limit
+    assert cq._stop_event.wait.call_count == attempt_limit, "Should idle"
+
+
+def test_cqs_connect_limit_very_high_sc30467():
+    cq = cqs.CommandQueueSubscriber(
+        queue_info=None, command_queue=None, stop_event=None
+    )
+    assert (
+        cq.connect_attempt_limit >= 5000
+    ), "Some very high limit as RMQ can be down for awhile; SC-30467"
 
 
 def test_cqs_gracefully_handles_unexpected_exception(mock_log, mock_rnd):
@@ -109,6 +131,48 @@ def test_cqs_gracefully_handles_unexpected_exception(mock_log, mock_rnd):
     assert mock_log.exception.call_count == cq.connect_attempt_limit
     args, _kwargs = mock_log.exception.call_args
     assert "shutting down" in args[0]
+
+
+@pytest.mark.parametrize("attempt_limit", (random.randint(10, 20),))
+def test_cqs_first_connect_attempts_logged(mock_log, mock_rnd, attempt_limit):
+    assert attempt_limit > 1, "This tests at least 2 different log lines"
+
+    mock_log.isEnabledFor.return_value = False
+
+    mock_stop = mock.Mock(spec=threading.Event)
+    mock_stop.is_set.return_value = False
+    mock_stop.wait.return_value = None
+
+    cq = cqs.CommandQueueSubscriber(
+        queue_info=None,
+        command_queue=None,
+        stop_event=mock_stop,
+        connect_attempt_limit=attempt_limit,
+    )
+    cq._connect = mock.Mock(spec=cqs.CommandQueueSubscriber._connect)
+    cq.run()
+
+    count_debug_connects = sum(
+        "Opening connection to AMQP service.  Attempt:" in a[0]
+        for a, _ in mock_log.debug.call_args_list
+    )
+    first_connection_logged = sum(
+        a[0].endswith("Opening connection to AMQP service.")
+        for a, _ in mock_log.info.call_args_list
+    )
+    second_connection_logged = sum(
+        f"Will continue for up to {attempt_limit} attempts." in a[0]
+        for a, _ in mock_log.info.call_args_list
+    )
+    second_log = next(
+        a[0]
+        for a, _ in mock_log.info.call_args_list
+        if f"Will continue for up to {attempt_limit} attempts." in a[0]
+    )
+    assert count_debug_connects == attempt_limit, "Connection attempts always debugged"
+    assert first_connection_logged == 1, "First connection attempt logged (INFO)"
+    assert second_connection_logged == 1, "Second log contains connection attempt limit"
+    assert "--debug" in second_log, "Second log explains how to get all attempts logged"
 
 
 def test_cqs_on_message_puts_to_queue(randomstring):
@@ -187,6 +251,10 @@ def test_cqs_stops_loop_on_open_failure(mock_log, mock_cqs, exc):
 
         mcqs._on_open_failed(mcqs._connection, exc)  # kernel of test
 
+        if mcqs._connection_tries == 1:
+            assert mock_log.warning.called, "For log clutter, expect only one warning"
+            mock_log.warning.reset_mock()
+
         assert mcqs._connection.ioloop.stop.called
         assert mock_log.debug.called
         (fmt, *args), *_ = mock_log.debug.call_args
@@ -196,7 +264,7 @@ def test_cqs_stops_loop_on_open_failure(mock_log, mock_cqs, exc):
         assert exc.__class__.__name__ in msg
 
     assert mcqs._connection_tries == mcqs.connect_attempt_limit
-    assert mock_log.warning.called, "Expected warning only on watcher quit"
+    assert mock_log.error.called, "Expected warning only on watcher quit"
 
 
 def test_cqs_connection_closed_stops_loop(mock_cqs):
@@ -205,6 +273,38 @@ def test_cqs_connection_closed_stops_loop(mock_cqs):
     assert not mcqs._connection.ioloop.stop.called
     mcqs._on_connection_closed(mcqs._connection, exc)
     assert mcqs._connection.ioloop.stop.called
+
+
+@pytest.mark.parametrize("attempt_limit", (random.randint(3, 50),))
+def test_cqs_on_connection_closed_logs(mock_log, attempt_limit):
+    assert attempt_limit > 2, "At least 3 states tested"
+
+    exc = pika.exceptions.ChannelClosedByClient(200, "Some text")
+    cq = cqs.CommandQueueSubscriber(
+        queue_info=None, command_queue=None, stop_event=None
+    )
+    mock_conn = mock.Mock(spec=pika.BaseConnection)
+    assert not mock_log.debug.called, "Verify test setup"
+    cq._on_connection_closed(mock_conn, exc)
+
+    assert mock_log.debug.called
+    assert not mock_log.info.called, "Healthy shutdown not concerning"
+    assert not mock_log.warning.called, "Healthy shutdown not concerning"
+
+    mock_log.reset_mock()
+    cq._connection_tries += 1  # now at == 1
+    cq._on_connection_closed(mock_conn, exc)
+    assert mock_log.debug.called, "Debug always emitted"
+    assert mock_log.info.called, "Inform user after unexpected close"
+    assert mock_log.warning.called, "Inform user can't sustain connection"
+
+    for _i in range(attempt_limit - 2):
+        mock_log.reset_mock()
+        cq._connection_tries += 1  # now at > 1
+        cq._on_connection_closed(mock_conn, exc)
+        assert mock_log.debug.called, "Debug always emitted"
+        assert not mock_log.info.called, "Log informed; don't spam it"
+        assert not mock_log.warning.called, "Log informed; don't spam it"
 
 
 def test_cqs_channel_closed_retries_then_shuts_down(mock_log, mock_cqs, randomstring):
