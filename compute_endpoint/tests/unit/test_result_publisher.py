@@ -3,6 +3,7 @@ from concurrent.futures import Future
 from unittest import mock
 
 import pika
+import pytest
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
     ResultPublisher,
@@ -10,6 +11,11 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.rabbit_mq.result_publisher."
 q_info = {"queue_publish_kwargs": {}}
+
+
+@pytest.fixture
+def mock_log(mocker):
+    yield mocker.patch(f"{_MOCK_BASE}log", autospec=True)
 
 
 def test_rp_verifies_exchange(randomstring):
@@ -39,7 +45,7 @@ def test_rp_verifies_queue(randomstring):
     assert k["queue"] == queue_info["queue"]
 
 
-def test_new_channel_resets_delivery_index():
+def test_rp_new_channel_resets_delivery_index():
     mock_channel = mock.Mock()
     queue_info = {"exchange": "some_exchange", **q_info}
     rp = ResultPublisher(queue_info=queue_info)
@@ -49,7 +55,7 @@ def test_new_channel_resets_delivery_index():
     assert rp._delivery_tag_index == 0
 
 
-def test_delivery_confirmation_enabled():
+def test_rp_delivery_confirmation_enabled():
     mock_channel = mock.Mock()
     queue_info = {**q_info}
     rp = ResultPublisher(queue_info=queue_info)
@@ -62,8 +68,7 @@ def test_delivery_confirmation_enabled():
     assert a[0] == rp._on_delivery
 
 
-def test_channel_closed_retries_then_shuts_down(mocker, randomstring):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_rp_channel_closed_retries_then_shuts_down(mock_log, randomstring):
     exc = Exception(f"some reason: {randomstring()}")
     queue_info = {**q_info}
     rp = ResultPublisher(queue_info=queue_info)
@@ -95,7 +100,7 @@ def test_channel_closed_retries_then_shuts_down(mocker, randomstring):
     rp._on_channel_closed(rp._mq_conn, exc)
 
 
-def test_stable_connection_resets_fail_counter(mocker):
+def test_rp_stable_connection_resets_fail_counter(mocker):
     mock_time = mocker.patch(f"{_MOCK_BASE}time")
     mock_time.time.side_effect = [1000, 1061]  # 60 seconds passed
     queue_info = {**q_info}
@@ -109,7 +114,7 @@ def test_stable_connection_resets_fail_counter(mocker):
     assert rp._connection_tries == 0
 
 
-def test_handles_bulk_ack_deliveries():
+def test_rp_handles_bulk_ack_deliveries():
     queue_info = {**q_info}
     rp = ResultPublisher(queue_info=queue_info)
     multiple_dtag = rp._delivery_tag_index + random.randint(5, 30)
@@ -127,10 +132,7 @@ def test_handles_bulk_ack_deliveries():
     rp._on_delivery(mock_frame)
     assert len(rp._awaiting_confirmation) == 1
 
-    (
-        dtag,
-        f,
-    ) = rp._awaiting_confirmation.popitem()  # should be only one, now, per +2, above
+    dtag, f = rp._awaiting_confirmation.popitem()  # should be only one, per +2 (above)
     assert dtag == multiple_dtag + 1, "only ack up to received frame"
     assert not f.done()
 
@@ -138,7 +140,7 @@ def test_handles_bulk_ack_deliveries():
     assert all(f.result() is None for f in delivered.values())
 
 
-def test_handles_bulk_nack_deliveries():
+def test_rp_handles_bulk_nack_deliveries():
     queue_info = {**q_info}
     rp = ResultPublisher(queue_info=queue_info)
     multiple_dtag = rp._delivery_tag_index + random.randint(5, 30)
@@ -156,10 +158,7 @@ def test_handles_bulk_nack_deliveries():
     rp._on_delivery(mock_frame)
     assert len(rp._awaiting_confirmation) == 1
 
-    (
-        dtag,
-        f,
-    ) = rp._awaiting_confirmation.popitem()  # should be only one, now, per +2, above
+    dtag, f = rp._awaiting_confirmation.popitem()  # should be only one, per +2 (above)
     assert dtag == multiple_dtag + 1, "only nack up to received frame"
     assert not f.done()
 
@@ -167,7 +166,7 @@ def test_handles_bulk_nack_deliveries():
     assert all(f.exception() is not None for f in delivered.values())
 
 
-def test_event_watcher_publishes(randomstring):
+def test_rp_event_watcher_publishes(randomstring):
     queue_info = {**q_info}
     rp = ResultPublisher(queue_info=queue_info)
     rp._connection = mock.Mock()
@@ -197,7 +196,7 @@ def test_event_watcher_publishes(randomstring):
     assert all(f.done() for f in futs)
 
 
-def test_publish_enqueues_message(randomstring):
+def test_rp_publish_enqueues_message(randomstring):
     queue_info = {**q_info}
     rp = ResultPublisher(queue_info=queue_info)
     rp._mq_chan = mock.Mock()

@@ -38,6 +38,18 @@ class MockedCommandQueueSubscriber(cqs.CommandQueueSubscriber):
 
 
 @pytest.fixture
+def mock_log(mocker):
+    yield mocker.patch(f"{_MOCK_BASE}log", autospec=True)
+
+
+@pytest.fixture
+def mock_rnd(mocker):
+    mock_rnd = mocker.patch(f"{_MOCK_BASE}random")
+    mock_rnd.uniform.return_value = 0  # used in the tested code for sleep; don't wait!
+    yield mock_rnd
+
+
+@pytest.fixture
 def mock_cqs():
     q = {"queue": None}
     mq = mock.Mock(spec=queue.SimpleQueue)
@@ -67,9 +79,7 @@ def test_cqs_repr():
     assert f"pid={os.getpid()}" in repr(cq)
 
 
-def test_cqs_stops_if_unable_to_connect(mocker):
-    mock_rnd = mocker.patch(f"{_MOCK_BASE}random")
-    mock_rnd.uniform.return_value = 0  # don't wait during test
+def test_cqs_stops_if_unable_to_connect(mock_rnd):
     mock_stop = mock.Mock(spec=threading.Event)
     mock_stop.is_set.return_value = False
     mock_stop.wait.return_value = None
@@ -84,10 +94,7 @@ def test_cqs_stops_if_unable_to_connect(mocker):
     assert cq._stop_event.wait.call_count == cq.connect_attempt_limit, "Should idle"
 
 
-def test_cqs_gracefully_handles_unexpected_exception(mocker):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mock_rnd = mocker.patch(f"{_MOCK_BASE}random")
-    mock_rnd.uniform.return_value = 0  # don't wait during test
+def test_cqs_gracefully_handles_unexpected_exception(mock_log, mock_rnd):
     mock_stop = mock.Mock(spec=threading.Event)
     mock_stop.is_set.return_value = False
     mock_stop.wait.return_value = None
@@ -104,7 +111,7 @@ def test_cqs_gracefully_handles_unexpected_exception(mocker):
     assert "shutting down" in args[0]
 
 
-def test_on_message_puts_to_queue(randomstring):
+def test_cqs_on_message_puts_to_queue(randomstring):
     mock_q = mock.Mock(spec=queue.SimpleQueue)
     cq = cqs.CommandQueueSubscriber(
         queue_info=None, command_queue=mock_q, stop_event=None
@@ -119,8 +126,7 @@ def test_on_message_puts_to_queue(randomstring):
     assert mock_q.put.call_args[0][0] == (bd.delivery_tag, props, body)
 
 
-def test_on_message_redacts_credentials(mocker, randomstring):
-    mock_dlog = mocker.patch(f"{_MOCK_BASE}log.debug")
+def test_cqs_on_message_redacts_credentials(mock_log, randomstring):
     mock_q = mock.Mock(spec=queue.SimpleQueue)
     cq = cqs.CommandQueueSubscriber(
         queue_info=None, command_queue=mock_q, stop_event=None
@@ -132,8 +138,8 @@ def test_on_message_redacts_credentials(mocker, randomstring):
     body = f"amqps://{uname}:{pword}@somehost...".encode()
     cq._on_message(mock_chan, bd, props, body)
 
-    assert mock_dlog.called
-    a, _k = mock_dlog.call_args
+    assert mock_log.debug.called
+    a, _k = mock_log.debug.call_args
     msg = a[0] % a[1:]
     assert "Received message from" in msg
     assert "amqps://" in msg
@@ -143,8 +149,7 @@ def test_on_message_redacts_credentials(mocker, randomstring):
     assert "***:***" in msg
 
 
-def test_on_message_gracefully_handles_garbled_packet(mocker):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_cqs_on_message_gracefully_handles_garbled_packet(mock_log):
     cq = cqs.CommandQueueSubscriber(
         queue_info=None, command_queue=None, stop_event=None
     )
@@ -154,8 +159,7 @@ def test_on_message_gracefully_handles_garbled_packet(mocker):
     assert "Invalid Basic.Deliver" in mock_log.debug.call_args[0][0]
 
 
-def test_on_message_nacks_on_failure(mocker):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_cqs_on_message_nacks_on_failure(mock_log):
     cq = cqs.CommandQueueSubscriber(
         queue_info=None, command_queue=None, stop_event=None
     )
@@ -170,9 +174,8 @@ def test_on_message_nacks_on_failure(mocker):
 
 
 @pytest.mark.parametrize("exc", (MemoryError("some description"), "some description"))
-def test_cqs_stops_loop_on_open_failure(mocker, mock_cqs, exc):
+def test_cqs_stops_loop_on_open_failure(mock_log, mock_cqs, exc):
     *_, mcqs = mock_cqs
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     assert not mcqs._connection.ioloop.stop.called, "Test setup verification"
 
     while not mcqs._stop_event.is_set():
@@ -204,32 +207,31 @@ def test_cqs_connection_closed_stops_loop(mock_cqs):
     assert mcqs._connection.ioloop.stop.called
 
 
-def test_cqs_channel_closed_retries_then_shuts_down(mock_cqs, randomstring):
+def test_cqs_channel_closed_retries_then_shuts_down(mock_log, mock_cqs, randomstring):
     exc_text = f"some pika reason {randomstring()}"
     exc = Exception(exc_text)
     *_, mcqs = mock_cqs
 
-    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
-        for i in range(1, mcqs.channel_close_window_limit):
-            mcqs._connection.ioloop.call_later.reset_mock()
-            mcqs._on_channel_closed(mcqs._channel, exc)
-            assert len(mcqs._channel_closes) == i
-            a, _k = mock_log.warning.call_args
-            assert " Channel closed " in a[0]
-            assert exc_text in a[0], "Expect exception text in logs"
-        assert mock_log.debug.call_count == i
-        assert mock_log.warning.call_count == i
-        assert not mock_log.error.called
-
-        mcqs._on_channel_closed(mcqs._connection, exc)
-        assert mock_log.error.called
-        a, _k = mock_log.error.call_args
-        assert " Unable to sustain channel " in a[0], "Expect error log after attempts"
+    for i in range(1, mcqs.channel_close_window_limit):
+        mcqs._connection.ioloop.call_later.reset_mock()
+        mcqs._on_channel_closed(mcqs._channel, exc)
+        assert len(mcqs._channel_closes) == i
+        a, _k = mock_log.warning.call_args
+        assert " Channel closed " in a[0]
         assert exc_text in a[0], "Expect exception text in logs"
+    assert mock_log.debug.call_count == i
+    assert mock_log.warning.call_count == i
+    assert not mock_log.error.called
 
-        # and finally, no error if called "too many" times
-        mcqs._on_channel_closed(mcqs._connection, exc)
-        assert mock_log.error.call_count == 2
+    mcqs._on_channel_closed(mcqs._connection, exc)
+    assert mock_log.error.called
+    a, _k = mock_log.error.call_args
+    assert " Unable to sustain channel " in a[0], "Expect error log after attempts"
+    assert exc_text in a[0], "Expect exception text in logs"
+
+    # and finally, no error if called "too many" times
+    mcqs._on_channel_closed(mcqs._connection, exc)
+    assert mock_log.error.call_count == 2
 
     assert mock_log.debug.call_count == i, "After attempts, should be only errors"
     assert mock_log.warning.call_count == i, "After attempts, should be only errors"
@@ -282,7 +284,7 @@ def test_cqs_amqp_acks_in_bulk(mock_cqs):
     assert mcqs._channel.basic_ack.call_count == 1
 
 
-def test_event_watcher_initiates_shutdown(mock_cqs):
+def test_cqs_event_watcher_initiates_shutdown(mock_cqs):
     *_, stop_event, mcqs = mock_cqs
 
     stop_event.set()
