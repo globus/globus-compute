@@ -98,8 +98,9 @@ class CommandQueueSubscriber(threading.Thread):
     def run(self):
         log.debug("%s AMQP thread begins", self)
         idle_for_s = 0.0
-        while self._connection_tries < self.connect_attempt_limit and not (
-            self._stop_event.is_set()
+        while (
+            not self._stop_event.is_set()
+            and self._connection_tries < self.connect_attempt_limit
         ):
             if self._connection or self._connection_tries:
                 idle_for_s = random.uniform(0.5, 10)

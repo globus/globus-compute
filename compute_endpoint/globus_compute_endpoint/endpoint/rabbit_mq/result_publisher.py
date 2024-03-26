@@ -108,19 +108,20 @@ class ResultPublisher(threading.Thread):
         log.debug("%r thread begins", self)
         self._thread_id = threading.get_ident()
 
+        idle_for_s = 0.0
         while (
             not self._stop_event.is_set()
             and self._connection_tries < self.connect_attempt_limit
         ):
             if self._mq_conn or self._connection_tries:
-                wait_for = random.uniform(0.5, 10)
-                msg = f"%r reconnecting in {wait_for:.1f}s."
+                idle_for_s = random.uniform(0.5, 10)
+                msg = f"%r reconnecting in {idle_for_s:.1f}s."
                 log.debug(msg, self)
                 if self._connection_tries == self.connect_attempt_limit - 1:
                     log.warning(f"{msg}  (final attempt)", self)
 
-                if self._stop_event.wait(wait_for):
-                    break
+            if self._stop_event.wait(idle_for_s):
+                break
 
             self._connection_tries += 1
             try:
