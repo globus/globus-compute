@@ -3,13 +3,17 @@ from __future__ import annotations
 import typing as t
 from types import ModuleType
 
-import pydantic
+from globus_compute_common.pydantic_v1 import (
+    BaseModel,
+    FilePath,
+    root_validator,
+    validator,
+)
 from globus_compute_endpoint import engines, strategies
 from parsl import addresses as parsl_addresses
 from parsl import channels as parsl_channels
 from parsl import launchers as parsl_launchers
 from parsl import providers as parsl_providers
-from pydantic import BaseModel, FilePath, validator
 
 
 def _validate_import(field: str, package: ModuleType):
@@ -116,7 +120,7 @@ class ConfigModel(BaseConfigModel):
 
     _validate_engine = _validate_params("engine")
 
-    @pydantic.root_validator
+    @root_validator
     @classmethod
     def _validate(cls, values):
         is_mu = values.get("multi_user") is True

@@ -23,7 +23,6 @@ from http import HTTPStatus
 import globus_compute_sdk as GC
 from cachetools import TTLCache
 from globus_compute_endpoint.endpoint.identity_mapper import PosixIdentityMapper
-from pydantic import BaseModel
 
 try:
     import pyprctl
@@ -33,6 +32,7 @@ import setproctitle
 import yaml
 from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
+from globus_compute_common.pydantic_v1 import BaseModel
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import (
