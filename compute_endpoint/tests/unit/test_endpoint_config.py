@@ -1,9 +1,9 @@
 import typing as t
 
 import pytest
+from globus_compute_common.pydantic_v1 import ValidationError
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.model import ConfigModel
-from pydantic.error_wrappers import ValidationError
 
 
 @pytest.fixture

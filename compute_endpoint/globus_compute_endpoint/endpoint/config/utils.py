@@ -9,8 +9,8 @@ import shlex
 
 import yaml
 from click import ClickException
+from globus_compute_common.pydantic_v1 import ValidationError
 from packaging.version import Version
-from pydantic import ValidationError
 
 from .config import Config
 from .model import ConfigModel
