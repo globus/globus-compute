@@ -286,19 +286,13 @@ class EndpointManager:
         ptitle += f" [{setproctitle.getproctitle()}]"
         setproctitle.setproctitle(ptitle)
 
-        cqs_kwargs = config._cqs_kwargs or {}
-        cqs_kwargs.update(
-            dict(
-                queue_info=cq_info,
-                command_queue=self._command_queue,
-                stop_event=self._command_stop_event,
-                thread_name="CQS",
-            )
+        self._command = CommandQueueSubscriber(
+            queue_info=cq_info,
+            command_queue=self._command_queue,
+            stop_event=self._command_stop_event,
+            thread_name="CQS",
         )
-        rp_kwargs = config._rp_kwargs or {}
-        rp_kwargs["queue_info"] = rq_info
-        self._command = CommandQueueSubscriber(**cqs_kwargs)
-        self._heartbeat_publisher = ResultPublisher(**rp_kwargs)
+        self._heartbeat_publisher = ResultPublisher(queue_info=rq_info)
 
     @staticmethod
     def get_metadata(config: Config, conf_dir: pathlib.Path) -> dict:
