@@ -19,6 +19,9 @@ from multiprocessing import Process
 
 import dill
 from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import (
+    EPStatusReport as CommonEPStatusReport,
+)
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
 from globus_compute_endpoint.endpoint.messages_compat import convert_ep_status_report
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
@@ -476,7 +479,7 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
             self.address, self.worker_result_port
         )
 
-    def get_status_report(self) -> EPStatusReport:
+    def get_status_report(self) -> CommonEPStatusReport:
         """HTEX Interchange reports EPStatusReport periodically"""
         raise NotImplementedError
 
