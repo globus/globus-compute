@@ -480,7 +480,10 @@ class EndpointInterchange:
                     # fixes the issue.
                     self._quiesce_event.set()
 
-                    log.exception("Something broke while forwarding results")
+                    log.exception(
+                        "Something broke while forwarding results; setting quiesce"
+                        " event"
+                    )
                     if task_id:
                         log.info("Storing result for later: %s", task_id)
                         self.result_store[task_id] = packed_message
@@ -501,6 +504,7 @@ class EndpointInterchange:
         task_processor_thread.start()
         result_processor_thread.start()
 
+        connection_stable_hearbeats = 0
         last_t, last_r = 0, 0
 
         soft_idle_limit = max(0, self.config.idle_heartbeats_soft)
@@ -523,8 +527,12 @@ class EndpointInterchange:
             )
             last_t, last_r = num_t, num_r
 
-            # only reset come heartbeat and still alive
-            self._reconnect_fail_counter = 0
+            # only reset come 2 heartbeats and still alive
+            if self._reconnect_fail_counter:
+                connection_stable_hearbeats += 1
+                if connection_stable_hearbeats > 1:
+                    log.info("Connection stable for 2 heartbeats; reset fail count")
+                    self._reconnect_fail_counter = 0
 
             if not soft_idle_limit:
                 # idle timeout not enabled; "always on"
