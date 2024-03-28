@@ -1,10 +1,9 @@
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Enable users to install either Pydantic V1 or V2. The former remains
-  the recommended and officially supported version.
+- Add support for Pydantic V2.
 
 Changed
 ^^^^^^^
 
-- Bump ``globus-compute-common`` requirement to version ``0.4.0``.
+- Bump ``globus-compute-common`` requirement to version ``0.4.1``.
