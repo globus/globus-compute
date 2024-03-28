@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import sys
 import typing as t
+import warnings
 from datetime import datetime, timezone
 from itertools import islice
 from pathlib import Path
@@ -69,3 +71,27 @@ def check_version(task_details: dict | None) -> str | None:
                 f"(worker SDK version: {worker_sdk}; worker OS: {worker_os})"
             )
     return None
+
+
+@t.overload
+def get_env_var_with_deprecation(
+    current_name: str, old_name: str, default: None = None
+) -> str | None: ...
+
+
+@t.overload
+def get_env_var_with_deprecation(
+    current_name: str, old_name: str, default: str
+) -> str: ...
+
+
+def get_env_var_with_deprecation(
+    current_name: str, old_name: str, default: str | None = None
+) -> str | None:
+    if old_name in os.environ:
+        warnings.warn(
+            f"{old_name} is deprecated and will be removed in a future release. "
+            f"Use {current_name} instead."
+        )
+
+    return os.getenv(current_name, os.getenv(old_name, default))
