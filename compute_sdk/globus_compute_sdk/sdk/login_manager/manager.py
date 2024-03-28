@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import threading
 import typing as t
@@ -9,6 +8,7 @@ import typing as t
 import globus_sdk
 from globus_sdk.scopes import AuthScopes, ScopeBuilder
 
+from ..utils import get_env_var_with_deprecation
 from ..web_client import WebClient
 from .client_login import get_client_login, is_client_login
 from .globus_auth import internal_auth_client
@@ -19,7 +19,8 @@ log = logging.getLogger(__name__)
 
 
 def _get_funcx_all_scope() -> str:
-    return os.getenv(
+    return get_env_var_with_deprecation(
+        "GLOBUS_COMPUTE_SCOPE",
         "FUNCX_SCOPE",
         "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
     )
