@@ -3,6 +3,41 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.17.0a0:
+
+globus-compute-sdk & globus-compute-endpoint v2.17.0a0
+------------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add support for Pydantic V2.
+
+Bug Fixes
+^^^^^^^^^
+
+- Address a race-condition in detecting Endpoint stability.  Previously, the EP
+  could keep resetting an internal fail counter, potentially allowing the EP to
+  stay up indefinitely in a half-working state.  The EP logic now more
+  faithfully detects an unrecoverable error and will shutdown rather than
+  giving an appearance of being alive.
+
+Changed
+^^^^^^^
+
+- Update AMQP reconnection handling; previously the reopen-connection logic was
+  woefully optimistic of service or network downtime, assuming connectivity
+  would be restored in ~a minute.  Reality is that a network can be down for
+  hours and a service can take multiple minutes to update.  Consequently,
+  update the number of retry attempts from 3 or 5 to 7,200.  (For context,
+  reconnection attempts occur randomly between every 0.5s and 10s, so this
+  means than an endpoint that has lost connectivity will attempt to reconnect
+  to the web-services for somewhere between 1 and 20 hours.)  Hopefully, this
+  is an adequate value to ensure that Compute endpoints weather most relevant
+  connectivity outages.
+
+- Bump ``globus-compute-common`` requirement to version ``0.4.1``.
+
 .. _changelog-2.16.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.16.0
