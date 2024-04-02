@@ -1,6 +1,5 @@
 import os
 import pathlib
-import pickle
 import queue
 import random
 import threading
@@ -8,7 +7,7 @@ import uuid
 
 import pytest
 from globus_compute_common.messagepack import pack, unpack
-from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
+from globus_compute_common.messagepack.message_types import EPStatusReport, Result
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.cli import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
@@ -87,60 +86,6 @@ def test_start_requires_pre_registered(mocker, funcx_dir):
             reg_info=None,
             endpoint_id="mock_endpoint_id",
         )
-
-
-@pytest.mark.skip("EPInterchange is no longer unpacking a task")
-def test_invalid_task_received(mocker, endpoint_uuid):
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    conf = Config(executors=[mocker.Mock(endpoint_id=endpoint_uuid)])
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
-
-    mock_results = mocker.MagicMock()
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_results)
-    mocker.patch(f"{_MOCK_BASE}convert_to_internaltask", side_effect=Exception("BLAR"))
-    task = Task(task_id=uuid.uuid4(), task_buffer="")
-    ei.pending_task_queue.put([{}, pack(task)])
-    t = threading.Thread(target=ei._main_loop, daemon=True)
-    t.start()
-
-    try_assert(lambda: mock_results.publish.called)
-    ei.time_to_quit = True
-    t.join()
-
-    assert mock_results.publish.called
-    msg = mock_results.publish.call_args_list[0][0][0]
-    result: Result = unpack(msg)
-    assert result.task_id == task.task_id
-    assert "Failed to start task" in result.data
-
-
-@pytest.mark.skip("EPInterchange no longer unpacks result body")
-def test_invalid_result_received(mocker, endpoint_uuid):
-    mock_rqp = mocker.Mock(spec=ResultPublisher)
-    mocker.patch(f"{_MOCK_BASE}ResultQueuePublisher", return_value=mock_rqp)
-
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    conf = Config(executors=[mocker.Mock(endpoint_id=endpoint_uuid)])
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
-    res = {
-        "task_id": endpoint_uuid,
-        "not_data_field": bytes(i for i in range(20)),  # invalid utf8; not a string
-    }
-    task_id = str(uuid.uuid4())
-    result_bytes = pickle.dumps(res)
-    ei.results_passthrough.put({"task_id": task_id, "message": result_bytes})
-    t = threading.Thread(target=ei._main_loop, daemon=True)
-    t.start()
-
-    try_assert(lambda: mock_rqp.publish.call_count > 1)
-    ei.time_to_quit = True
-    t.join()
-
-    a = next(a[0] for a, _ in mock_rqp.publish.call_args_list if b"Task ID:" in a[0])
-    res = unpack(a)
-
-    assert "(KeyError)" in res.data, "Expect user-facing data contains exception type"
-    assert task_id in res.data, "Expect user-facing data contains task id"
 
 
 def test_die_with_parent_refuses_to_start_if_not_parent(mocker):
