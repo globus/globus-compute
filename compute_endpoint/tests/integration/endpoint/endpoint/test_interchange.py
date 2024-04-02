@@ -3,6 +3,7 @@ import pathlib
 import queue
 import random
 import threading
+import typing as t
 import uuid
 
 import pytest
@@ -29,6 +30,45 @@ def funcx_dir(tmp_path):
 @pytest.fixture(autouse=True)
 def reset_signals_auto(reset_signals):
     yield
+
+
+@pytest.fixture
+def mock_log(mocker):
+    yield mocker.patch(f"{_MOCK_BASE}log")
+
+
+@pytest.fixture
+def mock_ex(mocker, endpoint_uuid):
+    ex = mocker.Mock(endpoint_id=endpoint_uuid, executor_exception=None)
+    yield ex
+
+
+@pytest.fixture
+def mock_conf(mocker, mock_ex):
+    conf = Config(executors=[mock_ex])
+    yield conf
+
+
+@pytest.fixture
+def ep_ix_factory(endpoint_uuid, mock_conf):
+    to_stop: t.List[EndpointInterchange] = []
+
+    def _f(*a, **k):
+        reg_info = {"task_queue_info": {}, "result_queue_info": {}}
+        kw = {"endpoint_id": endpoint_uuid, "config": mock_conf, "reg_info": reg_info}
+        kw.update(k)
+        to_stop.append(EndpointInterchange(*a, **kw))
+        return to_stop[-1]
+
+    yield _f
+
+    for _ei in to_stop:
+        _ei.stop()
+
+
+@pytest.fixture
+def ep_ix(ep_ix_factory):
+    yield ep_ix_factory()
 
 
 @pytest.fixture(autouse=True)
@@ -88,12 +128,8 @@ def test_start_requires_pre_registered(mocker, funcx_dir):
         )
 
 
-def test_die_with_parent_refuses_to_start_if_not_parent(mocker):
-    ei = EndpointInterchange(
-        config=Config(executors=[mocker.Mock()]),
-        reg_info={"task_queue_info": {}, "result_queue_info": {}},
-        parent_pid=os.getpid(),  # _not_ ppid; that's the test.
-    )
+def test_die_with_parent_refuses_to_start_if_not_parent(mocker, ep_ix_factory):
+    ei = ep_ix_factory(parent_pid=os.getpid())  # _not_ ppid; that's the test.
     mock_warn = mocker.patch.object(log, "warning")
     assert not ei.time_to_quit, "Verify test setup"
     ei.start()
@@ -103,21 +139,17 @@ def test_die_with_parent_refuses_to_start_if_not_parent(mocker):
     assert "refusing to start" in warn_msg
 
 
-def test_die_with_parent_goes_away_if_parent_dies(mocker):
+def test_die_with_parent_goes_away_if_parent_dies(mocker, ep_ix_factory):
     ppid = os.getppid()
 
     mocker.patch(f"{_MOCK_BASE}ResultPublisher")
     mocker.patch(f"{_MOCK_BASE}time.sleep")
     mock_ppid = mocker.patch(f"{_MOCK_BASE}os.getppid")
     mock_ppid.side_effect = (ppid, 1)
-    ei = EndpointInterchange(
-        config=Config(executors=[mocker.Mock()]),
-        reg_info={"task_queue_info": {}, "result_queue_info": {}},
-        parent_pid=ppid,
-    )
-    ei.executors = {"mock_executor": mocker.Mock()}
+    ei = ep_ix_factory(parent_pid=ppid)
     mock_warn = mocker.patch.object(log, "warning")
     assert not ei.time_to_quit, "Verify test setup"
+
     ei.start()
     assert ei.time_to_quit
 
@@ -126,17 +158,14 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker):
     assert f"Parent ({ppid}) has gone away" in warn_msg
 
 
-def test_no_idle_if_not_configured(mocker, endpoint_uuid, mock_spt, mock_quiesce):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_no_idle_if_not_configured(
+    mocker, ep_ix_factory, mock_conf, mock_log, endpoint_uuid, mock_spt, mock_quiesce
+):
     mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    conf = Config(
-        executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=1,
-        idle_heartbeats_soft=0,
-    )
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
+    mock_conf.idle_heartbeats_soft = 0
+    mock_conf.heartbeat_period = 1
+    ei = ep_ix_factory(config=mock_conf)
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = queue.Empty
     ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
@@ -153,17 +182,16 @@ def test_no_idle_if_not_configured(mocker, endpoint_uuid, mock_spt, mock_quiesce
 
 
 @pytest.mark.parametrize("idle_limit", (random.randint(2, 100),))
-def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt, idle_limit, mock_quiesce):
+def test_soft_idle_honored(
+    mocker, mock_log, mock_conf, ep_ix_factory, mock_spt, idle_limit, mock_quiesce
+):
     result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
     msg = {"task_id": str(result.task_id), "message": pack(result)}
 
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    mock_ex = mocker.Mock(endpoint_id=endpoint_uuid)
-    conf = Config(executors=[mock_ex], idle_heartbeats_soft=idle_limit)
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
+    mock_conf.idle_heartbeats_soft = idle_limit
+    ei = ep_ix_factory(config=mock_conf)
 
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = (msg, queue.Empty)
@@ -179,7 +207,7 @@ def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt, idle_limit, mock_qui
     transition_count = sum("In idle state" in m for m in log_args)
     assert transition_count == 1, f"expected logs not spammed -- {log_args}"
 
-    shut_down_s = f"{(idle_limit - 1) * conf.heartbeat_period:,}"
+    shut_down_s = f"{(idle_limit - 1) * mock_conf.heartbeat_period:,}"
     idle_msg = next(m for m in log_args if "In idle state" in m)
     assert "due to" in idle_msg, "expected to find reason"
     assert "idle_heartbeats_soft" in idle_msg, "expected to find setting name"
@@ -195,21 +223,17 @@ def test_soft_idle_honored(mocker, endpoint_uuid, mock_spt, idle_limit, mock_qui
 
 
 @pytest.mark.parametrize("idle_limit", (random.randint(4, 100),))
-def test_hard_idle_honored(mocker, endpoint_uuid, mock_spt, idle_limit, mock_quiesce):
+def test_hard_idle_honored(
+    mocker, mock_log, mock_conf, ep_ix_factory, mock_spt, idle_limit, mock_quiesce
+):
     idle_soft_limit = random.randrange(2, idle_limit)
 
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(f"{_MOCK_BASE}ResultPublisher")
     mocker.patch(f"{_MOCK_BASE}threading.Thread")
 
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    mock_ex = mocker.Mock(endpoint_id=endpoint_uuid)
-    conf = Config(
-        executors=[mock_ex],
-        idle_heartbeats_soft=idle_soft_limit,
-        idle_heartbeats_hard=idle_limit,
-    )
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
+    mock_conf.idle_heartbeats_soft = idle_soft_limit
+    mock_conf.idle_heartbeats_hard = idle_limit
+    ei = ep_ix_factory(config=mock_conf)
     ei._quiesce_event = mock_quiesce
 
     ei._main_loop()
@@ -218,7 +242,7 @@ def test_hard_idle_honored(mocker, endpoint_uuid, mock_spt, idle_limit, mock_qui
     transition_count = sum("Possibly idle" in m for m in log_args)
     assert transition_count == 1, "expected logs not spammed"
 
-    shut_down_s = f"{(idle_limit - idle_soft_limit - 1) * conf.heartbeat_period:,}"
+    shut_down_s = f"{(idle_limit - idle_soft_limit - 1) * mock_conf.heartbeat_period:,}"
     idle_msg = next(m for m in log_args if "Possibly idle" in m)
     assert "idle_heartbeats_hard" in idle_msg, "expected to find setting name"
     assert f" shut down in {shut_down_s}" in idle_msg, "expected to find timeout time"
@@ -236,18 +260,15 @@ def test_hard_idle_honored(mocker, endpoint_uuid, mock_spt, idle_limit, mock_qui
     ), "expect process title updated; reflects status"
 
 
-def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt, mock_quiesce):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_unidle_updates_proc_title(
+    mocker, mock_log, mock_conf, ep_ix_factory, mock_spt, mock_quiesce
+):
     mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    conf = Config(
-        executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        heartbeat_period=1,
-        idle_heartbeats_soft=1,
-        idle_heartbeats_hard=3,
-    )
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
+    mock_conf.heartbeat_period = 1
+    mock_conf.idle_heartbeats_soft = 1
+    mock_conf.idle_heartbeats_hard = 3
+    ei = ep_ix_factory(config=mock_conf)
     ei._quiesce_event = mock_quiesce
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = queue.Empty
@@ -283,17 +304,15 @@ def test_unidle_updates_proc_title(mocker, endpoint_uuid, mock_spt, mock_quiesce
     assert last.startswith("[idle; shut down in ")
 
 
-def test_sends_final_status_message_on_shutdown(mocker, endpoint_uuid, mock_quiesce):
+def test_sends_final_status_message_on_shutdown(
+    mocker, mock_conf, ep_ix_factory, endpoint_uuid, mock_quiesce
+):
     mock_rqp = mocker.Mock(spec=ResultPublisher)
     mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
 
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    conf = Config(
-        executors=[mocker.Mock(endpoint_id=endpoint_uuid)],
-        idle_heartbeats_soft=1,
-        idle_heartbeats_hard=2,
-    )
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
+    mock_conf.idle_heartbeats_soft = 1
+    mock_conf.idle_heartbeats_hard = 2
+    ei = ep_ix_factory(config=mock_conf)
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = queue.Empty
     ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
@@ -310,7 +329,7 @@ def test_sends_final_status_message_on_shutdown(mocker, endpoint_uuid, mock_quie
 
 
 def test_faithfully_handles_status_report_messages(
-    mocker, endpoint_uuid, randomstring, mock_quiesce
+    mocker, ep_ix, endpoint_uuid, randomstring, mock_quiesce
 ):
     mock_rqp = mocker.Mock(spec=ResultPublisher)
     mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
@@ -319,20 +338,18 @@ def test_faithfully_handles_status_report_messages(
         endpoint_id=endpoint_uuid, global_state={"sentinel": "foo"}, task_statuses=[]
     )
     status_report_msg = {"message": pack(status_report)}
-    reg_info = {"task_queue_info": {}, "result_queue_info": {}}
-    conf = Config(executors=[mocker.Mock(endpoint_id=endpoint_uuid)])
-    ei = EndpointInterchange(endpoint_id=endpoint_uuid, config=conf, reg_info=reg_info)
-    ei.results_passthrough = mocker.Mock(spec=queue.Queue)
-    ei.results_passthrough.get.side_effect = (status_report_msg, queue.Empty)
-    ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
-    ei.pending_task_queue.get.side_effect = queue.Empty
-    ei._quiesce_event = mock_quiesce
 
-    t = threading.Thread(target=ei._main_loop, daemon=True)
+    ep_ix.results_passthrough = mocker.Mock(spec=queue.Queue)
+    ep_ix.results_passthrough.get.side_effect = (status_report_msg, queue.Empty)
+    ep_ix.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ep_ix.pending_task_queue.get.side_effect = queue.Empty
+    ep_ix._quiesce_event = mock_quiesce
+
+    t = threading.Thread(target=ep_ix._main_loop, daemon=True)
     t.start()
 
     try_assert(lambda: mock_rqp.publish.called)
-    ei.time_to_quit = True
+    ep_ix.time_to_quit = True
     t.join()
 
     assert mock_rqp.publish.call_count > 1, "Test packet, then the final status report"
