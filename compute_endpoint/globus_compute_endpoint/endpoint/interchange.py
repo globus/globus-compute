@@ -10,6 +10,7 @@ import signal
 import sys
 import threading
 import time
+import typing as t
 from concurrent.futures import Future
 
 # multiprocessing.Event is a method, not a class
@@ -38,6 +39,11 @@ from globus_compute_sdk import __version__ as funcx_sdk_version
 from parsl.version import VERSION as PARSL_VERSION
 
 log = logging.getLogger(__name__)
+
+
+class _ResultPassthroughType(t.TypedDict):
+    message: bytes
+    task_id: str | None
 
 
 class EndpointInterchange:
@@ -127,9 +133,7 @@ class EndpointInterchange:
         }
         log.info(f"Platform info: {self.current_platform}")
 
-        self.results_passthrough: queue.Queue[dict[str, bytes | str | None]] = (
-            queue.Queue()
-        )
+        self.results_passthrough: queue.Queue[_ResultPassthroughType] = queue.Queue()
         # Rename self.executor -> self.engine in second round
         self.executor: GlobusComputeEngineBase = self.config.executors[0]
         self._test_start = False
@@ -364,7 +368,7 @@ class EndpointInterchange:
                         return
             log.debug("Exit process-stored-results thread.")
 
-        def process_pending_tasks():
+        def process_pending_tasks() -> None:
             # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
             # globus-compute-manager.  In terms of shutting down (or "rebooting")
             # gracefully, iterate once a second whether a task has arrived.
@@ -425,7 +429,7 @@ class EndpointInterchange:
                         error_details=ResultErrorDetails(code=code, user_message=msg),
                         task_statuses=[],
                     )
-                    res = {
+                    res: _ResultPassthroughType = {
                         "task_id": tid,
                         "message": pack(failed_result),
                     }
@@ -433,7 +437,7 @@ class EndpointInterchange:
 
             log.debug("Exit process-pending-tasks thread.")
 
-        def process_pending_results():
+        def process_pending_results() -> None:
             # Forward incoming results from the globus-compute-manager to the
             # Globus Compute services. For graceful handling of shutdown
             # (or "reboot"), wait up to a second or incoming results before
