@@ -1,9 +1,0 @@
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- Add support for Pydantic V2.
-
-Changed
-^^^^^^^
-
-- Bump ``globus-compute-common`` requirement to version ``0.4.1``.
