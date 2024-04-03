@@ -1,6 +1,5 @@
 Globus Compute - Fast Function Serving
-
-=============================
+======================================
 |licence| |build-status| |docs| |NSF-2004894| |NSF-2004932|
 
 Globus Compute (formerly funcX) is a high-performance function-as-a-service (FaaS)
