@@ -37,24 +37,11 @@ $EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py comp
 
 ```bash
 git add changelog.d/ docs/changelog.rst
-git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
+git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
 git commit -m 'Bump versions and changelog for release'
 git push
 ```
 
 4. Run the release script `./release.sh` from the repo root. This will use
    `tox` and your pypi credentials and will create a signed release tag. At the
-   end of this step, new packages will be published to pypi.
-
-5. Push the release tag, e.g. `git push upstream 2.0.2`
-
-6. Update the version numbers to the next point version and re-add the `-dev` suffix,
-   then commit and push, e.g.
-
-```bash
-$EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
-git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/globus_compute_endpoint/version.py
-git commit -m 'Bump versions for dev'
-git push
-```
-
+   end of this step, new packages will be published to pypi and the tag to GitHub.
