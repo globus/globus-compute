@@ -118,7 +118,7 @@ def build_payload(status):
 
 def on_main_repo():
     """check if running from a fork"""
-    res = os.environ["GITHUB_REPOSITORY"].lower() == "funcx-faas/funcx"
+    res = os.environ["GITHUB_REPOSITORY"].lower() == "globus/globus-compute"
     print(f"Checking main repo: {res}")
     return res
 
