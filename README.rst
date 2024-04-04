@@ -7,10 +7,10 @@ platform that enables intuitive, flexible, efficient, scalable, and performant r
 function execution on existing infrastructure including clouds, clusters, and supercomputers.
 
 .. |licence| image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
-   :target: https://github.com/funcx-faas/funcX/blob/master/LICENSE
+   :target: https://github.com/globus/globus-compute/blob/master/LICENSE
    :alt: Apache Licence V2.0
-.. |build-status| image:: https://github.com/funcx-faas/funcX/actions/workflows/ci.yaml/badge.svg?branch=main
-   :target: https://github.com/funcx-faas/funcX/actions/workflows/ci.yaml
+.. |build-status| image:: https://github.com/globus/globus-compute/actions/workflows/ci.yaml/badge.svg?branch=main
+   :target: https://github.com/globus/globus-compute/actions/workflows/ci.yaml
    :alt: Build status
 .. |docs| image:: https://readthedocs.org/projects/globus-compute/badge/?version=latest
    :target: https://globus-compute.readthedocs.io/en/latest/

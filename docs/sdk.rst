@@ -228,7 +228,7 @@ The AuthorizerLoginManager can be used to simply return static tokens and enable
       https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all
 
 
-More details on the Globus Compute login manager prototcol are available `here. <https://github.com/funcx-faas/funcX/blob/main/compute_sdk/globus_compute_sdk/sdk/login_manager/protocol.py>`_
+More details on the Globus Compute login manager prototcol are available `here. <https://github.com/globus/globus-compute/blob/main/compute_sdk/globus_compute_sdk/sdk/login_manager/protocol.py>`_
 
 
 .. code:: python

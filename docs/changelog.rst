@@ -1437,7 +1437,7 @@ Bug Fixes
 
 - When a provider raised an exception, that exception was then mishandled
   and presented as an AttributeError. This handling now no longer corrupts
-  the exception. https://github.com/funcx-faas/funcX/issues/679
+  the exception. https://github.com/globus/globus-compute/issues/679
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -1469,7 +1469,7 @@ Bug Fixes
 ^^^^^^^^^
 
 - Updates the data size limit for WebSockets from 1MB to 11MB to
-  address issue:https://github.com/funcx-faas/funcX/issues/677
+  address issue:https://github.com/globus/globus-compute/issues/677
 
 - Fixed an issue in which funcx-endpoint commands expected the ``~/.funcx/``
   directory to exist, preventing the endpoint from starting on new installs
@@ -1537,12 +1537,12 @@ Yadu Nand Babuji <yadudoc1729@gmail.com>, Zhuozhao Li <zhuozhl@clemson.edu>
 Bug Fixes
 ^^^^^^^^^
 
-* ``MaxResultSizeExceeded`` is now defined in ``funcx.utils.errors``. Fixes `issue#640 <https://github.com/funcx-faas/funcX/issues/640>`_
+* ``MaxResultSizeExceeded`` is now defined in ``funcx.utils.errors``. Fixes `issue#640 <https://github.com/globus/globus-compute/issues/640>`_
 
-* Fixed Websocket disconnect after idling for 10 mins. See `issue#562 <https://github.com/funcx-faas/funcX/issues/562>`_
+* Fixed Websocket disconnect after idling for 10 mins. See `issue#562 <https://github.com/globus/globus-compute/issues/562>`_
   funcX SDK will not auto-reconnect on remote-side disconnects
 
-* Cleaner logging on the ``funcx-endpoint``. See `PR#643 <https://github.com/funcx-faas/funcX/pull/643>`_
+* Cleaner logging on the ``funcx-endpoint``. See `PR#643 <https://github.com/globus/globus-compute/pull/643>`_
   Previously available ``set_stream_logger``, ``set_file_logger`` methods are now removed.
   For debugging the SDK use standard logging methods, as described in the
   `Python Logging HOWTO <https://docs.python.org/3/howto/logging.html>`_, on
@@ -1560,21 +1560,21 @@ Bug Fixes
     ch.setLevel(logging.DEBUG)
     funcx_logger.addHandler(ch)
 
-* Warn and continue on failure to load a results ack file. `PR#616 <https://github.com/funcx-faas/funcX/pull/616>`_
+* Warn and continue on failure to load a results ack file. `PR#616 <https://github.com/globus/globus-compute/pull/616>`_
 
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-* Result size raised to 10MB from 512KB. See `PR#647 <https://github.com/funcx-faas/funcX/pull/647>`_
+* Result size raised to 10MB from 512KB. See `PR#647 <https://github.com/globus/globus-compute/pull/647>`_
 
 * Version match constraints between the ``funcx-endpoint`` and the ``funcx-worker`` are now relaxed.
   This allows containers of any supported python3 version to be used for running tasks.
-  See `PR#637 <https://github.com/funcx-faas/funcX/pull/637>`_
+  See `PR#637 <https://github.com/globus/globus-compute/pull/637>`_
 
 * New example config for Polaris at Argonne Leadership Computing Facility
 
-* Simplify instructions for installing endpoint secrets to cluster. `PR#623 <https://github.com/funcx-faas/funcX/pull/623>`_
+* Simplify instructions for installing endpoint secrets to cluster. `PR#623 <https://github.com/globus/globus-compute/pull/623>`_
 
 * Webservice and Websocket service URLs are resolved by the names "production" and
   "dev". These values can be passed to FuncX client init as in ``environment="dev"``,
@@ -1613,7 +1613,7 @@ Stephen Rosen <sirosen@globus.org>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
 Bug Fixes
 ^^^^^^^^^
 
-* Updated requirements to exclude ``pyzmq==22.3.0`` due to unstable wheel. `Issue#577 <https://github.com/funcx-faas/funcX/issues/611>`_
+* Updated requirements to exclude ``pyzmq==22.3.0`` due to unstable wheel. `Issue#577 <https://github.com/globus/globus-compute/issues/611>`_
 
 * Updated requirements specification to ``globus-sdk<3.0``
 
@@ -1641,28 +1641,28 @@ Uriel Mandujano <uriel@globus.org>, and Yadu Nand Babuji <yadudoc1729@gmail.com>
 Bug Fixes
 ^^^^^^^^^
 
-* An exception is raised if results arrive over WebSocket result when no future is available to receive it `PR#590 <https://github.com/funcx-faas/funcX/pull/590>`_
+* An exception is raised if results arrive over WebSocket result when no future is available to receive it `PR#590 <https://github.com/globus/globus-compute/pull/590>`_
 
-* Example configs have been updated to use ``init_blocks=0`` as a default. `PR#583 <https://github.com/funcx-faas/funcX/pull/583>`_
+* Example configs have been updated to use ``init_blocks=0`` as a default. `PR#583 <https://github.com/globus/globus-compute/pull/583>`_
 
-* Log result passing to forwarder only for result messages `PR#577 <https://github.com/funcx-faas/funcX/pull/577>`_
+* Log result passing to forwarder only for result messages `PR#577 <https://github.com/globus/globus-compute/pull/577>`_
 
-* Fix zmq option setting bugs `PR#565 <https://github.com/funcx-faas/funcX/pull/565>`_
+* Fix zmq option setting bugs `PR#565 <https://github.com/globus/globus-compute/pull/565>`_
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-* Endpoints will now stay running and retry connecting to funcX hosted services in a disconnection event `PR#588 <https://github.com/funcx-faas/funcX/pull/588>`_, `PR#572 <https://github.com/funcx-faas/funcX/pull/572>`_
+* Endpoints will now stay running and retry connecting to funcX hosted services in a disconnection event `PR#588 <https://github.com/globus/globus-compute/pull/588>`_, `PR#572 <https://github.com/globus/globus-compute/pull/572>`_
 
-* Endpoints will now use ACK messages from the forwarder to confirm that results have been received `PR#571 <https://github.com/funcx-faas/funcX/pull/571>`_
+* Endpoints will now use ACK messages from the forwarder to confirm that results have been received `PR#571 <https://github.com/globus/globus-compute/pull/571>`_
 
-* Endpoints will persist unacked results and resend them during disconnection events `PR#580 <https://github.com/funcx-faas/funcX/pull/580>`_
+* Endpoints will persist unacked results and resend them during disconnection events `PR#580 <https://github.com/globus/globus-compute/pull/580>`_
 
-* Result size limits have been revised from 10MB to 512KB. If result size exceeds 512KB, a ``MaxResultSizeExceeded`` exception is returned. `PR#586 <https://github.com/funcx-faas/funcX/pull/586>`_
+* Result size limits have been revised from 10MB to 512KB. If result size exceeds 512KB, a ``MaxResultSizeExceeded`` exception is returned. `PR#586 <https://github.com/globus/globus-compute/pull/586>`_
 
-* Add additional platform info to registration message `PR#592 <https://github.com/funcx-faas/funcX/pull/592>`_
+* Add additional platform info to registration message `PR#592 <https://github.com/globus/globus-compute/pull/592>`_
 
-* All endpoint logs, (EndpointInterchange.log, interchange.stderr, interchange.stdout) will now be collated into a single log: ``endpoint.log`` `PR#582 <https://github.com/funcx-faas/funcX/pull/582>`_
+* All endpoint logs, (EndpointInterchange.log, interchange.stderr, interchange.stdout) will now be collated into a single log: ``endpoint.log`` `PR#582 <https://github.com/globus/globus-compute/pull/582>`_
 
 funcx & funcx-endpoint v0.3.2
 -----------------------------
@@ -1677,9 +1677,9 @@ Yadu Nand Babuji <yadudoc1729@gmail.com>, Zhuozhao Li <zhuozhl@clemson.edu>
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-* Streamlined release process `PR#569 <https://github.com/funcx-faas/funcX/pull/569>`_, `PR#568 <https://github.com/funcx-faas/funcX/pull/568>`_
+* Streamlined release process `PR#569 <https://github.com/globus/globus-compute/pull/569>`_, `PR#568 <https://github.com/globus/globus-compute/pull/568>`_
 
-* Added a new funcX config for ``Cooley`` at ALCF. `PR#566 <https://github.com/funcx-faas/funcX/pull/566>`_
+* Added a new funcX config for ``Cooley`` at ALCF. `PR#566 <https://github.com/globus/globus-compute/pull/566>`_
 
 
 funcx & funcx-endpoint v0.3.1
@@ -1693,9 +1693,9 @@ Ben Galewsky <bengal1@illinois.edu>, Kirill Nagaitsev <knagaitsev@uchicago.edu>,
 Bug Fixes
 ^^^^^^^^^
 
-* Removed process check from endpoint status check for better cross platform support `PR#559 <https://github.com/funcx-faas/funcX/pull/559>`_
+* Removed process check from endpoint status check for better cross platform support `PR#559 <https://github.com/globus/globus-compute/pull/559>`_
 
-* Fixes to ensure that ``container_cmd_options`` propagate correctly `PR#555 <https://github.com/funcx-faas/funcX/pull/555>`_
+* Fixes to ensure that ``container_cmd_options`` propagate correctly `PR#555 <https://github.com/globus/globus-compute/pull/555>`_
 
 
 
@@ -1713,13 +1713,13 @@ Yongyan Rao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
 Bug Fixes
 ^^^^^^^^^
 
-* ``FuncXClient.get_result(<TASK_ID>)`` will now raise a ``TaskPending`` with an expanded failure reason.  See `PR#502 <https://github.com/funcx-faas/funcX/pull/502>`_
+* ``FuncXClient.get_result(<TASK_ID>)`` will now raise a ``TaskPending`` with an expanded failure reason.  See `PR#502 <https://github.com/globus/globus-compute/pull/502>`_
 
-* funcx-endpoint start and stop commands are now improved to report broken/disconnected states and handle them better. See `issue#327 <https://github.com/funcx-faas/funcX/issues/327>`_
+* funcx-endpoint start and stop commands are now improved to report broken/disconnected states and handle them better. See `issue#327 <https://github.com/globus/globus-compute/issues/327>`_
 
-* Fixed ManagerLost exceptions triggering failures.  See `issue#486 <https://github.com/funcx-faas/funcX/issues/486>`_
+* Fixed ManagerLost exceptions triggering failures.  See `issue#486 <https://github.com/globus/globus-compute/issues/486>`_
 
-* Several fixes and tests for better error reporting. See `PR#523 <https://github.com/funcx-faas/funcX/pull/523>`_
+* Several fixes and tests for better error reporting. See `PR#523 <https://github.com/globus/globus-compute/pull/523>`_
 
 
 
@@ -1770,9 +1770,9 @@ New Functionality
         print("Result : ", future.result())
 
 
-* Endpoint states have been renamed to ``running``, ``stopped``, and ``disconnected``. See `PR#525 <https://github.com/funcx-faas/funcX/pull/525>`_
+* Endpoint states have been renamed to ``running``, ``stopped``, and ``disconnected``. See `PR#525 <https://github.com/globus/globus-compute/pull/525>`_
 
-* Container routing behavior has been improved to support ``soft`` and ``hard`` routing strategies. See `PR#324 <https://github.com/funcx-faas/funcX/pull/324>`_
+* Container routing behavior has been improved to support ``soft`` and ``hard`` routing strategies. See `PR#324 <https://github.com/globus/globus-compute/pull/324>`_
 
 funcx & funcx-endpoint v0.2.3
 -----------------------------
@@ -1791,13 +1791,13 @@ Bug Fixes
 
 * Updated version requirements in ``funcx-endpoint`` to match the ``funcx`` version
 
-* ``funcx-endpoint`` commandline autocomplete has been fixed. See `issue#496 <https://github.com/funcx-faas/funcX/issues/496>`_
+* ``funcx-endpoint`` commandline autocomplete has been fixed. See `issue#496 <https://github.com/globus/globus-compute/issues/496>`_
 
-* ``funcx-endpoint restart`` failure is fixed. See `issue#488 <https://github.com/funcx-faas/funcX/issues/488>`_
+* ``funcx-endpoint restart`` failure is fixed. See `issue#488 <https://github.com/globus/globus-compute/issues/488>`_
 
-* Several fixes and improvements to worker terminate messages which caused workers to crash silently. See `issue#462 <https://github.com/funcx-faas/funcX/pull/462>`_
+* Several fixes and improvements to worker terminate messages which caused workers to crash silently. See `issue#462 <https://github.com/globus/globus-compute/pull/462>`_
 
-* Fixed ``KubernetesProvider`` to use a default of ``init_blocks=0``. See `issue#237 <https://github.com/funcx-faas/funcX/issues/237>`_
+* Fixed ``KubernetesProvider`` to use a default of ``init_blocks=0``. See `issue#237 <https://github.com/globus/globus-compute/issues/237>`_
 
 
 
@@ -1807,16 +1807,16 @@ New Functionality
 
 * ``FuncXClient.get_result(<TASK_ID>)`` will now raise a ``TaskPending`` exception if the task is not complete.
 
-* Multiple improvement to function serialization. See `issue#479 <https://github.com/funcx-faas/funcX/pull/479>`_
+* Multiple improvement to function serialization. See `issue#479 <https://github.com/globus/globus-compute/pull/479>`_
 
   * ``FuncXSerializer`` has been updated to prioritize source-based function serialization methods that offer
     more reliable behavior when the python version across the client and endpoint do not match.
 
   * ``FuncXSerializer`` now attempts deserialization on an isolated process to preempt failures on a remote worker.
 
-* More consistent worker task message types. See `PR#462 <https://github.com/funcx-faas/funcX/pull/462>`_
+* More consistent worker task message types. See `PR#462 <https://github.com/globus/globus-compute/pull/462>`_
 
-* Better OS agnostic path joining. See `PR#458 <https://github.com/funcx-faas/funcX/pull/458>`_
+* Better OS agnostic path joining. See `PR#458 <https://github.com/globus/globus-compute/pull/458>`_
 
 
 
@@ -1851,7 +1851,7 @@ Yongyan Rao <yongyan.rao@gmail.com>, and Zhuozhao Li <zhuozhao@uchicago.edu>
 New Features
 ^^^^^^^^^^^^
 
-* Cleaner reporting when an older non-compatible ``Config`` object is used. Refer: `issue 427 <https://github.com/funcx-faas/funcX/issues/427>`_
+* Cleaner reporting when an older non-compatible ``Config`` object is used. Refer: `issue 427 <https://github.com/globus/globus-compute/issues/427>`_
 
 * Better automated checks at SDK initialization to confirm that the SDK and Endpoint versions are supported by the web-service.
 
@@ -1865,7 +1865,7 @@ Bug Fixes
 
 * Fixed an unsafe string based version comparison check.
 
-* Fixed an issue with poor error reporting when starting non-existent endpoints. Refer: `issue 432 <https://github.com/funcx-faas/funcX/issues/432>`_
+* Fixed an issue with poor error reporting when starting non-existent endpoints. Refer: `issue 432 <https://github.com/globus/globus-compute/issues/432>`_
 
 * Fixed a bug in incorrectly passing the ``funcx_service_address`` to the EndpointInterchange.
 
