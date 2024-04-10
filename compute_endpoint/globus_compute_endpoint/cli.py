@@ -150,29 +150,59 @@ def start_options(f):
     return f
 
 
-def get_ep_dir_by_name_or_uuid(ctx, param, value):
+def get_ep_dir_by_name_or_uuid(ctx, param, value, require_local: bool = True):
+    """
+    :param require_local:  Whether a local directory needs to be present,
+                             specified by name or found via provided UUID.
+                             If this is False, an unrecognized UUID is ok,
+                             presumably used to interact with the web-service.
+    """
     conf_dir = get_config_dir()
     try:
         uuid.UUID(value)
     except ValueError:
         # value is a name
         path = conf_dir / value
+        uuid_provided = False
     else:
-        # value is a uuid
+        uuid_provided = True
         path = Endpoint.get_endpoint_dir_by_uuid(conf_dir, value)
-        if path is None:
-            msg = textwrap.dedent(
-                f"""
-                There is no endpoint on this machine with ID '{value}'!
 
-                1. Please create a configuration template with:
-                    globus-compute-endpoint configure
-                2. Update the configuration
-                3. Start the endpoint
-                """
-            )
-            raise ClickException(msg)
+        # pass the UUID value as a param to be used later, but only if
+        # the endpoint isn't necessarily local.  This require_local check
+        # also avoids adding the `ep_uuid` as a param to some endpoint commands
+        if not require_local:
+            ctx.params["ep_uuid"] = value
+
+    if (path and not path.exists()) or (path is None and require_local):
+        # If a EP name is given but dir doesn't exist, or if a UUID
+        # is given but a local dir is required but missing, error out.
+        # (Otherwise, proceed with at least one of ep_dir/ep_uuid set)
+        if uuid_provided:
+            ep_info = f"with ID {value}"
+            ep_name = "<endpoint_name>"
+        else:
+            ep_info = f"at {path}"
+            ep_name = value
+
+        msg = textwrap.dedent(
+            f"""
+            There is no endpoint configuration on this machine {ep_info}
+
+            1. Please create a configuration template with:
+                globus-compute-endpoint configure {ep_name}
+            2. Update the configuration
+            3. Start the endpoint
+            """
+        )
+        raise ClickException(msg)
+
     ctx.params["ep_dir"] = path
+
+
+def get_ep_dir_uuid_only_ok(ctx, param, value):
+    # A version of get_ep_dir that allows a UUID without a local dir present
+    get_ep_dir_by_name_or_uuid(ctx, param, value, require_local=False)
 
 
 def verify_not_uuid(ctx, param, value):
@@ -193,6 +223,19 @@ def name_or_uuid_arg(f):
         callback=get_ep_dir_by_name_or_uuid,
         default="default",
         expose_value=False,  # callback supplies ep_dir to command functions
+    )(f)
+
+
+def uuid_arg_or_local_dir(f):
+    """
+    A version of the decorator that allows UUIDs that do not have a local presence
+    """
+    return click.argument(
+        "name_or_uuid",
+        required=False,
+        callback=get_ep_dir_uuid_only_ok,
+        default="default",
+        expose_value=False,  # callback supplies ep_dir/ep_uuid to command functions
     )(f)
 
 
@@ -764,40 +807,69 @@ def list_endpoints():
 
 
 @app.command("delete")
-@name_or_uuid_arg
+@uuid_arg_or_local_dir
 @click.option(
     "--force",
     default=False,
     is_flag=True,
-    help="Deletes the local endpoint even if the web service returns an error.",
+    help=(
+        "Ignores any errors encountered while attempting to delete an "
+        "endpoint locally and remotely."
+    ),
 )
 @click.option(
-    "--yes", default=False, is_flag=True, help="Do not ask for confirmation to delete."
+    "--yes",
+    default=False,
+    is_flag=True,
+    help="Do not ask for confirmation to delete endpoints.",
 )
 @common_options
 @handle_auth_errors
-def delete_endpoint(*, ep_dir: pathlib.Path, force: bool, yes: bool):
+def delete_endpoint(
+    *,
+    ep_dir: pathlib.Path | None,
+    ep_uuid: str | None = None,
+    force: bool,
+    yes: bool,
+):
     """Deletes an endpoint and its config."""
 
-    ep_conf = None
-    try:
-        ep_conf = get_config(ep_dir)
-    except Exception as e:
-        print(f"({type(e).__name__}) {e}\n")
-        if not yes:
-            yes = click.confirm(
-                f"Failed to read configuration from {ep_dir}/\n"
-                f"  Are you sure you want to delete endpoint <{ep_dir.name}>?",
-                abort=True,
-            )
+    ep_info = f"< {ep_dir.name} >" if ep_dir else ""
+    if ep_uuid:
+        ep_info += f" ( {ep_uuid} )"
 
     if not yes:
-        yes = click.confirm(
-            f"Are you sure you want to delete endpoint <{ep_dir.name}>?",
+        click.confirm(
+            f"Are you sure you want to delete endpoint {ep_info}?",
             abort=True,
         )
 
-    Endpoint.delete_endpoint(ep_dir, ep_conf, force=force)
+    ep_conf = None
+    error_msg = None
+
+    if ep_dir:
+        try:
+            ep_conf = get_config(ep_dir)
+            if ep_uuid is None:
+                ep_uuid = Endpoint.get_endpoint_id(ep_dir)
+        except Exception:
+            # Endpoint directory exists locally but error loading the config
+            error_msg = f"Failed to read configuration from {ep_dir}/ "
+    else:
+        error_msg = f"No local endpoint configuration available for {ep_uuid}"
+
+    if error_msg:
+        if force:
+            log.info(f"{error_msg}, proceeding to remote deletion by --force ...")
+        else:
+            raise ClickException(
+                f"{error_msg}\n\n"
+                "Please add the --force flag if you wish to proceed with "
+                "attempting to delete the endpoint both locally and from the "
+                "Globus Compute web services."
+            )
+
+    Endpoint.delete_endpoint(ep_dir, ep_conf, force=force, ep_uuid=ep_uuid)
 
 
 @app.command("self-diagnostic")

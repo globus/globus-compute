@@ -60,7 +60,7 @@ def test_file_config_rotates_at_reasonable_size(fs):
 
 def test_file_config_does_not_rotate_unrotatable_sc30480(anon_pipe):
     read_h, write_h = anon_pipe
-    if platform.system() == "darwin":
+    if platform.system() == "Darwin":
         # macOS doesn't have /proc, /dev is equivalent for this test
         logp = pathlib.Path(f"/dev/fd/{write_h}")
     else:

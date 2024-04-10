@@ -436,44 +436,59 @@ class TestStart:
             **mock_optionals,
         )
 
-    @pytest.mark.parametrize("dir_exists", (True, False))
     @pytest.mark.parametrize("web_svc_ok", (True, False))
     @pytest.mark.parametrize("force", (True, False))
-    def test_delete_endpoint(self, mocker, dir_exists, web_svc_ok, force):
+    def test_delete_endpoint(self, mocker, web_svc_ok, force):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         ep_uuid_str = str(uuid.uuid4())
 
-        mock_client = mocker.patch(f"{_MOCK_BASE}Client")
         mock_stop_endpoint = mocker.patch.object(Endpoint, "stop_endpoint")
         mock_rmtree = mocker.patch.object(shutil, "rmtree")
-        mocker.patch.object(Endpoint, "get_endpoint_id", return_value=ep_uuid_str)
-
-        # Immediately exit if the dir doesn't exist
-        if not dir_exists:
-            with pytest.raises(SystemExit):
-                manager.delete_endpoint(config_dir, None, force)
-            return
 
         manager.configure_endpoint(config_dir, None)
+
+        mock_gcc = mocker.Mock()
+        mocker.patch(f"{_MOCK_BASE}Endpoint.get_funcx_client").return_value = mock_gcc
 
         # Exit if the web service call fails and we're not force deleting
         if not web_svc_ok:
             exc = GlobusAPIError(_fake_http_response(status=500, method="POST"))
-            mock_client.return_value.delete_endpoint.side_effect = exc
+            mock_gcc.delete_endpoint.side_effect = exc
+            mock_gcc.get_endopint_status.side_effect = exc
 
             if not force:
                 with pytest.raises(SystemExit), patch(f"{_MOCK_BASE}log") as mock_log:
-                    manager.delete_endpoint(config_dir, None, force)
+                    manager.delete_endpoint(
+                        config_dir, force=force, ep_uuid=ep_uuid_str
+                    )
                 a, _k = mock_log.critical.call_args
-                assert "without deleting the endpoint" in a[0], "expected notice"
+                assert "without deleting the local endpoint" in a[0], "expected notice"
 
                 assert not mock_stop_endpoint.called
                 assert not mock_rmtree.called
                 return
+        else:
+            mock_gcc.get_endpoint_status.return_value = {
+                # "offline" is tested in test_endpoint_unit
+                "status": "online"
+            }
 
-        manager.delete_endpoint(config_dir, None, force)
+        try:
+            manager.delete_endpoint(
+                config_dir,
+                ep_config=None,
+                force=force,
+                ep_uuid=ep_uuid_str,
+            )
 
-        mock_client.return_value.delete_endpoint.assert_called_with(ep_uuid_str)
-        mock_stop_endpoint.assert_called_with(config_dir, None)
-        mock_rmtree.assert_called_with(config_dir)
+            if web_svc_ok:
+                mock_stop_endpoint.assert_called_with(config_dir, None, remote=False)
+            assert mock_gcc.delete_endpoint.called
+            assert mock_gcc.delete_endpoint.call_args[0][0] == ep_uuid_str
+            mock_rmtree.assert_called_with(config_dir)
+        except SystemExit as e:
+            # If currently running, error out if force is not specified
+            # the message str itself is confirmed in test_endpoint_unit
+            assert not force
+            assert e.code == -1
