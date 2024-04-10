@@ -36,12 +36,11 @@ Data limits are used to ensure that the inputs and results associated with funct
 by Globus Compute both at the user level as well as in the aggregate. Without these limits functions that either
 consume or produce large volumes of data could overload the system.
 
-The current data limit is set to **5MB** on task submissions, which applies to both individual functions
-as well as batch submissions. The SDK will raise a ``MaxRequestSizeExceeded`` exception when this limit
-is exceeded. This limit currently is much larger than the limit on result size since this limit applies
-to batch job requests.
+The current data limit is set to **10MB** on task submissions, which applies to both individual functions
+as well as batch submissions. The SDK will raise a ``GlobusAPIError`` exception stating
+``TASK_PAYLOAD_TOO_LARGE`` when this limit is exceeded.
 
-Similarly, there is a data limit of **512KB** on result size on a per-function basis. If the serialized
+Similarly, there is a data limit of **10MB** on result size on a per-function basis. If the serialized
 result from a task exceeds this limit, a ``MaxResultSizeExceeded`` exception is reported by the SDK when
 the task request is queried. In this case, the result is unrecoverable.
 
@@ -60,8 +59,3 @@ difficult. On the other hand, tasks once launched can be lost on the client-side
 programmatic error. To avoid such cases, Globus Compute considers a task to be abandoned when there has been
 no activity on a task for more than **2 weeks**. However, when a result is available but has not been
 fetched by the client within **30 minutes** of completion, the result is marked as abandoned.
-
-
-
-
-
