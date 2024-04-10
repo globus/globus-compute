@@ -3,6 +3,44 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.18.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.18.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``GLOBUS_COMPUTE_CLIENT_ID`` and ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment
+  variables to configure client logins.
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed a bug in ``GlobusComputeEngine`` where a faulty endpoint-config could result in
+  the endpoint repeatedly submitting jobs to the batch scheduler.  The endpoint will
+  not shut down, reporting the root cause in ``endpoint.log``
+
+- Fixed bug where ``GlobusComputeEngine`` lost track of submitted jobs that failed to
+  have workers connect back. The endpoint will now report a fault if multiple jobs
+  have failed to connect back and shutdown, tasks submitted to the endpoint will
+  return an exception.
+
+Deprecated
+^^^^^^^^^^
+
+- ``FUNCX_SDK_CLIENT_ID`` and ``FUNCX_SDK_CLIENT_SECRET`` have been deprecated in favor
+  of their ``GLOBUS_COMPUTE_*`` cousins.
+
+Changed
+^^^^^^^
+
+- ``GlobusComputeEngine``'s ``strategy`` kwarg now only accepts ``str``, valid options are
+  ``{'none', 'simple'}`` where ``simple`` is the default.
+- The maximum duration that workers are allowed to idle when using ``GlobusComputeEngine``
+  can now be configured with the new kwarg ``max_idletime`` which accepts a float and defaults
+  to 120s.
+
 .. _changelog-2.17.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.17.0
