@@ -227,7 +227,7 @@ Pinning Workers to devices
 
 Many modern clusters provide multiple accelerators per compute note, yet many applications are best suited to using a
 single accelerator per task. Globus Compute supports pinning each worker to different accelerators using the ``available_accelerators``
-option of the ``HighThroughputEngine``. Provide either the number of accelerators (Globus Compute will assume they are named
+option of the ``GlobusComputeEngine``. Provide either the number of accelerators (Globus Compute will assume they are named
 in integers starting from zero) or a list of the names of the accelerators available on the node. Each Globus Compute worker
 will have the following environment variables set to the worker specific identity assigned:
 ``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``, ``SYCL_DEVICE_FILTER``.
