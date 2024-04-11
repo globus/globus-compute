@@ -374,7 +374,7 @@ class EndpointInterchange:
             # gracefully, iterate once a second whether a task has arrived.
             nonlocal num_tasks_forwarded
             while not self._quiesce_event.is_set():
-                if executor.executor_exception:
+                if getattr(executor, "executor_exception", False):
                     self.time_to_quit = True
                     log.exception(executor.executor_exception)
 
