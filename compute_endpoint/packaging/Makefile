@@ -19,12 +19,13 @@ ifeq ($(wildcard $(VENV_PY)),)
 endif
 
 # "package name - dash" and "package name - underscore"
-PKG_NAME_D := $(shell cd ../; $(VENV_PY) setup.py --name)
-PKG_NAME_U := $(shell echo -n $(PKG_NAME_D) | tr '-' '_')
+PKG_NAME := "globus-compute-agent"
+PIP_NAME_D := $(shell cd ../; $(VENV_PY) setup.py --name)
+PIP_NAME_U := $(shell echo $(PIP_NAME_D) | tr '-' '_')
 
 PKG_VERSION := $(shell cd ../; $(VENV_PY) setup.py --version | tr '-' '~')
-PKG_WHEEL = $(PKG_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
-PREREQS_TARBALL_NAME = $(PKG_NAME_U)-prereqs-py$(PY_VERSION)-$(PKG_VERSION).tar.xz
+PKG_WHEEL = $(PIP_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
+PREREQS_TARBALL_NAME = $(PIP_NAME_U)-prereqs-py$(PY_VERSION)-$(PKG_VERSION).tar.xz
 
 OS_CODENAME := $(shell test -f /etc/os-release && . /etc/os-release; echo $${VERSION_CODENAME:-focal})
 
@@ -55,8 +56,9 @@ show_vars:   ##-For debugging, show the Makefile variables; will install a venv
 	@echo "VIRTUALENV           : $(VIRTUALENV)"
 	@echo "VENV_PY              : $(VENV_PY)"
 	@echo "VENV_PIP             : $(VENV_PIP)"
-	@echo "PKG_NAME_D           : $(PKG_NAME_D)"
-	@echo "PKG_NAME_U           : $(PKG_NAME_U)"
+	@echo "PIP_NAME_D           : $(PIP_NAME_D)"
+	@echo "PIP_NAME_U           : $(PIP_NAME_U)"
+	@echo "PKG_NAME             : $(PKG_NAME)"
 	@echo "PKG_VERSION          : $(PKG_VERSION)"
 	@echo "PREREQS_TARBALL_NAME : $(PREREQS_TARBALL_NAME)"
 	@echo "PKG_WHEEL            : $(PKG_WHEEL)"
@@ -70,7 +72,7 @@ clean:  ##-Remove the venv, build/ dist/, prereqs tarball, and the package wheel
 
 .PHONY: distclean
 distclean: clean  ##-Run `clean` target, then additionally remove venv-*, *tar.xz, *whl
-	rm -rf -- venv-* "$(PKG_NAME_U)"-*tar.xz "$(PKG_NAME_U)"-*whl
+	rm -rf -- venv-* "$(PIP_NAME_U)"-*tar.xz "$(PIP_NAME_U)"-*whl
 
 _build_needs:
 	@/bin/echo -e "\033[36;1;40mChecking build dependencies before starting build\033[m ...\n"
@@ -123,16 +125,25 @@ deb_build_needs:  ##-Check that necessary executables are available before start
 deb: deb_build_needs dist  ##-Build a Debian package of the Globus Compute Endpoint (.deb)
 	(   cd dist/ \
 	 && rm -rf debbuild/ \
-	 && mkdir -p debbuild/$(PKG_NAME_D)/wheels/ \
-	 && tar -C debbuild/$(PKG_NAME_D)/wheels/ -xf "$(PREREQS_TARBALL_NAME)" \
-	 && cp $(PKG_WHEEL) debbuild/$(PKG_NAME_D)/wheels/ \
-	 && cp -R ../debian debbuild/$(PKG_NAME_D)/ \
-	 && cp ../package_shim.sh debbuild/$(PKG_NAME_D)/ \
-	 && cd debbuild/$(PKG_NAME_D)/ \
+	 && mkdir -p debbuild/$(PKG_NAME)/wheels/ \
+	 && tar -C debbuild/$(PKG_NAME)/wheels/ -xf "$(PREREQS_TARBALL_NAME)" \
+	 && cp $(PKG_WHEEL) debbuild/$(PKG_NAME)/wheels/ \
+	 && cp -R ../debian debbuild/$(PKG_NAME)/ \
+	 && cp ../package_shim.sh debbuild/$(PKG_NAME)/ \
+	 && cd debbuild/$(PKG_NAME)/ \
 	 && mv debian/changelog.in.in debian/changelog \
 	 && sed -i debian/changelog \
-	    -e "s/@VERSION@/$(PKG_VERSION)/g" \
+	    -e "s/@PACKAGE_NAME@/$(PKG_NAME)/g" \
+	    -e "s/@PACKAGE_VERSION@/$(PKG_VERSION)/g" \
 	    -e "s/@distro@/$(OS_CODENAME)/g" \
+	 && sed -i debian/control \
+	    -e "s/@PACKAGE_NAME@/$(PKG_NAME)/g" \
+	    -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
+	 && sed -i debian/copyright -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
+	 && sed -i debian/rules \
+	    -e "s/@PACKAGE_NAME@/$(PKG_NAME)/g" \
+	    -e "s/@PACKAGE_VERSION@/$(PKG_VERSION)/g" \
+	    -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
 	 && dpkg-buildpackage -uc -us \
 	)
 	@echo "\nDEB package successfully built:"
@@ -146,16 +157,17 @@ rpm: rpm_build_needs dist  ##-Build an RPM package of the Globus Compute Endpoin
 	(   cd dist/ \
 	 && pwd && ls \
 	 && rm -rf rpmbuild/ \
-	 && mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SPECS,SRPMS} rpmbuild/SOURCES/$(PKG_NAME_D)/wheels \
-	 && tar -C rpmbuild/SOURCES/$(PKG_NAME_D)/wheels -xf "$(PREREQS_TARBALL_NAME)" \
-	 && cp $(PKG_WHEEL) rpmbuild/SOURCES/$(PKG_NAME_D)/wheels/ \
-	 && cp ../package_shim.sh rpmbuild/SOURCES/$(PKG_NAME_D)/ \
+	 && mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SPECS,SRPMS} rpmbuild/SOURCES/$(PKG_NAME)/wheels \
+	 && tar -C rpmbuild/SOURCES/$(PKG_NAME)/wheels -xf "$(PREREQS_TARBALL_NAME)" \
+	 && cp $(PKG_WHEEL) rpmbuild/SOURCES/$(PKG_NAME)/wheels/ \
+	 && cp ../package_shim.sh rpmbuild/SOURCES/$(PKG_NAME)/ \
 	 && sed \
-	    -e "s/@VERSION@/$(PKG_VERSION)/g" \
-	    -e "s/@PACKAGE_NAME@/$(PKG_NAME_D)/g" \
+	    -e "s/@PACKAGE_VERSION@/$(PKG_VERSION)/g" \
+	    -e "s/@PACKAGE_NAME@/$(PKG_NAME)/g" \
 	    -e "s/@PACKAGE_WHEEL@/$(PKG_WHEEL)/g" \
-	    < ../fedora/$(PKG_NAME_D).spec.in > ./$(PKG_NAME_D).spec \
-	 && HOME="$$(pwd)" rpmbuild -ba ./$(PKG_NAME_D).spec \
+	    -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
+	    < ../fedora/$(PKG_NAME).spec.in > ./$(PKG_NAME).spec \
+	 && HOME="$$(pwd)" rpmbuild -ba ./$(PKG_NAME).spec \
 	)
 	@echo -e "\nRPM package successfully built:"
 	@ls -lh dist/rpmbuild/RPMS/**/*rpm

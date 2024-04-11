@@ -1,4 +1,4 @@
-globus-compute-endpoint (@VERSION@.@distro@) @distro@; urgency=low
+@PACKAGE_NAME@ (@PACKAGE_VERSION@.@distro@) @distro@; urgency=low
 
   * Initial release as a Debian package
 

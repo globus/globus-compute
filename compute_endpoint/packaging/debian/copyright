@@ -1,5 +1,5 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: globus-compute-endpoint
+Upstream-Name: @PIP_NAME@
 Source: https://github.com/globus/globus-compute/tree/main/compute_endpoint
 
 Files: *

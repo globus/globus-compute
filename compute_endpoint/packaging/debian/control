@@ -1,4 +1,4 @@
-Source: globus-compute-endpoint
+Source: @PACKAGE_NAME@
 Priority: optional
 Section: contrib/science
 Maintainer: Globus Support <support@globus.org>
@@ -6,10 +6,10 @@ Build-Depends: debhelper (>= 13.6), globus-python (>= 3.9), dh-exec, dh-python
 Standards-Version: 4.6.0
 Homepage: https://globus-compute.readthedocs.io/
 
-Package: globus-compute-endpoint
+Package: @PACKAGE_NAME@
 Architecture: amd64
 Depends: ${misc:Depends}, globus-python (>= 3.9)
-Provides: globus-compute-endpoint
+Provides: @PACKAGE_NAME@
 Description: agent to receive tasks as sent from the Globus Compute SDK
  This module is intended for system administrators; end-users will most-likely
- want to install the `globus-compute-endpoint` directly from PyPI.
+ want to install the `@PIP_NAME@` package directly from PyPI.
