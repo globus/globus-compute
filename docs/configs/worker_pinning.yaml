@@ -1,5 +1,5 @@
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     max_workers_per_node: 4
 
     # `available_accelerators` may be a natural number or a list of strings.
