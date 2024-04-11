@@ -14,7 +14,8 @@ export DEB_BUILD_OPTIONS
 # see FEATURE AREAS in dpkg-buildflags(1)
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
-name := globus-compute-endpoint
+name := @PACKAGE_NAME@
+package_executable := @PIP_NAME@
 VIRTUAL_ENV := /opt/$(name)/venv-py39
 TMP_BUILD_DIR := debian/$(name)-tmp
 TMP_VIRTUAL_ENV := $(TMP_BUILD_DIR)$(VIRTUAL_ENV)
@@ -32,7 +33,7 @@ override_dh_auto_configure:
 	. "$(TMP_VIRTUAL_ENV)/bin/activate"; \
 	set -x; \
 	python3 -mpip install --no-index --no-cache-dir -I --compile -U wheels/pip-*.whl; \
-	python3 -mpip install --no-index --no-cache-dir -I --pre --compile --find-links=file://$${PWD}/wheels/ $(name)
+	python3 -mpip install --no-index --no-cache-dir -I --pre --compile --find-links=file://$${PWD}/wheels/ "@PIP_NAME@"
 
 .PHONY: override_dh_auto_clean
 override_dh_auto_clean:
@@ -50,8 +51,8 @@ override_dh_auto_install:
 	  "$(DEST_VIRTUAL_ENV)" \
 	  "$(DEST_ROOT)$(_sbindir)" \
 	  "$(DEST_ROOT)$(_unitdir)"; \
-	install -m 755 "$${PWD}/package_shim.sh" "$(DEST_ROOT)$(_sbindir)/$(name)"
-	sed -i "$(DEST_ROOT)$(_sbindir)/$(name)" -e "s|@VIRTUAL_ENV@|$(VIRTUAL_ENV)|"
+	sed -i "$${PWD}/package_shim.sh" -e "s|@VIRTUAL_ENV@|$(VIRTUAL_ENV)|"
+	install -m 755 "$${PWD}/package_shim.sh" "$(DEST_ROOT)$(_sbindir)/$(package_executable)"
 	tar -C $(TMP_VIRTUAL_ENV) -cf - . | tar -C $(DEST_VIRTUAL_ENV) -xf -; \
 	set +x; \
 	for script in "$(DEST_VIRTUAL_ENV)"/bin/*; do \
