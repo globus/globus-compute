@@ -3,6 +3,17 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.18.1:
+
+globus-compute-sdk & globus-compute-endpoint v2.18.1
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed a bug that caused endpoints using the old ``HighThroughputExecutor`` to fail
+  silently.
+
 .. _changelog-2.18.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.18.0
