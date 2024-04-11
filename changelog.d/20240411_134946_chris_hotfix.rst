@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Fixed a bug that caused endpoints using the old ``HighThroughputExecutor`` to fail
-  silently.
