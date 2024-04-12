@@ -117,6 +117,7 @@ deb: deb_build_needs dist  ##-Build a Debian package of the Globus Compute Endpo
 	 && tar -C debbuild/globus-compute-endpoint/wheels/ --strip 1 -xf "$(PREREQS_TARBALL_NAME)" \
 	 && cp -R ../debian debbuild/globus-compute-endpoint/ \
 	 && cp $(PKG_WHEEL) debbuild/globus-compute-endpoint/wheels/ \
+	 && cp ../package_shim.sh debbuild/globus-compute-endpoint/ \
 	 && cd debbuild/globus-compute-endpoint/ \
 	 && mv debian/changelog.in.in debian/changelog \
 	 && sed -i -e "s/@VERSION@/$(PKG_VERSION)/g" -e "s/@distro@/$(OS_CODENAME)/g" debian/changelog \

@@ -56,6 +56,8 @@ override_dh_auto_install:
 	  "$(DEST_ROOT)$(_sbindir)" \
 	  "$(DEST_ROOT)$(_mandir)" \
 	  "$(DEST_ROOT)$(_unitdir)"; \
+	install -m 755 "$${PWD}/package_shim.sh" "$(DEST_ROOT)$(_sbindir)/$(name)"
+	sed -i "$(DEST_ROOT)$(_sbindir)/$(name)" -e "s|@VIRTUAL_ENV@|$(VIRTUAL_ENV)|"
 	tar -C $(TMP_VIRTUAL_ENV) -cf - . | tar -C $(DEST_VIRTUAL_ENV) -xf -; \
 	set +x; \
 	for script in "$(DEST_VIRTUAL_ENV)"/bin/*; do \
@@ -71,7 +73,6 @@ override_dh_auto_install:
 	  $(DEST_VIRTUAL_ENV)/lib/python*/site-packages/tests; \
 	sed -i "$(DEST_VIRTUAL_ENV)/bin/activate" -e "s|^VIRTUAL_ENV=.*|VIRTUAL_ENV=$(VIRTUAL_ENV)|"; \
 	ln -s "python$$(/opt/globus-python/bin/python3 -c 'import sys,platform; sys.stdout.write(".".join(platform.python_version_tuple()[:2]))')" "$(DEST_VIRTUAL_ENV)/lib/python"; \
-	ln -s ../../$(VIRTUAL_ENV)/bin/globus-compute-endpoint $(DEST_ROOT)/usr/sbin/globus-compute-endpoint; \
 	:
 
 .PHONY: override_dh_python3
