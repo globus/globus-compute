@@ -31,7 +31,7 @@ REQUIRES = [
     # building from source, which may mean there's an issue in the packaged library
     # further investigation may be needed if the issue persists in the next pyzmq
     # release
-    "pyzmq>=22.0.0,!=22.3.0,<=23.2.0",
+    "pyzmq>=22.0.0,!=22.3.0,<27.0.0",
     # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
