@@ -10,18 +10,6 @@ config = {
 }
 
 
-@pytest.fixture(autouse=True, scope="session")
-def load_funcx_session(request, pytestconfig):
-    """Load Globus Compute sdk client for the entire test suite,
-
-    The special path `local` indicates that configuration will not come
-    from a pytest managed configuration file; in that case, see
-    load_dfk_local_module for module-level configuration management.
-    """
-
-    # config = pytestconfig.getoption('config')[0]
-
-
 def pytest_addoption(parser):
     """Add funcx-specific command-line options to pytest."""
     parser.addoption(
