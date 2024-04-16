@@ -1,6 +1,7 @@
-display_name: SDSC Expanse
+display_name: Expanse@SDSC
+
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     max_workers_per_node: 2
     worker_debug: False
 
@@ -25,7 +26,11 @@ engine:
         # e.g., "module load anaconda3; source activate gce_env"
         worker_init: {{ COMMAND }}
 
-        init_blocks: 1
+        # Command to be run before starting a worker
+        # e.g., "module load anaconda3; source activate gce_env"
+        worker_init: "source ~/setup.sh"
+
+        init_blocks: 0
         min_blocks: 0
         max_blocks: 1
 
