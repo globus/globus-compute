@@ -456,6 +456,50 @@ a custom ``globus-compute-endpoint`` wrapper:
 
 (The use of ``exec`` is not critical, but keeps the process tree tidy.)
 
+Debugging User Endpoints
+========================
+
+During implementation, most users are accustomed to using the ``--debug`` flag (or
+equivalent) to get more information.  (And usually, caveat emptor, as the amount of
+information can be overwhelming.)  The ``globus-compute-endpoint`` executable similarly
+implements that flag.  However, if applied to the MEP, that flag will not carry-over to
+the child UEP instances.  In particular, the command executed by the MEP is:
+
+.. code-block:: python
+   :caption: arguments to ``os.execvpe``
+
+   proc_args = ["globus-compute-endpoint", "start", ep_name, "--die-with-parent"]
+
+Note the lack of the ``--debug`` flag; by default UEPs will not emit DEBUG level logs.
+To place UEPs into debug mode, use the ``debug`` top-level configuration directive:
+
+.. code-block:: yaml
+   :caption: ``user_config_template.yaml``
+   :emphasize-lines: 1
+
+   debug: true
+   display_name: Debugging template
+   idle_heartbeats_soft: 10
+   idle_heartbeats_hard: 5760
+   engine:
+      ...
+
+Note that this is *also* how to get the UEP to emit its configuration to the log, which
+may be helpful in determining which set of logs are associated with which configuration
+or just generally while implementing and debugging.  The configuration is emitted to the
+logs very early on in the UEP bootup stage; look for the following sentinel lines::
+
+   [TIMESTAMP] DEBUG ... Begin Compute endpoint configuration (5 lines):
+      ...
+   End Compute endpoint configuration
+
+To this end, the authors have found the following command line helpful for pulling out
+the configuration from the logs:
+
+.. code-block:: console
+
+   $ sed -n "/Begin Compute/,/End Compute/p" ~/.globus_compute/uep.[...]/endpoint.log | less
+
 Installing the MEP as a Service
 ===============================
 

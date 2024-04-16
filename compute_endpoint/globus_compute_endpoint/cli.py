@@ -641,6 +641,18 @@ def _do_start_endpoint(
                     console_enabled=state.log_to_console,
                     no_color=state.no_color,
                 )
+                if config_str is not None:
+                    num_lines = config_str.count("\n") + 1  # +1 == 0-based
+                    _rendered_config = config_str.replace("\n", "\n  | ")
+
+                    log.debug(
+                        f"Begin Compute endpoint configuration ({num_lines:,} lines):"
+                        f"\n  | {_rendered_config}"
+                        f"\nEnd Compute endpoint configuration"
+                    )
+                    del _rendered_config
+            del config_str
+
         except Exception as e:
             if isinstance(e, ClickException):
                 raise
