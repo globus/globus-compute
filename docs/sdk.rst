@@ -220,13 +220,20 @@ The AuthorizerLoginManager is responsible for serving tokens to the Client as ne
 The AuthorizerLoginManager can be used to simply return static tokens and enable programmatic use of the Client.
 
 .. note::
-    To access the funcX API the scope that needs to be requested from
-    Globus auth is FuncXClient.FUNCXSCOPE, which is:
+    Accessing the Globus Compute API requires the Globus Auth scope:
 
-    .. code::
+    .. code-block:: text
 
       https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all
 
+    This is also programmatically available as the ``FUNCX_SCOPE`` attribute on
+    the ``Client`` class:
+
+    .. code-block:: python
+
+      >>> from globus_compute_sdk import Client
+      >>> Client.FUNCX_SCOPE
+      'https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all'
 
 More details on the Globus Compute login manager prototcol are available `here. <https://github.com/globus/globus-compute/blob/main/compute_sdk/globus_compute_sdk/sdk/login_manager/protocol.py>`_
 

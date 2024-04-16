@@ -1,7 +1,7 @@
 Quickstart
 ==========
 
-**Globus Compute** client and endpoint software releases are available on `PyPI <https://pypi.org/project/funcx/>`_.
+**Globus Compute** client and endpoint software releases are available on `PyPI <https://pypi.org/project/globus-compute-sdk/>`_.
 
 You can try Globus Compute on a hosted `Jupyter notebook <https://jupyter.demo.globus.org/hub/user-redirect/lab/tree/globus-jupyter-notebooks/Compute_Introduction.ipynb>`_
 
