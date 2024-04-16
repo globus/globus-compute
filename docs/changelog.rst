@@ -831,8 +831,9 @@ New Functionality
   and ``globus_compute_sdk.Executor``
 
 - The endpoint agent command is now ``globus-compute-endpoint`` instead of ``funcx-endpoint``.
+
 - The above should be sufficient for many users.  If other classes from the old packages were
-  in use, please see https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html for more
+  in use, please see https://globus-compute.readthedocs.io/en/2.18.1/funcx_upgrade.html for more
   detailed change information and for additional upgrade requirements, if any.
 
 Deprecated

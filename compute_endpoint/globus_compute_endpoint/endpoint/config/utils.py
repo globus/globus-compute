@@ -10,7 +10,6 @@ import shlex
 import yaml
 from click import ClickException
 from globus_compute_common.pydantic_v1 import ValidationError
-from packaging.version import Version
 
 from .config import Config
 from .model import ConfigModel
@@ -21,19 +20,6 @@ log = logging.getLogger(__name__)
 def _load_config_py(conf_path: pathlib.Path) -> Config | None:
     if not conf_path.exists():
         return None
-
-    try:
-        from funcx_endpoint.version import VERSION
-
-        if Version(VERSION) < Version("2.0.0"):
-            msg = (
-                "To avoid compatibility issues with Globus Compute, please uninstall "
-                "funcx-endpoint or upgrade funcx-endpoint to >=2.0.0. Note that the "
-                "funcx-endpoint package is now deprecated."
-            )
-            raise ClickException(msg)
-    except ModuleNotFoundError:
-        pass
 
     try:
         spec = importlib.util.spec_from_file_location("config", conf_path)
@@ -61,34 +47,11 @@ def _load_config_py(conf_path: pathlib.Path) -> Config | None:
         )
         raise ClickException(msg) from err
 
-    except ModuleNotFoundError as err:
-        # Catch specific error when old config.py references funcx_endpoint
-        if "No module named 'funcx_endpoint'" in err.msg:
-            msg = (
-                f"{conf_path} contains import statements from a previously "
-                "configured endpoint that uses the (deprecated) "
-                "funcx-endpoint library. Please update the imports to reference "
-                "globus_compute_endpoint.\n\ni.e.\n"
-                "    from funcx_endpoint.endpoint.utils.config -> "
-                "from globus_compute_endpoint.endpoint.config\n"
-                "    from funcx_endpoint.executors -> "
-                "from globus_compute_endpoint.executors\n"
-                "\n"
-                "You can also use the command "
-                "`globus-compute-endpoint update_funcx_config [endpoint_name]` "
-                "to update them\n"
-            )
-            raise ClickException(msg) from err
-        else:
-            log.exception(err.msg)
-            raise
-
     except Exception:
         log.exception(
             "Globus Compute v2.0.0 made several non-backwards compatible changes to "
-            "the config. Your config might be out of date. "
-            "Refer to "
-            "https://funcx.readthedocs.io/en/latest/endpoints.html#configuring-funcx"
+            "the config. Your config might be out of date.  Refer to "
+            "https://globus-compute.readthedocs.io/en/latest/endpoints.html#configuring-an-endpoint"  # noqa
         )
         raise
 
