@@ -6,6 +6,7 @@ import logging
 import os
 import pathlib
 import random
+import re
 import shlex
 import typing as t
 import uuid
@@ -324,6 +325,30 @@ def test_cli_debug_overrides_config(mock_setup_log, run_line, mock_cli_state, ep
     assert mock_ensure.debug is True, "Verify test setup"
     assert "debug" in k
     assert k["debug"] is True, "Expect --debug flag overrides config"
+
+
+def test_debug_emits_ephemeral_config(run_line, mock_cli_state, ep_name, randomstring):
+    mock_ep, mock_ensure = mock_cli_state
+
+    mock_ensure.debug = False
+    ep_dir = mock_ensure.endpoint_config_dir / ep_name
+    ep_dir.mkdir(parents=True)
+    dname = randomstring()
+    config = {
+        "debug": True,
+        "display_name": dname,
+        "engine": {"type": "ThreadPoolEngine"},
+    }
+    data = {"config": yaml.safe_dump(config)}
+
+    with mock.patch(f"{_MOCK_BASE}log.debug") as mock_logd:
+        run_line(f"start {ep_name}", stdin=json.dumps(data))
+
+    a, *_ = mock_logd.call_args
+    # Per documentation, verify sentinels
+    assert a[0].startswith("Begin Compute endpoint"), "Expect start sentinel"
+    assert a[0].endswith("\nEnd Compute endpoint configuration"), "Expect end sentinel"
+    assert re.search(rf"\n +\| display_name: {dname}\n", a[0]), "Expect config emitted"
 
 
 def test_configure_validates_name(mock_command_ensure, run_line):
