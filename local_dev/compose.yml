@@ -1,0 +1,16 @@
+version: "3.10"
+name: globus-compute
+services:
+
+  endpoint:
+    build:
+      context: ../
+      dockerfile: endpoint_dev.Dockerfile
+      args:
+        LOCAL_USER: ${LOCAL_USER:-${USER}}
+    volumes:
+      - ../:/opt/globus-compute
+      - ./docker_data/.globus_compute:/home/${LOCAL_USER:-${USER}}/.globus_compute
+      - ./docker_data/.globus_compute_root:/root/.globus_compute
+    command: bash -c "socat TCP-LISTEN:${WEB_SVC_PORT:-5000},fork TCP:host.docker.internal:${WEB_SVC_PORT:-5000} & \
+                      socat TCP-LISTEN:${AMQP_SVC_PORT:-5672},fork TCP:host.docker.internal:${WEB_SVC_PORT:-5672}"
