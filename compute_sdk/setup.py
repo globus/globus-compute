@@ -26,7 +26,7 @@ REQUIRES = [
     "texttable>=1.6.7",
 ]
 DOCS_REQUIRES = [
-    "sphinx",
+    "sphinx>=7.3.2",
     "furo==2023.9.10",
 ]
 
