@@ -45,7 +45,7 @@ def execute_task(
     exec_start = TaskTransition(
         timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
     )
-
+    os.environ["GC_TASK_UUID"] = task_id
     result_message: dict[
         str,
         uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
