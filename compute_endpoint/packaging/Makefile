@@ -1,6 +1,8 @@
 .DEFAULT: help
 
-PYTHON3 := $(shell command -v /opt/globus-python/bin/python3)
+# Work with the (apparently) different setup in OpenSUSE, where `make` doesn't
+# invoke /bin/sh in the same manner as other platforms.
+PYTHON3 := $$($(SHELL) -c "command -v /opt/globus-python/bin/python3")
 
 PY_FULL_VERSION := $$($(PYTHON3) -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
 PY_MAJOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f1 )
@@ -150,8 +152,7 @@ deb: deb_build_needs dist  ##-Build a Debian package of the Globus Compute Endpo
 	@ls -lh dist/debbuild/*deb
 
 rpm_build_needs:  ##-Check that necessary executables are available before starting the RPM build.
-	@[ -x "$$(command -v rpmbuild)" ] || { echo "'rpmbuild' not found; missing 'rpmdevtools' package?"; exit 1; }
-
+	@[ -x "$$(command -v rpmbuild)" ] || { echo "'rpmbuild' not found; missing 'rpmdevtools' or 'rpm-build' package(s)?"; exit 1; }
 
 rpm: rpm_build_needs dist  ##-Build an RPM package of the Globus Compute Endpoint (.rpm)
 	(   cd dist/ \
@@ -167,7 +168,7 @@ rpm: rpm_build_needs dist  ##-Build an RPM package of the Globus Compute Endpoin
 	    -e "s/@PACKAGE_WHEEL@/$(PKG_WHEEL)/g" \
 	    -e "s/@PIP_NAME@/$(PIP_NAME_D)/g" \
 	    < ../fedora/$(PKG_NAME).spec.in > ./$(PKG_NAME).spec \
-	 && HOME="$$(pwd)" rpmbuild -ba ./$(PKG_NAME).spec \
+	 && HOME="$$(pwd)" rpmbuild --define "_topdir $$(pwd)/rpmbuild" -ba ./$(PKG_NAME).spec \
 	)
 	@echo -e "\nRPM package successfully built:"
 	@ls -lh dist/rpmbuild/RPMS/**/*rpm
