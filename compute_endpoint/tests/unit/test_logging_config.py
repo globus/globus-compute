@@ -1,6 +1,7 @@
 import logging.config
 import os
 import pathlib
+import platform
 import typing as t
 
 import pytest
@@ -59,7 +60,12 @@ def test_file_config_rotates_at_reasonable_size(fs):
 
 def test_file_config_does_not_rotate_unrotatable_sc30480(anon_pipe):
     read_h, write_h = anon_pipe
-    logp = pathlib.Path(f"/proc/self/fd/{write_h}")
+    if platform.system() == "darwin":
+        # macOS doesn't have /proc, /dev is equivalent for this test
+        logp = pathlib.Path(f"/dev/fd/{write_h}")
+    else:
+        # Should be "linux", "Windows" should have other problems
+        logp = pathlib.Path(f"/proc/self/fd/{write_h}")
     conf = _get_file_dict_config(logp, False, False, True)
 
     file_handler = conf["handlers"]["logfile"]
