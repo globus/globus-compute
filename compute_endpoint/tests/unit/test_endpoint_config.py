@@ -97,3 +97,28 @@ def test_config_warns_bad_identity_mapping_path(mocker, config_dict_mu, tmp_path
 def test_public(public: t.Any):
     c = Config(public=public)
     assert c.public is (public is True)
+
+
+@pytest.mark.parametrize("engine_type", ("GlobusComputeEngine", "HighThroughputEngine"))
+@pytest.mark.parametrize("strategy", ("simple", {"type": "SimpleStrategy"}, None))
+def test_conditional_engine_strategy(
+    engine_type: str, strategy: t.Union[str, dict, None], config_dict: dict
+):
+    config_dict["engine"]["type"] = engine_type
+    config_dict["engine"]["strategy"] = strategy
+
+    if engine_type == "GlobusComputeEngine":
+        if isinstance(strategy, str) or strategy is None:
+            ConfigModel(**config_dict)
+        elif isinstance(strategy, dict):
+            with pytest.raises(ValidationError) as pyt_e:
+                ConfigModel(**config_dict)
+            assert "object is incompatible" in str(pyt_e.value)
+
+    elif engine_type == "HighThroughputEngine":
+        if isinstance(strategy, dict) or strategy is None:
+            ConfigModel(**config_dict)
+        elif isinstance(strategy, str):
+            with pytest.raises(ValidationError) as pyt_e:
+                ConfigModel(**config_dict)
+            assert "string is incompatible" in str(pyt_e.value)

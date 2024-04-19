@@ -83,7 +83,7 @@ class ProviderModel(BaseConfigModel):
 class EngineModel(BaseConfigModel):
     type: str = "HighThroughputEngine"
     provider: t.Optional[ProviderModel]
-    strategy: t.Optional[StrategyModel]
+    strategy: t.Optional[t.Union[str, StrategyModel]]
     address: t.Optional[t.Union[str, AddressModel]]
     worker_ports: t.Optional[t.Tuple[int, int]]
     worker_port_range: t.Optional[t.Tuple[int, int]]
@@ -97,6 +97,29 @@ class EngineModel(BaseConfigModel):
 
     class Config:
         validate_all = True
+
+    @root_validator(pre=True)
+    @classmethod
+    def _validate_engine_strategy(cls, values: dict):
+        engine_type = values.get("type")
+        strategy = values.get("strategy")
+        if engine_type == "GlobusComputeEngine" and isinstance(strategy, dict):
+            raise ValueError(
+                "strategy as an object is incompatible with the GlobusComputeEngine."
+                " Please update to the string value 'simple' or null.\n"
+                "  E.g.,\n"
+                "  strategy: simple\n"
+            )
+        elif engine_type == "HighThroughputEngine" and isinstance(strategy, str):
+            raise ValueError(
+                "strategy as a string is incompatible with the HighThroughputEngine."
+                " Please update to an object or null.\n"
+                "  E.g.,\n"
+                "  strategy:\n"
+                "      type: SimpleStrategy\n"
+                "      max_idletime: 300\n"
+            )
+        return values
 
 
 class ConfigModel(BaseConfigModel):
