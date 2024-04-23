@@ -47,6 +47,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         encrypted: bool = True,
         strategy: str | None = None,
         job_status_kwargs: t.Optional[JobStatusPollerKwargs] = None,
+        working_dir: str | os.PathLike | None = None,
+        run_in_sandbox: bool = False,
         **kwargs,
     ):
         """``GlobusComputeEngine`` is a shim over `Parsl's HighThroughputExecutor
@@ -85,6 +87,14 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         encrypted: bool
             Flag to enable/disable encryption (CurveZMQ). Default is True.
 
+        working_dir: str | os.PathLike | None
+            Directory within which functions should execute. When set to None,
+            defaults to the endpoint_dir (~/.globus_compute/<endpoint_name>/)
+
+        run_in_sandbox: bool
+            Functions will run in a sandbox directory under the working_dir
+            if this option is enabled. Default: False
+
         """  # noqa: E501
         self.run_dir = os.getcwd()
         self.label = label
@@ -109,6 +119,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 **kwargs,
             )
         self.executor = executor
+        self.working_dir = working_dir
+        self.run_in_sandbox = run_in_sandbox
         if strategy is None:
             strategy = "simple"
 
@@ -181,6 +193,12 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     ):
         assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
         assert run_dir, "GCExecutor requires kwarg:run_dir at start"
+
+        if self.working_dir:
+            if not os.path.isabs(self.working_dir):
+                self.working_dir = os.path.join(run_dir, self.working_dir)
+        else:
+            self.working_dir = run_dir
 
         self.endpoint_id = endpoint_id
         self.run_dir = run_dir

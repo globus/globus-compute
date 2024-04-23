@@ -28,6 +28,8 @@ def execute_task(
     task_body: bytes,
     endpoint_id: t.Optional[uuid.UUID],
     result_size_limit: int = 10 * 1024 * 1024,
+    run_dir: t.Optional[t.Union[str, os.PathLike]] = None,
+    run_in_sandbox: bool = False,
 ) -> bytes:
     """Execute task is designed to enable any executor to execute a Task payload
     and return a Result payload, where the payload follows the globus-compute protocols
@@ -38,6 +40,9 @@ def execute_task(
     task_body: packed message as bytes
     endpoint_id: uuid string or None
     result_size_limit: result size in bytes
+    run_dir: directory to run function in
+    run_in_sandbox: if enabled run task under run_dir/<task_uuid>
+
     Returns
     -------
     messagepack packed Result
@@ -50,6 +55,13 @@ def execute_task(
         str,
         uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
     ]
+
+    if run_dir:
+        os.makedirs(run_dir, exist_ok=True)
+        os.chdir(run_dir)
+        if run_in_sandbox:
+            os.makedirs(str(task_id))  # task_id is expected to be unique
+            os.chdir(str(task_id))
 
     env_details = get_env_details()
     try:

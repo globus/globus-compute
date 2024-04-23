@@ -1,3 +1,4 @@
+import logging
 import random
 import uuid
 from multiprocessing.synchronize import Event as EventType
@@ -105,3 +106,29 @@ def test_reset_reconnect_attempt_limit_when_stable(mocker, fs):
     ei._main_loop()
     assert ei._reconnect_fail_counter == 0, "Expect stable determination after 2 HBs"
     assert ei._quiesce_event.wait.call_count == 3, "Verify loop iterations"
+
+
+def test_rundir_passed_to_gcengine(mocker, fs):
+    "Test EndpointInterchange passing run_dir to GCE on start"
+
+    mocker.patch(f"{_mock_base}ResultPublisher")
+    mocker.patch(f"{_mock_base}threading.Thread")
+    mocker.patch(f"{_mock_base}multiprocessing")
+    mock_gcengine = mocker.Mock()
+    mock_gcengine.start = mocker.Mock()
+
+    ei = EndpointInterchange(
+        config=Config(executors=[mock_gcengine]),
+        endpoint_id=str(uuid.uuid4()),
+        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+    )
+    ei._quiesce_event = mock.Mock(spec=EventType)
+
+    logging.warning(f"{ei.executor=}")
+    ei.start_engine()
+
+    mock_gcengine.start.assert_called_with(
+        results_passthrough=ei.results_passthrough,
+        endpoint_id=ei.endpoint_id,
+        run_dir=ei.logdir,
+    )

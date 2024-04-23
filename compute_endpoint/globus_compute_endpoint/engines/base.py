@@ -1,4 +1,5 @@
 import logging
+import os
 import queue
 import threading
 import time
@@ -88,6 +89,8 @@ class GlobusComputeEngineBase(ABC):
         # endpoint interchange happy
         self.container_type: t.Optional[str] = None
         self.run_dir: t.Optional[str] = None
+        self.working_dir: t.Optional[t.Union[str, os.PathLike]] = None
+        self.run_in_sandbox: bool = False
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
         self.results_passthrough: queue.Queue[dict[str, t.Union[bytes, str, None]]] = (
@@ -219,7 +222,14 @@ class GlobusComputeEngineBase(ABC):
                 "exception_history": [],
             }
         try:
-            future = self._submit(execute_task, task_id, packed_task, self.endpoint_id)
+            future = self._submit(
+                execute_task,
+                task_id,
+                packed_task,
+                self.endpoint_id,
+                run_dir=self.working_dir,
+                run_in_sandbox=self.run_in_sandbox,
+            )
         except Exception as e:
             future = Future()
             future.set_exception(e)
