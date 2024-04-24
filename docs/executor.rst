@@ -328,6 +328,23 @@ processing:
         for f in concurrent.futures.as_completed(futs):
             print("Received:", f.result())
 
+AMQP Port
+---------
+
+As of v2.11.0, newly configured endpoints use AMQP over port 443 by default,
+since firewall rules usually allow outbound HTTPS.
+
+The port that the Executor uses to fetch task results remains the default AMQP
+5671, but can be overridden via the ``amqp_port`` parameter during
+instantiation.  This may be necessary in cases where outbound 5671 is also
+unavailable in the task submission environment, such as some cloud VMs
+like BinderHub:
+
+.. code-block:: python
+
+  >>> from globus_compute_sdk import Executor
+  >>> gce = Executor(amqp_port=443)
+
 
 .. |Client| replace:: ``Client``
 .. _Client: reference/client.html
