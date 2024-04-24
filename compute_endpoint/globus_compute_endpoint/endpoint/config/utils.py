@@ -120,7 +120,7 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
                 "\n1. Please create a configuration template with:"
                 f"\n\t{configure_command}"
                 "\n2. Update the configuration"
-                "\n3. Start the endpoint\n"
+                "\n3. Try again\n"
             )
         raise ClickException(msg) from err
 
