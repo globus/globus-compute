@@ -5,7 +5,6 @@ Name:           @PACKAGE_NAME@
 %global         pythonversion           py39
 %global         VIRTUAL_ENV             /opt/%{name}/venv-%{pythonversion}
 %global         src_dir                 %{_sourcedir}/%{name}
-%global         wheels                  %{src_dir}/wheels
 %global         package_executable      @PIP_NAME@
 %global         globus_python3_version  3.9
 %global         __python                /opt/globus-python/bin/python3
@@ -33,6 +32,8 @@ Requires(pre):  /usr/sbin/useradd, /usr/bin/getent
 Requires(postun): /usr/sbin/userdel
 
 Group:          System Environment/Daemons
+Source:         @PACKAGE_TARBALL_NAME@
+Source1:        @PREREQS_TARBALL_NAME@
 
 License:        Apache 2.0
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}
@@ -48,24 +49,20 @@ want to install the `@PIP_NAME@` directly from PyPI.
 %prep
 %global DEST_VIRTUAL_ENV "$PWD/TMP_RPM_BUILD_ROOT%{VIRTUAL_ENV}"
 
-[ -f %{wheels}/@PACKAGE_WHEEL@ ] || {
-    C="" R=""
-    [ -t 2 ] && { C="\033[91;1;40m"; R="\033[m"; }
-    >&2 echo -e "${C}Main source wheel not found.  Reminder: the Makefile sets that up.  (Hint: make rpm)${R}";
-    exit 1
-}
+%setup -n "@PACKAGE_SOURCE_DIR@"
+%setup -n "@PREREQS_DIR@" -T -D -b 1
 
 rm -rf "%{DEST_VIRTUAL_ENV}"
 %__python -mvenv "%{DEST_VIRTUAL_ENV}"
 
 %build
 . "%{DEST_VIRTUAL_ENV}/bin/activate"
-python3 -mpip install --no-index --no-cache-dir -I --compile -U %{wheels}/pip-*.whl
+python3 -mpip install --no-index --no-cache-dir -I --compile -U pip-*.whl
+python3 -mpip install --pre --compile --no-index --no-cache-dir -I --find-links=./ "@PIP_NAME@"
 deactivate
 
 %install
 . "%{DEST_VIRTUAL_ENV}/bin/activate"
-python3 -mpip install --pre --compile --no-index --no-cache-dir -I --find-links=file://%{wheels} "@PIP_NAME@"
 
 tar -C "${PWD}/TMP_RPM_BUILD_ROOT" -cf - . | tar -C "${RPM_BUILD_ROOT}" -xf -
 
@@ -84,7 +81,7 @@ sed -i "${RPM_BUILD_ROOT}%{VIRTUAL_ENV}/bin/activate" \
     -e "s|^VIRTUAL_ENV=.*|VIRTUAL_ENV=%{VIRTUAL_ENV}|"
 
 install -d -m 755 ${RPM_BUILD_ROOT}%{_sbindir}
-install -m 755 %{src_dir}/package_shim.sh "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}"
+install -m 755 "%{_builddir}/@PACKAGE_SOURCE_DIR@"/package_shim.sh "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}"
 sed -i "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}" -e "s|@VIRTUAL_ENV@|%{VIRTUAL_ENV}|"
 
 %pre
@@ -105,7 +102,7 @@ sed -i "${RPM_BUILD_ROOT}%{_sbindir}/%{package_executable}" -e "s|@VIRTUAL_ENV@|
 %{_sbindir}/%{package_executable}
 
 %changelog
-* Mon Apr 08 2024 Globus Support <support@globus.org> - @PACKAGE_VERSION@-%{release}
+* Mon May 02 2024 Globus Toolkit <support@globus.org> - @PACKAGE_VERSION@-%{release}
   * Initial release as an RPM package
 
   * Includes support for multi-user Globus Compute Endpoints; see

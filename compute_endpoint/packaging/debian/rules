@@ -30,10 +30,10 @@ _unitdir=/lib/systemd/system
 .PHONY: override_dh_auto_configure
 override_dh_auto_configure:
 	$(PYTHON3) -mvenv $${PWD}/$(TMP_VIRTUAL_ENV)
-	. "$(TMP_VIRTUAL_ENV)/bin/activate"; \
+	. "$${PWD}/$(TMP_VIRTUAL_ENV)/bin/activate"; \
 	set -x; \
-	python3 -mpip install --no-index --no-cache-dir -I --compile -U wheels/pip-*.whl; \
-	python3 -mpip install --no-index --no-cache-dir -I --pre --compile --find-links=file://$${PWD}/wheels/ "@PIP_NAME@"
+	python -mpip install --no-index --no-cache-dir -I --compile -U prereqs/pip-*.whl; \
+	python -mpip install --no-index --no-cache-dir -I --pre --compile --find-links=file://$${PWD}/prereqs/ "@PIP_NAME@"
 
 .PHONY: override_dh_auto_clean
 override_dh_auto_clean:
@@ -77,6 +77,9 @@ override_dh_python3:
 .PHONY: override_dh_builddeb
 override_dh_builddeb:
 	dh_builddeb -- -Zxz
+
+.PHONY: override_dh_auto_build
+override_dh_auto_build:    # empty == we do it ourselves in auto_install (above)
 
 %:
 	dh $@ --with python3 --with systemd
