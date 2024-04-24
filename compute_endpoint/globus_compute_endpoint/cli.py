@@ -16,6 +16,7 @@ from datetime import datetime
 import click
 from click import ClickException
 from click_option_group import optgroup
+from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.utils import (
@@ -907,6 +908,24 @@ def create_auth_policy(
         return resp["policy"]["id"]
     except GlobusAPIError as e:
         raise ClickException(f"Unable to create authentication policy: [{e.text}]")
+
+
+@app.command(
+    "enable-on-boot",
+    help="Enable on-boot persistence; restarts the endpoint when the machine restarts.",
+)
+@name_or_uuid_arg
+def enable_on_boot_cmd(ep_dir: pathlib.Path):
+    enable_on_boot(ep_dir)
+
+
+@app.command(
+    "disable-on-boot",
+    help="Disable on-boot persistence.",
+)
+@name_or_uuid_arg
+def disable_on_boot_cmd(ep_dir: pathlib.Path):
+    disable_on_boot(ep_dir)
 
 
 def cli_run():
