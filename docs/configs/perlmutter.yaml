@@ -1,10 +1,7 @@
+display_name: Permutter@NERSC
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     worker_debug: False
-
-    strategy:
-        type: SimpleStrategy
-        max_idletime: 300
 
     address:
         type: address_by_interface
@@ -12,6 +9,7 @@ engine:
 
     provider:
         type: SlurmProvider
+        partition: debug
 
         # We request all hyperthreads on a node.
         # GPU nodes have 128 threads, CPU nodes have 256 threads
@@ -21,8 +19,9 @@ engine:
 
         # string to prepend to #SBATCH blocks in the submit
         # script to the scheduler
-        # For GPUs in the debug qos eg: "#SBATCH --constraint=gpu -q debug"
+        # For GPUs in the debug qos eg: "#SBATCH --constraint=gpu"
         scheduler_options: {{ OPTIONS }}
+
         # Your NERSC account, eg: "m0000"
         account: {{ NERSC_ACCOUNT }}
 
