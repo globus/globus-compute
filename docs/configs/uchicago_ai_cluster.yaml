@@ -1,5 +1,6 @@
+display_name: AI Cluster CS@UChicago
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     label: fe.cs.uchicago
     worker_debug: False
 
@@ -12,17 +13,21 @@ engine:
         partition: general
 
         # This is a hack. We use hostname ; to terminate the srun command, and
-        # start our own
+        # start our own.
         launcher:
             type: SrunLauncher
             overrides: >
                 hostname; srun --ntasks={{ TOTAL_WORKERS }}
                 --ntasks-per-node={{ WORKERS_PER_NODE }}
                 --gpus-per-task=rtx2080ti:{{ GPUS_PER_WORKER }}
-                --gpu-bind=map_gpu:{{ GPU_MAP }}
+                --gpu-bind=map_gpu:{{ GPU_MAP }} \
+            # To request a single gpu, use the following:
+            #   hostname; srun --ntasks=1
+            #   --ntasks-per-node=1
+            #   --gres=gpu:1 \
 
         # Scale between 0-1 blocks with 2 nodes per block
-        nodes_per_block: {{ NODES_PER_JOB }}
+        nodes_per_block: 1
         init_blocks: 0
         min_blocks: 0
         max_blocks: 1
