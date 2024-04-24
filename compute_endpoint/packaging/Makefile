@@ -2,9 +2,9 @@
 
 # Work with the (apparently) different setup in OpenSUSE, where `make` doesn't
 # invoke /bin/sh in the same manner as other platforms.
-PYTHON3 := $$($(SHELL) -c "command -v /opt/globus-python/bin/python3")
+PYTHON3 := $$("$(SHELL)" -c "command -v /opt/globus-python/bin/python3")
 
-PY_FULL_VERSION := $$($(PYTHON3) -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
+PY_FULL_VERSION := $$("$(PYTHON3)" -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
 PY_MAJOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f1 )
 PY_MINOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f2 )
 PY_VERSION := $(PY_MAJOR_VERSION)$(PY_MINOR_VERSION)
@@ -16,16 +16,16 @@ VENV_PY := $(shell pwd)/$(VIRTUALENV)/bin/python
 # This if conditional before the PKG_ variables, so as to ensure we have setuptools;
 # not so ideal, but at the moment, I don't know how to do better.  Hmm.
 ifeq ($(wildcard $(VENV_PY)),)
-	_DUMMY := $(shell $(PYTHON3) -mvenv "$(VIRTUALENV)")
-	_DUMMY := $(shell $(VENV_PY) -mpip install -U pip -U setuptools)
+	_DUMMY := $(shell "$(PYTHON3)" -mvenv "$(VIRTUALENV)")
+	_DUMMY := $(shell "$(VENV_PY)" -mpip install -U pip -U setuptools)
 endif
 
 # "package name - dash" and "package name - underscore"
 PKG_NAME := "globus-compute-agent"
-PIP_NAME_D := $(shell cd ../; $(VENV_PY) setup.py --name)
+PIP_NAME_D := $(shell cd ../; "$(VENV_PY)" setup.py --name)
 PIP_NAME_U := $(shell echo $(PIP_NAME_D) | tr '-' '_')
 
-PKG_VERSION := $(shell cd ../; $(VENV_PY) setup.py --version | tr '-' '~')
+PKG_VERSION := $(shell cd ../; "$(VENV_PY)" setup.py --version | tr '-' '~')
 PKG_WHEEL = $(PIP_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
 PREREQS_TARBALL_NAME = $(PIP_NAME_U)-prereqs-py$(PY_VERSION)-$(PKG_VERSION).tar.xz
 
@@ -77,7 +77,9 @@ distclean: clean  ##-Run `clean` target, then additionally remove venv-*, *tar.x
 	rm -rf -- venv-* "$(PIP_NAME_U)"-*tar.xz "$(PIP_NAME_U)"-*whl
 
 _build_needs:
-	@/bin/echo -e "\033[36;1;40mChecking build dependencies before starting build\033[m ...\n"
+	@([ -t 1 ] && _C="\033[36;1;40m" _R="\033[m"; \
+	  /bin/echo -e "$${_C}Checking build dependencies before starting build$${_R} ...\n"; \
+	)
 	@[ -x "$$(command -v git)" ] || { echo "'git' not found; missing 'git' package?"; exit 1; }
 	@[ -x "$$(command -v xz)" ] || { echo "'xz' not found; missing 'xz' package?"; exit 1; }
 	@[ -x "$$(command -v sed)" ] || { echo "'sed' not found; missing 'sed' package?"; exit 1; }
@@ -92,9 +94,9 @@ $(VENV_PY): _build_needs
 		echo "    make PYTHON3=/path/to/python"; \
 		exit 1; \
 	fi
-	$(PYTHON3) -mvenv $(VIRTUALENV)
-	. $(VIRTUALENV)/bin/activate
-	@$(VENV_PY) -m pip install -U pip -U setuptools -U build
+	"$(PYTHON3)" -mvenv "$(VIRTUALENV)"
+	. "$(VIRTUALENV)/bin/activate"
+	@"$(VENV_PY)" -m pip install -U pip -U setuptools -U build
 
 $(PKG_WHEEL): $(VENV_PY)
 	(   rm -rf build/ \
@@ -105,7 +107,7 @@ $(PKG_WHEEL): $(VENV_PY)
 	   { /bin/echo -e "\nBUILD COMPUTE FROM A RELEASE TAG (current branch: $$(git branch --show-current))"; exit 1; } \
 	    fi \
 	 && rm -rf tests/ \
-	 && $(VENV_PY) -m build --wheel -o ../../ \
+	 && "$(VENV_PY)" -m build --wheel -o ../../ \
 	)
 
 wheel: $(PKG_WHEEL)  ##-Make the wheel (note that this does *not* include dependencies)
