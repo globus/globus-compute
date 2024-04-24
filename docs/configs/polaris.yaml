@@ -1,40 +1,38 @@
+display_name: Polaris@ALCF
+
 engine:
-    type: HighThroughputEngine
-    max_workers_per_node: 1
+  type: GlobusComputeEngine
+  max_workers_per_node: 4
 
-    # Un-comment to give each worker exclusive access to a single GPU
-    # available_accelerators: 4
+  # Un-comment to give each worker exclusive access to a single GPU
+  # available_accelerators: 4
 
-    strategy:
-        type: SimpleStrategy
-        max_idletime: 300
+  address:
+    type: address_by_interface
+    ifname: bond0
 
-    address:
-        type: address_by_interface
-        ifname: bond0
+  provider:
+    type: PBSProProvider
 
-    provider:
-        type: PBSProProvider
+    launcher:
+      type: MpiExecLauncher
+      # Ensures 1 manger per node, work on all 64 cores
+      bind_cmd: --cpu-bind
+      overrides: --depth=64 --ppn 1
 
-        launcher:
-            type: MpiExecLauncher
-            # Ensures 1 manger per node, work on all 64 cores
-            bind_cmd: --cpu-bind
-            overrides: --depth=64 --ppn 1
+    account: {{ YOUR_POLARIS_ACCOUNT }}
+    queue: debug-scaling
+    cpus_per_node: 32
+    select_options: ngpus=4
 
-        account: {{ YOUR_POLARIS_ACCOUNT }}
-        queue: preemptable
-        cpus_per_node: 32
-        select_options: ngpus=4
+    # e.g., "#PBS -l filesystems=home:grand:eagle\n#PBS -k doe"
+    scheduler_options: "#PBS -l filesystems=home:grand:eagle"
 
-        # e.g., "#PBS -l filesystems=home:grand:eagle\n#PBS -k doe"
-        scheduler_options: "#PBS -l filesystems=home:grand:eagle"
+    # Node setup: activate necessary conda environment and such
+    worker_init: {{ COMMAND }}
 
-        # Node setup: activate necessary conda environment and such
-        worker_init: {{ COMMAND }}
-
-        walltime: 01:00:00
-        nodes_per_block: 1
-        init_blocks: 0
-        min_blocks: 0
-        max_blocks: 2
+    walltime: 01:00:00
+    nodes_per_block: 1
+    init_blocks: 0
+    min_blocks: 0
+    max_blocks: 2

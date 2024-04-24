@@ -1,3 +1,5 @@
+display_name: Midway3@rcc.uchicago.edu
+
 engine:
     type: HighThroughputEngine
     max_workers_per_node: 2

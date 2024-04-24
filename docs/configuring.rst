@@ -108,37 +108,6 @@ The KubernetesProvider exploits the Python Kubernetes API, which assumes that yo
    :language: yaml
 
 
-Theta (ALCF)
-^^^^^^^^^^^^
-
-.. image:: _static/images/ALCF-Theta_111016-1000px.jpg
-
-The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
-**Theta** supercomputer. This example uses the ``HighThroughputEngine`` and connects to Theta's Cobalt scheduler
-using the ``CobaltProvider``. This configuration assumes that the script is being executed on the login nodes of Theta.
-
-.. literalinclude:: configs/theta.yaml
-   :language: yaml
-
-The following configuration is an example to use singularity container on Theta.
-
-.. literalinclude:: configs/theta_singularity.yaml
-   :language: yaml
-
-
-Cooley (ALCF)
-^^^^^^^^^^^^^
-
-.. image:: _static/images/31174D02-Cooley800.jpg
-
-The following snippet shows an example configuration for executing on Argonne Leadership Computing Facility's
-**Cooley** cluster. This example uses the ``HighThroughputEngine`` and connects to Cooley's Cobalt scheduler
-using the ``CobaltProvider``. This configuration assumes that the script is being executed on the login nodes of Cooley.
-
-.. literalinclude:: configs/cooley.yaml
-   :language: yaml
-
-
 Polaris (ALCF)
 ^^^^^^^^^^^^^^
 
@@ -199,17 +168,6 @@ running on a login node, uses the ``SlurmProvider`` to interface with the schedu
 .. literalinclude:: configs/bridges-2.yaml
    :language: yaml
 
-Stampede2 (TACC)
-^^^^^^^^^^^^^^^^
-
-.. image:: _static/images/stampede2.jpg
-
-The following snippet shows an example configuration for accessing the Stampede2 system at the Texas Advanced Computing Center (TACC).
-The configuration below assumes that the user is running on a login node, uses the ``SlurmProvider`` to interface with the scheduler,
-and uses the ``SrunLauncher`` to launch workers.
-
-.. literalinclude:: configs/stampede2.yaml
-   :language: yaml
 
 FASTER (TAMU)
 ^^^^^^^^^^^^^
