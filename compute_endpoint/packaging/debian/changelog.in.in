@@ -1,8 +1,8 @@
-@PACKAGE_NAME@ (@PACKAGE_VERSION@.@distro@) @distro@; urgency=low
+@PACKAGE_NAME@ (@PACKAGE_VERSION@-1.@distro@) @distro@; urgency=low
 
   * Initial release as a Debian package
 
   * Includes support for multi-user Globus Compute Endpoints; see
     https://globus-compute.readthedocs.io/ for more information.
 
- -- Maintainer: Globus Support <support@globus.org>  Mon, 08 Apr 2024 11:01:30 -0500
+ -- Globus Toolkit <support@globus.org>  Mon, 02 May 2024 14:52:16 -0500

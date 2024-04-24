@@ -1,8 +1,8 @@
 Source: @PACKAGE_NAME@
 Priority: optional
 Section: contrib/science
-Maintainer: Globus Support <support@globus.org>
-Build-Depends: debhelper (>= 13.6), globus-python (>= 3.9), dh-exec, dh-python
+Maintainer: Globus Toolkit <support@globus.org>
+Build-Depends: debhelper (>= 12), globus-python (>= 3.9), dh-exec, dh-python
 Standards-Version: 4.6.0
 Homepage: https://globus-compute.readthedocs.io/
 
