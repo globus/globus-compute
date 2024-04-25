@@ -3,6 +3,23 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.19.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.19.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Expanded support for `pyzmq` dependency to include versions up to `26.x.x`.
+
+Bug Fixes
+^^^^^^^^^
+
+- We now raise an informative error when a user sets the ``strategy`` configuration field
+  to an incorrect value type for a given engine. For example, the ``GlobusComputeEngine``
+  expects ``strategy`` to be a string or null, not an object.
+
 .. _changelog-2.18.1:
 
 globus-compute-sdk & globus-compute-endpoint v2.18.1
