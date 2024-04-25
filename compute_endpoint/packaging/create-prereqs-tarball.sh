@@ -90,12 +90,12 @@ done > dependent-prereqs.txt
 
 modified_time="$(TZ=UTC0 date --rfc-3339=seconds)"
 
-TZ=UTC0 tar -C "$download_dir/" --format=posix \
+TZ=UTC0 tar --format=posix \
   --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime,delete=mtime \
   --mtime="$modified_time" \
   --numeric-owner \
   --owner=0 \
   --group=0 \
   --mode="go-rwx,u+rw" \
-  -cf - . \
-  | xz -9
+  -cf - "$download_dir/" \
+  | gzip -9

@@ -1,0 +1,98 @@
+#! groovy
+
+@Library('gcs-build-scripts') _
+
+pipeline {
+    agent none
+    options {
+        buildDiscarder(
+            logRotator(
+                numToKeepStr: '5',
+                artifactNumToKeepStr: '1',
+                artifactDaysToKeepStr: '7'
+            )
+        )
+        timeout(time: 3, unit: 'HOURS')
+        disableConcurrentBuilds()
+    }
+    stages {
+        stage ("Prep source") {
+            agent {label "package_creator"}
+            steps {
+                checkout scm
+                script {
+                    env.SOURCE_STASH_NAME = "${UUID.randomUUID()}";
+                    sh "git clean -fdx"
+                    sh "git checkout kevin_package_test"
+
+                    dir("compute_endpoint/packaging/") {
+                        sh(script: "make show_vars")
+                        sh(script: "make setup_dist_for_deb setup_dist_for_rpm")
+                        sh "mv dist/ ${env.SOURCE_STASH_NAME}"
+                        stash(name: env.SOURCE_STASH_NAME, includes: "${env.SOURCE_STASH_NAME}/**/*")
+                    }
+
+                    def venv_py = "${env.WORKSPACE}/compute_endpoint/packaging/venv/bin/python"
+                    def py_full_version = sh(script: "'${venv_py}' -c 'import sys; print(\"{}.{}\".format(*sys.version_info))'", returnStdout: true).trim()
+                    def (py_epoch_version, py_major_version) = py_full_version.tokenize(".")
+                    def pkg_version = "not yet set"
+
+                    dir("compute_endpoint/") {
+                        env.PACKAGE_VERSION = sh(script: "${venv_py} setup.py --version", returnStdout: true).trim().replace("-", "~")
+                        echo "pkg_version = ${env.PACKAGE_VERSION}"
+                    }
+                    env.PKG_TARBALL = "globus_compute_endpoint-${env.PACKAGE_VERSION.replace("~", "")}.tar.gz"
+                    env.PREREQS_TARBALL = "globus_compute_endpoint-prereqs-py${py_epoch_version}${py_major_version}-${env.PACKAGE_VERSION}.tar.gz"
+                }
+            }
+        }
+        stage ("Build packages") {
+            steps {
+                script {
+                    lock(resource: 'globus-compute-agent-build') {
+                        parallel "debian": {
+                            def extra_tarball_map = [
+                                prereqs: env.PREREQS_TARBALL
+                            ]
+                            env.DEB_ARTIFACTS_STASH = buildDebian(
+                                env.SOURCE_STASH_NAME,
+                                env.PKG_TARBALL,
+                                require_gcs5_repo: true,
+                                extra_tarball_map: extra_tarball_map
+                            )
+                        }, "rpm": {
+                            env.RPM_ARTIFACTS_STASH = buildMock(
+                                env.SOURCE_STASH_NAME,
+                                env.PKG_TARBALL,
+                                true
+                            )
+                        }, "failFast": false
+                    }
+                }
+            }
+        }
+        stage ("Publish packages") {
+            agent { label "master" }
+            steps {
+                script {
+                    def stashname = "${UUID.randomUUID()}"
+
+                    sh "ls -lR"
+                    dir("artifacts") {
+                        if (env.DEB_ARTIFACTS_STASH) {
+                            unstash(name: env.DEB_ARTIFACTS_STASH)
+                        }
+                        if (env.RPM_ARTIFACTS_STASH) {
+                            unstash(name: env.RPM_ARTIFACTS_STASH)
+                        }
+
+                        stash(name: stashname, includes: "**/*")
+                        deleteDir()
+                    }
+                    publishResults(stashname, "globus-compute-agent",  env.PACKAGE_VERSION, false)
+                    deleteDir()
+                }
+            }
+        }
+    }
+}
