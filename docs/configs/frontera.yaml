@@ -1,5 +1,7 @@
+display_name: Frontera@TACC
+
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     max_workers_per_node: 2
     worker_debug: False
 
