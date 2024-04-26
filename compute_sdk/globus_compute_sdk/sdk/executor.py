@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import copy
 import json
 import logging
 import os
@@ -88,7 +89,7 @@ class _TaskSubmissionInfo:
         self.task_group_uuid = as_optional_uuid(task_group_id)
         self.function_uuid = as_uuid(function_id)
         self.endpoint_uuid = as_uuid(endpoint_id)
-        self.user_endpoint_config = user_endpoint_config
+        self.user_endpoint_config = copy.deepcopy(user_endpoint_config)
         self.args = args
         self.kwargs = kwargs
 
