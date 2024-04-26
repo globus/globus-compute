@@ -149,6 +149,34 @@ def test_task_submission_info_stringification(tg_id, fn_id, ep_id, uep_config):
     assert f"user_endpoint_config={{{uep_config_len}}};"
 
 
+@pytest.mark.parametrize(
+    "tg_id, fn_id, ep_id, uep_config",
+    (
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"heartbeat": 10}),
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {}),
+    ),
+)
+def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, uep_config):
+    fut_id = 10
+
+    info = _TaskSubmissionInfo(
+        task_num=fut_id,
+        task_group_id=tg_id,
+        function_id=fn_id,
+        endpoint_id=ep_id,
+        user_endpoint_config=uep_config,
+        args=(),
+        kwargs={},
+    )
+    before_changes = str(info)
+
+    uep_config["something else"] = "abc"
+    uep_config["heartbeat"] = 12345
+
+    after_changes = str(info)
+    assert before_changes == after_changes
+
+
 @pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
 def test_deprecated_args_warned(argname, mocker):
     mock_warn = mocker.patch(f"{_MOCK_BASE}warnings")
