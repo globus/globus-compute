@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import multiprocessing
 import os
@@ -500,13 +501,13 @@ class EndpointInterchange:
             log.debug("Exit process-pending-results thread.")
 
         stored_processor_thread = threading.Thread(
-            target=process_stored_results, name="Stored Result Handler"
+            target=process_stored_results, daemon=True, name="Stored Result Handler"
         )
         task_processor_thread = threading.Thread(
-            target=process_pending_tasks, name="Pending Task Handler"
+            target=process_pending_tasks, daemon=True, name="Pending Task Handler"
         )
         result_processor_thread = threading.Thread(
-            target=process_pending_results, name="Pending Result Handler"
+            target=process_pending_results, daemon=True, name="Pending Result Handler"
         )
         stored_processor_thread.start()
         task_processor_thread.start()
@@ -625,8 +626,13 @@ class EndpointInterchange:
             },
             task_statuses={},
         )
-        f = results_publisher.publish(pack(message))
-        f.result(timeout=5)
+        try:
+            f = results_publisher.publish(pack(message))
+            f.result(timeout=5)
+        except concurrent.futures.TimeoutError:
+            log.warning(
+                "Unable to send final heartbeat (timeout sending); ignoring for quiesce"
+            )
         results_publisher.stop()
 
         log.debug("_main_loop exits")

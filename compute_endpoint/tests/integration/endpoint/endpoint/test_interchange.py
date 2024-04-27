@@ -5,6 +5,7 @@ import random
 import threading
 import typing as t
 import uuid
+from concurrent.futures import Future, TimeoutError
 from unittest import mock
 
 import pytest
@@ -353,6 +354,29 @@ def test_sends_final_status_message_on_shutdown(
     assert isinstance(epsr, EPStatusReport)
     assert epsr.endpoint_id == uuid.UUID(endpoint_uuid)
     assert epsr.global_state["heartbeat_period"] == 0
+
+
+def test_gracefully_handles_final_status_message_timeout(
+    mocker, mock_log, mock_conf, ep_ix_factory, endpoint_uuid, mock_quiesce
+):
+    mock_rqp = mocker.Mock(spec=ResultPublisher)
+    mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
+
+    mock_conf.idle_heartbeats_soft = 1
+    mock_conf.idle_heartbeats_hard = 2
+    ei = ep_ix_factory(config=mock_conf)
+    ei.results_passthrough = mocker.Mock(spec=queue.Queue)
+    ei.results_passthrough.get.side_effect = queue.Empty
+    ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ei.pending_task_queue.get.side_effect = queue.Empty
+    ei._quiesce_event = mock_quiesce
+
+    mock_future = mocker.Mock(spec=Future)
+    mock_future.result.side_effect = TimeoutError("asdfasdf")
+    mock_rqp.publish.return_value = mock_future
+    ei._main_loop()
+
+    assert mock_rqp
 
 
 def test_faithfully_handles_status_report_messages(
