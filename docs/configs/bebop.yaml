@@ -1,6 +1,8 @@
+display_name: Bebop@ANL
+
 engine:
-    type: HighThroughputEngine
-    max_workers_per_node: 1
+    type: GlobusComputeEngine
+    max_workers_per_node: 2
     worker_debug: False
 
     address:
@@ -13,17 +15,12 @@ engine:
         launcher:
           type: SrunLauncher
 
-        # string to prepend to #SBATCH blocks in the submit
-        # script to the scheduler
-        # eg: '#SBATCH --constraint=knl,quad,cache'
-        scheduler_options: {{ OPTIONS }}
-
         # Command to be run before starting a worker
-        # e.g., "module load Anaconda; source activate parsl_env"
+        # e.g., "module load anaconda; source activate gce_env"
         worker_init: {{ COMMAND }}
 
         nodes_per_block: 1
-        init_blocks: 1
+        init_blocks: 0
         min_blocks: 0
         max_blocks: 1
         walltime: 00:30:00
