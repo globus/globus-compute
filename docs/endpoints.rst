@@ -267,50 +267,25 @@ Here's an example:
 Restarting endpoint when machine restarts
 -----------------------------------------
 
-To ensure that a compute endpoint comes back online when its host machine restarts, a
-systemd service can be configured to run the endpoint.
-
-1. Ensure the endpoint isn't running:
-
-   .. code-block:: console
-
-      $ globus-compute-endpoint stop <my-endpoint-name>
-
-2. Update the endpoint's ``config.yaml`` to set ``detach_endpoint`` to ``false``
-
-3. Create a service file at ``/etc/systemd/system/my-globus-compute-endpoint.service``,
-   and populate it with the following settings:
-
-   .. code-block:: cfg
-
-      [Unit]
-      Description=Globus Compute Endpoint systemd service
-      After=network.target
-      StartLimitIntervalSec=0
-
-      [Service]
-      ExecStart=</full/path/to/globus-compute-endpoint/executable> start <my-endpoint-name>
-      User=<user_account>
-      Type=simple
-      Restart=always
-      RestartSec=1
-
-      [Install]
-      WantedBy=multi-user.target
-
-4. Enable the service and start the endpoint:
-
-   .. code-block:: console
-
-      $ sudo systemctl enable my-globus-compute-endpoint.service --now
-
-To edit an existing systemd service, make changes to the service file and then run the
-following:
+Run ``globus-compute-endpoint enable-on-boot`` to install a systemd unit file:
 
 .. code-block:: console
 
-   $ sudo systemctl daemon-reload
-   $ sudo systemctl restart my-globus-compute-endpoint.service
+   $ globus-compute-endpoint enable-on-boot my-endpoint
+   Systemd service installed. Run
+      sudo systemctl enable globus-compute-endpoint-my-endpoint.service --now
+   to enable the service and start the endpoint.
+
+Run ``globus-compute-endpoint disable-on-boot`` for commands to disable and uninstall
+the service:
+
+.. code-block:: console
+
+   $ globus-compute-endpoint disable-on-boot my-endpoint
+   Run the following to disable on-boot-persistence:
+      systemctl stop globus-compute-endpoint-my-endpoint
+      systemctl disable globus-compute-endpoint-my-endpoint
+      rm /etc/systemd/system/globus-compute-endpoint-my-endpoint.service
 
 
 AMQP Port

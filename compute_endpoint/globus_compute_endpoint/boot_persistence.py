@@ -97,7 +97,7 @@ def enable_on_boot(ep_dir: pathlib.Path):
         raise ClickException(f"{e}\n\nUnable to create unit file. Are you root?")
 
     print(
-        "Systemd service installed. Run"
+        f"Systemd service installed at {unit_file_path}. Run"
         f"\n\tsudo systemctl enable {service_name} --now"
         "\nto enable the service and start the endpoint."
     )
