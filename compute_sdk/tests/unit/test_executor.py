@@ -120,13 +120,15 @@ def mock_log(mocker):
 
 
 @pytest.mark.parametrize(
-    "tg_id, fn_id, ep_id, uep_config",
+    "tg_id, fn_id, ep_id, res_spec, uep_config",
     (
-        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"heartbeat": 10}),
-        (str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), None),
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"num_nodes": 2}, {"heartbeat": 10}),
+        (str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), None, None),
     ),
 )
-def test_task_submission_info_stringification(tg_id, fn_id, ep_id, uep_config):
+def test_task_submission_info_stringification(
+    tg_id, fn_id, ep_id, res_spec, uep_config
+):
     fut_id = 10
 
     info = _TaskSubmissionInfo(
@@ -134,6 +136,7 @@ def test_task_submission_info_stringification(tg_id, fn_id, ep_id, uep_config):
         task_group_id=tg_id,
         function_id=fn_id,
         endpoint_id=ep_id,
+        resource_specification=res_spec,
         user_endpoint_config=uep_config,
         args=(),
         kwargs={},
@@ -145,18 +148,20 @@ def test_task_submission_info_stringification(tg_id, fn_id, ep_id, uep_config):
     assert f"task_group_uuid='{tg_id}'" in as_str
     assert f"function_uuid='{fn_id}'" in as_str
     assert f"endpoint_uuid='{ep_id}'" in as_str
+    res_spec_len = len(res_spec) if res_spec else 0
+    assert f"resource_specification={{{res_spec_len}}};"
     uep_config_len = len(uep_config) if uep_config else 0
     assert f"user_endpoint_config={{{uep_config_len}}};"
 
 
 @pytest.mark.parametrize(
-    "tg_id, fn_id, ep_id, uep_config",
+    "tg_id, fn_id, ep_id, res_spec, uep_config",
     (
-        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"heartbeat": 10}),
-        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {}),
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"num_nodes": 2}, {"heartbeat": 10}),
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {}, {}),
     ),
 )
-def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, uep_config):
+def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, res_spec, uep_config):
     fut_id = 10
 
     info = _TaskSubmissionInfo(
@@ -164,12 +169,15 @@ def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, uep_config):
         task_group_id=tg_id,
         function_id=fn_id,
         endpoint_id=ep_id,
+        resource_specification=res_spec,
         user_endpoint_config=uep_config,
         args=(),
         kwargs={},
     )
     before_changes = str(info)
 
+    res_spec["foo"] = "bar"
+    res_spec["num_nodes"] = 100
     uep_config["something else"] = "abc"
     uep_config["heartbeat"] = 12345
 
@@ -316,6 +324,34 @@ def test_register_function_sends_metadata(gc_executor):
 
 
 @pytest.mark.parametrize(
+    "is_valid, res_spec",
+    (
+        (True, None),
+        (True, {"foo": "bar"}),
+        (False, {"foo": str}),
+        (False, "{'foo': 'bar'}"),
+        (False, "spec"),
+        (False, 1),
+    ),
+)
+def test_resource_specification(gc_executor, is_valid: bool, res_spec):
+    _, gce = gc_executor
+
+    assert gce.resource_specification is None, "Default value is None"
+
+    if is_valid:
+        gce.resource_specification = res_spec
+        assert gce.resource_specification == res_spec
+    else:
+        with pytest.raises(TypeError) as pyt_e:
+            gce.resource_specification = res_spec
+        if isinstance(res_spec, dict):
+            # Ensure we retain original exception
+            assert isinstance(pyt_e.value.__cause__, TypeError)
+        assert gce.resource_specification is None
+
+
+@pytest.mark.parametrize(
     "is_valid,uep_config",
     (
         (True, None),
@@ -341,6 +377,20 @@ def test_user_endpoint_config(gc_executor, is_valid: bool, uep_config):
             # Ensure we retain original exception
             assert isinstance(pyt_e.value.__cause__, TypeError)
         assert gce.user_endpoint_config is None
+
+
+def test_resource_specification_added_to_batch(gc_executor):
+    gcc, gce = gc_executor
+
+    gce.endpoint_id = uuid.uuid4()
+    gce.resource_specification = {"foo": "bar"}
+    gcc.register_function.return_value = uuid.uuid4()
+
+    gce.submit(noop)
+
+    try_assert(lambda: gcc.batch_run.called)
+    args, _ = gcc.create_batch.call_args
+    assert gce.resource_specification in args
 
 
 def test_user_endpoint_config_added_to_batch(gc_executor):
@@ -774,6 +824,7 @@ def test_task_submitter_stops_executor_on_upstream_error_response(
         task_group_id=uuid.uuid4(),
         endpoint_id=uuid.uuid4(),
         function_id=uuid.uuid4(),
+        resource_specification=None,
         user_endpoint_config=None,
         args=(),
         kwargs={},
@@ -858,7 +909,7 @@ def test_task_submit_handles_multiple_user_endpoint_configs(
     for expected, (a, _k) in zip(
         (uep_config_1, uep_config_2), gcc.create_batch.call_args_list
     ):
-        found_uep_config = a[1]
+        found_uep_config = a[2]
         assert found_uep_config == expected
 
 
@@ -902,7 +953,7 @@ def test_task_submitter_sets_future_task_ids(gc_executor):
         "endpoint_id": "ep_id",
         "tasks": {"fn_id": batch_ids},
     }
-    gce._submit_tasks("tg_id", "ep_id", None, futs, tasks)
+    gce._submit_tasks("tg_id", "ep_id", None, None, futs, tasks)
 
     assert all(f.task_id == task_id for f, task_id in zip(futs, batch_ids))
 
@@ -921,7 +972,7 @@ def test_submit_tasks_stops_futures_on_bad_response(gc_executor, batch_response)
     ]
 
     with pytest.raises(KeyError) as pyt_exc:
-        gce._submit_tasks("tg_id", "ep_id", None, futs, tasks)
+        gce._submit_tasks("tg_id", "ep_id", None, None, futs, tasks)
 
     for fut in futs:
         assert fut.exception() is pyt_exc.value
