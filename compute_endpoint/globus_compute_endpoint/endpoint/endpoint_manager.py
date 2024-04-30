@@ -822,38 +822,51 @@ class EndpointManager:
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
 
+        log.debug("Child process continues ...")
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
+        log.debug(f"Child process PID: (pid: {pid})")
 
         exit_code = 70
         try:
             # in the child process; no need to load this in MUEP space
+            log.debug(f"(pid: {pid}) Importing shutil")
             import shutil
+
+            log.debug(f"(pid: {pid}) Importing current_process")
             from multiprocessing.process import current_process
 
             # hack to work with logging module; distinguish fork()ed process
             # beyond subtle pid: MainProcess-12345 --> UserEnd...(PreExec)-23456
+            log.debug(f"(pid: {pid}) Setting convenience process name (PreExec)")
             current_process().name = "UserEndpointProcess_Bootstrap(PreExec)"
 
+            log.debug(f"(pid: {pid}) Importing setup_logging")
             from globus_compute_endpoint.logging_config import setup_logging
 
             # after dropping privileges, any log.* calls may not be able to access
             # the parent's logging file.  We'll rely on stderr in that case, and fall
             # back to the exit_code in the worst case.
+            log.debug(f"(pid: {pid}) Resetting logging to no file.")
             setup_logging(logfile=None, debug=log.getEffectiveLevel() <= logging.DEBUG)
 
             # load prior to dropping privileges
+            log.debug(f"(pid: {pid}) Loading user config template ({self.conf_dir})")
             template_str, user_config_schema = load_user_config_template(self.conf_dir)
 
+            log.debug(f"(pid: {pid}) Determining *this* executable")
             pybindir = pathlib.Path(sys.executable).parent
             default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
+            log.debug(f"(pid: {pid}) Creating env dictionary, setting PATH")
             env: dict[str, str] = {"PATH": ":".join(map(str, default_path))}
             env_path = self.conf_dir / "user_environment.yaml"
             try:
+                log.debug(f"(pid: {pid}) Checking for {env_path}")
                 if env_path.exists():
                     log.debug("Load default environment variables from: %s", env_path)
                     env_text = env_path.read_text()
                     if env_text:
+                        log.debug(f"(pid: {pid}) Loading YAML for {env_path}")
                         env_data = yaml.safe_load(env_text)
                         if env_data:
                             env.update({k: str(v) for k, v in env_data.items()})
@@ -868,18 +881,27 @@ class EndpointManager:
                     e,
                 )
             user_home = {"HOME": udir, "USER": uname}
+            log.debug(f"(pid: {pid}) Updating `env` with {user_home}")
             env.update(user_home)
+            log.debug(f"(pid: {pid}) Updating process environment with {user_home}")
             os.environ.update(user_home)
 
+            log.debug(f"(pid: {pid}) Enforcing a user directory (current udir: {udir})")
             if not os.path.isdir(udir):
                 udir = "/"
 
             wd = env.get("PWD", udir)
 
+            log.debug(f"(pid: {pid}) Changing directory to /")
             os.chdir("/")  # always succeeds, so start from known place
             exit_code += 1
 
+            log.debug(f"(pid: {pid}) Determing uid and gid")
             if (os.getuid(), os.getgid()) != (uid, gid):
+                log.debug(
+                    f"(pid: {pid}) Need to change: ({os.getuid()},"
+                    f" {os.getgid()}) != ({uid}, {gid})"
+                )
                 # For multi-user systems, this is the expected path.  But for those
                 # who run the multi-user setup as a non-privileged user, there is
                 # no need to change the user: they're already executing _as that
