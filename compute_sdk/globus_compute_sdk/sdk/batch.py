@@ -15,13 +15,16 @@ class Batch:
     def __init__(
         self,
         task_group_id: UUID_LIKE_T | None,
+        resource_specification: dict[str, t.Any] | None = None,
         user_endpoint_config: dict[str, t.Any] | None = None,
         request_queue=False,
         serializer: ComputeSerializer | None = None,
     ):
         """
         :param task_group_id: UUID of task group to which to submit the batch
-        :user_endpoint_config: User endpoint configuration values as described and
+        :param resource_specification: Specify resource requirements for individual task
+            execution.
+        :param user_endpoint_config: User endpoint configuration values as described and
             allowed by endpoint administrators
         :param request_queue: Whether to request a result queue from the web service;
             typically only used by the Executor
@@ -29,6 +32,7 @@ class Batch:
             arguments
         """
         self.task_group_id = task_group_id
+        self.resource_specification = resource_specification
         self.user_endpoint_config = user_endpoint_config
         self.tasks: dict[str, list[str]] = defaultdict(list)
         self._serde = serializer or _default_serde
@@ -80,6 +84,8 @@ class Batch:
         }
         if self.task_group_id:
             data["task_group_id"] = str(self.task_group_id)
+        if self.resource_specification:
+            data["resource_specification"] = self.resource_specification
         if self.user_endpoint_config:
             data["user_endpoint_config"] = self.user_endpoint_config
 
