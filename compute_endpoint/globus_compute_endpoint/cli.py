@@ -413,6 +413,29 @@ def start_endpoint(*, ep_dir: pathlib.Path, **_kwargs):
     )
 
 
+@app.command(name="start_user_endpoint", hidden=True)
+@common_options
+def start_user_endpoint():
+    CommandState.ensure()
+    if not sys.stdin or sys.stdin.closed:
+        log.error("No process information available on stdin")
+        sys.exit(1)
+
+    from globus_compute_endpoint.endpoint.user_endpoint import cmd_start_user_endpoint
+
+    # This data *must* exist, and should not be called by a user; make no bones
+    # about *not* being robust.
+    stdin_data = json.loads(sys.stdin.read())
+    uname = stdin_data["uname"]
+    conf_dir = pathlib.Path(stdin_data["conf_dir"])
+    args = stdin_data.get("args", [])
+    kwargs = stdin_data.get("kwargs", {})
+
+    # Meanwhile, if a regular user _does_ call this, well, "good for you."
+    # This process only has privileges if run by root.
+    cmd_start_user_endpoint(uname, conf_dir, args, kwargs)  # does not return
+
+
 @app.command(name="login", help="Manually log in with Globus")
 @click.option(
     "--force",
