@@ -49,7 +49,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         job_status_kwargs: t.Optional[JobStatusPollerKwargs] = None,
         **kwargs,
     ):
-        """The ``GlobusComputeEngine`` is a shim over `Parsl's HighThroughputExecutor
+        """``GlobusComputeEngine`` is a shim over `Parsl's HighThroughputExecutor
         <parslhtex_>`_, almost all of arguments are passed along, unfettered.
         Consequently, please reference `Parsl's HighThroughputExecutor <parslhtex_>`_
         documentation for a complete list of arguments; we list below only the

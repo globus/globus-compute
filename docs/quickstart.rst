@@ -156,7 +156,7 @@ endpoint can be configured and started as follows. During the
 configuration process you will be prompted to authenticate
 following the same process as using the SDK.
 For more advanced deployments (e.g., on clouds and clusters) please
-refer to the `endpoints`_ documentation.
+refer to the :doc:`endpoints/index` documentation.
 
 .. code-block:: console
 
@@ -165,5 +165,3 @@ refer to the `endpoints`_ documentation.
   $ globus-compute-endpoint configure
 
   $ globus-compute-endpoint start <ENDPOINT_NAME>
-
-.. _endpoints: endpoints.html

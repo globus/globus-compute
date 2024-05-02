@@ -8,10 +8,4 @@ Globus Compute SDK
 
     executor
     client
-
-Globus Compute Endpoint
-=======================
-
-.. toctree::
-
     engine
