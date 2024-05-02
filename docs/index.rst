@@ -88,7 +88,7 @@ how to download and configure an endpoint for local (multi-process) execution:
    quickstart
    executor
    sdk
-   endpoints
+   endpoints/index
    tutorial
    actionprovider
    reference/index
