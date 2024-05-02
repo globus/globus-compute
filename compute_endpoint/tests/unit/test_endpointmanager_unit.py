@@ -649,7 +649,7 @@ def test_children_signaled_at_shutdown(
     em.wait_for_children = noop
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_time = mocker.patch(f"{_MOCK_BASE}time")
-    mock_time.time.side_effect = [0, 10, 20, 30]  # don't _actually_ wait.
+    mock_time.monotonic.side_effect = [0, 10, 20, 30]  # don't _actually_ wait.
     mock_os.getuid.side_effect = ["us"]  # fail if called more than once; intentional
     mock_os.getgid.side_effect = ["us"]  # fail if called more than once; intentional
     mock_os.getpgid = lambda pid: pid

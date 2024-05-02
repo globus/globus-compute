@@ -473,8 +473,8 @@ class EndpointManager:
                     os.setresuid(proc_uid, proc_uid, -1)
                     os.setresgid(proc_gid, proc_gid, -1)
 
-            deadline = time.time() + 10
-            while self._children and time.time() < deadline:
+            deadline = time.monotonic() + 10
+            while self._children and time.monotonic() < deadline:
                 time.sleep(0.5)
                 self.wait_for_children()
 
