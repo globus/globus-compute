@@ -1,8 +1,8 @@
+amqp_port: 443
 display_name: NCSA Delta 2 CPU
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     max_workers_per_node: 2
-    worker_debug: False
 
     address:
         type: address_by_interface
