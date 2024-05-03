@@ -19,18 +19,6 @@ The following snippet shows an example configuration for executing remotely on A
    :language: yaml
 
 
-Blue Waters (NCSA)
-^^^^^^^^^^^^^^^^^^
-
-.. image:: _static/images/blue-waters-supercomputer.jpg
-
-The following snippet shows an example configuration for executing remotely on Blue Waters, a supercomputer at the National Center for Supercomputing Applications.
-The configuration assumes the user is running on a login node, uses the ``TorqueProvider`` to interface
-with the scheduler, and uses the ``AprunLauncher`` to launch workers.
-
-.. literalinclude:: configs/bluewaters.yaml
-   :language: yaml
-
 Delta (NCSA)
 ^^^^^^^^^^^^
 
