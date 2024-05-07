@@ -2,6 +2,7 @@ import os
 import pathlib
 
 import pytest
+import yaml
 from click import ClickException
 from globus_compute_endpoint.boot_persistence import (
     _systemd_service_name,
@@ -35,7 +36,7 @@ engine:
         init_blocks: 1
         min_blocks: 0
         max_blocks: 1
-        """
+        """.strip()
     )
     return ep_dir
 
@@ -76,19 +77,28 @@ def test_enable_on_boot_no_systemd(fake_ep_dir, mocker):
     assert "Systemd not found" in str(e)
 
 
+@pytest.mark.parametrize("mu", (True, False))
 def test_enable_on_boot_detach_endpoint(
-    fake_ep_dir, systemd_unit_dir, fs: fakefs.FakeFilesystem
+    mocker, fake_ep_dir, systemd_unit_dir, mu: bool, fs: fakefs.FakeFilesystem
 ):
-    cfg = fake_ep_dir / "config.yaml"
-    old_text = cfg.read_text()
-    new_text = "\n".join(x for x in old_text.split("\n") if "detach_endpoint" not in x)
-    fs.remove(cfg)
-    cfg.write_text(new_text)
+    cfg_path = fake_ep_dir / "config.yaml"
+    cfg = yaml.safe_load(cfg_path.read_text())
+    del cfg["detach_endpoint"]
+    if mu:
+        cfg["multi_user"] = True
+        del cfg["engine"]
+    cfg_path.write_text(yaml.dump(cfg))
 
-    with pytest.raises(ClickException) as e:
+    if mu:
+        mocker.patch(f"{_MOCK_BASE}LoginManager")
+        mock_print = mocker.patch(f"{_MOCK_BASE}print")
         enable_on_boot(fake_ep_dir)
+        assert "Systemd service installed at " in mock_print.call_args[0][0]
+    else:
+        with pytest.raises(ClickException) as e:
+            enable_on_boot(fake_ep_dir)
 
-    assert "cannot run in detached mode" in str(e)
+        assert "cannot run in detached mode" in str(e)
 
 
 @pytest.mark.parametrize("exists", [True, False])
@@ -123,12 +133,12 @@ def test_enable_on_boot_no_perms(
     fake_ep_dir, systemd_unit_dir, fs: fakefs.FakeFilesystem, mocker
 ):
     mocker.patch(f"{_MOCK_BASE}LoginManager")
-    os.chmod(systemd_unit_dir, fakefs.PERM_READ)
+    systemd_unit_dir.chmod(fakefs.PERM_READ)
 
-    with pytest.raises(ClickException) as e:
+    with pytest.raises(ClickException) as pyt_exc:
         enable_on_boot(fake_ep_dir)
 
-    assert "Unable to create unit file" in str(e)
+    assert "Unable to create systemd unit file" in str(pyt_exc.value)
 
 
 def test_disable_on_boot_happy_path(
