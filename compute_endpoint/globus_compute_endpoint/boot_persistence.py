@@ -1,5 +1,4 @@
 import getpass
-import os
 import pathlib
 import shutil
 import textwrap
@@ -50,28 +49,29 @@ def enable_on_boot(ep_dir: pathlib.Path):
     ep_name = ep_dir.name
 
     config = get_config(ep_dir)
-    if config.detach_endpoint:
-        # config.py takes priority if it exists
-        if os.path.isfile(ep_dir / "config.py"):
-            # can't give users a nice packaged command to run here, so just tell them
-            msg = (
-                f"Persistent endpoints cannot run in detached mode. Update {ep_name}'s"
-                " config to set detach_endpoint=False and try again."
-            )
-        else:
-            # _can_ give a nice packaged command if they use yaml, though
-            msg = (
-                "Persistent endpoints cannot run in detached mode. Run the following"
-                f" command to update {ep_name}'s config:"
-                f"\n\techo 'detach_endpoint: false' >> {ep_dir / 'config.yaml'}"
-            )
-        raise ClickException(msg)
+    if not config.multi_user:
+        if config.detach_endpoint:
+            # config.py takes priority if it exists
+            if (ep_dir / "config.py").is_file():
+                # can't give users a nice packaged command to run here; just tell them
+                msg = (
+                    "Persistent endpoints cannot run in detached mode.  Update"
+                    f" {ep_name} config to set `detach_endpoint=False` and try again."
+                )
+            else:
+                # _can_ give a nice packaged command if they use yaml, though
+                msg = (
+                    "Persistent endpoints cannot run in detached mode.  Run the"
+                    f" following command to update {ep_name}'s config:"
+                    f"\n\techo 'detach_endpoint: false' >> {ep_dir / 'config.yaml'}"
+                )
+            raise ClickException(msg)
 
-    if Endpoint.check_pidfile(ep_dir)["active"]:
-        raise ClickException(
-            "Cannot enable on-boot persistence for an endpoint that is currently"
-            f" running. Stop endpoint {ep_name} and try again."
-        )
+        if Endpoint.check_pidfile(ep_dir)["active"]:
+            raise ClickException(
+                "Cannot enable on-boot persistence for an endpoint that is currently"
+                f" running. Stop endpoint {ep_name} and try again."
+            )
 
     # ensure that credentials exist when systemd tries to start endpoint, so that
     # auth login flow doesn't run under systemd
@@ -94,7 +94,10 @@ def enable_on_boot(ep_dir: pathlib.Path):
             f" a file with the name {unit_file_path} already exists"
         )
     except PermissionError as e:
-        raise ClickException(f"{e}\n\nUnable to create unit file. Are you root?")
+        raise ClickException(
+            f"{e}\n\nUnable to create systemd unit file.  (Do you need to be root?)\n"
+            f"\n----- Systemd unit file content -----\n{unit_file_text}"
+        )
 
     print(
         f"Systemd service installed at {unit_file_path}. Run"
