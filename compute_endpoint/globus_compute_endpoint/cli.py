@@ -238,7 +238,6 @@ def version_command():
     "--multi-user",
     is_flag=True,
     default=False,
-    hidden=True,
     help="Configure endpoint as multi-user capable",
 )
 @click.option(
