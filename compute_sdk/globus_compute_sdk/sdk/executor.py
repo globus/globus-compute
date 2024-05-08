@@ -750,26 +750,31 @@ class Executor(concurrent.futures.Executor):
         return futures
 
     def shutdown(self, wait=True, *, cancel_futures=False):
+        if self._stopped:
+            # we've already shutdown (e.g., manually); if we're being called again
+            # then it's likely as a context manager is shutting down; the work has
+            # already been done, so bow out early
+            return
+
         thread_id = threading.get_ident()
         log.debug("%r: initiating shutdown (thread: %s)", self, thread_id)
-        if self._task_submitter.is_alive():
-            log.debug(
-                "%r: %s still alive; sending poison pill",
-                self,
-                self._task_submitter.name,
-            )
-            self._tasks_to_send.put((None, None))
-            if wait and self._task_submitter.ident != thread_id:
-                self._task_submitter.join(2)
-                if self._task_submitter.is_alive():
-                    log.warning(
-                        "Task submission thread did not stop in a timely fashion; an"
-                        " HTTP request may yet be outstanding.  Attempting to shutdown"
-                        " Executor anyway"
-                    )
-
         with self._shutdown_lock:
             self._stopped = True
+            if self._task_submitter.is_alive():
+                log.debug(
+                    "%r: %s still alive; sending poison pill",
+                    self,
+                    self._task_submitter.name,
+                )
+                try:
+                    # first, drain the queue
+                    while True:
+                        self._tasks_to_send.get(block=False)
+                        self._tasks_to_send.task_done()
+                except queue.Empty:
+                    pass
+                self._tasks_to_send.put((None, None))  # poison pill for submitter
+
             if self._result_watcher:
                 self._result_watcher.shutdown(wait=wait, cancel_futures=cancel_futures)
                 self._result_watcher = None

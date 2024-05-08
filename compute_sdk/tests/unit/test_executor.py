@@ -217,32 +217,82 @@ def test_executor_shutdown(gc_executor):
     _, gce = gc_executor
     gce.shutdown()
 
-    try_assert(_is_stopped(gce._task_submitter))
-    try_assert(_is_stopped(gce._result_watcher))
+    assert gce._stopped
+    assert _is_stopped(gce._task_submitter)
+    assert _is_stopped(gce._result_watcher)
 
 
 def test_executor_context_manager(gc_executor):
     _, gce = gc_executor
     with gce:
         pass
+
+    assert gce._stopped
     assert _is_stopped(gce._task_submitter)
     assert _is_stopped(gce._result_watcher)
 
 
-def test_executor_stuck_submitter_doesnt_hold_shutdown(gc_executor, mock_log):
+def test_executor_shutdown_idempotent(gc_executor):
     _, gce = gc_executor
-    gce._task_submitter = mock.Mock(spec=threading.Thread)
-    gce._task_submitter.join.side_effect = lambda *a, **kw: None
+    assert not gce._stopped, "Verify test setup"
+    assert gce._task_submitter.is_alive(), "Verify test setup"
+    assert gce._result_watcher is None, "Verify test setup"
+
+    mock_rw = mock.Mock(spec=_ResultWatcher)
+    mock_rw.shutdown.side_effect = (None, AssertionError)
+    gce._result_watcher = mock_rw
+    gce.shutdown()
+
+    assert mock_rw.shutdown.call_count == 1
+    for _ in range(10):
+        gce._result_watcher = mock_rw
+        gce.shutdown()
+    assert mock_rw.shutdown.call_count == 1
+    gce._result_watcher = None
+
+
+def test_executor_shutdown_idempotent_with(gc_executor):
+    _, gce = gc_executor
+    assertion = AssertionError("Expected that context manager exit is noop")
+    mock_rw = mock.Mock(spec=_ResultWatcher)
+    mock_rw.shutdown.side_effect = (None, assertion)
+    gce._result_watcher = mock_rw
+    with gce:
+        gce.shutdown()
+        gce._result_watcher = mock_rw
+    gce._result_watcher = None
+
+
+@pytest.mark.parametrize("num_submits", (random.randint(1, 1000),))
+def test_executor_stuck_submitter_doesnt_hold_shutdown(
+    gc_executor, num_submits, mock_log
+):
+    def some_func(*a, **k):
+        return None
+
+    fn_id = uuid.uuid4()
+
+    gcc, gce = gc_executor
+    gce._tasks_to_send.put((None, None))  # shutdown actual thread before ...
+    try_assert(lambda: not gce._task_submitter.is_alive(), "Verify test setup")
+
+    gcc.register_function.return_value = str(fn_id)
+    gce.endpoint_id = uuid.uuid4()
+    gce._task_submitter = mock.Mock(spec=threading.Thread)  # ... install our mock
+    gce._task_submitter.join.side_effect = some_func
     gce._task_submitter.is_alive.return_value = True
 
-    assert not gce._task_submitter.join.called, "Verify test setup"
+    for _ in range(num_submits):
+        gce.submit(some_func)
+    assert gce._tasks_to_send.qsize() == num_submits
+
     gce.shutdown()
-    assert gce._task_submitter.join.called, "Verify test setup"
+
+    assert not gce._task_submitter.join.called, "poison pill sent; thread NOT joined"
+    assert gce._tasks_to_send.qsize() == 1
+    assert (None, None) == gce._tasks_to_send.get()
 
     gce._task_submitter.is_alive.return_value = False  # allow test cleanup
-
-    warn_log, _ = mock_log.warning.call_args
-    assert "did not stop in a timely fashion" in warn_log[0]
 
 
 def test_multiple_register_function_fails(gc_executor):
@@ -792,12 +842,7 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
     for _ in range(num_batches * batch_size):
         gce.submit(noop)
 
-    # force the batches to be populated by flushing the queues. more consistent than
-    # waiting for the queues to flush themselves automatically due to slowdowns
-    # introduced by `coverage`.
-    gce.shutdown(cancel_futures=True)
-
-    assert gcc.batch_run.call_count >= num_batches
+    try_assert(lambda: gcc.batch_run.call_count >= num_batches)
     for args, _kwargs in gcc.batch_run.call_args_list:
         *_, batch = args
         assert 0 < batch.add.call_count <= batch_size
