@@ -431,25 +431,28 @@ def test_sends_data_during_registration(
 
     assert mock_gcc.register_endpoint.called
     _a, k = mock_gcc.register_endpoint.call_args
-    for key in (
+    expected_keys = {
         "name",
         "endpoint_id",
-        "display_name",
         "metadata",
         "multi_user",
+        "display_name",
+        "allowed_functions",
+        "auth_policy",
+        "subscription_id",
         "public",
-    ):
-        assert key in k, "Expected minimal top-level fields"
+    }
+    assert expected_keys == k.keys(), "Missing or unexpected keys; update this test?"
 
-    for key in (
+    expected_keys = {
         "endpoint_version",
         "hostname",
         "local_user",
         "config",
         "user_config_template",
         "user_config_schema",
-    ):
-        assert key in k["metadata"], "Expected minimal metadata"
+    }
+    assert expected_keys == k["metadata"].keys(), "Expected minimal metadata"
 
     for key in (
         "type",
