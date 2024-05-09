@@ -17,7 +17,7 @@ package-specific virtual environments for command line applications, so install 
 
 .. code-block:: console
 
-   $ python3 -m pipx install globus-compute-endpoint
+   $ python3 -m pipx install --include-deps globus-compute-endpoint
 
 .. note::
 
