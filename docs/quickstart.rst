@@ -64,7 +64,7 @@ The Globus Compute endpoint can be installed using `Pipx <https://pypa.github.io
 
 .. code-block:: console
 
-  $ python3 -m pipx install globus-compute-endpoint
+  $ python3 -m pipx install --include-deps globus-compute-endpoint
 
 or
 
