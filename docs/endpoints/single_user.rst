@@ -18,7 +18,7 @@ For those just looking for the quickstart commands:
 
 .. code-block:: console
 
-   $ python3 -m pipx install globus-compute-endpoint
+   $ python3 -m pipx install globus-compute-endpoint --include-deps
 
    $ globus-compute-endpoint configure my_first_endpoint
 
@@ -37,7 +37,7 @@ recommend use of |pipx for library isolation|_:
 
 .. code-block:: console
 
-   $ python3 -m pipx install globus-compute-endpoint
+   $ python3 -m pipx install globus-compute-endpoint --include-deps
 
 .. note::
 
