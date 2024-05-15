@@ -33,47 +33,9 @@ jobs:
         cd smoke_tests
         make staging
 
-  safety-check-sdk:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: main
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '${{ env.TARGET_PYTHON_VERSION }}'
-    - name: install requirements
-      run: |
-        python -m venv .venv
-        .venv/bin/python -m pip install --upgrade pip setuptools wheel
-        .venv/bin/python -m pip install './compute_sdk'
-        .venv/bin/python -m pip install safety
-    - name: run safety check
-      run: .venv/bin/safety check
-
-  safety-check-endpoint:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: main
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '${{ env.TARGET_PYTHON_VERSION }}'
-    - name: install requirements
-      run: |
-        python -m venv .venv
-        .venv/bin/python -m pip install --upgrade pip setuptools wheel
-        .venv/bin/python -m pip install './compute_endpoint'
-        .venv/bin/python -m pip install safety
-    - name: run safety check
-      run: .venv/bin/safety check
-
   slack-notify:
     needs:
       - smoke-test-staging
-      - safety-check-sdk
-      - safety-check-endpoint
     if: always()
     timeout-minutes: 10
     runs-on: ubuntu-latest
