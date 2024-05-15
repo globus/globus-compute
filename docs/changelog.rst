@@ -3,6 +3,37 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.20.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.20.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``enable-on-boot`` and ``disable-on-boot`` commands to the
+  ``globus-compute-endpoint`` CLI, which contain packaged commands and configuration
+  for managing systemd units for Compute endpoints.
+
+Bug Fixes
+^^^^^^^^^
+
+- Addressed a hanging bug at endpoint shutdown.
+
+- Make Executor shutdown idempotent -- if a user manually shut down the
+  Executor within a ``with`` block, the Executor shutdown could hang if there
+  were outstanding task futures.  Now the Executor recognizes that it has
+  already been shutdown once, and the function returns early.
+
+Changed
+^^^^^^^
+
+- Improve Executor shutdown performance by no longer attempting to join the
+  task submitting thread.  This thread is already set to ``daemon=True`` and
+  will correctly stop at Executor shutdown, so observe that ``.join()`` is
+  strictly a waiting operation.  It is not a clue to the Python interpreter to
+  clean up any resources.
+
 .. _changelog-2.19.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.19.0
