@@ -15,20 +15,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
       - name: install requirements
         run: |
-          python -m pip install -U pip setuptools wheel
+          python -m pip install -U pip
           python -m pip install pre-commit tox
       - name: run pre-commit
         run: pre-commit run -a
-      - name: mypy (sdk)
+      - name: mypy and pip-audit (sdk)
         run: |
           cd compute_sdk
           tox -e mypy
-      - name: mypy (endpoint)
+          tox -e pip-audit
+      - name: mypy and pip-audit (endpoint)
         run: |
           cd compute_endpoint
           tox -e mypy
+          tox -e pip-audit
 
   # ensure docs can build, imitating the RTD build as best we can
   check-docs:
@@ -41,23 +45,6 @@ jobs:
           python-version: "3.11"
       - name: build docs
         run: make docs
-
-  safety-check-endpoint:
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: install requirements
-        run: |
-          python -m pip install -U pip setuptools
-          python -m pip install './compute_sdk' './compute_endpoint'
-          python -m pip install safety
-          rm -rf /opt/hostedtoolcache/Python/*/x64/lib/python3.*/site-packages/pip-23.{0,1,2}*
-      - name: run safety check
-        run: safety check
 
   test-sdk:
     timeout-minutes: 5
