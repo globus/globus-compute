@@ -7,10 +7,10 @@ Single User Compute Endpoints
   API necessary for running code on their laptop, campus cluster, or even
   leadership‑class HPC machines.
 
-A single-user Compute endpoint (CEP) is a user-level service (i.e., run by the
+A single-user Compute endpoint (SEP) is a user-level service (i.e., run by the
 user, not an administrator) that receives tasks from the Globus Compute web services,
 ferries those tasks to site-specific execution engines, and forwards the results back to
-the web-services.  The defining characteristic of a CEP over a :doc:`multi-user Compute
+the web-services.  The defining characteristic of a SEP over a :doc:`multi-user Compute
 Endpoint (MEP) <multi_user>` is that the user is responsible for the configuration and
 lifecycle.
 
@@ -86,7 +86,7 @@ service upon first connect.  Until then, it exists solely as a subdirectory of
 
 As Globus Compute endpoints may be run on a diverse set of computational resources
 (i.e., the gamut from laptops to supercomputers), it is important to configure each
-CEP instance to match the underlying capabilities and restrictions of the resource.  The
+SEP instance to match the underlying capabilities and restrictions of the resource.  The
 default configuration is functional |nbsp| -- |nbsp| it will process tasks |nbsp| --
 |nbsp| but it is intentionally limited to only use processes on the Endpoint host.  In
 it's entirety, the default configuration is:
@@ -122,7 +122,7 @@ example, if an endpoint is on the local workstation, the configuration might use
 discussion; Parsl implements `a number of other providers`_.)
 
 Using the full power of the underlying resources requires site-specific setup, and can
-be tricky to get right.  For instance, configuring the CEP to submit tasks to a batch
+be tricky to get right.  For instance, configuring the SEP to submit tasks to a batch
 scheduler might require a scheduler account id, awareness of which queues are
 accessible for the account id and the job size at hand (that can change!), knowledge of
 which network interface cards to use, administrator-chosen setup steps, and so forth ...
@@ -146,14 +146,14 @@ these are known working configurations.
 Starting the Endpoint
 ---------------------
 
-After configuration, start the CEP instance with the ``start`` subcommand:
+After configuration, start the SEP instance with the ``start`` subcommand:
 
 .. code-block:: console
 
    $ globus-compute-endpoint start my_first_endpoint
    Starting endpoint; registered ID: <...registered UUID...>
 
-The CEP instance will first register with the Globus Compute web services, open two AMQP
+The SEP instance will first register with the Globus Compute web services, open two AMQP
 connections to the Globus Compute AMQP service (one to receive tasks, one to submit
 results), print the web service-provided Endpoint ID to the console, then daemonize.
 Though the prompt returns, the process is still running:
@@ -183,12 +183,12 @@ HTTPS (port 443) and AMQPS (port 5671).
    as a particular username (c.f., ``$USER``, ``uid``), but to connect to the Globus
    Compute web services (and thereafter receive tasks and transmit results), the
    endpoint must be associated with a Globus Auth identity.  The Globus Compute web
-   services will validate incoming tasks for this CEP against this identity.  Further,
-   once registered, the CEP instance cannot be run by another Globus Auth identity.
+   services will validate incoming tasks for this SEP against this identity.  Further,
+   once registered, the SEP instance cannot be run by another Globus Auth identity.
 
 .. note::
 
-   On the first invocation, the CEP will emit a long link to the console and ask for a
+   On the first invocation, the SEP will emit a long link to the console and ask for a
    Globus Auth code in return.  As part of this step, the Globus Compute web services
    will request access to your Globus Auth identity and Globus Groups.   (Subsequent
    runs will not need to perform this login step as the credentials are cached.)
@@ -211,6 +211,7 @@ More ergonomic, however, is the ``stop`` subcommand:
 
    $ globus-compute-endpoint stop my_first_endpoint
    > Endpoint <my_first_endpoint> is now stopped
+
 
 Listing Endpoints
 -----------------
@@ -243,6 +244,7 @@ Endpoints will be in one of the following states:
   and therefore cannot service any functions.  Starting this endpoint will first invoke
   necessary endpoint cleanup, since it was not stopped correctly previously.
 
+
 Ensuring execution environment
 ------------------------------
 
@@ -266,8 +268,9 @@ general there are two approaches:
    Python version and ``globus-compute-endpoint`` module version on the worker
    environment to that on the endpoint itself.
 
+
 Python based environment isolation
-----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To use python based environment management, use the |worker_init|_ config option:
 
@@ -292,10 +295,10 @@ the endpoint itself, before any workers start.  This can be achieved using the t
     pip install -r requirements.txt
 
 .. note::
-   Note that ``endpoint_setup`` runs in a shell, as a child of the CEP process, and must
+   Note that ``endpoint_setup`` runs in a shell, as a child of the SEP process, and must
    finish successfully before the start up process continues.  In particular, *note that
    it is not possible to use this hook to set or change environment variables for the
-   CEP.*
+   SEP.*
 
 Similarly, artifacts created by ``endpoint_setup`` can be cleaned up with
 ``endpoint_teardown``:
@@ -306,26 +309,22 @@ Similarly, artifacts created by ``endpoint_setup`` can be cleaned up with
     conda remove -n my-conda-env --all
 
 
-Advanced Setups
----------------
-
-Client Identities
-^^^^^^^^^^^^^^^^^
-To start an endpoint using a client identity, rather than as a user, export the
-``GLOBUS_COMPUTE_CLIENT_ID`` and ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment variables.
-This is explained in detail in :ref:`client credentials with globus compute clients`.
-
 Containerized Environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Container support is limited to ``GlobusComputeEngine``.  To configure the endpoint the
 following options are supported:
 
-* `container_type` : Specify container type from one of ``('docker', 'apptainer',
-  'singularity', 'custom', 'None')``
-* `container_uri`: Specify container uri, or file path if specifying sif files
-* `container_cmd_options`: Specify custom command options to pass to the container
-  launch command, such as filesystem mount paths, network options etc.
+* ``container_type``
+    Specify container type from one of ``('docker', 'apptainer', 'singularity',
+    'custom', 'None')``
+
+* ``container_uri``
+    Specify container uri, or file path if specifying sif files
+
+* ``container_cmd_options``
+    Specify custom command options to pass to the container launch command, such as
+    filesystem mount paths, network options etc.
 
 .. code-block:: yaml
 
@@ -364,6 +363,17 @@ Here's an example:
        max_blocks: 1
        min_blocks: 0
        type: LocalProvider
+
+
+Advanced Setups
+---------------
+
+Client Identities
+^^^^^^^^^^^^^^^^^
+To start an endpoint using a client identity, rather than as a user, export the
+``GLOBUS_COMPUTE_CLIENT_ID`` and ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment variables.
+This is explained in detail in :ref:`client credentials with globus compute clients`.
+
 
 .. _enable_on_boot:
 

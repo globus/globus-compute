@@ -5,8 +5,8 @@ Multi-user Compute endpoints (MEP) enable administrators to securely offer compu
 resources to users without mandating the typical shell access (i.e., ssh).  The basic
 thrust is that the administrator of a MEP creates a configuration template, which is
 then populated by user data and passed to a user endpoint process, or UEP.  The UEP runs
-as the local POSIX user, with the only difference from a standard :abbr:`CEP
-([single-user] Compute endpoint)` being that it was started not by a human at the
+as the local POSIX user, with the only difference from a standard :abbr:`SEP
+(single-user Compute endpoint)` being that it was started not by a human at the
 command line but on demand by the parent MEP.  In this manner, administrators may preset
 endpoint configuration options (e.g., Torque, PBS, Slurm) and offer user-configurable
 items (e.g., account id, problem-specific number of blocks), while at the same time
@@ -27,11 +27,11 @@ SDK interaction might look like:
 
    mep_id = "id_as_shared_by_mep_admin"  # perhaps via email, or a web site
    with Executor() as ex:
-       ex.endpoint_id = mep_id  # no change from a CEP interaction
+       ex.endpoint_id = mep_id  # no change from a SEP interaction
        f = ex.submit(hello_from_node, "Obi-Wan")
        print(f.result())
 
-This interaction is no different than for use of a CEP (in fact, the Tutorial Endpoint
+This interaction is no different than for use of a SEP (in fact, the Tutorial Endpoint
 is a MEP, and this interaction works there as well!), although does not customize the
 configuration.  For that, the only necessary addition is the ``user_endpoint_config``:
 
@@ -46,7 +46,7 @@ configuration.  For that, the only necessary addition is the ``user_endpoint_con
 
    mep_id = "id_as_shared_by_mep_admin"  # perhaps via email, or a web site
    with Executor() as ex:
-       ex.endpoint_id = mep_id  # no change from a CEP interaction
+       ex.endpoint_id = mep_id  # no change from a SEP interaction
        ex.user_endpoint_config = {"ACCOUNT_ID": "OBIWAN123"}
        f = ex.submit(hello_from_node, "Obi-Wan")
        print(f.result())
@@ -368,8 +368,8 @@ That will be injected into the UEP process as an environment variable.
 Running the MEP
 ===============
 
-The MEP starts in the exact same way as the CEP |nbsp| -- |nbsp| with the ``start``
-subcommand.  Unlike the CEP, however, the MEP has no notion of the ``detach_endpoint``
+The MEP starts in the exact same way as the SEP |nbsp| -- |nbsp| with the ``start``
+subcommand.  Unlike the SEP, however, the MEP has no notion of the ``detach_endpoint``
 configuration item.  Once started, the MEP stays attached to the console, with a timer
 that updates every second:
 
@@ -455,14 +455,14 @@ a custom ``globus-compute-endpoint`` wrapper:
 Installing the MEP as a Service
 ===============================
 
-Installing the MEP as a service is the same :ref:`procedure as with a CEP
+Installing the MEP as a service is the same :ref:`procedure as with a SEP
 <enable_on_boot>`: use the ``enable-on-boot`` command.  This will dynamically create a
 systemd unit file and also install it.
 
 Authentication Policies
 =======================
 
-Administrators can limit access to an MEP via a Globus authentication policy, which verifies
+Administrators can limit access to a MEP via a Globus authentication policy, which verifies
 that the user has appropriate identities linked to their Globus account and that the required
 identities have recent authentications. Authentication policies are stored within the Globus
 Auth service and can be shared among multiple MEPs.
@@ -576,24 +576,23 @@ right.
 Tracing a Task to a MEP
 =======================
 
-A :abbr:`MEP (multi-user compute endpoint)` might be thought of as a
-:abbr:`CEP ([single-user] Compute Endpoint)` manager.  In a typical non-MEP
-paradigm, a normal user would log in (e.g., via SSH) to a compute resource (e.g., a
-cluster's login-node), create a Python virtual environment (e.g., `virtualenv`_,
-`pipx`_, `conda`_), and then install and run ``globus-compute-endpoint`` from their
-user-space.  By contrast, a MEP is a root-installed and root-run process that manages
-child processes for regular users.  Upon receiving a "start endpoint" request from the
-Globus Compute AMQP service, a MEP creates a user-process via the venerable ``fork()``
+A MEP might be thought of as a :abbr:`SEP ([single-user] Compute Endpoint)` manager.  In
+a typical non-MEP paradigm, a normal user would log in (e.g., via SSH) to a compute
+resource (e.g., a cluster's login-node), create a Python virtual environment (e.g.,
+`virtualenv`_, `pipx`_, `conda`_), and then install and run ``globus-compute-endpoint``
+from their user-space.  By contrast, a MEP is a root-installed and root-run process that
+manages child processes for regular users.  Upon receiving a "start endpoint" request
+from the Globus Compute AMQP service, a MEP creates a user-process via the ``fork()``
 |rarr| *drop privileges* |rarr| ``exec()`` pattern, and then watches that child process
 until it stops.  At no point does the MEP ever attempt to execute tasks, nor does the
 MEP even see tasks |nbsp| --- |nbsp| those are handled the same as they have been
-to-date, by the CEPs.  To disambiguate, we call a MEP-started CEP a user endpoint or
-UEP.  The lifecycle of a UEP is managed by an MEP, while a human manages the CEP
+to-date, by the SEPs.  To disambiguate, we call a MEP-started SEP a user endpoint or
+UEP.  The lifecycle of a UEP is managed by a MEP, while a human manages the SEP
 lifecycle.
 
-The workflow for a task sent to an MEP roughly follows these steps:
+The workflow for a task sent to a MEP roughly follows these steps:
 
-#. The user acquires an MEP endpoint id (perhaps as shared by the administrator via an
+#. The user acquires a MEP endpoint id (perhaps as shared by the administrator via an
    internal email, web page, or bulletin).
 
 #. The user uses the SDK to send the task to the MEP with the ``endpoint_id``:
