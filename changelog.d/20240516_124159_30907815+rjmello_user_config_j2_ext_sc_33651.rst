@@ -1,0 +1,6 @@
+Changed
+^^^^^^^
+
+- The default user configuration template filename will use a ``.j2`` file extension to
+  clarify that we will treat the file as a Jinja template. Both ``user_config_template.yaml``
+  and ``user_config_template.yaml.j2`` are now valid, but the latter will take precedence.

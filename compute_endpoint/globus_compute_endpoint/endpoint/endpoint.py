@@ -55,7 +55,7 @@ class Endpoint:
 
     @staticmethod
     def user_config_template_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
-        return endpoint_dir / "user_config_template.yaml"
+        return endpoint_dir / "user_config_template.yaml.j2"
 
     @staticmethod
     def user_config_schema_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
@@ -156,7 +156,7 @@ class Endpoint:
                 world_executable = 0o0711 & ((0o0777 - user_umask) | 0o0111)
                 endpoint_dir.chmod(world_executable)
 
-                src_user_tmpl_path = package_dir / "config/user_config_template.yaml"
+                src_user_tmpl_path = package_dir / "config/user_config_template.yaml.j2"
                 src_user_schem_path = package_dir / "config/user_config_schema.json"
                 src_user_env_path = package_dir / "config/user_environment.yaml"
                 src_example_idmap_path = (

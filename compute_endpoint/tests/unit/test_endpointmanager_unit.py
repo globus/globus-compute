@@ -33,6 +33,7 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import (
     _validate_user_opts,
     load_user_config_schema,
+    load_user_config_template,
     render_config_user_template,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
@@ -1906,6 +1907,27 @@ def test_pipe_size_limit(mocker, successful_exec_from_mocked_root, conf_size):
     else:
         assert pyexc.value.code < 87
         assert f"{stdin_data_size} bytes" in mock_log.error.call_args[0][0]
+
+
+@pytest.mark.parametrize("ext", (".yaml.j2", ".yaml"))
+@pytest.mark.parametrize("ep_name", ("my-ep", "my.j2-ep"))
+def test_load_user_config_template_valid_extensions(
+    fs, ep_name: str, ext: str, randomstring
+):
+    conf_dir = pathlib.Path(f"/{randomstring()}/{ep_name}")
+    conf_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+    template_path = conf_dir / f"user_config_template{ext}"
+    template_str = "multi_user: true"
+    template_path.write_text(template_str)
+
+    assert load_user_config_template(conf_dir) == (template_str, None)
+
+
+def test_load_user_config_template_prefer_j2(conf_dir: pathlib.Path):
+    (conf_dir / "user_config_template.yaml").write_text("yaml")
+    (conf_dir / "user_config_template.yaml.j2").write_text("j2")
+    assert load_user_config_template(conf_dir) == ("j2", None)
 
 
 @pytest.mark.parametrize(

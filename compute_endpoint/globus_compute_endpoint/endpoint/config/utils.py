@@ -5,6 +5,7 @@ import inspect
 import json
 import logging
 import pathlib
+import re
 import shlex
 
 import yaml
@@ -200,6 +201,9 @@ def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | N
     from globus_compute_endpoint.endpoint.endpoint import Endpoint
 
     user_config_path = Endpoint.user_config_template_path(endpoint_dir)
+    if not user_config_path.exists():
+        log.info("user_config_template.yaml.j2 does not exist; trying .yaml")
+        user_config_path = pathlib.Path(re.sub(r"\.j2$", "", str(user_config_path)))
     template_str = _read_config_yaml(user_config_path)
 
     user_config_schema = load_user_config_schema(endpoint_dir)
