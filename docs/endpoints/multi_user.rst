@@ -194,7 +194,7 @@ Configuration of a MEP starts with the ``--multi-user`` command line flag to the
 
        Example identity mapping configuration: /.../.globus_compute/debug_queue/example_identity_mapping_config.json
 
-       User endpoint configuration template: /.../.globus_compute/debug_queue/user_config_template.yaml
+       User endpoint configuration template: /.../.globus_compute/debug_queue/user_config_template.yaml.j2
        User endpoint configuration schema: /.../.globus_compute/debug_queue/user_config_schema.json
        User endpoint environment variables: /.../.globus_compute/debug_queue/user_environment.yaml
 
@@ -285,8 +285,8 @@ For a much more thorough dive into the identity mapping configurations, please c
 the `Identity Mapping documentation`_.
 
 
-``user_config_template.yaml``
------------------------------
+``user_config_template.yaml.j2``
+--------------------------------
 
 This file is the template that will be interpolated with user-specific variables for
 successful start-UEP requests.  More than simple interpolation, the MEP actually treats
@@ -640,7 +640,7 @@ The workflow for a task sent to a MEP roughly follows these steps:
 The above workflow may be of interest to system administrators from a "How does this
 work in theory?" point of view, but will be of little utility to most users.  The part
 of interest to most end users is the on-the-fly custom configuration.  If the
-administrator has provided any hook-in points in ``user_config_template.yaml`` (e.g., an
+administrator has provided any hook-in points in ``user_config_template.yaml.j2`` (e.g., an
 account id), then a user may specify that via the ``user_endpoint_config`` argument to
 the Executor constructor:
 
@@ -679,7 +679,7 @@ resources UEPs may utilize.  For example, many users struggle to discover which
 interface is routed to a cluster's internal network; the administrator can preset that,
 completely bypassing the question.  Using ALCF's Polaris as an example, the
 administrator could use the following user configuration template
-(``user_config_template.yaml``) to place all jobs sent to this MEP on the
+(``user_config_template.yaml.j2``) to place all jobs sent to this MEP on the
 ``debug-scaling`` queue, and pre-select the obvious defaults (`per the
 documentation <https://docs.alcf.anl.gov/polaris/running-jobs/>`_):
 
@@ -727,7 +727,7 @@ and consume no more wall time.
 Another benefit is a cleaner process table on the login nodes.  Rather than having user
 endpoints sit idle on a login-node for days after a run has completed (perhaps until the
 next machine reboot), a MEP setup automatically shuts down idle UEPs (as defined in
-``user_config_template.yaml``).  When the UEP has had no movement for 48h (by default;
+``user_config_template.yaml.j2``).  When the UEP has had no movement for 48h (by default;
 see ``idle_heartbeat_hard``), or has no outstanding work for 5m (by default; see
 ``idle_heartbeats_soft``), it will shut itself down.
 
@@ -793,7 +793,7 @@ Administrator Quickstart
 
           Example identity mapping configuration: /root/.globus_compute/prod_gpu_large/example_identity_mapping_config.json
 
-          User endpoint configuration template: /root/.globus_compute/prod_gpu_large/user_config_template.yaml
+          User endpoint configuration template: /root/.globus_compute/prod_gpu_large/user_config_template.yaml.j2
           User endpoint configuration schema: /root/.globus_compute/prod_gpu_large/user_config_schema.json
           User endpoint environment variables: /root/.globus_compute/prod_gpu_large/user_environment.yaml
 
@@ -811,7 +811,7 @@ Administrator Quickstart
    valid, it references ``example.com`` so will not work until modified.   Please refer
    to the `Globus Connect Server Identity Mapping Guide`_ for help updating this file.
 
-#. Modify ``user_config_template.yaml`` as appropriate for the resources to make
+#. Modify ``user_config_template.yaml.j2`` as appropriate for the resources to make
    available.  This file will be interpreted as a Jinja template and will be rendered
    with user-provided variables to generate the final UEP configuration.  The default
    configuration (as created in step 4) has a basic working configuration, but uses the

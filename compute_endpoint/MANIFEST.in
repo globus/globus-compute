@@ -2,5 +2,5 @@ include PyPI.md
 include globus_compute_endpoint/endpoint/config/default_config.yaml
 include globus_compute_endpoint/endpoint/config/example_identity_mapping_config.json
 include globus_compute_endpoint/endpoint/config/user_config_schema.json
-include globus_compute_endpoint/endpoint/config/user_config_template.yaml
+include globus_compute_endpoint/endpoint/config/user_config_template.yaml.j2
 include globus_compute_endpoint/endpoint/config/user_environment.yaml
