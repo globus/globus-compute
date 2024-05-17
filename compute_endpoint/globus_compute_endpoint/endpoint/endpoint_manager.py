@@ -963,7 +963,7 @@ class EndpointManager:
 
             user_opts = kwargs.get("user_opts", {})
             user_config = render_config_user_template(
-                template_str, user_config_schema, user_opts
+                self._config, template_str, user_config_schema, user_opts
             )
             stdin_data_dict = {
                 "amqp_creds": kwargs.get("amqp_creds"),

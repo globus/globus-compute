@@ -59,6 +59,7 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
+_CFG_UTILS_MOCK_BASE = "globus_compute_endpoint.endpoint.config.utils."
 
 _mock_rootuser_rec = pwd.struct_passwd(
     ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
@@ -1942,15 +1943,16 @@ def test_load_user_config_template_prefer_j2(conf_dir: pathlib.Path):
 def test_render_user_config(mocker, data):
     is_valid, user_opts = data
     template = "heartbeat_period: {{ heartbeat }}"
+    parent_cfg = Config()
 
     if is_valid:
-        rendered = render_config_user_template(template, {}, user_opts)
+        rendered = render_config_user_template(parent_cfg, template, {}, user_opts)
         rendered_dict = yaml.safe_load(rendered)
         assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
     else:
-        mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+        mock_log = mocker.patch(f"{_CFG_UTILS_MOCK_BASE}log")
         with pytest.raises(jinja2.exceptions.UndefinedError):
-            render_config_user_template(template, {}, user_opts)
+            render_config_user_template(parent_cfg, template, {}, user_opts)
         a, _k = mock_log.debug.call_args
         assert "Missing required" in a[0]
 
@@ -1986,7 +1988,7 @@ engine:
             "accelerators": [f"{uuid.uuid4()}\n    mem_per_worker: 100"],
         },
     }
-    rendered = render_config_user_template(template, {}, user_opts)
+    rendered = render_config_user_template(Config(), template, {}, user_opts)
     rendered_dict = yaml.safe_load(rendered)
 
     assert len(rendered_dict) == 2
@@ -2017,12 +2019,13 @@ def test_render_user_config_option_types(data):
     is_valid, val = data
     template = "foo: {{ foo }}"
     user_opts = {"foo": val}
+    parent_cfg = Config()
 
     if is_valid:
-        render_config_user_template(template, {}, user_opts)
+        render_config_user_template(parent_cfg, template, {}, user_opts)
     else:
         with pytest.raises(ValueError) as pyt_exc:
-            render_config_user_template(template, {}, user_opts)
+            render_config_user_template(parent_cfg, template, {}, user_opts)
         assert "not a valid user config option type" in pyt_exc.exconly()
 
 
@@ -2039,12 +2042,12 @@ def test_render_user_config_sandbox(mocker: MockFixture, data: t.Tuple[str, t.An
     template = f"foo: {jinja_op}"
     user_opts = {"foo": val}
     mocker.patch(
-        "globus_compute_endpoint.endpoint.config.utils._sanitize_user_opts",
+        f"{_CFG_UTILS_MOCK_BASE}_sanitize_user_opts",
         return_value=user_opts,
     )
 
     with pytest.raises(jinja2.exceptions.SecurityError):
-        render_config_user_template(template, {}, user_opts)
+        render_config_user_template(Config(), template, {}, user_opts)
 
 
 @pytest.mark.parametrize(
@@ -2070,7 +2073,7 @@ def test_render_user_config_shell_escape(data: t.Tuple[bool, t.Any]):
     is_valid, option = data
     template = "option: {{ option|shell_escape }}"
     user_opts = {"option": option}
-    rendered = render_config_user_template(template, {}, user_opts)
+    rendered = render_config_user_template(Config(), template, {}, user_opts)
     rendered_dict = yaml.safe_load(rendered)
 
     assert len(rendered_dict) == 1
@@ -2098,7 +2101,7 @@ def test_render_user_config_apply_schema(mocker: MockFixture, schema_exists: boo
     mock_validate = mocker.patch.object(jsonschema, "validate")
 
     user_opts = {"foo": "bar"}
-    render_config_user_template(template, schema, user_opts)
+    render_config_user_template(Config(), template, schema, user_opts)
 
     if schema_exists:
         assert mock_validate.called
@@ -2107,6 +2110,16 @@ def test_render_user_config_apply_schema(mocker: MockFixture, schema_exists: boo
         assert kwargs["schema"] == schema
     else:
         assert not mock_validate.called
+
+
+def test_render_config_passes_parent_config():
+    template = "parent_heartbeat: {{ parent_config.heartbeat_period }}"
+    parent_cfg = Config()
+
+    rendered = render_config_user_template(parent_cfg, template)
+
+    rendered_dict = yaml.safe_load(rendered)
+    assert rendered_dict["parent_heartbeat"] == parent_cfg.heartbeat_period
 
 
 @pytest.mark.parametrize(
@@ -2123,7 +2136,7 @@ def test_render_user_config_apply_schema(mocker: MockFixture, schema_exists: boo
 def test_validate_user_config_options(mocker: MockFixture, data: t.Tuple[bool, dict]):
     is_valid, user_opts = data
 
-    mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+    mock_log = mocker.patch(f"{_CFG_UTILS_MOCK_BASE}log")
 
     schema = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2151,13 +2164,21 @@ def test_validate_user_config_options(mocker: MockFixture, data: t.Tuple[bool, d
 def test_validate_user_config_options_invalid_schema(
     mocker: MockFixture, schema: t.Any
 ):
-    mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+    mock_log = mocker.patch(f"{_CFG_UTILS_MOCK_BASE}log")
     user_opts = {"foo": "bar"}
     with pytest.raises(jsonschema.SchemaError):
         _validate_user_opts(user_opts, schema)
     assert mock_log.error.called
     a, *_ = mock_log.error.call_args
     assert "user config schema is invalid" in str(a)
+
+
+def test_validate_parent_config_reserved():
+    with pytest.raises(ValueError) as pyt_exc:
+        render_config_user_template(Config(), {}, user_opts={"parent_config": "foo"})
+
+    assert "parent_config" in str(pyt_exc)
+    assert "reserved" in str(pyt_exc)
 
 
 @pytest.mark.parametrize(
@@ -2168,7 +2189,7 @@ def test_load_user_config_schema(
 ):
     is_valid, schema_json = data
 
-    mock_log = mocker.patch("globus_compute_endpoint.endpoint.config.utils.log")
+    mock_log = mocker.patch(f"{_CFG_UTILS_MOCK_BASE}log")
 
     template = Endpoint.user_config_schema_path(conf_dir)
     template.write_text(schema_json)
