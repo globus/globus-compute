@@ -21,6 +21,7 @@ from globus_compute_endpoint.endpoint.config.default_config import (
     config as default_config,
 )
 from globus_compute_endpoint.endpoint.config.utils import (
+    get_config,
     load_user_config_template,
     render_config_user_template,
     serialize_config,
@@ -645,10 +646,11 @@ def test_mu_endpoint_user_ep_yamls_world_readable(tmp_path):
 def test_mu_endpoint_user_ep_sensible_default(tmp_path):
     ep_dir = tmp_path / "new_endpoint_dir"
     Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
+    parent_cfg = get_config(ep_dir)
 
     tmpl_str, schema = load_user_config_template(ep_dir)
     # Doesn't crash; loads yaml, jinja template has defaults
-    render_config_user_template(tmpl_str, schema, {})
+    render_config_user_template(parent_cfg, tmpl_str, schema, {})
 
 
 def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data, mock_reg_info):

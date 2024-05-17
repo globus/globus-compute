@@ -311,6 +311,10 @@ Given the above template, users submitting to this MEP would be able to specify 
 ``endpoint_setup`` and ``worker_init`` values.  All other values will remain unchanged
 when the UEP starts up.
 
+All templates additionally have access to the configuration of the parent MEP via the
+``parent_config`` variable. This is a reserved word in the Compute template
+specification, meaning users are unable to specify a value for it.
+
 As linked on the left, :doc:`there are a number of example configurations
 <endpoint_examples>` to showcase the available options, but ``idle_heartbeats_soft`` and
 ``idle_heartbeats_hard`` bear describing.
