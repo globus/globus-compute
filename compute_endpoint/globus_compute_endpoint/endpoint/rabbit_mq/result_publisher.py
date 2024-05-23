@@ -188,7 +188,6 @@ class ResultPublisher(threading.Thread):
             log.error(f"{self!r} {msg}")
             if not isinstance(exc, Exception):
                 exc = Exception(str(exc))
-            self._cancellation_reason = exc
         mq_conn.ioloop.stop()
 
     def _on_connection_closed(self, mq_conn: pika.BaseConnection, exc: Exception):
