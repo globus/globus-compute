@@ -6,6 +6,7 @@ from concurrent.futures import Future
 from unittest import mock
 
 import pika
+import pika.exceptions
 import pytest
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     RabbitPublisherStatus,
@@ -19,6 +20,20 @@ q_info = {"queue_publish_kwargs": {"exchange": "results"}, "exchange": "results"
 @pytest.fixture
 def mock_log(mocker):
     yield mocker.patch(f"{_MOCK_BASE}log", autospec=True)
+
+
+def test_rp_callbacks_hooked_up(mocker, randomstring):
+    mock_pika = mocker.patch(f"{_MOCK_BASE}pika")
+    queue_info = {"queue": randomstring(), **q_info, "connection_url": "amqp:///"}
+    rp = ResultPublisher(queue_info=queue_info)
+    rp._connect()
+
+    assert mock_pika.SelectConnection.called
+
+    _a, k = mock_pika.SelectConnection.call_args
+    assert "on_open_callback" in k, "Verify successful connection open handled"
+    assert "on_close_callback" in k, "Verify connection close handled"
+    assert "on_open_error_callback" in k, "Verify connection error handled"
 
 
 def test_rp_verifies_exchange(randomstring):
@@ -141,6 +156,23 @@ def test_rp_stable_connection_resets_fail_counter(mocker):
     rp._on_queue_verified(None)
     rp._event_watcher()
     assert rp._connection_tries == 0
+
+
+def test_rp_stops_trying_on_unrecoverable(randomstring, mock_log):
+    exc_text = randomstring()
+    exc = pika.exceptions.ProbableAuthenticationError(f"some reason: {exc_text}")
+
+    mock_conn = mock.Mock(spec=pika.BaseConnection)
+    queue_info = {"queue": randomstring(), **q_info}
+
+    attempt_limit = random.randint(1_000_000, 2_000_000)  # something large
+    rp = ResultPublisher(queue_info=queue_info, connect_attempt_limit=attempt_limit)
+    rp._on_open_failed(mock_conn, exc)
+    assert rp._connection_tries >= attempt_limit, "Expect signal to event loop"
+
+    a, _k = mock_log.error.call_args
+    assert "[invalid credentials; unrecoverable]" in a[0]
+    assert exc_text in a[0]
 
 
 def test_rp_handles_bulk_ack_deliveries():

@@ -87,6 +87,24 @@ def test_cqs_repr():
     assert f"pid={os.getpid()}" in repr(cq)
 
 
+def test_cqs_callbacks_hooked_up(mocker, randomstring):
+    mock_pika = mocker.patch(f"{_MOCK_BASE}pika")
+    qinfo = {"connection_url": "amqp:///"}
+    mock_stop = mock.Mock(spec=threading.Event)
+    mock_cqq = mock.Mock(spec=queue.SimpleQueue)
+    cq = cqs.CommandQueueSubscriber(
+        queue_info=qinfo, command_queue=mock_cqq, stop_event=mock_stop
+    )
+    cq._connect()
+
+    assert mock_pika.SelectConnection.called
+
+    _a, k = mock_pika.SelectConnection.call_args
+    assert "on_open_callback" in k, "Verify successful connection open handled"
+    assert "on_close_callback" in k, "Verify connection close handled"
+    assert "on_open_error_callback" in k, "Verify connection error handled"
+
+
 @pytest.mark.parametrize("attempt_limit", (random.randint(1, 50),))
 def test_cqs_stops_if_unable_to_connect(mock_rnd, attempt_limit):
     mock_stop = mock.Mock(spec=threading.Event)
@@ -346,6 +364,29 @@ def test_cqs_stable_connection_resets_fail_counter(mocker, mock_cqs):
     mcqs._start_consuming()
     mcqs._event_watcher()
     assert mcqs._connection_tries == 0
+
+
+def test_cqs_stops_trying_on_unrecoverable(randomstring, mock_log):
+    exc_text = randomstring()
+    exc = pika.exceptions.ProbableAuthenticationError(f"some reason: {exc_text}")
+
+    mock_conn = mock.Mock(spec=pika.BaseConnection)
+    mock_stop = mock.Mock(spec=threading.Event)
+
+    attempt_limit = random.randint(1_000_000, 2_000_000)  # something large
+    cq = cqs.CommandQueueSubscriber(
+        queue_info=None,
+        command_queue=None,
+        stop_event=mock_stop,
+        connect_attempt_limit=attempt_limit,
+    )
+    cq._on_open_failed(mock_conn, exc)
+    assert cq._connection_tries >= attempt_limit, "Expect signal to event loop"
+    assert mock_stop.set.called, "Expect signal to event loop"
+
+    a, _k = mock_log.error.call_args
+    assert "[invalid credentials; unrecoverable]" in a[0]
+    assert exc_text in a[0]
 
 
 def test_cqs_channel_opened_starts_consuming(mock_cqs):
