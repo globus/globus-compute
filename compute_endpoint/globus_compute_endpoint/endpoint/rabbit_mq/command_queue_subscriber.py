@@ -149,6 +149,10 @@ class CommandQueueSubscriber(threading.Thread):
 
     def _on_open_failed(self, mq_conn: pika.BaseConnection, exc: str | Exception):
         count = f"[attempt {self._connection_tries} (of {self.connect_attempt_limit})]"
+        if isinstance(exc, pika.exceptions.ProbableAuthenticationError):
+            count = "[invalid credentials; unrecoverable]"
+            self._connection_tries = self.connect_attempt_limit
+
         pid = f"(pid: {os.getpid()})"
         exc_text = f"Failed to open connection - ({exc.__class__.__name__}) {exc}"
         msg = f"{count} {pid} {exc_text}"

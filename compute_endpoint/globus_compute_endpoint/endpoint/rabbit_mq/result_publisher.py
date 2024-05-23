@@ -173,15 +173,19 @@ class ResultPublisher(threading.Thread):
 
     def _on_open_failed(self, mq_conn: pika.BaseConnection, exc: str | Exception):
         count = f"[attempt {self._connection_tries} (of {self.connect_attempt_limit})]"
+        if isinstance(exc, pika.exceptions.ProbableAuthenticationError):
+            count = "[invalid credentials; unrecoverable]"
+            self._connection_tries = self.connect_attempt_limit
+
         pid = f"(pid: {os.getpid()})"
         exc_text = f"Failed to open connection - ({exc.__class__.__name__}) {exc}"
         msg = f"{count} {pid} {exc_text}"
-        log.debug("%r, %s", self, msg)
+        log.debug("%r %s", self, msg)
         if self._connection_tries == 1:
             log.warning(f"{self!r} {msg}")
 
         if not (self._connection_tries < self.connect_attempt_limit):
-            log.error(msg)
+            log.error(f"{self!r} {msg}")
             if not isinstance(exc, Exception):
                 exc = Exception(str(exc))
             self._cancellation_reason = exc
