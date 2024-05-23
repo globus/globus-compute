@@ -44,7 +44,7 @@ def cat(path: str, wildcard: bool = False, max_bytes: int = 0):
             hline = "-" * len(cat_cmd)
             click.echo(hline + "\n")
 
-    kernel.display_name = f"func:cat({path})"  # type: ignore
+    kernel.display_name = f"cat({path})"  # type: ignore
     return kernel
 
 
@@ -60,7 +60,7 @@ def test_conn(host: str, port: int, timeout: int = 5):
                 bold=True,
             )
 
-    kernel.display_name = f"func:test_conn({host}, {port})"  # type: ignore
+    kernel.display_name = f"test_conn({host}, {port})"  # type: ignore
     return kernel
 
 
@@ -84,7 +84,7 @@ def test_ssl_conn(host: str, port: int, timeout: int = 5):
                 bold=True,
             )
 
-    kernel.display_name = f"func:test_ssl_conn({host}, {port})"  # type: ignore
+    kernel.display_name = f"test_ssl_conn({host}, {port})"  # type: ignore
     return kernel
 
 
@@ -94,7 +94,7 @@ def get_service_versions(base_url: str):
         res = wc.get_version(service="all")
         click.echo(f"{res}\n")
 
-    kernel.display_name = f"func:get_service_versions({base_url})"  # type: ignore
+    kernel.display_name = f"get_service_versions({base_url})"  # type: ignore
     return kernel
 
 
@@ -159,15 +159,15 @@ def run_self_diagnostic(log_bytes: int = 0):
     ]
 
     for cmd in commands:
-        display_name = (
-            str(cmd)
-            if not callable(cmd)
-            else getattr(cmd, "display_name", f"func:{cmd.__name__}()")
-        )
+        if callable(cmd):
+            display_name = getattr(cmd, "display_name", f"{cmd.__name__}()")
+            display_name = f"python:{display_name}"
+        else:
+            display_name = str(cmd)
+
         click.secho(f"== Diagnostic: {display_name} ==", fg="yellow", bold=True)
 
         if callable(cmd):
             cmd()
-            continue
-
-        _run_command(cmd)
+        else:
+            _run_command(cmd)
