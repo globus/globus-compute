@@ -154,8 +154,11 @@ def run_self_diagnostic(log_bytes: int = 0):
         "netstat -r",
         "globus-compute-endpoint whoami",
         "globus-compute-endpoint list",
-        cat("~/.globus_compute/*/config.*", wildcard=True),
-        cat("~/.globus_compute/*/endpoint.log", wildcard=True, max_bytes=log_bytes),
+        cat("~/.globus_compute/*/*.yaml", wildcard=True),
+        cat("~/.globus_compute/*/*.py", wildcard=True),
+        cat("~/.globus_compute/*/*.j2", wildcard=True),
+        cat("~/.globus_compute/*/*.json", wildcard=True),
+        cat("~/.globus_compute/*/*.log", wildcard=True, max_bytes=log_bytes),
     ]
 
     for cmd in commands:
