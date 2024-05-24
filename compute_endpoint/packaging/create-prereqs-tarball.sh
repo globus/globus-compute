@@ -4,13 +4,13 @@ set -e
 serr() { >&2 echo "$@"; }
 
 usage() {
-  serr "usage: $0 <path_to_python_source_project_with_setup_py> > <some_name.txz>"
+  serr "usage: $0 <path_to_python_source_project_with_setup_py> [local/python/dep/project] [...] > <some_name.tgz>"
   serr
-  serr "Writes to stdout a tarball (XZ compressed) of the specified Python package's"
+  serr "Writes to stdout a tarball (GZip compressed) of the specified Python package's"
   serr "prerequisite wheels."
   serr -e "\n  Examples:\n"
-  serr "    $ $0 some/python/project/ > my_project.txz"
-  serr "    $ $0 some/python/project/ | some_other_filter [| ...]"
+  serr "    $ $0 some/python/project/ > my_project.tgz"
+  serr "    $ $0 some/python/project/ local/python/dep/ | some_other_filter [| ...]"
 
   if [[ -n "$1" ]]; then
     serr -e "\n\033[91;1;40m$1\033[39;49m"
@@ -56,6 +56,11 @@ trap _cleanup EXIT
 src_dir="$(realpath "$1/")"
 shift 1
 
+local_deps_paths=()
+for local_dep_dir in "$@"; do
+  local_deps_paths+="$(realpath "$local_dep_dir/")"
+done
+
 # RPM and DEB packages don't understand -prerelease bits from semver spec, so
 # replace with ~ that works almost the same
 py_full_version=$("$PYTHON_BIN" -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
@@ -74,9 +79,9 @@ mkdir "$download_dir/"
 
 >&2 python -m pip install -U pip
 >&2 python -m pip install wheel setuptools
->&2 python -m pip download -d "$download_dir" "$src_dir" pip
->&2 python -m pip download -d "$download_dir" "$src_dir"
->&2 python -m pip download -d "$download_dir" --python-version $py_version --platform manylinux2014_x86_64 --no-deps "$src_dir"
+>&2 python -m pip download -d "$download_dir" pip
+>&2 python -m pip download -d "$download_dir" "$src_dir" "${local_deps_paths[@]}"
+>&2 python -m pip download -d "$download_dir" --python-version $py_version --platform manylinux2014_x86_64 --no-deps "$src_dir" "${local_deps_paths[@]}"
 
 for p in "$download_dir/"*.whl; do
     name=$(basename "$p" .whl)
