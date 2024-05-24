@@ -120,7 +120,7 @@ $(PKG_WHEEL): $(VENV_PY)
 wheel: $(PKG_WHEEL)  ##-Make the wheel (note that this does *not* include dependencies)
 
 $(PREREQS_TARBALL_NAME): $(VENV_PY) $(PKG_WHEEL)
-	PYTHON_BIN="$(VENV_PY)" bash create-prereqs-tarball.sh ./build/compute_endpoint/ > "$(PREREQS_TARBALL_NAME)"
+	PYTHON_BIN="$(VENV_PY)" bash create-prereqs-tarball.sh ./build/compute_endpoint/ ./build/compute_sdk/ > "$(PREREQS_TARBALL_NAME)"
 
 prereq_tarball: $(PREREQS_TARBALL_NAME)  ##-Make a tarball of wheel dependencies
 
