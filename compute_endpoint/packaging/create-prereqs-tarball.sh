@@ -3,6 +3,15 @@
 set -e
 serr() { >&2 echo "$@"; }
 
+is_in_array() {
+  local needle="$1"
+  shift
+  for item in "$@"; do
+    [[ $item = $needle ]] && return 0
+  done
+  return 1
+}
+
 usage() {
   serr "usage: $0 <path_to_python_source_project_with_setup_py> [local/python/dep/project] [...] > <some_name.tgz>"
   serr
@@ -56,9 +65,12 @@ trap _cleanup EXIT
 src_dir="$(realpath "$1/")"
 shift 1
 
-local_deps_paths=()
-for local_dep_dir in "$@"; do
-  local_deps_paths+="$(realpath "$local_dep_dir/")"
+local_wheels=()
+local_pkg_names=()  # no need to download this; see dependent-prereqs.txt
+for whl in "$@"; do
+  lpn="$(basename "$whl" .whl)"
+  local_pkg_names+=("${lpn//-*}")
+  local_wheels+=("$(realpath "$whl")")
 done
 
 # RPM and DEB packages don't understand -prerelease bits from semver spec, so
@@ -78,16 +90,17 @@ mkdir "$download_dir/"
 . ./venv.download-prereqs/bin/activate
 
 >&2 python -m pip install -U pip
->&2 python -m pip install wheel setuptools
+>&2 python -m pip install -U wheel setuptools
 >&2 python -m pip download -d "$download_dir" pip
->&2 python -m pip download -d "$download_dir" "$src_dir" "${local_deps_paths[@]}"
->&2 python -m pip download -d "$download_dir" --python-version $py_version --platform manylinux2014_x86_64 --no-deps "$src_dir" "${local_deps_paths[@]}"
+>&2 python -m pip download -d "$download_dir" "$src_dir" "${local_wheels[@]}"
+>&2 python -m pip download -d "$download_dir" --python-version $py_version --platform manylinux2014_x86_64 --no-deps "$src_dir" "${local_wheels[@]}"
 
 for p in "$download_dir/"*.whl; do
     name=$(basename "$p" .whl)
     wname="${name%-*-*-*}"
     wver="${wname##*-}"
     wname="${wname%-$wver}"
+    if is_in_array "$wname" "${local_pkg_names[@]}"; then continue; fi
     echo "$wname"
 done > dependent-prereqs.txt
 

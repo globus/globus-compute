@@ -24,11 +24,17 @@ endif
 PKG_NAME := "globus-compute-agent"
 PIP_NAME_D := $(shell cd ../; "$(VENV_PY)" setup.py --name)
 PIP_NAME_U := $(shell echo $(PIP_NAME_D) | tr '-' '_')
+SDK_NAME_D := $(shell cd ../../compute_sdk; "$(VENV_PY)" setup.py --name)
+SDK_NAME_U := $(shell echo $(SDK_NAME_D) | tr '-' '_')
 
 PKG_VERSION := $(shell cd ../; "$(VENV_PY)" setup.py --version | tr '-' '~')
 PKG_WHEEL := $(PIP_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
 PKG_SOURCE_DIR := $(PIP_NAME_U)-$(PKG_VERSION)
 PKG_TARBALL := $(PKG_SOURCE_DIR).tar.gz
+SDK_WHEEL := $(SDK_NAME_U)-$(PKG_VERSION)-py$(PY_MAJOR_VERSION)-none-any.whl
+SDK_SOURCE_DIR := $(SDK_NAME_U)-$(PKG_VERSION)
+SDK_TARBALL := $(SDK_SOURCE_DIR).tar.gz
+
 PREREQS_DIR := $(PIP_NAME_U)-prereqs-py$(PY_VERSION)-$(PKG_VERSION)
 PREREQS_TARBALL_NAME = $(PREREQS_DIR).tar.gz
 
@@ -70,6 +76,9 @@ show_vars:   ##-For debugging, show the Makefile variables; will install a venv
 	@echo "PKG_SOURCE_DIR       : $(PKG_SOURCE_DIR)"
 	@echo "PKG_TARBALL          : $(PKG_TARBALL)"
 	@echo "PKG_WHEEL            : $(PKG_WHEEL)"
+	@echo "SDK_SOURCE_DIR       : $(SDK_SOURCE_DIR)"
+	@echo "SDK_TARBALL          : $(SDK_TARBALL)"
+	@echo "SDK_WHEEL            : $(SDK_WHEEL)"
 	@echo
 	@echo "  Override python path with PYTHON3 variable:"
 	@echo "    $(MAKE) PYTHON3=/path/to/python target(s)"
@@ -115,12 +124,15 @@ $(PKG_WHEEL): $(VENV_PY)
 	    fi \
 	 && rm -rf tests/ \
 	 && "$(VENV_PY)" -m build -o ../../ \
+	 && cd ../compute_sdk/ \
+	 && rm -rf tests/ \
+	 && "$(VENV_PY)" -m build -o ../../ \
 	)
 
-wheel: $(PKG_WHEEL)  ##-Make the wheel (note that this does *not* include dependencies)
+wheels: $(PKG_WHEEL)  ##-Make the wheels (note that this does *not* include dependencies)
 
 $(PREREQS_TARBALL_NAME): $(VENV_PY) $(PKG_WHEEL)
-	PYTHON_BIN="$(VENV_PY)" bash create-prereqs-tarball.sh ./build/compute_endpoint/ ./build/compute_sdk/ > "$(PREREQS_TARBALL_NAME)"
+	PYTHON_BIN="$(VENV_PY)" bash create-prereqs-tarball.sh ./build/compute_endpoint/ "./$(SDK_WHEEL)" > "$(PREREQS_TARBALL_NAME)"
 
 prereq_tarball: $(PREREQS_TARBALL_NAME)  ##-Make a tarball of wheel dependencies
 
