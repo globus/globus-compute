@@ -1,7 +1,7 @@
-display_name: Midway3@rcc.uchicago.edu
+label: Midway@RCC.UChicago
 
 engine:
-    type: HighThroughputEngine
+    type: GlobusComputeEngine
     max_workers_per_node: 2
     worker_debug: False
 
@@ -11,7 +11,9 @@ engine:
 
     provider:
         type: SlurmProvider
-        partition: broadwl
+        partition: caslake
+
+        account: {{ ACCOUNT }}
 
         launcher:
             type: SrunLauncher
