@@ -1,4 +1,0 @@
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- Added multi-user endpoint related files to the `self-diagnostic` command output.
