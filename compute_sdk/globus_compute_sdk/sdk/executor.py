@@ -404,7 +404,7 @@ class Executor(concurrent.futures.Executor):
         """
         The port to use when connecting to the result queue. Can be one of 443, 5671,
         5672, or None. If None, the port is assigned by the Compute web services
-        (typically 5671).
+        (which default to 443).
         """
         return self._amqp_port
 

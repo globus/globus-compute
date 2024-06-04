@@ -9,7 +9,6 @@ import globus_compute_sdk.sdk.client
 import globus_compute_sdk.sdk.login_manager
 import pytest
 import responses
-import yaml
 from click import ClickException
 from click.testing import CliRunner
 from globus_compute_endpoint.cli import (
@@ -51,21 +50,6 @@ def test_non_configured_endpoint(mocker, tmp_path):
         result = CliRunner().invoke(app, ["start", "newendpoint"])
         assert "newendpoint" in result.stdout
         assert "not configured" in result.stdout
-
-
-def test_newly_configured_endpoint_amqp_port(tmp_path, randomstring):
-    env = {"GLOBUS_COMPUTE_USER_DIR": str(tmp_path)}
-    ep_name = randomstring()
-    with mock.patch.dict(os.environ, env):
-        result = CliRunner().invoke(app, ["configure", ep_name])
-
-        assert ep_name in result.stdout
-        assert result.exit_code == 0
-
-        config_path = tmp_path / ep_name / "config.yaml"
-        config_dict = yaml.safe_load(config_path.read_text())
-
-        assert config_dict["amqp_port"] == 443
 
 
 @pytest.mark.parametrize(

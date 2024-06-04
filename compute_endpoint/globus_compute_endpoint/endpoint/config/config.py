@@ -129,7 +129,7 @@ class Config(RepresentationMixin):
     amqp_port : int | None
         Port to use for AMQP connections. Note that only 5671, 5672, and 443 are
         supported by the Compute web services. If None, the port is assigned by the
-        services (typically 5671).
+        services (which default to 443).
         Default: None
     """
 
