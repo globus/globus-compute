@@ -1,4 +1,3 @@
-amqp_port: 443
 display_name: null
 engine:
   type: GlobusComputeEngine
