@@ -56,12 +56,16 @@ def execute_task(
         uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
     ]
 
+    os.environ.pop("GC_TASK_SANDBOX_DIR", None)
+    os.environ["GC_TASK_UUID"] = str(task_id)
     if run_dir:
         os.makedirs(run_dir, exist_ok=True)
         os.chdir(run_dir)
         if run_in_sandbox:
             os.makedirs(str(task_id))  # task_id is expected to be unique
             os.chdir(str(task_id))
+            # Set sandbox dir so that apps can use it
+            os.environ["GC_TASK_SANDBOX_DIR"] = os.getcwd()
 
     env_details = get_env_details()
     try:
