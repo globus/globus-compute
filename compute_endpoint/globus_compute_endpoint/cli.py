@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import contextlib
 import difflib
-import gzip
 import json
 import logging
 import os
@@ -12,7 +10,6 @@ import shutil
 import sys
 import textwrap
 import uuid
-from datetime import datetime
 
 import click
 from click import ClickException
@@ -27,10 +24,9 @@ from globus_compute_endpoint.endpoint.utils import (
 )
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
-from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
+from globus_compute_sdk.sdk._environments import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.client_login import is_client_login
-from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
 
@@ -874,41 +870,11 @@ def delete_endpoint(
 
 
 @app.command("self-diagnostic")
-@click.option(
-    "-z",
-    "--gzip",
-    "compress",
-    default=False,
-    is_flag=True,
-    help="Save the output to a Gzip-compressed file.",
-)
-@click.option(
-    "--log-kb",
-    default=5120,
-    help=(
-        "Specify the number of kilobytes (KB) to read from log files."
-        " Defaults to 5,120 KB (5 MB)."
-    ),
-)
-@click.help_option("-h", "--help")
-def self_diagnostic(compress: bool, log_kb: int):
-    """Run several diagnostic commands to help identify issues.
-
-    This may produce a large amount of output.
-    """
-    log_bytes = log_kb * 1024
-
-    if not compress:
-        run_self_diagnostic(log_bytes=log_bytes)
-    else:
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        filename = f"globus_compute_diagnostic_{current_date}.txt.gz"
-
-        with gzip.open(filename, "wb") as f:
-            with contextlib.redirect_stdout(f):  # type: ignore[type-var]
-                run_self_diagnostic(log_bytes=log_bytes)
-
-        click.echo(f"Successfully created {filename}")
+def self_diagnostic():
+    print(
+        "The endpoint specific self-diagnostic command has been deprecated.\n"
+        "Please use the `globus-compute-diagnostic` command instead."
+    )
 
 
 @app.command(

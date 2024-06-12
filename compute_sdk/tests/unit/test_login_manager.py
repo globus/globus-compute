@@ -8,17 +8,14 @@ from unittest import mock
 import globus_sdk
 import pytest
 import requests
-from globus_compute_sdk.sdk._environments import _get_envname
+from globus_compute_sdk.sdk._environments import _get_envname, ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager import LoginManager, requires_login
 from globus_compute_sdk.sdk.login_manager.client_login import (
     _get_client_creds_from_env,
     get_client_login,
     is_client_login,
 )
-from globus_compute_sdk.sdk.login_manager.tokenstore import (
-    _resolve_namespace,
-    ensure_compute_dir,
-)
+from globus_compute_sdk.sdk.login_manager.tokenstore import _resolve_namespace
 
 CID_KEY = "GLOBUS_COMPUTE_CLIENT_ID"
 CSC_KEY = "GLOBUS_COMPUTE_CLIENT_SECRET"
@@ -36,7 +33,7 @@ def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.R
 
 @pytest.fixture
 def logman(mocker, tmp_path):
-    home = mocker.patch(f"{MOCK_BASE}.tokenstore._home")
+    home = mocker.patch("globus_compute_sdk._environments._home")
     home.return_value = tmp_path
     return LoginManager()
 
@@ -110,26 +107,6 @@ def test_get_client_creds_deprecation(funcx_id, funcx_sec, compute_id, compute_s
         assert any(
             funcx_sc_key in r.message.args[0] for r in record
         ), f"{funcx_sc_key} was set so it should be warned about"
-
-
-@pytest.mark.parametrize("dir_exists", [True, False])
-@pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
-def test_ensure_compute_dir(fs, dir_exists, user_dir):
-    home_dirname = pathlib.Path.home()
-    dirname = home_dirname / ".globus_compute"
-
-    if dir_exists:
-        fs.create_dir(dirname)
-
-    if user_dir is not None:
-        dirname = pathlib.Path(user_dir)
-        with mock.patch.dict(os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(dirname)}):
-            compute_dirname = ensure_compute_dir()
-    else:
-        compute_dirname = ensure_compute_dir()
-
-    assert compute_dirname.is_dir()
-    assert compute_dirname == dirname
 
 
 @pytest.mark.parametrize("user_dir_defined", [True, False])

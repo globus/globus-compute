@@ -23,6 +23,7 @@ from http import HTTPStatus
 import globus_compute_sdk as GC
 from cachetools import TTLCache
 from globus_compute_endpoint.endpoint.identity_mapper import PosixIdentityMapper
+from globus_compute_sdk.sdk._environments import ensure_compute_dir
 
 try:
     import pyprctl
@@ -970,7 +971,7 @@ class EndpointManager:
             startup_proc_title = f"Endpoint starting up for {uname} [{args_title}]"
             setproctitle.setproctitle(startup_proc_title)
 
-            gc_dir: pathlib.Path = GC.sdk.login_manager.tokenstore.ensure_compute_dir()
+            gc_dir: pathlib.Path = ensure_compute_dir()
             (gc_dir / ep_name).mkdir(mode=0o700, parents=True, exist_ok=True)
 
             user_opts = kwargs.get("user_opts", {})
