@@ -116,3 +116,17 @@ def get_env_var_with_deprecation(
         )
 
     return os.getenv(current_name, os.getenv(old_name, default))
+
+
+def display_name(name: str):
+    """
+    Used for descriptions of commands
+    :param name:  A short string describing the method, currently used when
+                    displaying headers when running diagnostic tests.
+    """
+
+    def decorator(func):
+        func.display_name = name
+        return func
+
+    return decorator
