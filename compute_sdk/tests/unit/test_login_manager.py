@@ -112,16 +112,12 @@ def test_get_client_creds_deprecation(funcx_id, funcx_sec, compute_id, compute_s
         ), f"{funcx_sc_key} was set so it should be warned about"
 
 
-@pytest.mark.parametrize("legacy_dir_exists", [True, False])
 @pytest.mark.parametrize("dir_exists", [True, False])
 @pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
-def test_ensure_compute_dir(fs, legacy_dir_exists, dir_exists, user_dir):
+def test_ensure_compute_dir(fs, dir_exists, user_dir):
     home_dirname = pathlib.Path.home()
-    legacy_dirname = home_dirname / ".funcx"
     dirname = home_dirname / ".globus_compute"
 
-    if legacy_dir_exists:
-        fs.create_dir(legacy_dirname)
     if dir_exists:
         fs.create_dir(dirname)
 
@@ -134,8 +130,6 @@ def test_ensure_compute_dir(fs, legacy_dir_exists, dir_exists, user_dir):
 
     assert compute_dirname.is_dir()
     assert compute_dirname == dirname
-    if legacy_dir_exists and not dir_exists and user_dir is None:
-        assert legacy_dirname.is_symlink()
 
 
 @pytest.mark.parametrize("user_dir_defined", [True, False])
