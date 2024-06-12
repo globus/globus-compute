@@ -22,6 +22,10 @@ REQUIRES = [
     "pika>=1.2",
     "tblib==1.7.0",
     "texttable>=1.6.7",
+    # 3 below for color highlighting related console print
+    "colorama==0.4.6",
+    "rich==13.7.1",
+    "psutil<6",
 ]
 DOCS_REQUIRES = [
     "sphinx>=7.3.2",
@@ -95,5 +99,10 @@ setup(
     project_urls={
         "Changelog": "https://globus-compute.readthedocs.io/en/latest/changelog.html",  # noqa: E501
         "Upgrade to Globus Compute": "https://globus-compute.readthedocs.io/en/latest/funcx_upgrade.html",  # noqa: E501
+    },
+    entry_points={
+        "console_scripts": [
+            "globus-compute-diagnostic=globus_compute_sdk.sdk.diagnostic:do_diagnostic"
+        ]
     },
 )

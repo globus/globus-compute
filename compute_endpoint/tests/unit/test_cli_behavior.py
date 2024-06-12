@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import gzip
 import json
 import logging
 import os
@@ -31,11 +30,9 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
+from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
-from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import MISSING, AuthClient
-from globus_sdk.experimental.globus_app import UserApp
-from pyfakefs import fake_filesystem as fakefs
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.cli."
@@ -208,7 +205,6 @@ def test_get_globus_app_with_scopes(mocker: MockFixture):
             scopes.append(str(scope))
 
     assert len(scopes) > 0
-    assert all(str(s) in scopes for s in WebClient.default_scope_requirements)
     assert all(str(s) in scopes for s in ComputeAuthClient.default_scope_requirements)
 
 
@@ -626,210 +622,6 @@ def test_die_with_parent_detached(
     assert config.detach_endpoint is (not die_with_parent)
 
 
-def test_self_diagnostic(
-    mocker: MockFixture,
-    mock_command_ensure,
-    mock_cli_state,
-    randomstring,
-    fs: fakefs.FakeFilesystem,
-    run_line: t.Callable,
-    ep_name,
-):
-    mock_sock = mock.MagicMock()
-    mock_ssock = mock.MagicMock()
-    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
-    mock_create_conn = mocker.patch("socket.create_connection")
-    mock_create_conn.return_value.__enter__.return_value = mock_sock
-    mock_create_ctx = mocker.patch("ssl.create_default_context")
-    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
-        mock_ssock
-    )
-    mocker.patch.object(WebClient, "get_version")
-
-    home_path = os.path.expanduser("~")
-    ep_dir_path = f"{home_path}/.globus_compute/{ep_name}/"
-    conf_path = f"{ep_dir_path}/config.yaml"
-    log_path = f"{ep_dir_path}/endpoint.log"
-    conf_data = randomstring()
-    log_data = randomstring()
-
-    fs.create_dir(ep_dir_path)
-
-    with open(conf_path, "w") as f:
-        f.write(conf_data)
-
-    with open(log_path, "w") as f:
-        f.write(log_data)
-
-    res = run_line("self-diagnostic")
-    stdout = res.stdout_bytes.decode("utf-8")
-
-    assert stdout.count("== Diagnostic") >= 21
-    assert stdout.count("Connected successfully") == 2
-    assert stdout.count("established SSL connection") == 2
-    assert conf_data in stdout
-    assert log_data in stdout
-
-
-@pytest.mark.parametrize("env", ["sandbox", "integration", "staging"])
-def test_self_diagnostic_sdk_environment(
-    mocker: MockFixture,
-    mock_command_ensure,
-    mock_cli_state,
-    fs: fakefs.FakeFilesystem,
-    run_line: t.Callable,
-    monkeypatch,
-    env: str,
-):
-    mock_sock = mock.MagicMock()
-    mock_ssock = mock.MagicMock()
-    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
-    mock_create_conn = mocker.patch("socket.create_connection")
-    mock_create_conn.return_value.__enter__.return_value = mock_sock
-    mock_create_ctx = mocker.patch("ssl.create_default_context")
-    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
-        mock_ssock
-    )
-    mocker.patch.object(WebClient, "get_version")
-
-    mock_test_conn = mocker.patch(
-        "globus_compute_endpoint.self_diagnostic.test_conn",
-        return_value=lambda: "Success!",
-    )
-    mock_test_ssl_conn = mocker.patch(
-        "globus_compute_endpoint.self_diagnostic.test_ssl_conn",
-        return_value=lambda: "Success!",
-    )
-
-    monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", env)
-    run_line("self-diagnostic")
-
-    assert f"compute.api.{env}.globuscs.info" in mock_test_conn.call_args_list[0][0]
-    assert f"compute.amqps.{env}.globuscs.info" in mock_test_conn.call_args_list[1][0]
-    assert f"compute.api.{env}.globuscs.info" in mock_test_ssl_conn.call_args_list[0][0]
-    assert (
-        f"compute.amqps.{env}.globuscs.info" in mock_test_ssl_conn.call_args_list[1][0]
-    )
-
-
-def test_self_diagnostic_gzip(
-    mocker: MockFixture,
-    mock_cli_state,
-    mock_command_ensure,
-    fs: fakefs.FakeFilesystem,
-    run_line: t.Callable,
-):
-    mock_sock = mock.MagicMock()
-    mock_ssock = mock.MagicMock()
-    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
-    mock_create_conn = mocker.patch("socket.create_connection")
-    mock_create_conn.return_value.__enter__.return_value = mock_sock
-    mock_create_ctx = mocker.patch("ssl.create_default_context")
-    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
-        mock_ssock
-    )
-    mocker.patch.object(WebClient, "get_version")
-
-    res = run_line("self-diagnostic --gzip")
-    stdout = res.stdout_bytes.decode("utf-8")
-
-    assert "Successfully created" in stdout
-    assert "== Diagnostic" not in stdout
-
-    for fname in fs.listdir("."):
-        if fname.endswith(".txt.gz"):
-            break
-    with gzip.open(fname, "rb") as f:
-        contents = f.read().decode("utf-8")
-
-    assert contents.count("== Diagnostic") >= 21
-
-
-@pytest.mark.parametrize("test_data", [(True, 1), (False, 0.5), (False, "")])
-def test_self_diagnostic_log_size(
-    mocker: MockFixture,
-    mock_cli_state,
-    mock_command_ensure,
-    fs: fakefs.FakeFilesystem,
-    run_line: t.Callable,
-    test_data: list[tuple[bool, int | float | str]],
-):
-    should_succeed, kb = test_data
-
-    mock_sock = mock.MagicMock()
-    mock_ssock = mock.MagicMock()
-    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
-    mock_create_conn = mocker.patch("socket.create_connection")
-    mock_create_conn.return_value.__enter__.return_value = mock_sock
-    mock_create_ctx = mocker.patch("ssl.create_default_context")
-    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
-        mock_ssock
-    )
-    mocker.patch.object(WebClient, "get_version")
-
-    def run_cmd():
-        res = run_line(f"self-diagnostic --log-kb {kb}")
-        return res.stdout_bytes.decode("utf-8")
-
-    if should_succeed:
-        stdout = run_cmd()
-        assert stdout.count("== Diagnostic") >= 21
-    else:
-        with pytest.raises(AssertionError):
-            stdout = run_cmd()
-
-
-def test_self_diagnostic_log_size_limit(
-    mocker: MockFixture,
-    mock_cli_state,
-    mock_command_ensure,
-    fs: fakefs.FakeFilesystem,
-    run_line: t.Callable,
-    ep_name,
-):
-    home_path = os.path.expanduser("~")
-    ep_dir_path = f"{home_path}/.globus_compute/{ep_name}/"
-    log_path = f"{ep_dir_path}/endpoint.log"
-
-    fs.create_dir(ep_dir_path)
-
-    mock_sock = mock.MagicMock()
-    mock_ssock = mock.MagicMock()
-    mock_ssock.cipher.return_value = ("mocked_cipher", "mocked_version", None)
-    mock_create_conn = mocker.patch("socket.create_connection")
-    mock_create_conn.return_value.__enter__.return_value = mock_sock
-    mock_create_ctx = mocker.patch("ssl.create_default_context")
-    mock_create_ctx.return_value.wrap_socket.return_value.__enter__.return_value = (
-        mock_ssock
-    )
-    mocker.patch.object(WebClient, "get_version")
-
-    def run_cmd():
-        # Limit log file size to 1 KB
-        res = run_line("self-diagnostic --log-kb 1")
-        return res.stdout_bytes.decode("utf-8")
-
-    f_size = 1024  # 1 KB
-    with open(log_path, "w") as f:
-        f.write("$" * f_size)
-    stdout = run_cmd()
-
-    f_size += 1  # Adding 1 extra byte
-    with open(log_path, "w") as f:
-        # Adding one extra byte
-        f.write("$" * f_size)
-    stdout_limited = run_cmd()
-
-    assert len(stdout) == len(stdout_limited)
-
-
-_test_name_or_uuid_decorator__data = [
-    ("foo", str(uuid.uuid4())),
-    ("123", str(uuid.uuid4())),
-    ("nice_normal_name", str(uuid.uuid4())),
-]
-
-
 def test_python_exec(mocker: MockFixture, run_line: t.Callable):
     mock_execvpe = mocker.patch("os.execvpe")
     run_line("python-exec path.to.module arg --option val")
@@ -838,6 +630,13 @@ def test_python_exec(mocker: MockFixture, run_line: t.Callable):
         [sys.executable, "-m", "path.to.module", "arg", "--option", "val"],
         os.environ,
     )
+
+
+_test_name_or_uuid_decorator__data = [
+    ("foo", str(uuid.uuid4())),
+    ("123", str(uuid.uuid4())),
+    ("nice_normal_name", str(uuid.uuid4())),
+]
 
 
 @pytest.mark.parametrize("name,uuid", _test_name_or_uuid_decorator__data)

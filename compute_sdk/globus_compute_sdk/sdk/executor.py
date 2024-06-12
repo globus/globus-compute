@@ -830,7 +830,7 @@ class Executor(concurrent.futures.Executor):
                 print(gcx.get_worker_hardware_details())
         """
 
-        return self.submit(run_hardware_report).result()
+        return self.submit(run_hardware_report, "Compute Endpoint worker").result()
 
     def _task_submitter_impl(self) -> None:
         """
@@ -1488,7 +1488,7 @@ class _ResultWatcher(threading.Thread):
         message to AMQP service -- the responsibility to handle invalid messages
         is not with this class.
         """
-        msg_id: int = basic_deliver.delivery_tag
+        msg_id: int = basic_deliver.delivery_tag  # type: ignore
         log.debug("Received message %s: [%s] %s", msg_id, props, body)
 
         try:

@@ -10,13 +10,19 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 
 @pytest.mark.parametrize("dir_exists", [True, False])
 @pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
+@pytest.mark.parametrize("home_arg", ["/other/dir", None])
 def test_ensure_compute_dir(
     dir_exists: bool,
     user_dir: str | None,
+    home_arg: str | None,
     fs: FakeFilesystem,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    home = pathlib.Path.home()
+    if home_arg and not user_dir:
+        home = pathlib.Path(home_arg)
+    else:
+        home = pathlib.Path.home()
+
     dirname = home / ".globus_compute"
 
     if dir_exists:
@@ -26,7 +32,7 @@ def test_ensure_compute_dir(
         dirname = pathlib.Path(user_dir)
         monkeypatch.setenv("GLOBUS_COMPUTE_USER_DIR", str(dirname))
 
-    compute_dirname = ensure_compute_dir()
+    compute_dirname = ensure_compute_dir(home=home)
 
     assert compute_dirname.is_dir()
     assert compute_dirname == dirname

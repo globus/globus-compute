@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import os
-import pathlib
+from pathlib import Path
 
 
-def ensure_compute_dir() -> pathlib.Path:
-    dirname = pathlib.Path.home() / ".globus_compute"
+def _home() -> Path:
+    # this is a hook point for tests to patch over
+    # it just returns `pathlib.Path.home()`
+    # replace this with a mock to return some test directory
+    return Path.home()
+
+
+def ensure_compute_dir(home: Path | None = None) -> Path:
+    dirname = (home if home else _home()) / ".globus_compute"
 
     user_dir = os.getenv("GLOBUS_COMPUTE_USER_DIR")
     if user_dir:
-        dirname = pathlib.Path(user_dir)
+        dirname = Path(user_dir)
 
     if dirname.is_dir():
         pass
