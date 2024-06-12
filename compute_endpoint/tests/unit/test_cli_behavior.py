@@ -279,6 +279,53 @@ def test_restart_endpoint_does_start_and_stop(
     mock_ep.start_endpoint.assert_called_once()
 
 
+@mock.patch(f"{_MOCK_BASE}setup_logging")
+def test_debug_configurable(mock_setup_log, run_line, mock_cli_state, ep_name):
+    mock_ep, mock_ensure = mock_cli_state
+
+    mock_ensure.debug = False
+    ep_dir = mock_ensure.endpoint_config_dir / ep_name
+    ep_dir.mkdir(parents=True)
+    config = {"debug": False, "engine": {"type": "ThreadPoolEngine"}}
+    data = {"config": yaml.safe_dump(config)}
+
+    run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=None)
+
+    _a, k = mock_setup_log.call_args
+    assert mock_ensure.debug is False, "Verify test setup"
+    assert "debug" in k
+    assert k["debug"] is False, "Null test: stays false"
+
+    mock_setup_log.reset_mock()
+    config["debug"] = True
+    data["config"] = yaml.safe_dump(config)
+
+    run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=None)
+
+    _a, k = mock_setup_log.call_args
+    assert mock_ensure.debug is False, "Verify test setup"
+    assert "debug" in k
+    assert k["debug"] is True, "Expect config sets debug"
+
+
+@mock.patch(f"{_MOCK_BASE}setup_logging")
+def test_cli_debug_overrides_config(mock_setup_log, run_line, mock_cli_state, ep_name):
+    mock_ep, mock_ensure = mock_cli_state
+
+    mock_ensure.debug = True
+    ep_dir = mock_ensure.endpoint_config_dir / ep_name
+    ep_dir.mkdir(parents=True)
+    config = {"debug": False, "engine": {"type": "ThreadPoolEngine"}}
+    data = {"config": yaml.safe_dump(config)}
+
+    run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=None)
+
+    _a, k = mock_setup_log.call_args
+    assert mock_ensure.debug is True, "Verify test setup"
+    assert "debug" in k
+    assert k["debug"] is True, "Expect --debug flag overrides config"
+
+
 def test_configure_validates_name(mock_command_ensure, run_line):
     compute_dir = mock_command_ensure.endpoint_config_dir
     compute_dir.mkdir(parents=True, exist_ok=True)

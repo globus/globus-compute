@@ -328,7 +328,7 @@ class Endpoint:
 
     def start_endpoint(
         self,
-        endpoint_dir,
+        endpoint_dir: pathlib.Path,
         endpoint_uuid,
         endpoint_config: Config,
         log_to_console: bool,
