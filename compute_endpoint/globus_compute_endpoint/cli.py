@@ -17,6 +17,7 @@ import click
 from click import ClickException
 from click_option_group import optgroup
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
+from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.utils import (
@@ -76,14 +77,14 @@ def get_config_dir() -> pathlib.Path:
     return state.endpoint_config_dir
 
 
-def get_cli_endpoint() -> Endpoint:
+def get_cli_endpoint(conf: Config) -> Endpoint:
     # this getter creates an Endpoint object from the CommandState
     # it takes its various configurable values from the current CommandState
     # as a result, any number of CLI options may be used to tweak the CommandState
     # via callbacks, and the Endpoint will only be constructed within commands which
     # access the Endpoint via this getter
     state = CommandState.ensure()
-    endpoint = Endpoint(debug=state.debug)
+    endpoint = Endpoint(debug=state.debug or conf.debug)
 
     return endpoint
 
@@ -632,6 +633,14 @@ def _do_start_endpoint(
                 ep_config = load_config_yaml(config_str)
             else:
                 ep_config = get_config(ep_dir)
+
+            if not state.debug and ep_config.debug:
+                setup_logging(
+                    logfile=ep_dir / "endpoint.log",
+                    debug=ep_config.debug,
+                    console_enabled=state.log_to_console,
+                    no_color=state.no_color,
+                )
         except Exception as e:
             if isinstance(e, ClickException):
                 raise
@@ -660,7 +669,7 @@ def _do_start_endpoint(
             epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
             epm.start()
         else:
-            get_cli_endpoint().start_endpoint(
+            get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
                 endpoint_uuid,
                 ep_config,

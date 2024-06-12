@@ -70,6 +70,14 @@ class Config(RepresentationMixin):
         Path where the endpoint's stderr should be written
         Default: ./interchange.stderr
 
+    debug : bool
+        If set emit debug-level log messages.
+
+        This is a configuration implementation of the CLI's ``--debug`` flag.  Note
+        that if this value is explicitly False, then the CLI flag, if utilized, will
+        still put the EP into "debug mode."  The CLI wins.
+        Default: False
+
     detach_endpoint : Bool
         Should the endpoint daemon be run as a detached process? This is good for
         a real edge node, but an anti-pattern for kubernetes pods
@@ -163,6 +171,7 @@ class Config(RepresentationMixin):
         log_dir=None,
         stdout="./endpoint.log",
         stderr="./endpoint.log",
+        debug: bool = False,
         **kwargs,
     ):
 
@@ -216,6 +225,7 @@ class Config(RepresentationMixin):
         self.log_dir = log_dir
         self.stdout = stdout
         self.stderr = stderr
+        self.debug = debug
 
         # Misc info
         self.display_name = display_name
