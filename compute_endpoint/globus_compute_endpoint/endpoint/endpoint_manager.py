@@ -853,14 +853,25 @@ class EndpointManager:
             env: dict[str, str] = {"PATH": ":".join(map(str, default_path))}
             env_path = self.conf_dir / "user_environment.yaml"
             try:
-                if env_path.exists():
-                    log.debug("Load default environment variables from: %s", env_path)
-                    env_text = env_path.read_text()
-                    if env_text:
-                        env_data = yaml.safe_load(env_text)
-                        if env_data:
-                            env.update({k: str(v) for k, v in env_data.items()})
-
+                log.debug("Load default environment variables from: %s", env_path)
+                env_text = env_path.read_text()
+                if not env_text:
+                    raise ValueError("empty file")
+                env_data = yaml.safe_load(env_text)
+                if env_data:
+                    env.update({k: str(v) for k, v in env_data.items()})
+            except FileNotFoundError:
+                log.warning(
+                    "No user environment variable file found at %s.  Using default: %s",
+                    env_path,
+                    env,
+                )
+            except ValueError:
+                log.warning(
+                    "User environment variable file at %s is empty.  Using default: %s",
+                    env_path,
+                    env,
+                )
             except Exception as e:
                 log.warning(
                     "Failed to parse user environment variables from %s.  Using "

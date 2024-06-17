@@ -1613,6 +1613,30 @@ def test_environment_default_path_set_if_not_specified(
     assert "PATH" in env, "Expected PATH is always set"
 
 
+def test_warns_if_environment_file_not_found(successful_exec_from_mocked_root, caplog):
+    _, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    conf_path = conf_dir / "user_environment.yaml"
+    conf_path.unlink(missing_ok=True)
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert f"No user environment variable file found at {conf_path}" in caplog.text
+
+
+def test_warns_if_environment_file_empty(successful_exec_from_mocked_root, caplog):
+    _, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    conf_path = conf_dir / "user_environment.yaml"
+    conf_path.write_text("")
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert f"User environment variable file at {conf_path} is empty" in caplog.text
+
+
 def test_warns_if_executable_not_found(
     successful_exec_from_mocked_root, mocker, randomstring
 ):
