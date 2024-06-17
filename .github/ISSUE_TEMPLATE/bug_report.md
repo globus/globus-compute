@@ -32,5 +32,6 @@ A clear and concise description of what you expected to happen.
 - Where are you running the funcX script from? [e.g. Laptop/Workstation, Login node, Compute node]
 - Where does the endpoint run? [e.g. Laptop/Workstation, Login node]
 - What is your endpoint-uuid?
-- Attach endpoint logs at `~/.globus_compute/<ENDPOINT_NAME>` if this is an endpoint issue.
-  Please let us know if you'd prefer to share logs privately.
+- If this is an endpoint issue, run `globus-compute-endpoint self-diagnostic -z` and attach the resulting zip file.
+  This archive will contain logs, configuration, and machine information; if you'd prefer to share it privately,
+  you can reach the [Compute team via Slack](https://join.slack.com/t/funcx/shared_invite/zt-gfeclqkz-RuKjkZkvj1t~eWvlnZV0KA).
