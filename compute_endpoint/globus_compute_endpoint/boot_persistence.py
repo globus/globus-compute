@@ -11,7 +11,7 @@ from globus_compute_sdk.sdk.login_manager import LoginManager
 _SYSTEMD_UNIT_DIR = pathlib.Path("/etc/systemd/system")
 
 _SYSTEMD_UNIT_TEMPLATE = """[Unit]
-Description=systemd service for Globus Compute Endpoint "{ep_name}"
+Description=Globus Compute Endpoint "{ep_name}"
 After=network.target
 StartLimitIntervalSec=0
 
