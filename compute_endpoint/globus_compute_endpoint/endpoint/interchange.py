@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
 import multiprocessing
 import os
@@ -388,8 +389,13 @@ class EndpointInterchange:
 
                     fid: str = prop_headers.get("function_uuid")
                     tid: str = prop_headers.get("task_uuid")
+
                     if not fid or not tid:
                         raise InvalidMessageError("Task message missing headers")
+
+                    res_spec_s: str = prop_headers.get("resource_specification", "null")
+                    # guarantee that res_spec is always a dict
+                    res_spec: dict = json.loads(res_spec_s) or {}
 
                     if fid and not self.function_allowed(fid):
                         # Same as web-service message but packed in a
@@ -418,7 +424,9 @@ class EndpointInterchange:
                     continue
 
                 try:
-                    executor.submit(task_id=tid, packed_task=body)
+                    executor.submit(
+                        task_id=tid, packed_task=body, resource_specification=res_spec
+                    )
                     num_tasks_forwarded += 1  # Safe given GIL
 
                 except Exception as exc:

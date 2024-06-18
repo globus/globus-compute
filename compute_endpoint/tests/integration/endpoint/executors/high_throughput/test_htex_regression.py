@@ -35,7 +35,10 @@ def test_engine_submit(engine):
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = engine.submit(str(task_id), task_message)
+    resource_spec = {}
+    future = engine.submit(
+        str(task_id), task_message, resource_specification=resource_spec
+    )
     packed_result = future.result()
 
     # Confirm that the future got the right answer

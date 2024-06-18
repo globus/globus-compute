@@ -198,18 +198,25 @@ class GlobusComputeEngineBase(ABC):
     def _submit(
         self,
         func: t.Callable,
+        resource_specification: t.Dict,
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
         """Subclass should use the internal execution system to implement this"""
         raise NotImplementedError()
 
-    def submit(self, task_id: str, packed_task: bytes) -> Future:
+    def submit(
+        self,
+        task_id: str,
+        packed_task: bytes,
+        resource_specification: t.Dict,
+    ) -> Future:
         """GC Endpoints should submit tasks via this method so that tasks are
         tracked properly.
         Parameters
         ----------
         packed_task: messagepack bytes buffer
+        resource_specification: Dict that specifies resource requirements
         Returns
         -------
         future
@@ -220,10 +227,12 @@ class GlobusComputeEngineBase(ABC):
                 "retry_count": 0,
                 "packed_task": packed_task,
                 "exception_history": [],
+                "resource_specification": resource_specification,
             }
         try:
             future = self._submit(
                 execute_task,
+                resource_specification,
                 task_id,
                 packed_task,
                 self.endpoint_id,

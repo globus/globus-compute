@@ -231,10 +231,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     def _submit(
         self,
         func: t.Callable,
+        resource_specification: t.Dict,
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
-        return self.executor.submit(func, {}, *args, **kwargs)
+        return self.executor.submit(func, resource_specification, *args, **kwargs)
 
     @property
     def provider(self):
@@ -380,7 +381,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         if retry_info["retry_count"] < self.max_retries_on_system_failure:
             retry_info["retry_count"] += 1
             retry_info["exception_history"].append(exception)
-            self.submit(task_id, retry_info["packed_task"])
+            self.submit(
+                task_id,
+                retry_info["packed_task"],
+                resource_specification=retry_info["resource_specification"],
+            )
         else:
             # This is a terminal state
             result_bytes = super()._handle_task_exception(
