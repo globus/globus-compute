@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import multiprocessing
 import time
 import uuid
@@ -132,6 +134,7 @@ def test_epi_forwards_tasks_and_results(
                     headers={
                         "function_uuid": "some_func",
                         "task_uuid": str(task_uuid),
+                        "resource_specification": "null",
                     },
                 ),
             )
@@ -139,7 +142,8 @@ def test_epi_forwards_tasks_and_results(
             # then get (consume) our expected result
             result: Result | None = None
             for mframe, mprops, mbody in chan.consume(
-                queue=res_q_name, inactivity_timeout=1
+                queue=res_q_name,
+                inactivity_timeout=10,
             ):
                 assert (mframe, mprops, mbody) != (None, None, None), "no timely result"
                 result = unpack(mbody)
@@ -162,7 +166,9 @@ def test_epi_rejects_allowlist_task(
     run_interchange_process, pika_conn_params, randomstring, request
 ):
     """
-    Copy of test_epi_forwards_tasks_and_results, but check for disallowed
+    Copy of test_epi_forwards_tasks_and_results, but check for disallowed,
+    this test also doubles up as checking for not specifying the
+    resource_specification field.
     """
     _, _, endpoint_uuid, reg_info = run_interchange_process
 
@@ -206,3 +212,119 @@ def test_epi_rejects_allowlist_task(
                     assert f"Function {func_to_run} not permitted" in result.data
                     assert f"on endpoint {endpoint_uuid}" in result.data
                 break
+
+
+@pytest.mark.parametrize(
+    "resource_specification",
+    [
+        "NO_HEADER",  # SPECIAL CASE: Missing header
+        "null",
+        None,
+        '{"num_nodes": 2, "ranks_per_node": 2, "num_ranks": 4}',
+    ],
+)
+def test_resource_specification(
+    run_interchange_process, pika_conn_params, randomstring, resource_specification
+):
+    """
+    Verify the two main threads of kernel interest: that tasks are pulled from the
+    appropriate queue, and results are put into appropriate queue with the correct
+    routing_key.
+    """
+    ix_proc, tmp_path, endpoint_uuid, reg_info = run_interchange_process
+
+    task_uuid = uuid.uuid4()
+    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
+    task_q, res_q = reg_info["task_queue_info"], reg_info["result_queue_info"]
+    res_q_name = res_q["queue"]
+    task_q_name = task_q["queue"]
+    task_exch = task_q["exchange"]
+    with pika.BlockingConnection(pika_conn_params) as mq_conn:
+        with mq_conn.channel() as chan:
+            x = chan.is_open
+            logging.warning(f"Channel open : {x=}")
+            chan.queue_purge(task_q_name)
+            chan.queue_purge(res_q_name)
+            # publish our canary task
+            header = {
+                "function_uuid": "some_func",
+                "task_uuid": str(task_uuid),
+            }
+
+            if resource_specification != "NO_HEADER":
+                header["resource_specification"] = resource_specification
+            chan.basic_publish(
+                task_exch,
+                task_q_name,
+                pack(task_msg),
+                properties=pika.BasicProperties(
+                    content_type="application/json",
+                    content_encoding="utf-8",
+                    headers=header,
+                ),
+            )
+
+            # then get (consume) our expected result
+            result: Result | None = None
+            for mframe, mprops, mbody in chan.consume(
+                queue=res_q_name,
+            ):
+                assert (mframe, mprops, mbody) != (None, None, None), "no timely result"
+                result = unpack(mbody)
+                break
+    assert result.task_id == task_uuid
+    assert result.data == task_msg.task_buffer
+
+
+def test_bad_resource_specification(
+    run_interchange_process, pika_conn_params, randomstring
+):
+    """
+    Verify that a result is returned for a task that carries
+    a bad resource_spec, in this case we use {"BAD_KEY": ...}
+    to trigger an exception in the MockExecutor
+    """
+    ix_proc, tmp_path, endpoint_uuid, reg_info = run_interchange_process
+
+    task_uuid = uuid.uuid4()
+    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
+    task_q, res_q = reg_info["task_queue_info"], reg_info["result_queue_info"]
+    res_q_name = res_q["queue"]
+    task_q_name = task_q["queue"]
+    task_exch = task_q["exchange"]
+
+    # The MockExecutor raises an exception on receiving res_spec with BAD_KEY
+    resource_specification = json.dumps({"BAD_KEY": "BAD_VALUE"})
+    with pika.BlockingConnection(pika_conn_params) as mq_conn:
+        with mq_conn.channel() as chan:
+            x = chan.is_open
+            logging.warning(f"Channel open : {x=}")
+            chan.queue_purge(task_q_name)
+            chan.queue_purge(res_q_name)
+            # publish our canary task
+            chan.basic_publish(
+                task_exch,
+                task_q_name,
+                pack(task_msg),
+                properties=pika.BasicProperties(
+                    content_type="application/json",
+                    content_encoding="utf-8",
+                    headers={
+                        "function_uuid": "some_func",
+                        "task_uuid": str(task_uuid),
+                        "resource_specification": resource_specification,
+                    },
+                ),
+            )
+
+            # then get (consume) our expected result
+            result: Result | None = None
+            for mframe, mprops, mbody in chan.consume(
+                queue=res_q_name,
+            ):
+                assert (mframe, mprops, mbody) != (None, None, None), "no timely result"
+                result = unpack(mbody)
+                break
+    assert result.task_id == task_uuid
+    assert "Invalid resource specification options supplied: BAD_KEY" in result.data
+    assert result.error_details.code == "RemoteExecutionError"

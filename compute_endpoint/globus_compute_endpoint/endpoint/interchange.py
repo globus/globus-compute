@@ -391,10 +391,13 @@ class EndpointInterchange:
                     tid: str = prop_headers.get("task_uuid")
 
                     if not fid or not tid:
-                        raise InvalidMessageError("Task message missing headers")
+                        raise InvalidMessageError(
+                            "Task message missing function or task id in headers"
+                        )
 
-                    res_spec_s: str = prop_headers.get("resource_specification", "null")
-                    # guarantee that res_spec is always a dict
+                    res_spec_s: str = (
+                        prop_headers.get("resource_specification") or "null"
+                    )
                     res_spec: dict = json.loads(res_spec_s) or {}
 
                     if fid and not self.function_allowed(fid):

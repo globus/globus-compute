@@ -183,7 +183,7 @@ def test_engine_submit_container_location(
     mock_put = mocker.patch.object(engine.outgoing_q, "put")
 
     engine.container_type = container_type
-    engine.submit(str(task_id), task_message)
+    engine.submit(str(task_id), task_message, {})
 
     a, _ = mock_put.call_args
     unpacked_msg = InternalTask.unpack(a[0])

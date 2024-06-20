@@ -44,7 +44,7 @@ def test_success_after_1_fail(gc_engine_with_retries, tmp_path):
     task_message = messagepack.pack(
         messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
     )
-    engine.submit(task_id, task_message)
+    engine.submit(task_id, task_message, resource_specification={})
 
     flag = False
     for _i in range(20):
@@ -75,7 +75,7 @@ def test_repeated_fail(gc_engine_with_retries, tmp_path):
     task_message = messagepack.pack(
         messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
     )
-    engine.submit(task_id, task_message)
+    engine.submit(task_id, task_message, resource_specification={})
 
     flag = False
     for _i in range(30):

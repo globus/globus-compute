@@ -125,3 +125,9 @@ def succeed_after_n_runs(dirpath: pathlib.Path, fail_count: int = 1):
         os.killpg(manager_pgid, signal.SIGKILL)
 
     return f"Success on attempt: {prior_run_count+1}"
+
+
+def get_env_vars():
+    import os
+
+    return os.environ

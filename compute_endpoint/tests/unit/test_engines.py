@@ -93,7 +93,7 @@ def test_engine_submit_internal(engine_type: GlobusComputeEngineBase, engine_run
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = engine.submit(str(task_id), task_message)
+    future = engine.submit(str(task_id), task_message, resource_specification={})
     packed_result = future.result()
 
     # Confirm that the future got the right answer
@@ -130,7 +130,7 @@ def test_proc_pool_engine_not_started():
     engine = ProcessPoolEngine(max_workers=2)
 
     with pytest.raises(AssertionError) as pyt_exc:
-        future = engine.submit(double, 10)
+        future = engine.submit(double, 10, resource_specification={})
         future.result()
     assert "engine has not been started" in str(pyt_exc)
 
@@ -152,7 +152,7 @@ def test_gc_engine_system_failure(engine_runner):
             task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
         )
     )
-    future = engine.submit(str(task_id), task_message)
+    future = engine.submit(str(task_id), task_message, {})
 
     assert isinstance(future, concurrent.futures.Future)
     with pytest.raises(ManagerLost):
@@ -276,7 +276,12 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring):
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
 
     taskb = b"some packed task bytes"
-    futs = [gce.submit(task_id=str(uuid.uuid4()), packed_task=taskb) for _ in range(5)]
+    futs = [
+        gce.submit(
+            task_id=str(uuid.uuid4()), packed_task=taskb, resource_specification={}
+        )
+        for _ in range(5)
+    ]
 
     assert all(f.done() for f in futs), "Expect immediate completion for failed state"
     assert all(exc_text in str(f.exception()) for f in futs)
@@ -287,7 +292,9 @@ def test_gcengine_exception_report_from_bad_state():
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
     task_id = uuid.uuid4()
-    gce.submit(task_id=str(task_id), packed_task=b"MOCK_PACKED_TASK")
+    gce.submit(
+        task_id=str(task_id), resource_specification={}, packed_task=b"MOCK_PACKED_TASK"
+    )
 
     result = None
     for _i in range(10):

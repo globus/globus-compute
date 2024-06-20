@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import multiprocessing
+import typing as t
 import unittest.mock
 import uuid
 
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_sdk import Client
+from parsl.executors.high_throughput.mpi_prefix_composer import (
+    InvalidResourceSpecification,
+)
 
 
 class MockExecutor(unittest.mock.Mock):
@@ -27,9 +31,19 @@ class MockExecutor(unittest.mock.Mock):
         self.endpoint_id = endpoint_id
         self.run_dir = run_dir
 
-    def submit(self, task_id: uuid.UUID, packed_task: bytes):
+    def submit(
+        self,
+        task_id: uuid.UUID,
+        packed_task: bytes,
+        resource_specification: t.Dict,
+    ):
         task: Task = messagepack.unpack(packed_task)
         res = Result(task_id=task_id, data=task.task_buffer)
+
+        # This is a hack to trigger an InvalidResourceSpecification
+        if "BAD_KEY" in resource_specification:
+            raise InvalidResourceSpecification("BAD_KEY")
+
         packed_result = messagepack.pack(res)
         msg = {"task_id": str(task_id), "message": packed_result}
         self.results_passthrough.put(msg)
