@@ -678,10 +678,9 @@ class Endpoint:
                 if status.get("status") == "online":
                     if not force:
                         log.warning(
-                            f"Endpoint {ep_uuid} is currently running.  To proceed "
-                            "with deletion, first suspend it with the command "
-                            "`globus-compute-endpoint stop --remote {ep_uuid}` or "
-                            "ignore the current status with `delete --force`"
+                            f"Endpoint {ep_uuid} is currently running.  To "
+                            "proceed with deletion, first stop the endpoint, "
+                            "or ignore the current status with `delete --force`"
                         )
                         exit(-1)
                     if ep_dir:
