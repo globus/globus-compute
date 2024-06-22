@@ -98,16 +98,25 @@ def get_service_versions(base_url: str):
     return kernel
 
 
+def get_executable_path(exec_name: str):
+    def kernel():
+        path = shutil.which(exec_name)
+        click.echo(f"{path}\n")
+
+    kernel.display_name = f"which({exec_name})"  # type: ignore
+    return kernel
+
+
+def which_python():
+    click.echo(f"{sys.executable}\n")
+
+
 def get_openssl_version():
     click.echo(f"{ssl.OPENSSL_VERSION}\n")
 
 
 def get_python_version():
     click.echo(f"Python version {sys.version}\n")
-
-
-def which_python():
-    click.echo(f"{sys.executable}\n")
 
 
 def _run_command(cmd: str):
@@ -152,6 +161,8 @@ def run_self_diagnostic(log_bytes: int = 0):
         "ifconfig",
         "ip route",
         "netstat -r",
+        get_executable_path("globus-compute-endpoint"),
+        get_executable_path("process_worker_pool.py"),
         "globus-compute-endpoint whoami",
         "globus-compute-endpoint list",
         cat("~/.globus_compute/*/*.yaml", wildcard=True),

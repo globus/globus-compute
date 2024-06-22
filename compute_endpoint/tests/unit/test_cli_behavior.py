@@ -640,7 +640,7 @@ def test_self_diagnostic(
     res = run_line("self-diagnostic")
     stdout = res.stdout_bytes.decode("utf-8")
 
-    assert stdout.count("== Diagnostic") >= 19
+    assert stdout.count("== Diagnostic") >= 21
     assert stdout.count("Connected successfully") == 2
     assert stdout.count("established SSL connection") == 2
     assert conf_data in stdout
@@ -718,7 +718,7 @@ def test_self_diagnostic_gzip(
     with gzip.open(fname, "rb") as f:
         contents = f.read().decode("utf-8")
 
-    assert contents.count("== Diagnostic") >= 19
+    assert contents.count("== Diagnostic") >= 21
 
 
 @pytest.mark.parametrize("test_data", [(True, 1), (False, 0.5), (False, "")])
@@ -749,7 +749,7 @@ def test_self_diagnostic_log_size(
 
     if should_succeed:
         stdout = run_cmd()
-        assert stdout.count("== Diagnostic") >= 19
+        assert stdout.count("== Diagnostic") >= 21
     else:
         with pytest.raises(AssertionError):
             stdout = run_cmd()
