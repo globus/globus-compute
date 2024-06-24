@@ -49,7 +49,7 @@ def test_non_configured_endpoint(mocker, tmp_path):
     with mock.patch.dict(os.environ, env):
         result = CliRunner().invoke(app, ["start", "newendpoint"])
         assert "newendpoint" in result.stdout
-        assert "not configured" in result.stdout
+        assert "no endpoint configuration" in result.stdout
 
 
 @pytest.mark.parametrize(

@@ -255,7 +255,7 @@ def test_delete_endpoint_network_error(
     f = io.StringIO()
     with redirect_stdout(f):
         with pytest.raises(SystemExit) as pytest_exc:
-            ep.delete_endpoint(ep_dir, ep_conf)
+            ep.delete_endpoint(ep_dir, ep_conf, ep_uuid=ep_uuid_str)
 
     assert pytest_exc.value.code == os.EX_TEMPFAIL
     assert "could not be deleted from the web" in mock_log.warning.call_args[0][0]
@@ -864,3 +864,121 @@ def test_handles_provided_endpoint_id_with_json(
 
     _a, k = mock_gcc.register_endpoint.call_args
     assert k["endpoint_id"] == ep_uuid_str
+
+
+def test_delete_remote_endpoint_no_local_offline(
+    mocker: MockFixture,
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+):
+    ep = mock_ep_data[0]
+    ep_uuid = str(uuid.uuid4())
+    mock_gcc = mocker.Mock()
+    mock_gcc.get_endpoint_status.return_value = {"status": "offline"}
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+    ep.delete_endpoint(None, None, force=False, ep_uuid=ep_uuid)
+    assert mock_gcc.delete_endpoint.called
+    assert mock_gcc.delete_endpoint.call_args[0][0] == ep_uuid
+
+
+@pytest.mark.parametrize(
+    "ep_status",
+    ["online", "offline"],
+)
+def test_delete_endpoint_with_uuid_happy(
+    ep_status: str,
+    mocker: MockFixture,
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+):
+    ep = mock_ep_data[0]
+    ep_dir = mock_ep_data[1]
+    ep_config = mock_ep_data[4]
+    ep_uuid = str(uuid.uuid4())
+    mock_log = mocker.patch(f"{_mock_base}log")
+    mock_gcc = mocker.Mock()
+    mock_gcc.get_endpoint_status.return_value = {"status": ep_status}
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+    mock_stop = mocker.patch(f"{_mock_base}Endpoint.stop_endpoint")
+
+    ep.delete_endpoint(
+        ep_dir, ep_config, force=(ep_status == "online"), ep_uuid=ep_uuid
+    )
+
+    if ep_status == "online":
+        assert mock_stop.called
+    assert mock_gcc.delete_endpoint.called
+    assert "deleted from the web service" in mock_log.info.call_args_list[0].args[0]
+    assert "has been deleted" in mock_log.info.call_args_list[1].args[0]
+
+
+@pytest.mark.parametrize(
+    (
+        "ep_dir_exists",
+        "no_uuid",
+        "ep_status",
+        "force",
+        "log_msg",
+        "exc",
+        "exit_code",
+    ),
+    [
+        (
+            False,
+            False,
+            "online",
+            False,
+            "currently running",
+            None,
+            -1,
+        ),
+        (
+            False,
+            True,
+            "offline",
+            False,
+            "Name or UUID is needed to delete an Endpoint",
+            None,
+            -1,
+        ),
+        (
+            False,
+            False,
+            "online",
+            False,
+            "blah xyz",
+            NetworkError("blah xyz", Exception("something")),
+            os.EX_TEMPFAIL,
+        ),
+    ],
+)
+def test_delete_endpoint_with_uuid_errors(
+    ep_dir_exists: bool,
+    no_uuid: bool,
+    ep_status: str,
+    force: bool,
+    log_msg: str | None,
+    exc: Exception | None,
+    exit_code: bool,
+    mocker: MockFixture,
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+):
+    ep = mock_ep_data[0]
+    ep_dir = mock_ep_data[1] if ep_dir_exists else None
+    ep_config = mock_ep_data[3] if ep_dir_exists else None
+
+    ep_uuid = None if no_uuid else str(uuid.uuid4())
+
+    mock_log = mocker.patch(f"{_mock_base}log")
+    mock_gcc = mocker.Mock()
+    if exc:
+        mock_gcc.get_endpoint_status.side_effect = exc
+    else:
+        mock_gcc.get_endpoint_status.return_value = {
+            "status": ep_status,
+        }
+    mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
+
+    with pytest.raises(SystemExit) as exit_info:
+        ep.delete_endpoint(ep_dir, ep_config, force=force, ep_uuid=ep_uuid)
+
+    assert exit_info.value.code == exit_code
+    assert log_msg in mock_log.warning.call_args[0][0]

@@ -655,62 +655,73 @@ class Endpoint:
 
     @staticmethod
     def delete_endpoint(
-        endpoint_dir: pathlib.Path, endpoint_config: Config | None, force: bool = False
+        ep_dir: pathlib.Path | None,
+        ep_config: Config | None = None,
+        force: bool = False,
+        ep_uuid: str | None = None,
     ):
-        ep_name = endpoint_dir.name
+        ep_name = None
 
-        if not endpoint_dir.exists():
-            log.warning(f"Endpoint <{ep_name}> does not exist")
+        if ep_dir:
+            ep_name = str(ep_dir)
+        elif ep_uuid:
+            ep_name = ep_uuid
+        else:
+            log.warning("Name or UUID is needed to delete an Endpoint")
             exit(-1)
 
-        endpoint_id = Endpoint.get_endpoint_id(endpoint_dir)
-        if endpoint_id is None:
-            log.warning(
-                f"Configuration for endpoint <{ep_name}> could not be found, it "
-                "might not have been initialized locally"
-            )
-            if not force:
-                exit(-1)
+        # If we have the UUID, do the online status check/deletion first
+        if ep_uuid:
+            try:
+                gc_client = Endpoint.get_funcx_client(ep_config)
+                status = gc_client.get_endpoint_status(ep_uuid)
+                if status.get("status") == "online":
+                    if not force:
+                        log.warning(
+                            f"Endpoint {ep_uuid} is currently running.  To "
+                            "proceed with deletion, first stop the endpoint, "
+                            "or ignore the current status with `delete --force`"
+                        )
+                        exit(-1)
+                    if ep_dir:
+                        # Stop endpoint to handle process cleanup
+                        Endpoint.stop_endpoint(ep_dir, ep_config, remote=False)
 
-        # Delete endpoint from web service
-        try:
-            fx_client = Endpoint.get_funcx_client(endpoint_config)
-            fx_client.delete_endpoint(endpoint_id)
-            log.info(f"Endpoint <{ep_name}> has been deleted from the web service")
-        except AuthAPIError:
-            # Send to the exception handler
-            raise
-        except GlobusAPIError as e:
-            log.warning(
-                f"Endpoint <{ep_name}> could not be deleted from the web service"
-                f"  [{e.text}]"
-            )
-            if not force:
-                log.critical("Exiting without deleting the endpoint")
-                exit(os.EX_UNAVAILABLE)
-        except NetworkError as e:
-            log.warning(
-                f"Endpoint <{ep_name}> could not be deleted from the web service"
-                f"  [{e}]"
-            )
-            if not force:
-                msg = (
-                    "globus-compute-endpoint is unable to reach the Globus Compute "
-                    "service due to a network error.\n"
-                    "Please ensure the Globus Compute service address is reachable, "
-                    "then attempt to delete the endpoint again."
+                gc_client.delete_endpoint(ep_uuid)
+                log.info(f"Endpoint {ep_uuid} has been deleted from the web service")
+            except AuthAPIError:
+                # Send to the exception handler
+                raise
+            except GlobusAPIError as e:
+                # GlobusAPIError is more known, handled slightly differently
+                log.warning(
+                    f"Endpoint {ep_uuid} could not be deleted from the web service: "
+                    f"[{e.text}]"
                 )
-                print(msg)
-                log.critical(msg)
-                exit(os.EX_TEMPFAIL)
+                if ep_dir and not force:
+                    log.critical("Exiting without deleting the local endpoint")
+                    exit(os.EX_UNAVAILABLE)
+            except NetworkError as e:
+                # NetworkError is unexpected, user can probably retry
+                log.warning(
+                    f"Endpoint {ep_uuid} could not be deleted from the web service: "
+                    f"  [{e}]"
+                )
+                if not force:
+                    msg = (
+                        "globus-compute-endpoint is unable to reach the Globus "
+                        "Compute service due to a network error.\n"
+                        "Please ensure the Globus Compute service address is "
+                        "reachable, then attempt to delete the endpoint again."
+                    )
+                    print(msg)
+                    log.critical(msg)
+                    exit(os.EX_TEMPFAIL)
 
-        # Stop endpoint to handle process cleanup
-        Endpoint.stop_endpoint(endpoint_dir, None)
-
-        # Delete endpoint directory
-        shutil.rmtree(endpoint_dir)
-
-        log.info(f"Endpoint <{ep_name}> has been deleted.")
+        if ep_dir and ep_dir.exists():
+            # Delete endpoint directory
+            shutil.rmtree(ep_dir)
+            log.info(f"Endpoint {ep_name} has been deleted from {ep_dir}")
 
     @staticmethod
     def check_pidfile(endpoint_dir: pathlib.Path):
