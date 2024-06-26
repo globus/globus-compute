@@ -1,4 +1,0 @@
-Changed
-^^^^^^^
-
-- Bumped ``parsl`` dependency version to 2024.6.10.
