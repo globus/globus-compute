@@ -295,7 +295,7 @@ motivated administrator.  The initial user config template implements two
 user-specifiable variables, ``endpoint_setup`` and ``worker_init``.  Both of these
 default to the empty string if not specified by the user (i.e., ``...|default()``).
 
-.. code-block:: yaml
+.. code-block:: yaml+jinja
 
    endpoint_setup: {{ endpoint_setup|default() }}
    engine:
@@ -807,7 +807,7 @@ administrator could use the following user configuration template
 ``debug-scaling`` queue, and pre-select the obvious defaults (`per the
 documentation <https://docs.alcf.anl.gov/polaris/running-jobs/>`_):
 
-.. code-block:: yaml
+.. code-block:: yaml+jinja
 
    display_name: Polaris at ALCF - debug-scaling queue
    engine:
