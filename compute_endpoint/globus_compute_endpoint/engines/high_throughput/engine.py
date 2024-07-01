@@ -748,7 +748,9 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
         return container_loc
 
-    def submit(self, task_id: str, packed_task: bytes) -> HTEXFuture:
+    def submit(
+        self, task_id: str, packed_task: bytes, resource_specification: t.Dict
+    ) -> HTEXFuture:
         """Submits a messagepacked.Task for execution
 
         Parameters

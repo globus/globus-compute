@@ -92,6 +92,7 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
     def _submit(
         self,
         func: t.Callable,
+        resource_specification: t.Dict,
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
