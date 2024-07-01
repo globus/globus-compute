@@ -47,7 +47,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         encrypted: bool = True,
         strategy: str | None = None,
         job_status_kwargs: t.Optional[JobStatusPollerKwargs] = None,
-        working_dir: str | os.PathLike | None = None,
+        working_dir: str | os.PathLike = "tasks_working_dir",
         run_in_sandbox: bool = False,
         **kwargs,
     ):
@@ -87,9 +87,12 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         encrypted: bool
             Flag to enable/disable encryption (CurveZMQ). Default is True.
 
-        working_dir: str | os.PathLike | None
-            Directory within which functions should execute. When set to None,
-            defaults to the endpoint_dir (~/.globus_compute/<endpoint_name>/)
+        working_dir: str | os.PathLike
+            Directory within which functions should execute, defaults to
+            (~/.globus_compute/<endpoint_name>/tasks_working_dir)
+            If a relative path is supplied, the working dir is set relative
+            to the endpoint.run_dir. If an absolute path is supplied, it is
+            used as is.
 
         run_in_sandbox: bool
             Functions will run in a sandbox directory under the working_dir
@@ -194,11 +197,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
         assert run_dir, "GCExecutor requires kwarg:run_dir at start"
 
-        if self.working_dir:
-            if not os.path.isabs(self.working_dir):
-                self.working_dir = os.path.join(run_dir, self.working_dir)
-        else:
-            self.working_dir = run_dir
+        if not os.path.isabs(self.working_dir):
+            # set relative to run_dir
+            self.working_dir = os.path.join(run_dir, self.working_dir)
 
         self.endpoint_id = endpoint_id
         self.run_dir = run_dir
