@@ -205,6 +205,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.executor.run_dir = self.run_dir
         script_dir = os.path.join(self.run_dir, "submit_scripts")
         self.executor.provider.script_dir = script_dir
+        self.executor.launch_cmd = (
+            f"globus-compute-endpoint exec {self.executor.launch_cmd}"
+        )
         if self.container_type:
             self.executor.launch_cmd = self.containerized_launch_cmd()
             logger.info(

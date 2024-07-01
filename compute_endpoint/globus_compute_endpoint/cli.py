@@ -8,6 +8,7 @@ import logging
 import pathlib
 import re
 import shutil
+import subprocess
 import sys
 import textwrap
 import uuid
@@ -908,6 +909,26 @@ def self_diagnostic(compress: bool, log_kb: int):
                 run_self_diagnostic(log_bytes=log_bytes)
 
         click.echo(f"Successfully created {filename}")
+
+
+@app.command(
+    "exec",
+    context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
+)
+@click.argument("executable")
+@click.help_option("-h", "--help")
+@click.pass_context
+def run_python_executable(ctx: click.Context, executable: str):
+    """Run supported Python executables via the CLI. This helps to minimize PATH
+    issues when launching workers, etc.
+    """
+    if executable == "process_worker_pool.py":
+        from parsl.executors.high_throughput import process_worker_pool
+
+        exec_path = process_worker_pool.__file__
+    else:
+        raise ClickException(f"'{executable}' is not a supported Python executable")
+    subprocess.run([sys.executable, exec_path] + ctx.args)
 
 
 def create_or_choose_auth_project(ac: AuthClient) -> str:
