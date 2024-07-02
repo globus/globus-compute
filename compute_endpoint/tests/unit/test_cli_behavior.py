@@ -8,6 +8,7 @@ import pathlib
 import random
 import re
 import shlex
+import sys
 import typing as t
 import uuid
 from unittest import mock
@@ -804,6 +805,14 @@ _test_name_or_uuid_decorator__data = [
     ("123", str(uuid.uuid4())),
     ("nice_normal_name", str(uuid.uuid4())),
 ]
+
+
+def test_python_exec(mocker: MockFixture, run_line: t.Callable):
+    mock_subprocess_run = mocker.patch("subprocess.run")
+    run_line("python-exec path.to.module arg --option val")
+    mock_subprocess_run.assert_called_with(
+        [sys.executable, "-m", "path.to.module", "arg", "--option", "val"]
+    )
 
 
 @pytest.mark.parametrize("name,uuid", _test_name_or_uuid_decorator__data)

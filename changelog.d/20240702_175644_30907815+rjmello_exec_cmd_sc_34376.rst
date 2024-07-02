@@ -1,0 +1,6 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added the ``globus-compute-endpoint python-exec`` command to run Python modules as scripts
+  from the Globus Compute endpoint CLI. The primary use case is to launch Parsl processes
+  without requiring additional commands in the user's ``PATH`` (e.g., ``process_worker_pool.py``).
