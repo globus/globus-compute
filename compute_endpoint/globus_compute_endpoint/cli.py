@@ -918,17 +918,13 @@ def self_diagnostic(compress: bool, log_kb: int):
 @click.argument("executable")
 @click.help_option("-h", "--help")
 @click.pass_context
-def run_python_executable(ctx: click.Context, executable: str):
-    """Run supported Python executables via the CLI. This helps to minimize PATH
-    issues when launching workers, etc.
+def run_executable(ctx: click.Context, executable: str):
+    """Run an executable within the same Python environment as the CLI.
+    This helps to minimize PATH issues when launching workers, etc.
     """
-    if executable == "process_worker_pool.py":
-        from parsl.executors.high_throughput import process_worker_pool
-
-        exec_path = process_worker_pool.__file__
-    else:
-        raise ClickException(f"'{executable}' is not a supported Python executable")
-    subprocess.run([sys.executable, exec_path] + ctx.args)
+    if not shutil.which(executable):
+        raise ClickException(f"'{executable}' could not be found")
+    subprocess.run([executable] + ctx.args)
 
 
 def create_or_choose_auth_project(ac: AuthClient) -> str:
