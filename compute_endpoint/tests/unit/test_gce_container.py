@@ -52,7 +52,7 @@ def test_custom(tmp_path):
     assert gce.executor.launch_cmd
     assert gce.executor.launch_cmd.startswith("mycontainer")
     assert f"{tmp_path}:{tmp_path}" in gce.executor.launch_cmd
-    assert "process_worker_pool.py" in gce.executor.launch_cmd
+    assert "process_worker_pool" in gce.executor.launch_cmd
     gce.executor.start.assert_called()
 
 

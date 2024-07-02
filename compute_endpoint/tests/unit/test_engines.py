@@ -169,9 +169,21 @@ def test_serialized_engine_config_has_provider(engine_type: GlobusComputeEngineB
     assert executor.get("provider")
 
 
+def test_gcengine_compute_launch_cmd(engine_runner):
+    engine: GlobusComputeEngine = engine_runner(GlobusComputeEngine)
+    assert engine.executor.launch_cmd.startswith(
+        "globus-compute-endpoint python-exec"
+        " parsl.executors.high_throughput.process_worker_pool"
+    )
+    assert "process_worker_pool.py" not in engine.executor.launch_cmd
+
+
 def test_gcengine_pass_through_to_executor(mocker: MockFixture):
     mock_executor = mocker.patch(
         "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
+    )
+    mocker.patch.object(
+        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
     )
 
     args = ("arg1", 2)
@@ -197,6 +209,9 @@ def test_gcengine_start_pass_through_to_executor(
     )
     mock_executor.provider = mock.MagicMock()
     mock_executor.status_polling_interval = 5
+    mocker.patch.object(
+        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
+    )
 
     run_dir = tmp_path
     scripts_dir = str(tmp_path / "submit_scripts")
@@ -212,10 +227,15 @@ def test_gcengine_start_pass_through_to_executor(
     assert mock_executor.provider.script_dir == scripts_dir
 
 
-def test_gcengine_start_provider_without_channel(tmp_path: pathlib.Path):
+def test_gcengine_start_provider_without_channel(
+    mocker: MockFixture, tmp_path: pathlib.Path
+):
     mock_executor = mock.Mock(spec=HighThroughputExecutor)
     mock_executor.status_polling_interval = 5
     mock_executor.provider = mock.Mock(spec=KubernetesProvider)
+    mocker.patch.object(
+        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
+    )
 
     assert not hasattr(mock_executor.provider, "channel"), "Verify test setup"
 
