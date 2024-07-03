@@ -89,7 +89,7 @@ class GlobusComputeEngineBase(ABC):
         # endpoint interchange happy
         self.container_type: t.Optional[str] = None
         self.run_dir: t.Optional[str] = None
-        self.working_dir: t.Optional[t.Union[str, os.PathLike]] = None
+        self.working_dir: t.Union[str, os.PathLike] = "tasks_working_dir"
         self.run_in_sandbox: bool = False
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.

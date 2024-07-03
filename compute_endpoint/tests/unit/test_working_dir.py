@@ -1,11 +1,13 @@
 import os
 import uuid
+from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines.globus_compute import GlobusComputeEngine
 from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_sdk.serialize import ComputeSerializer
+from parsl.executors import HighThroughputExecutor
 from tests.utils import ez_pack_function
 
 
@@ -22,28 +24,64 @@ def get_cwd():
     return os.getcwd()
 
 
-def test_working_dir_default(tmp_path):
-
-    gce = GlobusComputeEngine()
+def test_default_working_dir(tmp_path):
+    """Verify that working dir is set to tasks dir in the run_dir by default"""
+    gce = GlobusComputeEngine(
+        address="127.0.0.1",
+    )
+    gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
     gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
-    assert gce.working_dir == tmp_path
-    gce.shutdown()
+    assert gce.executor.run_dir == tmp_path
+    assert gce.working_dir == os.path.join(tmp_path, "tasks_working_dir")
 
 
-def test_working_dir_user_set(tmp_path):
-
-    gce = GlobusComputeEngine(working_dir="/tmp")
+def test_relative_working_dir(tmp_path):
+    """Test working_dir relative to run_dir"""
+    gce = GlobusComputeEngine(
+        address="127.0.0.1",
+        working_dir="relative_path",
+    )
+    gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
     gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
-    assert gce.working_dir == "/tmp"
-    gce.shutdown()
+    assert gce.run_dir == gce.executor.run_dir
+    assert gce.working_dir == os.path.join(tmp_path, "relative_path")
 
 
-def test_working_dir_relative(tmp_path):
-
-    gce = GlobusComputeEngine(working_dir="foobar")
+def test_absolute_working_dir(tmp_path):
+    """Test absolute path for working_dir"""
+    gce = GlobusComputeEngine(
+        address="127.0.0.1",
+        working_dir="/absolute/path",
+    )
+    gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
     gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
-    assert gce.working_dir == os.path.join(tmp_path, "foobar")
-    gce.shutdown()
+    assert gce.run_dir == gce.executor.run_dir
+    assert gce.working_dir == "/absolute/path"
+
+
+def test_submit_pass(tmp_path):
+    """Test absolute path for working_dir"""
+    gce = GlobusComputeEngine(
+        address="127.0.0.1",
+    )
+    gce.executor.start = mock.Mock(spec=HighThroughputExecutor.start)
+    gce.executor.submit = mock.Mock(spec=HighThroughputExecutor.submit)
+    gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+
+    gce.submit(
+        task_id=uuid.uuid4(),
+        packed_task=b"PACKED_TASK",
+        resource_specification={},
+    )
+
+    gce.executor.submit.assert_called()
+    flag = False
+    for call in gce.executor.submit.call_args_list:
+        args, kwargs = call
+        assert "run_dir" in kwargs
+        assert kwargs["run_dir"] == os.path.join(tmp_path, "tasks_working_dir")
+        flag = True
+    assert flag, "Call args parsing failed, did not find run_dir"
 
 
 def test_execute_task_working_dir(tmp_path, reset_cwd):
