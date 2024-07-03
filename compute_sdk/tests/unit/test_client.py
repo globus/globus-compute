@@ -353,24 +353,32 @@ def test_missing_task_info(gcc):
 
 
 @pytest.mark.parametrize(
-    "dill_python",
+    ("worker_dill", "worker_py", "should_warn"),
     [
-        [None, None],
-        # Impossible dill and python versions will always warn
-        ["000.dill", None],
-        [None, "1.2.3"],
-        ["000.dill", "1.2.3"],
+        # None means use the same dill/python version as the SDK
+        # Impossible dill versions should always warn
+        [None, None, False],
+        ["000.dill", "1.1.8", True],
+        ["000.dill", None, True],
+        [None, "1.1.8", True],
     ],
 )
-def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
-    worker_dill, worker_python = dill_python
-
+def test_version_mismatch_from_details(
+    mocker,
+    gcc,
+    mock_response,
+    worker_dill,
+    worker_py,
+    should_warn,
+):
     # Returned env same as client by default
-    response_details = get_env_details()
-    if worker_dill:
-        response_details["dill_version"] = worker_dill
-    if worker_python:
-        response_details["python_version"] = worker_python
+    sdk_details = get_env_details()
+    sdk_py = sdk_details["python_version"]
+
+    if worker_dill is None:
+        worker_dill = sdk_details["dill_version"]
+
+    task_py = worker_py if worker_py else sdk_py
 
     tid = str(uuid.uuid4())
     result = "some data"
@@ -381,8 +389,8 @@ def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
         "completion_t": "1677183605.212898",
         "details": {
             "os": "Linux-5.19.0-1025-aws-x86_64-with-glibc2.35",
-            "python_version": response_details["python_version"],
-            "dill_version": response_details["dill_version"],
+            "dill_version": worker_dill,
+            "python_version": task_py,
             "globus_compute_sdk_version": "2.3.2",
             "task_transitions": {
                 "execution-start": 1692742841.843334,
@@ -396,17 +404,12 @@ def test_version_mismatch_from_details(mocker, gcc, mock_response, dill_python):
 
     assert gcc.get_result(tid) == result
 
-    should_warn = worker_dill is not None or worker_python is not None
     assert mock_log.warning.called == should_warn
-    if worker_dill or worker_python:
+    if should_warn:
         a, *_ = mock_log.warning.call_args
-        assert "Warning - dependency versions are mismatched" in a[0]
-        if worker_dill and worker_python:
-            assert f"but worker used {worker_python}/{worker_dill}" in a[0]
-        if worker_python:
-            assert f"but worker used {worker_python}" in a[0]
-        if worker_dill:
-            assert f"/{worker_dill}\n(worker SDK version" in a[0]
+        assert "environment differences detected" in a[0]
+        assert f"but worker used {task_py}/{worker_dill}" in a[0]
+        assert "worker SDK version: " in a[0]
 
 
 @pytest.mark.parametrize("should_fail", [True, False])
@@ -448,10 +451,7 @@ def test_version_mismatch_warns_on_failure_and_success(
         assert task_res == result
 
     assert mock_log.warning.called
-    assert (
-        "Warning - dependency versions are mismatched"
-        in mock_log.warning.call_args[0][0]
-    )
+    assert "environment differences detected" in mock_log.warning.call_args[0][0]
 
 
 @pytest.mark.parametrize(

@@ -11,6 +11,8 @@ from platform import platform
 
 import dill
 import globus_compute_sdk.version as sdk_version
+import packaging.version
+from packaging.version import Version
 
 
 def chunk_by(iterable: t.Iterable, size) -> t.Iterable[tuple]:
@@ -47,11 +49,14 @@ def get_env_details() -> t.Dict[str, t.Any]:
     }
 
 
-def check_version(task_details: dict | None) -> str | None:
+def check_version(task_details: dict | None, check_py_micro: bool = True) -> str | None:
     """
     This method adds an optional string to some Exceptions below to
     warn of differing environments as a possible cause.  It is pre-pended
 
+    :param task_details:    Task details from worker environment
+    :param check_py_minor:  Whether Python micro version mismatches should
+                              trigger a warning, or only major/minor diffs
     """
     if task_details:
         worker_py = task_details.get("python_version", "UnknownPy")
@@ -60,15 +65,34 @@ def check_version(task_details: dict | None) -> str | None:
         worker_epid = task_details.get("endpoint_id", "<unknown>")
         worker_sdk = task_details.get("globus_compute_sdk_version", "UnknownSDK")
         client_details = get_env_details()
+
         sdk_py = client_details["python_version"]
+        python_mismatch = True
+        if worker_py != "UnknownPy":
+            try:
+                sdk_v = Version(sdk_py)
+                worker_v = Version(worker_py)
+                python_mismatch = (sdk_v.major, sdk_v.minor) != (
+                    worker_v.major,
+                    worker_v.minor,
+                )
+                if python_mismatch is False and check_py_micro:
+                    python_mismatch = sdk_v.micro != worker_v.micro
+            except packaging.version.InvalidVersion:
+                # Python version invalid mostly from mocks, handle as mismatch
+                pass
+
         sdk_dill = client_details["dill_version"]
-        if (sdk_py, sdk_dill) != (worker_py, worker_dill):
+        if python_mismatch or sdk_dill != worker_dill:
             return (
-                "Warning - dependency versions are mismatched between local SDK "
-                f"and remote worker on endpoint {worker_epid}: "
-                f"local SDK uses Python {sdk_py}/Dill {sdk_dill} "
+                "Local SDK and remote worker execution environment differences "
+                f"detected for endpoint {worker_epid} -\n"
+                f"  SDK uses Python {sdk_py}/Dill {sdk_dill} "
                 f"but worker used {worker_py}/{worker_dill}\n"
-                f"(worker SDK version: {worker_sdk}; worker OS: {worker_os})"
+                f"  (worker SDK version: {worker_sdk}; worker OS: {worker_os})\n"
+                "Dill and Python version mismatches can cause issues during "
+                "function/argument (de)serialization. Globus Compute recommends "
+                "keeping them in sync."
             )
     return None
 
