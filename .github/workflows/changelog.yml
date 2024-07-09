@@ -16,11 +16,11 @@ jobs:
           fetch-depth: 0
       - name: check PR adds a news file
         run: |
-          news_files="$(git diff --name-only "$(git merge-base origin/main "$GITHUB_SHA")" "$GITHUB_SHA" -- changelog.d/*.rst)"
+          news_files="$(git diff --name-only "$(git merge-base origin/main "$GITHUB_SHA")" "$GITHUB_SHA" -- docs/changelog.rst changelog.d/*.rst)"
           if [ -n "$news_files" ]; then
             echo "Saw new files. changelog.d:"
             echo "$news_files"
           else
-            echo "No news files seen"
+            echo "No news files or changelog.rst modification seen"
             exit 1
           fi
