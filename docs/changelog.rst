@@ -8,13 +8,13 @@ Changelog
 globus-compute-sdk & globus-compute-endpoint v2.23.0
 ------------------------------------------------------
 
+New Functionality
+^^^^^^^^^^^^^^^^^
+
 - The ``delete`` command can now delete endpoints by name or UUID from the
   Compute service remotely when local config files are not available.  Note
   that without the ``--force`` option the command may exit early if the
   endpoint is currently running or local config files are corrupted.
-
-New Functionality
-^^^^^^^^^^^^^^^^^
 
 - Included the paths to the ``globus-compute-endpoint`` and ``process_worker_pool.py``
   executables in the ``self-diagnostic`` command output.
