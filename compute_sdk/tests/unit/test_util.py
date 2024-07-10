@@ -36,6 +36,6 @@ def test_check_py_version(mocker, sdk_py, worker_py, check_micro, should_warn):
 
     result = check_version(task_details, check_py_micro=check_micro)
     if should_warn:
-        assert result and "environment differences detected" in result
+        assert result and "Environment differences detected" in result
     else:
         assert result is None

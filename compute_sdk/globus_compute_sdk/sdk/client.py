@@ -189,7 +189,7 @@ class Client:
 
         check_result = check_version(worker_details)
         if check_result is not None:
-            logger.warning(check_result)
+            warnings.warn(check_result, UserWarning)
             self._version_mismatch_already_warned_eps.add(worker_ep_id)
 
     def _update_task_table(
