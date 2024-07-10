@@ -30,9 +30,8 @@ def test_main_exception_always_quiesces(mocker, fs, randomstring, reset_signals)
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=num_iterations + 10,
     )
-    ei._task_puller_proc = mocker.Mock()
-    ei._start_threads_and_main = mocker.Mock()
-    ei._start_threads_and_main.side_effect = _mock_start_threads
+    ei._main_loop = mock.Mock()
+    ei._main_loop.side_effect = _mock_start_threads
     with mock.patch(f"{_mock_base}log") as mock_log:
         ei.start()
     assert mock_log.error.call_count == num_iterations
@@ -41,7 +40,7 @@ def test_main_exception_always_quiesces(mocker, fs, randomstring, reset_signals)
 
     assert ei._quiesce_event.set.called
     assert ei._quiesce_event.set.call_count == num_iterations
-    assert ei._start_threads_and_main.call_count == num_iterations
+    assert ei._main_loop.call_count == num_iterations
 
 
 @pytest.mark.parametrize("reconnect_attempt_limit", [-1, 0, 1, 2, 3, 5, 10])
@@ -64,12 +63,10 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit, reset_sign
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=reconnect_attempt_limit,
     )
-    ei._task_puller_proc = mocker.MagicMock()
-    ei._start_threads_and_main = mocker.MagicMock()
-    ei._start_threads_and_main.side_effect = _mock_start_threads
+    ei._main_loop = mock.Mock(spec=ei._main_loop)
     ei.start()
 
-    assert ei._start_threads_and_main.call_count == expected_reconnect_limit
+    assert ei._main_loop.call_count == expected_reconnect_limit
 
     expected_msg = f"Failed {expected_reconnect_limit} consecutive"
     assert mock_log.critical.called

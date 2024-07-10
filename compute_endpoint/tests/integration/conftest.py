@@ -2,13 +2,9 @@ from __future__ import annotations
 
 import multiprocessing
 import os
+import queue
 import random
 import string
-
-# multiprocessing.Event is a method, not a class
-# to annotate, we need the "real" class
-# see: https://github.com/python/typeshed/issues/4266
-from multiprocessing.synchronize import Event as EventType
 
 import pika
 import pika.exceptions
@@ -181,38 +177,31 @@ def ensure_result_queue(pika_conn_params):
 
 @pytest.fixture
 def start_task_q_subscriber(
-    running_subscribers,
     task_queue_info,
-    default_endpoint_id,
     ensure_task_queue,
 ):
+    running_subscribers: list[TaskQueueSubscriber] = []
+
     def func(
         *,
-        endpoint_id: str | None = None,
-        queue: multiprocessing.Queue | None = None,
-        quiesce_event: EventType | None = None,
+        task_queue: queue.SimpleQueue | None = None,
         override_params: pika.connection.Parameters | None = None,
     ):
-        if endpoint_id is None:
-            endpoint_id = default_endpoint_id
-        if quiesce_event is None:
-            quiesce_event = multiprocessing.Event()
-        if queue is None:
-            queue = multiprocessing.Queue()
+        if task_queue is None:
+            task_queue = queue.SimpleQueue()
         q_info = task_queue_info if override_params is None else override_params
         ensure_task_queue(queue_opts={"queue": q_info["queue"]})
 
-        task_q = TaskQueueSubscriber(
-            queue_info=q_info,
-            external_queue=queue,
-            quiesce_event=quiesce_event,
-            endpoint_id=endpoint_id,
-        )
-        task_q.start()
-        running_subscribers.append(task_q)
-        return task_q
+        tqs = TaskQueueSubscriber(queue_info=q_info, pending_task_queue=task_queue)
+        tqs.start()
+        running_subscribers.append(tqs)
+        return tqs
 
-    return func
+    yield func
+
+    for sub in running_subscribers:
+        sub._stop_event.set()
+        sub.join()
 
 
 @pytest.fixture

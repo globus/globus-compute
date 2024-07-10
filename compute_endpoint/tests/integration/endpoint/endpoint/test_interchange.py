@@ -196,7 +196,7 @@ def test_no_idle_if_not_configured(
     ei = ep_ix_factory(config=mock_conf)
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
     ei.pending_task_queue.get.side_effect = queue.Empty
     ei._quiesce_event = mock_quiesce
 
@@ -223,7 +223,7 @@ def test_soft_idle_honored(
 
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = (msg, queue.Empty)
-    ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
     ei.pending_task_queue.get.side_effect = queue.Empty
 
     ei._quiesce_event = mock_quiesce
@@ -300,7 +300,7 @@ def test_unidle_updates_proc_title(
     ei._quiesce_event = mock_quiesce
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
     ei.pending_task_queue.get.side_effect = queue.Empty
 
     main_thread_may_continue = threading.Event()
@@ -343,7 +343,7 @@ def test_sends_final_status_message_on_shutdown(
     ei = ep_ix_factory(config=mock_conf)
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
     ei.pending_task_queue.get.side_effect = queue.Empty
     ei._quiesce_event = mock_quiesce
     ei._main_loop()
@@ -367,7 +367,7 @@ def test_gracefully_handles_final_status_message_timeout(
     ei = ep_ix_factory(config=mock_conf)
     ei.results_passthrough = mocker.Mock(spec=queue.Queue)
     ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
     ei.pending_task_queue.get.side_effect = queue.Empty
     ei._quiesce_event = mock_quiesce
 
@@ -392,7 +392,7 @@ def test_faithfully_handles_status_report_messages(
 
     ep_ix.results_passthrough = mocker.Mock(spec=queue.Queue)
     ep_ix.results_passthrough.get.side_effect = (status_report_msg, queue.Empty)
-    ep_ix.pending_task_queue = mocker.Mock(spec=queue.Queue)
+    ep_ix.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
     ep_ix.pending_task_queue.get.side_effect = queue.Empty
     ep_ix._quiesce_event = mock_quiesce
 
