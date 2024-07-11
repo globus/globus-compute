@@ -9,3 +9,4 @@ Globus Compute SDK
     executor
     client
     engine
+    mpi_engine
