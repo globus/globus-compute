@@ -1,0 +1,37 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Adding `GlobusMPIEngine` with better support for MPI applications.
+  `GlobusMPIEngine` uses Parsl's `MPIExecutor` under the covers to
+  dynamically partition a single batch job to schedule MPI tasks.
+
+  Here's an example endpoint configuration that uses `GlobusMPIEngine`
+
+  .. code-block:: yaml
+
+    display_name: MPIEngine@Expanse.SDSC
+    engine:
+      type: GlobusMPIEngine
+      mpi_launcher: srun
+
+      address:
+        type: address_by_interface
+        ifname: ib0
+
+      provider:
+        type: SlurmProvider
+        partition: compute
+        account: chi150
+
+        launcher:
+          type: SimpleLauncher
+
+        # Command to be run before starting a worker
+        # e.g., "module load anaconda3; source activate gce_env"
+
+        worker_init: "source ~/setup_funcx_test_env.sh"
+        nodes_per_block: 2
+        init_blocks: 0
+        min_blocks: 0
+        max_blocks: 1
+        walltime: 00:05:00

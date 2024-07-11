@@ -121,6 +121,14 @@ scheduler, and uses the ``SrunLauncher`` to launch workers.
 .. literalinclude:: configs/expanse.yaml
    :language: yaml
 
+The |GlobusMPIEngine|_ adds support for running MPI applications. The following snippet
+shows an example configure for Expanse that uses the ``SlurmProvider`` to provision
+batch jobs each with 4 nodes, which can be dynamically partitioned to launch
+MPI functions with ``srun``.
+
+.. literalinclude:: configs/expanse_mpi.yaml
+   :language: yaml
+
 
 UChicago AI Cluster
 ^^^^^^^^^^^^^^^^^^^
@@ -287,3 +295,5 @@ specific identity assigned: ``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``,
 
 .. |Providers| replace:: ``Providers``
 .. _Providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
+.. |GlobusMPIEngine| replace:: ``GlobusMPIEngine``
+.. _GlobusMPIEngine: reference/mpi_engine.html
