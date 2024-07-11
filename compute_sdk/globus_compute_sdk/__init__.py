@@ -10,5 +10,12 @@ __version__ = _version
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.container_spec import ContainerSpec
 from globus_compute_sdk.sdk.executor import Executor
+from globus_compute_sdk.sdk.shell_function import ShellFunction, ShellResult
 
-__all__ = ("Executor", "Client", "ContainerSpec")
+__all__ = (
+    "Executor",
+    "Client",
+    "ContainerSpec",
+    "ShellFunction",
+    "ShellResult",
+)
