@@ -10,12 +10,8 @@ class MPIFunction(BashFunction):
         stdout: t.Optional[str] = None,
         stderr: t.Optional[str] = None,
         rundir: t.Optional[str] = None,
-        resource_specification: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
     ):
-        assert (
-            resource_specification
-        ), "MPIFunction requires kwarg:resource_specification"
         import copy
 
         self.stdout = stdout or self.stdout
