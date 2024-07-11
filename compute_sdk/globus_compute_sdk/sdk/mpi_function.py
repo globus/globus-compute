@@ -4,6 +4,9 @@ from .bash_function import BashFunction
 
 
 class MPIFunction(BashFunction):
+    """MPIFunction extends BashFunction, as a thin wrapper that adds an
+    MPI launcher prefix to the BashFunction command.
+    """
 
     def __call__(
         self,

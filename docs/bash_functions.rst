@@ -95,8 +95,63 @@ Here's an example:
    124
 
 
+MPIFunctions
+------------
+
+|MPIFunction|_ extends |BashFunction|_ to support launching MPI applications. Similar
+to the |BashFunction|_ interface, |MPIFunction|_ accepts a command string which it
+launches using the appropriate MPI launcher as configured on a target endpoint configured
+with |GlobusMPIEngine|_. This allows |MPIFunction|_ definitions to be agnostic to the
+MPI environment on any of the endpoints it may be sent to. An |MPIFunction|_
+
+Here's an example:
+
+.. code-block:: python
+
+   mpi_func = MPIFunction("lmp_mpi -in {input_file}")
+
+   executor.resource_specification = {"num_nodes" : 2, "num_ranks": 4}
+
+   future = executor.submit(mpi_func, input_file="/path/to/input_1")
+
+
+Resource Specification
+^^^^^^^^^^^^^^^^^^^^^^
+
+Globus Compute allows for dynamically requesting MPI resources on a per-function basis
+by updating the `resource_specification` attribute on the executor. `resource_specification`
+takes these fields `num_nodes`, `num_ranks`, and `ranks_per_node`. Please refer to the
+`resource specification docs from Parsl <https://parsl.readthedocs.io/en/stable/userguide/mpi_apps.html#writing-an-mpi-app>`_
+for more details.
+
+Here's an example of dynamically changing the resources requested:
+
+.. code-block:: python
+
+   mpi_func = MPIFunction("lmp_mpi -in {input_file}")
+
+   all_futures = []
+   for nodes in range(1,5):
+      executor.resource_specification = {"num_nodes" : nodes,
+                                         "num_ranks": nodes * 4}
+      future = executor.submit(mpi_func, input_file="/path/to/input_file")
+      all_futures.append(future)
+
+   # Wait for all the MPI runs
+   [future.result() for future in all_futures]
+
+
+
+
+
 .. |BashFunction| replace:: ``BashFunction``
 .. _BashFunction: reference/bash_function.html
 
 .. |BashResult| replace:: ``BashResult``
 .. _BashResult: reference/bash_function.html#globus_compute_sdk.sdk.bash_function.BashResult
+
+.. |MPIFunction| replace:: ``MPIFunction``
+.. _MPIFunction: reference/mpi_function.html
+
+.. |GlobusMPIEngine| replace:: ``GlobusMPIEngine``
+.. _GlobusMPIEngine: reference/mpi_engine.html
