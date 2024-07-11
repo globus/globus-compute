@@ -3,6 +3,34 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.24.0a0:
+
+globus-compute-sdk & globus-compute-endpoint v2.24.0
+------------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The engine that renders user endpoint config files now receives information about
+  the runtime environment used to submit tasks, such as Python environment and Globus
+  Compute SDK version, via the ``user_runtime`` variable. For a complete list of the
+  fields that are sent, `reference the documentation on batch.UserRuntime. <https://globus-compute.readthedocs.io/en/latest/reference/client.html#globus_compute_sdk.sdk.batch.UserRuntime>`_
+
+- Added the ``globus-compute-endpoint python-exec`` command to run Python modules as scripts
+  from the Globus Compute endpoint CLI. The primary use case is to launch Parsl processes
+  without requiring additional commands in the user's ``PATH`` (e.g., ``process_worker_pool.py``).
+
+Changed
+~~~~~~~
+
+- Worker nodes no longer need to resolve the ``process_worker_pool.py`` command.
+
+Changed
+^^^^^^^
+
+- Unless manually specified, all ``Executor`` objects in the same process will
+  share the same task group ID.
+
 .. _changelog-2.23.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.23.0
