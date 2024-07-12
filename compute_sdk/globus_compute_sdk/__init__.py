@@ -11,6 +11,7 @@ from globus_compute_sdk.sdk.bash_function import BashFunction, BashResult
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.container_spec import ContainerSpec
 from globus_compute_sdk.sdk.executor import Executor
+from globus_compute_sdk.sdk.mpi_function import MPIFunction
 
 __all__ = (
     "Executor",
@@ -18,4 +19,5 @@ __all__ = (
     "ContainerSpec",
     "BashFunction",
     "BashResult",
+    "MPIFunction"
 )
