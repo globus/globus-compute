@@ -45,3 +45,10 @@ git push
 4. Run the release script `./release.sh` from the repo root. This will use
    `tox` and your pypi credentials and will create a signed release tag. At the
    end of this step, new packages will be published to pypi and the tag to GitHub.
+
+5. Open a PR to merge the release branch into `main`. Once approved, merge it using
+   the "Merge commit" option. This will ensure that the tagged commit from the release
+   branch is properly included in the `main` branch.
+
+6. Create a GitHub release from the tag. See [GitHub documentation](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release)
+   for instructions.
