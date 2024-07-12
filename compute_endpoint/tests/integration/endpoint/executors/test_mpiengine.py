@@ -5,12 +5,17 @@ from queue import Queue
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusMPIEngine
-from globus_compute_sdk.sdk.bash_function import BashResult
-from globus_compute_sdk.sdk.mpi_function import MPIFunction
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.launchers import SimpleLauncher
 from parsl.providers import LocalProvider
 from tests.utils import ez_pack_function, get_env_vars
+
+temporary_skip = False
+try:
+    from globus_compute_sdk.sdk.bash_function import BashResult
+    from globus_compute_sdk.sdk.mpi_function import MPIFunction
+except ImportError:
+    temporary_skip = True
 
 
 @pytest.fixture
@@ -51,6 +56,7 @@ def mpi_engine(tmp_path, nodeslist):
     engine.shutdown()
 
 
+@pytest.mark.skipif(temporary_skip, reason="Skip test until MPIFunctions are merged")
 def test_mpi_function(mpi_engine, tmp_path):
     """Test for the right cmd being generated"""
     engine, nodeslist = mpi_engine
