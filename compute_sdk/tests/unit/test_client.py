@@ -412,17 +412,16 @@ def test_version_mismatch_from_details(
         },
     }
 
-    mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
+    mock_warn = mocker.patch("globus_compute_sdk.sdk.client.warnings")
     gcc.web_client.get_task.return_value = mock_response(200, returned_task)
 
     assert gcc.get_result(tid) == result
 
-    assert mock_log.warning.called == should_warn
+    assert mock_warn.warn.called == should_warn
     if should_warn:
-        a, *_ = mock_log.warning.call_args
-        assert "environment differences detected" in a[0]
-        assert f"but worker used {task_py}/{worker_dill}" in a[0]
-        assert "worker SDK version: " in a[0]
+        a, *_ = mock_warn.warn.call_args
+        assert "Environment differences detected" in a[0]
+        assert f"Workers: Python {task_py}/Dill {worker_dill}" in a[0]
 
 
 @pytest.mark.parametrize("should_fail", [True, False])
@@ -452,7 +451,7 @@ def test_version_mismatch_warns_on_failure_and_success(
     else:
         returned_task["result"] = gcc.fx_serializer.serialize(result)
 
-    mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
+    mock_warn = mocker.patch("globus_compute_sdk.sdk.client.warnings")
     gcc.web_client.get_task.return_value = mock_response(200, returned_task)
 
     if should_fail:
@@ -463,8 +462,8 @@ def test_version_mismatch_warns_on_failure_and_success(
         task_res = gcc.get_result(tid)
         assert task_res == result
 
-    assert mock_log.warning.called
-    assert "environment differences detected" in mock_log.warning.call_args[0][0]
+    assert mock_warn.warn.called
+    assert "Environment differences detected" in mock_warn.warn.call_args[0][0]
 
 
 @pytest.mark.parametrize(
@@ -505,7 +504,7 @@ def test_version_mismatch_only_warns_once_per_ep(mocker, gcc, mock_response, ep_
         },
     }
 
-    mock_log = mocker.patch("globus_compute_sdk.sdk.client.logger")
+    mock_warn = mocker.patch("globus_compute_sdk.sdk.client.warnings")
 
     for ep_id in ep_ids:
         tid = str(uuid.uuid4())
@@ -515,4 +514,4 @@ def test_version_mismatch_only_warns_once_per_ep(mocker, gcc, mock_response, ep_
 
         assert gcc.get_result(tid) == result
 
-    assert mock_log.warning.call_count == len(set(ep_ids))
+    assert mock_warn.warn.call_count == len(set(ep_ids))

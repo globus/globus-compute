@@ -327,5 +327,39 @@ the other alternatives that we currently support are ``DillTextInspect`` and
 strategies and will use the first one that deserializes successfully at
 execution time.
 
+
+Avoiding Serialization Errors
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We strongly recommend that you use the same python version as the target
+Endpoint when using the SDK to submit new functions.
+
+The serialization/deserialization mechanics in python and the pickle/dill
+libraries are implemented at the bytecode level and have evolved extensively
+over time.  There is no backward/forward compatability guarantee between
+versions.  Thus a function serialized in an older version of python or dill
+may not deserialize correctly in later versions, and the opposite is even more
+problematic.
+
+Even a single number difference in python minor versions, ie from 3.10 --> 3.11,
+can generate issues.  Micro version differences, ie from 3.11.8 to 3.11.9,
+are mostly safe, though not universally.
+
+Errors may surface as serialization/deserialization Exceptions, Globus
+Compute task workers lost due to SEGFAULT, or even incorrect results.
+
+Note that the |Client|_ class's ``register_function()`` method can be used
+to pre-serialize a function using the registering SDK's environment and
+return a UUID identifier.   The resulting bytecode will then be deserialized
+at run time by an Endpoint whenever a task that specifies this function UUID
+is submitted (possibly from a different SDK environment) using the Client's
+``.run()`` or the Executor's ``.submit_to_registered_function()`` methods.
+On the other hand, the |Executor|_ 's ``.submit()`` takes a function argument
+and serializes a fresh copy each time it is invoked.
+
+.. |Client| replace:: ``Client``
+.. _Client: reference/client.html
+.. |Executor| replace:: ``Executor``
+.. _Executor: reference/executor.html
 .. |dill| replace:: ``dill``
 .. _dill: https://dill.readthedocs.io/en/latest/#basic-usage

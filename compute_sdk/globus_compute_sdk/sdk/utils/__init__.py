@@ -61,9 +61,7 @@ def check_version(task_details: dict | None, check_py_micro: bool = True) -> str
     if task_details:
         worker_py = task_details.get("python_version", "UnknownPy")
         worker_dill = task_details.get("dill_version", "UnknownDill")
-        worker_os = task_details.get("os", "UnknownOS")
         worker_epid = task_details.get("endpoint_id", "<unknown>")
-        worker_sdk = task_details.get("globus_compute_sdk_version", "UnknownSDK")
         client_details = get_env_details()
 
         sdk_py = client_details["python_version"]
@@ -85,14 +83,13 @@ def check_version(task_details: dict | None, check_py_micro: bool = True) -> str
         sdk_dill = client_details["dill_version"]
         if python_mismatch or sdk_dill != worker_dill:
             return (
-                "Local SDK and remote worker execution environment differences "
-                f"detected for endpoint {worker_epid} -\n"
-                f"  SDK uses Python {sdk_py}/Dill {sdk_dill} "
-                f"but worker used {worker_py}/{worker_dill}\n"
-                f"  (worker SDK version: {worker_sdk}; worker OS: {worker_os})\n"
-                "Dill and Python version mismatches can cause issues during "
-                "function/argument (de)serialization. Globus Compute recommends "
-                "keeping them in sync."
+                "\nEnvironment differences detected between local SDK and "
+                f"endpoint {worker_epid} workers:\n"
+                f"\t    SDK: Python {sdk_py}/Dill {sdk_dill}\n"
+                f"\tWorkers: Python {worker_py}/Dill {worker_dill}\n"
+                f"This may cause serialization issues.  See "
+                "https://globus-compute.readthedocs.io/en/latest/sdk.html#avoiding-serialization-errors "  # noqa"
+                "for more information."
             )
     return None
 
