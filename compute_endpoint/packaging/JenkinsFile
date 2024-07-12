@@ -29,7 +29,7 @@ pipeline {
 
                     // temporary hack to build for stable
                     sh "git checkout build_for_stable"
-                    env.TAG_NAME = "v2.23.0"
+                    env.TAG_NAME = "v2.24.0a0"
                     env.DEFAULT_BRANCH = "build_for_stable"
 
                     dir("compute_endpoint/packaging/") {
