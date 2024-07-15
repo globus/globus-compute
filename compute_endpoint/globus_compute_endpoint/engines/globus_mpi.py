@@ -1,5 +1,6 @@
 import os
 import typing as t
+from concurrent.futures import Future
 
 from globus_compute_endpoint.engines.globus_compute import (
     VALID_CONTAINER_TYPES,
@@ -100,3 +101,13 @@ class GlobusMPIEngine(GlobusComputeEngine):
             working_dir=working_dir,
             run_in_sandbox=run_in_sandbox,
         )
+
+    def _submit(
+        self,
+        func: t.Callable,
+        resource_specification: t.Dict,
+        *args: t.Any,
+        **kwargs: t.Any,
+    ) -> Future:
+        # override submit since super rejects resource_specification
+        return self.executor.submit(func, resource_specification, *args, **kwargs)

@@ -100,6 +100,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             if this option is enabled. Default: False
 
         """  # noqa: E501
+
+        if kwargs.get("enable_mpi_mode") or kwargs.get("mpi_launcher"):
+            raise ValueError(
+                "MPI mode is not supported on GlobusComputeEngine."
+                " Use GlobusMPIEngine instead."
+            )
+
         self.run_dir = os.getcwd()
         self.label = label
         self._status_report_thread = ReportingThread(target=self.report_status, args=[])
@@ -256,6 +263,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
+        if resource_specification:
+            raise ValueError(
+                "resource_specification is not supported on GlobusComputeEngine."
+                " For MPI apps, use GlobusMPIEngine."
+            )
         return self.executor.submit(func, resource_specification, *args, **kwargs)
 
     @property

@@ -327,3 +327,24 @@ def test_gcengine_exception_report_from_bad_state():
     assert result.task_id == task_id
     assert result.error_details.code == "RemoteExecutionError"
     assert "ZeroDivisionError" in result.data
+
+
+def test_gcengine_rejects_mpi_mode(randomstring):
+    with pytest.raises(ValueError) as pyt_exc_1:
+        GlobusComputeEngine(enable_mpi_mode=True)
+
+    assert "is not supported" in str(pyt_exc_1)
+
+    with pytest.raises(ValueError) as pyt_exc_2:
+        GlobusComputeEngine(mpi_launcher=randomstring())
+
+    assert "is not supported" in str(pyt_exc_2)
+
+
+def test_gcengine_rejects_resource_specification():
+    with pytest.raises(ValueError) as pyt_exc:
+        GlobusComputeEngine().submit(
+            "task_id", packed_task=b"packed_task", resource_specification={"foo": "bar"}
+        ).result()
+
+    assert "is not supported" in str(pyt_exc)
