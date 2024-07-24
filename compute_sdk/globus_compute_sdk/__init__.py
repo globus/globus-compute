@@ -14,10 +14,10 @@ from globus_compute_sdk.sdk.mpi_function import MPIFunction
 from globus_compute_sdk.sdk.shell_function import ShellFunction, ShellResult
 
 __all__ = (
-    "Executor",
     "Client",
     "ContainerSpec",
+    "Executor",
+    "MPIFunction",
     "ShellFunction",
     "ShellResult",
-    "MPIFunction",
 )

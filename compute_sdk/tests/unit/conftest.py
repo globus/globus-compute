@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import string
 from unittest import mock
@@ -26,3 +27,11 @@ def mock_response():
         return GlobusHTTPResponse(resp, client=mock.Mock())
 
     yield response
+
+
+@pytest.fixture
+def run_in_tmp_dir(tmp_path):
+    pwd = os.getcwd()
+    os.chdir(tmp_path)
+    yield tmp_path
+    os.chdir(pwd)
