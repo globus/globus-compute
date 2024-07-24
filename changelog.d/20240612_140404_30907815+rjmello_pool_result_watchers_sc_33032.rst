@@ -1,5 +1,0 @@
-Changed
-^^^^^^^
-
-- Unless manually specified, all ``Executor`` objects in the same process will
-  share the same task group ID.
