@@ -21,12 +21,9 @@ New Functionality
   without requiring additional commands in the user's ``PATH`` (e.g., ``process_worker_pool.py``).
 
 Changed
-~~~~~~~
+^^^^^^^
 
 - Worker nodes no longer need to resolve the ``process_worker_pool.py`` command.
-
-Changed
-^^^^^^^
 
 - Unless manually specified, all ``Executor`` objects in the same process will
   share the same task group ID.
