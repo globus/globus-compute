@@ -122,7 +122,7 @@ scheduler, and uses the ``SrunLauncher`` to launch workers.
    :language: yaml
 
 The |GlobusMPIEngine|_ adds support for running MPI applications. The following snippet
-shows an example configure for Expanse that uses the ``SlurmProvider`` to provision
+shows an example configuration for Expanse that uses the ``SlurmProvider`` to provision
 batch jobs each with 4 nodes, which can be dynamically partitioned to launch
 MPI functions with ``srun``.
 

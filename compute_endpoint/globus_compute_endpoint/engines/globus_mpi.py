@@ -24,11 +24,11 @@ class GlobusMPIEngine(GlobusComputeEngine):
         strategy: t.Optional[str] = None,
         job_status_kwargs: t.Optional[JobStatusPollerKwargs] = None,
         working_dir: t.Union[str, os.PathLike] = "tasks_working_dir",
-        run_in_sandbox: bool = False,
+        run_in_sandbox: bool = True,
         **kwargs,
     ):
         """``GlobusMPIEngine`` is a shim over `Parsl's MPIExecutor
-        <parslmpiex_>`_, almost all of arguments are passed along, unfettered.
+        <parslmpiex_>`_, and as such, all of arguments are passed along, unfettered.
         Consequently, please reference `Parsl's MPIExecutor <parslmpiex_>`_
         documentation for a complete list of arguments; we list below only the
         arguments specific to the ``GlobusMPIEngine``.
@@ -53,8 +53,7 @@ class GlobusMPIEngine(GlobusComputeEngine):
 
         strategy: str | None
             Specify which scaling strategy to use; this is eventually given to
-            `Parsl's Strategy <parslstrategy_>`_.  [Deprecated; use
-            ``job_status_kwargs``]
+            `Parsl's Strategy <parslstrategy_>`_.
 
         job_status_kwargs: dict | None
             Keyword arguments to be passed through to `Parsl's JobStatusPoller
@@ -65,14 +64,14 @@ class GlobusMPIEngine(GlobusComputeEngine):
 
         working_dir: str | os.PathLike
             Directory within which functions should execute, defaults to
-            (~/.globus_compute/<endpoint_name>/tasks_working_dir)
+            ``~/.globus_compute/<endpoint_name>/tasks_working_dir``.
             If a relative path is supplied, the working dir is set relative
-            to the endpoint.run_dir. If an absolute path is supplied, it is
+            to the ``endpoint.run_dir``. If an absolute path is supplied, it is
             used as is.
 
         run_in_sandbox: bool
-            Functions will run in a sandbox directory under the working_dir
-            if this option is enabled. Default: False
+            Functions will run in a sandbox directory under the ``working_dir``
+            if this option is enabled. Default: True
 
         """  # noqa: E501
 
