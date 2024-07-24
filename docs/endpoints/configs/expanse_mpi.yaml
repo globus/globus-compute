@@ -1,9 +1,8 @@
-display_name: Expanse@SDSC
+display_name: ExpanseMPI@SDSC
 
 engine:
-    type: GlobusComputeEngine
-    max_workers_per_node: 2
-    worker_debug: False
+    type: GlobusMPIEngine
+    mpi_launcher: srun
 
     address:
         type: address_by_interface
@@ -15,7 +14,7 @@ engine:
         account: {{ ACCOUNT }}
 
         launcher:
-            type: SrunLauncher
+            type: SimpleLauncher
 
         # string to prepend to #SBATCH blocks in the submit
         # script to the scheduler
@@ -26,6 +25,7 @@ engine:
         # e.g., "module load anaconda3; source activate gce_env"
         worker_init: {{ COMMAND }}
 
+        nodes_per_block: 4
         init_blocks: 0
         min_blocks: 0
         max_blocks: 1

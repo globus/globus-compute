@@ -15,6 +15,8 @@ import responses
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.sdk.web_client import WebClient
+from parsl.launchers import SimpleLauncher
+from parsl.providers import LocalProvider
 
 
 @pytest.fixture(autouse=True)
@@ -109,7 +111,15 @@ def engine_heartbeat() -> int:
 
 
 @pytest.fixture
-def engine_runner(tmp_path, engine_heartbeat, reporting_period=0.1) -> t.Callable:
+def nodeslist(num=100):
+    limit = random.randint(1, num)
+    yield [f"NODE{node_i}" for node_i in range(1, limit)]
+
+
+@pytest.fixture
+def engine_runner(
+    tmp_path, engine_heartbeat, nodeslist, reporting_period=0.1
+) -> t.Callable:
     engines_to_shutdown = []
 
     def _runner(engine_type: t.Type[GlobusComputeEngineBase], **kwargs):
@@ -125,6 +135,27 @@ def engine_runner(tmp_path, engine_heartbeat, reporting_period=0.1) -> t.Callabl
                 heartbeat_period=engine_heartbeat,
                 heartbeat_threshold=2,
                 job_status_kwargs=dict(max_idletime=0, strategy_period=0.1),
+            )
+        elif engine_type is engines.GlobusMPIEngine:
+            nodefile_path = tmp_path / "pbs_nodefile"
+            nodes_string = "\n".join(nodeslist)
+            worker_init = f"""
+                echo -e "{nodes_string}" > {nodefile_path} ;
+                export PBS_NODEFILE={nodefile_path}
+                """
+
+            k = dict(
+                address="127.0.0.1",
+                heartbeat_period=engine_heartbeat,
+                heartbeat_threshold=1,
+                mpi_launcher="mpiexec",
+                provider=LocalProvider(
+                    init_blocks=1,
+                    min_blocks=1,
+                    max_blocks=1,
+                    worker_init=worker_init,
+                    launcher=SimpleLauncher(),
+                ),
             )
         else:
             raise NotImplementedError(f"Unimplemented: {engine_type.__name__}")
