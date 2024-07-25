@@ -23,7 +23,7 @@ def cat(path: str, wildcard: bool = False, max_bytes: int = 0):
 
     full_path = os.path.expanduser(path)
     if wildcard:
-        files = glob.glob(full_path)
+        files = glob.glob(full_path, recursive=True)
     else:
         files = [full_path]
 
@@ -165,11 +165,11 @@ def run_self_diagnostic(log_bytes: int = 0):
         get_executable_path("process_worker_pool.py"),
         "globus-compute-endpoint whoami",
         "globus-compute-endpoint list",
-        cat("~/.globus_compute/*/*.yaml", wildcard=True),
-        cat("~/.globus_compute/*/*.py", wildcard=True),
-        cat("~/.globus_compute/*/*.j2", wildcard=True),
-        cat("~/.globus_compute/*/*.json", wildcard=True),
-        cat("~/.globus_compute/*/*.log", wildcard=True, max_bytes=log_bytes),
+        cat("~/.globus_compute/**/*.yaml", wildcard=True),
+        cat("~/.globus_compute/**/*.py", wildcard=True),
+        cat("~/.globus_compute/**/*.j2", wildcard=True),
+        cat("~/.globus_compute/**/*.json", wildcard=True),
+        cat("~/.globus_compute/**/*.log", wildcard=True, max_bytes=log_bytes),
     ]
 
     for cmd in commands:

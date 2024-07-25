@@ -62,3 +62,26 @@ def test_cat_honors_max_bytes(fs, max_bytes):
     else:
         assert len(payload) == fsize, fdata
         assert expected_sentinel in payload, fdata
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "endpoint.log",
+        "GlobusComputeEngine/interchange.log",
+        "GlobusComputeEngine/block-0/some-block-id/manager.log",
+        "GlobusComputeEngine/block-0/some-block-id/worker_0.log",
+    ],
+)
+def test_cat_wildcard_finds_files_recursively(fs, path, randomstring):
+    full_path = pathlib.Path("/some_ep_dir/" + path)
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    contents = randomstring()
+    full_path.write_text(contents)
+
+    with contextlib.redirect_stdout(io.BytesIO()) as f:
+        cat("/some_ep_dir/**/*.log", wildcard=True)()
+
+    payload = str(f.getvalue())
+    assert path in payload
+    assert contents in payload
