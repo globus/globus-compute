@@ -10,3 +10,4 @@ Globus Compute SDK
     client
     engine
     mpi_engine
+    shell_function
