@@ -82,7 +82,7 @@ class ShellFunction:
         self.stderr = stderr
         self.walltime = walltime
         if walltime:
-            assert walltime >= 0, f"Negative {walltime=} is not allowed"
+            assert walltime >= 0, f"Negative walltime={walltime} is not allowed"
         self.snippet_lines = snippet_lines
 
     @property
