@@ -36,7 +36,7 @@ Quickstart
 
 Globus Compute is currently available on PyPI.
 
-To install Globus Compute, please ensure you have python3.7+.::
+To install Globus Compute, please ensure you have python3.8+.::
 
    $ python3 --version
 
