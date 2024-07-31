@@ -2,6 +2,7 @@ import concurrent.futures
 import random
 import uuid
 
+import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusMPIEngine
 from globus_compute_sdk.sdk.mpi_function import MPIFunction
