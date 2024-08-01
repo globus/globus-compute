@@ -5,10 +5,10 @@ import difflib
 import gzip
 import json
 import logging
+import os
 import pathlib
 import re
 import shutil
-import subprocess
 import sys
 import textwrap
 import uuid
@@ -924,7 +924,7 @@ def run_python_executable(ctx: click.Context, module: str):
 
     E.g., globus-compute-endpoint python-exec path.to.module --ahoy matey
     """
-    subprocess.run([sys.executable, "-m", module] + ctx.args)
+    os.execvpe(sys.executable, [sys.executable, "-m", module] + ctx.args, os.environ)
 
 
 def create_or_choose_auth_project(ac: AuthClient) -> str:
