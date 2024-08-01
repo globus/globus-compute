@@ -808,10 +808,12 @@ _test_name_or_uuid_decorator__data = [
 
 
 def test_python_exec(mocker: MockFixture, run_line: t.Callable):
-    mock_subprocess_run = mocker.patch("subprocess.run")
+    mock_execvpe = mocker.patch("os.execvpe")
     run_line("python-exec path.to.module arg --option val")
-    mock_subprocess_run.assert_called_with(
-        [sys.executable, "-m", "path.to.module", "arg", "--option", "val"]
+    mock_execvpe.assert_called_with(
+        sys.executable,
+        [sys.executable, "-m", "path.to.module", "arg", "--option", "val"],
+        os.environ,
     )
 
 
