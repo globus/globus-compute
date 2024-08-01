@@ -5,21 +5,15 @@ import uuid
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusMPIEngine
+from globus_compute_sdk.sdk.mpi_function import MPIFunction
+from globus_compute_sdk.sdk.shell_function import ShellResult
 from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.executors.high_throughput.mpi_prefix_composer import (
     InvalidResourceSpecification,
 )
 from tests.utils import ez_pack_function, get_env_vars
 
-temporary_skip = False
-try:
-    from globus_compute_sdk.sdk.bash_function import BashResult
-    from globus_compute_sdk.sdk.mpi_function import MPIFunction
-except ImportError:
-    temporary_skip = True
 
-
-@pytest.mark.skipif(temporary_skip, reason="Skip test until MPIFunctions are merged")
 def test_mpi_function(engine_runner, nodeslist, tmp_path):
     """Test for the right cmd being generated"""
     engine = engine_runner(GlobusMPIEngine)
@@ -29,10 +23,8 @@ def test_mpi_function(engine_runner, nodeslist, tmp_path):
     num_nodes = random.randint(1, len(nodeslist))
     resource_spec = {"num_nodes": num_nodes, "num_ranks": random.randint(1, 4)}
 
-    mpi_func = MPIFunction("pwd", resource_specification=resource_spec)
-    task_body = ez_pack_function(
-        serializer, mpi_func, (), {"resource_specification": resource_spec}
-    )
+    mpi_func = MPIFunction("pwd")
+    task_body = ez_pack_function(serializer, mpi_func, (), {})
     task_message = messagepack.pack(
         messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
     )
@@ -45,7 +37,7 @@ def test_mpi_function(engine_runner, nodeslist, tmp_path):
     assert result.error_details is None
     result = serializer.deserialize(result.data)
 
-    assert isinstance(result, BashResult)
+    assert isinstance(result, ShellResult)
     assert result.cmd == "$PARSL_MPI_PREFIX pwd"
 
 

@@ -1,0 +1,26 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added a new ``MPIFunction`` class to support MPI applications. ``MPIFunction`` extends ``ShellFunction``
+  to use an MPI launcher to use a subset of nodes within a batch job to run MPI applications. To partition
+  a batch job, ``MPIFunction`` must be sent to an endpoint configured with ``GlobusMPIEngine``.
+  Here is a usage example:
+
+  .. code-block:: python
+
+     from globus_compute_sdk import MPIFunction, Executor
+
+     mpi_func = MPIFunction("hostname")
+     with Executor(endpoint_id=<ENDPOINT_ID>) as ex:
+          ex.resource_specification = {
+              "num_nodes": 2,
+              "ranks_per_node": 2
+          }
+          future = ex.submit(mpi_func)
+          print(future.result().stdout)
+
+     # Example output:
+     node001
+     node001
+     node002
+     node002

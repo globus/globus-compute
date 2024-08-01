@@ -36,8 +36,9 @@ The |ShellResult|_ object captures outputs relevant to simplify debugging when e
 failures. By default, |ShellFunction|_ captures 1000 lines of stdout and stderr, but this
 can be changed via the `ShellFunction(snippet_lines)` kwarg.
 
-Results
-^^^^^^^
+
+Shell Results
+^^^^^^^^^^^^^
 
 The output from a |ShellFunction|_ is encapsulated in a |ShellResult|_. Here are the various fields made
 available through the |ShellResult|_:
@@ -92,8 +93,4 @@ Here's an example:
    124
 
 
-.. |ShellFunction| replace:: ``ShellFunction``
-.. _ShellFunction: reference/shell_function.html
-
-.. |ShellResult| replace:: ``ShellResult``
-.. _ShellResult: reference/shell_function.html#globus_compute_sdk.sdk.shell_function.ShellResult
+.. include:: mpi_functions.rst

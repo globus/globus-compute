@@ -5,12 +5,6 @@ import pytest
 from globus_compute_sdk.sdk.shell_function import ShellFunction, ShellResult
 
 
-@pytest.fixture
-def run_in_tmp_dir(tmp_path):
-    os.chdir(tmp_path)
-    return tmp_path
-
-
 def test_shell_function_no_stdfile(run_in_tmp_dir):
     """Confirm that stdout/err snippet is reported after successful run"""
 
@@ -171,3 +165,13 @@ def test_stdout_naming(run_in_tmp_dir):
         assert len(std_file.split(".")) == 3
         assert std_file.split(".")[-1] in ["stdout", "stderr"]
         assert std_file.split(".")[0] == task_id
+
+
+def test_bad_walltime(run_in_tmp_dir):
+    """BashFunction should raise an error on negative walltime"""
+    task_id = str(uuid.uuid4())
+
+    os.environ.pop("GC_TASK_SANDBOX_DIR", None)
+    os.environ["GC_TASK_UUID"] = task_id
+    with pytest.raises(AssertionError):
+        ShellFunction("pwd", walltime=-1)
