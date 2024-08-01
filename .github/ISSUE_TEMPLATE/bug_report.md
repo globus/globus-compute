@@ -12,7 +12,7 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior, for e.g:
-1. Install globus-compute-sdk==2.0.0 and globus-compute-endpoint==2.0.0 with Python 3.7 on cluster
+1. Install globus-compute-sdk==2.0.0 and globus-compute-endpoint==2.0.0 with Python 3.10 on cluster
 2. Run a test script
 3. Wait 5 mins
 4. See error
