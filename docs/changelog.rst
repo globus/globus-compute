@@ -3,10 +3,90 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-2.24.0a0:
+.. _changelog-2.25.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.25.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added a new ``ShellFunction`` class to support remote execution of commandline strings.
+
+  .. code:: python
+
+      bf = ShellFunction("echo '{message}'")
+      future = executor.submit(bf, message="Hello World!")
+      shell_result = future.result()  # ShellFunction returns a ShellResult
+      print(shell_result.returncode)  # Exitcode
+      print(shell_result.cmd)         # Reports the commandline string executed
+      print(shell_result.stdout)      # Snippet of stdout captured
+      print(shell_result.stderr)      # Snippet of stderr captured
+
+- Adding ``GlobusMPIEngine`` with better support for MPI applications.
+  ``GlobusMPIEngine`` uses Parsl's `MPIExecutor
+  <https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html>`_
+  under the hood to dynamically partition a single batch job to schedule MPI
+  tasks.
+
+  Here's an example endpoint configuration that uses ``GlobusMPIEngine``
+
+  .. code-block:: yaml
+
+    display_name: MPIEngine@Expanse.SDSC
+    engine:
+      type: GlobusMPIEngine
+      mpi_launcher: srun
+
+      provider:
+         ...
+
+- Added a new ``MPIFunction`` class to support MPI applications.
+  ``MPIFunction`` extends ``ShellFunction`` to use an MPI launcher to use a
+  subset of nodes within a batch job to run MPI applications. To partition a
+  batch job, ``MPIFunction`` must be sent to an endpoint configured with
+  ``GlobusMPIEngine``.  Here is a usage example:
+
+  .. code-block:: python
+
+     from globus_compute_sdk import MPIFunction, Executor
+
+     mpi_func = MPIFunction("hostname")
+     with Executor(endpoint_id=<ENDPOINT_ID>) as ex:
+          ex.resource_specification = {
+              "num_nodes": 2,
+              "ranks_per_node": 2
+          }
+          future = ex.submit(mpi_func)
+          print(future.result().stdout)
+
+     # Example output:
+     node001
+     node001
+     node002
+     node002
+
+Bug Fixes
+^^^^^^^^^
+
+- Pulling tasks from RabbitMQ is now performed via a thread within the main
+  endpoint process, rather than a separate process. This reduces the endpoint's
+  overall memory footprint and fixes sporadic issues in which the formerly
+  forked process would inherit thread locks.
+
+Deprecated
+^^^^^^^^^^
+
+- ``globus-compute-sdk`` and ``globus-compute-endpoint`` drop support for
+  Python3.7.  Python3.7 reached `end-of-life on 2023-06-27
+  <https://devguide.python.org/versions/>`_. We discontinue support for
+  Python3.7 since Parsl, an upstream core dependency, has also dropped support
+  for it (in ``parsl==2024.7.1``).
+
+.. _changelog-2.24.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.24.0
-------------------------------------------------------
+----------------------------------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
@@ -31,7 +111,7 @@ Changed
 .. _changelog-2.23.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.23.0
-------------------------------------------------------
+----------------------------------------------------
 
 New Functionality
 ^^^^^^^^^^^^^^^^^
