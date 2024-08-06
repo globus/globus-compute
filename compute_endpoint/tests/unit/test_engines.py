@@ -169,8 +169,8 @@ def test_serialized_engine_config_has_provider(engine_type: GlobusComputeEngineB
     assert executor.get("provider")
 
 
-def test_gcengine_compute_launch_cmd(engine_runner):
-    engine: GlobusComputeEngine = engine_runner(GlobusComputeEngine)
+def test_gcengine_compute_launch_cmd():
+    engine = GlobusComputeEngine()
     assert engine.executor.launch_cmd.startswith(
         "globus-compute-endpoint python-exec"
         " parsl.executors.high_throughput.process_worker_pool"
@@ -178,12 +178,25 @@ def test_gcengine_compute_launch_cmd(engine_runner):
     assert "process_worker_pool.py" not in engine.executor.launch_cmd
 
 
+def test_gcengine_compute_interchange_launch_cmd():
+    engine = GlobusComputeEngine()
+    assert engine.executor.interchange_launch_cmd[:3] == [
+        "globus-compute-endpoint",
+        "python-exec",
+        "parsl.executors.high_throughput.interchange",
+    ]
+    assert "interchange.py" not in engine.executor.interchange_launch_cmd
+
+
 def test_gcengine_pass_through_to_executor(mocker: MockFixture):
     mock_executor = mocker.patch(
         "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
     )
     mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
+        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="foo-bar"
+    )
+    mocker.patch.object(
+        GlobusComputeEngine, "_get_compute_ix_launch_cmd", return_value="foo-bar"
     )
 
     args = ("arg1", 2)
@@ -209,9 +222,8 @@ def test_gcengine_start_pass_through_to_executor(
     )
     mock_executor.provider = mock.MagicMock()
     mock_executor.status_polling_interval = 5
-    mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
-    )
+    mock_executor.launch_cmd = "foo-bar"
+    mock_executor.interchange_launch_cmd = "foo-bar"
 
     run_dir = tmp_path
     scripts_dir = str(tmp_path / "submit_scripts")
@@ -233,9 +245,8 @@ def test_gcengine_start_provider_without_channel(
     mock_executor = mock.Mock(spec=HighThroughputExecutor)
     mock_executor.status_polling_interval = 5
     mock_executor.provider = mock.Mock(spec=KubernetesProvider)
-    mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
-    )
+    mock_executor.launch_cmd = "foo-bar"
+    mock_executor.interchange_launch_cmd = "foo-bar"
 
     assert not hasattr(mock_executor.provider, "channel"), "Verify test setup"
 
