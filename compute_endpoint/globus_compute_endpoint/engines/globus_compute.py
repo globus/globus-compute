@@ -409,11 +409,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def scale_out(self, blocks: int):
         logger.info(f"Scaling out {blocks} blocks")
-        return self.executor.scale_out(blocks=blocks)
+        return self.executor.scale_out_facade(n=blocks)
 
     def scale_in(self, blocks: int):
         logger.info(f"Scaling in {blocks} blocks")
-        return self.executor.scale_in(blocks=blocks)
+        return self.executor.scale_in_facade(n=blocks)
 
     def _handle_task_exception(
         self,
