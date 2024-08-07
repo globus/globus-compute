@@ -1,7 +1,0 @@
-Bug Fixes
-^^^^^^^
-
-- Pulling tasks from RabbitMQ is now performed via a thread within the main endpoint
-  process, rather than a separate process. This reduces the endpoint's overall memory
-  footprint and fixes sporadic issues in which the formerly forked process would inherit
-  thread locks.
