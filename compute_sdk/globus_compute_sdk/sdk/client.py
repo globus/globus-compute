@@ -743,6 +743,20 @@ class Client:
             raise SystemError(message)
 
     @requires_login
+    def get_allowed_functions(self, endpoint_id: UUID_LIKE_T):
+        """List the functions that are allowed to execute on this endpoint
+        Parameters
+        ----------
+        endpoint_id : UUID | str
+            The ID of the endpoint
+        Returns
+        -------
+        json
+            The response of the request
+        """
+        return self.web_client.get_allowed_functions(endpoint_id).data
+
+    @requires_login
     def stop_endpoint(self, endpoint_id: str):
         """Stop an endpoint by dropping it's active connections.
 

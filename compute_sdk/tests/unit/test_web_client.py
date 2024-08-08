@@ -142,6 +142,20 @@ def test_get_function(client: WebClient, randomstring: t.Callable):
     assert res["some_key"] == expected_response
 
 
+def test_get_allowed_functions(client: WebClient, randomstring: t.Callable):
+    ep_uuid_str = str(uuid.uuid4())
+    expected_response = randomstring()
+    responses.add(
+        responses.GET,
+        f"{_BASE_URL}/v3/endpoints/{ep_uuid_str}/allowed_functions",
+        json={"some_key": expected_response},
+    )
+
+    res = client.get_allowed_functions(ep_uuid_str)
+
+    assert res["some_key"] == expected_response
+
+
 def test_delete_function(client: WebClient, randomstring: t.Callable):
     func_uuid_str = str(uuid.uuid4())
     expected_response = randomstring()
