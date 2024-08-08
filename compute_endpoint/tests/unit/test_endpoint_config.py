@@ -122,3 +122,26 @@ def test_conditional_engine_strategy(
             with pytest.raises(ValidationError) as pyt_e:
                 ConfigModel(**config_dict)
             assert "string is incompatible" in str(pyt_e.value)
+
+
+@pytest.mark.parametrize(
+    "provider_type, compatible",
+    (
+        ("LocalProvider", True),
+        ("AWSProvider", False),
+        ("GoogleCloudProvider", False),
+        ("KubernetesProvider", False),
+    ),
+)
+def test_provider_container_compatibility(
+    config_dict: dict, provider_type: str, compatible: bool
+):
+    config_dict["engine"]["container_uri"] = "docker://ubuntu"
+    config_dict["engine"]["provider"] = {"type": provider_type}
+
+    if compatible:
+        ConfigModel(**config_dict)
+    else:
+        with pytest.raises(ValueError) as pyt_e:
+            ConfigModel(**config_dict)
+        assert f"not compatible with {provider_type}" in str(pyt_e.value)
