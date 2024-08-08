@@ -242,6 +242,11 @@ class WebClient(globus_sdk.BaseClient):
     def get_function(self, function_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/functions/{function_id}")
 
+    def get_allowed_functions(
+        self, endpoint_id: UUID_LIKE_T
+    ) -> globus_sdk.GlobusHTTPResponse:
+        return self.get(f"/v3/endpoints/{endpoint_id}/allowed_functions")
+
     def stop_endpoint(self, endpoint_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.post(f"/v2/endpoints/{endpoint_id}/lock", data={})
 
