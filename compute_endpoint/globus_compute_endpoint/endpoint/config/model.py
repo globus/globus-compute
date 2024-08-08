@@ -121,6 +121,24 @@ class EngineModel(BaseConfigModel):
             )
         return values
 
+    @root_validator(pre=True)
+    @classmethod
+    def _validate_provider_container_compatibility(cls, values: dict):
+        provider_type = values.get("provider", {}).get("type")
+        if provider_type in (
+            "AWSProvider",
+            "GoogleCloudProvider",
+            "KubernetesProvider",
+        ):
+            if values.get("container_uri"):
+                raise ValueError(
+                    f"The 'container_uri' field is not compatible with {provider_type}"
+                    " because this provider manages containers internally. For more"
+                    f" information on how to configure {provider_type}, please refer to"
+                    f" Parsl documentation: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.{provider_type}.html"  # noqa"
+                )
+        return values
+
 
 class ConfigModel(BaseConfigModel):
     engine: t.Optional[EngineModel]
