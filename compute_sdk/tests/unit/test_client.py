@@ -327,6 +327,15 @@ def test_get_function(gcc):
     gcc.web_client.get_function.assert_called_with(func_uuid_str)
 
 
+def test_get_allowed_functions(gcc):
+    ep_uuid_str = str(uuid.uuid4())
+    gcc.web_client = mock.MagicMock()
+
+    gcc.get_allowed_functions(ep_uuid_str)
+
+    gcc.web_client.get_allowed_functions.assert_called_with(ep_uuid_str)
+
+
 def test_delete_function(gcc):
     func_uuid_str = str(uuid.uuid4())
     gcc.web_client = mock.MagicMock()
