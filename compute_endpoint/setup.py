@@ -44,6 +44,9 @@ REQUIRES = [
     "jsonschema>=4.19.0,<4.20",
     "cachetools>=5.3.1",
     "types-cachetools>=5.3.0.6",
+    # Pin to 42.0.0 to avoid CryptographyDeprecationWarning, to be fixed in parsl
+    # See https://funcx.slack.com/archives/C016JMYST9C/p1723232785192439
+    "cryptography==42.0.0",
 ]
 
 TEST_REQUIRES = [
