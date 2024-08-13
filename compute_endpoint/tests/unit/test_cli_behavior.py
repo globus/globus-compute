@@ -234,10 +234,11 @@ def test_start_ep_reads_stdin(
 ):
     data_is_valid, data = stdin_data
 
+    conf = Config()
     mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
-    mock_load_conf.return_value = Config()
+    mock_load_conf.return_value = conf
     mock_get_config = mocker.patch(f"{_MOCK_BASE}get_config")
-    mock_get_config.return_value = Config()
+    mock_get_config.return_value = conf
 
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_sys = mocker.patch(f"{_MOCK_BASE}sys")
@@ -495,9 +496,9 @@ def test_start_ep_incorrect_config_py(
     assert "modified incorrectly?" in res.stderr
 
 
-@mock.patch("globus_compute_endpoint.endpoint.config.utils._read_config_yaml")
+@mock.patch("globus_compute_endpoint.endpoint.config.utils.load_config_yaml")
 def test_start_ep_config_py_takes_precedence(
-    read_config, run_line, mock_cli_state, make_endpoint_dir, ep_name
+    load_config_yaml, run_line, mock_cli_state, make_endpoint_dir, ep_name
 ):
     ep_dir = make_endpoint_dir()
     conf_py = ep_dir / "config.py"
@@ -509,7 +510,7 @@ def test_start_ep_config_py_takes_precedence(
 
     run_line(f"start {ep_name}")
     assert mock_ep.start_endpoint.called
-    assert not read_config.called, "Key outcome: config.py takes precendence"
+    assert not load_config_yaml.called, "Key outcome: config.py takes precedence"
 
 
 def test_single_user_requires_engine_configured(mock_command_ensure, ep_name, run_line):

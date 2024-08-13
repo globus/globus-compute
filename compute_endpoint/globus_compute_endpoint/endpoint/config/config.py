@@ -229,3 +229,6 @@ class Config(RepresentationMixin):
 
         # Misc info
         self.display_name = display_name
+
+        # Used to store the raw content of the YAML or Python config file
+        self.source_content: str | None = None
