@@ -870,6 +870,7 @@ class Endpoint:
             "hostname": socket.getfqdn(),
             # should be more accurate than `getpass.getuser()` in non-login situations
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
+            "endpoint_config": config.source_content,
         }
 
         try:

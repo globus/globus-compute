@@ -307,6 +307,7 @@ class EndpointManager:
             "hostname": socket.getfqdn(),
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
             "config": serialize_config(config),
+            "endpoint_config": config.source_content,
             "user_config_template": user_config_template,
             "user_config_schema": user_config_schema,
         }
