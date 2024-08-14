@@ -21,6 +21,10 @@ pipeline {
             steps {
                 script {
                     def scmVars = checkout scm
+
+                    # Uncomment below line to build for stable
+                    # env.BUILD_FOR_STABLE = 'true'
+
                     env.BRANCH_NAME = scmVars.GIT_BRANCH.replaceFirst(/^.*origin\//, "")
                     env.SOURCE_STASH_NAME = "${UUID.randomUUID()}"
                     echo "env.BRANCH_NAME = ${env.BRANCH_NAME}"
