@@ -3,6 +3,24 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.26.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.26.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- The endpoint CLI will now raise an error if the endpoint configuration includes
+  both the ``container_uri`` field and a provider that manages containers internally
+  (``AWSProvider``, ``GoogleCloudProvider``, or ``KubernetesProvider``). This prevents
+  conflicts in container management.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency version to 2024.8.12.
+
 .. _changelog-2.25.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.25.0
