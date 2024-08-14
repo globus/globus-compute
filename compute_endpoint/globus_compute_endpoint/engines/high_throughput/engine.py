@@ -14,6 +14,7 @@ import threading
 import time
 import typing as t
 import uuid
+import warnings
 from concurrent.futures import Future
 from multiprocessing import Process
 
@@ -260,6 +261,12 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         passthrough=True,
         task_status_queue=None,
     ):
+        warnings.warn(
+            "HighThroughputEngine is deprecated."
+            " Please use GlobusComputeEngine instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log.debug("Initializing HighThroughputEngine")
         self.provider = provider
         self.label = label
