@@ -112,7 +112,7 @@ def engine_heartbeat() -> int:
 
 @pytest.fixture
 def nodeslist(num=100):
-    limit = random.randint(1, num)
+    limit = random.randint(2, num)
     yield [f"NODE{node_i}" for node_i in range(1, limit)]
 
 
