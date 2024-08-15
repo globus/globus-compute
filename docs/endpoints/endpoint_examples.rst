@@ -21,9 +21,9 @@ like Slurm and PBSTorque to provision compute nodes dynamically in response to w
 These capabilities are largely borrowed from Parsl's |HighThroughputExecutor|_ and therefore
 all of |HighThroughputExecutor|_'s parameter options are supported as passthrough.
 
-Note::
-As of ``globus-compute-endpoint==2.12.0`` |GlobusComputeEngine|_, replaces the
-``HighThroughputEngine`` as the default executor.
+.. note::
+   As of ``globus-compute-endpoint==2.12.0``, |GlobusComputeEngine|_ is the default engine type.
+   The ``HighThroughputEngine`` is marked for deprecation.
 
 Here are |GlobusComputeEngine|_ specific features:
 
