@@ -164,9 +164,10 @@ uses the ``SlurmProvider`` to interface with the scheduler, and uses the
 .. literalinclude:: configs/midway.yaml
    :language: yaml
 
-The following configuration is an example to use singularity container on Midway.
+The following configuration example uses an Apptainer (formerly Singularity) container
+on Midway.
 
-.. literalinclude:: configs/midway_singularity.yaml
+.. literalinclude:: configs/midway_apptainer.yaml
    :language: yaml
 
 
