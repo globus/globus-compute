@@ -192,7 +192,7 @@ Polaris (ALCF)
 .. image:: ../_static/images/ALCF_Polaris.jpeg
 
 The following snippet shows an example configuration for executing on Argonne Leadership
-Computing Facility's **Polaris** cluster. This example uses the ``HighThroughputEngine``
+Computing Facility's **Polaris** cluster. This example uses the ``GlobusComputeEngine``
 and connects to Polaris's PBS scheduler using the ``PBSProProvider``.  This
 configuration assumes that the script is being executed on the login node of Polaris.
 
@@ -206,7 +206,7 @@ Perlmutter (NERSC)
 .. image:: ../_static/images/Nersc9-image-compnew-sizer7-group-type-4-1.jpg
 
 The following snippet shows an example configuration for accessing NERSC's
-**Perlmutter** supercomputer.  This example uses the ``HighThroughputEngine`` and
+**Perlmutter** supercomputer.  This example uses the ``GlobusComputeEngine`` and
 connects to Perlmutters's Slurm scheduler.  It is configured to request 2 nodes
 configured with 1 TaskBlock per node. Finally, it includes override information to
 request a particular node type (GPU) and to configure a specific Python environment on
