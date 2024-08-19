@@ -19,36 +19,97 @@ You will also need the following credentials:
 - pypi credentials for use with `twine` (e.g. a token in `~/.pypirc`) valid for
     publishing `globus-compute-sdk` and `globus-compute-endpoint`
 
-## Procedure
+## Alpha releases
 
-1. Bump versions of both packages to a new latest version number.  This is
-   the next higher alpha version number like 2.16.0a1 if 2.16.0a0 already
-   exists, or <X>.<Y+1>.<Z>a0 if this will be the first alpha release for an
-   upcoming production release when the existing PyPI version is <X>.<Y>.<Z>
+1. Branch off from the `main` branch to create a release branch (e.g., `v.1.1.0`):
+
+```bash
+git checkout -b v1.1.0 main
+```
+
+2. Bump the version of both packages to a new alpha release (e.g., `1.0.0` -> `1.1.0a0`):
 
 ```bash
 $EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
 ```
 
-2. Update the changelog by running `scriv collect --edit`
+3. Commit the changes:
 
-3. Add and commit the changes to version numbers and changelog files (including
-   the removal of `changelog.d/` files), e.g. as follows
+```bash
+git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
+git commit -m "Bump versions for alpha release v1.1.0a0"
+git push -u origin v1.1.0
+```
+
+4. Run `./release.sh` from the repo root. This script creates a signed tag named after
+   the current version and pushes it to GitHub, then uses the `tox` release command
+   to push each package to PyPi.
+
+### Alpha release bugfixes
+
+1. Branch off from the release branch to create a new bugfix branch:
+
+```bash
+git checkout -b some-bugfix v1.1.0
+```
+
+2. Commit your changes and push to GitHub.
+
+```bash
+git add .
+git commit -m "Fixed X"
+git push -u origin some-bugfix
+```
+
+3. Open a PR in GitHub to merge the bugfix branch into the release branch.
+
+4. Once the PR is approved and merged, pull the new commits from the remote
+   release branch:
+
+```bash
+git checkout v1.1.0
+git pull
+```
+
+5. Repeat steps 2 through 4 of the main [Alpha releases](#alpha-releases) procedure.
+   Be sure to only bump the alpha version number (e.g., `1.1.0a0` -> `1.1.0a1`).
+
+## Production releases
+
+1. Checkout the release branch.
+
+```bash
+git checkout v1.1.0
+```
+
+2. Remove the alpha version designation for both packages (e.g., `1.1.0a1` -> `1.1.0`):
+
+```bash
+$EDITOR compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
+```
+
+2. Update the changelog:
+
+```bash
+scriv collect --edit
+```
+
+3. Commit the changes:
 
 ```bash
 git add changelog.d/ docs/changelog.rst
 git add compute_sdk/globus_compute_sdk/version.py compute_endpoint/setup.py compute_endpoint/globus_compute_endpoint/version.py
-git commit -m 'Bump versions and changelog for release'
+git commit -m "Bump versions and changelog for release v1.1.0"
 git push
 ```
 
-4. Run the release script `./release.sh` from the repo root. This will use
-   `tox` and your pypi credentials and will create a signed release tag. At the
-   end of this step, new packages will be published to pypi and the tag to GitHub.
+5. Run `./release.sh` from the repo root.
 
-5. Open a PR to merge the release branch into `main`. Once approved, merge it using
-   the "Merge commit" option. This will ensure that the tagged commit from the release
-   branch is properly included in the `main` branch.
+5. Open a PR in GitHub to merge the release branch into `main`.
+
+   **⚠️ Important:** Once approved, merge the PR using the "Merge commit" option.
+   This will ensure that the tagged commits and bug fixes from the release branch
+   are properly added to the `main` branch.
 
 6. Create a GitHub release from the tag. See [GitHub documentation](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release)
    for instructions.
