@@ -174,7 +174,7 @@ def test_connection_closed_shuts_down(start_task_q_subscriber):
 
 def test_channel_closed_retries_then_shuts_down(start_task_q_subscriber):
     tqs: TaskQueueSubscriber = start_task_q_subscriber()
-    try_assert(lambda: tqs._connection, "Ensure we establish a connection")
+    try_assert(lambda: tqs._channel, "Ensure we establish a connection")
 
     for i in range(1, tqs.channel_close_window_limit):
         tqs._on_channel_closed(tqs._channel, MemoryError())
