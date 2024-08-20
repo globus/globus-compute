@@ -15,7 +15,10 @@ from globus_compute_endpoint import engines
 from globus_compute_endpoint.cli import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
-from globus_compute_endpoint.endpoint.rabbit_mq import ResultPublisher
+from globus_compute_endpoint.endpoint.rabbit_mq import (
+    ResultPublisher,
+    TaskQueueSubscriber,
+)
 from globus_compute_endpoint.endpoint.utils.config import Config
 from tests.utils import try_assert
 
@@ -46,9 +49,22 @@ def mock_ex(mocker, endpoint_uuid):
 
 
 @pytest.fixture
-def mock_conf(mocker, mock_ex):
-    conf = Config(executors=[mock_ex])
-    yield conf
+def mock_conf(mock_ex):
+    yield Config(executors=[mock_ex])
+
+
+@pytest.fixture
+def mock_rp():
+    m = mock.Mock(spec=ResultPublisher)
+    with mock.patch(f"{_MOCK_BASE}ResultPublisher", return_value=m):
+        yield m
+
+
+@pytest.fixture
+def mock_tqs():
+    m = mock.Mock(spec=TaskQueueSubscriber)
+    with mock.patch(f"{_MOCK_BASE}TaskQueueSubscriber", return_value=m):
+        yield m
 
 
 @pytest.fixture
@@ -132,7 +148,7 @@ def test_start_requires_pre_registered(mocker, funcx_dir):
 
 @pytest.mark.parametrize("num_iters", (1, 2, 5, 10))
 def test_detects_bad_executor_when_no_tasks(
-    mocker, mock_log, num_iters, ep_ix, mock_ex, randomstring
+    mock_log, num_iters, ep_ix, mock_ex, randomstring, mock_rp, mock_tqs
 ):
     expected_iters = num_iters
     exc_text = randomstring()
@@ -147,7 +163,6 @@ def test_detects_bad_executor_when_no_tasks(
     with mock.patch.object(ep_ix, "pending_task_queue") as ptq:
         ptq.get.side_effect = update_executor_exception
 
-        mocker.patch(f"{_MOCK_BASE}ResultPublisher", spec=ResultPublisher)
         ep_ix._main_loop()
 
         assert ep_ix.time_to_quit, "Sanity check"
@@ -167,10 +182,9 @@ def test_die_with_parent_refuses_to_start_if_not_parent(mocker, ep_ix_factory):
     assert "refusing to start" in warn_msg
 
 
-def test_die_with_parent_goes_away_if_parent_dies(mocker, ep_ix_factory):
+def test_die_with_parent_goes_away_if_parent_dies(mocker, ep_ix_factory, mock_rp):
     ppid = os.getppid()
 
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
     mocker.patch(f"{_MOCK_BASE}time.sleep")
     mock_ppid = mocker.patch(f"{_MOCK_BASE}os.getppid")
     mock_ppid.side_effect = (ppid, 1)
@@ -187,10 +201,16 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker, ep_ix_factory):
 
 
 def test_no_idle_if_not_configured(
-    mocker, ep_ix_factory, mock_conf, mock_log, endpoint_uuid, mock_spt, mock_quiesce
+    mocker,
+    ep_ix_factory,
+    mock_conf,
+    mock_log,
+    endpoint_uuid,
+    mock_spt,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
 ):
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
-
     mock_conf.idle_heartbeats_soft = 0
     mock_conf.heartbeat_period = 1
     ei = ep_ix_factory(config=mock_conf)
@@ -211,12 +231,18 @@ def test_no_idle_if_not_configured(
 
 @pytest.mark.parametrize("idle_limit", (random.randint(2, 100),))
 def test_soft_idle_honored(
-    mocker, mock_log, mock_conf, ep_ix_factory, mock_spt, idle_limit, mock_quiesce
+    mocker,
+    mock_log,
+    mock_conf,
+    ep_ix_factory,
+    mock_spt,
+    idle_limit,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
 ):
     result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
     msg = {"task_id": str(result.task_id), "message": pack(result)}
-
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
 
     mock_conf.idle_heartbeats_soft = idle_limit
     ei = ep_ix_factory(config=mock_conf)
@@ -252,11 +278,18 @@ def test_soft_idle_honored(
 
 @pytest.mark.parametrize("idle_limit", (random.randint(4, 100),))
 def test_hard_idle_honored(
-    mocker, mock_log, mock_conf, ep_ix_factory, mock_spt, idle_limit, mock_quiesce
+    mocker,
+    mock_log,
+    mock_conf,
+    ep_ix_factory,
+    mock_spt,
+    idle_limit,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
 ):
     idle_soft_limit = random.randrange(2, idle_limit)
 
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
     mocker.patch(f"{_MOCK_BASE}threading.Thread")
 
     mock_conf.idle_heartbeats_soft = idle_soft_limit
@@ -289,10 +322,15 @@ def test_hard_idle_honored(
 
 
 def test_unidle_updates_proc_title(
-    mocker, mock_log, mock_conf, ep_ix_factory, mock_spt, mock_quiesce
+    mocker,
+    mock_log,
+    mock_conf,
+    ep_ix_factory,
+    mock_spt,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
 ):
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher")
-
     mock_conf.heartbeat_period = 1
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 3
@@ -333,11 +371,8 @@ def test_unidle_updates_proc_title(
 
 
 def test_sends_final_status_message_on_shutdown(
-    mocker, mock_conf, ep_ix_factory, endpoint_uuid, mock_quiesce
+    mocker, mock_conf, ep_ix_factory, endpoint_uuid, mock_quiesce, mock_rp, mock_tqs
 ):
-    mock_rqp = mocker.Mock(spec=ResultPublisher)
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
-
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
     ei = ep_ix_factory(config=mock_conf)
@@ -348,8 +383,8 @@ def test_sends_final_status_message_on_shutdown(
     ei._quiesce_event = mock_quiesce
     ei._main_loop()
 
-    assert mock_rqp.publish.called
-    packed_bytes = mock_rqp.publish.call_args[0][0]
+    assert mock_rp.publish.called
+    packed_bytes = mock_rp.publish.call_args[0][0]
     epsr = unpack(packed_bytes)
     assert isinstance(epsr, EPStatusReport)
     assert epsr.endpoint_id == uuid.UUID(endpoint_uuid)
@@ -357,11 +392,15 @@ def test_sends_final_status_message_on_shutdown(
 
 
 def test_gracefully_handles_final_status_message_timeout(
-    mocker, mock_log, mock_conf, ep_ix_factory, endpoint_uuid, mock_quiesce
+    mocker,
+    mock_log,
+    mock_conf,
+    ep_ix_factory,
+    endpoint_uuid,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
 ):
-    mock_rqp = mocker.Mock(spec=ResultPublisher)
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
-
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
     ei = ep_ix_factory(config=mock_conf)
@@ -373,18 +412,15 @@ def test_gracefully_handles_final_status_message_timeout(
 
     mock_future = mocker.Mock(spec=Future)
     mock_future.result.side_effect = TimeoutError("asdfasdf")
-    mock_rqp.publish.return_value = mock_future
+    mock_rp.publish.return_value = mock_future
     ei._main_loop()
 
-    assert mock_rqp
+    assert mock_rp
 
 
 def test_faithfully_handles_status_report_messages(
-    mocker, ep_ix, endpoint_uuid, randomstring, mock_quiesce
+    mocker, ep_ix, endpoint_uuid, randomstring, mock_quiesce, mock_rp, mock_tqs
 ):
-    mock_rqp = mocker.Mock(spec=ResultPublisher)
-    mocker.patch(f"{_MOCK_BASE}ResultPublisher", return_value=mock_rqp)
-
     status_report = EPStatusReport(
         endpoint_id=endpoint_uuid, global_state={"sentinel": "foo"}, task_statuses=[]
     )
@@ -399,12 +435,12 @@ def test_faithfully_handles_status_report_messages(
     t = threading.Thread(target=ep_ix._main_loop, daemon=True)
     t.start()
 
-    try_assert(lambda: mock_rqp.publish.called)
+    try_assert(lambda: mock_rp.publish.called)
     ep_ix.time_to_quit = True
     t.join()
 
-    assert mock_rqp.publish.call_count > 1, "Test packet, then the final status report"
-    packed_bytes = mock_rqp.publish.call_args_list[0][0][0]
+    assert mock_rp.publish.call_count > 1, "Test packet, then the final status report"
+    packed_bytes = mock_rp.publish.call_args_list[0][0][0]
     found_epsr = unpack(packed_bytes)
     assert isinstance(found_epsr, EPStatusReport)
     assert found_epsr.endpoint_id == uuid.UUID(endpoint_uuid)
