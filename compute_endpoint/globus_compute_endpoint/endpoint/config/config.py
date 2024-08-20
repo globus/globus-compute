@@ -3,12 +3,12 @@ from __future__ import annotations
 import inspect
 import os
 import pathlib
+import typing as t
 import warnings
 
 from globus_compute_endpoint.engines import GlobusComputeEngine
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from parsl.utils import RepresentationMixin
-
-_DEFAULT_EXECUTORS = [GlobusComputeEngine()]
 
 
 class Config(RepresentationMixin):
@@ -17,10 +17,11 @@ class Config(RepresentationMixin):
     Parameters
     ----------
 
-    executors : list of Executors
+    executors
         A list of executors which serve as the backend for function execution.
-        As of 0.2.2, this list should contain only one executor.
-        Default: [GlobusComputeEngine()]
+        As of 0.2.2, this list should contain only one executor.  If ``None``,
+        then use a default-instantiation of ``GlobusComputeEngine``.
+        Default: None
 
     environment: str
         Environment the endpoint should connect to. If not specified, the endpoint
@@ -144,7 +145,7 @@ class Config(RepresentationMixin):
     def __init__(
         self,
         # Execution backed
-        executors: list = _DEFAULT_EXECUTORS,
+        executors: t.Iterable[GlobusComputeEngineBase] | None = None,
         # Connection info
         environment: str | None = None,
         local_compute_services: bool = False,
@@ -187,7 +188,9 @@ class Config(RepresentationMixin):
             warnings.warn(msg)
 
         # Execution backends
-        self.executors = executors  # List of executors
+        if executors is None:
+            executors = (GlobusComputeEngine(),)
+        self.executors: list[GlobusComputeEngineBase] = [e for e in executors]
 
         # Connection info
         self.environment = environment
