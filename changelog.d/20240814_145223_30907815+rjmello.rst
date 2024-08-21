@@ -1,9 +1,0 @@
-Deprecated
-^^^^^^^^^^
-
-- The ``HighThroughputEngine`` is now marked for deprecation. All users should migrate to
-  ``GlobusComputeEngine``.
-
-  To help with migration, we suggest checking out our many `endpoint configuration examples
-  <https://globus-compute.readthedocs.io/en/stable/endpoints/endpoint_examples.html>`_, all
-  of which use ``GlobusComputeEngine``.

@@ -3,6 +3,38 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.27.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.27.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``Client.get_allowed_functions`` for retrieving the list of functions that are
+  allowed to be executed on an endpoint.
+
+Removed
+^^^^^^^
+
+- The ``add_to_whitelist``, ``delete_from_whitelist``, and ``get_whitelist`` functions
+  have been removed from the ``Client``. Use the ``allowed_functions`` endpoint config
+  option instead of the add/remove functions, and ``Client.get_allowed_functions``
+  instead of ``get_whitelist``.
+
+- Remove forgotten ``webockets`` dependency from setup requirements; the SDK
+  does not use the websockets library as of :ref:`v2.3.0 <changelog-2.3.0>`.
+
+Deprecated
+^^^^^^^^^^
+
+- The ``HighThroughputEngine`` is now marked for deprecation. All users should migrate to
+  ``GlobusComputeEngine``.
+
+  To help with migration, we suggest checking out our many `endpoint configuration examples
+  <https://globus-compute.readthedocs.io/en/stable/endpoints/endpoint_examples.html>`_, all
+  of which use ``GlobusComputeEngine``.
+
 .. _changelog-2.26.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.26.0
