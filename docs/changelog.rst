@@ -3,6 +3,16 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.27.1:
+
+globus-compute-sdk & globus-compute-endpoint v2.27.1
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Set upper bound for ``pyzmq`` dependency to ``v26.1.0`` to avoid bug with ``libzmq`` installation.
+
 .. _changelog-2.27.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.27.0
