@@ -4,7 +4,6 @@ import json
 import logging
 import sys
 import typing as t
-import uuid
 import warnings
 
 from globus_compute_sdk.errors import (
@@ -50,10 +49,7 @@ class Client:
 
     def __init__(
         self,
-        http_timeout=None,
-        funcx_home=None,
         environment: str | None = None,
-        task_group_id: t.Union[None, uuid.UUID, str] = None,
         local_compute_services: bool = False,
         do_version_check: bool = True,
         *,
@@ -67,25 +63,8 @@ class Client:
 
         Parameters
         ----------
-        http_timeout: int
-            Timeout for any call to service in seconds.
-            Default is no timeout
-
-            DEPRECATED - see self.web_client
-
-        funcx_home: any
-            DEPRECATED - was never used
-
         environment: str
             For internal use only. The name of the environment to use.
-
-        task_group_id: str|uuid.UUID
-            Set the TaskGroup ID (a UUID) for this Client instance.
-            Typically, one uses this to submit new tasks to an existing
-            session or to reestablish Executor futures.
-            Default: None (will be auto generated)
-
-            DEPRECATED - use create_batch or the executor instead
 
         local_compute_services: str
             For internal use only. TODO
@@ -107,18 +86,6 @@ class Client:
             Allows login logic to be overridden for specific use cases. If None, a
             LoginManager will be used.
         """
-        for arg, name in [
-            (http_timeout, "http_timeout"),
-            (funcx_home, "funcx_home"),
-            (task_group_id, "task_group_id"),
-        ]:
-            if arg is not None:
-                msg = (
-                    f"The '{name}' argument is deprecated. "
-                    "It will be removed in a future release."
-                )
-                warnings.warn(msg)
-
         for arg_name in kwargs:
             msg = (
                 f"The '{arg_name}' argument is unrecognized. "
