@@ -971,7 +971,9 @@ class EndpointManager:
             setproctitle.setproctitle(startup_proc_title)
 
             gc_dir: pathlib.Path = GC.sdk.login_manager.tokenstore.ensure_compute_dir()
-            (gc_dir / ep_name).mkdir(mode=0o700, parents=True, exist_ok=True)
+            ep_dir = gc_dir / ep_name
+            ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            ep_log = ep_dir / "endpoint.log"
 
             user_opts = kwargs.get("user_opts", {})
             user_runtime = kwargs.get("user_runtime", {})
@@ -1013,19 +1015,19 @@ class EndpointManager:
             os.close(read_handle)
             exit_code += 1
 
-            log.debug("Redirecting stdout and stderr (%s)", os.devnull)
-            with os.fdopen(null_fd, "w") as null_f:
-                if os.dup2(null_f.fileno(), 1) != 1:
-                    raise OSError("Unable to close stdout")
+            log.debug("Convey credentials; redirect stdout, stderr (to '%s')", ep_log)
+            log_fd = os.open(ep_log, os.O_WRONLY | os.O_APPEND | os.O_SYNC, mode=0o200)
+            with os.fdopen(log_fd, "w") as log_f:
+                if os.dup2(log_f.fileno(), 1) != 1:
+                    raise OSError(f"Unable to redirect stdout to {ep_log}")
                 exit_code += 1
-                if os.dup2(null_f.fileno(), 2) != 2:
-                    raise OSError("Unable to close stderr")
+                if os.dup2(log_f.fileno(), 2) != 2:
+                    raise OSError(f"Unable to redirect stderr to {ep_log}")
 
-            # After the last os.dup2(), we are unable to get logs at *all*; hence the
-            # exit_code as a last-ditch attempt at sharing "what went wrong where" to
-            # the parent process.
+            # After the last os.dup2(), std* streams are sent to user's EP log file
+            # and not the MEP's logs.  Use the exit_code as an avenue to share "what
+            # went wrong where" to the parent process (the MEP).
             exit_code += 1
-            log.debug("Writing credentials and config to stdin")
             with os.fdopen(write_handle, "w") as stdin_pipe:
                 # intentional side effect: close handle
                 stdin_pipe.write(stdin_data)

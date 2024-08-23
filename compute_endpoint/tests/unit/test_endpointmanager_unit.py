@@ -49,7 +49,6 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_CFG_UTILS_MOCK_BASE = "globus_compute_endpoint.endpoint.config.utils."
 
 _mock_rootuser_rec = pwd.struct_passwd(
     ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
@@ -65,6 +64,10 @@ _mock_localuser_rec = pwd.struct_passwd(
         "/bin/false",
     )
 )
+
+
+def mock_ensure_compute_dir():
+    return pathlib.Path(_mock_localuser_rec.pw_dir) / ".globus_compute"
 
 
 @pytest.fixture
@@ -173,8 +176,8 @@ def mock_unprivileged_epmanager(mocker, conf_dir, mock_client, mock_conf):
 
     mock_os.fork.return_value = 0
     mock_os.pipe.return_value = 40, 41
-    mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
-    mock_os.open.return_value = 4
+    mock_os.dup2.side_effect = AssertionError("dup2: mocked away; is test correct?")
+    mock_os.open.side_effect = AssertionError("open: mocked away; is test correct?")
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = AssertionError(
@@ -215,7 +218,7 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     mock_os.fork.return_value = 0
     mock_os.pipe.return_value = 40, 41
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
-    mock_os.open.return_value = 4
+    mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = (
@@ -230,6 +233,10 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     )
 
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
+    mocker.patch(
+        f"{_MOCK_BASE}GC.sdk.login_manager.tokenstore.ensure_compute_dir",
+        side_effect=mock_ensure_compute_dir,
+    )
 
     ep_uuid, mock_gcc = mock_client
 
@@ -253,25 +260,33 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
 
 
 @pytest.fixture
-def successful_exec_from_mocked_root(
-    mocker, epmanager_as_root, user_conf_template, mock_props
-):
-    conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_root
+def ident():
+    return "successful_exec_some_identity"
 
-    ident = "successful_exec_some_identity"
-    _, mock_gcc = mock_client
-    mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
-        "identity_set": [{"sub": ident}]
-    }
 
-    pld = {
+@pytest.fixture
+def command_payload(ident):
+    return {
         "globus_username": "a@example.com",
         "globus_effective_identity": 1,
         "globus_identity_set": [ident],
         "command": "cmd_start_endpoint",
         "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
     }
-    queue_item = (1, mock_props, json.dumps(pld).encode())
+
+
+@pytest.fixture
+def successful_exec_from_mocked_root(
+    mocker, epmanager_as_root, user_conf_template, mock_props, ident, command_payload
+):
+    conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_root
+
+    _, mock_gcc = mock_client
+    mock_gcc.login_manager.get_auth_client.return_value.userinfo.return_value = {
+        "identity_set": [{"sub": ident}]
+    }
+
+    queue_item = (1, mock_props, json.dumps(command_payload).encode())
 
     em.identity_mapper = mocker.Mock()
     em.identity_mapper.map_identity.return_value = "typicalglobusname@somehost.org"
@@ -1939,6 +1954,29 @@ def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, co
         em._event_loop()
 
     assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+
+
+def test_redirect_stdstreams_to_user_log(
+    successful_exec_from_mocked_root, conf_dir, command_payload
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    mock_os.O_WRONLY = 0x1
+    mock_os.O_APPEND = 0x2
+    mock_os.O_SYNC = 0x4
+    exp_flags = mock_os.O_WRONLY | mock_os.O_APPEND | mock_os.O_SYNC
+
+    uep_name = command_payload["kwargs"]["name"]
+    uep_dir = mock_ensure_compute_dir() / uep_name
+    ep_log = uep_dir / "endpoint.log"
+
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    a, k = next((a, k) for a, k in mock_os.open.call_args_list if a[0] == ep_log)
+    assert a[1] == exp_flags, "Expect replacement stdout/stderr: append, wronly, sync"
 
 
 @pytest.mark.parametrize("port", [random.randint(0, 65535)])
