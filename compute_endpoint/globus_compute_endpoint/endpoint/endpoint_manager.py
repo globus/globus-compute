@@ -837,9 +837,10 @@ class EndpointManager:
 
             # hack to work with logging module; distinguish fork()ed process
             # beyond subtle pid: MainProcess-12345 --> UserEnd...(PreExec)-23456
-            current_process().name = "UserEndpointProcess_Bootstrap(PreExec)"
+            preexec_name = "UserEndpointProcess_Bootstrap(PreExec)"
+            current_process().name = preexec_name
 
-            from globus_compute_endpoint.logging_config import setup_logging
+            from globus_compute_endpoint.logging_config import LOG_TS_FMT, setup_logging
 
             # after dropping privileges, any log.* calls may not be able to access
             # the parent's logging file.  We'll rely on stderr in that case, and fall
@@ -1028,6 +1029,23 @@ class EndpointManager:
             # and not the MEP's logs.  Use the exit_code as an avenue to share "what
             # went wrong where" to the parent process (the MEP).
             exit_code += 1
+
+            _conf = yaml.safe_load(user_config)
+            if _conf.get("debug") is True:
+                now = datetime.now().strftime(LOG_TS_FMT)
+                num_lines = user_config.count("\n") + 1  # +1 ==> \n *splits* lines
+                _rendered_config = user_config.replace("\n", "\n  | ")
+
+                # Roughly approximate a `log.debug()` call, but don't leak some
+                # details.  Minor, "but still."
+                print(
+                    f"{now} DEBUG {preexec_name} Endpoint Begin Compute endpoint"
+                    f" configuration ({num_lines:,} lines):"
+                    f"\n  | {_rendered_config}"
+                    f"\nEnd Compute endpoint configuration"
+                )
+            del _conf
+
             with os.fdopen(write_handle, "w") as stdin_pipe:
                 # intentional side effect: close handle
                 stdin_pipe.write(stdin_data)

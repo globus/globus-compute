@@ -1921,7 +1921,7 @@ def test_pipe_size_limit(mocker, successful_exec_from_mocked_root, conf_size):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
 
-    conf_str = "$" * conf_size
+    conf_str = "v: " + "$" * (conf_size - 3)
 
     # Add 34 bytes for dict keys, etc.
     stdin_data_size = conf_size + 34
@@ -1977,6 +1977,43 @@ def test_redirect_stdstreams_to_user_log(
 
     a, k = next((a, k) for a, k in mock_os.open.call_args_list if a[0] == ep_log)
     assert a[1] == exp_flags, "Expect replacement stdout/stderr: append, wronly, sync"
+
+
+@pytest.mark.parametrize("debug", (True, False))
+def test_user_debug_emits_ephemeral_config_to_user_log(
+    mocker, successful_exec_from_mocked_root, conf_dir, command_payload, debug
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    template_path = Endpoint.user_config_template_path(conf_dir)
+
+    if debug:
+        with open(template_path, "a") as f:
+            f.write("\ndebug: true")
+
+    def duped_first_check(*a, **k):
+        assert mock_os.dup2.call_count == 3, "3 std streams; to log file, not stdout"
+
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")  # quiet down, test
+    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
+    mock_print = mocker.patch(f"{_MOCK_BASE}print")
+    mock_print.side_effect = duped_first_check
+
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    assert mock_print.called is debug, "Expect only written if `debug: true` set"
+    if debug:
+        template = template_path.read_text()
+        exp_lines = template.count("\n") + 1  # +1 ==> \n *splits* lines
+        a, _k = mock_print.call_args
+        c = a[0]
+        assert "DEBUG" in c
+        assert " Endpoint Begin Compute endpoint" in c, "Expect sentinel begin"
+        assert "\nEnd Compute endpoint configuration" in c, "Expect sentinel end"
+        assert f"({exp_lines:,} lines)" in c, "Expect line count"
 
 
 @pytest.mark.parametrize("port", [random.randint(0, 65535)])
