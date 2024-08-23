@@ -421,7 +421,8 @@ def do_diagnostic_base(diagnostic_args):
         "--log-kb",
         metavar="number",
         action="store",
-        default=5120,
+        # default=5120,
+        default=10,   # TODO remove this and use the 5120 before merge
         type=int,
         help=(
             "Specify the number of kilobytes (KB) to read from log files."
