@@ -33,7 +33,12 @@ def use_fs(fs):
     yield
 
 
-def test_render_user_config_escape_strings():
+@pytest.fixture
+def conf_no_exec():
+    yield Config(executors=[])  # empty list to avoid unnecessary network lookup
+
+
+def test_render_user_config_escape_strings(conf_no_exec):
     template = """
 endpoint_setup: {{ setup }}
 engine:
@@ -50,7 +55,7 @@ engine:
             "accelerators": [f"{uuid.uuid4()}\n    mem_per_worker: 100"],
         },
     }
-    rendered_str = render_config_user_template(Config(), template, {}, user_opts)
+    rendered_str = render_config_user_template(conf_no_exec, template, {}, user_opts)
     loaded = yaml.safe_load(rendered_str)
 
     assert len(loaded) == 2
@@ -75,17 +80,16 @@ engine:
         (False, locals),
     ],
 )
-def test_render_user_config_option_types(data):
+def test_render_user_config_option_types(conf_no_exec, data):
     is_valid, val = data
     template = "foo: {{ foo }}"
     user_opts = {"foo": val}
-    parent_cfg = Config()
 
     if is_valid:
-        render_config_user_template(parent_cfg, template, {}, user_opts)
+        render_config_user_template(conf_no_exec, template, {}, user_opts)
     else:
         with pytest.raises(ValueError) as pyt_exc:
-            render_config_user_template(parent_cfg, template, {}, user_opts)
+            render_config_user_template(conf_no_exec, template, {}, user_opts)
         assert "not a valid user config option type" in pyt_exc.exconly()
 
 
@@ -97,13 +101,13 @@ def test_render_user_config_option_types(data):
         ("{{ foo._priv }}", type("Foo", (object,), {"_priv": "secret"})()),
     ],
 )
-def test_render_user_config_sandbox(data: t.Tuple[str, t.Any]):
+def test_render_user_config_sandbox(conf_no_exec, data: t.Tuple[str, t.Any]):
     jinja_op, val = data
     template = f"foo: {jinja_op}"
     user_opts = {"foo": val}
     with mock.patch(f"{_MOCK_BASE}_sanitize_user_opts", return_value=user_opts):
         with pytest.raises(jinja2.exceptions.SecurityError):
-            render_config_user_template(Config(), template, {}, user_opts)
+            render_config_user_template(conf_no_exec, template, {}, user_opts)
 
 
 @pytest.mark.parametrize(
@@ -125,11 +129,11 @@ def test_render_user_config_sandbox(data: t.Tuple[str, t.Any]):
         (False, "10"),
     ],
 )
-def test_render_user_config_shell_escape(data: t.Tuple[bool, t.Any]):
+def test_render_user_config_shell_escape(conf_no_exec, data: t.Tuple[bool, t.Any]):
     is_valid, option = data
     template = "option: {{ option|shell_escape }}"
     user_opts = {"option": option}
-    rendered = render_config_user_template(Config(), template, {}, user_opts)
+    rendered = render_config_user_template(conf_no_exec, template, {}, user_opts)
     rendered_dict = yaml.safe_load(rendered)
 
     assert len(rendered_dict) == 1
@@ -142,7 +146,7 @@ def test_render_user_config_shell_escape(data: t.Tuple[bool, t.Any]):
 
 
 @pytest.mark.parametrize("schema_exists", (True, False))
-def test_render_user_config_apply_schema(schema_exists: bool):
+def test_render_user_config_apply_schema(conf_no_exec, schema_exists: bool):
     template = "foo: {{ foo }}"
     schema = {}
     if schema_exists:
@@ -156,7 +160,7 @@ def test_render_user_config_apply_schema(schema_exists: bool):
 
     user_opts = {"foo": "bar"}
     with mock.patch.object(jsonschema, "validate") as mock_validate:
-        render_config_user_template(Config(), template, schema, user_opts)
+        render_config_user_template(conf_no_exec, template, schema, user_opts)
 
     if schema_exists:
         assert mock_validate.called
@@ -167,22 +171,21 @@ def test_render_user_config_apply_schema(schema_exists: bool):
         assert not mock_validate.called
 
 
-def test_render_config_passes_parent_config():
+def test_render_config_passes_parent_config(conf_no_exec):
     template = "parent_heartbeat: {{ parent_config.heartbeat_period }}"
-    parent_cfg = Config()
 
-    rendered = render_config_user_template(parent_cfg, template)
+    rendered = render_config_user_template(conf_no_exec, template)
 
     rendered_dict = yaml.safe_load(rendered)
-    assert rendered_dict["parent_heartbeat"] == parent_cfg.heartbeat_period
+    assert rendered_dict["parent_heartbeat"] == conf_no_exec.heartbeat_period
 
 
-def test_render_config_passes_user_runtime():
+def test_render_config_passes_user_runtime(conf_no_exec):
     template = "user_python: {{ user_runtime.python_version }}"
     user_runtime = {"python_version": "X.Y.Z"}
 
     rendered = render_config_user_template(
-        Config(), template, user_runtime=user_runtime
+        conf_no_exec, template, user_runtime=user_runtime
     )
 
     rendered_dict = yaml.safe_load(rendered)
@@ -236,9 +239,9 @@ def test_validate_user_config_options_invalid_schema(mock_log, schema):
 
 
 @pytest.mark.parametrize("reserved_word", RESERVED_USER_CONFIG_TEMPLATE_VARIABLES)
-def test_validate_user_opts_reserved_words(reserved_word):
+def test_validate_user_opts_reserved_words(conf_no_exec, reserved_word):
     with pytest.raises(ValueError) as pyt_exc:
-        render_config_user_template(Config(), {}, user_opts={reserved_word: "foo"})
+        render_config_user_template(conf_no_exec, {}, user_opts={reserved_word: "foo"})
 
     assert reserved_word in str(pyt_exc)
     assert "reserved" in str(pyt_exc)
@@ -296,17 +299,16 @@ def test_load_user_config_template_prefer_j2():
         (False, {"foo": "bar"}),
     ],
 )
-def test_render_user_config(mock_log, data):
+def test_render_user_config(mock_log, conf_no_exec, data):
     is_valid, user_opts = data
     template = "heartbeat_period: {{ heartbeat }}"
-    parent_cfg = Config()
 
     if is_valid:
-        rendered = render_config_user_template(parent_cfg, template, {}, user_opts)
+        rendered = render_config_user_template(conf_no_exec, template, {}, user_opts)
         rendered_dict = yaml.safe_load(rendered)
         assert rendered_dict["heartbeat_period"] == user_opts["heartbeat"]
     else:
         with pytest.raises(jinja2.exceptions.UndefinedError):
-            render_config_user_template(parent_cfg, template, {}, user_opts)
+            render_config_user_template(conf_no_exec, template, {}, user_opts)
         a, _k = mock_log.debug.call_args
         assert "Missing required" in a[0]
