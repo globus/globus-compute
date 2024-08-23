@@ -228,19 +228,23 @@ def get_diagnostic_commands(log_bytes: int):
     # Run endpoint related diagnostics when it is installed
     ep_install_dir = print_endpoint_install_dir()
     if "is not installed" not in ep_install_dir:
-        commands.extend(
-            [
+        commands.extend([
                 print(ep_install_dir),
                 "globus-compute-endpoint whoami",
                 "globus-compute-endpoint list",
-                cat(f"{gc_home_dir}*/*.yaml", wildcard=True, max_bytes=log_bytes),
-                cat(f"{gc_home_dir}*/*.log", wildcard=True, max_bytes=log_bytes),
-                # TODO uncomment before merge.  Too much output for testing
-                # cat("~/.globus_compute/*/*.py", wildcard=True),
-                # cat("~/.globus_compute/*/*.j2", wildcard=True),
-                # cat("~/.globus_compute/*/*.json", wildcard=True),
-            ]
-        )
+        ])
+
+        if log_bytes > 0:
+            # Specifying 0 means we don't want to print logs.
+            # TODO maybe we want to disallow 0 for real world use (testing use)
+            commands.extend([
+                    cat(f"{gc_home_dir}/*/*.yaml", wildcard=True, max_bytes=log_bytes),
+                    cat(f"{gc_home_dir}/*/*.log", wildcard=True, max_bytes=log_bytes),
+                    cat(f"{gc_home_dir}/*/*.py", wildcard=True, max_bytes=log_bytes),
+                    cat(f"{gc_home_dir}/*/*.j2", wildcard=True, max_bytes=log_bytes),
+                    cat(f"{gc_home_dir}/*/*.json", wildcard=True, max_bytes=log_bytes),
+                ]
+            )
     else:
         ep_install_dir = None
 
