@@ -108,6 +108,8 @@ easiest approach is typically from the command line:
 Globus Compute will then cache the credentials for future invocations, so this workflow
 will only be initiated once.
 
+.. _quickstart-run-function:
+
 Running a function
 ------------------
 
