@@ -7,8 +7,16 @@ from unittest import mock
 import pytest
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
+from globus_compute_endpoint.endpoint.rabbit_mq import TaskQueueSubscriber
 
 _mock_base = "globus_compute_endpoint.endpoint.interchange."
+
+
+@pytest.fixture
+def mock_tqs():
+    m = mock.Mock(spec=TaskQueueSubscriber)
+    with mock.patch(f"{_mock_base}TaskQueueSubscriber", return_value=m):
+        yield m
 
 
 def test_main_exception_always_quiesces(mocker, fs, randomstring, reset_signals):
@@ -74,7 +82,7 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit, reset_sign
     assert excepts_left > 0, "expect reconnect limit to stop loop, not test backup"
 
 
-def test_reset_reconnect_attempt_limit_when_stable(mocker, fs):
+def test_reset_reconnect_attempt_limit_when_stable(mocker, fs, mock_tqs):
     mocker.patch(f"{_mock_base}ResultPublisher")
     mocker.patch(f"{_mock_base}threading.Thread")
     mocker.patch(f"{_mock_base}multiprocessing")
