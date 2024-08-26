@@ -1,5 +1,5 @@
-The Globus Compute Executor
-===========================
+Globus Compute Executor
+=======================
 
 .. autoclass:: globus_compute_sdk.Executor
     :members:
