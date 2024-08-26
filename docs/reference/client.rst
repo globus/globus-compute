@@ -1,5 +1,5 @@
-The Globus Compute Client
-=========================
+Globus Compute Client
+=====================
 
 .. autoclass:: globus_compute_sdk.Client
     :members:

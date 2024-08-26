@@ -1,208 +1,132 @@
 Multi-User Compute Endpoints
 ****************************
 
-Multi-user Compute endpoints (MEP) enable administrators to securely offer compute
+  This chapter describes Multi-user Compute Endpoints (MEP) for site administrators.
+  For those not running MEPs with ``root`` privileges, please instead consult the
+  :ref:`endpoints_templating_configuration` section in the previous chapter.
+
+Multi-user Compute Endpoints (MEP) enable administrators to securely offer compute
 resources to users without mandating the typical shell access (i.e., ssh).  The basic
-thrust is that the administrator of a MEP creates a configuration template, which is
-then populated by user data and passed to a user endpoint process, or UEP.  The UEP runs
-as the local POSIX user, with the only difference from a standard :abbr:`SEP
-(single-user Compute endpoint)` being that it was started not by a human at the
-command line but on demand by the parent MEP.  In this manner, administrators may preset
-endpoint configuration options (e.g., Torque, PBS, Slurm) and offer user-configurable
-items (e.g., account id, problem-specific number of blocks), while at the same time
-lowering the barrier to use of the resource.
+thrust is that the administrator of a MEP creates a configuration template that is
+populated by user data and passed to a user endpoint process, or UEP.  When a user
+sends a task to the MEP, it will start a UEP on their behalf as a local POSIX user
+account mapped from their Globus Auth identity.  In this manner, administrators may
+preset endpoint configuration options (e.g., Torque, PBS, Slurm) and offer
+user‑configurable items (e.g., account id, problem‑specific number of blocks), while at
+the same time lowering the barrier to use of the resource.
 
-From an SDK user's perspective, the change to use a MEP is minimal, requiring still the
-endpoint agent identifier, and optionally any template-variable values.  An example
-SDK interaction might look like:
+.. note::
 
-.. code-block:: python
-   :emphasize-lines: 7, 9
-
-   from globus_compute_sdk import Executor
-
-   def hello_from_node(name: str):
-       import os
-       return f"Hello, {name}; I ran on {os.uname().nodename}"
-
-   mep_id = "id_as_shared_by_mep_admin"  # perhaps via email, or a web site
-   with Executor() as ex:
-       ex.endpoint_id = mep_id  # no change from a SEP interaction
-       f = ex.submit(hello_from_node, "Obi-Wan")
-       print(f.result())
-
-This interaction is no different than for use of a SEP (in fact, the Tutorial Endpoint
-is a MEP, and this interaction works there as well!), although does not customize the
-configuration.  For that, the only necessary addition is the ``user_endpoint_config``:
-
-.. code-block:: python
-   :emphasize-lines: 10
-
-   from globus_compute_sdk import Executor
-
-   def hello_from_node(name: str):
-       import os
-       return f"Hello, {name}; I ran on {os.uname().nodename}"
-
-   mep_id = "id_as_shared_by_mep_admin"  # perhaps via email, or a web site
-   with Executor() as ex:
-       ex.endpoint_id = mep_id  # no change from a SEP interaction
-       ex.user_endpoint_config = {"ACCOUNT_ID": "OBIWAN123"}
-       f = ex.submit(hello_from_node, "Obi-Wan")
-       print(f.result())
-
-More on the specifics later.  The rest of this section is oriented toward cluster
-administrators, and assumes a passable understanding of installation and use of a
-single-user Compute endpoint.
+   The only difference between a "normal" endpoint process and a UEP is a semantic one
+   for discussion so as to differentiate the two different starting contexts.  An
+   endpoint is started manually by a human, while a UEP will always have a
+   parent MEP process.
 
 .. tip::
 
-   For those just looking for the instructions, see the `Administrator Quickstart`_,
+   For those just looking to get up and running, see the `Administrator Quickstart`_,
    below.
-
-.. _repo-based-installation:
-
-Repository-Based Installation
-=============================
-
-The ``globus-compute-endpoint`` project is available on PyPI, and is also available in
-Globus' repositories as native DEB and RPM packages.  The repository package is
-``globus-compute-agent``.
-
-Prerequisites
--------------
-
-#. Supported Linux Distributions
-
-   Where feasible, Globus Compute supports the `same Linux distributions as does Globus
-   Connect Server`_.
-
-#. Administrator Privileges
-
-   Per usual semantics, installing the DEB or RPM packages will require administrative
-   access on the target host.
-
-#. TCP Ports
-
-   * Port 443, outbound to ``compute.api.globus.org``
-   * Port 443, outbound to ``compute.amqps.globus.org``
-
-   We do not offer a range of specific IP addresses for firewall blocking rules.
-
-What is Installed
------------------
-
-The package manager packages rely on Globus' supplied Python.  As of this writing, that
-is Python3.9, and is installed to ``/opt/globus-python/``.  This version of Python is
-not critical to the Globus Compute Endpoint software in general, but it is the version
-of Python against which the DEB and RPM packages were built.
-
-The Globus Compute Endpoint software will be installed in
-``/opt/globus-compute-agent/`` and a shell-script wrapper will be installed to
-``/usr/sbin/globus-compute-endpoint``
-
-RPM Installation
-----------------
-
-.. code-block::
-
-   # install Globus' public key
-   dnf install https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
-
-   # install the Globus Compute Agent package
-   dnf install globus-compute-agent
-
-DEB Installation
-----------------
-
-.. code-block::
-
-   # install Globus' public key
-   curl -LOs https://downloads.globus.org/globus-connect-server/stable/installers/repo/deb/globus-repo_latest_all.deb
-   dpkg -i globus-repo_latest_all.deb
-   apt-key add /usr/share/globus-repo/RPM-GPG-KEY-Globus
-
-   # install the Globus Compute Agent package
-   apt update
-   apt install globus-compute-agent
-
-SUSE
-----
-
-.. code-block::
-
-   # install Globus' public key
-   rpm --import https://downloads.globus.org/globus-connect-server/stable/installers/keys/GPG-KEY-Globus
-   zypper install https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
-
-   # install the Globus Compute Agent package
-   zypper install globus-compute-agent
 
 
 User Endpoint Startup Overview
 ==============================
 
 UEPs are initiated by tasks sent to the MEP id.  In REST-speak, that means that one or
-more tasks were |POSTed to the /v3/endpoints/<endpoint_uuid>/submit|_ Globus Compute
+more tasks were |POSTed to the /v3/endpoints/<mep_uuid>/submit|_ Globus Compute
 route.  When the web service determines that the ``endpoint_uuid`` is for a MEP, it
 generates a UEP identifier specific to the tuple of the ``endpoint_uuid``, the Globus
 Auth identity of the user making the request, and the endpoint configuration in the
 request (e.g., ``generate_identifier_from(site_id, user_id, conf)``) |nbsp| --- |nbsp|
 this identifier is simultaneously stable and unique.  After verifying that the generated
 ID is either new, or already belongs to the user, the web service then sends a start-UEP
-request to the MEP (via
-`AMQP <https://en.wikipedia.org/wiki/Advanced_Message_Queuing_Protocol>`_), asking it to
-start an endpoint identified by the generated UEP id, and on behalf of the Globus Auth
-identity making the REST request.
+message to the MEP (via `AMQP
+<https://en.wikipedia.org/wiki/Advanced_Message_Queuing_Protocol>`_), asking it to start
+an endpoint on behalf of the Globus Auth identity making the REST request identified by
+the generated UEP id.
 
-At the other end of the AMQP queue, the MEP receives the start-UEP request, validates
+At the other end of the AMQP queue, the MEP receives the start-UEP message, validates
 the basic structure, then attempts to map the Globus Auth identity.  If the mapping is
 successful and the POSIX username exists, the MEP will proceed to ``fork()`` a new
 process.  The child process will immediately and irreversibly become the user, and then
 ``exec()`` a new ``globus-compute-endpoint`` instance.
 
-The new child process |nbsp| -- |nbsp| the UEP |nbsp| -- |nbsp| will receive AMQP
+The new child process |nbsp| --- |nbsp| the UEP |nbsp| --- |nbsp| will receive AMQP
 connection credentials from the MEP (which received them as part of the start-UEP
 request), and immediately let the web service know it is ready to receive tasks.
+
+(For those who prefer lists over prose, please see :ref:`tracing-a-task-to-mep`.)
 
 
 Security Posture
 ================
 
-The current security model of the MEP relies heavily on POSIX user support.  The only
-job of the MEP is to start UEPs for users on request from the web service.  The actual
-processing of tasks is left to the individual UEPs.  This is accomplished through the
-well-known ``fork()`` |rarr| *drop privileges* |rarr| ``exec()`` Unix workflow,
-mimicking the approach of many other services (including Globus GridFTP and the Apache
-Web server).  In this manner, all of the standard Unix administrative user controls can
-be enforced.
+The current security model of the MEP relies heavily upon Identity Mapping and POSIX
+user support.  The only job of the MEP is to start UEPs for users on request from the
+Globus Compute web service.  The actual processing of tasks is left to the individual
+UEPs.  This is accomplished through the well-known ``fork()`` |rarr| *drop privileges*
+|rarr| ``exec()`` Unix workflow, mimicking the approach of many other services
+(including Secure Shell [ssh], Globus GridFTP, and the Apache Web server).  In this
+manner, all of the standard Unix administrative user controls can be enforced.
+
+Additionally, administrators may further limit access to MEP installations via Globus
+authentication policies, which can verify that users have site-appropriate identities
+linked to their Globus account with recent authentications.
+
+
+.. _identity-mapping:
+
+Identity Mapping
+----------------
+
+"Mapping an identity" is the site-specific process of verifying that one identity is
+equivalent to another for the purposes of a given action.  In the Globus Compute case,
+this means translating a Globus Auth identity set to a local POSIX user account on the
+MEP host for each start-UEP message.  For an administrator-run MEP (i.e., running as the
+``root`` user), an identity mapping configuration is required, and is the main
+difference from a :ref:`non-root MEP <endpoints_templating_configuration>` |nbsp| ---
+|nbsp| a ``root``-owned MEP first maps the Globus Auth identity set from each start-UEP
+message to a local POSIX user (i.e., a local username), before ``fork()``-ing a new
+process, dropping privileges to that user, and starting the requested UEP.
+
+Please reference the discussion with :ref:`example-idmap-config` (below) for specifics
+and examples.
+
+
+Authentication Policies
+-----------------------
+
+While identity mapping is the primary means of access control, administrators can also
+use Globus authentication policies to narrow which identities can even send tasks to
+MEPs.  An authentication policy can enforce details such as that a user has an identity
+from a specific domain or has authenticated with the Globus Auth recently.  Refer to the
+`Authentication Policies documentation`_ for more background and specifics on what
+Globus authentication policies can do and how they fit in to a site's security posture.
 
 
 Configuration
 =============
 
-Configuration of a MEP starts with the ``--multi-user`` command line flag to the
-``configure`` subcommand:
+Creating a MEP starts with the ``--multi-user`` :ref:`command line flag
+<create-templatable-endpoint>` to the ``configure`` subcommand, which will generate the
+below five configuration files:
 
 .. code-block:: console
 
-   # globus-compute-endpoint configure debug_queue --multi-user
+   # globus-compute-endpoint configure --multi-user mep_debug
+   Created multi-user profile for endpoint named <mep_debug>
 
-   Created multi-user profile for endpoint named <debug_queue>
+       Configuration file: /root/.globus_compute/mep_debug/config.yaml
 
-       Configuration file: /.../.globus_compute/debug_queue/config.yaml
+       Example identity mapping configuration: /root/.globus_compute/mep_debug/example_identity_mapping_config.json
 
-       Example identity mapping configuration: /.../.globus_compute/debug_queue/example_identity_mapping_config.json
-
-       User endpoint configuration template: /.../.globus_compute/debug_queue/user_config_template.yaml.j2
-       User endpoint configuration schema: /.../.globus_compute/debug_queue/user_config_schema.json
-       User endpoint environment variables: /.../.globus_compute/debug_queue/user_environment.yaml
+       User endpoint configuration template: /root/.globus_compute/mep_debug/user_config_template.yaml.j2
+       User endpoint configuration schema: /root/.globus_compute/mep_debug/user_config_schema.json
+       User endpoint environment variables: /root/.globus_compute/mep_debug/user_environment.yaml
 
    Use the `start` subcommand to run it:
 
-       # globus-compute-endpoint start debug_queue
+   globus-compute-endpoint start mep_debug
 
-This command creates five configuration files, explained below.
 
 ``config.yaml``
 ---------------
@@ -210,10 +134,11 @@ This command creates five configuration files, explained below.
 The default MEP ``config.yaml`` file is:
 
 .. code-block:: yaml
+   :caption: The default multi-user ``config.yaml`` configuration
 
    amqp_port: 443
    display_name: null
-   identity_mapping_config_path: /.../.globus_compute/debug_queue/example_identity_mapping_config.json
+   identity_mapping_config_path: /root/.globus_compute/mep_debug/example_identity_mapping_config.json
    multi_user: true
 
 The ``multi_user`` flag is required, but the ``identity_mapping_config_path`` is only
@@ -222,21 +147,33 @@ root``).  ``display_name`` is optional, but if set, determines how the MEP will 
 in the `Web UI`_.  (And as the MEP does *not execute tasks*, :ref:`there is no engine
 block <cea_configuration>`.)
 
+.. _example-idmap-config:
+
 ``example_identity_mapping_config.json``
 ----------------------------------------
-The default identity mapping configuration is valid, but will not work as it references
-``/bin/false`` and ``@example.com``.  This file shows what a valid configuration might
-look like, *but will require modification to work for an actual setup.*  (And hopefully
-the filename communicates the same idea!)  In particular, note that the mapping of
-identities from Globus Auth that are passed with each "start UEP" request is a key part
-of the MEP setup and security.
 
-.. warning::
+This is a valid-syntax-but-will-never-successfully-map example identity mapping
+configuration file.  It is a JSON list of identity mapping configurations that will be
+tried in order.  By implementation within the MEP code base, the first configuration to
+return a match "wins."  In this example, the first configuration is a call out to an
+external tool, as specified by the |idmap_external|_ DATA_TYPE.  The command is a list
+of arguments, with the first element as the actual executable.  In this case, the flags
+are strictly illustrative, as ``/bin/false`` always returns with a non-zero exit code
+and so will be ignored by the |globus-identity-mapping|_ logic.  However, if the site
+requires custom or special logic to acquire the correct local username, this executable
+must accept a |idmap_input|_ JSON document via ``stdin`` and output a |idmap_output|_
+JSON document to ``stdout``.
 
-   At the Globus Compute web service, MEPs are, by default, open.  Any (Globus Auth
-   authenticated) user may submit tasks to them.  The intended and primary means of
-   access control is the identity mapping configuration.  For more information, see
-   `An Open Endpoint`_
+The second configuration in this example is an |idmap_expression|_, which means it uses
+a subset of regular expression syntax to search for a suitable POSIX username.  This
+configuration searches the ``username`` field from the passed identity set for a value
+that ends in ``@example.com``.  The library appends the ``^`` and ``$`` anchors to the
+regex before searching, so the actual regular expression used would be
+``^(.*)@example.com$``.  Finally, if a match is found, the first saved group is the
+output (i.e., ``{0}``).  If the ``username`` field contained ``mickey97@example.com``,
+then this configuration would return ``mickey97``, and the MEP would then use
+`getpwnam(3)`_ to look up ``mickey97``.  But if the username field(s) did not end with
+``@example.com``, then it would not match and the start-UEP request would fail.
 
 .. code-block:: json
    :caption: The default example identity mapping configuration; technically functional
@@ -261,29 +198,158 @@ of the MEP setup and security.
      }
    ]
 
-The file is a JSON list of identity mapping configurations that will be tried in order.
-By implementation within the MEP code base, the first configuration to return a match
-"wins."  In this example, the first configuration is a call out to an external tool,
-as specified by the ``external_identity_mapping#1.0.0`` DATA_TYPE.  The command is a
-list of arguments, with the first element as the actual executable.  In this case,
-the flags are strictly illustrative, as ``/bin/false`` always returns with a non-zero
-exit code and so will be ignored by the |globus-identity-mapping|_ logic.
+The syntax of this document is defined in the `Globus Connect Server Identity Mapping
+<https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/>`_
+documentation.  It is a JSON-list of mapping configurations, and there are two
+implemented strategies to determine a mapping:
 
-The second configuration in this example is an ``expression_identity_mapping#1.0.0``,
-which means it uses a subset of regular expression syntax to search for a suitable
-POSIX username.  This configuration searches the ``username`` field from the passed
-identity (or identities, if the user has multiple linked Globus Auth identities) for
-a value that ends in ``@example.com``.  The library appends the ``^`` and ``$`` anchors
-to the regex before searching, so the actual regular expression used would be
-``^(.*)@example.com$``.  Finally, if a match is found, the first saved group is the
-output (i.e., ``{0}``).  If the ``username`` field contained ``mickey97@example.com``,
-then this configuration would return ``mickey97``, and the MEP would then use
-`getpwnam(3)`_ to look up ``mickey97``.  But if the username field(s) did not end with
-``@example.com``, then it would not match and the start-UEP request would fail.
+* ``expression_identity_mapping#1.0.0`` |nbsp| --- |nbsp| Regular Expression based
+  mapping applies an administrator-defined regular expression against any field in the
+  input identity documents, returning ``None`` or the matched string.  (Example below.)
 
-For a much more thorough dive into the identity mapping configurations, please consult
-the `Identity Mapping documentation`_.
+* ``external_identity_mapping#1.0.0`` |nbsp| --- |nbsp| Invoke an administrator-defined
+  external process, passing the input identity documents via ``stdin``, and reading the
+  response from ``stdout``.
 
+.. note::
+
+   While developing this file, administrators may appreciate using the
+   ``globus-idm-validator`` tool.  This script is installed as part of the
+   |globus-identity-mapping|_ dependency.
+
+The MEP process watches this file for changes.  If an administrator needs to make a
+live change, simply update the content of the identity mapping file specified by the
+``config.yaml`` configuration.  The MEP server will note the change, and atomically
+apply it: if the new identity mapping configuration is invalid, the previously loaded
+configuration will remain in place.  In both cases (valid or invalid), the MEP will emit
+a message to the log.
+
+``expression_identity_mapping#1.0.0``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For example, a simple policy might require that users of a system have an email address
+at your institution or department.  The identity mapping configuration might be:
+
+.. code-block:: json
+   :caption: ``only_allow_my_institution.json``
+
+   [
+     {
+       "DATA_TYPE": "expression_identity_mapping#1.0.0",
+       "mappings": [
+         {"source": "{email}", "output": "{0}", "match": "(.*)@your_institution.com"},
+         {"source": "{email}", "output": "{0}", "match": "(.*)@cs.your_institution.com"}
+       ]
+     }
+   ]
+
+
+A Globus Auth identity (input) document might look something like:
+
+.. code-block:: json
+   :caption: An example identity set, containing two linked identities for the same
+      person.
+
+   [
+     {
+       "id": "00000000-0000-4444-8888-111111111111",
+       "email": "joe.schmoe@legal.your_institution.com",
+       "identity_provider": "abcd7238-f917-4eb2-9ace-c523fa9b1234",
+       "identity_type": "login",
+       "name": "Joe Blow",
+       "organization": null,
+       "status": "used",
+       "username": "joe@legal.your_institution.com"
+     },
+     {
+       "id": "00000000-0000-4444-8888-222222222222",
+       "email": "blow@cs.your_institution.com",
+       "identity_provider": "ef345063-bffd-41f7-b403-24f97e325678",
+       "identity_type": "login",
+       "name": "Joe Blow",
+       "organization": "Your Institution, GmbH",
+       "status": "used",
+       "username": "blow@your_institution.com"
+     }
+   ]
+
+This user has linked both identities, so both identities are in the identity set.  Per
+the configuration, the first identity will not match either regex, but the second
+(``blow@your_institution.com``) will, and the returned username would be
+``blow``.  Note that any field could be tested, but this example used ``email``.
+
+``external_identity_mapping#1.0.0``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sometimes, more complicated logic may be required (e.g., LDAP lookups), in which case
+consider the ``external_identity_mapping#1.0.0`` configuration stanza.  The
+administrator may write a script (or generally, an executable) for the required custom
+logic.  The script will be passed a ``identity_mapping_input#1.0.0`` JSON document via
+``stdin``, and must output a ``identity_mapping_output#1.0.0`` JSON document on
+``stdout``.
+
+.. code-block:: json
+   :caption: An example ``identity_mapping_input#1.0.0`` document
+
+   {
+     "DATA_TYPE": "identity_mapping_input#1.0.0",
+     "identities": [
+       {
+         "id": "00000000-0000-4444-8888-111111111111",
+         "email": "joe.schmoe@legal.your_institution.com",
+         "identity_provider": "abcd7238-f917-4eb2-9ace-c523fa9b1234",
+         "identity_type": "login",
+         "name": "Joe Blow",
+         "organization": null,
+         "status": "used",
+         "username": "joe@legal.your_institution.com"
+       },
+       {
+         "id": "00000000-0000-4444-8888-222222222222",
+         "email": "blow@cs.your_institution.com",
+         "identity_provider": "ef345063-bffd-41f7-b403-24f97e325678",
+         "identity_type": "login",
+         "name": "Joe Blow",
+         "organization": "Your Institution, GmbH",
+         "status": "used",
+         "username": "blow@your_institution.com"
+       }
+     ]
+   }
+
+The executable must identify the successfully mapped identity in the output document by
+the ``id`` field.  For example, if an LDAP lookup of ``joe@legal.your_institution.com``
+were to result in ``schmoe.joe`` for this MEP host, then the output document might read:
+
+.. code-block:: json
+   :caption: Hypothetical ``identity_mapping_output#1.0.0`` document from an external
+      script
+
+   {
+     "DATA_TYPE": "identity_mapping_output#1.0.0",
+     "result": [
+       {"id": "1234567c-cf51-4032-afb8-05986708abcd", "output": "schmoe.joe"}
+     ]
+   }
+
+
+.. note::
+
+   Reminder that the identity mapping configuration is a JSON *list*.  Multiple mappings
+   may be defined, and each will be tried in order until one maps the identity
+   successfully or no mappings are possible.
+
+For a much more thorough dive into identity mapping configurations, please consult
+the Globus Connect Server's `Identity Mapping documentation`_.
+
+.. |idmap_external| replace:: ``external_identity_mapping#1.0.0``
+.. _idmap_external: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#external_program_reference
+.. |idmap_expression| replace:: ``expression_identity_mapping#1.0.0``
+.. _idmap_expression: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#expression_reference
+.. |idmap_input| replace:: ``identity_mapping_input#1.0.0``
+.. _idmap_input: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#input_document
+.. |idmap_output| replace:: ``identity_mapping_output#1.0.0``
+.. _idmap_output: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#output_document
 
 .. _user-config-template-yaml-j2:
 
@@ -291,11 +357,11 @@ the `Identity Mapping documentation`_.
 --------------------------------
 
 This file is the template that will be interpolated with user-specific variables for
-successful start-UEP requests.  More than simple interpolation, the MEP actually treats
-this file as a `Jinja template`_, so there is a good bit of flexibility available to the
-motivated administrator.  The initial user config template implements two
-user-specifiable variables, ``endpoint_setup`` and ``worker_init``.  Both of these
-default to the empty string if not specified by the user (i.e., ``...|default()``).
+successful start-UEP requests.  More than simple interpolation, the MEP treats this file
+as a `Jinja template`_, so there is a good bit of flexibility available to the motivated
+administrator.  The initial user config template implements two user-specifiable
+variables, ``endpoint_setup`` and ``worker_init``.  Both of these default to the empty
+string if not specified by the user (i.e., ``...|default()``).
 
 .. code-block:: yaml+jinja
 
@@ -334,7 +400,7 @@ Every template also has access to the following variables:
   in situations involving Python-based configuration files.
 
 - ``user_runtime``: Contains information about the runtime that the user used when
-  submitting the task request, such as Python version. See |UserRuntime|_ for a complete
+  submitting the task request, such as Python version. See |UserRuntime| for a complete
   list of available information.
 
 These are reserved words and their values cannot be overidden by the user or admin,
@@ -351,11 +417,11 @@ and an error is thrown if a user tries to send it as a user option:
    ) as ex:
        ex.submit(some_task).result()
 
-       # the following exception is thrown:
-       # GlobusAPIError: ('POST', 'http://compute.api.globus.org/v3/endpoints/<mep_id>/submit',
-       #   'Bearer', 422, 'SEMANTICALLY_INVALID', "Request payload failed validation:
-       #   Unable to start user endpoint process for <user> [exit code: 77; (ValueError)
-       #   'parent_config' is a reserved word and cannot be passed in via user config]")
+   # the following exception is thrown:
+   # GlobusAPIError: ('POST', 'http://compute.api.globus.org/v3/endpoints/<mep_id>/submit',
+   #   'Bearer', 422, 'SEMANTICALLY_INVALID', "Request payload failed validation:
+   #   Unable to start user endpoint process for <user> [exit code: 77; (ValueError)
+   #   'parent_config' is a reserved word and cannot be passed in via user config]")
 
 ``user_config_schema.json``
 ---------------------------
@@ -376,9 +442,12 @@ variables to be strings, and then any other properties. Example:
       "additionalProperties": true
    }
 
-Configuring a JSON document schema is out of scope for this documentation, but this tool
-is available to restrict what the MEP will accept from users for interpolation.  Please
-consult the `JSON Schema documentation <https://json-schema.org/>`_ for more information.
+While configuring a JSON schema is out of scope for this documentation, one item to call
+out specifically is ``additionalProperties: true``.  If set to true, then the schema
+will allow any key not already-specified in ``properties`` |nbsp| --- |nbsp| in other
+words, any arbitrary keys and values specified by the user at task submission time,
+whether or not they are utilized in ``user_config_template.yaml.j2``.  Please consult
+the `JSON Schema documentation <https://json-schema.org/>`_ for more information.
 
 ``user_environment.yaml``
 -------------------------
@@ -398,8 +467,8 @@ That will be injected into the UEP process as an environment variable.
 Running the MEP
 ===============
 
-The MEP starts in the exact same way as the SEP |nbsp| -- |nbsp| with the ``start``
-subcommand.  Unlike the SEP, however, the MEP has no notion of the ``detach_endpoint``
+The MEP starts in the exact same way as the CEA |nbsp| --- |nbsp| with the ``start``
+subcommand.  Unlike the CEA, however, the MEP has no notion of the ``detach_endpoint``
 configuration item.  Once started, the MEP stays attached to the console, with a timer
 that updates every second:
 
@@ -409,12 +478,12 @@ that updates every second:
         >>> Multi-User Endpoint ID: [endpoint_uuid] <<<
     ----> Fri Apr 19 11:56:27 2024
 
-The timer is only displayed if the agent is connected to the terminal, and is intended
-as a hint to the administrator that the agent is alive and working, even if no start
-UEP requests are yet incoming.
+The timer is only displayed if the process is connected to the terminal, and is intended
+as a hint to the administrator that the MEP process is running, even if no start UEP
+requests are yet incoming.
 
-And that's it.  The Multi-user endpoint is running, waiting for start UEP requests to
-come in.
+And |hellip| that's it.  The Multi-user endpoint is running, waiting for start UEP requests
+to come in.  (But see :ref:`mep-as-a-service` for automatic starting.)
 
 To stop the MEP, type ``Ctrl+\`` (SIGQUIT) or ``Ctrl+C`` (SIGINT).  Alternatively, the
 process also responds to SIGTERM.
@@ -487,52 +556,53 @@ Configuring to Accept Multiple Python Versions
 ==============================================
 
 By default, Globus Compute serializes task submissions via `dill`_ with a method that
-uses Python bytecode. That's to say it does *not* serialize the source code unless
-asked to, for both technical and historical reasons. However, because the underlying
+uses Python bytecode.  That's to say it does *not* serialize the source code unless
+asked to, for both technical and historical reasons.  However, because the underlying
 representations that Python uses for bytecode are subject to change at the whim of the
 Python developers, if the Python version running the **SDK** that is used to serialize
 and submit a task is different from the Python version of the **worker** that
-deserializes and runs the task, the worker may error. Such errors are often hard to
+deserializes and runs the task, the worker may error.  Such errors are often hard to
 debug because they happen at a low level in Python.
 
 As a result, our recommendation is to keep Python versions in sync between SDK
-invocations and endpoint workers. This is limiting in workflows where admins have little
-control over their users' SDK environments, such as locally run Jupyter notebooks. This
-can sometimes be alleviated with `an alternate serialization strategy
-<https://globus-compute.readthedocs.io/en/stable/sdk.html#specifying-a-serialization-strategy>`_,
-but not all serialization strategies work in all environments, and admins can't enforce
-this automatically - users have to be educated on what strategy to use. A more robust
-workaround is to use the ``user_runtime`` config template variable to detect what Python
-version was used to submit the task.
+invocations and endpoint workers.  This is limiting in workflows where admins have
+little control over their users' SDK environments, such as locally run Jupyter
+notebooks.  This can sometimes be alleviated with :ref:`an alternate serialization
+strategy <specifying-serde-strategy>`, but not all serialization strategies work in all
+environments, and admins can't enforce this automatically |nbsp| --- |nbsp| users have
+to be educated on what strategy to use.  A more robust workaround is to use the
+``user_runtime`` config template variable to detect what Python version was used to
+submit the task.
 
-Say an admin wants to accept the three most recent Python versions (3.10-3.12). Using
+Say an admin wants to accept the three most recent Python versions (3.10-3.12).  Using
 `conda`_, they can create an environment for each Python version they want to support,
 and launch the UEP's workers with the correct environment depending on the user's Python
-version. A config template for that might look like:
+version.  A config template for that might look like:
 
 .. code-block:: yaml+jinja
 
    endpoint_setup: {{ endpoint_setup|default() }}
    engine:
-      type: GlobusComputeEngine
-      provider:
-         type: LocalProvider
-      {% if '3.12' in user_runtime.python_version %}
-         worker_init: conda activate py312
-      {% elif '3.11' in user_runtime.python_version %}
-         worker_init: conda activate py311
-      {% elif '3.10' in user_runtime.python_version %}
-         worker_init: conda activate py310
-      {% else %}
-         worker_init: conda activate py310  # as a back up
-      {% endif %}
+     type: GlobusComputeEngine
+     provider:
+        type: LocalProvider
+     {% if '3.12' in user_runtime.python_version %}
+        worker_init: conda activate py312
+     {% elif '3.11' in user_runtime.python_version %}
+        worker_init: conda activate py311
+     {% elif '3.10' in user_runtime.python_version %}
+        worker_init: conda activate py310
+     {% else %}
+        worker_init: conda activate py310  # as a back up
+     {% endif %}
 
 This of course requires that there are conda environments named ``py312``, ``py311``,
 and ``py310`` with the appropriate Python versions and ``globus-compute-endpoint``
 installed.
 
 For more information on what an MEP knows about the user's runtime environment, see
-|UserRuntime|_.
+|UserRuntime|.
+
 
 Debugging User Endpoints
 ========================
@@ -578,12 +648,15 @@ the configuration from the logs:
 
    $ sed -n "/Begin Compute/,/End Compute/p" ~/.globus_compute/uep.[...]/endpoint.log | less
 
+.. _mep-as-a-service:
+
 Installing the MEP as a Service
 ===============================
 
-Installing the MEP as a service is the same :ref:`procedure as with a SEP
+Installing the MEP as a service is the same :ref:`procedure as with a CEA
 <enable_on_boot>`: use the ``enable-on-boot`` command.  This will dynamically create a
 systemd unit file and also install it.
+
 
 Authentication Policies
 =======================
@@ -600,35 +673,39 @@ field and other useful information.
   The ``high_assurance`` and ``authentication_assurance_timeout`` policies are only supported on
   MEPs with HA subscriptions.
 
+
 Create a New Authentication Policy
 ----------------------------------
 
-Administrators can create new authentication policies via the `Globus Auth API <https://docs.globus.org/api/auth/reference/#create_policy>`_,
-or via the following ``configure`` subcommand options:
+Administrators can create new authentication policies via the `Globus Auth API
+<https://docs.globus.org/api/auth/reference/#create_policy>`_, or via the following
+``configure`` subcommand options:
 
 .. note::
   The resulting policy will be automatically applied to the MEP's ``config.yaml``.
 
 ``--auth-policy-project-id``
-  The id of a Globus Auth project that this policy will belong to. If not provided, the user will
-  be prompted to create one.
+  The id of a Globus Auth project that this policy will belong to. If not provided,
+  the user will be prompted to create one.
 
 ``--auth-policy-display-name``
   A user friendly name for the policy.
 
 ``--allowed-domains``
-  A comma separated list of domains that can satisfy the policy. These may include wildcards.
-  E.g. ``*.edu, globus.org``. See ``domain_constraints_include`` in the `Authentication Policies documentation`_
-  for more details.
+  A comma separated list of domains that can satisfy the policy. These may include
+  wildcards.  For example, ``*.edu, globus.org``.  For more details, see
+  ``domain_constraints_include`` in the `Authentication Policies documentation`_.
 
 ``--excluded-domains``
-  A comma separated list of domains that can *not* satisfy the policy. These may include wildcards.
-  E.g. ``*.edu, globus.org``. See ``domain_constraints_exclude`` in the `Authentication Policies documentation`_
-  for more details.
+  A comma separated list of domains that will fail the policy.  These may include
+  wildcards.  For example, ``*.edu, globus.org``.  For more details, see
+  ``domain_constraints_exclude`` in the `Authentication Policies documentation`_.
 
 ``--auth-timeout``
-  The maximum amount of time in seconds that a previous authentication must have occurred to satisfy
-  the policy. Setting this will also set ``high_assurance`` to ``true``.
+  The maximum amount of time in seconds that a previous authentication must have
+  occurred to satisfy the policy.  Setting this will also set ``high_assurance`` to
+  ``true``.
+
 
 Apply an Existing Authentication Policy
 ---------------------------------------
@@ -640,8 +717,8 @@ Administrators can apply an authentication policy directly in the MEP's ``config
    multi_user: true
    authentication_policy: 2340174a-1a0e-46d8-a958-7c3ddf2c834a
 
-... or via the ``--auth-policy`` option with the ``configure`` subcommand, which will make the necessary
-changes to ``config.yaml``:
+... or via the ``--auth-policy`` option with the ``configure`` subcommand, which will
+make the necessary changes to ``config.yaml``:
 
 .. code-block:: bash
 
@@ -699,22 +776,24 @@ the larger point is that the identity mapping configuration *is really important
 right.
 
 
+.. _tracing-a-task-to-mep:
+
 Tracing a Task to a MEP
 =======================
 
-A MEP might be thought of as a :abbr:`SEP ([single-user] Compute Endpoint)` manager.  In
-a typical non-MEP paradigm, a normal user would log in (e.g., via SSH) to a compute
-resource (e.g., a cluster's login-node), create a Python virtual environment (e.g.,
-`virtualenv`_, `pipx`_, `conda`_), and then install and run ``globus-compute-endpoint``
-from their user-space.  By contrast, a MEP is a root-installed and root-run process that
-manages child processes for regular users.  Upon receiving a "start endpoint" request
-from the Globus Compute AMQP service, a MEP creates a user-process via the ``fork()``
-|rarr| *drop privileges* |rarr| ``exec()`` pattern, and then watches that child process
-until it stops.  At no point does the MEP ever attempt to execute tasks, nor does the
-MEP even see tasks |nbsp| --- |nbsp| those are handled the same as they have been
-to-date, by the SEPs.  To disambiguate, we call a MEP-started SEP a user endpoint or
-UEP.  The lifecycle of a UEP is managed by a MEP, while a human manages the SEP
-lifecycle.
+A MEP might be thought of as a :abbr:`CEA ([single-user] Compute Endpoint agent)`
+manager.  In a typical non-MEP paradigm, a normal user would log in (e.g., via SSH) to a
+compute resource (e.g., a cluster's login-node), create a Python virtual environment
+(e.g., `virtualenv`_, `pipx`_, `conda`_), and then install and run
+``globus-compute-endpoint`` from their user-space.  By contrast, a MEP is a
+``root``-installed and ``root``-run process that manages child processes for regular
+users.  Upon receiving a "start endpoint" message from the Globus Compute AMQP service,
+a MEP creates a user-process via the ``fork()`` |rarr| *drop privileges* |rarr|
+``exec()`` pattern, and then watches that child process until it stops.  At no point
+does the MEP ever attempt to execute tasks, nor does the MEP even see tasks |nbsp| ---
+|nbsp| those are handled the same as they have been to-date, by the CEAs.  To
+disambiguate, we call a MEP-started CEA a user endpoint or UEP.  The lifecycle of a UEP
+is managed by a MEP, while a human manages the CEA lifecycle.
 
 The workflow for a task sent to a MEP roughly follows these steps:
 
@@ -733,25 +812,26 @@ The workflow for a task sent to a MEP roughly follows these steps:
 
       mep_site_id = "..."  # as acquired from step 1
       with Executor() as ex:
-          endpoint_id = mep_site_id
+          ex.endpoint_id = mep_site_id
           fut = ex.submit(some_task)
           print("Result:", fut.result())  # Reminder: blocks until result received
 
 #. After the ``ex.submit()`` call, the SDK POSTs a REST request to the Globus Compute
    web service.
 
-#. The web-service identifies the endpoint in the request as belonging to a MEP.
+#. The Compute web-service identifies the endpoint in the request as belonging to a MEP.
 
-#. The web-service generates a UEP id specific to the tuple of the ``mep_site_id``, the
-   id of the user making the request, and the endpoint configuration in the request
-   (e.g., ``tuple(site_id, user_id, conf)``) |nbsp| --- |nbsp| this identifier is
-   simultaneously stable and unique.
+#. The Compute web-service generates a UEP id specific to the tuple of the
+   ``mep_site_id``, the id of the user making the request, and the endpoint
+   configuration in the request (e.g., ``tuple(site_id, user_id, conf)``) |nbsp| ---
+   |nbsp| this identifier is simultaneously stable and unique.
 
-#. The web-service sends a start-UEP-request to the MEP (via AMQP), asking it to start
-   an endpoint identified by the id generated in the previous step, and as the user
-   identified by the REST request.
+#. The Compute web-service sends a start-UEP message to the MEP (via AMQP), asking it to
+   start an endpoint as the user that initiated the REST request and identified by the
+   id generated in the previous step.
 
-#. The MEP maps the Globus Auth identity in the start-UEP-request to a local username.
+#. The MEP maps the Globus Auth identity in the start-UEP-request to a local (POSIX)
+   username.
 
 #. The MEP ascertains the host-specific UID based on a `getpwnam(3)`_ call with the
    local username from the previous step.
@@ -768,22 +848,35 @@ work in theory?" point of view, but will be of little utility to most users.  Th
 of interest to most end users is the on-the-fly custom configuration.  If the
 administrator has provided any hook-in points in ``user_config_template.yaml.j2`` (e.g., an
 account id), then a user may specify that via the ``user_endpoint_config`` argument to
-the Executor constructor:
+the Executor constructor or for later submissions:
 
 .. code-block:: python
+   :caption: Utilizing the ``.user_endpoint_config`` via both a constructor call, and
+      an ad-hoc change
+   :emphasize-lines: 9, 13
 
    from globus_compute_sdk import Executor
 
-   def some_task(*a, **k):
-       return 1
+   def jittery_multiply(a, b):
+       return a * b + (1 - random.random()) * (1 + abs(a - b))
 
    mep_site_id = "..."  # as acquired from step 1
    with Executor(
        endpoint_id=mep_site_id,
        user_endpoint_config={"account_id": "user_allocation_account_id"},
    ) as ex:
-       fut = ex.submit(some_task)
-       print("Result:", fut.result())  # Reminder: blocks until result received
+       futs = [ex.submit(jittery_multiply, 2, 7)]
+
+       ex.user_endpoint_config["account_id"] = "different_allocation_id"
+       futs = [ex.submit(jittery_multiply, 13, 11)]
+
+       # Reminder: .result() blocks until result received
+       results = list[f.result() for f in futs]
+       print("Result:", results)
+
+N.B. this is example code highlighting the ``user_endpoint_config`` attribute of the
+``Executor`` class; please generally consult the :doc:`../executor` documentation.
+
 
 Key Benefits
 ============
@@ -803,13 +896,14 @@ scripts locally on their own workstation, and the rest "just works."
 Another boon for administrators is the ability to fine-tune and pre-configure what
 resources UEPs may utilize.  For example, many users struggle to discover which
 interface is routed to a cluster's internal network; the administrator can preset that,
-completely bypassing the question.  Using ALCF's Polaris as an example, the
-administrator could use the following user configuration template
-(``user_config_template.yaml.j2``) to place all jobs sent to this MEP on the
-``debug-scaling`` queue, and pre-select the obvious defaults (`per the
-documentation <https://docs.alcf.anl.gov/polaris/running-jobs/>`_):
+completely bypassing the question.  Using `ALCF's Polaris
+<https://www.alcf.anl.gov/polaris>`_ as an example, the administrator could use the
+following user configuration template (``user_config_template.yaml.j2``) to place all
+jobs sent to this MEP on the ``debug-scaling`` queue, and pre-select the obvious
+defaults (`per the documentation <https://docs.alcf.anl.gov/polaris/running-jobs/>`_):
 
 .. code-block:: yaml+jinja
+   :caption: ``/root/.globus_compute/mep_debug_scaling/user_config_template.yaml.j2``
 
    display_name: Polaris at ALCF - debug-scaling queue
    engine:
@@ -938,7 +1032,7 @@ Administrator Quickstart
    to the `Globus Connect Server Identity Mapping Guide`_ for help updating this file.
 
 #. Modify ``user_config_template.yaml.j2`` as appropriate for the resources to make
-   available.  This file will be interpreted as a Jinja template and will be rendered
+   available.  This file will be interpreted as a `Jinja template`_ and will be rendered
    with user-provided variables to generate the final UEP configuration.  The default
    configuration (as created in step 4) has a basic working configuration, but uses the
    ``LocalProvider``.
@@ -947,9 +1041,10 @@ Administrator Quickstart
    starting point.
 
 #. Optionally modify ``user_config_schema.json``; the file, if it exists, defines the
-   `JSON schema`_ against which user-provided variables are validated.  (N.B.: if a
-   variable is not specified in the schema but exists in the template, then it is
-   treated as valid.)
+   `JSON schema`_ against which user-provided variables are validated.  Writing JSON
+   schemas is out of scope for this documentation, but we do specifically recognize
+   ``additionalProperties: true`` which makes the default schema very permissive: any
+   key not specifically specified in the schema *is treated as valid*.
 
 #. Modify ``user_environment.yaml`` for any environment variables that should be
    injected into the user endpoint process space:
@@ -1008,10 +1103,12 @@ Administrator Quickstart
 .. |rarr| unicode:: 0x2192
    :trim:
 
+.. |hellip| unicode:: 0x2026
+
 .. _`same Linux distributions as does Globus Connect Server`: https://docs.globus.org/globus-connect-server/v5/#supported_linux_distributions
 
-.. |POSTed to the /v3/endpoints/<endpoint_uuid>/submit| replace:: POSTed to the ``/v3/endpoints/<endpoint_uuid>/submit``
-.. _POSTed to the /v3/endpoints/<endpoint_uuid>/submit: https://compute.api.globus.org/redoc#tag/Endpoints/operation/submit_batch_v3_endpoints__endpoint_uuid__submit_post
+.. |POSTed to the /v3/endpoints/<mep_uuid>/submit| replace:: POSTed to the ``/v3/endpoints/<mep_uuid>/submit``
+.. _POSTed to the /v3/endpoints/<mep_uuid>/submit: https://compute.api.globus.org/redoc#tag/Endpoints/operation/submit_batch_v3_endpoints__endpoint_uuid__submit_post
 
 .. _Web UI: https://app.globus.org/compute
 .. _Identity Mapping documentation: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/
@@ -1022,16 +1119,10 @@ Administrator Quickstart
 .. _Jinja template: https://jinja.palletsprojects.com/en/3.1.x/
 .. _Globus Connect Server Identity Mapping Guide: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#mapping_recipes
 .. _#help on the Globus Compute Slack: https://funcx.slack.com/archives/C017637NZFA
-.. |UserRuntime| replace:: ``UserRuntime``
-.. _UserRuntime: https://globus-compute.readthedocs.io/en/latest/reference/client.html#globus_compute_sdk.sdk.batch.UserRuntime
-.. _the documentation for a number of known working examples: https://globus-compute.readthedocs.io/en/latest/endpoints.html#example-configurations
+.. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
 .. _JSON schema: https://json-schema.org/
-.. _automatically start the multi-user endpoint when the host boots: https://globus-compute.readthedocs.io/en/latest/endpoints.html#restarting-endpoint-when-machine-restarts
 
 .. _virtualenv: https://pypi.org/project/virtualenv/
 .. _pipx: https://pypa.github.io/pipx/
 .. _conda: https://docs.conda.io/en/latest/
 .. _dill: https://pypi.org/project/dill/
-
-.. |Install the globus-compute-endpoint package| replace:: Install the ``globus-compute-endpoint`` package
-.. _Install the globus-compute-endpoint package:

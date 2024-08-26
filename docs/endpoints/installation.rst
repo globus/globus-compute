@@ -1,0 +1,123 @@
+Installing the Compute Endpoint
+*******************************
+
+The Globus Compute Endpoint is offered both as a PyPI package, and as pre-built DEB and
+RPM packages.
+
+Operating System Support
+========================
+
+Currently, the Globus Compute Endpoint is only supported on Linux.  While some have
+reported success running Compute endpoints on macOS, we do not currently support
+it.  If running on a non-Linux host OS is necessary, consider doing so in a container
+running Linux.
+
+.. note::
+
+   Though the Compute Endpoint is only supported on Linux, the
+   :doc:`Globus Compute SDK <../sdk>` *is* supported on other operating systems.
+
+.. _pypi-based-installation:
+
+Installing Directly via PyPI
+============================
+
+If the site administrator has not already installed the Globus Compute Endpoint
+software, users typically install it from `PyPI
+<https://pypi.org/project/globus-compute-endpoint/>`_.  We **strongly** recommend
+installing the Globus Compute endpoint into an isolated virtual environment (e.g.,
+`venv <https://docs.python.org/3/library/venv.html>`_, `virtualenv
+<https://pypi.org/project/virtualenv/>`_.  We
+recommend use of |pipx for library isolation|_:
+
+.. code-block:: console
+
+   $ python3 -m pipx install globus-compute-endpoint
+
+
+.. _repo-based-installation:
+
+Repository-Based Installation
+=============================
+
+The ``globus-compute-endpoint`` project is available on PyPI, and is also available in
+Globus' repositories as native DEB and RPM packages.  The repository package is
+``globus-compute-agent``.
+
+.. _compute-endpoint-pre-requisites:
+
+Prerequisites
+-------------
+
+#. Supported Linux Distributions
+
+   Where feasible, Globus Compute supports the `same Linux distributions as does Globus
+   Connect Server`_.
+
+#. Administrator Privileges
+
+   Per usual semantics, installing the DEB or RPM packages will require administrative
+   access on the target host.
+
+#. TCP Ports
+
+   * Port 443, outbound to ``compute.api.globus.org``
+   * Port 443, outbound to ``compute.amqps.globus.org``
+
+   .. note::
+       We do not offer a range of specific IP addresses for firewall blocking rules.
+
+What is Installed
+-----------------
+
+The package manager packages rely on Globus' supplied Python.  As of this writing, that
+is Python3.9, and is installed to ``/opt/globus-python/``.  This version of Python is
+not critical to the Globus Compute Endpoint software in general, but it is the version
+of Python against which the DEB and RPM packages were built.
+
+The Globus Compute Endpoint software will be installed in
+``/opt/globus-compute-agent/`` and a shell-script wrapper will be installed to
+``/usr/sbin/globus-compute-endpoint``
+
+RPM Installation
+----------------
+
+.. code-block::
+
+   # install Globus' public key
+   dnf install https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
+
+   # install the Globus Compute Agent package
+   dnf install globus-compute-agent
+
+DEB Installation
+----------------
+
+.. code-block::
+
+   # install Globus' public key
+   curl -LOs https://downloads.globus.org/globus-connect-server/stable/installers/repo/deb/globus-repo_latest_all.deb
+   dpkg -i globus-repo_latest_all.deb
+   apt-key add /usr/share/globus-repo/RPM-GPG-KEY-Globus
+
+   # install the Globus Compute Agent package
+   apt update
+   apt install globus-compute-agent
+
+SUSE Installation
+-----------------
+
+.. code-block::
+
+   # install Globus' public key
+   rpm --import https://downloads.globus.org/globus-connect-server/stable/installers/keys/GPG-KEY-Globus
+   zypper install https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
+
+   # install the Globus Compute Agent package
+   zypper install globus-compute-agent
+
+
+.. |pipx for library isolation| replace:: ``pipx`` for library isolation
+.. _pipx for library isolation: https://pipx.pypa.io/stable/
+.. _`same Linux distributions as does Globus Connect Server`: https://docs.globus.org/globus-connect-server/v5/#supported_linux_distributions
+
