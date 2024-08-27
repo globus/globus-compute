@@ -46,8 +46,14 @@ def mock_general_reports(mocker, mock_gc_home):
         [
             "whoami",
             "uname -a",
-            cat(f"{home_dir}/*/*.yaml", wildcard=True, max_bytes=1024),
-            cat(f"{home_dir}/*/*.log", wildcard=True, max_bytes=1024),
+            cat(
+                [
+                    f"{home_dir}/*/*.yaml",
+                    f"{home_dir}/*/*.log",
+                ],
+                wildcard=True,
+                max_bytes=1024
+            ),
             # test_conn(get_web_service_url()),
         ],
         [
@@ -76,7 +82,7 @@ def test_cat_handles_non_binary_files_gracefully(fs):
     bfile.parent.mkdir(parents=True)
     bfile.write_text(str(os.urandom(64)))
     with contextlib.redirect_stdout(io.StringIO()) as f:
-        cat(str(bfile))()
+        cat([str(bfile)])()
     assert len(f.getvalue()) > 64
 
 
@@ -85,7 +91,7 @@ def test_cat_handles_binary_files_gracefully(fs):
     bfile.parent.mkdir(parents=True)
     bfile.write_bytes(os.urandom(64))
     with contextlib.redirect_stdout(io.StringIO()) as f:
-        cat(str(bfile))()
+        cat([str(bfile)])()
     assert len(f.getvalue()) > 64
 
 
@@ -93,7 +99,7 @@ def test_cat_handles_missing_file_gracefully(fs):
     bfile = pathlib.Path("/some/file")
     bfile.parent.mkdir(parents=True)
     with contextlib.redirect_stdout(io.StringIO()) as f:
-        cat(str(bfile))()
+        cat([str(bfile)])()
     expected_header = f"cat {bfile}"
     expected_header_hline = "=" * len(str(bfile))
     expected_footer_hline = "-" * len(str(bfile))
@@ -122,9 +128,9 @@ def test_cat_honors_max_bytes(fs, max_bytes):
 
     with contextlib.redirect_stdout(io.StringIO()) as f:
         if max_bytes is None:
-            cat(str(bfile))()
+            cat([str(bfile)])()
         else:
-            cat(str(bfile), max_bytes=max_bytes)()
+            cat([str(bfile)], max_bytes=max_bytes)()
     payload = "\n".join(f.getvalue().splitlines()[2:-2])  # remove header and footer
     payload = payload[3:]  # remove line header
 
@@ -154,7 +160,7 @@ def test_cat_wildcard_finds_files_recursively(fs, path, randomstring):
     full_path.write_text(contents)
 
     with contextlib.redirect_stdout(io.StringIO()) as f:
-        cat("/some_ep_dir/**/*.log", wildcard=True)()
+        cat(["/some_ep_dir/**/*.log"], wildcard=True)()
 
     payload = str(f.getvalue())
     assert path in payload

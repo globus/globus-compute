@@ -23,6 +23,9 @@ from globus_compute_sdk.sdk._environments import (
     get_amqp_service_host,
     get_web_service_url,
 )
+from globus_compute_sdk import Client, Executor
+from globus_compute_sdk.serialize.concretes import DillCodeTextInspect
+from globus_compute_sdk.sdk.utils.sample_function import sdk_tutorial_sample_function
 from globus_compute_sdk.sdk.hardware_report import hardware_commands_list
 from globus_compute_sdk.sdk.utils import display_name
 from globus_compute_sdk.sdk.utils.tutorial_endpoint import TutorialEndpointTester
@@ -32,16 +35,23 @@ OUTPUT_FILENAME = "globus_compute_diagnostic_{}.txt"
 CUR_CMD_OUTPUT_FILENAME = "globus_compute_diagnostic_current_test.txt"
 
 
-def cat(path: str, wildcard: bool = False, max_bytes: int = 0):
+def cat(
+    paths: list[str], wildcard: bool = False, max_bytes: int = 0, sort_dir: bool = True
+):
     max_bytes = max(0, max_bytes)
 
-    full_path = os.path.expanduser(path)
+    all_paths = [os.path.expanduser(path) for path in paths]
     if wildcard:
-        files = glob.glob(full_path, recursive=True)
+        files = []
+        for full_path in all_paths:
+            files.extend(glob.glob(full_path, recursive=True))
     else:
-        files = [full_path]
+        files = all_paths
 
-    @display_name(f"cat({path})")
+    if sort_dir:
+        files.sort()
+
+    @display_name(f"cat({paths})")
     def kernel() -> None:
         for filename in files:
             cat_cmd = "cat " + filename
@@ -380,12 +390,14 @@ def run_all_commands_wrapper(
     #     ep_uuid = TUTORIAL_EP_UUID
 
     if ep_uuid:
-        ep_tester = TutorialEndpointTester(ep_uuid)
         ep_test_title = "Run sample function on Tutorial Endpoint via Executor"
         print_highlight(f"== Diagnostic: {ep_test_title} ==")
         with open(CUR_CMD_OUTPUT_FILENAME, "w") as f:
             with contextlib.redirect_stdout(f):
-                ep_tester.run_new_func_with_executor()
+                gcc = Client(code_serialization_strategy=DillCodeTextInspect())
+                with Executor(client=gcc, endpoint_id=ep_uuid) as gce:
+                    fut = gce.submit(sdk_tutorial_sample_function)
+                    print(f"\nHello World echoing time result:\n  {fut.result()}")
 
         append_diagnostic_result(ep_test_title, log_filename, console=print_to_console)
 
@@ -417,12 +429,12 @@ def do_diagnostic_base(diagnostic_args):
         ),
     )
     parser.add_argument(
-        "-kb",
+        "-k",
         "--log-kb",
         metavar="number",
         action="store",
         # default=5120,
-        default=10,   # TODO remove this and use the 5120 before merge
+        default=1,   # TODO remove this and use the 5120 before merge
         type=int,
         help=(
             "Specify the number of kilobytes (KB) to read from log files."
@@ -430,7 +442,7 @@ def do_diagnostic_base(diagnostic_args):
         ),
     )
     parser.add_argument(
-        "-ep",
+        "-e",
         "--endpoint-uuid",
         default=None,
         type=str,
