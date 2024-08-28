@@ -802,15 +802,16 @@ def test_emits_endpoint_id_if_isatty(mocker, epmanager_as_root):
 
 
 def test_as_root_and_no_identity_mapper_configuration_fails(
-    mocker, mock_client, conf_dir
+    mocker, mock_client, conf_dir, mock_conf
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
 
     ep_uuid, _ = mock_client
+    mock_conf.identity_mapping_config_path = None
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, Config())
+        EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert pyt_exc.value.code == os.EX_OSFILE
     assert mock_log.error.called
@@ -902,7 +903,9 @@ def test_clean_exit_on_identity_collection_error(
 
 
 @pytest.mark.no_mock_pim
-def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf_dir):
+def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
+    mocker, conf_dir, mock_conf
+):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
@@ -914,9 +917,9 @@ def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf
     }
     conf_p = conf_dir / "idmap.json"
     conf_p.touch(mode=0o000)
-    conf = Config(identity_mapping_config_path=conf_p)
+    mock_conf.identity_mapping_config_path = conf_p
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, conf, reg_info)
+        EndpointManager(conf_dir, ep_uuid, mock_conf, reg_info)
 
     assert pyt_exc.value.code == os.EX_NOPERM
     assert mock_log.error.called
@@ -927,7 +930,7 @@ def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf
     conf_p.chmod(mode=0o644)
     conf_p.write_text("[{asfg")
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, conf, reg_info)
+        EndpointManager(conf_dir, ep_uuid, mock_conf, reg_info)
 
     assert pyt_exc.value.code == os.EX_CONFIG
     assert mock_log.error.called
