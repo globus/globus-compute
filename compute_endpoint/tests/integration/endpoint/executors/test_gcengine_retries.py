@@ -14,7 +14,7 @@ def gc_engine_with_retries(tmp_path):
     ep_id = uuid.uuid4()
     engine = GlobusComputeEngine(
         address="127.0.0.1",
-        max_workers=1,
+        max_workers_per_node=1,
         heartbeat_period=1,
         heartbeat_threshold=1,
         max_retries_on_system_failure=0,
