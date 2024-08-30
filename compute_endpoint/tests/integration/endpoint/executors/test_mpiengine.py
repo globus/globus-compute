@@ -14,7 +14,7 @@ from parsl.executors.high_throughput.mpi_prefix_composer import (
 from tests.utils import ez_pack_function, get_env_vars
 
 
-def test_mpi_function(engine_runner, nodeslist, tmp_path):
+def test_mpi_function(engine_runner, nodeslist):
     """Test for the right cmd being generated"""
     engine = engine_runner(GlobusMPIEngine)
     task_id = uuid.uuid1()

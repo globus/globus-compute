@@ -3,6 +3,7 @@ import queue
 import random
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
@@ -42,13 +43,15 @@ def mock_gce(tmp_path):
 
     executor.launch_cmd = ""
     scripts_dir = str(tmp_path / "submit_scripts")
-    engine = GlobusComputeEngine(
-        executor=executor,
-        working_dir=scripts_dir,
-        provider=LocalProvider(min_blocks=0, max_blocks=0, init_blocks=0),
-    )
-    engine.results_passthrough = queue.Queue()
-    yield engine
+    with mock.patch.object(GlobusComputeEngine, "_ExecutorClass", MockHTEX) as mock_Ex:
+        mock_Ex.__name__ = MockHTEX.__name__
+        engine = GlobusComputeEngine(
+            executor=executor,
+            working_dir=scripts_dir,
+            provider=LocalProvider(min_blocks=0, max_blocks=0, init_blocks=0),
+        )
+        engine.results_passthrough = queue.Queue()
+        yield engine
 
 
 def test_success_after_1_fail(mock_gce, tmp_path):
