@@ -36,10 +36,12 @@ class JobStatusPollerKwargs(t.TypedDict, total=False):
 class GlobusComputeEngine(GlobusComputeEngineBase):
     """GlobusComputeEngine is a wrapper over Parsl's HighThroughputExecutor"""
 
+    _ExecutorClass: t.Type[HighThroughputExecutor] = HighThroughputExecutor
+
     def __init__(
         self,
         *args,
-        label: str = "GlobusComputeEngine",
+        label: str | None = None,
         max_retries_on_system_failure: int = 0,
         executor: t.Optional[HighThroughputExecutor] = None,
         container_type: t.Literal[VALID_CONTAINER_TYPES] = None,  # type: ignore
@@ -65,9 +67,9 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         Parameters
         ----------
 
-        label: str
+        label: str | None
            Label used to name engine log directories and batch jobs
-           default: "GlobusComputeEngine"
+           default: None (in which case, "GlobusComputeEngine" will be set)
 
         max_retries_on_system_failure: int
            Set the number of retries for functions that fail due to
@@ -101,14 +103,17 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         """  # noqa: E501
 
-        if kwargs.get("enable_mpi_mode") or kwargs.get("mpi_launcher"):
-            raise ValueError(
-                "MPI mode is not supported on GlobusComputeEngine."
-                " Use GlobusMPIEngine instead."
-            )
+        if self._ExecutorClass is HighThroughputExecutor:
+            # temporary measure to help users upgrade
+            if kwargs.get("enable_mpi_mode") or kwargs.get("mpi_launcher"):
+                raise ValueError(
+                    "MPI mode is not supported on GlobusComputeEngine."
+                    " Use GlobusMPIEngine instead."
+                )
 
+        ex_name = self._ExecutorClass.__name__
         self.run_dir = os.getcwd()
-        self.label = label
+        self.label = label or type(self).__name__
         self._status_report_thread = ReportingThread(target=self.report_status, args=[])
         super().__init__(
             *args, max_retries_on_system_failure=max_retries_on_system_failure, **kwargs
@@ -123,12 +128,20 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.container_cmd_options = container_cmd_options
 
         if executor is None:
-            executor = HighThroughputExecutor(  # type: ignore
+            executor = self._ExecutorClass(
                 *args,
-                label=label,
-                encrypted=encrypted,
-                **kwargs,
+                **{
+                    **kwargs,
+                    "label": f"{self.label}-{ex_name}",
+                    "encrypted": encrypted,
+                },
             )
+        elif not isinstance(executor, self._ExecutorClass):
+            # Mypy: nominally unreachable, but humans can typo before they get it
+            # right; help the hapless typist out with a pointed error message
+            found = type(executor).__name__  # type: ignore[unreachable]
+            raise TypeError(f"`executor` must of type {ex_name} (received: {found})")
+
         self.executor = executor
         self.executor.interchange_launch_cmd = self._get_compute_ix_launch_cmd()
         self.executor.launch_cmd = self._get_compute_launch_cmd()

@@ -16,6 +16,7 @@ from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.engines import (
     GlobusComputeEngine,
+    GlobusMPIEngine,
     HighThroughputEngine,
     ProcessPoolEngine,
     ThreadPoolEngine,
@@ -205,17 +206,7 @@ def test_gcengine_compute_interchange_launch_cmd():
     assert "interchange.py" not in engine.executor.interchange_launch_cmd
 
 
-def test_gcengine_pass_through_to_executor(mocker: MockFixture):
-    mock_executor = mocker.patch(
-        "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
-    )
-    mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="foo-bar"
-    )
-    mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_ix_launch_cmd", return_value="foo-bar"
-    )
-
+def test_gcengine_pass_through_to_executor(randomstring):
     args = ("arg1", 2)
     kwargs = {
         "label": "VroomEngine",
@@ -224,36 +215,39 @@ def test_gcengine_pass_through_to_executor(mocker: MockFixture):
         "max_workers": 1,
         "foo": "bar",
     }
-    GlobusComputeEngine(*args, **kwargs)
 
-    a, k = mock_executor.call_args
+    m = mock.Mock(launch_cmd="")
+    with mock.patch.object(GlobusComputeEngine, "_ExecutorClass") as mock_ex:
+        mock_ex.__name__ = randomstring()
+        mock_ex.return_value = m
+        GlobusComputeEngine(*args, **kwargs)
+        kwargs["label"] = f"{kwargs['label']}-{mock_ex.__name__}"
+    a, k = mock_ex.call_args
     assert a == args
     assert kwargs == k
 
 
-def test_gcengine_start_pass_through_to_executor(
-    mocker: MockFixture, tmp_path: pathlib.Path
-):
-    mock_executor = mocker.patch(
-        "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
+def test_gcengine_start_pass_through_to_executor(tmp_path: pathlib.Path):
+    mock_ex = mock.Mock(
+        status_polling_interval=5,
+        launch_cmd="foo-bar",
+        interchange_launch_cmd="foo-bar",
     )
-    mock_executor.provider = mock.MagicMock()
-    mock_executor.status_polling_interval = 5
-    mock_executor.launch_cmd = "foo-bar"
-    mock_executor.interchange_launch_cmd = "foo-bar"
 
     run_dir = tmp_path
     scripts_dir = str(tmp_path / "submit_scripts")
-    engine = GlobusComputeEngine(executor=mock_executor)
 
-    assert mock_executor.run_dir != run_dir
-    assert mock_executor.provider.script_dir != scripts_dir
+    with mock.patch.object(GlobusComputeEngine, "_ExecutorClass", mock.Mock):
+        engine = GlobusComputeEngine(executor=mock_ex)
+
+    assert mock_ex.run_dir != run_dir
+    assert mock_ex.provider.script_dir != scripts_dir
 
     engine.start(endpoint_id=uuid.uuid4(), run_dir=run_dir, results_passthrough=Queue())
     engine.shutdown()
 
-    assert mock_executor.run_dir == run_dir
-    assert mock_executor.provider.script_dir == scripts_dir
+    assert mock_ex.run_dir == run_dir
+    assert mock_ex.provider.script_dir == scripts_dir
 
 
 def test_gcengine_start_provider_without_channel(
@@ -361,3 +355,31 @@ def test_gcengine_rejects_resource_specification(task_uuid):
         ).result()
 
     assert "is not supported" in str(pyt_exc)
+
+
+def test_gcmpiengine_default_executor(randomstring):
+    with mock.patch.object(GlobusMPIEngine, "_ExecutorClass") as mock_ex:
+        mock_ex.__name__ = randomstring()
+        mock_ex.return_value = mock.Mock(launch_cmd="")
+        engine = GlobusMPIEngine()
+
+    assert mock_ex.called, "Expect Parsl's MPIExecutor as default option"
+
+    exp_en_label = GlobusMPIEngine.__name__
+    exp_ex_label = f"{exp_en_label}-{mock_ex.__name__}"
+    assert engine.label == exp_en_label, "Expect reasonable, explanatory default"
+    a, k = mock_ex.call_args
+    assert k["label"] == exp_ex_label, "Expect distinct executor label"
+    assert k["encrypted"] is True, "Expect encrypted by default"
+
+
+def test_gcmpiengine_accepts_resource_specification(task_uuid):
+    with mock.patch.object(GlobusMPIEngine, "_ExecutorClass") as mock_ex:
+        mock_ex.__name__ = "ClassName"
+        mock_ex.return_value = mock.Mock(launch_cmd="")
+        engine = GlobusMPIEngine()
+        engine.submit(
+            str(task_uuid), b"some task", resource_specification={"some": "conf"}
+        )
+
+    assert engine.executor.submit.called, "Verify test: correct internal method invoked"
