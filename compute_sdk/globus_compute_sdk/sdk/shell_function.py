@@ -130,9 +130,10 @@ class ShellFunction:
         sandbox_error_message = None
 
         sandbox_dir = os.environ.get("GC_TASK_SANDBOX_DIR")
-        run_dir = self.run_dir if self.run_dir else sandbox_dir
-        
-        if not run_dir and not sandbox_dir:
+        # run_dir takes precedence over sandbox_dir
+        run_dir = self.run_dir or sandbox_dir
+
+        if not run_dir:
             sandbox_error_message = (
                 "WARNING: Task sandboxing will not work due to "
                 "endpoint misconfiguration. Please enable sandboxing "
