@@ -15,6 +15,7 @@ from datetime import datetime
 
 log = logging.getLogger(__name__)
 
+LOG_TS_FMT = "%Y-%m-%d %H:%M:%S,%f"
 DEFAULT_FORMAT = (
     "%(asctime)s %(levelname)s %(processName)s-%(process)d "
     "%(threadName)s-%(thread)d %(name)s:%(lineno)d %(funcName)s "
@@ -80,7 +81,7 @@ class ComputeConsoleFormatter(logging.Formatter):
     ) -> None:
         super().__init__()
 
-        kwargs.setdefault("datefmt", "%Y-%m-%d %H:%M:%S,%f")
+        kwargs.setdefault("datefmt", LOG_TS_FMT)
 
         self.use_color = debug and not no_color and sys.stderr.isatty()
 
@@ -172,12 +173,12 @@ def _get_file_dict_config(
                 "()": ComputeConsoleFormatter,
                 "debug": debug,
                 "no_color": no_color,
-                "datefmt": "%Y-%m-%d %H:%M:%S,%f",
+                "datefmt": LOG_TS_FMT,
             },
             "filefmt": {
                 "()": DatetimeFormatter,
                 "format": DEFAULT_FORMAT,
-                "datefmt": "%Y-%m-%d %H:%M:%S,%f",
+                "datefmt": LOG_TS_FMT,
             },
         },
         "handlers": {
@@ -213,7 +214,7 @@ def _get_stream_dict_config(debug: bool, no_color: bool) -> dict:
                 "()": ComputeConsoleFormatter,
                 "debug": debug,
                 "no_color": no_color,
-                "datefmt": "%Y-%m-%d %H:%M:%S,%f",
+                "datefmt": LOG_TS_FMT,
             },
         },
         "handlers": {

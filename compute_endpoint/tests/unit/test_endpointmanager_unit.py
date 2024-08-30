@@ -802,15 +802,16 @@ def test_emits_endpoint_id_if_isatty(mocker, epmanager_as_root):
 
 
 def test_as_root_and_no_identity_mapper_configuration_fails(
-    mocker, mock_client, conf_dir
+    mocker, mock_client, conf_dir, mock_conf
 ):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
 
     ep_uuid, _ = mock_client
+    mock_conf.identity_mapping_config_path = None
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, Config())
+        EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert pyt_exc.value.code == os.EX_OSFILE
     assert mock_log.error.called
@@ -902,7 +903,9 @@ def test_clean_exit_on_identity_collection_error(
 
 
 @pytest.mark.no_mock_pim
-def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf_dir):
+def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
+    mocker, conf_dir, mock_conf
+):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
@@ -914,9 +917,9 @@ def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf
     }
     conf_p = conf_dir / "idmap.json"
     conf_p.touch(mode=0o000)
-    conf = Config(identity_mapping_config_path=conf_p)
+    mock_conf.identity_mapping_config_path = conf_p
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, conf, reg_info)
+        EndpointManager(conf_dir, ep_uuid, mock_conf, reg_info)
 
     assert pyt_exc.value.code == os.EX_NOPERM
     assert mock_log.error.called
@@ -927,7 +930,7 @@ def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(mocker, conf
     conf_p.chmod(mode=0o644)
     conf_p.write_text("[{asfg")
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, conf, reg_info)
+        EndpointManager(conf_dir, ep_uuid, mock_conf, reg_info)
 
     assert pyt_exc.value.code == os.EX_CONFIG
     assert mock_log.error.called
@@ -1921,7 +1924,7 @@ def test_pipe_size_limit(mocker, successful_exec_from_mocked_root, conf_size):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
 
-    conf_str = "$" * conf_size
+    conf_str = "v: " + "$" * (conf_size - 3)
 
     # Add 34 bytes for dict keys, etc.
     stdin_data_size = conf_size + 34
@@ -1977,6 +1980,43 @@ def test_redirect_stdstreams_to_user_log(
 
     a, k = next((a, k) for a, k in mock_os.open.call_args_list if a[0] == ep_log)
     assert a[1] == exp_flags, "Expect replacement stdout/stderr: append, wronly, sync"
+
+
+@pytest.mark.parametrize("debug", (True, False))
+def test_user_debug_emits_ephemeral_config_to_user_log(
+    mocker, successful_exec_from_mocked_root, conf_dir, command_payload, debug
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    template_path = Endpoint.user_config_template_path(conf_dir)
+
+    if debug:
+        with open(template_path, "a") as f:
+            f.write("\ndebug: true")
+
+    def duped_first_check(*a, **k):
+        assert mock_os.dup2.call_count == 3, "3 std streams; to log file, not stdout"
+
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")  # quiet down, test
+    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
+    mock_print = mocker.patch(f"{_MOCK_BASE}print")
+    mock_print.side_effect = duped_first_check
+
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    assert mock_print.called is debug, "Expect only written if `debug: true` set"
+    if debug:
+        template = template_path.read_text()
+        exp_lines = template.count("\n") + 1  # +1 ==> \n *splits* lines
+        a, _k = mock_print.call_args
+        c = a[0]
+        assert "DEBUG" in c
+        assert " Endpoint Begin Compute endpoint" in c, "Expect sentinel begin"
+        assert "\nEnd Compute endpoint configuration" in c, "Expect sentinel end"
+        assert f"({exp_lines:,} lines)" in c, "Expect line count"
 
 
 @pytest.mark.parametrize("port", [random.randint(0, 65535)])
