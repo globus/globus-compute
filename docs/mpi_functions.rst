@@ -36,10 +36,10 @@ Here's an example:
 
 .. code-block:: python
 
-      MPIFunction("""true; # force the default prefix to launch a no-op
-      $PARSL_MPI_PREFIX <command_1>
-      $PARSL_MPI_PREFIX <command_2>
-      """)
+    MPIFunction("""true; # force the default prefix to launch a no-op
+    $PARSL_MPI_PREFIX <command_1>
+    $PARSL_MPI_PREFIX <command_2>
+    """)
 
 
 Here is an example configuration for an HPC system that uses PBSPro scheduler:
@@ -85,38 +85,43 @@ Here's another trimmed example for an HPC system that uses Slurm as the schedule
 
 
 .. code-block:: python
+    :caption: globus_compute_mpi_function_example.py
 
-   from globus_compute_sdk import MPIFunction
+    from globus_compute_sdk import Executor, MPIFunction
 
-    ep_id = <SPECIFY_ENDPOINT_ID>
+    ep_id = "<SPECIFY_ENDPOINT_ID>"
     func = MPIFunction("hostname")
-    for nodes in range(1,4):
-        executor.resource_specification = {
-             "num_nodes": 2,
-             "ranks_per_node": nodes
-        }
-        fu = executor.submit(func)
-        mpi_result = fu.result()
-        print(mpi_result.stdout)
+    with Executor(endpoint_id=ep_id) as ex:
+        for nodes in range(1, 4):  # reminder: 1, 2, 3; 4 not included
+            ex.resource_specification = {
+                "num_nodes": 2,
+                "ranks_per_node": nodes
+            }
+            fu = ex.submit(func)
+            mpi_result = fu.result()
+            print(mpi_result.stdout)
 
-        # The above line prints:
-        exp-14-08
-        exp-14-20
+Expect output similar to:
 
-        exp-14-08
-        exp-14-20
-        exp-14-08
-        exp-14-20
+.. code-block:: text
 
-        exp-14-08
-        exp-14-20
-        exp-14-08
-        exp-14-08
-        exp-14-20
-        exp-14-20
+    exp-14-08
+    exp-14-20
+
+    exp-14-08
+    exp-14-20
+    exp-14-08
+    exp-14-20
+
+    exp-14-08
+    exp-14-20
+    exp-14-08
+    exp-14-08
+    exp-14-20
+    exp-14-20
 
 The |ShellResult|_ object captures outputs relevant to simplify debugging when execution
-failures. By default, |MPIFunction|_ captures 1000 lines of stdout and stderr, but this
+failures. By default, |MPIFunction|_ captures 1,000 lines of stdout and stderr, but this
 can be changed via the ``MPIFunction(snippet_lines:int = <NUM_LINES>)`` kwarg.
 
 Results
