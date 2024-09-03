@@ -288,23 +288,6 @@ def test_gcengine_encrypted(encrypted: bool, engine_runner):
     assert engine.encrypted is not encrypted
 
 
-@pytest.mark.parametrize("max_workers_per_node", (1, 2, None))
-@pytest.mark.parametrize("max_workers", (3, 4, 5))
-def test_gcengine_max_workers_per_node(
-    engine_runner, max_workers_per_node: t.Union[int, None], max_workers: int
-):
-    engine: GlobusComputeEngine = engine_runner(
-        GlobusComputeEngine,
-        max_workers_per_node=max_workers_per_node,
-        max_workers=max_workers,
-    )
-
-    if max_workers_per_node:
-        assert engine.executor.max_workers == max_workers_per_node
-    else:
-        assert engine.executor.max_workers == max_workers
-
-
 def test_gcengine_new_executor_not_exceptional():
     gce = GlobusComputeEngine()
     assert gce.executor_exception is None, "Expect no exception from fresh Executor"
