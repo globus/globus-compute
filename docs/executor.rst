@@ -212,7 +212,7 @@ example uses `concurrent.futures.as_completed`_:
         # statement.  Otherwise, at the unindent, `.shutdown()` will be
         # implicitly invoked (with default arguments) and the script will not
         # continue until *all* of the futures complete.
-        futs = [fx.submit(slow_double, i) for i in range(10, 20)]
+        futs = [gce.submit(slow_double, i) for i in range(10, 20)]
         for f in concurrent.futures.as_completed(futs):
             print("Received:", f.result())
 
