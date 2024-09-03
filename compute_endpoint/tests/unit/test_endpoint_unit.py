@@ -240,9 +240,15 @@ def test_delete_endpoint_network_error(
 
     uname, pword = randomstring(), randomstring()
     register_endpoint_response(endpoint_id=ep_uuid_str, username=uname, password=pword)
+    responses.add(
+        method=responses.GET,
+        url=f"https://compute.api.globus.org/v2/endpoints/{ep_uuid_str}/status",
+        headers={"Content-Type": "application/json"},
+        json={},
+    )
 
     mock_gcc = get_standard_compute_client()
-    mocker.patch.object(
+    mock_delete = mocker.patch.object(
         mock_gcc, "delete_endpoint", side_effect=NetworkError("foo", Exception)
     )
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
@@ -255,6 +261,7 @@ def test_delete_endpoint_network_error(
             ep.delete_endpoint(ep_dir, ep_conf, ep_uuid=ep_uuid_str)
 
     assert pytest_exc.value.code == os.EX_TEMPFAIL
+    assert mock_delete.called, "Verify test setup; was kernel actually invoked?"
     assert "could not be deleted from the web" in mock_log.warning.call_args[0][0]
     assert "unable to reach the Globus Compute" in mock_log.critical.call_args[0][0]
     assert "unable to reach the Globus Compute" in f.getvalue()  # stdout
