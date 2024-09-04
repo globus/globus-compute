@@ -1,31 +1,22 @@
-import uuid
-
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusComputeEngine
 from globus_compute_sdk.sdk.shell_function import ShellFunction
-from globus_compute_sdk.serialize import ComputeSerializer
-from tests.utils import ez_pack_function
 
 
-def test_shell_function(engine_runner, tmp_path):
+def test_shell_function(engine_runner, tmp_path, task_uuid, serde, ez_pack_task):
     """Test running ShellFunction with GCE: Happy path"""
     engine = engine_runner(GlobusComputeEngine)
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
     shell_func = ShellFunction("pwd")
-    task_body = ez_pack_function(serializer, shell_func, (), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
-    )
-    future = engine.submit(task_id, task_message, resource_specification={})
+    task_bytes = ez_pack_task(shell_func)
+    future = engine.submit(task_uuid, task_bytes, resource_specification={})
 
     packed_result = future.result()
     result = messagepack.unpack(packed_result)
 
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert result.error_details is None
-    result_obj = serializer.deserialize(result.data)
+    result_obj = serde.deserialize(result.data)
 
     assert "pwd" == result_obj.cmd
     assert result_obj.returncode == 0
@@ -42,46 +33,38 @@ def test_shell_function(engine_runner, tmp_path):
         ("touch foo; ./foo", "Permission denied", 126),
     ],
 )
-def test_fail_shell_function(engine_runner, tmp_path, cmd, error_str, returncode):
+def test_fail_shell_function(
+    engine_runner, cmd, error_str, returncode, serde, task_uuid, ez_pack_task
+):
     """Test running ShellFunction with GCE: Failure path"""
     engine = engine_runner(GlobusComputeEngine, run_in_sandbox=True)
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
     shell_func = ShellFunction(cmd, walltime=0.1)
-    task_body = ez_pack_function(serializer, shell_func, (), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
-    )
-    future = engine.submit(task_id, task_message, resource_specification={})
+    task_bytes = ez_pack_task(shell_func)
+    future = engine.submit(task_uuid, task_bytes, resource_specification={})
 
     packed_result = future.result()
     result = messagepack.unpack(packed_result)
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert not result.error_details
 
-    result_obj = serializer.deserialize(result.data)
+    result_obj = serde.deserialize(result.data)
 
     assert error_str in result_obj.stderr
     assert result_obj.returncode == returncode
 
 
-def test_no_sandbox(engine_runner, tmp_path):
+def test_no_sandbox(engine_runner, task_uuid, serde, ez_pack_task):
     """Test running ShellFunction without sandbox"""
     engine = engine_runner(GlobusComputeEngine, run_in_sandbox=False)
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
     shell_func = ShellFunction("pwd")
-    task_body = ez_pack_function(serializer, shell_func, (), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
-    )
-    future = engine.submit(task_id, task_message, resource_specification={})
+    task_bytes = ez_pack_task(shell_func)
+    future = engine.submit(task_uuid, task_bytes, resource_specification={})
 
     packed_result = future.result()
     result = messagepack.unpack(packed_result)
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert result.error_details is None
-    result_obj = serializer.deserialize(result.data)
+    result_obj = serde.deserialize(result.data)
 
     assert "pwd" == result_obj.cmd
     assert result_obj.returncode == 0

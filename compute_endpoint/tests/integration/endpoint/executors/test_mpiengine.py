@@ -1,68 +1,55 @@
 import concurrent.futures
 import random
-import uuid
 
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusMPIEngine
 from globus_compute_sdk.sdk.mpi_function import MPIFunction
 from globus_compute_sdk.sdk.shell_function import ShellResult
-from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.executors.high_throughput.mpi_prefix_composer import (
     InvalidResourceSpecification,
 )
-from tests.utils import ez_pack_function, get_env_vars
+from tests.utils import get_env_vars
 
 
-def test_mpi_function(engine_runner, nodeslist):
+def test_mpi_function(engine_runner, nodeslist, serde, task_uuid, ez_pack_task):
     """Test for the right cmd being generated"""
     engine = engine_runner(GlobusMPIEngine)
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
 
     num_nodes = random.randint(1, len(nodeslist))
     resource_spec = {"num_nodes": num_nodes, "num_ranks": random.randint(1, 4)}
 
     mpi_func = MPIFunction("pwd")
-    task_body = ez_pack_function(serializer, mpi_func, (), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
-    )
-    future = engine.submit(task_id, task_message, resource_specification=resource_spec)
+    task_bytes = ez_pack_task(mpi_func)
+    future = engine.submit(task_uuid, task_bytes, resource_specification=resource_spec)
 
     packed_result = future.result(timeout=10)
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert result.error_details is None
-    result = serializer.deserialize(result.data)
+    result = serde.deserialize(result.data)
 
     assert isinstance(result, ShellResult)
     assert result.cmd == "$PARSL_MPI_PREFIX pwd"
 
 
-def test_env_vars(engine_runner, nodeslist, tmp_path):
+def test_env_vars(engine_runner, nodeslist, serde, task_uuid, ez_pack_task):
     engine = engine_runner(GlobusMPIEngine)
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, get_env_vars, (), {})
-
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
-    )
+    task_bytes = ez_pack_task(get_env_vars)
     num_nodes = random.randint(1, len(nodeslist))
     future = engine.submit(
-        task_id,
-        task_message,
+        task_uuid,
+        task_bytes,
         resource_specification={"num_nodes": num_nodes, "num_ranks": 2},
     )
 
     packed_result = future.result(timeout=10)
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert result.error_details is None
-    inner_result = serializer.deserialize(result.data)
+    inner_result = serde.deserialize(result.data)
 
     assert inner_result["PARSL_NUM_NODES"] == str(num_nodes)
     assert inner_result["PARSL_MPI_PREFIX"].startswith("mpiexec")

@@ -4,7 +4,6 @@ import pathlib
 import random
 import time
 import typing as t
-import uuid
 from queue import Queue
 from unittest import mock
 
@@ -22,57 +21,26 @@ from globus_compute_endpoint.engines import (
     ThreadPoolEngine,
 )
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
-from globus_compute_sdk.serialize import ComputeSerializer
 from parsl import HighThroughputExecutor
 from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import KubernetesProvider
-from pytest_mock import MockFixture
-from tests.utils import double, ez_pack_function, kill_manager
+from tests.utils import double, kill_manager
 
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope="module")
-def serde():
-    return ComputeSerializer()
-
-
-@pytest.fixture
-def task_uuid() -> uuid.UUID:
-    return uuid.uuid4()
-
-
-@pytest.fixture
-def container_uuid() -> uuid.UUID:
-    return uuid.uuid4()
-
-
-@pytest.fixture
-def ez_pack_task(serde, task_uuid, container_uuid):
-    def _pack_it(fn, *a, **k) -> bytes:
-        task_body = ez_pack_function(serde, fn, a, k)
-        return messagepack.pack(
-            messagepack.message_types.Task(
-                task_id=task_uuid, container_id=container_uuid, task_buffer=task_body
-            )
-        )
-
-    return _pack_it
-
-
-def test_result_message_packing(serde):
+def test_result_message_packing(serde, task_uuid):
     exec_start = TaskTransition(
         timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
     )
 
-    task_id = uuid.uuid1()
     result = random.randint(0, 1000)
 
     exec_end = TaskTransition(
         timestamp=time.time_ns(), state=TaskState.EXEC_END, actor=ActorName.WORKER
     )
     result_message = dict(
-        task_id=task_id,
+        task_id=task_uuid,
         data=serde.serialize(result),
         task_statuses=[exec_start, exec_end],
     )
@@ -84,9 +52,8 @@ def test_result_message_packing(serde):
 
     unpacked = messagepack.unpack(packed_result)
     assert isinstance(unpacked, messagepack.message_types.Result)
-    # assert unpacked.
-    logger.warning(f"Type of unpacked : {unpacked}")
-    assert unpacked.task_id == task_id
+
+    assert unpacked.task_id == task_uuid
     assert serde.deserialize(unpacked.data) == result
 
 
@@ -227,32 +194,31 @@ def test_gcengine_pass_through_to_executor(randomstring):
     assert kwargs == k
 
 
-def test_gcengine_start_pass_through_to_executor(tmp_path: pathlib.Path):
+def test_gcengine_start_pass_through_to_executor(tmp_path: pathlib.Path, endpoint_uuid):
     mock_ex = mock.Mock(
         status_polling_interval=5,
         launch_cmd="foo-bar",
         interchange_launch_cmd="foo-bar",
     )
 
-    run_dir = tmp_path
     scripts_dir = str(tmp_path / "submit_scripts")
 
     with mock.patch.object(GlobusComputeEngine, "_ExecutorClass", mock.Mock):
         engine = GlobusComputeEngine(executor=mock_ex)
 
-    assert mock_ex.run_dir != run_dir
+    assert mock_ex.run_dir != tmp_path
     assert mock_ex.provider.script_dir != scripts_dir
 
-    engine.start(endpoint_id=uuid.uuid4(), run_dir=run_dir, results_passthrough=Queue())
+    engine.start(
+        endpoint_id=endpoint_uuid, run_dir=tmp_path, results_passthrough=Queue()
+    )
     engine.shutdown()
 
-    assert mock_ex.run_dir == run_dir
+    assert mock_ex.run_dir == tmp_path
     assert mock_ex.provider.script_dir == scripts_dir
 
 
-def test_gcengine_start_provider_without_channel(
-    mocker: MockFixture, tmp_path: pathlib.Path
-):
+def test_gcengine_start_provider_without_channel(tmp_path: pathlib.Path, endpoint_uuid):
     mock_executor = mock.Mock(spec=HighThroughputExecutor)
     mock_executor.status_polling_interval = 5
     mock_executor.provider = mock.Mock(spec=KubernetesProvider)
@@ -263,7 +229,7 @@ def test_gcengine_start_provider_without_channel(
 
     engine = GlobusComputeEngine(executor=mock_executor)
     engine.start(
-        endpoint_id=uuid.uuid4(), run_dir=tmp_path, results_passthrough=Queue()
+        endpoint_id=endpoint_uuid, run_dir=tmp_path, results_passthrough=Queue()
     )
     engine.shutdown()
 
@@ -295,16 +261,14 @@ def test_gcengine_executor_exception_passthrough(randomstring):
     assert exc_text in str(gce.executor_exception)
 
 
-def test_gcengine_bad_state_futures_failed_immediately(randomstring):
+def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
     gce = GlobusComputeEngine()
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
 
     taskb = b"some packed task bytes"
     futs = [
-        gce.submit(
-            task_id=str(uuid.uuid4()), packed_task=taskb, resource_specification={}
-        )
+        gce.submit(task_id=str(task_uuid), packed_task=taskb, resource_specification={})
         for _ in range(5)
     ]
 
@@ -312,13 +276,12 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring):
     assert all(exc_text in str(f.exception()) for f in futs)
 
 
-def test_gcengine_exception_report_from_bad_state():
+def test_gcengine_exception_report_from_bad_state(task_uuid):
     gce = GlobusComputeEngine()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
-    task_id = uuid.uuid4()
     gce.submit(
-        task_id=str(task_id), resource_specification={}, packed_task=b"MOCK_PACKED_TASK"
+        task_id=str(task_uuid), resource_specification={}, packed_task=b"MOCK_TASK"
     )
 
     result = None
@@ -329,7 +292,7 @@ def test_gcengine_exception_report_from_bad_state():
         if isinstance(result, messagepack.message_types.Result):
             break
 
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert result.error_details.code == "RemoteExecutionError"
     assert "ZeroDivisionError" in result.data
 

@@ -5,8 +5,7 @@ import uuid
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import HighThroughputEngine
-from globus_compute_sdk.serialize import ComputeSerializer
-from tests.utils import double, ez_pack_function
+from tests.utils import double
 
 
 @pytest.fixture
@@ -24,20 +23,13 @@ def engine(tmp_path):
     engine.shutdown()
 
 
-def test_engine_submit(engine):
+def test_engine_submit(engine, serde, task_uuid, ez_pack_task):
     q = engine.results_passthrough
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
     task_arg = random.randint(1, 1000)
-    task_body = ez_pack_function(serializer, double, (task_arg,), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
+    task_bytes = ez_pack_task(double, task_arg)
     resource_spec = {}
     future = engine.submit(
-        str(task_id), task_message, resource_specification=resource_spec
+        str(task_uuid), task_bytes, resource_specification=resource_spec
     )
     packed_result = future.result()
 
@@ -45,7 +37,7 @@ def test_engine_submit(engine):
     assert isinstance(packed_result, bytes)
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
 
     # Confirm that the same result got back though the queue
     for _i in range(10):
@@ -63,8 +55,8 @@ def test_engine_submit(engine):
             packed_result == packed_result_q
         ), "Result from passthrough_q and future should match"
 
-        assert result.task_id == task_id
-        final_result = serializer.deserialize(result.data)
+        assert result.task_id == task_uuid
+        final_result = serde.deserialize(result.data)
         expected = task_arg * 2
         assert final_result == expected, f"Expected {expected}, but got: {final_result}"
         break

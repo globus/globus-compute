@@ -1,11 +1,8 @@
 import logging
-import uuid
 from unittest import mock
 
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines.helper import execute_task
-from globus_compute_sdk.serialize import ComputeSerializer
-from tests.utils import ez_pack_function
 
 logger = logging.getLogger(__name__)
 
@@ -16,20 +13,12 @@ def divide(x, y):
     return x / y
 
 
-def test_execute_task():
-    serializer = ComputeSerializer()
-    ep_id = uuid.uuid1()
-    task_id = uuid.uuid1()
-    input, output = (10, 2), 5
-    task_body = ez_pack_function(serializer, divide, input, {})
+def test_execute_task(endpoint_uuid, serde, task_uuid, ez_pack_task):
+    inp, outp = (10, 2), 5
 
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
+    task_bytes = ez_pack_task(divide, *inp)
 
-    packed_result = execute_task(task_id, task_message, ep_id)
+    packed_result = execute_task(task_uuid, task_bytes, endpoint_uuid)
     assert isinstance(packed_result, bytes)
 
     result = messagepack.unpack(packed_result)
@@ -39,31 +28,14 @@ def test_execute_task():
     assert "python_version" in result.details
     assert "dill_version" in result.details
     assert "endpoint_id" in result.details
-    assert serializer.deserialize(result.data) == output
+    assert serde.deserialize(result.data) == outp
 
 
-def test_execute_task_with_exception():
-    serializer = ComputeSerializer()
-    ep_id = uuid.uuid1()
-    task_id = uuid.uuid1()
-    task_body = ez_pack_function(
-        serializer,
-        divide,
-        (
-            10,
-            0,
-        ),
-        {},
-    )
-
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
+def test_execute_task_with_exception(endpoint_uuid, task_uuid, ez_pack_task):
+    task_bytes = ez_pack_task(divide, 10, 0)
 
     with mock.patch(f"{_MOCK_BASE}log") as mock_log:
-        packed_result = execute_task(task_id, task_message, ep_id)
+        packed_result = execute_task(task_uuid, task_bytes, endpoint_uuid)
 
     assert mock_log.exception.called
     a, _k = mock_log.exception.call_args
