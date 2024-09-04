@@ -76,6 +76,7 @@ class Endpoint:
         original_path: pathlib.Path,
         target_path: pathlib.Path,
         multi_user: bool,
+        high_assurance: bool,
         display_name: str | None,
         auth_policy: str | None,
         subscription_id: str | None,
@@ -88,6 +89,9 @@ class Endpoint:
 
         if auth_policy:
             config_dict["authentication_policy"] = auth_policy
+
+        if high_assurance:
+            config_dict["high_assurance"] = high_assurance
 
         if multi_user:
             config_dict["multi_user"] = multi_user
@@ -109,6 +113,7 @@ class Endpoint:
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
         multi_user=False,
+        high_assurance=False,
         display_name: str | None = None,
         auth_policy: str | None = None,
         subscription_id: str | None = None,
@@ -143,6 +148,7 @@ class Endpoint:
                 endpoint_config,
                 config_target_path,
                 multi_user,
+                high_assurance,
                 display_name,
                 auth_policy,
                 subscription_id,
@@ -187,6 +193,7 @@ class Endpoint:
         conf_dir: pathlib.Path,
         endpoint_config: str | None,
         multi_user: bool = False,
+        high_assurance: bool = False,
         display_name: str | None = None,
         auth_policy: str | None = None,
         subscription_id: str | None = None,
@@ -202,6 +209,7 @@ class Endpoint:
             conf_dir,
             templ_conf_path,
             multi_user,
+            high_assurance,
             display_name,
             auth_policy,
             subscription_id,
@@ -428,6 +436,7 @@ class Endpoint:
                     allowed_functions=endpoint_config.allowed_functions,
                     auth_policy=endpoint_config.authentication_policy,
                     subscription_id=endpoint_config.subscription_id,
+                    high_assurance=endpoint_config.high_assurance,
                 )
 
             except GlobusAPIError as e:

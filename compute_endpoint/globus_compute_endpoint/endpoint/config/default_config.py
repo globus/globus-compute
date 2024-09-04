@@ -4,6 +4,7 @@ from parsl.providers import LocalProvider
 
 config = UserEndpointConfig(
     display_name=None,  # If None, defaults to the endpoint name
+    high_assurance=False,
     executors=[
         GlobusComputeEngine(
             provider=LocalProvider(

@@ -44,6 +44,7 @@ def _validate_params(field: str):
 
 class BaseConfigModel(BaseModel):
     multi_user: t.Optional[bool]
+    high_assurance: t.Optional[bool]
     display_name: t.Optional[str]
     allowed_functions: t.Optional[t.List[uuid.UUID]]
     authentication_policy: t.Optional[uuid.UUID]
