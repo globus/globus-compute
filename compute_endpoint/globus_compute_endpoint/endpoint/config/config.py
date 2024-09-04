@@ -92,6 +92,10 @@ class Config(RepresentationMixin):
         Designates the endpoint as a multi-user endpoint
         Default: None
 
+    high_assurance : bool | None
+        Designates the endpoint as a high-assurance endpoint
+        Default: None
+
     public : bool | None
         Indicates if all users can discover the multi-user endpoint via our web UI and
         API. This field is only supported on multi-user endpoints and does not control
@@ -150,6 +154,7 @@ class Config(RepresentationMixin):
         environment: str | None = None,
         local_compute_services: bool = False,
         multi_user: bool | None = None,
+        high_assurance: bool | None = None,
         public: bool | None = None,
         allowed_functions: list[str] | None = None,
         authentication_policy: str | None = None,
@@ -198,6 +203,7 @@ class Config(RepresentationMixin):
 
         # Multi-user tuning
         self.multi_user = multi_user is True
+        self.high_assurance = high_assurance is True
         self.force_mu_allow_same_user = force_mu_allow_same_user is True
         self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
         self.identity_mapping_config_path = identity_mapping_config_path
