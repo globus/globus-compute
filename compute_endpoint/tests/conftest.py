@@ -12,11 +12,14 @@ import globus_compute_sdk as gc
 import globus_sdk
 import pytest
 import responses
+from globus_compute_common import messagepack
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.sdk.web_client import WebClient
+from globus_compute_sdk.serialize import ComputeSerializer
 from parsl.launchers import SimpleLauncher
 from parsl.providers import LocalProvider
+from tests.utils import ez_pack_function
 
 
 @pytest.fixture(autouse=True)
@@ -192,3 +195,31 @@ def noop():
         pass
 
     return _wrapped
+
+
+@pytest.fixture
+def task_uuid() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
+def container_uuid() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture(scope="module")
+def serde():
+    return ComputeSerializer()
+
+
+@pytest.fixture
+def ez_pack_task(serde, task_uuid, container_uuid):
+    def _pack_it(fn, *a, **k) -> bytes:
+        task_body = ez_pack_function(serde, fn, a, k)
+        return messagepack.pack(
+            messagepack.message_types.Task(
+                task_id=task_uuid, container_id=container_uuid, task_buffer=task_body
+            )
+        )
+
+    return _pack_it

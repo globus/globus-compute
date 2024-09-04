@@ -25,13 +25,14 @@ def large_result(size):
     return bytearray(size)
 
 
-def ez_pack_function(serializer, func, args, kwargs):
-    serialized_func = serializer.serialize(func)
-    serialized_args = serializer.serialize(args)
-    serialized_kwargs = serializer.serialize(kwargs)
-    return serializer.pack_buffers(
-        [serialized_func, serialized_args, serialized_kwargs]
-    )
+def sleeper(t: float):
+    import time
+
+    now = start = time.monotonic()
+    while now - start < t:
+        time.sleep(0.0001)
+        now = time.monotonic()
+    return True
 
 
 @pytest.fixture(autouse=True)
@@ -123,55 +124,36 @@ def test_execute_failing_function(test_worker):
     )
 
 
-def test_execute_function_exceeding_result_size_limit(test_worker):
+def test_execute_function_exceeding_result_size_limit(
+    test_worker, endpoint_uuid, task_uuid, ez_pack_task
+):
     return_size = 10
 
-    task_id = uuid.uuid1()
-    ep_id = uuid.uuid1()
-
-    payload = ez_pack_function(test_worker.serializer, large_result, (return_size,), {})
-    task_body = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=payload)
-    )
+    task_bytes = ez_pack_task(large_result, return_size)
 
     with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
         s_result = execute_task(
-            task_id, task_body, ep_id, result_size_limit=return_size - 2
+            task_uuid, task_bytes, endpoint_uuid, result_size_limit=return_size - 2
         )
     result = messagepack.unpack(s_result)
 
     assert isinstance(result, messagepack.message_types.Result)
     assert result.error_details
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert result.error_details
     assert result.error_details.code == "MaxResultSizeExceeded"
     assert mock_log.exception.called
 
 
-def sleeper(t):
-    import time
-
-    now = start = time.monotonic()
-    while now - start < t:
-        time.sleep(0.0001)
-        now = time.monotonic()
-    return True
-
-
-def test_app_timeout(test_worker):
-    task_id = uuid.uuid1()
-    ep_id = uuid.uuid1()
-    task_body = ez_pack_function(test_worker.serializer, sleeper, (1,), {})
-    task_body = messagepack.pack(
-        messagepack.message_types.Task(task_id=task_id, task_buffer=task_body)
-    )
+def test_app_timeout(test_worker, endpoint_uuid, task_uuid, ez_pack_task):
+    task_bytes = ez_pack_task(sleeper, 1)
 
     with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
         with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
-            packed_result = execute_task(task_id, task_body, ep_id)
+            packed_result = execute_task(task_uuid, task_bytes, endpoint_uuid)
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
     assert "AppTimeout" in result.data
     assert mock_log.exception.called

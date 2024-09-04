@@ -38,22 +38,15 @@ def htex():
 
 
 @pytest.mark.skip("Skip until HTEX has been fixed up")
-def test_htex_submit_raw(htex):
+def test_htex_submit_raw(htex, serde, task_uuid, ez_pack_task):
     """Testing the HighThroughputExecutor/Engine"""
     engine = htex
 
     q = engine.results_passthrough
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, double, (3,), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
+    task_bytes = ez_pack_task(double, 3)
 
     # HTEX doesn't give you a future back
-    engine.submit_raw(task_message)
+    engine.submit_raw(task_bytes)
 
     # Confirm that the same result got back though the queue
     for _i in range(3):
@@ -68,30 +61,22 @@ def test_htex_submit_raw(htex):
             continue
 
         # At this point the message should be the result
-        assert result.task_id == task_id
+        assert result.task_id == task_uuid
 
-        final_result = serializer.deserialize(result.data)
+        final_result = serde.deserialize(result.data)
         assert final_result == 6, f"Expected 6, but got: {final_result}"
         break
 
 
 @pytest.mark.skip("Skip until HTEX has been fixed up")
-def test_htex_submit_raw_exception(htex):
+def test_htex_submit_raw_exception(htex, task_uuid, ez_pack_task):
     """Testing the HighThroughputExecutor/Engine with a remote side exception"""
     engine = htex
 
     q = engine.results_passthrough
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, div_zero, (3,), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
-
+    task_bytes = ez_pack_task(div_zero, 3)
     # HTEX doesn't give you a future back
-    engine.submit_raw(task_message)
+    engine.submit_raw(task_bytes)
 
     # Confirm that the same result got back though the queue
     for _i in range(3):
@@ -106,28 +91,21 @@ def test_htex_submit_raw_exception(htex):
             continue
 
         # At this point the message should be the result
-        assert result.task_id == task_id
+        assert result.task_id == task_uuid
         assert result.error_details
         break
 
 
 @pytest.mark.skip("Skip until HTEX has been fixed up")
-def test_htex_manager_lost(htex):
+def test_htex_manager_lost(htex, task_uuid, ez_pack_task):
     """Testing the HighThroughputExecutor/Engine"""
     engine = htex
 
     q = engine.results_passthrough
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, kill_manager, (), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
+    task_bytes = ez_pack_task(kill_manager)
 
     # HTEX doesn't give you a future back
-    engine.submit_raw(task_message)
+    engine.submit_raw(task_bytes)
 
     # Confirm that the same result got back though the queue
     for _i in range(10):
@@ -143,7 +121,7 @@ def test_htex_manager_lost(htex):
             continue
 
         # At this point the message should be the result
-        assert result.task_id == task_id
+        assert result.task_id == task_uuid
 
         assert result.error_details.code == "RemoteExecutionError"
         assert "ManagerLost" in result.data
@@ -151,15 +129,14 @@ def test_htex_manager_lost(htex):
 
 
 def test_engine_submit_container_location(
-    mocker: MockFixture, htex: HighThroughputEngine
+    mocker: MockFixture, htex: HighThroughputEngine, serde: ComputeSerializer
 ):
     engine = htex
     task_id = uuid.uuid4()
     container_id = uuid.uuid4()
     container_type = "singularity"
     container_loc = "/path/to/container"
-    serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, double, (10,), {})
+    task_body = ez_pack_function(serde, double, (10,), {})
     task_message = messagepack.pack(
         messagepack.message_types.Task(
             task_id=task_id,
