@@ -24,6 +24,7 @@ pipeline {
                     env.BRANCH_NAME = scmVars.GIT_BRANCH.replaceFirst(/^.*origin\//, "")
                     env.SOURCE_STASH_NAME = "${UUID.randomUUID()}"
                     echo "env.BRANCH_NAME = ${env.BRANCH_NAME}"
+                    echo "env.DEFAULT_BRANCH = ${env.DEFAULT_BRANCH}"
                     sh "git clean -fdx"
 
                     dir("compute_endpoint/packaging/") {
