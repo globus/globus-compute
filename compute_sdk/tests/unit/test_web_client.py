@@ -60,37 +60,13 @@ def test_get_version_service_param(client, service_param):
     assert res["version"] == 100
 
 
-@pytest.mark.parametrize("user_app_name", [None, "bar"])
-def test_app_name_from_constructor(user_app_name):
-    client = WebClient(
-        # use the same fake URL and disable retries as in the default test case
-        base_url=_BASE_URL,
-        transport_params={"max_retries": 0},
-        # and also pass in the app_name
-        app_name=user_app_name,
-    )
-
-    assert client.user_app_name == user_app_name
-    assert __version__ in client.app_name
-    assert "globus-compute-sdk" in client.app_name
-    if user_app_name:
-        assert user_app_name in client.app_name
-
-
-@pytest.mark.parametrize("user_app_name", [None, "baz"])
-def test_user_app_name_property(client, user_app_name):
-    client.user_app_name = user_app_name
-
-    assert client.user_app_name == user_app_name
-    assert __version__ in client.app_name
-    assert "globus-compute-sdk" in client.app_name
-    if user_app_name:
-        assert user_app_name in client.app_name
-
-
-def test_app_name_not_settable(client):
-    with pytest.raises(NotImplementedError):
-        client.app_name = "qux"
+@pytest.mark.parametrize("app_name", [None, str(uuid.uuid4())])
+def test_app_name_value(app_name: str | None):
+    wc = WebClient(base_url=_BASE_URL, app_name=app_name)
+    if app_name is None:
+        assert wc.app_name == f"globus-compute-sdk-{__version__}"
+    else:
+        assert wc.app_name == app_name
 
 
 def test_get_amqp_url(client, randomstring):
