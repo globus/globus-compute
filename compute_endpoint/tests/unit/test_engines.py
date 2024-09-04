@@ -373,13 +373,15 @@ def test_gcmpiengine_default_executor(randomstring):
     assert k["encrypted"] is True, "Expect encrypted by default"
 
 
-def test_gcmpiengine_accepts_resource_specification(task_uuid):
+def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
+    spec = {"some": "conf", "sentinel": randomstring()}
     with mock.patch.object(GlobusMPIEngine, "_ExecutorClass") as mock_ex:
         mock_ex.__name__ = "ClassName"
         mock_ex.return_value = mock.Mock(launch_cmd="")
         engine = GlobusMPIEngine()
-        engine.submit(
-            str(task_uuid), b"some task", resource_specification={"some": "conf"}
-        )
+        engine.submit(str(task_uuid), b"some task", resource_specification=spec)
 
     assert engine.executor.submit.called, "Verify test: correct internal method invoked"
+
+    a, _k = engine.executor.submit.call_args
+    assert spec in a
