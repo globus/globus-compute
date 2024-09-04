@@ -299,6 +299,12 @@ def version_command():
     help="Configure endpoint as multi-user capable",
 )
 @click.option(
+    "--high-assurance",
+    is_flag=True,
+    default=False,
+    help="Configure endpoint as high assurance capable",
+)
+@click.option(
     "--display-name",
     help="A human readable display name for the endpoint, if desired",
 )
@@ -364,6 +370,7 @@ def configure_endpoint(
     name: str,
     endpoint_config: str | None,
     multi_user: bool,
+    high_assurance: bool,
     display_name: str | None,
     auth_policy: str | None,
     auth_policy_project_id: str | None,
@@ -386,6 +393,11 @@ def configure_endpoint(
 
     if multi_user and not _has_multi_user:
         raise ClickException("multi-user endpoints are not supported on this system")
+
+    if high_assurance and not auth_policy and not subscription_id:
+        raise ClickException(
+            "high-assurance(HA) endpoints require a HA policy or subscription id"
+        )
 
     if (
         auth_policy_project_id is not None
@@ -431,6 +443,7 @@ def configure_endpoint(
         ep_dir,
         endpoint_config,
         multi_user,
+        high_assurance,
         display_name,
         auth_policy,
         subscription_id,
