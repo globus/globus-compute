@@ -507,6 +507,7 @@ def test_sends_data_during_registration(
         "endpoint_id",
         "metadata",
         "multi_user",
+        "high_assurance",
         "display_name",
         "allowed_functions",
         "auth_policy",

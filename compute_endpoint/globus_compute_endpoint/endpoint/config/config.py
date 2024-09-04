@@ -62,6 +62,7 @@ class BaseConfig:
         self,
         *,
         multi_user: bool = False,
+        high_assurance: bool = False,
         display_name: str | None = None,
         allowed_functions: t.Iterable[UUID_LIKE_T] | None = None,
         authentication_policy: UUID_LIKE_T | None = None,
@@ -76,6 +77,7 @@ class BaseConfig:
         self.display_name = display_name
         self.debug = debug is True
         self.multi_user = multi_user is True
+        self.high_assurance = high_assurance is True
 
         # Connection info and tuning
         self.amqp_port = amqp_port

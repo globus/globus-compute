@@ -194,6 +194,7 @@ class WebClient(globus_sdk.BaseClient):
         subscription_id: t.Optional[UUID_LIKE_T] = None,
         public: t.Optional[bool] = None,
         additional_fields: t.Optional[t.Dict[str, t.Any]] = None,
+        high_assurance: t.Optional[bool] = None,
     ) -> globus_sdk.GlobusHTTPResponse:
         data: t.Dict[str, t.Any] = {"endpoint_name": endpoint_name}
 
@@ -218,6 +219,8 @@ class WebClient(globus_sdk.BaseClient):
             data["subscription_uuid"] = subscription_id
         if public is not None:
             data["public"] = public
+        if high_assurance is not None:
+            data["high_assurance"] = high_assurance
         if additional_fields is not None:
             data.update(additional_fields)
 

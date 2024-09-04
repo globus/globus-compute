@@ -59,24 +59,30 @@ class TestStart:
         with pytest.raises(Exception, match="ConfigExists"):
             manager.configure_endpoint(config_dir, None)
 
+    @pytest.mark.parametrize("ha", [None, True, False])
     @pytest.mark.parametrize("mu", [None, True, False])
-    def test_configure_multi_user_existing_config(self, mu):
+    def test_configure_multi_user_ha_existing_config(self, ha, mu):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = Endpoint._config_file_path(config_dir)
         config_copy = str(config_dir.parent / "config2.yaml")
 
-        # First, make an entry with multi_user
-        manager.configure_endpoint(config_dir, None, multi_user=True)
+        # First, make an entry with multi_user/ha
+        manager.configure_endpoint(
+            config_dir, None, multi_user=True, high_assurance=False
+        )
         shutil.move(config_file, config_copy)
         shutil.rmtree(config_dir)
 
-        # Then, modify it with new setting
-        manager.configure_endpoint(config_dir, config_copy, multi_user=mu)
+        # Then, modify it with new settings
+        manager.configure_endpoint(
+            config_dir, config_copy, multi_user=mu, high_assurance=ha
+        )
 
         with open(config_file) as f:
             config_dict = yaml.safe_load(f)
         assert "multi_user" in config_dict
+        assert ("high_assurance" in config_dict) is (ha is True)
 
         os.remove(config_copy)
 
