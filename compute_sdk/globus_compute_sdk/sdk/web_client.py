@@ -8,6 +8,7 @@ It also implements data helpers for building complex payloads. Most notably,
 
 import json
 import typing as t
+import warnings
 
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
@@ -107,10 +108,31 @@ class WebClient(globus_sdk.BaseClient):
             base_url = get_web_service_url(environment)
         base_url = remove_url_path(base_url)
 
-        super().__init__(environment=environment, base_url=base_url, **kwargs)
+        if app_name is None:
+            app_name = user_agent_substring(__version__)
 
-        self._user_app_name = None
-        self.user_app_name = app_name
+        super().__init__(
+            environment=environment, base_url=base_url, app_name=app_name, **kwargs
+        )
+
+    @property
+    def user_app_name(self) -> t.Optional[str]:
+        warnings.warn(
+            "'user_app_name' is deprecated. Please directly use 'app_name' instead.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.app_name
+
+    @user_app_name.setter
+    def user_app_name(self, value: str):
+        warnings.warn(
+            "'user_app_name' is deprecated. Please directly use 'app_name' instead.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        if value is not None:
+            self.app_name = f"{self.app_name}/{value}"
 
     def get_version(self, *, service: str = "all") -> globus_sdk.GlobusHTTPResponse:
         return self.get("/v2/version", query_params={"service": service})
@@ -135,30 +157,6 @@ class WebClient(globus_sdk.BaseClient):
         if additional_fields is not None:
             data.update(additional_fields)
         return self.post("/v2/batch_status", data=data)
-
-    # the Client needs to send version information through BaseClient.app_name,
-    # so that's overridden here to prevent direct manipulation. use user_app_name
-    # instead to send any custom metadata through the User Agent request header
-    @property
-    def app_name(self) -> t.Optional[str]:
-        return super().app_name
-
-    @app_name.setter
-    def app_name(self, value) -> None:
-        raise NotImplementedError("Use user_app_name instead")
-
-    # support custom user extensions of the default funcx app name
-    @property
-    def user_app_name(self):
-        return self._user_app_name
-
-    @user_app_name.setter
-    def user_app_name(self, value):
-        self._user_app_name = value
-        app_name = user_agent_substring(__version__)
-        if value is not None:
-            app_name += f"/{value}"
-        globus_sdk.BaseClient.app_name.fset(self, app_name)
 
     def submit(
         self, endpoint_id: UUID_LIKE_T, batch: t.Dict[str, t.Any]
