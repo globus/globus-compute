@@ -34,7 +34,7 @@ def is_client_login() -> bool:
     """
     client_id, client_secret = _get_client_creds_from_env()
 
-    if bool(client_id) ^ bool(client_secret):
+    if client_secret and not client_id:
         raise ValueError(
             "Both GLOBUS_COMPUTE_CLIENT_ID and GLOBUS_COMPUTE_CLIENT_SECRET must "
             "be set to use a client identity. Either set both environment "

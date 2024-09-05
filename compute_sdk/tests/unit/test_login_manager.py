@@ -170,7 +170,13 @@ def test_is_client_login():
     with mock.patch.dict(os.environ, env):
         assert is_client_login()
 
-    for cid, csc in (("", ""), ("", None), (None, ""), (None, None)):
+    for cid, csc in (
+        ("some_id", ""),
+        ("some_id", None),
+        ("", None),
+        (None, ""),
+        (None, None),
+    ):
         env = {}
         if cid is not None:
             env[CID_KEY] = cid
@@ -180,8 +186,6 @@ def test_is_client_login():
             assert not is_client_login()
 
     for cid, csc in (
-        ("some_id", ""),
-        ("some_id", None),
         ("", "some_secret"),
         (None, "some_secret"),
     ):
