@@ -69,6 +69,22 @@ def test_app_name_value(app_name: str | None):
         assert wc.app_name == app_name
 
 
+@pytest.mark.parametrize("user_app_name", [None, "baz"])
+def test_user_app_name_property(client: WebClient, user_app_name: str | None):
+    client.user_app_name = user_app_name
+    assert client.user_app_name == client.app_name
+    assert f"globus-compute-sdk-{__version__}" in client.app_name
+    if user_app_name:
+        assert user_app_name in client.app_name
+
+
+def test_user_app_name_deprecated(client: WebClient):
+    with pytest.warns(DeprecationWarning):
+        client.user_app_name
+    with pytest.warns(DeprecationWarning):
+        client.user_app_name = "foo"
+
+
 def test_get_amqp_url(client, randomstring):
     expected_response = randomstring()
     responses.add(
