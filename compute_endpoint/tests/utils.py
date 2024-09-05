@@ -1,9 +1,11 @@
 import itertools
-import pathlib
 import sys
 import time
 import types
 import typing as t
+
+from globus_compute_common import messagepack
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 
 
 def create_traceback(start: int = 0) -> types.TracebackType:
@@ -110,24 +112,14 @@ def div_zero(x: int):
     return x / 0
 
 
-def succeed_after_n_runs(dirpath: pathlib.Path, fail_count: int = 1):
-    import os
-    import signal
-    from glob import glob
-
-    prior_run_count = len(glob(os.path.join(dirpath, "foo.*.txt")))
-    with open(os.path.join(dirpath, f"foo.{prior_run_count+1}.txt"), "w+") as f:
-        f.write(f"Hello at {time} counter={prior_run_count+1}")
-
-    if prior_run_count < fail_count:
-        manager_pid = os.getppid()
-        manager_pgid = os.getpgid(manager_pid)
-        os.killpg(manager_pgid, signal.SIGKILL)
-
-    return f"Success on attempt: {prior_run_count+1}"
-
-
 def get_env_vars():
     import os
 
     return os.environ
+
+
+def get_result(engine: GlobusComputeEngineBase, task_uuid):
+    while True:
+        msg = engine.results_passthrough.get()
+        if msg.get("task_id") == task_uuid:
+            return messagepack.unpack(msg["message"])

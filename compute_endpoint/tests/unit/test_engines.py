@@ -1,14 +1,17 @@
 import concurrent.futures
+import functools
 import logging
 import pathlib
 import random
 import time
 import typing as t
+from concurrent.futures import Future
 from queue import Queue
 from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
+from globus_compute_common.messagepack import message_types
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
 from globus_compute_endpoint.endpoint.config import Config
@@ -24,9 +27,44 @@ from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from parsl import HighThroughputExecutor
 from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import KubernetesProvider
-from tests.utils import double, kill_manager
+from tests.utils import double, get_result, kill_manager
 
 logger = logging.getLogger(__name__)
+
+
+def succeed_after_n_runs(dirpath: pathlib.Path, fail_count: int = 1):
+    run_no = len(list(dirpath.glob("foo.*.txt"))) + 1
+    (dirpath / f"foo.{run_no}.txt").write_text(f"{run_no}")
+
+    if run_no < fail_count + 1:
+        raise MemoryError("test-induced not-real memory error")
+
+    return f"Success on attempt: {run_no}"
+
+
+def mock_submit(self, _f, _rs, task_id, mock_packed_task: t.Callable, *_a, **_k):
+    r = {"task_id": task_id, "data": mock_packed_task()}
+    packed_result = messagepack.pack(message_types.Result(**r))
+    f = Future()
+    f.set_result(packed_result)
+    return f
+
+
+@pytest.fixture
+def gc_engine_with_retries(tmp_path, endpoint_uuid):
+    mock_ex = mock.Mock(
+        launch_cmd="",
+        status_polling_interval=0,
+    )
+    with mock.patch.object(GlobusComputeEngine, "_ExecutorClass", mock.Mock):
+        with mock.patch.object(GlobusComputeEngine, "_submit", mock_submit):
+            engine = GlobusComputeEngine(
+                executor=mock_ex,
+                max_retries_on_system_failure=0,
+            )
+            engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
+            yield engine
+            engine.shutdown()
 
 
 def test_result_message_packing(serde, task_uuid):
@@ -318,6 +356,47 @@ def test_gcengine_rejects_resource_specification(task_uuid):
         ).result()
 
     assert "is not supported" in str(pyt_exc)
+
+
+def test_gcengine_success_after_fail(
+    gc_engine_with_retries, tmp_path, task_uuid, ez_pack_task
+):
+    engine = gc_engine_with_retries
+    engine.max_retries_on_system_failure = 2
+    fail_count = 1
+    mock_bytes = functools.partial(
+        succeed_after_n_runs, tmp_path, fail_count=fail_count
+    )
+
+    engine.submit(task_uuid, mock_bytes, resource_specification={})
+
+    result = get_result(engine, task_uuid)
+    assert result.task_id == task_uuid
+    assert result.error_details is None
+
+
+def test_gcengine_repeated_fail(task_uuid, gc_engine_with_retries, tmp_path):
+    engine = gc_engine_with_retries
+    engine.max_retries_on_system_failure = 2
+    fail_count = 3
+    mock_bytes = functools.partial(
+        succeed_after_n_runs, tmp_path, fail_count=fail_count
+    )
+
+    engine.submit(task_uuid, mock_bytes, resource_specification={})
+
+    result = get_result(engine, task_uuid)
+    assert result.task_id == task_uuid
+    assert result.error_details
+    assert "test-induced not-real memory error" in result.data
+    count = result.data.count("Traceback from attempt")
+    assert count == fail_count, "Got incorrect # of failure reports"
+    assert "final attempt" in result.data
+
+
+def test_gcengine_default_retries_is_0():
+    engine = GlobusComputeEngine(address="127.0.0.1")
+    assert engine.max_retries_on_system_failure == 0, "Users must knowingly opt-in"
 
 
 def test_gcmpiengine_default_executor(randomstring):
