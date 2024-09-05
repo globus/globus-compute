@@ -1,6 +1,5 @@
 import os
 import uuid
-from contextlib import nullcontext
 from itertools import chain, combinations
 from unittest import mock
 
@@ -10,7 +9,6 @@ import requests
 from globus_compute_sdk.sdk._environments import _get_envname
 from globus_compute_sdk.sdk.login_manager import LoginManager, requires_login
 from globus_compute_sdk.sdk.login_manager.client_login import (
-    _get_client_creds_from_env,
     get_client_login,
     is_client_login,
 )
@@ -36,77 +34,6 @@ def logman(mocker, tmp_path):
     compute_dir.mkdir()
     mocker.patch(f"{MOCK_BASE}.tokenstore.ensure_compute_dir", return_value=compute_dir)
     return LoginManager()
-
-
-def test_get_client_creds_from_env(randomstring):
-    for expected_cid, expected_csc in (
-        (randomstring(), randomstring()),
-        ("", None),
-        (None, ""),
-        (None, None),
-    ):
-        env = {}
-        if expected_cid is not None:
-            env[CID_KEY] = expected_cid
-        if expected_csc is not None:
-            env[CSC_KEY] = expected_csc
-        with mock.patch.dict(os.environ, env):
-            found_cid, found_csc = _get_client_creds_from_env()
-
-        assert expected_cid == found_cid
-        assert expected_csc == found_csc
-
-
-@pytest.mark.parametrize("funcx_id", ["foo", "", None])
-@pytest.mark.parametrize("funcx_sec", ["foo", "", None])
-@pytest.mark.parametrize("compute_id", ["foo", "", None])
-@pytest.mark.parametrize("compute_sec", ["foo", "", None])
-def test_get_client_creds_deprecation(funcx_id, funcx_sec, compute_id, compute_sec):
-    funcx_id_key = CID_KEY.replace("GLOBUS_COMPUTE", "FUNCX_SDK")
-    funcx_sc_key = CSC_KEY.replace("GLOBUS_COMPUTE", "FUNCX_SDK")
-    env = {
-        key: val
-        for key, val in [
-            (funcx_id_key, funcx_id),
-            (funcx_sc_key, funcx_sec),
-            (CID_KEY, compute_id),
-            (CSC_KEY, compute_sec),
-        ]
-        if val is not None
-    }
-    context = (
-        pytest.warns(UserWarning)
-        if funcx_id is not None or funcx_sec is not None
-        else nullcontext()
-    )
-
-    with mock.patch.dict(os.environ, env):
-        with context as record:
-            found_cid, found_csc = _get_client_creds_from_env()
-
-    if compute_id is not None:
-        assert found_cid == compute_id
-    elif funcx_id is not None:
-        assert found_cid == funcx_id
-    else:
-        assert found_cid is None
-
-    if compute_sec is not None:
-        assert found_csc == compute_sec
-    elif funcx_sec is not None:
-        assert found_csc == funcx_sec
-    else:
-        assert found_csc is None
-
-    if funcx_id is not None:
-        assert any(
-            funcx_id_key in r.message.args[0] for r in record
-        ), f"{funcx_id_key} was set so it should be warned about"
-
-    if funcx_sec is not None:
-        assert any(
-            funcx_sc_key in r.message.args[0] for r in record
-        ), f"{funcx_sc_key} was set so it should be warned about"
 
 
 def test_is_client_login():
