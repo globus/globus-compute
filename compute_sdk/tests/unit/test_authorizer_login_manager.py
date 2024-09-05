@@ -11,8 +11,9 @@ _MOCK_BASE = "globus_compute_sdk.sdk.login_manager."
 
 @pytest.fixture
 def logman(mocker, tmp_path):
-    home = mocker.patch(f"{_MOCK_BASE}tokenstore._home")
-    home.return_value = tmp_path
+    compute_dir = tmp_path / ".globus_compute"
+    compute_dir.mkdir()
+    mocker.patch(f"{_MOCK_BASE}tokenstore.ensure_compute_dir", return_value=compute_dir)
     return AuthorizerLoginManager({})
 
 

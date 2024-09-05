@@ -971,7 +971,7 @@ class EndpointManager:
             startup_proc_title = f"Endpoint starting up for {uname} [{args_title}]"
             setproctitle.setproctitle(startup_proc_title)
 
-            gc_dir: pathlib.Path = GC.sdk.login_manager.tokenstore.ensure_compute_dir()
+            gc_dir: pathlib.Path = GC.sdk.compute_dir.ensure_compute_dir()
             ep_dir = gc_dir / ep_name
             ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
             ep_log = ep_dir / "endpoint.log"
