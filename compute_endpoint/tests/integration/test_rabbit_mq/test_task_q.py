@@ -162,7 +162,7 @@ def test_connection_closed_shuts_down(start_task_q_subscriber):
     # The RabbitMQ queue is configured for exclusive use, so attempting
     # to reconnect will cause an error.
     tqs.connect_attempt_limit = 1
-    try_assert(lambda: tqs._connection), "Ensure we establish a connection"
+    try_assert(lambda: tqs._connection, "Ensure we establish a connection")
 
     assert not tqs._stop_event.is_set()
     tqs._on_connection_closed(tqs._connection, MemoryError())
@@ -174,7 +174,7 @@ def test_connection_closed_shuts_down(start_task_q_subscriber):
 
 def test_channel_closed_retries_then_shuts_down(start_task_q_subscriber):
     tqs: TaskQueueSubscriber = start_task_q_subscriber()
-    try_assert(lambda: tqs._connection), "Ensure we establish a connection"
+    try_assert(lambda: tqs._channel, "Ensure we establish a connection")
 
     for i in range(1, tqs.channel_close_window_limit):
         tqs._on_channel_closed(tqs._channel, MemoryError())

@@ -1,21 +1,15 @@
 heartbeat_period: 15
 heartbeat_threshold: 200
-log_dir: "."
 
 engine:
-    type: HighThroughputEngine
-    label: Kubernetes_funcX
+    type: GlobusComputeEngine
     max_workers_per_node: 1
+
+    # Encryption is not currently supported for KubernetesProvider
+    encrypted: false
 
     address:
       type: address_by_route
-
-    scheduler_mode: hard
-    container_type: docker
-
-    strategy:
-        type: KubeSimpleStrategy
-        max_idletime: 3600
 
     provider:
         type: KubernetesProvider
@@ -27,14 +21,18 @@ engine:
         init_mem: 1024Mi
         max_mem: 4096Mi
 
-        # e.g., python:3.8-buster
-        image: {{ IMAGE }}
-
-        # e.g., "pip install --force-reinstall globus_compute_endpoint>=2.0.1"
-        worker_init: {{ COMMAND }}
-
         # e.g., default
         namespace: {{ NAMESPACE }}
 
-        incluster_config: False
+        # Must follow Kubernetes naming rules
+        # e.g., globus-compute-pod
+        pod_name: {{ POD_NAME }}
 
+        # e.g., python:3.12-bookworm
+        image: {{ IMAGE }}
+
+        # The secret key to download the image
+        secret: {{ SECRET }}
+
+        # e.g., "pip install --force-reinstall globus-compute-endpoint"
+        worker_init: {{ COMMAND }}

@@ -31,12 +31,39 @@ from tests.utils import double, ez_pack_function, kill_manager
 logger = logging.getLogger(__name__)
 
 
-def test_result_message_packing():
+@pytest.fixture(scope="module")
+def serde():
+    return ComputeSerializer()
+
+
+@pytest.fixture
+def task_uuid() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
+def container_uuid() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
+def ez_pack_task(serde, task_uuid, container_uuid):
+    def _pack_it(fn, *a, **k) -> bytes:
+        task_body = ez_pack_function(serde, fn, a, k)
+        return messagepack.pack(
+            messagepack.message_types.Task(
+                task_id=task_uuid, container_id=container_uuid, task_buffer=task_body
+            )
+        )
+
+    return _pack_it
+
+
+def test_result_message_packing(serde):
     exec_start = TaskTransition(
         timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
     )
 
-    serializer = ComputeSerializer()
     task_id = uuid.uuid1()
     result = random.randint(0, 1000)
 
@@ -45,7 +72,7 @@ def test_result_message_packing():
     )
     result_message = dict(
         task_id=task_id,
-        data=serializer.serialize(result),
+        data=serde.serialize(result),
         task_statuses=[exec_start, exec_end],
     )
 
@@ -59,7 +86,7 @@ def test_result_message_packing():
     # assert unpacked.
     logger.warning(f"Type of unpacked : {unpacked}")
     assert unpacked.task_id == task_id
-    assert serializer.deserialize(unpacked.data) == result
+    assert serde.deserialize(unpacked.data) == result
 
 
 @pytest.mark.parametrize(
@@ -81,26 +108,21 @@ def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
 @pytest.mark.parametrize(
     "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
 )
-def test_engine_submit_internal(engine_type: GlobusComputeEngineBase, engine_runner):
+def test_engine_submit_internal(
+    engine_type: GlobusComputeEngineBase, engine_runner, serde, task_uuid, ez_pack_task
+):
     engine = engine_runner(engine_type)
 
     q = engine.results_passthrough
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, double, (3,), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
-    future = engine.submit(str(task_id), task_message, resource_specification={})
+    task_bytes = ez_pack_task(double, 3)
+    future = engine.submit(str(task_uuid), task_bytes, resource_specification={})
     packed_result = future.result()
 
     # Confirm that the future got the right answer
     assert isinstance(packed_result, bytes)
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
-    assert result.task_id == task_id
+    assert result.task_id == task_uuid
 
     # Confirm that the same result got back though the queue
     for _i in range(3):
@@ -119,18 +141,19 @@ def test_engine_submit_internal(engine_type: GlobusComputeEngineBase, engine_run
             packed_result == packed_result_q
         ), "Result from passthrough_q and future should match"
 
-        assert passed_task_id == str(task_id)
-        assert result.task_id == task_id
-        final_result = serializer.deserialize(result.data)
-        assert final_result == 6, f"Expected 6, but got: {final_result}"
+        assert passed_task_id == str(task_uuid)
+        assert result.task_id == task_uuid
+        final_result = serde.deserialize(result.data)
+        assert final_result == 6
         break
 
 
-def test_proc_pool_engine_not_started():
-    engine = ProcessPoolEngine(max_workers=2)
+def test_proc_pool_engine_not_started(task_uuid, ez_pack_task):
+    engine = ProcessPoolEngine(max_workers=1)
+    task_bytes = ez_pack_task(double, 10)
 
     with pytest.raises(AssertionError) as pyt_exc:
-        future = engine.submit(double, 10, resource_specification={})
+        future = engine.submit(str(task_uuid), task_bytes, resource_specification={})
         future.result()
     assert "engine has not been started" in str(pyt_exc)
 
@@ -139,20 +162,12 @@ def test_proc_pool_engine_not_started():
     assert "engine has not been started" in str(pyt_exc)
 
 
-def test_gc_engine_system_failure(engine_runner):
+def test_gc_engine_system_failure(ez_pack_task, task_uuid, engine_runner):
     """Test behavior of engine failure killing task"""
-    engine = engine_runner(GlobusComputeEngine)
-    engine.max_retries_on_system_failure = 0
+    engine = engine_runner(GlobusComputeEngine, max_retries_on_system_failure=0)
 
-    task_id = uuid.uuid1()
-    serializer = ComputeSerializer()
-    task_body = ez_pack_function(serializer, kill_manager, (), {})
-    task_message = messagepack.pack(
-        messagepack.message_types.Task(
-            task_id=task_id, container_id=uuid.uuid1(), task_buffer=task_body
-        )
-    )
-    future = engine.submit(str(task_id), task_message, {})
+    task_bytes = ez_pack_task(kill_manager)
+    future = engine.submit(str(task_uuid), task_bytes, {})
 
     assert isinstance(future, concurrent.futures.Future)
     with pytest.raises(ManagerLost):
@@ -160,7 +175,9 @@ def test_gc_engine_system_failure(engine_runner):
 
 
 @pytest.mark.parametrize("engine_type", (GlobusComputeEngine, HighThroughputEngine))
-def test_serialized_engine_config_has_provider(engine_type: GlobusComputeEngineBase):
+def test_serialized_engine_config_has_provider(
+    engine_type: t.Type[GlobusComputeEngineBase],
+):
     ep_config = Config(executors=[engine_type(address="127.0.0.1")])
 
     res = serialize_config(ep_config)
@@ -169,8 +186,8 @@ def test_serialized_engine_config_has_provider(engine_type: GlobusComputeEngineB
     assert executor.get("provider")
 
 
-def test_gcengine_compute_launch_cmd(engine_runner):
-    engine: GlobusComputeEngine = engine_runner(GlobusComputeEngine)
+def test_gcengine_compute_launch_cmd():
+    engine = GlobusComputeEngine()
     assert engine.executor.launch_cmd.startswith(
         "globus-compute-endpoint python-exec"
         " parsl.executors.high_throughput.process_worker_pool"
@@ -178,12 +195,25 @@ def test_gcengine_compute_launch_cmd(engine_runner):
     assert "process_worker_pool.py" not in engine.executor.launch_cmd
 
 
+def test_gcengine_compute_interchange_launch_cmd():
+    engine = GlobusComputeEngine()
+    assert engine.executor.interchange_launch_cmd[:3] == [
+        "globus-compute-endpoint",
+        "python-exec",
+        "parsl.executors.high_throughput.interchange",
+    ]
+    assert "interchange.py" not in engine.executor.interchange_launch_cmd
+
+
 def test_gcengine_pass_through_to_executor(mocker: MockFixture):
     mock_executor = mocker.patch(
         "globus_compute_endpoint.engines.globus_compute.HighThroughputExecutor"
     )
     mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
+        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="foo-bar"
+    )
+    mocker.patch.object(
+        GlobusComputeEngine, "_get_compute_ix_launch_cmd", return_value="foo-bar"
     )
 
     args = ("arg1", 2)
@@ -209,9 +239,8 @@ def test_gcengine_start_pass_through_to_executor(
     )
     mock_executor.provider = mock.MagicMock()
     mock_executor.status_polling_interval = 5
-    mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
-    )
+    mock_executor.launch_cmd = "foo-bar"
+    mock_executor.interchange_launch_cmd = "foo-bar"
 
     run_dir = tmp_path
     scripts_dir = str(tmp_path / "submit_scripts")
@@ -233,9 +262,8 @@ def test_gcengine_start_provider_without_channel(
     mock_executor = mock.Mock(spec=HighThroughputExecutor)
     mock_executor.status_polling_interval = 5
     mock_executor.provider = mock.Mock(spec=KubernetesProvider)
-    mocker.patch.object(
-        GlobusComputeEngine, "_get_compute_launch_cmd", return_value="mock_launch_cmd"
-    )
+    mock_executor.launch_cmd = "foo-bar"
+    mock_executor.interchange_launch_cmd = "foo-bar"
 
     assert not hasattr(mock_executor.provider, "channel"), "Verify test setup"
 
@@ -341,10 +369,12 @@ def test_gcengine_rejects_mpi_mode(randomstring):
     assert "is not supported" in str(pyt_exc_2)
 
 
-def test_gcengine_rejects_resource_specification():
+def test_gcengine_rejects_resource_specification(task_uuid):
     with pytest.raises(ValueError) as pyt_exc:
         GlobusComputeEngine().submit(
-            "task_id", packed_task=b"packed_task", resource_specification={"foo": "bar"}
+            str(task_uuid),
+            packed_task=b"packed_task",
+            resource_specification={"foo": "bar"},
         ).result()
 
     assert "is not supported" in str(pyt_exc)

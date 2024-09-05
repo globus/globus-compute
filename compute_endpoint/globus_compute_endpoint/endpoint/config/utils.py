@@ -24,6 +24,10 @@ RESERVED_USER_CONFIG_TEMPLATE_VARIABLES = (
 )
 
 
+def _read_config_file(config_path: pathlib.Path) -> str:
+    return config_path.read_text()
+
+
 def _load_config_py(conf_path: pathlib.Path) -> Config | None:
     if not conf_path.exists():
         return None
@@ -36,6 +40,7 @@ def _load_config_py(conf_path: pathlib.Path) -> Config | None:
         if not config:
             raise Exception(f"Unable to import configuration (no config): {conf_path}")
         spec.loader.exec_module(config)
+        config.config.source_content = _read_config_file(conf_path)
         return config.config
 
     except FileNotFoundError as err:
@@ -63,10 +68,6 @@ def _load_config_py(conf_path: pathlib.Path) -> Config | None:
         raise
 
 
-def _read_config_yaml(config_path: pathlib.Path) -> str:
-    return config_path.read_text()
-
-
 def load_config_yaml(config_str: str) -> Config:
     try:
         config_dict = dict(yaml.safe_load(config_str))
@@ -92,6 +93,8 @@ def load_config_yaml(config_str: str) -> Config:
     # This has the side effect of disallowing the display name 'None'
     if config.display_name == "None":
         config.display_name = None
+
+    config.source_content = config_str
     return config
 
 
@@ -107,7 +110,7 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
         return config
 
     try:
-        config_str = _read_config_yaml(config_yaml_path)
+        config_str = _read_config_file(config_yaml_path)
     except FileNotFoundError as err:
         endpoint_name = endpoint_dir.name
 
@@ -221,7 +224,7 @@ def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | N
     if not user_config_path.exists():
         log.info("user_config_template.yaml.j2 does not exist; trying .yaml")
         user_config_path = pathlib.Path(re.sub(r"\.j2$", "", str(user_config_path)))
-    template_str = _read_config_yaml(user_config_path)
+    template_str = _read_config_file(user_config_path)
 
     user_config_schema = load_user_config_schema(endpoint_dir)
 

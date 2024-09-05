@@ -218,3 +218,12 @@ def test_engine_invalid_result_data(task_id: t.Optional[str]):
     htex.is_alive = False
     htex._engine_bad_state.set()
     queue_mgmt_thread.join()
+
+
+def test_deprecation_notice(mocker):
+    mock_warn = mocker.patch(
+        "globus_compute_endpoint.engines.high_throughput.engine.warnings"
+    )
+    HighThroughputEngine()
+    assert mock_warn.warn.called
+    assert "HighThroughputEngine is deprecated" in mock_warn.warn.call_args[0][0]

@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 REQUIRES = [
     "requests>=2.31.0,<3",
     "globus-sdk",  # version will be bounded by `globus-compute-sdk`
-    "globus-compute-sdk==2.25.0",
+    "globus-compute-sdk==2.27.0a1",
     "globus-compute-common==0.4.1",
     "globus-identity-mapping==0.3.0",
     # table printing used in list-endpoints
@@ -31,11 +31,11 @@ REQUIRES = [
     # building from source, which may mean there's an issue in the packaged library
     # further investigation may be needed if the issue persists in the next pyzmq
     # release
-    "pyzmq>=22.0.0,!=22.3.0,<27.0.0",
+    "pyzmq>=22.0.0,!=22.3.0,<=26.1.0",
     # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
-    "parsl==2024.6.10",
+    "parsl==2024.8.12",
     "pika>=1.2.0",
     "pyprctl<0.2.0",
     "setproctitle>=1.3.2,<1.4",

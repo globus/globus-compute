@@ -17,9 +17,6 @@ import pytest
 import responses
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import Config
-from globus_compute_endpoint.endpoint.config.default_config import (
-    config as default_config,
-)
 from globus_compute_endpoint.endpoint.config.utils import (
     get_config,
     load_user_config_template,
@@ -512,11 +509,14 @@ def test_endpoint_get_metadata(mocker):
     mock_pwuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.pwd.getpwuid")
     mock_pwuid.return_value = SimpleNamespace(pw_name=mock_data["local_user"])
 
-    meta = Endpoint.get_metadata(default_config)
+    test_config = Config()
+    test_config.source_content = "foo: bar"
+    meta = Endpoint.get_metadata(test_config)
 
     for k, v in mock_data.items():
         assert meta[k] == v
 
+    assert meta["endpoint_config"] == test_config.source_content
     config = meta["config"]
     assert len(config["executors"]) == 1
     assert config["executors"][0]["type"] == "GlobusComputeEngine"

@@ -430,6 +430,7 @@ def test_sends_data_during_registration(
     ep_uuid, mock_gcc = mock_client
     mock_conf.multi_user = True
     mock_conf.public = public
+    mock_conf.source_content = "foo: bar"
     EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert mock_gcc.register_endpoint.called
@@ -452,6 +453,7 @@ def test_sends_data_during_registration(
         "hostname",
         "local_user",
         "config",
+        "endpoint_config",
         "user_config_template",
         "user_config_schema",
     }
@@ -469,6 +471,7 @@ def test_sends_data_during_registration(
     assert k["public"] is mock_conf.public
     assert k["multi_user"] is True
     assert k["metadata"]["config"]["multi_user"] is True
+    assert k["metadata"]["endpoint_config"] == mock_conf.source_content
 
 
 def test_handles_network_error_scriptably(

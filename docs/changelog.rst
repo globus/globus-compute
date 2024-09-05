@@ -3,6 +3,66 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.27.1:
+
+globus-compute-sdk & globus-compute-endpoint v2.27.1
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Set upper bound for ``pyzmq`` dependency to ``v26.1.0`` to avoid bug with ``libzmq`` installation.
+
+.. _changelog-2.27.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.27.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added ``Client.get_allowed_functions`` for retrieving the list of functions that are
+  allowed to be executed on an endpoint.
+
+Removed
+^^^^^^^
+
+- The ``add_to_whitelist``, ``delete_from_whitelist``, and ``get_whitelist`` functions
+  have been removed from the ``Client``. Use the ``allowed_functions`` endpoint config
+  option instead of the add/remove functions, and ``Client.get_allowed_functions``
+  instead of ``get_whitelist``.
+
+- Remove forgotten ``webockets`` dependency from setup requirements; the SDK
+  does not use the websockets library as of :ref:`v2.3.0 <changelog-2.3.0>`.
+
+Deprecated
+^^^^^^^^^^
+
+- The ``HighThroughputEngine`` is now marked for deprecation. All users should migrate to
+  ``GlobusComputeEngine``.
+
+  To help with migration, we suggest checking out our many `endpoint configuration examples
+  <https://globus-compute.readthedocs.io/en/stable/endpoints/endpoint_examples.html>`_, all
+  of which use ``GlobusComputeEngine``.
+
+.. _changelog-2.26.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.26.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- The endpoint CLI will now raise an error if the endpoint configuration includes
+  both the ``container_uri`` field and a provider that manages containers internally
+  (``AWSProvider``, ``GoogleCloudProvider``, or ``KubernetesProvider``). This prevents
+  conflicts in container management.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency version to 2024.8.12.
+
 .. _changelog-2.25.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.25.0

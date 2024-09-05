@@ -21,9 +21,9 @@ like Slurm and PBSTorque to provision compute nodes dynamically in response to w
 These capabilities are largely borrowed from Parsl's |HighThroughputExecutor|_ and therefore
 all of |HighThroughputExecutor|_'s parameter options are supported as passthrough.
 
-Note::
-As of ``globus-compute-endpoint==2.12.0`` |GlobusComputeEngine|_, replaces the
-``HighThroughputEngine`` as the default executor.
+.. note::
+   As of ``globus-compute-endpoint==2.12.0``, |GlobusComputeEngine|_ is the default engine type.
+   The ``HighThroughputEngine`` is marked for deprecation.
 
 Here are |GlobusComputeEngine|_ specific features:
 
@@ -164,9 +164,10 @@ uses the ``SlurmProvider`` to interface with the scheduler, and uses the
 .. literalinclude:: configs/midway.yaml
    :language: yaml
 
-The following configuration is an example to use singularity container on Midway.
+The following configuration example uses an Apptainer (formerly Singularity) container
+on Midway.
 
-.. literalinclude:: configs/midway_singularity.yaml
+.. literalinclude:: configs/midway_apptainer.yaml
    :language: yaml
 
 
@@ -191,7 +192,7 @@ Polaris (ALCF)
 .. image:: ../_static/images/ALCF_Polaris.jpeg
 
 The following snippet shows an example configuration for executing on Argonne Leadership
-Computing Facility's **Polaris** cluster. This example uses the ``HighThroughputEngine``
+Computing Facility's **Polaris** cluster. This example uses the ``GlobusComputeEngine``
 and connects to Polaris's PBS scheduler using the ``PBSProProvider``.  This
 configuration assumes that the script is being executed on the login node of Polaris.
 
@@ -205,7 +206,7 @@ Perlmutter (NERSC)
 .. image:: ../_static/images/Nersc9-image-compnew-sizer7-group-type-4-1.jpg
 
 The following snippet shows an example configuration for accessing NERSC's
-**Perlmutter** supercomputer.  This example uses the ``HighThroughputEngine`` and
+**Perlmutter** supercomputer.  This example uses the ``GlobusComputeEngine`` and
 connects to Perlmutters's Slurm scheduler.  It is configured to request 2 nodes
 configured with 1 TaskBlock per node. Finally, it includes override information to
 request a particular node type (GPU) and to configure a specific Python environment on

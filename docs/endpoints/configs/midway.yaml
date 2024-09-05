@@ -1,9 +1,7 @@
-label: Midway@RCC.UChicago
-
 engine:
     type: GlobusComputeEngine
+    label: Midway@RCC.UChicago
     max_workers_per_node: 2
-    worker_debug: False
 
     address:
         type: address_by_interface
@@ -11,20 +9,23 @@ engine:
 
     provider:
         type: SlurmProvider
-        partition: caslake
-
-        account: {{ ACCOUNT }}
 
         launcher:
             type: SrunLauncher
 
+        # e.g., pi-compute
+        account: {{ ACCOUNT }}
+
+        # e.g., caslake
+        partition: {{ PARTITION }}
+
         # string to prepend to #SBATCH blocks in the submit
         # script to the scheduler
-        # e.g., "#SBATCH --constraint=knl,quad,cache"
+        # e.g., "#SBATCH --gres=gpu:4"
         scheduler_options: {{ OPTIONS }}
 
         # Command to be run before starting a worker
-        # e.g., module load Anaconda; source activate parsl_env
+        # e.g., "module load Anaconda; source activate compute-env"
         worker_init: {{ COMMAND }}
 
         # Scale between 0-1 blocks with 2 nodes per block

@@ -28,9 +28,9 @@ pipeline {
                     sh "git clean -fdx"
 
                     // temporary hack to build for stable
-                    sh "git checkout build_for_stable"
-                    env.TAG_NAME = "v2.26.0"
-                    env.DEFAULT_BRANCH = "build_for_stable"
+                    # sh "git checkout build_for_stable"
+                    # env.TAG_NAME = "main"
+                    # env.DEFAULT_BRANCH = "build_for_stable"
 
                     dir("compute_endpoint/packaging/") {
                         sh(script: "make show_vars")

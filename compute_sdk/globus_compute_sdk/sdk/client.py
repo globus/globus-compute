@@ -743,61 +743,18 @@ class Client:
             raise SystemError(message)
 
     @requires_login
-    def add_to_whitelist(self, endpoint_id, function_ids):
-        """Adds the function to the endpoint's whitelist
-
+    def get_allowed_functions(self, endpoint_id: UUID_LIKE_T):
+        """List the functions that are allowed to execute on this endpoint
         Parameters
         ----------
-        endpoint_id : str
-            The uuid of the endpoint
-        function_ids : list
-            A list of function id's to be whitelisted
-
+        endpoint_id : UUID | str
+            The ID of the endpoint
         Returns
         -------
         json
             The response of the request
         """
-        return self.web_client.whitelist_add(endpoint_id, function_ids)
-
-    @requires_login
-    def get_whitelist(self, endpoint_id):
-        """List the endpoint's whitelist
-
-        Parameters
-        ----------
-        endpoint_id : str
-            The uuid of the endpoint
-
-        Returns
-        -------
-        json
-            The response of the request
-        """
-        return self.web_client.get_whitelist(endpoint_id)
-
-    @requires_login
-    def delete_from_whitelist(self, endpoint_id, function_ids):
-        """List the endpoint's whitelist
-
-        Parameters
-        ----------
-        endpoint_id : str
-            The uuid of the endpoint
-        function_ids : list
-            A list of function id's to be whitelisted
-
-        Returns
-        -------
-        json
-            The response of the request
-        """
-        if not isinstance(function_ids, list):
-            function_ids = [function_ids]
-        res = []
-        for fid in function_ids:
-            res.append(self.web_client.whitelist_remove(endpoint_id, fid))
-        return res
+        return self.web_client.get_allowed_functions(endpoint_id).data
 
     @requires_login
     def stop_endpoint(self, endpoint_id: str):

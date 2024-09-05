@@ -130,6 +130,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 **kwargs,
             )
         self.executor = executor
+        self.executor.interchange_launch_cmd = self._get_compute_ix_launch_cmd()
         self.executor.launch_cmd = self._get_compute_launch_cmd()
 
         self.working_dir = working_dir
@@ -153,6 +154,17 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     @property
     def encrypted(self):
         return self.executor.encrypted
+
+    def _get_compute_ix_launch_cmd(self) -> t.List[str]:
+        """Returns an endpoint CLI command to launch Parsl's interchange process,
+        rather than rely on Parsl's interchange.py command. This helps to minimize
+        PATH-related issues.
+        """
+        return [
+            "globus-compute-endpoint",
+            "python-exec",
+            "parsl.executors.high_throughput.interchange",
+        ]
 
     def _get_compute_launch_cmd(self) -> str:
         """Modify the launch command so that we launch the worker pool via the
@@ -397,11 +409,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def scale_out(self, blocks: int):
         logger.info(f"Scaling out {blocks} blocks")
-        return self.executor.scale_out(blocks=blocks)
+        return self.executor.scale_out_facade(n=blocks)
 
     def scale_in(self, blocks: int):
         logger.info(f"Scaling in {blocks} blocks")
-        return self.executor.scale_in(blocks=blocks)
+        return self.executor.scale_in_facade(n=blocks)
 
     def _handle_task_exception(
         self,

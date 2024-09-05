@@ -242,21 +242,10 @@ class WebClient(globus_sdk.BaseClient):
     def get_function(self, function_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/functions/{function_id}")
 
-    def get_whitelist(self, endpoint_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
-        return self.get(f"/v2/endpoints/{endpoint_id}/whitelist")
-
-    def whitelist_add(
-        self, endpoint_id: UUID_LIKE_T, function_ids: t.Iterable[UUID_LIKE_T]
+    def get_allowed_functions(
+        self, endpoint_id: UUID_LIKE_T
     ) -> globus_sdk.GlobusHTTPResponse:
-        if isinstance(function_ids, str):
-            function_ids = [function_ids]
-        data = {"func": [str(f) for f in function_ids]}
-        return self.post(f"/v2/endpoints/{endpoint_id}/whitelist", data=data)
-
-    def whitelist_remove(
-        self, endpoint_id: UUID_LIKE_T, function_id: UUID_LIKE_T
-    ) -> globus_sdk.GlobusHTTPResponse:
-        return self.delete(f"/v2/endpoints/{endpoint_id}/whitelist/{function_id}")
+        return self.get(f"/v3/endpoints/{endpoint_id}/allowed_functions")
 
     def stop_endpoint(self, endpoint_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.post(f"/v2/endpoints/{endpoint_id}/lock", data={})
