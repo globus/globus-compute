@@ -12,19 +12,9 @@ import uuid
 
 import globus_sdk
 
-from ..utils import get_env_var_with_deprecation
+from ..auth.client_login import get_client_creds
 
 log = logging.getLogger(__name__)
-
-
-def _get_client_creds_from_env() -> tuple[str | None, str | None]:
-    client_id = get_env_var_with_deprecation(
-        "GLOBUS_COMPUTE_CLIENT_ID", "FUNCX_SDK_CLIENT_ID"
-    )
-    client_secret = get_env_var_with_deprecation(
-        "GLOBUS_COMPUTE_CLIENT_SECRET", "FUNCX_SDK_CLIENT_SECRET"
-    )
-    return client_id, client_secret
 
 
 def is_client_login() -> bool:
@@ -32,7 +22,7 @@ def is_client_login() -> bool:
     Return True if the correct env variables have been set to use a
     client identity with the Globus Compute SDK
     """
-    client_id, client_secret = _get_client_creds_from_env()
+    client_id, client_secret = get_client_creds()
 
     if client_secret and not client_id:
         raise ValueError(
@@ -52,7 +42,7 @@ def get_client_login() -> globus_sdk.ConfidentialAppAuthClient:
     if not is_client_login():
         raise ValueError("No client is logged in")
 
-    client_id, client_secret = _get_client_creds_from_env()
+    client_id, client_secret = get_client_creds()
 
     try:
         uuid.UUID(client_id)
