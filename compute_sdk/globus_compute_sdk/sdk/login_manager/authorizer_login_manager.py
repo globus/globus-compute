@@ -8,11 +8,9 @@ from globus_compute_sdk.sdk.login_manager.protocol import LoginManagerProtocol
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk.scopes import AuthScopes
 
-from .manager import ComputeScopeBuilder
+from ..auth.scopes import ComputeScopes
 
 log = logging.getLogger(__name__)
-
-ComputeScopes = ComputeScopeBuilder()
 
 
 class AuthorizerLoginManager(LoginManagerProtocol):
