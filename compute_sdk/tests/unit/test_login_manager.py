@@ -1,5 +1,4 @@
 import os
-import pathlib
 import uuid
 from contextlib import nullcontext
 from itertools import chain, combinations
@@ -15,10 +14,7 @@ from globus_compute_sdk.sdk.login_manager.client_login import (
     get_client_login,
     is_client_login,
 )
-from globus_compute_sdk.sdk.login_manager.tokenstore import (
-    _resolve_namespace,
-    ensure_compute_dir,
-)
+from globus_compute_sdk.sdk.login_manager.tokenstore import _resolve_namespace
 
 CID_KEY = "GLOBUS_COMPUTE_CLIENT_ID"
 CSC_KEY = "GLOBUS_COMPUTE_CLIENT_SECRET"
@@ -36,8 +32,9 @@ def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.R
 
 @pytest.fixture
 def logman(mocker, tmp_path):
-    home = mocker.patch(f"{MOCK_BASE}.tokenstore._home")
-    home.return_value = tmp_path
+    compute_dir = tmp_path / ".globus_compute"
+    compute_dir.mkdir()
+    mocker.patch(f"{MOCK_BASE}.tokenstore.ensure_compute_dir", return_value=compute_dir)
     return LoginManager()
 
 
@@ -110,59 +107,6 @@ def test_get_client_creds_deprecation(funcx_id, funcx_sec, compute_id, compute_s
         assert any(
             funcx_sc_key in r.message.args[0] for r in record
         ), f"{funcx_sc_key} was set so it should be warned about"
-
-
-@pytest.mark.parametrize("dir_exists", [True, False])
-@pytest.mark.parametrize("user_dir", ["/my/dir", None, ""])
-def test_ensure_compute_dir(fs, dir_exists, user_dir):
-    home_dirname = pathlib.Path.home()
-    dirname = home_dirname / ".globus_compute"
-
-    if dir_exists:
-        fs.create_dir(dirname)
-
-    if user_dir is not None:
-        dirname = pathlib.Path(user_dir)
-        with mock.patch.dict(os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(dirname)}):
-            compute_dirname = ensure_compute_dir()
-    else:
-        compute_dirname = ensure_compute_dir()
-
-    assert compute_dirname.is_dir()
-    assert compute_dirname == dirname
-
-
-@pytest.mark.parametrize("user_dir_defined", [True, False])
-def test_conflicting_compute_file(fs, user_dir_defined):
-    filename = pathlib.Path.home() / ".globus_compute"
-    fs.create_file(filename)
-
-    with pytest.raises(FileExistsError) as exc:
-        if user_dir_defined:
-            with mock.patch.dict(
-                os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(filename)}
-            ):
-                ensure_compute_dir()
-        else:
-            ensure_compute_dir()
-
-    assert "Error creating directory" in str(exc)
-
-
-def test_restricted_user_dir(fs):
-    parent_dirname = pathlib.Path("/parent/dir/")
-    config_dirname = parent_dirname / "config"
-
-    fs.create_dir(parent_dirname)
-    os.chmod(parent_dirname, 0o000)
-
-    with pytest.raises(PermissionError) as exc:
-        with mock.patch.dict(
-            os.environ, {"GLOBUS_COMPUTE_USER_DIR": str(config_dirname)}
-        ):
-            ensure_compute_dir()
-
-    assert "Permission denied" in str(exc)
 
 
 def test_is_client_login():

@@ -28,7 +28,7 @@ from globus_compute_endpoint.cli import (
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
+from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import MISSING, AuthClient
 from pyfakefs import fake_filesystem as fakefs

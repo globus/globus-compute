@@ -28,9 +28,9 @@ from globus_compute_endpoint.endpoint.utils import (
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
+from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.client_login import is_client_login
-from globus_compute_sdk.sdk.login_manager.tokenstore import ensure_compute_dir
 from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
 
