@@ -6,9 +6,9 @@ import threading
 import typing as t
 
 import globus_sdk
-from globus_sdk.scopes import AuthScopes, ScopeBuilder
+from globus_sdk.scopes import AuthScopes
 
-from ..utils import get_env_var_with_deprecation
+from ..auth.scopes import ComputeScopeBuilder
 from ..web_client import WebClient
 from .client_login import get_client_login, is_client_login
 from .globus_auth import internal_auth_client
@@ -17,29 +17,6 @@ from .tokenstore import get_token_storage_adapter
 
 log = logging.getLogger(__name__)
 
-
-def _get_funcx_all_scope() -> str:
-    return get_env_var_with_deprecation(
-        "GLOBUS_COMPUTE_SCOPE",
-        "FUNCX_SCOPE",
-        "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
-    )
-
-
-class ComputeScopeBuilder(ScopeBuilder):
-    # FIXME:
-    # for some reason, the funcx resource server name on the production scope is
-    # "funcx_service" even though this doesn't match the resource server ID and the
-    # scope is in URL format
-    # at some point, we ought to work out how to fix this to normalize this so that it
-    # conforms to one of the known, pre-existing modes for scopes
-    def __init__(self):
-        super().__init__("funcx_service")
-        self.all = _get_funcx_all_scope()
-
-
-#: a ScopeBuilder in the style of globus_sdk.scopes for the Globus Compute service
-#: it supports one scope named 'all', as in ``ComputeScopes.all``
 ComputeScopes = ComputeScopeBuilder()
 
 
