@@ -17,6 +17,10 @@ from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
 from globus_sdk.exc.api import GlobusAPIError
+from globus_sdk.experimental.globus_app import GlobusApp
+from globus_sdk.scopes import Scope
+
+from .auth.scopes import ComputeScopes
 
 
 def _get_packed_code(
@@ -96,11 +100,15 @@ class WebClient(globus_sdk.BaseClient):
     # use the Globus Compute-specific error class
     error_class = GlobusAPIError
 
+    scopes = ComputeScopes
+    default_scope_requirements = [Scope(ComputeScopes.all)]
+
     def __init__(
         self,
         *,
         environment: t.Optional[str] = None,
         base_url: t.Optional[str] = None,
+        app: t.Optional[GlobusApp] = None,
         app_name: t.Optional[str] = None,
         **kwargs,
     ):
@@ -112,7 +120,11 @@ class WebClient(globus_sdk.BaseClient):
             app_name = user_agent_substring(__version__)
 
         super().__init__(
-            environment=environment, base_url=base_url, app_name=app_name, **kwargs
+            environment=environment,
+            base_url=base_url,
+            app=app,
+            app_name=app_name,
+            **kwargs,
         )
 
     @property
