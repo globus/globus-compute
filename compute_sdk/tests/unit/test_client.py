@@ -6,15 +6,21 @@ import globus_compute_sdk as gc
 import pytest
 from globus_compute_sdk import ContainerSpec, __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
+from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
     FunctionRegistrationMetadata,
+    WebClient,
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 from globus_sdk import __version__ as __version_globus__
+from globus_sdk.experimental.globus_app import UserApp
+from pytest_mock import MockerFixture
+
+_MOCK_BASE = "globus_compute_sdk.sdk.client."
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +46,10 @@ def gcc():
         {"asynchronous": True},
     ],
 )
-def test_client_warns_on_unknown_kwargs(kwargs):
+def test_client_warns_on_unknown_kwargs(kwargs, mocker: MockerFixture):
+    mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
+    mocker.patch(f"{_MOCK_BASE}WebClient")
+
     known_kwargs = [
         "funcx_home",
         "environment",
@@ -49,11 +58,12 @@ def test_client_warns_on_unknown_kwargs(kwargs):
         "code_serialization_strategy",
         "data_serialization_strategy",
         "login_manager",
+        "app",
     ]
     unknown_kwargs = [k for k in kwargs if k not in known_kwargs]
 
     with pytest.warns(UserWarning) as warnings:
-        _ = gc.Client(do_version_check=False, login_manager=mock.Mock(), **kwargs)
+        _ = gc.Client(do_version_check=False, app=mock.Mock(spec=UserApp), **kwargs)
 
     assert len(warnings) == len(unknown_kwargs)
     for warning in warnings:
@@ -63,8 +73,11 @@ def test_client_warns_on_unknown_kwargs(kwargs):
 @pytest.mark.parametrize("env", [None, "local", "dev", "production"])
 @pytest.mark.parametrize("usage_method", ["env_var", "param"])
 def test_client_init_sets_addresses_by_env(
-    monkeypatch, env, usage_method, randomstring
+    monkeypatch, env, usage_method, randomstring, mocker: MockerFixture
 ):
+    mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
+    mocker.patch(f"{_MOCK_BASE}WebClient")
+
     if env in (None, "production"):
         web_uri = "https://compute.api.globus.org"
     elif env == "dev":
@@ -76,7 +89,7 @@ def test_client_init_sets_addresses_by_env(
 
     # default kwargs: turn off external interactions
     kwargs = {
-        "login_manager": mock.Mock(),
+        "app": mock.Mock(spec=UserApp),
         "do_version_check": False,
     }
     # either pass the env as a param or set it in the environment
@@ -524,3 +537,55 @@ def test_version_mismatch_only_warns_once_per_ep(mocker, gcc, mock_response, ep_
         assert gcc.get_result(tid) == result
 
     assert mock_warn.warn.call_count == len(set(ep_ids))
+
+
+def test_client_globus_app_and_login_manager_mutually_exclusive():
+    app = mock.Mock(spec=UserApp)
+    login_manager = mock.Mock(spec=LoginManager)
+    with pytest.raises(ValueError) as excinfo:
+        gc.Client(do_version_check=False, login_manager=login_manager, app=app)
+    assert "'app' and 'login_manager' are mutually exclusive" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("custom_app", [True, False])
+def test_client_handles_globus_app(
+    custom_app: bool, mocker: MockerFixture, randomstring
+):
+    mock_auth_client = mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
+    mock_auth_client.return_value = mock.Mock(spec=ComputeAuthClient)
+    mock_web_client = mocker.patch(f"{_MOCK_BASE}WebClient")
+    mock_web_client.return_value = mock.Mock(spec=WebClient)
+    mock_get_globus_app = mocker.patch(f"{_MOCK_BASE}get_globus_app")
+
+    mock_app = mock.Mock(spec=UserApp)
+    env = randomstring()
+    kwargs = {"environment": env}
+    if custom_app:
+        kwargs["app"] = mock_app
+    else:
+        # Client will default to using a GlobusApp
+        mock_get_globus_app.return_value = mock_app
+
+    client = gc.Client(do_version_check=False, **kwargs)
+
+    if custom_app:
+        mock_get_globus_app.assert_not_called()
+    else:
+        mock_get_globus_app.assert_called_once_with(environment=env)
+
+    assert client.app is mock_app
+    assert client.web_client is mock_web_client.return_value
+    mock_web_client.assert_called_once_with(
+        base_url=client.web_service_address, app=mock_app
+    )
+    assert client.auth_client is mock_auth_client.return_value
+    mock_auth_client.assert_called_once_with(app=mock_app)
+
+
+def test_client_handles_login_manager():
+    mock_lm = mock.Mock(spec=LoginManager)
+    client = gc.Client(do_version_check=False, login_manager=mock_lm)
+    assert client.login_manager is mock_lm
+    assert mock_lm.get_auth_client.call_count == 1
+    assert mock_lm.get_web_client.call_count == 1
+    assert mock_lm.get_web_client.call_args[1]["base_url"] == client.web_service_address

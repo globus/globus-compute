@@ -21,11 +21,15 @@ from globus_compute_sdk.sdk.web_client import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
 from globus_compute_sdk.version import __version__, compare_versions
+from globus_sdk.experimental.globus_app import GlobusApp
 from globus_sdk.version import __version__ as __version_globus__
 
+from .auth.auth_client import ComputeAuthClient
+from .auth.globus_app import get_globus_app
 from .batch import Batch, UserRuntime
-from .login_manager import LoginManager, LoginManagerProtocol, requires_login
+from .login_manager import LoginManagerProtocol, requires_login
 from .utils import get_env_var_with_deprecation
+from .web_client import WebClient
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +60,7 @@ class Client:
         code_serialization_strategy: SerializationStrategy | None = None,
         data_serialization_strategy: SerializationStrategy | None = None,
         login_manager: LoginManagerProtocol | None = None,
+        app: GlobusApp | None = None,
         **kwargs,
     ):
         """
@@ -83,8 +88,13 @@ class Client:
             globus_compute_sdk.serialize.DEFAULT_STRATEGY_DATA will be used.
 
         login_manager: LoginManagerProtocol
-            Allows login logic to be overridden for specific use cases. If None, a
-            LoginManager will be used.
+            Allows login logic to be overridden for specific use cases. If None,
+            a ``GlobusApp`` will be used. Mutually exclusive with ``app``.
+
+        app: GlobusApp
+            A ``GlobusApp`` that will handle authorization and storing and validating
+            tokens. If None, a standard ``GlobusApp`` will be used. Mutually exclusive
+            with ``login_manager``.
         """
         for arg_name in kwargs:
             msg = (
@@ -99,18 +109,19 @@ class Client:
 
         self._task_status_table: dict[str, dict] = {}
 
-        # if a login manager was passed, no login flow is triggered
-        if login_manager is not None:
-            self.login_manager: LoginManagerProtocol = login_manager
-        # but if login handling is implicit (as when no login manager is passed)
-        # then ensure that the user is logged in
+        if app and login_manager:
+            raise ValueError("'app' and 'login_manager' are mutually exclusive.")
+        elif login_manager:
+            self.login_manager = login_manager
+            self.auth_client = login_manager.get_auth_client()
+            self.web_client = self.login_manager.get_web_client(
+                base_url=self.web_service_address
+            )
         else:
-            self.login_manager = LoginManager(environment=environment)
-            self.login_manager.ensure_logged_in()
+            self.app = app if app else get_globus_app(environment=environment)
+            self.auth_client = ComputeAuthClient(app=self.app)
+            self.web_client = WebClient(base_url=self.web_service_address, app=self.app)
 
-        self.web_client = self.login_manager.get_web_client(
-            base_url=self.web_service_address
-        )
         self.fx_serializer = ComputeSerializer(
             strategy_code=code_serialization_strategy,
             strategy_data=data_serialization_strategy,
