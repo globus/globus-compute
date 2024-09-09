@@ -84,6 +84,6 @@ def test_gcengine_status_report(mocker: MockFixture, engine_runner: callable):
     assert info["prefetch_capacity"] == engine.executor.prefetch_capacity
     assert info["max_blocks"] == engine.executor.provider.max_blocks
     assert info["min_blocks"] == engine.executor.provider.min_blocks
-    assert info["max_workers_per_node"] == engine.executor.max_workers
+    assert info["max_workers_per_node"] == engine.executor.max_workers_per_node
     assert info["nodes_per_block"] == engine.executor.provider.nodes_per_block
     assert info["heartbeat_period"] == engine.executor.heartbeat_period
