@@ -179,8 +179,9 @@ def test_gcengine_pass_through_to_executor(randomstring):
         "label": "VroomEngine",
         "address": "127.0.0.1",
         "encrypted": False,
-        "max_workers": 1,
+        "max_workers_per_node": 1,
         "foo": "bar",
+        randomstring(): randomstring(),
     }
 
     m = mock.Mock(launch_cmd="")
