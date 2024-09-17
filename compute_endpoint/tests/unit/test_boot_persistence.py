@@ -1,5 +1,6 @@
 import os
 import pathlib
+from unittest import mock
 
 import pytest
 import yaml
@@ -10,6 +11,7 @@ from globus_compute_endpoint.boot_persistence import (
     enable_on_boot,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_sdk.experimental.globus_app import UserApp
 from pyfakefs import fake_filesystem as fakefs
 
 _MOCK_BASE = "globus_compute_endpoint.boot_persistence."
@@ -50,15 +52,12 @@ def systemd_unit_dir(fs: fakefs.FakeFilesystem, mocker):
     return unit_dir
 
 
-def test_enable_on_boot_happy_path(
-    fake_ep_dir, systemd_unit_dir, ep_name, mocker, capsys
-):
-    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
-    mock_ensure_logged_in = mock_login_manager.return_value.ensure_logged_in
+def test_enable_on_boot_happy_path(fake_ep_dir, systemd_unit_dir, ep_name, capsys):
+    mock_app = mock.Mock(spec=UserApp)
 
-    enable_on_boot(fake_ep_dir)
+    enable_on_boot(fake_ep_dir, mock_app)
 
-    mock_ensure_logged_in.assert_called_once()
+    mock_app.login.assert_called_once()
 
     assert any(ep_name in f for f in os.listdir(systemd_unit_dir))
 
@@ -70,9 +69,10 @@ def test_enable_on_boot_happy_path(
 
 def test_enable_on_boot_no_systemd(fake_ep_dir, mocker):
     mocker.patch(f"{_MOCK_BASE}_systemd_available", return_value=False)
+    mock_app = mock.Mock(spec=UserApp)
 
     with pytest.raises(ClickException) as e:
-        enable_on_boot(fake_ep_dir)
+        enable_on_boot(fake_ep_dir, mock_app)
 
     assert "Systemd not found" in str(e)
 
@@ -81,6 +81,7 @@ def test_enable_on_boot_no_systemd(fake_ep_dir, mocker):
 def test_enable_on_boot_detach_endpoint(
     mocker, fake_ep_dir, systemd_unit_dir, mu: bool, fs: fakefs.FakeFilesystem
 ):
+    mock_app = mock.Mock(spec=UserApp)
     cfg_path = fake_ep_dir / "config.yaml"
     cfg = yaml.safe_load(cfg_path.read_text())
     del cfg["detach_endpoint"]
@@ -90,27 +91,26 @@ def test_enable_on_boot_detach_endpoint(
     cfg_path.write_text(yaml.dump(cfg))
 
     if mu:
-        mocker.patch(f"{_MOCK_BASE}LoginManager")
         mock_print = mocker.patch(f"{_MOCK_BASE}print")
-        enable_on_boot(fake_ep_dir)
+        enable_on_boot(fake_ep_dir, mock_app)
         assert "Systemd service installed at " in mock_print.call_args[0][0]
     else:
         with pytest.raises(ClickException) as e:
-            enable_on_boot(fake_ep_dir)
+            enable_on_boot(fake_ep_dir, mock_app)
 
         assert "cannot run in detached mode" in str(e)
 
 
 @pytest.mark.parametrize("exists", [True, False])
 def test_enable_on_boot_active_ep(fake_ep_dir, systemd_unit_dir, mocker, exists):
-    mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_app = mock.Mock(spec=UserApp)
     mocker.patch(
         f"{_MOCK_BASE}Endpoint.check_pidfile",
         return_value={"exists": exists, "active": True},
     )
 
     with pytest.raises(ClickException) as e:
-        enable_on_boot(fake_ep_dir)
+        enable_on_boot(fake_ep_dir, mock_app)
 
     assert "currently running" in str(e)
 
@@ -118,12 +118,12 @@ def test_enable_on_boot_active_ep(fake_ep_dir, systemd_unit_dir, mocker, exists)
 def test_enable_on_boot_service_file_already_exists(
     fake_ep_dir, systemd_unit_dir, ep_name, randomstring, mocker
 ):
-    mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_app = mock.Mock(spec=UserApp)
     unit = systemd_unit_dir / f"{_systemd_service_name(ep_name)}.service"
     unit.write_text(randomstring())
 
     with pytest.raises(ClickException) as e:
-        enable_on_boot(fake_ep_dir)
+        enable_on_boot(fake_ep_dir, mock_app)
 
     assert "already exists" in str(e)
     assert ep_name in str(e)
@@ -132,11 +132,11 @@ def test_enable_on_boot_service_file_already_exists(
 def test_enable_on_boot_no_perms(
     fake_ep_dir, systemd_unit_dir, fs: fakefs.FakeFilesystem, mocker
 ):
-    mocker.patch(f"{_MOCK_BASE}LoginManager")
+    mock_app = mock.Mock(spec=UserApp)
     systemd_unit_dir.chmod(fakefs.PERM_READ)
 
     with pytest.raises(ClickException) as pyt_exc:
-        enable_on_boot(fake_ep_dir)
+        enable_on_boot(fake_ep_dir, mock_app)
 
     assert "Unable to create systemd unit file" in str(pyt_exc.value)
 

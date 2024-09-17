@@ -21,16 +21,20 @@ from globus_compute_endpoint.cli import (
     _AUTH_POLICY_DEFAULT_DESC,
     _AUTH_POLICY_DEFAULT_NAME,
     _do_login,
+    _do_logout_endpoints,
     app,
     create_or_choose_auth_project,
+    get_globus_app_with_scopes,
     init_config_dir,
 )
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import MISSING, AuthClient
+from globus_sdk.experimental.globus_app import UserApp
 from pyfakefs import fake_filesystem as fakefs
 from pytest_mock import MockFixture
 
@@ -50,6 +54,20 @@ def ep_name(randomstring):
 @pytest.fixture
 def fake_ep_uuid():
     yield str(uuid.uuid4())
+
+
+@pytest.fixture
+def mock_app(mocker: MockFixture):
+    mock_app = mock.Mock(spec=UserApp)
+    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=mock_app)
+    return mock_app
+
+
+@pytest.fixture
+def mock_auth_client(mocker: MockFixture):
+    mock_auth_client = mock.Mock(spec=ComputeAuthClient)
+    mocker.patch(f"{_MOCK_BASE}ComputeAuthClient", return_value=mock_auth_client)
+    return mock_auth_client
 
 
 @pytest.fixture
@@ -175,6 +193,35 @@ def test_init_config_dir_permission_error(fs):
             init_config_dir()
 
     assert "Permission denied" in str(exc)
+
+
+def test_get_globus_app_with_scopes(mocker: MockFixture):
+    mock_stdin = mocker.patch.object(sys, "stdin")
+    mock_stdin.isatty.return_value = True
+    mock_stdin.closed = False
+
+    app = get_globus_app_with_scopes()
+
+    scopes = []
+    for scope_list in app.scope_requirements.values():
+        for scope in scope_list:
+            scopes.append(str(scope))
+
+    assert len(scopes) > 0
+    assert all(str(s) in scopes for s in WebClient.default_scope_requirements)
+    assert all(str(s) in scopes for s in ComputeAuthClient.default_scope_requirements)
+
+
+@pytest.mark.parametrize("exception_type", [ValueError, RuntimeError])
+def test_get_globus_app_with_scopes_handles_exception(
+    exception_type: Exception, mocker: MockFixture
+):
+    mocker.patch(
+        f"{_MOCK_BASE}get_globus_app", side_effect=exception_type("Test exception")
+    )
+    with pytest.raises(ClickException) as exc:
+        get_globus_app_with_scopes()
+    assert "Test exception" in str(exc)
 
 
 def test_start_ep_corrupt(run_line, mock_cli_state, make_endpoint_dir, ep_name):
@@ -940,39 +987,62 @@ def test_fail_exit_sends_amqp_msg(
     assert mock_send.called
 
 
-@pytest.mark.parametrize("force", [True, False], ids=["forced", "unforced"])
-@pytest.mark.parametrize("is_client", [True, False], ids=["client", "noclient"])
-@pytest.mark.parametrize("logged_in", [True, False], ids=["authd", "unauthd"])
-def test_endpoint_login(mocker, caplog, force, is_client, logged_in):
-    mocker.patch(f"{_MOCK_BASE}is_client_login", return_value=is_client)
-    mock_lm_class = mocker.patch(f"{_MOCK_BASE}LoginManager")
-    mock_lm = mock_lm_class.return_value
-    mock_lm.SCOPES = {"scope": "token"}
-    if logged_in:
-        mock_lm._token_storage.get_by_resource_server.return_value = {"scope": "token"}
+@pytest.mark.parametrize("force", [True, False])
+@pytest.mark.parametrize("login_required", [True, False])
+def test_login(
+    force: bool,
+    login_required: bool,
+    caplog: pytest.LogCaptureFixture,
+    mocker: MockFixture,
+    mock_cli_state,
+):
+    mock_app = mock.Mock(spec=UserApp)
+    mock_app.login_required.return_value = login_required
+    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=mock_app)
     caplog.set_level(logging.INFO)
 
-    _do_login(force)
+    _do_login(force=force)
 
-    if is_client:
-        assert not mock_lm_class.called
-        assert "client credentials" in caplog.text
-        return
-
-    assert mock_lm_class.called
-    if force or not logged_in:
-        assert mock_lm.run_login_flow.called
-        assert not caplog.text
+    if login_required or force:
+        assert mock_app.login.call_count == 1
     else:
+        assert mock_app.login.call_count == 0
         assert "Already logged in" in caplog.text
 
 
 @pytest.mark.parametrize("force", [True, False], ids=["forced", "unforced"])
-def test_endpoint_login_handles_partial_client_login_state(monkeypatch, force):
+def test_login_handles_partial_client_login_state(monkeypatch, force):
     monkeypatch.setenv("GLOBUS_COMPUTE_CLIENT_SECRET", "some_uuid")
     with pytest.raises(ClickException) as e:
         _do_login(force)
     assert "both environment variables" in str(e)
+
+
+@pytest.mark.parametrize("force", [True, False])
+@pytest.mark.parametrize("running_endpoints", [{}, {"my_ep": {"status": "Running"}}])
+def test_logout(
+    force: bool,
+    running_endpoints: dict,
+    caplog: pytest.LogCaptureFixture,
+    mocker: MockFixture,
+    mock_cli_state,
+):
+    mock_app = mock.Mock(spec=UserApp)
+    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=mock_app)
+    mocker.patch(
+        f"{_MOCK_BASE}Endpoint.get_running_endpoints", return_value=running_endpoints
+    )
+    caplog.set_level(logging.INFO)
+
+    _do_logout_endpoints(force=force)
+
+    if running_endpoints and not force:
+        assert "endpoints are currently running" in caplog.text
+    elif not running_endpoints or force:
+        assert mock_app.logout.call_count == 1
+        assert "Logout succeeded" in caplog.text
+    else:
+        assert mock_app.logout.call_count == 0
 
 
 @pytest.mark.parametrize("ap_project_id", [None, "foo"])
@@ -1026,14 +1096,15 @@ def test_configure_ep_auth_policy_defaults(
     mock_cli_state,
     make_endpoint_dir,
     ep_name,
+    mock_app: UserApp,
+    mock_auth_client: ComputeAuthClient,
 ):
-    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
     mock_create_auth_policy = mocker.patch(f"{_MOCK_BASE}create_auth_policy")
 
     run_line(f"configure --auth-policy-project-id=foo {ep_name}")
 
     assert mock_create_auth_policy.call_args.kwargs == {
-        "ac": mock_login_manager.return_value.get_auth_client.return_value,
+        "ac": mock_auth_client,
         "project_id": "foo",
         "display_name": _AUTH_POLICY_DEFAULT_NAME,
         "description": _AUTH_POLICY_DEFAULT_DESC,
@@ -1049,8 +1120,9 @@ def test_configure_ep_auth_param_parse(
     mock_cli_state,
     make_endpoint_dir,
     ep_name,
+    mock_app: UserApp,
+    mock_auth_client: ComputeAuthClient,
 ):
-    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
     mock_create_auth_policy = mocker.patch(f"{_MOCK_BASE}create_auth_policy")
     params = " ".join(
         [
@@ -1066,7 +1138,7 @@ def test_configure_ep_auth_param_parse(
     run_line(f"configure {params} {ep_name}")
 
     assert mock_create_auth_policy.call_args.kwargs == {
-        "ac": mock_login_manager.return_value.get_auth_client.return_value,
+        "ac": mock_auth_client,
         "project_id": "p123",
         "display_name": "my awesome policy",
         "description": "policy desc",
@@ -1102,27 +1174,26 @@ def test_configure_ep_auth_policy_creates_or_chooses_project(
     mock_cli_state,
     make_endpoint_dir,
     ep_name,
+    mock_app: UserApp,
+    mock_auth_client: ComputeAuthClient,
     randomstring,
     has_projects,
 ):
     class StopTest(Exception):
         pass
 
-    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
-    mock_ac = mock_login_manager.return_value.get_auth_client.return_value
-
     if has_projects:
-        mock_ac.get_projects.return_value = [
+        mock_auth_client.get_projects.return_value = [
             {"id": str(uuid.uuid4()), "display_name": randomstring()} for _ in range(5)
         ]
         # stop test when choosing a project
         mocker.patch(f"{_MOCK_BASE}user_input_select", side_effect=StopTest)
     else:
-        mock_ac.get_projects.return_value = []
+        mock_auth_client.get_projects.return_value = []
         mock_input = mocker.patch("builtins.input")
         mock_input.return_value = "y"  # break out of interact loop asap
         # stop test when creating a project
-        mock_ac.create_project.side_effect = StopTest
+        mock_auth_client.create_project.side_effect = StopTest
 
     res = run_line(
         f"configure --auth-policy-display-name=foo {ep_name}", assert_exit_code=1
@@ -1138,11 +1209,11 @@ def test_configure_ep_auth_policy_timeout_sets_ha(
     mock_cli_state,
     make_endpoint_dir,
     ep_name,
+    mock_app: UserApp,
+    mock_auth_client: ComputeAuthClient,
     timeout,
 ):
-    mock_login_manager = mocker.patch(f"{_MOCK_BASE}LoginManager")
-    mock_ac = mock_login_manager.return_value.get_auth_client.return_value
-    create_policy = mock_ac.create_policy
+    mock_auth_client.create_policy.return_value = {"policy": {"id": "foo"}}
 
     if timeout is None:
         line = f"configure --auth-policy-project-id=bar {ep_name}"
@@ -1153,8 +1224,10 @@ def test_configure_ep_auth_policy_timeout_sets_ha(
 
     run_line(line)
 
-    assert create_policy.called
-    assert create_policy.call_args.kwargs["high_assurance"] == bool(timeout)
+    assert mock_auth_client.create_policy.called
+    assert mock_auth_client.create_policy.call_args.kwargs["high_assurance"] == bool(
+        timeout
+    )
 
 
 @pytest.mark.parametrize(

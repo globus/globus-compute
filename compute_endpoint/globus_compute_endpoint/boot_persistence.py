@@ -6,7 +6,7 @@ import textwrap
 from click import ClickException
 from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_sdk.experimental.globus_app import GlobusApp
 
 _SYSTEMD_UNIT_DIR = pathlib.Path("/etc/systemd/system")
 
@@ -39,7 +39,7 @@ def _systemd_available() -> bool:
     return _SYSTEMD_UNIT_DIR.exists()
 
 
-def enable_on_boot(ep_dir: pathlib.Path):
+def enable_on_boot(ep_dir: pathlib.Path, app: GlobusApp):
     if not _systemd_available():
         raise ClickException(
             "Systemd not found. On-boot persistence is currently only implemented for"
@@ -75,7 +75,7 @@ def enable_on_boot(ep_dir: pathlib.Path):
 
     # ensure that credentials exist when systemd tries to start endpoint, so that
     # auth login flow doesn't run under systemd
-    LoginManager().ensure_logged_in()
+    app.login()
 
     service_name = _systemd_service_name(ep_name)
     unit_file_path = _SYSTEMD_UNIT_DIR / f"{service_name}.service"

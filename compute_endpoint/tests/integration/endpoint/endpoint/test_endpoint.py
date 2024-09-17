@@ -12,7 +12,6 @@ import responses
 from click import ClickException
 from click.testing import CliRunner
 from globus_compute_endpoint.cli import (
-    _do_logout_endpoints,
     _do_stop_endpoint,
     _upgrade_funcx_imports_in_config,
     app,
@@ -109,47 +108,6 @@ def test_start_endpoint_data_passthrough(fs):
     assert req_json["authentication_policy"] == ep_conf.authentication_policy
     assert req_json["subscription_uuid"] == ep_conf.subscription_id
     assert req_json["public"] is ep_conf.public
-
-
-def test_endpoint_logout(monkeypatch):
-    # not forced, and no running endpoints
-    logout_true = mock.Mock(return_value=True)
-    logout_false = mock.Mock(return_value=False)
-    monkeypatch.setattr(
-        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
-    )
-    success, msg = _do_logout_endpoints(False, running_endpoints={})
-    logout_true.assert_called_once()
-    assert success
-
-    logout_true.reset_mock()
-
-    # forced, and no running endpoints
-    success, msg = _do_logout_endpoints(True, running_endpoints={})
-    logout_true.assert_called_once()
-    assert success
-
-    one_running = {
-        "default": {"status": "Running", "id": "123abcde-a393-4456-8de5-123456789abc"}
-    }
-
-    monkeypatch.setattr(
-        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_false
-    )
-    # not forced, with running endpoint
-    success, msg = _do_logout_endpoints(False, running_endpoints=one_running)
-    logout_false.assert_not_called()
-    assert not success
-
-    logout_true.reset_mock()
-
-    monkeypatch.setattr(
-        globus_compute_sdk.sdk.login_manager.LoginManager, "logout", logout_true
-    )
-    # forced, with running endpoint
-    success, msg = _do_logout_endpoints(True, running_endpoints=one_running)
-    logout_true.assert_called_once()
-    assert success
 
 
 @mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
