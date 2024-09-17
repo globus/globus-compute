@@ -28,11 +28,13 @@ from globus_compute_endpoint.endpoint.utils import (
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_endpoint.self_diagnostic import run_self_diagnostic
+from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
+from globus_compute_sdk.sdk.auth.globus_app import get_globus_app
+from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
-from globus_compute_sdk.sdk.login_manager import LoginManager
-from globus_compute_sdk.sdk.login_manager.client_login import is_client_login
-from globus_compute_sdk.sdk.login_manager.whoami import print_whoami_info
+from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
+from globus_sdk.experimental.globus_app import GlobusApp
 
 try:
     from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
@@ -76,6 +78,20 @@ def init_config_dir() -> pathlib.Path:
 def get_config_dir() -> pathlib.Path:
     state = CommandState.ensure()
     return state.endpoint_config_dir
+
+
+def get_globus_app_with_scopes() -> GlobusApp:
+    try:
+        app = get_globus_app()
+    except (RuntimeError, ValueError) as e:
+        raise ClickException(str(e))
+    app.add_scope_requirements(
+        {
+            WebClient.scopes.resource_server: WebClient.default_scope_requirements,
+            ComputeAuthClient.scopes.resource_server: ComputeAuthClient.default_scope_requirements,  # noqa E501
+        }
+    )
+    return app
 
 
 def get_cli_endpoint(conf: Config) -> Endpoint:
@@ -388,9 +404,8 @@ def configure_endpoint(
                 "create a new one at the same time"
             )
 
-        login_manager = LoginManager()
-        login_manager.ensure_logged_in()
-        ac = login_manager.get_auth_client()
+        app = get_globus_app_with_scopes()
+        ac = ComputeAuthClient(app=app)
 
         if not auth_policy_project_id:
             auth_policy_project_id = create_or_choose_auth_project(ac)
@@ -475,15 +490,7 @@ def login(force: bool):
     help="Revokes tokens even with currently running endpoints",
 )
 def logout_endpoints(force: bool):
-    success, msg = _do_logout_endpoints(force=force)
-    if not success:
-        # Raising ClickException is apparently the way to do sys.exit(1)
-        #     and return a non-zero value to the command line
-        # See https://click.palletsprojects.com/en/8.1.x/exceptions/
-        if not isinstance(msg, str) or msg is None:
-            # Generic unsuccessful if no reason was given
-            msg = "Logout unsuccessful"
-        raise ClickException(msg)
+    _do_logout_endpoints(force=force)
 
 
 @app.command("whoami", help="Show the currently logged-in identity")
@@ -494,44 +501,26 @@ def logout_endpoints(force: bool):
     help="Also show identities linked to the currently logged-in primary identity.",
 )
 def whoami(linked_identities: bool) -> None:
+    app = get_globus_app_with_scopes()
     try:
-        print_whoami_info(linked_identities)
+        print_whoami_info(app, linked_identities)
     except ValueError as ve:
         raise ClickException(str(ve))
 
 
 def _do_login(force: bool) -> None:
-    try:
-        assert not is_client_login()
-    except Exception as e:
-        if isinstance(e, AssertionError):
-            log.info("Don't need to log in when client credentials are present")
-            return
-        else:
-            raise ClickException(str(e))
-
-    lm = LoginManager()
-    if force or lm._token_storage.get_by_resource_server().keys() != lm.SCOPES.keys():
-        # if not forced, only run login flow if any tokens are missing
-        lm.run_login_flow()
+    app = get_globus_app_with_scopes()
+    if force or app.login_required():
+        app.login(force=force)
     else:
         log.info("Already logged in. Use --force to run login flow anyway")
 
 
-def _do_logout_endpoints(
-    force: bool, running_endpoints: dict | None = None
-) -> tuple[bool, str | None]:
-    """
-    Logout from all endpoints and remove cached authentication credentials
+def _do_logout_endpoints(force: bool) -> None:
+    """Logout from all endpoints and remove cached authentication credentials"""
+    compute_dir = get_config_dir()
+    running_endpoints = Endpoint.get_running_endpoints(compute_dir)
 
-    Returns True, None if logout was successful and tokens were found and revoked
-    Returns False, error_msg if token revocation was not done
-    """
-    if running_endpoints is None:
-        compute_dir = get_config_dir()
-        running_endpoints = Endpoint.get_running_endpoints(compute_dir)
-    tokens_revoked = False
-    error_msg = None
     if running_endpoints and not force:
         running_list = ", ".join(running_endpoints.keys())
         log.info(
@@ -539,15 +528,10 @@ def _do_logout_endpoints(
             + running_list
             + "\nPlease use logout --force to proceed"
         )
-        error_msg = "Not logging out with running endpoints without --force"
     else:
-        tokens_revoked = LoginManager().logout()
-        if tokens_revoked:
-            log.info("Logout succeeded and all cached credentials were revoked")
-        else:
-            error_msg = "No cached tokens were found, already logged out?"
-            log.info(error_msg)
-    return tokens_revoked, error_msg
+        app = get_globus_app_with_scopes()
+        app.logout()
+        log.info("Logout succeeded and all cached credentials were revoked")
 
 
 FUNCX_COMPUTE_IMPORT_UPDATES = {
@@ -1015,7 +999,8 @@ def create_auth_policy(
 )
 @name_or_uuid_arg
 def enable_on_boot_cmd(ep_dir: pathlib.Path):
-    enable_on_boot(ep_dir)
+    app = get_globus_app_with_scopes()
+    enable_on_boot(ep_dir, app=app)
 
 
 @app.command(

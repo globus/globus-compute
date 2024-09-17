@@ -503,7 +503,7 @@ class EndpointManager:
 
             gcc = GC.Client(**client_options)
             try:
-                userinfo = gcc.login_manager.get_auth_client().userinfo()
+                userinfo = gcc.auth_client.userinfo()
                 ids = userinfo["identity_set"]
                 parent_identities.update(ident["sub"] for ident in ids)
                 log.debug(
