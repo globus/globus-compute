@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import logging
 
-from globus_compute_sdk.sdk.login_manager import LoginManager
+from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.utils.printing import print_table
 from globus_sdk import AuthAPIError
+from globus_sdk.experimental.globus_app import GlobusApp
 
 NOT_LOGGED_IN_MSG = "Unable to retrieve user information. Please log in again."
 
 logger = logging.getLogger(__name__)
 
 
-def get_user_info(auth_client, user_id):
+def get_user_info(auth_client: ComputeAuthClient, user_id: str) -> list[str]:
     """
     Parse username, name, email from auth response and return a list of info
     """
@@ -22,17 +25,15 @@ def get_user_info(auth_client, user_id):
     ]
 
 
-def print_whoami_info(linked_identities: bool = False) -> None:
+def print_whoami_info(app: GlobusApp, linked_identities: bool = False) -> None:
     """
     Display information for the currently logged-in user.
     """
-
-    try:
-        auth_client = LoginManager().get_auth_client()
-    except LookupError:
+    if app.login_required():
         logger.debug(NOT_LOGGED_IN_MSG, exc_info=True)
         raise ValueError(NOT_LOGGED_IN_MSG)
 
+    auth_client = ComputeAuthClient(app=app)
     whoami_headers = ["Username", "Name", "ID", "Email"]
 
     # get userinfo from auth.
