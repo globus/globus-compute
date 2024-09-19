@@ -938,10 +938,12 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
 
     gce.endpoint_id = uuid.uuid4()
     gce.batch_size = batch_size
-    for _ in range(num_batches * batch_size):
-        gce.submit(noop)
+    with mock.patch(f"{_MOCK_BASE}time.sleep"):
+        for _ in range(num_batches * batch_size):
+            gce.submit(noop)
 
-    try_assert(lambda: gcc.batch_run.call_count >= num_batches)
+        try_assert(lambda: gcc.batch_run.call_count >= num_batches)
+
     for args, _kwargs in gcc.batch_run.call_args_list:
         *_, batch = args
         assert 0 < batch.add.call_count <= batch_size
@@ -1014,6 +1016,42 @@ def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(mocker, gc_execut
     for expected, (a, _k) in zip((tg_id_1, tg_id_2), gcc.create_batch.call_args_list):
         found_tg_uuid = a[0]
         assert found_tg_uuid == expected
+
+
+@pytest.mark.parametrize("burst_limit", (2, 3, 4))
+@pytest.mark.parametrize("burst_window", (2, 3, 4))
+def test_task_submitter_api_rate_limit(
+    gc_executor, mock_log, burst_limit, burst_window
+):
+    gcc, gce = gc_executor
+    gce.endpoint_id = uuid.uuid4()
+    gce._submit_tasks = mock.Mock()
+
+    gce._function_registry[gce._fn_cache_key(noop)] = str(uuid.uuid4())
+    gce.api_burst_limit = burst_limit
+    gce.api_burst_window_s = burst_window
+    gce.batch_size = random.randint(2, 10)
+
+    exp_rate_limit = random.randint(1, 10)
+    exp_api_submits = burst_limit + exp_rate_limit
+    uep_confs = [{"something": i} for i in range(exp_api_submits)]
+    with mock.patch(f"{_MOCK_BASE}time.sleep"):
+        for uep_conf in uep_confs:
+            gce.user_endpoint_config = uep_conf
+            gce.submit(noop)
+
+        try_assert(lambda: gce._submit_tasks.call_count == exp_api_submits)
+
+    exp_perc = [100 / gce.batch_size for _ in range(1, exp_api_submits)]
+    exp_perc_text = ", ".join(f"{p:.1f}%" for p in exp_perc)
+    cal = [(a, k) for a, k in mock_log.warning.call_args_list if "api_burst" in a[0]]
+    assert len(cal) == exp_rate_limit, "Expect log when rate limiting"
+
+    a, k = cal[-1]
+    assert "batch_size" in a[0], "Expect current value reported"
+    assert "API rate-limit" in a[0], "Expect basic explanation of why delayed"
+    assert "recent batch fill percent: %s" in a[0]
+    assert exp_perc_text == a[-1], "Expect to share batch utilization %"
 
 
 def test_task_submit_handles_multiple_user_endpoint_configs(
