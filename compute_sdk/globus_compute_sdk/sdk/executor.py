@@ -48,7 +48,6 @@ if t.TYPE_CHECKING:
     from pika.frame import Method
     from pika.spec import Basic, BasicProperties
 
-
 _REGISTERED_EXECUTORS: dict[int, Executor] = {}
 _RESULT_WATCHERS: dict[uuid.UUID, _ResultWatcher] = {}
 
@@ -136,6 +135,8 @@ class Executor(concurrent.futures.Executor):
         label: str = "",
         batch_size: int = 128,
         amqp_port: int | None = None,
+        api_burst_limit: int = 4,
+        api_burst_window_s: int = 16,
         **kwargs,
     ):
         """
@@ -156,6 +157,10 @@ class Executor(concurrent.futures.Executor):
             sending upstream [min: 1, default: 128]
         :param amqp_port: Port to use when connecting to results queue. Note that the
             Compute web services only support 5671, 5672, and 443.
+        :param api_burst_limit: Number of "free" API calls to allow before engaging
+            client-side (i.e., this executor) rate-limiting.  See ``api_burst_window_s``
+        :param api_burst_window_s: Window of time (in seconds) in which to count API
+            calls for rate-limiting.
         """
         deprecated_kwargs = {""}
         for key in kwargs:
@@ -191,6 +196,9 @@ class Executor(concurrent.futures.Executor):
 
         self.label = label
         self.batch_size = max(1, batch_size)
+
+        self.api_burst_limit = min(8, max(1, api_burst_limit))
+        self.api_burst_window_s = min(32, max(1, api_burst_window_s))
 
         self.task_count_submitted = 0
         self._task_counter: int = 0
@@ -868,6 +876,8 @@ class Executor(concurrent.futures.Executor):
             t.List[_TaskSubmissionInfo],
         ]
 
+        api_burst_ts: list[float] = []
+        api_burst_fill: list[float] = []
         try:
             fut: ComputeFuture | None = ComputeFuture()  # just start the loop; please
             while fut is not None:
@@ -899,18 +909,53 @@ class Executor(concurrent.futures.Executor):
                 if not tasks:
                     continue  # fut and task are None; "single point of exit"
 
+                api_rate_steady = self.api_burst_window_s / self.api_burst_limit
                 for submit_group, task_list in tasks.items():
                     fut_list = futs[submit_group]
+                    num_tasks = len(task_list)
 
                     tg_uuid, ep_uuid, res_spec, uep_config = submit_group
                     log.info(
                         f"Submitting tasks for Task Group {tg_uuid} to"
-                        f" Endpoint {ep_uuid}: {len(task_list):,}"
+                        f" Endpoint {ep_uuid}: {num_tasks:,}"
                     )
 
+                    if api_burst_ts:
+                        now = time.monotonic()
+                        then = now - self.api_burst_window_s
+                        api_burst_ts = [i for i in api_burst_ts if i > then]
+                        api_burst_fill = api_burst_fill[-len(api_burst_ts) :]
+                        if len(api_burst_ts) >= self.api_burst_limit:
+                            delay = api_rate_steady - (now - api_burst_ts[-1])
+                            delay = max(delay, 0) + random.random()
+                            _burst_rel = [f"{now - s:.2f}" for s in api_burst_ts]
+                            _burst_fill = [f"{p:.1f}%" for p in api_burst_fill]
+
+                            log.warning(
+                                "%r (tid:%s): API rate-limit delay of %.2fs"
+                                "\n  Consider submitting more tasks at once."
+                                "\n  batch_size         = %d"
+                                "\n  api_burst_limit    = %s"
+                                "\n  api_burst_window_s = %s (seconds)"
+                                "\n  recent sends:              %s"
+                                "\n  recent batch fill percent: %s",
+                                self,
+                                _tid,
+                                delay,
+                                self.batch_size,
+                                self.api_burst_limit,
+                                self.api_burst_window_s,
+                                ", ".join(_burst_rel),
+                                ", ".join(_burst_fill),
+                            )
+                            time.sleep(delay)
                     self._submit_tasks(
                         tg_uuid, ep_uuid, res_spec, uep_config, fut_list, task_list
                     )
+                    if num_tasks < self.api_burst_limit:
+                        api_burst_ts.append(time.monotonic())
+                        fill_percent = 100 * num_tasks / self.batch_size
+                        api_burst_fill.append(fill_percent)
 
                     to_watch = [f for f in fut_list if f.task_id and not f.done()]
                     if not to_watch:
