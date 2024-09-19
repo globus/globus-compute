@@ -33,7 +33,7 @@ class SerializationError(SerdeError):
         self.reason = reason
 
     def __repr__(self):
-        return f"Serialization failed due to {self.reason}"
+        return f"Serialization failed: {self.reason}"
 
 
 class DeserializationError(SerdeError):
@@ -43,7 +43,7 @@ class DeserializationError(SerdeError):
         self.reason = reason
 
     def __repr__(self):
-        return f"Deserialization failed due to {self.reason}"
+        return f"Deserialization failed: {self.reason}"
 
 
 class TaskPending(ComputeError):
