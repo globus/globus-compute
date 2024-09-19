@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import codecs
 import inspect
+import json
 import logging
 import pickle
 import typing as t
@@ -28,6 +29,22 @@ class DillDataBase64(SerializationStrategy):
     def deserialize(self, payload: str):
         chomped = self.chomp(payload)
         data = dill.loads(codecs.decode(chomped.encode(), "base64"))
+        return data
+
+
+class JSONData(SerializationStrategy):
+    identifier = "11\n"
+    _for_code = False
+
+    def __init__(self):
+        super().__init__()
+
+    def serialize(self, data) -> str:
+        return self.identifier + json.dumps(data)
+
+    def deserialize(self, payload: str):
+        chomped = self.chomp(payload)
+        data = json.loads(chomped)
         return data
 
 
@@ -230,6 +247,7 @@ class CombinedCode(SerializationStrategy):
 
 STRATEGIES_MAP: dict[str, t.Type[SerializationStrategy]] = {
     DillDataBase64.identifier: DillDataBase64,
+    JSONData.identifier: JSONData,
     DillCodeSource.identifier: DillCodeSource,
     DillCode.identifier: DillCode,
     DillCodeTextInspect.identifier: DillCodeTextInspect,
@@ -239,6 +257,7 @@ STRATEGIES_MAP: dict[str, t.Type[SerializationStrategy]] = {
 
 SELECTABLE_STRATEGIES = [
     DillDataBase64,
+    JSONData,
     DillCodeSource,
     DillCode,
     DillCodeTextInspect,

@@ -282,31 +282,31 @@ another serializer, use the ``code_serialization_strategy`` and
 .. code:: python
 
   from globus_compute_sdk import Client, Executor
-  from globus_compute_sdk.serialize import DillDataBase64, CombinedCode
+  from globus_compute_sdk.serialize import CombinedCode, JSONData
 
   gcc = Client(
     code_serialization_strategy=CombinedCode(),
-    data_serialization_strategy=DillDataBase64()
+    data_serialization_strategy=JSONData()
   )
   gcx = Executor('4b116d3c-1703-4f8f-9f6f-39921e5864df', client=gcc)
 
   # do something with gcx
 
-Note that currently the only supported data serialization strategy is ``DillDataBase64``.
+Note that currently the only alternative data serialization strategy is ``JSONData``.
 
 To check whether a strategy works for a given use-case, use the ``check_strategies``
 method:
 
 .. code:: python
 
-  from globus_compute_sdk.serialize import ComputeSerializer, DillCodeSource, DillDataBase64
+  from globus_compute_sdk.serialize import ComputeSerializer, DillCodeSource, JSONData
 
   def greet(name, greeting = "greetings"):
     return f"{greeting} {name}"
 
   serializer = ComputeSerializer(
     strategy_code=DillCodeSource(),
-    strategy_data=DillDataBase64()
+    strategy_data=JSONData()
   )
 
   serializer.check_strategies(greet, "world", greeting="hello")
@@ -317,8 +317,8 @@ method:
   fn, args, kwargs = serializer.check_strategies(greet, "world", greeting="hello")
   assert fn(*args, **kwargs) == greet("world", greeting="hello")
 
-Supported Method Serialization Strategies
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Supported Serialization Strategies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Note that if ``DillCode`` does not work for your use case, whether it is due
 to differing python/dill version or because of the construction of your method,
@@ -327,6 +327,13 @@ the other alternatives that we currently support are ``DillTextInspect`` and
 strategies and will use the first one that deserializes successfully at
 execution time.
 
+For data, the available strategies are ``DillDataBase64``, which serializes data to
+binary via dill and then to a string format via base-64 encoding, and ``JSONData``,
+which serializes data to JSON. ``DillDataBase64`` can serialize arbitrary python
+objects, while ``JSONData`` can only serialize JSON-able objects: generally ``str``,
+``int``, ``float``, ``bool``, and ``None``, and (potentially nested) ``dict``\s and
+``list``\s containing only those data types. ``JSONData`` is ideal for low-trust
+workflows, because deserialization via dill can result in arbitrary code execution.
 
 Avoiding Serialization Errors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
