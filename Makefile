@@ -1,5 +1,5 @@
 .venv-docs:
-	python -m venv .venv-docs
+	python3 -m venv .venv-docs
 	.venv-docs/bin/pip install -U pip setuptools
 	.venv-docs/bin/pip install './compute_sdk[docs]' './compute_endpoint'
 
