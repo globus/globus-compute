@@ -191,17 +191,6 @@ def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, res_spec, uep_confi
     assert before_changes == after_changes
 
 
-@pytest.mark.parametrize("argname", ("batch_interval", "batch_enabled"))
-def test_deprecated_args_warned(argname, mocker):
-    mock_warn = mocker.patch(f"{_MOCK_BASE}warnings")
-    gcc = mock.Mock(spec=Client)
-    Executor(client=gcc).shutdown()
-    mock_warn.warn.assert_not_called()
-
-    Executor(client=gcc, **{argname: 1}).shutdown()
-    mock_warn.warn.assert_called()
-
-
 def test_invalid_args_raise(randomstring):
     invalid_arg = f"abc_{randomstring()}"
     with pytest.raises(TypeError) as wrapped_err:
