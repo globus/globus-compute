@@ -98,7 +98,6 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
     ) -> Future:
         """We pass all params except the function to executor.submit()"""
         assert self.executor, "The engine has not been started"
-        logger.warning("Got task")
         return self.executor.submit(func, *args, **kwargs)
 
     def status_polling_interval(self) -> int:
