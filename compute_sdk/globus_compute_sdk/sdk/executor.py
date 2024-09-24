@@ -135,7 +135,6 @@ class Executor(concurrent.futures.Executor):
         user_endpoint_config: dict[str, t.Any] | None = None,
         label: str = "",
         batch_size: int = 128,
-        funcx_client: Client | None = None,
         amqp_port: int | None = None,
         **kwargs,
     ):
@@ -155,14 +154,10 @@ class Executor(concurrent.futures.Executor):
             logging and advanced needs with multiple executors.
         :param batch_size: the maximum number of tasks to coalesce before
             sending upstream [min: 1, default: 128]
-        :param funcx_client: [DEPRECATED] alias for client.
-        :param batch_interval: [DEPRECATED; unused] number of seconds to coalesce tasks
-            before submitting upstream
-        :param batch_enabled: [DEPRECATED; unused] whether to batch results
         :param amqp_port: Port to use when connecting to results queue. Note that the
             Compute web services only support 5671, 5672, and 443.
         """
-        deprecated_kwargs = {"batch_interval", "batch_enabled"}
+        deprecated_kwargs = {""}
         for key in kwargs:
             if key in deprecated_kwargs:
                 warnings.warn(
@@ -173,17 +168,7 @@ class Executor(concurrent.futures.Executor):
             msg = f"'{key}' is an invalid argument for {self.__class__.__name__}"
             raise TypeError(msg)
 
-        if funcx_client:
-            warnings.warn(
-                "'funcx_client' is superseded by 'client'"
-                " and will be removed in a future release",
-                DeprecationWarning,
-            )
-
-        if not client:
-            client = funcx_client if funcx_client else Client()
-
-        self.client = client
+        self.client = client or Client()
 
         self.endpoint_id = endpoint_id
 
