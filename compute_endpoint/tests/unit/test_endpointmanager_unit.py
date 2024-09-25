@@ -1958,7 +1958,8 @@ def test_redirect_stdstreams_to_user_log(
     mock_os.O_WRONLY = 0x1
     mock_os.O_APPEND = 0x2
     mock_os.O_SYNC = 0x4
-    exp_flags = mock_os.O_WRONLY | mock_os.O_APPEND | mock_os.O_SYNC
+    mock_os.O_CREAT = 0x8
+    exp_flags = mock_os.O_CREAT | mock_os.O_WRONLY | mock_os.O_APPEND | mock_os.O_SYNC
 
     uep_name = command_payload["kwargs"]["name"]
     uep_dir = mock_ensure_compute_dir() / uep_name
