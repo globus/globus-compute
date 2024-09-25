@@ -285,6 +285,8 @@ For a much more thorough dive into the identity mapping configurations, please c
 the `Identity Mapping documentation`_.
 
 
+.. _user-config-template-yaml-j2:
+
 ``user_config_template.yaml.j2``
 --------------------------------
 
