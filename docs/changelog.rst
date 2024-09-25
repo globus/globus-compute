@@ -39,11 +39,10 @@ Deprecated
 ^^^^^^^^^^
 
 - The ``HighThroughputEngine`` is now marked for deprecation. All users should migrate to
-  ``GlobusComputeEngine``.
+  |GlobusComputeEngine|.
 
-  To help with migration, we suggest checking out our many `endpoint configuration examples
-  <https://globus-compute.readthedocs.io/en/stable/endpoints/endpoint_examples.html>`_, all
-  of which use ``GlobusComputeEngine``.
+  To help with migration, we suggest checking out our many :doc:`endpoint configuration
+  examples <endpoints/endpoint_examples>`, all of which use |GlobusComputeEngine|.
 
 .. _changelog-2.26.0:
 
@@ -71,7 +70,7 @@ globus-compute-sdk & globus-compute-endpoint v2.25.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Added a new ``ShellFunction`` class to support remote execution of commandline strings.
+- Added a new |ShellFunction| class to support remote execution of commandline strings.
 
   .. code:: python
 
@@ -83,13 +82,11 @@ New Functionality
       print(shell_result.stdout)      # Snippet of stdout captured
       print(shell_result.stderr)      # Snippet of stderr captured
 
-- Adding ``GlobusMPIEngine`` with better support for MPI applications.
-  ``GlobusMPIEngine`` uses Parsl's `MPIExecutor
-  <https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html>`_
-  under the hood to dynamically partition a single batch job to schedule MPI
-  tasks.
+- Adding |GlobusMPIEngine| with better support for MPI applications.
+  |GlobusMPIEngine| uses Parsl's |MPIExecutor|_ under the hood to dynamically partition
+  a single batch job to schedule MPI tasks.
 
-  Here's an example endpoint configuration that uses ``GlobusMPIEngine``
+  Here's an example endpoint configuration that uses |GlobusMPIEngine|
 
   .. code-block:: yaml
 
@@ -101,11 +98,11 @@ New Functionality
       provider:
          ...
 
-- Added a new ``MPIFunction`` class to support MPI applications.
-  ``MPIFunction`` extends ``ShellFunction`` to use an MPI launcher to use a
+- Added a new |MPIFunction| class to support MPI applications.
+  |MPIFunction| extends |ShellFunction| to use an MPI launcher to use a
   subset of nodes within a batch job to run MPI applications. To partition a
-  batch job, ``MPIFunction`` must be sent to an endpoint configured with
-  ``GlobusMPIEngine``.  Here is a usage example:
+  batch job, |MPIFunction| must be sent to an endpoint configured with
+  |GlobusMPIEngine|.  Here is a usage example:
 
   .. code-block:: python
 
@@ -154,7 +151,7 @@ New Functionality
 - The engine that renders user endpoint config files now receives information about
   the runtime environment used to submit tasks, such as Python environment and Globus
   Compute SDK version, via the ``user_runtime`` variable. For a complete list of the
-  fields that are sent, `reference the documentation on batch.UserRuntime. <https://globus-compute.readthedocs.io/en/latest/reference/client.html#globus_compute_sdk.sdk.batch.UserRuntime>`_
+  fields that are sent, please reference the |UserRuntime| class documentation.
 
 - Added the ``globus-compute-endpoint python-exec`` command to run Python modules as scripts
   from the Globus Compute endpoint CLI. The primary use case is to launch Parsl processes
@@ -165,7 +162,7 @@ Changed
 
 - Worker nodes no longer need to resolve the ``process_worker_pool.py`` command.
 
-- Unless manually specified, all ``Executor`` objects in the same process will
+- Unless manually specified, all |Executor| objects in the same process will
   share the same task group ID.
 
 .. _changelog-2.23.0:
@@ -187,7 +184,7 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- We no longer raise an exception when using the ``GlobusComputeEngine`` with Parsl
+- We no longer raise an exception when using the |GlobusComputeEngine| with Parsl
   providers that do not utilize ``Channel`` objects (e.g., ``KubernetesProvider``).
 
 Changed
@@ -208,9 +205,9 @@ globus-compute-sdk & globus-compute-endpoint v2.22.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- ``GlobusComputeEngine`` now supports a ``working_dir`` keyword argument that sets the directory in which
+- |GlobusComputeEngine| now supports a ``working_dir`` keyword argument that sets the directory in which
   all functions will be executed. Relative paths, if set, will be considered relative to the endpoint directory
-  (``~/.globus_compute/<endpoint_name>``). If this option is not set, ``GlobusComputeEngine`` will use the
+  (``~/.globus_compute/<endpoint_name>``). If this option is not set, |GlobusComputeEngine| will use the
   endpoint directory as the working directory. Set this option using ``working_dir: <working_dir_path>``
   Example config:
 
@@ -222,7 +219,7 @@ New Functionality
       # Run functions in ~/.globus_compute/<EP_NAME>/TASKS
       working_dir: TASKS
 
-- ``GlobusComputeEngine`` now supports function sandboxing, where each function is executed within a
+- |GlobusComputeEngine| now supports function sandboxing, where each function is executed within a
   sandbox directory for better isolation. When this option is enabled by setting ``run_in_sandbox: True``
   a new directory with the function UUID as the name is created in the working directory (configurable with
   the ``working_dir`` kwarg). Example config:
@@ -237,8 +234,8 @@ New Functionality
       # Enable sandboxing to have functions run under /projects/MY_PROJ/<function_uuid>/
       run_in_sandbox: True
 
-- Implement ``debug`` as a top-level config boolean for a Compute Endpoint.
-  This flag determines whether debug-level logs are emitted -- the same
+- Implement ``debug`` as a top-level config boolean for a Compute Endpoint.  This flag
+  determines whether debug-level logs are emitted |nbsp| --- |nbsp| the same
   functionality as the ``--debug`` command line argument to the
   ``globus-compute-endpoint`` executable.  Note: if this flag is set to
   ``False`` when the ``--debug`` CLI flag is specified, the CLI wins.
@@ -246,8 +243,8 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed bug where ``GlobusComputeEngine`` set the current working directory to the directory
-  from which the endpoint was started. Now, ``GlobusComputeEngine`` will set the working directory
+- Fixed bug where |GlobusComputeEngine| set the current working directory to the directory
+  from which the endpoint was started. Now, |GlobusComputeEngine| will set the working directory
   to the endpoint directory (``~/.globus_compute/<endpoint_name>``) by default. This can be configured
   via the endpoint config.
 
@@ -267,10 +264,10 @@ New Functionality
 ^^^^^^^^^^^^^^^^^
 
 - MEPs now pass their configuration to UEP config templates via the ``parent_config``
-  variable. `See the docs <https://globus-compute.readthedocs.io/en/latest/endpoints/multi_user.html#user-config-template-yaml-j2>`
-  for more information.
+  variable.  Please reference the :ref:`user configuration template
+  <user-config-template-yaml-j2>` for more information.
 
-- Added multi-user endpoint related files to the `self-diagnostic` command output.
+- Added multi-user endpoint related files to the ``self-diagnostic`` command output.
 
 Bug Fixes
 ^^^^^^^^^
@@ -324,13 +321,13 @@ globus-compute-sdk & globus-compute-endpoint v2.19.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Expanded support for `pyzmq` dependency to include versions up to `26.x.x`.
+- Expanded support for ``pyzmq`` dependency to include versions up to ``26.x.x``.
 
 Bug Fixes
 ^^^^^^^^^
 
 - We now raise an informative error when a user sets the ``strategy`` configuration field
-  to an incorrect value type for a given engine. For example, the ``GlobusComputeEngine``
+  to an incorrect value type for a given engine. For example, the |GlobusComputeEngine|
   expects ``strategy`` to be a string or null, not an object.
 
 .. _changelog-2.18.1:
@@ -358,11 +355,11 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed a bug in ``GlobusComputeEngine`` where a faulty endpoint-config could result in
+- Fixed a bug in |GlobusComputeEngine| where a faulty endpoint-config could result in
   the endpoint repeatedly submitting jobs to the batch scheduler.  The endpoint will
   not shut down, reporting the root cause in ``endpoint.log``
 
-- Fixed bug where ``GlobusComputeEngine`` lost track of submitted jobs that failed to
+- Fixed bug where |GlobusComputeEngine| lost track of submitted jobs that failed to
   have workers connect back. The endpoint will now report a fault if multiple jobs
   have failed to connect back and shutdown, tasks submitted to the endpoint will
   return an exception.
@@ -376,9 +373,9 @@ Deprecated
 Changed
 ^^^^^^^
 
-- ``GlobusComputeEngine``'s ``strategy`` kwarg now only accepts ``str``, valid options are
+- |GlobusComputeEngine|'s ``strategy`` kwarg now only accepts ``str``, valid options are
   ``{'none', 'simple'}`` where ``simple`` is the default.
-- The maximum duration that workers are allowed to idle when using ``GlobusComputeEngine``
+- The maximum duration that workers are allowed to idle when using |GlobusComputeEngine|
   can now be configured with the new kwarg ``max_idletime`` which accepts a float and defaults
   to 120s.
 
@@ -473,7 +470,7 @@ Changed
 - Bumped parsl pinned version from ``2024.02.05`` to ``2024.3.4``
   This version bump brings in following fixes:
 
-  - HTEX to support `max_workers_per_node` as a kwarg
+  - HTEX to support ``max_workers_per_node`` as a keyword argument
   - Better stdout/err reporting from failed tasks
   - Support for detecting MISSING jobs
   - Better HTEX interchange shutdown logic to avoid hung processes
@@ -511,7 +508,7 @@ globus-compute-sdk & globus-compute-endpoint v2.13.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- Upgraded Parsl to version ``2024.02.05`` to enable encryption for the ``GlobusComputeEngine``.
+- Upgraded Parsl to version ``2024.02.05`` to enable encryption for the |GlobusComputeEngine|.
   Under the hood, Parsl uses CurveZMQ to encrypt all communication channels between the engine
   and related nodes.
 
@@ -534,7 +531,7 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- Improved handling of unexpected errors in the `HighThroughputEngine`.
+- Improved handling of unexpected errors in the ``HighThroughputEngine``.
 
 - Fixed ``Skipping analyzing "globus_compute_sdk"`` error when running ``mypy`` on
   code dependent on ``globus_compute_sdk``
@@ -570,8 +567,8 @@ Removed
 Changed
 ^^^^^^^
 
-- Changed the default engine type for new endpoints to `GlobusComputeEngine`, which
-  utilizes the Parsl `HighThroughputExecutor` under the hood.
+- Changed the default engine type for new endpoints to |GlobusComputeEngine|, which
+  utilizes the Parsl |HighThroughputExecutor|_ under the hood.
 
 - Pin Parsl version requirement to ``2024.01.22``.
 
@@ -627,7 +624,7 @@ globus-compute-sdk & globus-compute-endpoint v2.9.0
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-- ``GlobusComputeEngine`` can now be configured to automatically retry task failures when
+- |GlobusComputeEngine| can now be configured to automatically retry task failures when
   node failures (e.g nodes are lost due to batch job reaching walltime) occur. This option
   is set to 0 by default to avoid unintentional resource wastage from retrying tasks.
   Traceback history from all prior attempts is supplied if the last retry attempt fails.
@@ -667,17 +664,17 @@ New Functionality
 - Endpoints can be configured to talk to RMQ over a different port via the
   amqp_port configuration option.
 
-- Added support for endpoint status reports when using ``GlobusComputeEngine``.
+- Added support for endpoint status reports when using |GlobusComputeEngine|.
   The report includes information such as the total number of active workers,
   idle workers, and pending tasks.
 
 Bug Fixes
 ^^^^^^^^^
 
-- The engine configuration variable `label`, which defines the name of
-  the engine log directory, now works with `GlobusComputeEngine.`
+- The engine configuration variable ``label``, which defines the name of
+  the engine log directory, now works with |GlobusComputeEngine|.
 
-- The `GlobusComputeEngine` worker logs will appear in the `~/.globus_compute`
+- The |GlobusComputeEngine| worker logs will appear in the ``~/.globus_compute/``
   directory rather than the current working directory.
 
 .. _changelog-2.6.0:
@@ -694,23 +691,23 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- The ``GlobusComputeEngine``, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
+- The |GlobusComputeEngine|, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
   now respect the ``heartbeat_period`` variable, as defined in ``config.yaml``.
 
-- The ``GlobusComputeEngine`` has been updated to fully support the
+- The |GlobusComputeEngine| has been updated to fully support the
   ``heartbeat_period`` parameter.
 
 Changed
 ^^^^^^^
 
 - Renamed the ``heartbeat_period_s`` attribute to ``heartbeat_period`` for
-  ``GlobusComputeEngine``, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
+  |GlobusComputeEngine|, ``ProcessPoolEngine``, and ``ThreadPoolEngine``
   to maintain parity with the ``HighThroughputEngine`` and Parsl's
-  ``HighThroughputExecutor``.
+  |HighThroughputExecutor|_.
 
-- Changed ``heartbeat_period`` type from float to int for ``GlobusComputeEngine``,
+- Changed ``heartbeat_period`` type from float to int for |GlobusComputeEngine|,
   ``ProcessPoolEngine``, and ``ThreadPoolEngine`` to maintain parity with the
-  ``HighThroughputEngine`` and Parsl's ``HighThroughputExecutor``.
+  ``HighThroughputEngine`` and Parsl's |HighThroughputExecutor|_.
 
 .. _changelog-2.5.0:
 
@@ -755,9 +752,9 @@ Bug Fixes
 ^^^^^^^^^
 
 - Fix an innocuous bug during cleanup after having successfully shutdown an
-  Endpoint using the ``GlobusComputeEngine``.
+  Endpoint using the |GlobusComputeEngine|.
 
-- Configuration using ``GlobusComputeEngine`` now properly serializes and
+- Configuration using |GlobusComputeEngine| now properly serializes and
   registers with the Globus Compute web services.
 
 .. _changelog-2.3.3:
@@ -854,7 +851,10 @@ New Functionality
 Bug Fixes
 ^^^^^^^^^
 
-- Previously, starting an endpoint when it is already active or is currently locked will exit silently when ``globus-compute-endpoint start`` is run, with the only information available as a log line in endpoint.log.  Now, if start fails, a console message will display the reason on the command line.
+- Previously, starting an endpoint when it is already active or is currently locked
+  will exit silently when ``globus-compute-endpoint start`` is run, with the only
+  information available as a log line in endpoint.log.  Now, if start fails, a console
+  message will display the reason on the command line.
 
 - The ``data_serialization_strategy`` argument of ``Client`` is now properly respected
   when creating batches
@@ -862,9 +862,8 @@ Bug Fixes
 - For those who use multiple task groups, address race-condition where tasks
   could be mis-associated.
 
-- Fixes a bug where the `globus_compute_endpoint.engines.GlobusComputeEngine` sets
-  the stdout and stderr capture filepaths incorrectly on the Providers, causing batch
-  jobs to fail.
+- Fixes a bug where the |GlobusComputeEngine| sets the stdout and stderr capture
+  filepaths incorrectly on the Providers, causing batch jobs to fail.
 
 Removed
 ^^^^^^^
@@ -936,8 +935,8 @@ globus-compute-sdk & globus-compute-endpoint v2.2.4
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
-* Auto-scaling support for ``GlobusComputeEngine``
-  Here is an example configuration in python:
+* Auto-scaling support for |GlobusComputeEngine|.  Here is an example configuration in
+  python:
 
 .. code-block:: python
 
@@ -990,7 +989,7 @@ New Functionality
   shutdown process, respectively.
 
 - The engine ``type`` field is now supported in ``config.yaml``. Here you can
-  specify ``GlobusComputeEngine`` or ``HighThroughputEngine``, which is designed
+  specify |GlobusComputeEngine| or ``HighThroughputEngine``, which is designed
   to bridge any backward compatibility issues.
 
 Deprecated
@@ -1001,7 +1000,7 @@ Deprecated
   Upgrade to the ``globus_compute_endpoint.engines.GlobusComputeEngine`` which
   supercedes the ``HighThroughputExecutor``.
 
-  Please note that the ``GlobusComputeEngine`` has the following limitations:
+  Please note that the |GlobusComputeEngine| has the following limitations:
 
   #. It binds to all network interfaces instead of binding to a single interface
      to limit incoming worker connections to the internal network.
@@ -1082,7 +1081,7 @@ New Functionality
 
 - Support for 3 new execution ``Engines``, designed to replace the ``HighThroughputExecutor``
 
-  - ``GlobusComputeEngine``: Wraps Parsl's ``HighThroughputExecutor`` to match the current
+  - |GlobusComputeEngine|: Wraps Parsl's ``HighThroughputExecutor`` to match the current
     default executor (globus-computes' fork of ``HighThroughputExecutor``)
   - ``ProcessPoolEngine``: Wraps ``concurrent.futures.ProcessPoolExecutor`` for concurrent
     local execution
@@ -2378,3 +2377,19 @@ New Functionality
 
 
 * ``get_batch_status`` has been renamed to ``get_batch_result``
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+.. |Executor| replace:: :class:`Executor <globus_compute_sdk.sdk.executor.Executor>`
+.. |MPIFunction| replace:: :class:`MPIFunction <globus_compute_sdk.sdk.mpi_function.MPIFunction>`
+.. |ShellFunction| replace:: :class:`ShellFunction <globus_compute_sdk.sdk.shell_function.ShellFunction>`
+.. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
+
+.. |GlobusComputeEngine| replace:: :class:`GlobusComputeEngine <globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine>`
+.. |GlobusMPIEngine| replace:: :class:`GlobusMPIEngine <globus_compute_endpoint.engines.globus_mpi.GlobusMPIEngine>`
+
+.. |MPIExecutor| replace:: ``MPIExecutor``
+.. _MPIExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html
+.. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
+.. _HighThroughputExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.HighThroughputExecutor.html
