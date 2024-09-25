@@ -3,6 +3,86 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.28.0a0:
+
+globus-compute-sdk & globus-compute-endpoint v2.28.0a0
+------------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The multi-user endpoint now saves user-endpoint standard file streams (aka
+  ``stdout`` and ``stderr``) to the UEP's ``endpoint.log``.  This makes it much
+  easier to identity implementation missteps that affect the early UEP boot
+  process, before the UEP's logging is bootstrapped.
+
+- The SDK ``Client`` and ``WebClient`` now support using a ``GlobusApp`` for authentication.
+  For standard interactive login flows, users can leave the ``app`` argument blank when
+  initializing the ``Client``, or pass in a custom ``UserApp``. For client authentication,
+  users can leave the ``app`` argument blank and set the ``GLOBUS_COMPUTE_CLIENT_ID`` and
+  ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment variables, or pass in a custom ``ClientApp``.
+
+  For more information on how to use a ``GlobusApp``, see the `Globus SDK documentation
+  <https://globus-sdk-python.readthedocs.io/en/stable/experimental/examples/oauth2/globus_app.html>`_.
+
+  Users can still pass in a custom ``LoginManager`` to the ``login_manager`` argument, but
+  this is mutually exclusive with the ``app`` argument.
+
+  E.g.,
+
+  .. code-block:: python
+
+     from globus_compute_sdk import Client
+     from globus_sdk.experimental.globus_app import UserApp
+
+     gcc = Client()
+
+     # or
+
+     my_app = UserApp("my-app", client_id="...")
+     gcc = Client(app=my_app)
+
+- Added a new data serialization strategy, ``JSONData``, which serializes/deserializes
+  function args and kwargs via JSON. Usage example:
+
+  .. code-block:: python
+
+    from globus_compute_sdk import Client, Executor
+    from globus_compute_sdk.serialize import JSONData
+
+    gcc = Client(
+        data_serialization_strategy=JSONData()
+    )
+
+    with Executor(<your endpoint UUID>, client=gcc) as gcx:
+        # do something with gcx
+
+Bug Fixes
+^^^^^^^^^
+
+- We no longer raise an exception if a user defines the ``GLOBUS_COMPUTE_CLIENT_ID``
+  environment variable without defining ``GLOBUS_COMPUTE_SECRET_KEY``. The reverse,
+  however, will still raise an exception.
+
+Removed
+^^^^^^^
+
+- Removed ``http_timeout``, ``funcx_home``, and ``task_group_id`` arguments to
+  :doc:`Client <reference/client>`, that were previously deprecated in
+  :ref:`v2.3.0 <changelog-2.3.0>` (Aug 2023)
+
+Deprecated
+^^^^^^^^^^
+
+- The ``WebClient.user_app_name`` attribute has been marked for deprecation and
+  will be removed in a future release. Please directly use ``WebClient.app_name``
+  instead.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency version to `2024.9.9 <https://pypi.org/project/parsl/2024.9.9/>`_.
+
 .. _changelog-2.27.1:
 
 globus-compute-sdk & globus-compute-endpoint v2.27.1
