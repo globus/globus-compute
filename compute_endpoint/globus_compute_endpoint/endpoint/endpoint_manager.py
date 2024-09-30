@@ -1018,7 +1018,7 @@ class EndpointManager:
 
             log.debug("Convey credentials; redirect stdout, stderr (to '%s')", ep_log)
             log_fd_flags = os.O_CREAT | os.O_WRONLY | os.O_APPEND | os.O_SYNC
-            log_fd = os.open(ep_log, log_fd_flags, mode=0o200)
+            log_fd = os.open(ep_log, log_fd_flags, mode=0o600)
             with os.fdopen(log_fd, "w") as log_f:
                 if os.dup2(log_f.fileno(), 1) != 1:
                     raise OSError(f"Unable to redirect stdout to {ep_log}")
