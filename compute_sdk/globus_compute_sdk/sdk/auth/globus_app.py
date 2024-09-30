@@ -39,7 +39,7 @@ def get_globus_app(environment: str | None = None):
 
     # The authorization-via-web-link flow requires stdin; the user must visit
     # the web link and enter generated code.
-    elif not sys.stdin.isatty() or sys.stdin.closed and not _is_jupyter():
+    elif (not sys.stdin.isatty() or sys.stdin.closed) and not _is_jupyter():
         # Not technically necessary; the login flow would just die with an EOF
         # during input(), but adding this message here is much more direct --
         # handle the non-happy path by letting the user know precisely the issue
