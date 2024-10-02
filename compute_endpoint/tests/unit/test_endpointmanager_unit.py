@@ -1972,6 +1972,7 @@ def test_redirect_stdstreams_to_user_log(
 
     a, k = next((a, k) for a, k in mock_os.open.call_args_list if a[0] == ep_log)
     assert a[1] == exp_flags, "Expect replacement stdout/stderr: append, wronly, sync"
+    assert k["mode"] == 0o600, "Expect default to writable *and* readable"
 
 
 @pytest.mark.parametrize("debug", (True, False))
