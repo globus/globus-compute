@@ -1,6 +1,7 @@
 display_name: null
 engine:
   type: GlobusComputeEngine
+  max_workers_per_node: 1
   provider:
     type: LocalProvider
     init_blocks: 1
