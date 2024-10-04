@@ -322,6 +322,8 @@ def test_executor_shutdown_cancel_futures(
     gce.endpoint_id = uuid.uuid4()
     gce.task_group_id = uuid.uuid4()
 
+    # Does this fail sometimes?
+
     gcc.register_function.return_value = str(uuid.uuid4())
 
     gce._task_submitter = mock.Mock(spec=threading.Thread)
