@@ -21,6 +21,15 @@ def change_test_dir(mock_gc_home, monkeypatch):
     yield mock_gc_home
 
 
+"""
+Change this definition if the default changes in terms of print/zipped_file
+behavior.  ie. an empty list [] for creating zip files if that is the default,
+["-p"] if the default is creating a zip file and printing to console is needed.
+"""
+DIAG_PRINT_ARGS = ["-p"]
+DIAG_ZIP_ARGS = []
+
+
 @pytest.fixture
 def mock_hardware_report(mocker):
     simple_hardware_report = [
@@ -209,35 +218,29 @@ def test_cat_honors_max_bytes(fs, max_bytes):
     [
         "endpoint.log",
         "GlobusComputeEngine/interchange.log",
-        # "GlobusComputeEngine/block-0/some-block-id/manager.log",
-        # "GlobusComputeEngine/block-0/some-block-id/worker_0.log",
+        "GlobusComputeEngine/block-0/some-block-id/manager.log",
     ],
 )
 def test_cat_wildcard_finds_files_recursively(
-    fs,
+    tmp_path,
     path,
     randomstring,
     change_test_dir,
 ):
-    full_path = pathlib.Path("some_ep_dir/" + path)
+    parent_path = tmp_path / "some_ep_dir"
+    full_path = parent_path / path
     full_path.parent.mkdir(parents=True, exist_ok=True)
+    assert parent_path.exists()
     contents = randomstring()
-    full_path.write_text(contents)
+    with open(full_path, "w") as f:
+        f.write(contents)
 
     with contextlib.redirect_stdout(io.StringIO()) as f:
-        cat(["some_ep_dir/**/*.log"], wildcard=True)()
+        cat([str(parent_path) + "/**/*.log"], wildcard=True)()
 
     payload = str(f.getvalue())
     assert path in payload
     assert contents in payload
-
-
-"""
-Some following tests previously used fakefs, which apparently is no longer
-compatible with the new structure with lower level system calls.  See:
-
-https://stackoverflow.com/questions/75789398/how-to-use-pyfakefs-pytest-to-test-a-function-using-multiprocessing-queue-via  # noqa
-"""
 
 
 def test_diagnostic_simple(
@@ -248,7 +251,7 @@ def test_diagnostic_simple(
     change_test_dir,
     capsys,
 ):
-    do_diagnostic_base(["-p", "-k", "1"])
+    do_diagnostic_base(DIAG_PRINT_ARGS + ["-k", "1"])
     captured = capsys.readouterr()
 
     assert captured.out.count("== Diagnostic") == len(mock_all_reports)
@@ -283,7 +286,7 @@ def test_diagnostic_sdk_environment(
 
     monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", env)
 
-    do_diagnostic_base(["-k", "0"])
+    do_diagnostic_base(DIAG_PRINT_ARGS + ["-k", "0"])
 
     assert f"compute.api.{env}.globuscs.info" in mock_test_conn.call_args_list[0][0]
     assert f"compute.amqps.{env}.globuscs.info" in mock_test_conn.call_args_list[1][0]
@@ -301,7 +304,7 @@ def test_diagnostic_gzip(
     mock_endpoint_config_dir_data,
     capsys,
 ):
-    do_diagnostic_base(["-k", "1"])
+    do_diagnostic_base(DIAG_ZIP_ARGS + ["-k", "1"])
     captured = capsys.readouterr()
 
     for fname in os.listdir(change_test_dir):
@@ -314,7 +317,6 @@ def test_diagnostic_gzip(
         # All lines are diagnostic headings or blank lines for separation
         # No output -p flag was specified
         assert len(line.strip()) == 0 or line.startswith("== Diagnostic:")
-    print(captured.out)
 
     for random_file_data in mock_endpoint_config_dir_data.values():
         assert random_file_data in contents
@@ -328,8 +330,9 @@ def test_diagnostic_log_size_limit(
     mock_endpoint_config_dir_data,
     mock_gc_home,
 ):
-    # Limit log file size to 2 KB
-    do_diagnostic_base(["--log-kb", "2"])
+    # Limit log file size to 2 KB, so the last 2KB changes but size is the same
+    constant_diag_args = DIAG_ZIP_ARGS + ["--log-kb", "2"]
+    do_diagnostic_base(constant_diag_args)
 
     for fname in os.listdir(change_test_dir):
         if fname.endswith(".txt.gz"):
@@ -351,8 +354,8 @@ def test_diagnostic_log_size_limit(
             appended_to_log = True
     assert appended_to_log
 
-    # Gather diags with logs again after increasing log size, should be same size
-    do_diagnostic_base(["--log-kb", "2"])
+    # Gather diags with logs again after appending to logs
+    do_diagnostic_base(constant_diag_args)
 
     # Search for the file again, should be only 1
     for fname in os.listdir(change_test_dir):

@@ -34,7 +34,7 @@ from globus_compute_sdk.serialize.concretes import DillCodeTextInspect
 from rich import get_console
 from rich.console import Console
 
-OUTPUT_FILENAME = "xglobus_compute_diagnostic_{}.txt.gz"
+OUTPUT_FILENAME = "globus_compute_diagnostic_{}.txt.gz"
 
 
 def cat(
@@ -348,18 +348,20 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
     For each diagnostic, this method prints what is being run to stdout, then
     executes the diagnostic itself which outputs to stdout or file.
 
-    :param print_only       :  Whether to write diagnostic output to temporary
-                                file as they are being run.  If False, only
-                                print the name of each step as they are run,
-                                then collates and compresses actual output into
-                                a zip file.
-                                If True, output is to stdout and no new local
-                                files will be generated automatically.
+    :param print_only:        Whether to write diagnostic output to stdout
+                                If True, diagnostic output is to stdout and no
+                                local files are generated.
+                                If False, only print the display_name of each
+                                step as they are run to stdout to give the user
+                                a better sense of progress (useful if there
+                                are slower diagnostics), but capture all output
+                                to a buffer and write a gzipped version of the
+                                output to file in the working directory.
     :param log_bytes:         # of bytes to limit the individual endpoint log
                                 extractions to
     :param ep_uuid:           # If specified, register a sample function and
                                 send a task that uses the function UUID to the
-                                endpoint
+                                endpoint to test end to end connectivity
     """
 
     current_time = dt.now().astimezone(timezone.utc).strftime("%Y-%m-%d-%H-%M-%SZ")
@@ -367,11 +369,18 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
 
     diagnostic_output = []
 
-    # if not print_only:
-    # # TODO remove commented out code Initialize empty file
-    # open(log_filename, "w").close()
-
     diag_cmds, ep_install_dir = get_diagnostic_commands(log_bytes)
+
+    if ep_install_dir or ep_uuid:
+        # If the Endpoint is installed we will be running ``whoami`` and ``list``
+        # and if ep_uuid is provided we need to POST to the web-service.
+        # That means we need to be logged in, and that will be blocked if we
+        # are redirecting output (not a tty).  So we should trigger it early
+        # by creating a Client
+        print("Some diagnostic commands require being logged in.")
+        # Use DillCodeTextInspect so the sample function code is easier to verify
+        gcc = Client(code_serialization_strategy=DillCodeTextInspect())
+
     for cmd in diag_cmds:
         if cmd is None:
             # None signifies incompatibility with current OS with no warning needed
@@ -420,8 +429,9 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
         ep_test_title = "Run sample function on Tutorial Endpoint via Executor"
         print_highlight(f"== Diagnostic: {ep_test_title} ==")
         with io.StringIO() as buf, contextlib.redirect_stdout(buf):
-            gcc = Client(code_serialization_strategy=DillCodeTextInspect())
             with Executor(client=gcc, endpoint_id=ep_uuid) as gce:
+                # sdk_tutorial_sample_simple_function is just a Hello World
+                # Optionally use sdk_tutorial_sample_function which has local imports
                 fut = gce.submit(sdk_tutorial_sample_simple_function)
                 print(f"Endpoint simple function execution result:\n  {fut.result()}")
                 cur_output = buf.getvalue()
@@ -448,15 +458,25 @@ def do_diagnostic_base(diagnostic_args):
     #   this line is a no-op on other platforms
     colorama.just_fix_windows_console()
 
-    parser = argparse.ArgumentParser(description="Run diagnostics for Globus Compute")
+    DIAGNOSTIC_HELP_TEXT = (
+        "This utility gathers local hardware specifications,  tests "
+        "connectivity to the Globus Compute web services, and collates "
+        "portions of local Compute Endpoint log files, if present, to a "
+        "local compressed file."
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Run diagnostics for Globus Compute",
+        epilog=DIAGNOSTIC_HELP_TEXT,
+    )
     parser.add_argument(
         "-p",
         "--print-only",
         action="store_true",
         default=False,
         help=(
-            "Do not generate a Gzip-compressed file, print diagnostic results "
-            "to the console only."
+            "Do not generate a Gzip-compressed file. Print diagnostic results "
+            "to the console instead."
         ),
     )
     parser.add_argument(
@@ -464,11 +484,11 @@ def do_diagnostic_base(diagnostic_args):
         "--log-kb",
         metavar="number",
         action="store",
-        default=5120,
+        default=1024,
         type=int,
         help=(
             "Specify the number of kilobytes (KB) to read from log files."
-            " Defaults to 5,120 KB (5 MB)."
+            " Defaults to 1024 KB (1 MB) per file."
         ),
     )
     parser.add_argument(

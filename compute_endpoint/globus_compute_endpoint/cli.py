@@ -10,7 +10,6 @@ import shutil
 import sys
 import textwrap
 import uuid
-import warnings
 
 import click
 from click import ClickException
@@ -846,18 +845,16 @@ def delete_endpoint(
 
 
 @app.command("self-diagnostic")
-def self_diagnostic(compress: bool, log_kb: int, endpoint_uuid: str):
+def self_diagnostic():
     """
     Note that this functionality has been migrated to the SDK, leaving only
     a redirect here.
     """
-    warnings.warn(
-        "This endpoint specific self-diagnostic command has been deprecated.\n"
-        "Please use the `globus-compute-diagnostic` command from the SDK instead.",
-        DeprecationWarning,
-        stacklevel=2,
+    print(
+        "This endpoint self-diagnostic command has been deprecated.\n"
+        "  Please use the `globus-compute-diagnostic` command from the SDK instead.",
+        file=sys.stderr,
     )
-    print(f"Arguments: {sys.argv}")
     do_diagnostic_base(sys.argv[2:])
 
 

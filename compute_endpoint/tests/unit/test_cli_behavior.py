@@ -32,6 +32,7 @@ from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
+from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import MISSING, AuthClient
 from pytest_mock import MockFixture
 
@@ -205,6 +206,7 @@ def test_get_globus_app_with_scopes(mocker: MockFixture):
             scopes.append(str(scope))
 
     assert len(scopes) > 0
+    assert all(str(s) in scopes for s in WebClient.default_scope_requirements)
     assert all(str(s) in scopes for s in ComputeAuthClient.default_scope_requirements)
 
 
