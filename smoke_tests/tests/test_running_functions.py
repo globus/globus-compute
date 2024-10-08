@@ -86,6 +86,9 @@ def test_executor(compute_client, endpoint, tutorial_function_id):
     num_tasks = 10
     submit_count = 2  # we've had at least one bug that prevented executor re-use
 
+    # 30s sometimes fails, trying with 60 to see if that makes a difference
+    timeout_s = 60
+
     # use client on newer versions and funcx_client on older
     try:
         gce = Executor(endpoint_id=endpoint, client=compute_client)
@@ -100,7 +103,7 @@ def test_executor(compute_client, endpoint, tutorial_function_id):
             ]
 
             results = []
-            for f in concurrent.futures.as_completed(futures, timeout=30):
+            for f in concurrent.futures.as_completed(futures, timeout=timeout_s):
                 results.append(f.result())
 
             assert (
@@ -114,7 +117,7 @@ def test_executor(compute_client, endpoint, tutorial_function_id):
         assert len(futures) == submit_count * num_tasks
 
         results = []
-        for f in concurrent.futures.as_completed(futures, timeout=30):
+        for f in concurrent.futures.as_completed(futures, timeout=timeout_s):
             results.append(f.result())
         assert all(
             "Hello World!" == item for item in results
