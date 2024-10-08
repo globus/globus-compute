@@ -379,33 +379,48 @@ def test_executor_stuck_submitter_doesnt_hold_shutdown_if_cancel_futures(
     gce._task_submitter.is_alive.return_value = False  # allow test cleanup
 
 
-def test_multiple_register_function_fails(gc_executor):
+def test_multiple_register_function_fails(gc_executor, mock_log):
     gcc, gce = gc_executor
 
     gcc.register_function.return_value = "abc"
 
-    gce.register_function(noop)
+    exp_f_id = gce.register_function(noop)
 
-    with pytest.raises(ValueError):
+    f_id = gce.register_function(noop, function_id=exp_f_id)
+    assert f_id == exp_f_id, "Explicitly same func_id re-registered allowed ..."
+    assert mock_log.warning.called, "... but is odd, so warn about it"
+
+    a, k = mock_log.warning.call_args
+    assert "Function already registered" in a[0]
+    assert f_id in a[0]
+
+    with pytest.raises(ValueError) as pyt_e:
         gce.register_function(noop)
 
-    try_assert(lambda: gce._stopped)
-
-    with pytest.raises(RuntimeError):
-        gce.register_function(noop)
+    e_str = str(pyt_e.value)
+    assert "Function already registered" in e_str
+    assert f_id in e_str
+    assert "attempted" not in e_str
+    assert not gce._stopped
 
 
 def test_shortcut_register_function(gc_executor):
     gcc, gce = gc_executor
 
     fn_id = str(uuid.uuid4())
+    other_id = str(uuid.uuid4())
     gce.register_function(noop, function_id=fn_id)
 
-    with pytest.raises(ValueError) as pyt_exc:
-        gce.register_function(noop, function_id=fn_id)
+    with pytest.raises(ValueError) as pyt_e:
+        gce.register_function(noop, function_id=other_id)
 
-    assert "Function already registered" in str(pyt_exc.value)
-    gcc.register_function.assert_not_called()
+    e_str = str(pyt_e.value)
+    assert "Function already registered" in e_str
+    assert fn_id in e_str
+    assert f"attempted id: {other_id}" in e_str
+    assert not gce._stopped
+
+    assert not gcc.register_function.called
 
 
 def test_failed_registration_shuts_down_executor(gc_executor, randomstring):
@@ -419,6 +434,13 @@ def test_failed_registration_shuts_down_executor(gc_executor, randomstring):
 
     assert pyt_exc.value is exc, "Expected raw exception raised"
     try_assert(lambda: gce._stopped)
+
+    with pytest.raises(RuntimeError) as pyt_e:
+        gce.register_function(noop)
+
+    e_str = str(pyt_e.value)
+    assert "is shutdown" in e_str
+    assert "refusing to register function" in e_str
 
 
 @pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
