@@ -398,7 +398,7 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
         print_highlight(diag_header)
 
         if not print_only:
-            diagnostic_output.append(diag_header)
+            diagnostic_output.append(diag_header + "\n")
 
         cur_output = None
         with io.StringIO() as buf, contextlib.redirect_stdout(buf):
@@ -418,7 +418,7 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
             if print_only:
                 print(cur_output)
             else:
-                diagnostic_output.append(cur_output)
+                diagnostic_output.append(cur_output + "\n")
 
     # Should we provide default UUID as the Tutorial MEP?  It would
     # likely slow down the diagnostic by 10-20 seconds while starting the UEP
@@ -439,7 +439,7 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
             if print_only:
                 print(cur_output)
             else:
-                diagnostic_output.append(cur_output)
+                diagnostic_output.append(cur_output + "\n")
 
     if not print_only:
         # Creates a zipped version for easier transport back to Globus
