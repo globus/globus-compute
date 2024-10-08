@@ -453,15 +453,24 @@ class Executor(concurrent.futures.Executor):
             the ``Client.register_function()``.
         :returns: the function's ``function_id`` string, as returned by
             registration upstream
+        :raises ValueError: raised if a function has already been registered with
+            this Executor
         """
         if self._stopped:
             raise RuntimeError(f"{self!r} is shutdown; refusing to register function")
 
         fn_cache_key = self._fn_cache_key(fn)
         if fn_cache_key in self._function_registry:
-            msg = f"Function already registered as function id: {function_id}"
+            cached_fn_id = self._function_registry[fn_cache_key]
+            msg = f"Function already registered as function id: {cached_fn_id}"
+            if function_id:
+                if function_id == cached_fn_id:
+                    log.warning(msg)
+                    return cached_fn_id
+
+                msg += f" (attempted id: {function_id})"
+
             log.error(msg)
-            self.shutdown(wait=False, cancel_futures=True)
             raise ValueError(msg)
 
         if function_id:
