@@ -6,6 +6,7 @@ from unittest import mock
 
 import pytest
 import requests
+from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_sdk import GlobusHTTPResponse
 
 
@@ -35,3 +36,11 @@ def run_in_tmp_dir(tmp_path):
     os.chdir(tmp_path)
     yield tmp_path
     os.chdir(pwd)
+
+
+@pytest.fixture
+def mock_gc_home(tmp_path):
+    env = os.environ.copy()
+    env["GLOBUS_COMPUTE_USER_DIR"] = str(tmp_path / "home")
+    with mock.patch.dict(os.environ, env):
+        yield ensure_compute_dir().absolute()

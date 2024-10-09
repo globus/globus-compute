@@ -17,6 +17,7 @@ def test_ensure_compute_dir(
     monkeypatch: pytest.MonkeyPatch,
 ):
     home = pathlib.Path.home()
+
     dirname = home / ".globus_compute"
 
     if dir_exists:
