@@ -296,15 +296,18 @@ def test_diagnostic_sdk_environment(
     )
 
 
+@pytest.mark.parametrize("verbose", (True, False))
 def test_diagnostic_gzip(
     mock_gc_home,
     mock_gce_not_installed,
+    verbose,
     change_test_dir,
     mock_all_reports,
     mock_endpoint_config_dir_data,
     capsys,
 ):
-    do_diagnostic_base(DIAG_ZIP_ARGS + ["-k", "1"])
+    args = DIAG_ZIP_ARGS + ["-v"] if verbose else DIAG_ZIP_ARGS
+    do_diagnostic_base(args)
     captured = capsys.readouterr()
 
     for fname in os.listdir(change_test_dir):
@@ -313,10 +316,18 @@ def test_diagnostic_gzip(
     with gzip.open(fname, "rb") as f:
         contents = f.read().decode("utf-8")
 
-    for line in captured.out.split("\n"):
-        # All lines are diagnostic headings or blank lines for separation
-        # No output -p flag was specified
-        assert len(line.strip()) == 0 or line.startswith("== Diagnostic:")
+    captured_stdout = captured.out.split("\n")
+    if verbose:
+        diagnostic_heading_count = 0
+        for line in captured_stdout:
+            # All lines are diagnostic headings or blank lines for separation
+            # No output -p flag was specified
+            if line.startswith("== Diagnostic:"):
+                diagnostic_heading_count += 1
+        assert diagnostic_heading_count >= 5
+    else:
+        # Should be an empty ''
+        assert len(captured_stdout) == 1 and not captured_stdout[0]
 
     for random_file_data in mock_endpoint_config_dir_data.values():
         assert random_file_data in contents

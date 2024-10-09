@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
 import glob
 import gzip
 import io
@@ -14,6 +13,7 @@ import ssl
 import subprocess
 import sys
 from concurrent.futures import TimeoutError
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime as dt
 from datetime import timezone
 from urllib.parse import urlparse
@@ -348,7 +348,9 @@ def run_single_command(cmd: str):
         print_warning(f"Command failed: {e}\n")
 
 
-def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None = None):
+def run_all_diags_wrapper(
+    print_only: bool, log_bytes: int, verbose: bool, ep_uuid: str | None = None
+):
     """
     This is the diagnostic wrapper that obtains the list of commands to be run
     (which depends on whether we are in the SDK or Endpoint, and filters based
@@ -370,6 +372,8 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
                                 output to file in the working directory.
     :param log_bytes:         # of bytes to limit the individual endpoint log
                                 extractions to
+    :param verbose:           Whether to print test headings to stdout while
+                                redirecting the output to compressed file
     :param ep_uuid:           # If specified, register a sample function and
                                 send a task that uses the function UUID to the
                                 endpoint to test end to end connectivity
@@ -406,13 +410,14 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
         # This displays the command being run to console for every command
         # diagnostic_display = f"== Diagnostic: {display_name} =="
         diag_header = f"== Diagnostic: {display_name} =="
-        print_highlight(diag_header)
+        if print_only or verbose:
+            print_highlight(diag_header)
 
         if not print_only:
             diagnostic_output.append(diag_header + "\n")
 
         cur_output = None
-        with io.StringIO() as buf, contextlib.redirect_stdout(buf):
+        with io.StringIO() as buf, redirect_stdout(buf), redirect_stderr(buf):
             try:
                 if callable(cmd):
                     cmd_output = cmd()
@@ -438,8 +443,9 @@ def run_all_diags_wrapper(print_only: bool, log_bytes: int, ep_uuid: str | None 
 
     if ep_uuid:
         ep_test_title = f"Run sample function on endpoint {ep_uuid} via Executor"
-        print_highlight(f"== Diagnostic: {ep_test_title} ==")
-        with io.StringIO() as buf, contextlib.redirect_stdout(buf):
+        if print_only or verbose:
+            print_highlight(f"== Diagnostic: {ep_test_title} ==")
+        with io.StringIO() as buf, redirect_stdout(buf), redirect_stderr(buf):
             with Executor(client=gcc, endpoint_id=ep_uuid) as gce:
                 # sdk_tutorial_sample_simple_function is just a Hello World
                 # Optionally use sdk_tutorial_sample_function which has local imports
@@ -515,6 +521,17 @@ def do_diagnostic_base(diagnostic_args):
         ),
     )
     parser.add_argument(
+        "-v",
+        "--verbose",
+        default=False,
+        action="store_true",
+        help=(
+            "When writing diagnostic output to local compressed file, also "
+            "print the name of each test to stdout as they are being run, "
+            "to help monitor diagnostic progress."
+        ),
+    )
+    parser.add_argument(
         "-e",
         "--endpoint-uuid",
         default=None,
@@ -527,7 +544,9 @@ def do_diagnostic_base(diagnostic_args):
     )
 
     args = parser.parse_args(diagnostic_args)
-    run_all_diags_wrapper(args.print_only, args.log_kb * 1024, args.endpoint_uuid)
+    run_all_diags_wrapper(
+        args.print_only, args.log_kb * 1024, args.verbose, args.endpoint_uuid
+    )
 
 
 def do_diagnostic():
