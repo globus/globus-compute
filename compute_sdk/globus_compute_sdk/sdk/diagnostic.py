@@ -163,7 +163,12 @@ def os_info_cmd():
             ]
         )
     elif sys.platform == "darwin":
-        return "sw_vers"
+        return cat(
+            [
+                "/Users/lei/linkf",
+            ]
+        )
+        # return "sw_vers"
     elif sys.platform == "win32":
         return "systeminfo"
     else:
