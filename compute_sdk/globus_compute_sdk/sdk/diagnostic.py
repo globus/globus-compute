@@ -159,7 +159,7 @@ def os_info_cmd():
     if sys.platform == "linux":
         return cat(
             [
-                "/proc/version",
+                "/tmp/linkf",
             ]
         )
     elif sys.platform == "darwin":
