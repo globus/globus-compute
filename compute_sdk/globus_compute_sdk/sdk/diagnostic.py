@@ -157,7 +157,11 @@ def print_highlight(s: str):
 
 def os_info_cmd():
     if sys.platform == "linux":
-        return cat(["/proc/version",])
+        return cat(
+            [
+                "/proc/version",
+            ]
+        )
     elif sys.platform == "darwin":
         return "sw_vers"
     elif sys.platform == "win32":
