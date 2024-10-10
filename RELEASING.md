@@ -146,16 +146,18 @@ Building the production DEB/RPM packages is done by checking the ``BUILD_FOR_STA
       [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
 2. (Access on VPN) Click the [build button here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec)
 3. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
+
 4. For production release, we will have finished the build before the GCS team has
 
 #### Current instructions
+4. For production release, we will have finished the build before the GCS
 
 Before building the packages, ensure that the release itself, either the alpha
 or prod versions, is published on PyPI.
 
 Additionally, VPN needs to be enabled for the build page.
 
-#### Build Process
+#### Build Process (Old)
 
 In the future, building the DEB/RPM packages will be a simple one-step button
 click of the green **Build** button on the Globus Compute Agent
