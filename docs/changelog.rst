@@ -2473,3 +2473,5 @@ New Functionality
 .. _MPIExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.MPIExecutor.html
 .. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
 .. _HighThroughputExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.HighThroughputExecutor.html
+.. |LocalProvider| replace:: ``LocalProvider``
+.. _LocalProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.LocalProvider.html
