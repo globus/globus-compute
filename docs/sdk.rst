@@ -196,9 +196,12 @@ Client credentials can be useful if you need an endpoint to run in a service acc
 
 The Globus Compute SDK supports use of Globus Auth client credentials for login, if you have `registered a client. <https://docs.globus.org/api/auth/developer-guide/#register-app>`_
 
-To use client credentials, you must set the envrionment variables **GLOBUS_COMPUTE_CLIENT_ID** to your client ID, and **GLOBUS_COMPUTE_CLIENT_SECRET** to your client secret.
+To use client credentials, you must set the environment variables
+**GLOBUS_COMPUTE_CLIENT_ID** to your client ID, and **GLOBUS_COMPUTE_CLIENT_SECRET** to
+your client secret.
 
-When these envrionment variables are set they will take priority over any other credentials on the system and the Client will assume the identity of the client app.
+When these environment variables are set they will take priority over any other
+credentials on the system and the Client will assume the identity of the client app.
 This also applies when starting a Globus Compute endpoint.
 
 .. code:: bash
@@ -263,6 +266,8 @@ More details on the Globus Compute login manager prototcol are available `here. 
   gc = Client(login_manager=compute_login_manager)
   gce = Executor(endpoint_id=tutorial_endpoint, client=gc)
 
+
+.. _specifying-serde-strategy:
 
 Specifying a Serialization Strategy
 -----------------------------------
