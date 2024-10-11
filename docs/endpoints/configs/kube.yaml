@@ -3,6 +3,7 @@ heartbeat_threshold: 200
 
 engine:
     type: GlobusComputeEngine
+    label: kube
     max_workers_per_node: 1
 
     # Encryption is not currently supported for KubernetesProvider
