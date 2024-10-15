@@ -72,7 +72,7 @@ how to download and configure an endpoint for local (multi-process) execution:
 
 .. code-block:: console
 
-   $ python3 -m pipx install globus-compute-endpoint --include-deps
+   $ python3 -m pipx install globus-compute-endpoint
 
    $ globus-compute-endpoint configure
 
