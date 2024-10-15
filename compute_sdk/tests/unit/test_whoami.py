@@ -1,7 +1,7 @@
 import pytest
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import NOT_LOGGED_IN_MSG, print_whoami_info
-from globus_sdk.experimental.globus_app import UserApp
+from globus_sdk import UserApp
 from pytest_mock import MockerFixture
 
 MOCK_BASE = "globus_compute_sdk.sdk.auth.whoami"

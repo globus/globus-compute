@@ -4,8 +4,7 @@ import logging
 
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.utils.printing import print_table
-from globus_sdk import AuthAPIError
-from globus_sdk.experimental.globus_app import GlobusApp
+from globus_sdk import AuthAPIError, GlobusApp
 
 NOT_LOGGED_IN_MSG = "Unable to retrieve user information. Please log in again."
 

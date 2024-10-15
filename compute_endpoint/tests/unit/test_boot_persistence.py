@@ -11,7 +11,7 @@ from globus_compute_endpoint.boot_persistence import (
     enable_on_boot,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_sdk.experimental.globus_app import UserApp
+from globus_sdk import UserApp
 from pyfakefs import fake_filesystem as fakefs
 
 _MOCK_BASE = "globus_compute_endpoint.boot_persistence."

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from globus_sdk.experimental.tokenstorage import SQLiteTokenStorage
+from globus_sdk.tokenstorage import SQLiteTokenStorage
 
 from .._environments import _get_envname
 from ..compute_dir import ensure_compute_dir
