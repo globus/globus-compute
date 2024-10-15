@@ -476,6 +476,8 @@ def run_all_diags_wrapper(
             out_bytes = "".join(diagnostic_output).encode()
             f_out.write(out_bytes)
 
+        print(f"Compressed diagnostic output successfully writen to {zip_filename}")
+
 
 def do_diagnostic_base(diagnostic_args):
     """
