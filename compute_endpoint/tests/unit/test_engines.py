@@ -24,7 +24,7 @@ from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from parsl import HighThroughputExecutor
 from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import KubernetesProvider
-from tests.utils import double, kill_manager
+from tests.utils import double, get_cwd, kill_manager
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,19 @@ def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
 
     # 5-seconds is nominally "overkill," but gc on CI appears to need (at least) >1s
     assert future.result(timeout=5) == param * 2
+
+
+@pytest.mark.parametrize(
+    "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
+)
+def test_engine_working_dir(engine_type: GlobusComputeEngineBase, engine_runner):
+    """working dir remains constant across multiple fn invocations"""
+    engine = engine_runner(engine_type)
+
+    resource_spec = {}
+    future1 = engine._submit(get_cwd, resource_spec)
+    future2 = engine._submit(get_cwd, resource_spec)
+    assert future1.result() == future2.result()
 
 
 @pytest.mark.parametrize(

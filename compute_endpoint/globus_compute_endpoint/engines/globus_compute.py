@@ -50,7 +50,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         encrypted: bool = True,
         strategy: str | None = None,
         job_status_kwargs: t.Optional[JobStatusPollerKwargs] = None,
-        working_dir: str | os.PathLike = "tasks_working_dir",
+        working_dir: t.Union[str, os.PathLike] = "tasks_working_dir",
         run_in_sandbox: bool = False,
         **kwargs,
     ):
@@ -116,7 +116,10 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.label = label or type(self).__name__
         self._status_report_thread = ReportingThread(target=self.report_status, args=[])
         super().__init__(
-            *args, max_retries_on_system_failure=max_retries_on_system_failure, **kwargs
+            *args,
+            max_retries_on_system_failure=max_retries_on_system_failure,
+            working_dir=working_dir,
+            **kwargs,
         )
         self.strategy = strategy
 
@@ -146,7 +149,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.executor.interchange_launch_cmd = self._get_compute_ix_launch_cmd()
         self.executor.launch_cmd = self._get_compute_launch_cmd()
 
-        self.working_dir = working_dir
         self.run_in_sandbox = run_in_sandbox
         if strategy is None:
             strategy = "simple"

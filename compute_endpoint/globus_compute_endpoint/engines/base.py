@@ -79,6 +79,7 @@ class GlobusComputeEngineBase(ABC):
         *args: object,
         endpoint_id: t.Optional[uuid.UUID] = None,
         max_retries_on_system_failure: int = 0,
+        working_dir: t.Union[str, os.PathLike] = "tasks_working_dir",
         **kwargs: object,
     ):
         self._shutdown_event = threading.Event()
@@ -89,7 +90,9 @@ class GlobusComputeEngineBase(ABC):
         # endpoint interchange happy
         self.container_type: t.Optional[str] = None
         self.run_dir: t.Optional[str] = None
-        self.working_dir: t.Union[str, os.PathLike] = "tasks_working_dir"
+        self.working_dir: t.Union[str, os.PathLike] = working_dir
+        if not os.path.abspath(working_dir):
+            self.working_dir = os.path.abspath(working_dir)
         self.run_in_sandbox: bool = False
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
