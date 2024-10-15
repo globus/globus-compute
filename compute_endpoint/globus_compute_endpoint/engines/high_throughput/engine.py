@@ -779,7 +779,11 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
 
         container_loc = self._get_container_location(packed_task)
         ser = serializer.serialize(
-            (execute_task, [task_id, packed_task, self.endpoint_id], {})
+            (
+                execute_task,
+                [task_id, packed_task, self.endpoint_id],
+                {"run_dir": self.run_dir},
+            )
         )
         payload = Task(task_id, container_loc, ser).pack()
         assert self.outgoing_q  # Placate mypy

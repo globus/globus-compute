@@ -24,7 +24,7 @@ from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from parsl import HighThroughputExecutor
 from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import KubernetesProvider
-from tests.utils import double, kill_manager
+from tests.utils import double, get_cwd, kill_manager
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,37 @@ def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
 
     # 5-seconds is nominally "overkill," but gc on CI appears to need (at least) >1s
     assert future.result(timeout=5) == param * 2
+
+
+@pytest.mark.parametrize(
+    "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
+)
+def test_engine_working_dir(
+    engine_type: GlobusComputeEngineBase,
+    engine_runner,
+    ez_pack_task,
+    serde,
+    task_uuid,
+):
+    """working dir remains constant across multiple fn invocations
+    This test requires submitting the task payload so that the execute_task
+    wrapper is used which switches into the working_dir, which created
+    working_dir nesting when relative paths were used.
+    """
+    engine = engine_runner(engine_type)
+
+    task_args = (str(task_uuid), ez_pack_task(get_cwd), {})
+
+    future1 = engine.submit(*task_args)
+    unpacked1 = messagepack.unpack(future1.result())  # blocks; avoid race condition
+
+    future2 = engine.submit(*task_args)  # exact same task
+    unpacked2 = messagepack.unpack(future2.result())
+
+    # data is enough for test, but in error case, be kind to dev
+    cwd1 = serde.deserialize(unpacked1.data)
+    cwd2 = serde.deserialize(unpacked2.data)
+    assert cwd1 == cwd2, "working dir should be idempotent"
 
 
 @pytest.mark.parametrize(

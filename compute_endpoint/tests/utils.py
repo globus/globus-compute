@@ -131,3 +131,9 @@ def get_env_vars():
     import os
 
     return os.environ
+
+
+def get_cwd():
+    import os
+
+    return os.getcwd()
