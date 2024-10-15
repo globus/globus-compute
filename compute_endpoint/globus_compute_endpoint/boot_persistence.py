@@ -6,7 +6,7 @@ import textwrap
 from click import ClickException
 from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_sdk.experimental.globus_app import GlobusApp
+from globus_sdk import GlobusApp
 
 _SYSTEMD_UNIT_DIR = pathlib.Path("/etc/systemd/system")
 

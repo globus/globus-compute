@@ -3,7 +3,7 @@ from __future__ import annotations
 import platform
 import sys
 
-from globus_sdk.experimental.globus_app import ClientApp, GlobusAppConfig, UserApp
+from globus_sdk import ClientApp, GlobusAppConfig, UserApp
 
 from .client_login import get_client_creds
 from .token_storage import get_token_storage

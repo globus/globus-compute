@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from globus_compute_sdk.sdk.auth.globus_app import DEFAULT_CLIENT_ID, get_globus_app
-from globus_sdk.experimental.globus_app import ClientApp, UserApp
+from globus_sdk import ClientApp, UserApp
 from pytest_mock import MockerFixture
 
 _MOCK_BASE = "globus_compute_sdk.sdk.auth.globus_app."

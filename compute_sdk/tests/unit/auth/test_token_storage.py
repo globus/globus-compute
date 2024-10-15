@@ -7,7 +7,7 @@ from globus_compute_sdk.sdk.auth.token_storage import (
     _resolve_namespace,
     get_token_storage,
 )
-from globus_sdk.experimental.tokenstorage import SQLiteTokenStorage
+from globus_sdk.tokenstorage import SQLiteTokenStorage
 from pytest_mock import MockerFixture
 
 _MOCK_BASE = "globus_compute_sdk.sdk.auth.token_storage."

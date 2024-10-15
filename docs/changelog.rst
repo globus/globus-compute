@@ -23,7 +23,7 @@ New Functionality
   ``GLOBUS_COMPUTE_CLIENT_SECRET`` environment variables, or pass in a custom ``ClientApp``.
 
   For more information on how to use a ``GlobusApp``, see the `Globus SDK documentation
-  <https://globus-sdk-python.readthedocs.io/en/stable/experimental/examples/oauth2/globus_app.html>`_.
+  <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html>`_.
 
   Users can still pass in a custom ``LoginManager`` to the ``login_manager`` argument, but
   this is mutually exclusive with the ``app`` argument.
@@ -32,8 +32,7 @@ New Functionality
 
   .. code-block:: python
 
-     from globus_compute_sdk import Client
-     from globus_sdk.experimental.globus_app import UserApp
+     from globus_compute_sdk import Client, UserApp
 
      gcc = Client()
 

@@ -16,9 +16,7 @@ from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
-from globus_sdk.exc.api import GlobusAPIError
-from globus_sdk.experimental.globus_app import GlobusApp
-from globus_sdk.scopes import Scope
+from globus_sdk import GlobusAPIError, GlobusApp, Scope
 
 from .auth.scopes import ComputeScopes
 

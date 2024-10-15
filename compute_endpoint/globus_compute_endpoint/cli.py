@@ -30,8 +30,7 @@ from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
 from globus_compute_sdk.sdk.web_client import WebClient
-from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
-from globus_sdk.experimental.globus_app import GlobusApp
+from globus_sdk import MISSING, AuthClient, GlobusAPIError, GlobusApp, MissingType
 
 try:
     from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager

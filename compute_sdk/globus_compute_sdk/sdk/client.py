@@ -21,7 +21,7 @@ from globus_compute_sdk.sdk.web_client import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
 from globus_compute_sdk.version import __version__, compare_versions
-from globus_sdk.experimental.globus_app import GlobusApp
+from globus_sdk import GlobusApp
 from globus_sdk.version import __version__ as __version_globus__
 
 from .auth.auth_client import ComputeAuthClient

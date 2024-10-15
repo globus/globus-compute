@@ -16,8 +16,8 @@ from globus_compute_sdk.sdk.web_client import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
+from globus_sdk import UserApp
 from globus_sdk import __version__ as __version_globus__
-from globus_sdk.experimental.globus_app import UserApp
 from pytest_mock import MockerFixture
 
 _MOCK_BASE = "globus_compute_sdk.sdk.client."
