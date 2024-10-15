@@ -81,8 +81,31 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         *args: object,
         endpoint_id: uuid.UUID | None = None,
         max_retries_on_system_failure: int = 0,
+        working_dir: str | os.PathLike = "tasks_working_dir",
         **kwargs: object,
     ):
+        """
+        Parameters
+        ----------
+
+        endpoint_id: uuid | None
+            ID of the endpoint that the engine serves as execution backend
+
+        max_retries_on_system_failure: int
+            Set the number of retries for functions that fail due to system
+            failures such as node failure/loss. Since functions can fail
+            after partial runs, consider additional cleanup logic before
+            enabling this functionality. default=0
+
+        working_dir: str | os.PathLike
+            Directory within which functions should execute, defaults to
+            (~/.globus_compute/<endpoint_name>/tasks_working_dir)
+            If a relative path is supplied, the working dir is set relative
+            to the endpoint.run_dir. If an absolute path is supplied, it is
+            used as is. default="tasks_working_dir"
+
+        kwargs
+        """
         self._shutdown_event = threading.Event()
         self.endpoint_id = endpoint_id
         self.max_retries_on_system_failure = max_retries_on_system_failure
@@ -91,7 +114,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         # endpoint interchange happy
         self.container_type: str | None = None
         self.run_dir: str | None = None
-        self.working_dir: str | os.PathLike = "tasks_working_dir"
+        self.working_dir: str | os.PathLike = working_dir
         self.run_in_sandbox: bool = False
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
@@ -110,6 +133,11 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
     @abstractmethod
     def get_status_report(self) -> EPStatusReport:
         raise NotImplementedError
+
+    def set_working_dir(self, run_dir: str | None = None):
+        if not os.path.isabs(self.working_dir):
+            run_dir = os.path.abspath(run_dir or os.getcwd())
+            self.working_dir = os.path.join(run_dir, self.working_dir)
 
     def report_status(self) -> None:
         status_report = self.get_status_report()

@@ -79,7 +79,7 @@ def test_register_and_kill(test_worker):
     assert messages[1][0] == b"WRKR_DIE", messages
 
 
-def test_execute_hello_world(test_worker):
+def test_execute_hello_world(test_worker, tmp_path):
     task_id = uuid.uuid1()
     task_body = test_worker.serializer.serialize((hello_world, (), {}))
     internal_task = Task(task_id, "RAW", task_body)
@@ -125,7 +125,7 @@ def test_execute_failing_function(test_worker):
 
 
 def test_execute_function_exceeding_result_size_limit(
-    test_worker, endpoint_uuid, task_uuid, ez_pack_task
+    test_worker, endpoint_uuid, task_uuid, ez_pack_task, tmp_path
 ):
     return_size = 10
 
@@ -133,7 +133,11 @@ def test_execute_function_exceeding_result_size_limit(
 
     with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
         s_result = execute_task(
-            task_uuid, task_bytes, endpoint_uuid, result_size_limit=return_size - 2
+            task_uuid,
+            task_bytes,
+            endpoint_uuid,
+            result_size_limit=return_size - 2,
+            run_dir=tmp_path,
         )
     result = messagepack.unpack(s_result)
 
@@ -145,12 +149,14 @@ def test_execute_function_exceeding_result_size_limit(
     assert mock_log.exception.called
 
 
-def test_app_timeout(test_worker, endpoint_uuid, task_uuid, ez_pack_task):
+def test_app_timeout(test_worker, endpoint_uuid, task_uuid, ez_pack_task, tmp_path):
     task_bytes = ez_pack_task(sleeper, 1)
 
     with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
         with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
-            packed_result = execute_task(task_uuid, task_bytes, endpoint_uuid)
+            packed_result = execute_task(
+                task_uuid, task_bytes, endpoint_uuid, run_dir=tmp_path
+            )
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)

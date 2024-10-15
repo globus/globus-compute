@@ -32,6 +32,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         self,
         *args,
         endpoint_id: t.Optional[uuid.UUID] = None,
+        run_dir: t.Optional[str] = None,
         results_passthrough: t.Optional[queue.Queue] = None,
         **kwargs,
     ) -> None:
@@ -39,8 +40,8 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         Parameters
         ----------
         endpoint_id: Endpoint UUID
+        run_dir: endpoint run directory
         results_passthrough: Queue to which packed results will be posted
-        run_dir Not used
         Returns
         -------
         """
@@ -50,6 +51,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
             self.results_passthrough = results_passthrough
         assert self.results_passthrough
 
+        self.set_working_dir(run_dir=run_dir)
         # mypy think the thread can be none
         self._status_report_thread.start()
 
