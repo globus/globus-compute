@@ -196,4 +196,3 @@ env variables in our [JenkinsFile](https://github.com/globus/globus-compute/blob
 7. For production release, we will have finished the build before the GCS
    team, and can notify them that our build is complete.  They then will
    publish all packages when they finish their builds, which includes ours.
-
