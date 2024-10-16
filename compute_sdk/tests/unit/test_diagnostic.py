@@ -326,8 +326,13 @@ def test_diagnostic_gzip(
                 diagnostic_heading_count += 1
         assert diagnostic_heading_count >= 5
     else:
-        # Should be an empty ''
-        assert len(captured_stdout) == 1 and not captured_stdout[0]
+        assert len(captured_stdout) == 2
+
+    assert captured_stdout[-2].startswith(
+        "Compressed diagnostic output successfully writen to globus_compute_diagnostic_"
+    )
+    # Ends with line break
+    assert not captured_stdout[-1]
 
     for random_file_data in mock_endpoint_config_dir_data.values():
         assert random_file_data in contents
