@@ -118,22 +118,29 @@ git push
 
 #### Pre-requisites
 
-##### Old instructions
 Before building the packages:
 
 * ensure that the release itself, either the alpha or prod versions, is published on PyPI.
 * VPN is enabled to access the build page.
 
-###### Build Process
+#### Build Process
 
 To build the alpha DEB/RPM packages after the alpha PyPI is released, simply put
- the tag name ie. ``v2.28.0a0`` into the input at
+ the tag name ie. ``v2.29.0a0`` or ``v2.29.0`` into the input textbox of the 
 [build page here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec).
 then clicking the green **Build** button.
 
-Building the production DEB/RPM packages is done by checking the ``BUILD_FOR_STABLE`` checkbox before building.
+For production builds, check the  ``BUILD_FOR_STABLE`` box.
 
 1. Notes
+    Our alpha builds will go to the ``unstable`` repo, and production packages goes
+     to both the ``testing`` and ``stable`` repos.  
+    
+    After this build process for production, the testing and stable packages will
+    reside in an internal globus 'holding' repo.  GCS manages the infrastructure
+    so we need to run another Jenkins build to push it to live if GCS is not having
+    a release the same week.  TBD details
+
     * Example of unstable repo:
         * https://downloads.globus.org/globus-connect-server/unstable/rpm/el/9/x86_64/
     * Directory of testing images:
@@ -143,23 +150,9 @@ Building the production DEB/RPM packages is done by checking the ``BUILD_FOR_STA
             * https://builds.globus.org/downloads.globus.org/globus-connect-server/stable/rpm/el/8/x86_64/
         * After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
             * https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
-      [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
-2. (Access on VPN) Click the [build button here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec)
-3. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
-4. For production release, we will have finished the build before the GCS team has
+1. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
 
-#### Current instructions
-
-Before building the packages, ensure that the release itself, either the alpha
-or prod versions, is published on PyPI.
-
-Additionally, VPN needs to be enabled for the build page.
-
-#### Build Process
-
-In the future, building the DEB/RPM packages will be a simple one-step button
-click of the green **Build** button on the Globus Compute Agent
-[build page here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec).
+#### Old Build Process
 
 As a temporary workaround, we need to add a few lines to manually set some
 env variables in our [JenkinsFile](https://github.com/globus/globus-compute/blob/743fa1e398fd40a00efb5880c55e3fa6e47392fc/compute_endpoint/packaging/JenkinsFile#L24) before triggering the build, as detailed below.
