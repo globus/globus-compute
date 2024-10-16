@@ -95,13 +95,14 @@ and examples.
 Authentication Policies
 -----------------------
 
-While identity mapping is the primary means of access control, administrators can also
-use Globus authentication policies to narrow which identities can even send tasks to
-MEPs.  An authentication policy can enforce details such as that a user has an identity
-from a specific domain or has authenticated with the Globus Auth recently.  Refer to the
+In addition to the identity mapping access control, administrators may also use Globus
+authentication policies to narrow which identities can even send tasks to a MEP.  An
+authentication policy can enforce details such as that a user has an identity from a
+specific domain or has authenticated with the Globus Auth recently.  Refer to the
 `Authentication Policies documentation`_ for more background and specifics on what
 Globus authentication policies can do and how they fit in to a site's security posture.
 
+Please reference the larger :ref:`auth-policies` section (below) for more information.
 
 Configuration
 =============
@@ -467,8 +468,8 @@ That will be injected into the UEP process as an environment variable.
 Running the MEP
 ===============
 
-The MEP starts in the exact same way as the CEA |nbsp| --- |nbsp| with the ``start``
-subcommand.  Unlike the CEA, however, the MEP has no notion of the ``detach_endpoint``
+The MEP starts in the exact same way as a regular endpoint |nbsp| --- |nbsp| with the
+``start`` subcommand.  However, the MEP has no notion of the ``detach_endpoint``
 configuration item.  Once started, the MEP stays attached to the console, with a timer
 that updates every second:
 
@@ -482,8 +483,8 @@ The timer is only displayed if the process is connected to the terminal, and is 
 as a hint to the administrator that the MEP process is running, even if no start UEP
 requests are yet incoming.
 
-And |hellip| that's it.  The Multi-user endpoint is running, waiting for start UEP requests
-to come in.  (But see :ref:`mep-as-a-service` for automatic starting.)
+And |hellip| that's it.  The Multi-user endpoint is running, waiting for start UEP
+requests to come in.  (But see :ref:`mep-as-a-service` for automatic starting.)
 
 To stop the MEP, type ``Ctrl+\`` (SIGQUIT) or ``Ctrl+C`` (SIGINT).  Alternatively, the
 process also responds to SIGTERM.
@@ -653,25 +654,27 @@ the configuration from the logs:
 Installing the MEP as a Service
 ===============================
 
-Installing the MEP as a service is the same :ref:`procedure as with a CEA
-<enable_on_boot>`: use the ``enable-on-boot`` command.  This will dynamically create a
-systemd unit file and also install it.
+Installing the MEP as a service is the same :ref:`procedure as with a regular endpoint
+<enable_on_boot>`: use the ``enable-on-boot``.  This will dynamically create and
+install a systemd unit file.
 
+
+.. _auth-policies:
 
 Authentication Policies
 =======================
 
-Administrators can limit access to a MEP via a Globus authentication policy, which verifies
-that the user has appropriate identities linked to their Globus account and that the required
-identities have recent authentications. Authentication policies are stored within the Globus
-Auth service and can be shared among multiple MEPs.
+Administrators can limit access to a MEP via a Globus authentication policy, which
+verifies that the user has appropriate identities linked to their Globus account and
+that the required identities have recent authentications. Authentication policies are
+stored within the Globus Auth service and can be shared among multiple MEPs.
 
-Please refer to the `Authentication Policies documentation`_ for a description of each policy
-field and other useful information.
+Please refer to the `Authentication Policies documentation`_ for a description of each
+policy field and other useful information.
 
 .. note::
-  The ``high_assurance`` and ``authentication_assurance_timeout`` policies are only supported on
-  MEPs with HA subscriptions.
+   The ``high_assurance`` and ``authentication_assurance_timeout`` policies are only
+   supported on MEPs with HA subscriptions.
 
 
 Create a New Authentication Policy
@@ -781,19 +784,18 @@ right.
 Tracing a Task to a MEP
 =======================
 
-A MEP might be thought of as a :abbr:`CEA ([single-user] Compute Endpoint agent)`
-manager.  In a typical non-MEP paradigm, a normal user would log in (e.g., via SSH) to a
-compute resource (e.g., a cluster's login-node), create a Python virtual environment
-(e.g., `virtualenv`_, `pipx`_, `conda`_), and then install and run
-``globus-compute-endpoint`` from their user-space.  By contrast, a MEP is a
-``root``-installed and ``root``-run process that manages child processes for regular
-users.  Upon receiving a "start endpoint" message from the Globus Compute AMQP service,
-a MEP creates a user-process via the ``fork()`` |rarr| *drop privileges* |rarr|
+A MEP might be thought of as an endpoint manager.  In a typical non-MEP paradigm, a
+user would log in (e.g., via SSH) to a compute resource (e.g., a cluster's login-node),
+create a Python virtual environment (e.g., `virtualenv`_, `pipx`_, `conda`_), and then
+install and run ``globus-compute-endpoint`` from their user-space.  By contrast, a MEP
+is a ``root``-installed and ``root``-run process that manages child processes for
+regular users.  Upon receiving a "start endpoint" request from the Globus Compute AMQP
+service, a MEP creates a user-process via the ``fork()`` |rarr| *drop privileges* |rarr|
 ``exec()`` pattern, and then watches that child process until it stops.  At no point
-does the MEP ever attempt to execute tasks, nor does the MEP even see tasks |nbsp| ---
-|nbsp| those are handled the same as they have been to-date, by the CEAs.  To
-disambiguate, we call a MEP-started CEA a user endpoint or UEP.  The lifecycle of a UEP
-is managed by a MEP, while a human manages the CEA lifecycle.
+does the MEP attempt to execute tasks, nor does the MEP even see tasks |nbsp| --- |nbsp|
+those are handled the same as they have been to-date, by the UEPs.  The material
+difference between an endpoint started by a human and a UEP is a semantic one for
+clarity of discussion: MEPs start UEPs.
 
 The workflow for a task sent to a MEP roughly follows these steps:
 
@@ -846,9 +848,9 @@ The workflow for a task sent to a MEP roughly follows these steps:
 The above workflow may be of interest to system administrators from a "How does this
 work in theory?" point of view, but will be of little utility to most users.  The part
 of interest to most end users is the on-the-fly custom configuration.  If the
-administrator has provided any hook-in points in ``user_config_template.yaml.j2`` (e.g., an
-account id), then a user may specify that via the ``user_endpoint_config`` argument to
-the Executor constructor or for later submissions:
+administrator has provided any hook-in points in ``user_config_template.yaml.j2`` (e.g.,
+an account id), then a user may specify that via the ``user_endpoint_config`` argument
+to the Executor constructor or for later submissions:
 
 .. code-block:: python
    :caption: Utilizing the ``.user_endpoint_config`` via both a constructor call, and
@@ -947,9 +949,9 @@ and consume no more wall time.
 Another benefit is a cleaner process table on the login nodes.  Rather than having user
 endpoints sit idle on a login-node for days after a run has completed (perhaps until the
 next machine reboot), a MEP setup automatically shuts down idle UEPs (as defined in
-``user_config_template.yaml.j2``).  When the UEP has had no movement for 48h (by default;
-see ``idle_heartbeat_hard``), or has no outstanding work for 5m (by default; see
-``idle_heartbeats_soft``), it will shut itself down.
+``user_config_template.yaml.j2``).  When the UEP has had no movement for 48h (by
+default; see ``idle_heartbeat_hard``), or has no outstanding work for 5m (by default;
+see ``idle_heartbeats_soft``), it will shut itself down.
 
 For Users
 ---------

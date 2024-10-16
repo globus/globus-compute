@@ -1,11 +1,17 @@
-Example Globus Compute Endpoint Configurations
-**********************************************
+Example Configurations
+**********************
 
 .. _configuration-section:
 
-Globus Compute has been used on various systems around the world.  Below are example
-configurations for commonly used systems.  If you would like to add your system to this
-list please contact the Globus Compute Team via Slack.
+While Globus Compute is in use on various systems around the world, getting to a working
+configuration that matches the underlying system constraints and the requirements of the
+site-administrator often takes trial and error.  Below are example configurations for some
+well-known systems that are known to work.  These serve as a reference for getting
+started.
+
+If you would like to add your system to this list please contact the Globus Compute Team
+via `Slack <https://funcx.slack.com/>`_.  (The `#help channel`_ is a good place to
+start.)
 
 .. note::
    All configuration examples below must be customized for the user's
@@ -219,6 +225,8 @@ specific identity assigned: ``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``,
 
 .. |nbsp| unicode:: 0xA0
    :trim:
+
+.. _#help channel: https://funcx.slack.com/archives/C017637NZFA
 
 .. |GlobusComputeEngine| replace:: ``GlobusComputeEngine``
 .. _GCEngine: reference/engine.html

@@ -1,11 +1,11 @@
 Globus Compute Endpoints
 ************************
 
-A Globus Compute Endpoint is an agent (i.e., a service; a process) launched by the user
-to serve as a conduit for executing functions on a computing resource.  The Compute
-Endpoint agent (CEA) manages the site‑specific interactions for executing functions,
-leaving users with only a single API necessary for running code on their laptop,
-campus cluster, or even leadership‑class HPC machines.
+A Globus Compute Endpoint is a process launched by the user to serve as a conduit for
+executing functions on a computing resource.  The Compute Endpoint process manages the
+site‑specific interactions for executing functions, leaving users with only a single API
+necessary for running code on their laptop, campus cluster, or even leadership‑class HPC
+machines.
 
 In the mental model of Globus Compute, Endpoints are the remote instance:
 
@@ -15,8 +15,9 @@ In the mental model of Globus Compute, Endpoints are the remote instance:
 - Globus Compute Web Services |nbsp| --- |nbsp| the Globus‑provided cloud‑services that
   authenticate and ferry functions and tasks
 
-- **Globus Compute Endpoints** |nbsp| --- |nbsp| the agent that manages user‑accessible
-  compute resources to process tasks submitted by the SDK
+- **Globus Compute Endpoint** |nbsp| --- |nbsp| a site-specific process, typically on a
+  cluster head node, that manages user‑accessible compute resources to run tasks
+  submitted by the SDK
 
 The Compute Endpoint may be installed via PyPI in the usual manner, as well as via
 system packages.  See :doc:`installation` for more information.
@@ -54,7 +55,7 @@ Create a new endpoint directory and default files in ``$HOME/.globus_compute/`` 
 
        Configuration file: /.../.globus_compute/my_first_endpoint/config.yaml
 
-The Compute Endpoint will also be in the output of the ``list`` subcommand:
+This new Compute Endpoint will also be in the output of the ``list`` subcommand:
 
 .. code-block:: console
 
@@ -73,9 +74,10 @@ service upon first connect.  Until then, it exists solely as a subdirectory of
 
 As Globus Compute endpoints may be run on a diverse set of computational resources
 (i.e., the gamut from laptops to supercomputers), it is important to configure each
-CEA instance to match the underlying capabilities and restrictions of the resource.  The
+instance to match the underlying capabilities and restrictions of the resource.  The
 default configuration is functional |nbsp| --- |nbsp| it will process tasks |nbsp| ---
-|nbsp| but it is intentionally limited to only use processes on the Endpoint host.  In
+|nbsp| but it is intentionally limited to only use processes on the Endpoint host; in
+particular, on an HPC host, it will not use any additional computational nodes.  In
 its entirety, the default configuration is:
 
 .. code-block:: yaml
@@ -98,8 +100,8 @@ For now, the key items to observe are the structure (e.g., ``provider`` as a chi
 The *engine* pulls tasks from the incoming queue and conveys them to the *provider* for
 execution.  Globus Compute implements three engines: ``ThreadPoolEngine``,
 ``ProcessPoolEngine``, and ``GlobusComputeEngine``.  The first two are Compute endpoint
-wrappers of Python's |ThreadPoolExecutor|_ and |ProcessPoolExecutor|_.  These engines are
-most appropriate for single‑host (e.g., a personal workstation) installations.  For
+wrappers of Python's |ThreadPoolExecutor|_ and |ProcessPoolExecutor|_.  These engines
+are most appropriate for single‑host installations (e.g., a personal workstation).  For
 scheduler‑based clusters, |GlobusComputeEngine|_, as a wrapper over Parsl's
 |HighThroughputExecutor|_, enables access to multiple computation nodes.
 
@@ -110,12 +112,12 @@ example, if an endpoint is on the local workstation, the configuration might use
 this discussion; Parsl implements `a number of other providers`_.)
 
 Using the full power of the underlying resources requires site‑specific setup, and can
-be tricky to get right.  For instance, configuring the CEA to submit tasks to a batch
-scheduler might require a scheduler account id, awareness of which queues are
+be tricky to get right.  For instance, configuring the endpoint to submit tasks to a
+batch scheduler might require a scheduler account id, awareness of which queues are
 accessible for the account id and the job size at hand (that can change!), knowledge of
 which network interface cards to use, administrator‑chosen setup steps, and so forth ...
-the :doc:`list of example configurations <endpoint_examples>` is a good first resource as
-these are known working configurations.
+the :doc:`list of example configurations <endpoint_examples>` is a good first resource
+as these are known working configurations.
 
 .. |ThreadPoolExecutor| replace:: ``concurrent.futures.ThreadPoolExecutor``
 .. _ThreadPoolExecutor: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor
@@ -137,7 +139,7 @@ these are known working configurations.
 Starting the Endpoint
 ---------------------
 
-After configuration, start the CEA instance with the ``start`` subcommand:
+After configuration, start the endpoint instance with the ``start`` subcommand:
 
 .. code-block:: console
 
@@ -146,8 +148,8 @@ After configuration, start the CEA instance with the ``start`` subcommand:
 
 .. _endpoint-process-tree:
 
-The CEA instance will first register with the Globus Compute web services, open two AMQP
-connections to the Globus Compute AMQP service (one to receive tasks, one to submit
+The endpoint instance will first register with the Globus Compute web services, open two
+AMQP connections to the Globus Compute AMQP service (one to receive tasks, one to submit
 results; :ref:`both over port 443 <compute-endpoint-pre-requisites>`), print the web
 service‑provided Endpoint ID to the console, then daemonize.  Though the prompt returns,
 the process is still running:
@@ -176,16 +178,20 @@ The Globus Compute endpoint requires outbound access to the Globus Compute servi
    All Compute endpoints run on behalf of a user.  At the Unix level, the processes run
    as a particular username (c.f., ``$USER``, ``uid``), but to connect to the Globus
    Compute web services (and thereafter receive tasks and transmit results), the
-   endpoint must be associated with a Globus Auth identity.  The Globus Compute web
-   services will validate incoming tasks for this CEA against this identity.  Further,
-   once registered, the CEA instance cannot be run by another Globus Auth identity.
+   endpoint must be associated with a `Globus Auth identity`_.  The Globus Compute web
+   services will validate incoming tasks for this endpoint against this identity.
+   Further, once registered, the endpoint instance cannot be run by another Globus Auth
+   identity.
+
+.. _Globus Auth identity: https://www.globus.org/platform/services/auth
 
 .. note::
 
-   On the first invocation, the CEA will emit a long link to the console and ask for a
-   Globus Auth code in return.  As part of this step, the Globus Compute web services
-   will request access to your Globus Auth identity and Globus Groups.  (Subsequent
-   runs will not need to perform this login step as the credentials are cached.)
+   On the first invocation, the endpoint will emit a long link to the console and ask
+   for a Globus Auth code in return.  As part of this step, the Globus Compute web
+   services will request access to your Globus Auth identity and Globus Groups.
+   (Subsequent runs will not need to perform this login step as the credentials are
+   cached.)
 
 The default configuration will fork the endpoint process to the background, returning
 control to the shell.  To debug, or for general insight into the status, look in the
@@ -295,8 +301,9 @@ therefore all of |HighThroughputExecutor|_'s parameter options are supported as
 passthrough.
 
 .. note::
-   As of ``globus-compute-endpoint==2.12.0``, |GlobusComputeEngine|_ is the default engine type.
-   The ``HighThroughputEngine`` is deprecated.
+
+   As of ``globus-compute-endpoint==2.12.0``, |GlobusComputeEngine|_ is the default
+   engine type.  The ``HighThroughputEngine`` is deprecated.
 
 Here are |GlobusComputeEngine|_ specific features:
 
@@ -357,9 +364,9 @@ Ensuring Execution Environment
 ------------------------------
 
 When executing a function, endpoint *worker processes* expect to have all dependencies
-readily available.  For example, if a function requires ``numpy`` and a worker
-environment does not have that package installed, attempts to execute that function on
-that worker will fail.
+installed.  For example, if a function requires ``numpy`` and a worker environment does
+not have that package installed, attempts to execute that function on that worker will
+fail.
 
 The process tree as shown in :ref:`starting the endpoint <endpoint-process-tree>` is the
 Compute Endpoint interchange.  This is distinct from the *worker* processes, which are
@@ -406,13 +413,13 @@ the endpoint itself, before any workers start.  This can be achieved using the t
      conda activate my-conda-env
      pip install -r requirements.txt
 
-.. note::
+.. warning::
 
    The script specified by ``endpoint_setup`` runs in a shell (usually ``/bin/sh``), as
-   a child of the CEA process, and must finish successfully before the start up process
-   continues.  In particular, *note that it is not possible to use this hook to set or
-   change environment variables for the CEA*, and is a separate thought‑process from
-   ``worker_init`` which can do this for the workers.
+   a child process, and must finish successfully before the endpoint will continue
+   starting up.  In particular, *note that it is not possible to use this hook to set or
+   change environment variables for the endpoint*, and is a separate thought‑process
+   from ``worker_init`` which *can* set environment variables for the workers.
 
 Similarly, artifacts created by ``endpoint_setup`` may be cleaned up with
 ``endpoint_teardown``:
@@ -599,16 +606,17 @@ their endpoint configurations, bring up and bring down different endpoints, and 
 of which endpoints have which configuration.
 
 As of May, 2024, Compute Endpoints may now be run as "multi‑user" endpoints.  Please
-ignore the name (see the note, below) and instead think of it as "template‑able".  A
-multi‑user endpoint specifies a configuration *template* that will be filled in by
-SDK‑supplied user‑variables.  This configuration is then applied to sub‑processes of the
-multi‑user endpoint.  For ease and clarity, we call the parent process the Multi‑User
-Endpoint and abbreviate it as MEP, and the child‑processes *of* the MEP the User
-Endpoints, or UEPs.
+ignore the name (:ref:`see the note, below <pardon-the-mess>`) and instead think of it
+as "template‑able".  This type of 'multi'‑user endpoint specifies a configuration
+*template* that will be filled in by SDK‑supplied user‑variables.  This configuration is
+then applied to sub‑processes of the multi‑user endpoint.  To disambiguate, we call the
+parent process the Multi‑User Endpoint and abbreviate it as MEP, and the child‑processes
+*of* the MEP the User Endpoints, or UEPs.
 
-The UEP is exactly the same process and logic as discussed above with the CEA.  The only
-difference is that the UEP always has a parent MEP process.  Conversely, MEPs *do not
-run tasks*.  They have exactly one job: start UEPs based on the passed configuration.
+The UEP is exactly the same process and logic as discussed in previous sections.  The
+only difference is that the UEP always has a parent MEP process.  Conversely, MEPs *do
+not run tasks*.  They have exactly one job: start UEPs based on the passed
+configuration.
 
 .. _create-templatable-endpoint:
 
@@ -641,10 +649,10 @@ The default configuration of the MEP, in its entirety, is:
    identity_mapping_config_path: /.../.globus_compute/my_second_endpoint/example_identity_mapping_config.json
    multi_user: true
 
-Unless this MEP will be run as a power user (e.g., ``root``) |nbsp| --- |nbsp| in which
-case, please read :doc:`the next section <multi_user>` |nbsp| --- |nbsp| the Identity
-Mapping pieces may be removed.  (If left in place, they will be ignored and a warning
-message will be emitted to the log.)
+Unless this MEP will be run as a privileged user (e.g., ``root``) |nbsp| --- |nbsp| in
+which case, please read :doc:`the next section <multi_user>` |nbsp| --- |nbsp| the
+Identity Mapping pieces may be removed.  (If left in place, they will be ignored and a
+warning message will be emitted to the log.)
 
 .. code-block:: console
 
@@ -694,6 +702,8 @@ start the UEP.  On the SDK-side, this uses the ``user_endpoint_config`` on the E
 Both ``.submit()`` calls will send tasks to the *same* endpoint, the one specified by
 ``mep_id``, but the MEP will spawn two different UEPs, one for each unique
 ``user_endpoint_config`` sent to the web services.
+
+.. _pardon-the-mess:
 
 .. note::
 
