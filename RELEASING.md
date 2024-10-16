@@ -126,7 +126,7 @@ Before building the packages:
 #### Build Process
 
 To build the alpha DEB/RPM packages after the alpha PyPI is released, simply put
-the tag name ie. ``v2.29.0a0`` or ``v2.29.0`` into the input textbox of the 
+the tag name ie. ``v2.29.0a0`` or ``v2.29.0`` into the input textbox of the
 [build page here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec).
 then clicking the green **Build** button.
 
@@ -134,8 +134,8 @@ For production builds, check the  ``BUILD_FOR_STABLE`` box.
 
 1. Notes
     Our alpha builds will go to the ``unstable`` repo, and production packages goes
-     to both the ``testing`` and ``stable`` repos.  
-    
+     to both the ``testing`` and ``stable`` repos.
+
     After this build process for production, the testing and stable packages will
     reside in an internal globus 'holding' repo.  GCS manages the infrastructure
     so we need to run another Jenkins build to push it to live if GCS is not having
