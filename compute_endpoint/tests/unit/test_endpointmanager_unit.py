@@ -1,6 +1,7 @@
 import fcntl
 import io
 import json
+import logging
 import os
 import pathlib
 import pwd
@@ -68,6 +69,13 @@ _mock_localuser_rec = pwd.struct_passwd(
 
 def mock_ensure_compute_dir():
     return pathlib.Path(_mock_localuser_rec.pw_dir) / ".globus_compute"
+
+
+@pytest.fixture
+def mock_log():
+    with mock.patch(f"{_MOCK_BASE}log", spec=logging.Logger) as m:
+        m.getEffectiveLevel.return_value = logging.DEBUG
+        yield m
 
 
 @pytest.fixture
@@ -139,7 +147,7 @@ def mock_reg_info(mock_ep_uuid) -> str:
 
 @pytest.fixture
 def mock_client(mocker, mock_ep_uuid, mock_reg_info):
-    mock_gcc = mocker.Mock()
+    mock_gcc = mock.Mock()
     mock_gcc.register_endpoint.return_value = mock_reg_info
     mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
     yield mock_ep_uuid, mock_gcc
@@ -199,7 +207,7 @@ def mock_unprivileged_epmanager(mocker, conf_dir, mock_client, mock_conf):
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
     assert em.identity_mapper is None
 
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
 
     yield conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em
@@ -246,8 +254,8 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     mock_gcc.auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
-    em._command = mocker.Mock(spec=CommandQueueSubscriber)
-    em._heartbeat_publisher = mocker.Mock(spec=ResultPublisher)
+    em._command = mock.Mock(spec=CommandQueueSubscriber)
+    em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
 
     yield conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em
     if em.identity_mapper:
@@ -283,9 +291,9 @@ def successful_exec_from_mocked_root(
 
     queue_item = (1, mock_props, json.dumps(command_payload).encode())
 
-    em.identity_mapper = mocker.Mock()
+    em.identity_mapper = mock.Mock()
     em.identity_mapper.map_identity.return_value = "typicalglobusname@somehost.org"
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
 
@@ -357,6 +365,7 @@ def test_sets_process_title(
 )
 def test_gracefully_exits_if_registration_blocked(
     mocker,
+    mock_log,
     register_endpoint_failure_response,
     conf_dir,
     mock_conf,
@@ -366,7 +375,6 @@ def test_gracefully_exits_if_registration_blocked(
     exit_code,
     status_code,
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_gcc = get_standard_compute_client()
     mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
 
@@ -475,12 +483,12 @@ def test_sends_data_during_registration(
 
 def test_handles_network_error_scriptably(
     mocker,
+    mock_log,
     conf_dir,
     mock_conf,
     endpoint_uuid,
     randomstring,
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     some_err = randomstring()
     mocker.patch(
         "globus_compute_sdk.Client",
@@ -499,9 +507,8 @@ def test_handles_network_error_scriptably(
 
 
 def test_mismatched_id_gracefully_exits(
-    mocker, randomstring, conf_dir, mock_conf, mock_client
+    mock_log, randomstring, conf_dir, mock_conf, mock_client
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     wrong_uuid, mock_gcc = mock_client
     ep_uuid = str(uuid.uuid4())
     assert wrong_uuid != ep_uuid, "Verify test setup"
@@ -545,9 +552,8 @@ def test_mismatched_id_gracefully_exits(
     ),
 )
 def test_handles_invalid_reg_info(
-    mocker, randomstring, conf_dir, mock_conf, mock_client, received_data
+    mock_log, randomstring, conf_dir, mock_conf, mock_client, received_data
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     ep_uuid, mock_gcc = mock_client
     received_data[1]["endpoint_id"] = ep_uuid
     should_succeed, mock_gcc.register_endpoint.return_value = received_data
@@ -607,8 +613,9 @@ def test_writes_endpoint_uuid(epmanager_as_root):
     assert ep_data["endpoint_id"] == returned_uuid
 
 
-def test_log_contains_sentinel_lines(mocker, epmanager_as_root, noop, reset_signals):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_log_contains_sentinel_lines(
+    mocker, mock_log, epmanager_as_root, noop, reset_signals
+):
     *_, em = epmanager_as_root
 
     mocker.patch(f"{_MOCK_BASE}os")
@@ -653,7 +660,7 @@ def test_children_signaled_at_shutdown(
 ):
     *_, em = epmanager_as_root
 
-    em._event_loop = mocker.Mock()
+    em._event_loop = mock.Mock()
     em.wait_for_children = noop
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_time = mocker.patch(f"{_MOCK_BASE}time")
@@ -707,7 +714,7 @@ def test_children_signaled_at_shutdown(
         assert killpg_call[0] == exp_args, "Expected SIGTERM, *then* SIGKILL"
 
 
-def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mocker):
+def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mock_log):
     *_, mock_os, _mock_pwd, em = epmanager_as_root
     child_pid = random.randrange(1, 32768 + 1)
     args_tup = (
@@ -720,35 +727,32 @@ def test_restarts_running_endpoint_with_cached_args(epmanager_as_root, mocker):
     mock_os.waitstatus_to_exitcode.return_value = 0
 
     em._cached_cmd_start_args[child_pid] = args_tup
-    em.cmd_start_endpoint = mocker.Mock()
+    em.cmd_start_endpoint = mock.Mock()
 
-    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
-        em.wait_for_children()
+    em.wait_for_children()
 
     a, _k = mock_log.info.call_args
     assert "using cached arguments to start" in a[0]
     assert em.cmd_start_endpoint.call_args.args == args_tup
 
 
-def test_no_cached_args_means_no_restart(epmanager_as_root, mocker):
+def test_no_cached_args_means_no_restart(epmanager_as_root, mocker, mock_log):
     *_, em = epmanager_as_root
     child_pid = random.randrange(1, 32768 + 1)
 
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.waitpid.side_effect = [(child_pid, -1), (0, -1)]
     mock_os.waitstatus_to_exitcode.return_value = 0
-    em.cmd_start_endpoint = mocker.Mock()
+    em.cmd_start_endpoint = mock.Mock()
 
-    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
-        em.wait_for_children()
+    em.wait_for_children()
     a, _k = mock_log.info.call_args
     assert "stopped normally" in a[0], "Verify happy path"
 
     assert not em.cmd_start_endpoint.called
 
 
-def test_emits_endpoint_id_if_isatty(mocker, epmanager_as_root):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_emits_endpoint_id_if_isatty(mocker, mock_log, epmanager_as_root):
     *_, em = epmanager_as_root
 
     mocker.patch.object(em, "_install_signal_handlers", side_effect=Exception)
@@ -797,9 +801,8 @@ def test_emits_endpoint_id_if_isatty(mocker, epmanager_as_root):
 
 
 def test_as_root_and_no_identity_mapper_configuration_fails(
-    mocker, mock_client, conf_dir, mock_conf
+    mocker, mock_log, mock_client, conf_dir, mock_conf
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
 
@@ -830,9 +833,8 @@ def test_no_identity_mapper_if_unprivileged(mocker, conf_dir, mock_conf, mock_cl
 
 
 def test_unprivileged_warns_if_identity_conf_specified(
-    mocker, conf_dir, mock_conf, mock_client
+    mocker, mock_log, conf_dir, mock_conf, mock_client
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
 
     em = EndpointManager(conf_dir, None, mock_conf)
@@ -851,12 +853,11 @@ def test_unprivileged_warns_if_identity_conf_specified(
 
 
 def test_quits_if_not_privileged_and_no_identity_set(
-    mocker, mock_client, epmanager_as_root
+    mocker, mock_log, mock_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
     ep_uuid, mock_gcc = mock_client
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_gcc.auth_client.userinfo.return_value = {"identity_set": []}
     assert em._time_to_stop is False, "Verify test setup"
     em._event_loop()
@@ -868,12 +869,11 @@ def test_quits_if_not_privileged_and_no_identity_set(
 
 
 def test_clean_exit_on_identity_collection_error(
-    mocker, mock_client, epmanager_as_root
+    mocker, mock_log, mock_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
     ep_uuid, mock_gcc = mock_client
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_gcc.auth_client.userinfo.return_value = {"not_identity_set": None}
     assert em._time_to_stop is False, "Verify test setup"
     em._event_loop()
@@ -895,9 +895,8 @@ def test_clean_exit_on_identity_collection_error(
 
 @pytest.mark.no_mock_pim
 def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
-    mocker, conf_dir, mock_conf
+    mocker, mock_log, conf_dir, mock_conf
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
 
@@ -937,7 +936,7 @@ def test_iterates_even_if_no_commands(mocker, epmanager_as_root):
     em._event_loop()  # subtest is that it iterates and doesn't block
 
     em._time_to_stop = False
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_queue.get.side_effect = queue.Empty()
     em._event_loop()
 
@@ -966,7 +965,7 @@ def test_send_heartbeat_honors_shutdown(mocker, conf_dir, mock_ep_uuid, mock_reg
     conf = Config(executors=[])
     em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
     em._heartbeat_period = random.randint(1, 10000)
-    em._heartbeat_publisher = mocker.Mock(spec=ResultPublisher)
+    em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
 
     em.send_heartbeat()
     a, _ = em._heartbeat_publisher.publish.call_args
@@ -980,14 +979,12 @@ def test_send_heartbeat_honors_shutdown(mocker, conf_dir, mock_ep_uuid, mock_reg
 
 
 def test_send_heartbeat_shares_exception(
-    mocker, conf_dir, mock_ep_uuid, mock_reg_info, randomstring
+    mock_log, conf_dir, mock_ep_uuid, mock_reg_info, randomstring
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
-
     exc_text = randomstring()
     conf = Config(executors=[])
     em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
-    em._heartbeat_publisher = mocker.Mock(spec=ResultPublisher)
+    em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
     em._heartbeat_publisher.publish.return_value = Future()
     f = em.send_heartbeat()
     mock_log.error.reset_mock()
@@ -1000,8 +997,8 @@ def test_send_heartbeat_shares_exception(
 
 def test_sends_heartbeat_at_shutdown(mocker, epmanager_as_root, noop, reset_signals):
     *_, em = epmanager_as_root
-    hb_fut = mocker.Mock(spec=Future)
-    em.send_heartbeat = mocker.Mock(spec=EndpointManager.send_heartbeat)
+    hb_fut = mock.Mock(spec=Future)
+    em.send_heartbeat = mock.Mock(spec=EndpointManager.send_heartbeat)
     em.send_heartbeat.return_value = hb_fut
     em._event_loop = noop
     em.start()
@@ -1048,18 +1045,17 @@ def test_heartbeat_sent_periodically(
         last_time += em._heartbeat_period + 1
         return last_time
 
-    em.send_heartbeat = mocker.Mock(spec=EndpointManager.send_heartbeat)
-    em._command_queue = mocker.Mock(spec=queue.SimpleQueue)
+    em.send_heartbeat = mock.Mock(spec=EndpointManager.send_heartbeat)
+    em._command_queue = mock.Mock(spec=queue.SimpleQueue)
     em._command_queue.get.side_effect = mock_q_get
     mock_monotonic.side_effect = increase_time_by_hb
     em._event_loop()
     assert em.send_heartbeat.call_count == num_iterations
 
 
-def test_emits_command_requested_debug(mocker, epmanager_as_root, mock_props):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_emits_command_requested_debug(mock_log, epmanager_as_root, mock_props):
     *_, em = epmanager_as_root
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
 
     mock_props.content_type = "asdfasdf"  # quit loop early b/c test is satisfied
@@ -1089,11 +1085,10 @@ def test_emits_command_requested_debug(mocker, epmanager_as_root, mock_props):
 
 
 def test_emitted_debug_command_credentials_removed(
-    mocker, epmanager_as_root, randomstring, mock_props
+    mock_log, epmanager_as_root, randomstring, mock_props
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
 
     mock_props.content_type = "asdfasdf"  # quit early in loop b/c test is satisfied
@@ -1115,10 +1110,9 @@ def test_emitted_debug_command_credentials_removed(
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_command_verifies_content_type(mocker, epmanager_as_root, mock_props):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_command_verifies_content_type(mock_log, epmanager_as_root, mock_props):
     *_, em = epmanager_as_root
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
 
     mock_props.content_type = "asdfasdfasdfasd"  # the test
@@ -1133,12 +1127,11 @@ def test_command_verifies_content_type(mocker, epmanager_as_root, mock_props):
     assert em._command.ack.called, "Command always ACKed"
 
 
-def test_ignores_stale_commands(mocker, epmanager_as_root, mock_props, randomstring):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_ignores_stale_commands(mock_log, epmanager_as_root, mock_props, randomstring):
     *_, mock_os, _, em = epmanager_as_root
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
 
     ep_name = randomstring()
     child_pid = random.randint(2, 1000000)
@@ -1182,9 +1175,8 @@ def test_send_failure_notice_conditionally_forks(
 
 
 def test_send_failure_notice_gracefully_ignores_malformed_kwargs(
-    mocker, epmanager_as_root
+    mock_log, epmanager_as_root
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
 
     with pytest.raises(SystemExit) as pyt_exc:
@@ -1233,8 +1225,7 @@ def test_send_failure_notice_sends_message(mocker, epmanager_as_root, randomstri
     assert k["msg"] is err_msg
 
 
-def test_send_failure_notice_fails_to_send(mocker, epmanager_as_root, randomstring):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_send_failure_notice_fails_to_send(mock_log, epmanager_as_root, randomstring):
     *_, mock_os, _, em = epmanager_as_root
     mock_os.fork.return_value = 0  # test the child process path
 
@@ -1250,14 +1241,13 @@ def test_send_failure_notice_fails_to_send(mocker, epmanager_as_root, randomstri
     assert "Unable to send user endpoint start up failure" in a[0]
 
 
-def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root, mock_props):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_handles_invalid_server_msg_gracefully(mock_log, epmanager_as_root, mock_props):
     *_, em = epmanager_as_root
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
 
     queue_item = (1, mock_props, json.dumps({"asdf": 123}).encode())
 
-    em._command_queue = mocker.Mock()
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
@@ -1284,9 +1274,8 @@ def test_handles_invalid_server_msg_gracefully(mocker, epmanager_as_root, mock_p
     ),
 )
 def test_unprivileged_handles_identity_set_robustly(
-    mocker, mock_props, mock_unprivileged_epmanager, is_invalid, idset, randomstring
+    mock_log, mock_props, mock_unprivileged_epmanager, is_invalid, idset, randomstring
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     cmd_payload = {
         "globus_effective_identity": f"abc{randomstring()}",
         "globus_identity_set": idset,
@@ -1295,7 +1284,7 @@ def test_unprivileged_handles_identity_set_robustly(
     queue_item = (1, mock_props, json.dumps(cmd_payload).encode())
 
     *_, em = mock_unprivileged_epmanager
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
     em._command_queue.get.side_effect = (queue_item, queue.Empty())
     em._event_loop()
 
@@ -1331,15 +1320,14 @@ def test_unprivileged_happy_path(
     queue_item = (1, mock_props, json.dumps(cmd_payload).encode())
 
     em._command_queue.get.side_effect = (queue_item, queue.Empty())
-    em.cmd_start_endpoint = mocker.Mock(spec=em.cmd_start_endpoint)
+    em.cmd_start_endpoint = mock.Mock(spec=em.cmd_start_endpoint)
     em._event_loop()
     assert em.cmd_start_endpoint.called
 
 
 def test_handles_unknown_identity_gracefully(
-    mocker, epmanager_as_root, mock_props, randomstring
+    mock_log, epmanager_as_root, mock_props, randomstring
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
 
     pld = {
@@ -1350,8 +1338,8 @@ def test_handles_unknown_identity_gracefully(
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
     em.identity_mapper.map_identity.return_value = None
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
-    em._command_queue = mocker.Mock()
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
 
@@ -1372,9 +1360,8 @@ def test_handles_unknown_identity_gracefully(
 
 
 def test_gracefully_handles_identity_mapping_error(
-    mocker, epmanager_as_root, randomstring, mock_props
+    mock_log, epmanager_as_root, randomstring, mock_props
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
 
     pld = {
@@ -1386,8 +1373,8 @@ def test_gracefully_handles_identity_mapping_error(
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
     em.identity_mapper.map_identity.side_effect = MemoryError(exc_text)
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
-    em._command_queue = mocker.Mock()
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
 
@@ -1412,13 +1399,12 @@ def test_gracefully_handles_identity_mapping_error(
     "cmd_name", ("", "_private", "9c", "valid_but_do_not_exist", " ", "a" * 101)
 )
 def test_handles_unknown_or_invalid_command_gracefully(
-    mocker, epmanager_as_root, cmd_name, mock_props, randomstring
+    mocker, mock_log, epmanager_as_root, cmd_name, mock_props, randomstring
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, em = epmanager_as_root
 
     mocker.patch(f"{_MOCK_BASE}pwd")
-    em.identity_mapper = mocker.Mock()
+    em.identity_mapper = mock.Mock()
     em.identity_mapper.map_identity.return_value = "a"
 
     pld = {
@@ -1432,8 +1418,8 @@ def test_handles_unknown_or_invalid_command_gracefully(
 
     mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
 
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
-    em._command_queue = mocker.Mock()
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
@@ -1455,13 +1441,12 @@ def test_handles_unknown_or_invalid_command_gracefully(
 
 
 def test_handles_local_user_not_found_gracefully(
-    mocker, epmanager_as_root, randomstring, mock_props
+    mock_log, epmanager_as_root, randomstring, mock_props
 ):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
     *_, mock_pwd, em = epmanager_as_root
 
     invalid_user_name = "username_that_is_not_on_localhost6_" + randomstring()
-    em.identity_mapper = mocker.Mock()
+    em.identity_mapper = mock.Mock()
     em.identity_mapper.map_identity.return_value = invalid_user_name
     mock_pwd.getpwnam.side_effect = KeyError(invalid_user_name)
 
@@ -1472,8 +1457,8 @@ def test_handles_local_user_not_found_gracefully(
     }
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
-    em._command_queue = mocker.Mock()
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
@@ -1492,8 +1477,9 @@ def test_handles_local_user_not_found_gracefully(
     assert pld["globus_username"] in k["user_ident"]
 
 
-def test_handles_failed_command(mocker, epmanager_as_root, mock_props, randomstring):
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+def test_handles_failed_command(
+    mocker, mock_log, epmanager_as_root, mock_props, randomstring
+):
     mocker.patch(f"{_MOCK_BASE}pwd.getpwnam")
     mocker.patch(
         f"{_MOCK_BASE}EndpointManager.cmd_start_endpoint", side_effect=Exception()
@@ -1509,10 +1495,10 @@ def test_handles_failed_command(mocker, epmanager_as_root, mock_props, randomstr
     }
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
-    em.identity_mapper = mocker.Mock()
+    em.identity_mapper = mock.Mock()
     em.identity_mapper.map_identity.return_value = "a"
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
-    em._command_queue = mocker.Mock()
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
+    em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
     em._event_loop()
@@ -1640,15 +1626,12 @@ def test_warns_if_environment_file_empty(successful_exec_from_mocked_root, caplo
 
 
 def test_warns_if_executable_not_found(
-    successful_exec_from_mocked_root, mocker, randomstring
+    mock_log, successful_exec_from_mocked_root, randomstring
 ):
     mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
     exc_text = f"Some error: {randomstring()}"
     mock_os.execvpe.side_effect = Exception(exc_text)
-    em.send_failure_notice = mocker.Mock(spec=em.send_failure_notice)
-
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
 
     expected_env = {"PATH": "/some/typoed:/path:/here"}
     (conf_dir / "user_environment.yaml").write_text(yaml.dump(expected_env))
@@ -1910,10 +1893,8 @@ def test_all_files_closed(successful_exec_from_mocked_root):
 
 
 @pytest.mark.parametrize("conf_size", [10, 222, 223, 300])
-def test_pipe_size_limit(mocker, successful_exec_from_mocked_root, conf_size):
+def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, conf_size):
     *_, em = successful_exec_from_mocked_root
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")
-    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
 
     conf_str = "v: " + "$" * (conf_size - 3)
 
@@ -1977,7 +1958,7 @@ def test_redirect_stdstreams_to_user_log(
 
 @pytest.mark.parametrize("debug", (True, False))
 def test_user_debug_emits_ephemeral_config_to_user_log(
-    mocker, successful_exec_from_mocked_root, conf_dir, command_payload, debug
+    mocker, mock_log, successful_exec_from_mocked_root, conf_dir, command_payload, debug
 ):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -1990,8 +1971,6 @@ def test_user_debug_emits_ephemeral_config_to_user_log(
     def duped_first_check(*a, **k):
         assert mock_os.dup2.call_count == 3, "3 std streams; to log file, not stdout"
 
-    mock_log = mocker.patch(f"{_MOCK_BASE}log")  # quiet down, test
-    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mock_print.side_effect = duped_first_check
 
