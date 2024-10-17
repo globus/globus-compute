@@ -50,6 +50,7 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
+_GOOD_EC = 87  # SPoA for "good/happy-path" exit code
 
 _mock_rootuser_rec = pwd.struct_passwd(
     ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
@@ -1544,7 +1545,7 @@ def test_environment_default_path(mocker, successful_exec_from_mocked_root):
     expected_pybindir = pathlib.Path(sys.executable).parent
     expected_order = ("/usr/local/bin", "/usr/bin", "/bin", str(expected_pybindir))
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_os.execvpe.call_args
     env = k["env"]
     assert "PATH" in env, "Path always set, with default if nothing else available"
@@ -1561,7 +1562,7 @@ def test_loads_user_environment(successful_exec_from_mocked_root, randomstring):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_os.execvpe.call_args
     env = k["env"]
     assert sentinel_key in env
@@ -1578,7 +1579,7 @@ def test_handles_invalid_user_environment_file_gracefully(
     env_path.write_text("\nalkdhj: g\nkladhj - asdf -asd f")
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_warn.call_args_list[0]
     assert "Failed to parse user environment variables" in a[0]
     assert env_path in a, "Expected pointer to problem file in warning"
@@ -1595,7 +1596,7 @@ def test_environment_default_path_set_if_not_specified(
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_os.execvpe.call_args
     env = k["env"]
     assert "PATH" in env, "Expected PATH is always set"
@@ -1609,7 +1610,7 @@ def test_warns_if_environment_file_not_found(successful_exec_from_mocked_root, c
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     assert f"No user environment variable file found at {conf_path}" in caplog.text
 
 
@@ -1621,7 +1622,7 @@ def test_warns_if_environment_file_empty(successful_exec_from_mocked_root, caplo
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     assert f"User environment variable file at {conf_path} is empty" in caplog.text
 
 
@@ -1668,7 +1669,7 @@ def test_start_endpoint_children_die_with_parent(successful_exec_from_mocked_roo
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     a, k = mock_os.execvpe.call_args
     assert a[0] == "globus-compute-endpoint", "Sanity check"
     assert k["args"][0] == a[0], "Expect transparency for admin"
@@ -1680,7 +1681,7 @@ def test_start_endpoint_children_have_own_session(successful_exec_from_mocked_ro
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     assert mock_os.setsid.called
 
 
@@ -1689,7 +1690,7 @@ def test_start_endpoint_privileges_dropped(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
     expected_user = _mock_localuser_rec.pw_name
     expected_gid = _mock_localuser_rec.pw_gid
@@ -1714,7 +1715,7 @@ def test_start_endpoint_logs_to_std(mocker, successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
     log_config = mock_logging.config.dictConfig.call_args[0][0]
     handlers = log_config["handlers"]
@@ -1854,7 +1855,7 @@ def test_default_to_secure_umask(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
     assert mock_os.umask.called
     umask = mock_os.umask.call_args[0][0]
@@ -1866,7 +1867,7 @@ def test_start_from_user_dir(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
     udir = mock_os.chdir.call_args[0][0]
     expected_udir = _mock_localuser_rec.pw_dir
@@ -1878,7 +1879,7 @@ def test_all_files_closed(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
     _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)
     assert mock_os.closerange.called
@@ -1911,7 +1912,7 @@ def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, con
         em._event_loop()
 
     if is_valid:
-        assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+        assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     else:
         assert pyexc.value.code < 87
         assert f"{stdin_data_size} bytes" in mock_log.error.call_args[0][0]
@@ -1928,7 +1929,7 @@ def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, co
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
 
 def test_redirect_stdstreams_to_user_log(
@@ -1949,7 +1950,7 @@ def test_redirect_stdstreams_to_user_log(
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
     a, k = next((a, k) for a, k in mock_os.open.call_args_list if a[0] == ep_log)
     assert a[1] == exp_flags, "Expect replacement stdout/stderr: append, wronly, sync"
@@ -1977,7 +1978,7 @@ def test_user_debug_emits_ephemeral_config_to_user_log(
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 87, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
     assert mock_print.called is debug, "Expect only written if `debug: true` set"
     if debug:
