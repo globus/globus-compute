@@ -553,6 +553,8 @@ a custom ``globus-compute-endpoint`` wrapper:
 (The use of ``exec`` is not critical, but keeps the process tree tidy.)
 
 
+.. _configure-multiple-python-versions:
+
 Configuring to Accept Multiple Python Versions
 ==============================================
 
@@ -570,15 +572,15 @@ invocations and endpoint workers.  This is limiting in workflows where admins ha
 little control over their users' SDK environments, such as locally run Jupyter
 notebooks.  This can sometimes be alleviated with :ref:`an alternate serialization
 strategy <specifying-serde-strategy>`, but not all serialization strategies work in all
-environments, and admins can't enforce this automatically |nbsp| --- |nbsp| users have
-to be educated on what strategy to use.  A more robust workaround is to use the
+environments, and admins can't enforce this automatically |nbsp| --- |nbsp| users must
+be educated on what strategy to use.  A more robust workaround is to use the
 ``user_runtime`` config template variable to detect what Python version was used to
 submit the task.
 
-Say an admin wants to accept the three most recent Python versions (3.10-3.12).  Using
-`conda`_, they can create an environment for each Python version they want to support,
-and launch the UEP's workers with the correct environment depending on the user's Python
-version.  A config template for that might look like:
+Suppose an admin wants to accept the four most recent Python versions (3.10-3.13).
+Using `conda`_, they can create an environment for each Python version they want to
+support, and launch the UEP's workers with the correct environment depending on the
+user's Python version.  A config template for that might look like:
 
 .. code-block:: yaml+jinja
 
@@ -587,19 +589,19 @@ version.  A config template for that might look like:
      type: GlobusComputeEngine
      provider:
         type: LocalProvider
-     {% if '3.12' in user_runtime.python_version %}
+     {% if '3.13' in user_runtime.python_version %}
+        worker_init: conda activate py313
+     {% elif '3.12' in user_runtime.python_version %}
         worker_init: conda activate py312
      {% elif '3.11' in user_runtime.python_version %}
         worker_init: conda activate py311
-     {% elif '3.10' in user_runtime.python_version %}
-        worker_init: conda activate py310
      {% else %}
-        worker_init: conda activate py310  # as a back up
+        worker_init: conda activate py310
      {% endif %}
 
-This of course requires that there are conda environments named ``py312``, ``py311``,
-and ``py310`` with the appropriate Python versions and ``globus-compute-endpoint``
-installed.
+This of course requires that there are conda environments named ``py313, ``py312``,
+``py311``, and ``py310`` with the appropriate Python versions and
+``globus-compute-endpoint`` installed.
 
 For more information on what an MEP knows about the user's runtime environment, see
 |UserRuntime|.
@@ -635,8 +637,8 @@ To place UEPs into debug mode, use the ``debug`` top-level configuration directi
 
 Note that this is *also* how to get the UEP to emit its configuration to the log, which
 may be helpful in determining which set of logs are associated with which configuration
-or just generally while implementing and debugging.  The configuration is emitted to the
-logs very early on in the UEP bootup stage; look for the following sentinel lines::
+or just generally while implementing and debugging.  The configuration is written to the
+logs before the UEP boots; look for the following sentinel lines::
 
    [TIMESTAMP] DEBUG ... Begin Compute endpoint configuration (5 lines):
       ...
