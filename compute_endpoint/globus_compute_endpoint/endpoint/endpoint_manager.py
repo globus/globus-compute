@@ -895,32 +895,14 @@ class EndpointManager:
             os.chdir("/")  # always succeeds, so start from known place
             exit_code += 1
 
-            if (os.getuid(), os.getgid()) != (uid, gid):
+            orig_uid, orig_gid = os.getuid(), os.getgid()
+            if (orig_uid, orig_gid) != (uid, gid):
                 # For multi-user systems, this is the expected path.  But for those
                 # who run the multi-user setup as a non-privileged user, there is
                 # no need to change the user: they're already executing _as that
                 # uid_!
-                try:
-                    # The initialization of groups is "fungible" if not a
-                    # privileged user
-                    log.debug("Initializing groups for %s, %s", uname, gid)
-                    os.initgroups(uname, gid)
-                except PermissionError as e:
-                    log.warning(
-                        "Unable to initialize groups; unprivileged user?  Ignoring"
-                        " error, but further attempts to drop privileges may fail."
-                        "\n  Process ID (pid): %s"
-                        "\n  Current user: %s (uid: %s, gid: %s)"
-                        "\n  Attempted to initgroups to: %s (uid: %s, name: %s)",
-                        os.getpid(),
-                        self._mu_user.pw_name,
-                        os.getuid(),
-                        os.getgid(),
-                        gid,
-                        uid,
-                        uname,
-                    )
-                    log.debug("Exception text: (%s) %s", e.__class__.__name__, e)
+                log.debug("Initializing groups for %s, %s", uname, gid)
+                os.initgroups(uname, gid)  # raises (good!) on error
                 exit_code += 1
 
                 # But actually becoming the correct UID is _not_ fungible.  If we
@@ -931,6 +913,25 @@ class EndpointManager:
                 exit_code += 1
                 log.debug("Setting process uid for %s to %s (%s)", pid, uid, uname)
                 os.setresuid(uid, uid, uid)  # raises (good!) on error
+                exit_code += 1
+
+                try:
+                    # Be paranoid by testing that we *can't* get back to orig_uid
+                    os.setuid(orig_uid)
+                except PermissionError:
+                    pass  # good; the kernel has our backs now
+                else:
+                    log.critical(
+                        "Unexpectedly regained original privileges!  (Should not have"
+                        f" been able to re-assume uid {orig_uid} from {uid}.)"
+                    )
+
+                    # This message is potentially (likely) sent back to the SDK; no
+                    # sense in sharing the specifics (i.e., `msg`) beyond the
+                    # administrator.
+                    raise PermissionError("PermissionError: failed to start endpoint")
+                del orig_uid, orig_gid
+
                 exit_code += 1
 
             # If we had any capabilities, we drop them now.
