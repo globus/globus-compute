@@ -1,12 +1,27 @@
+from __future__ import annotations
+
 from itertools import chain, combinations
+from unittest import mock
 
 import pytest
+from globus_compute_sdk.sdk.auth.scopes import ComputeScopes
 from globus_compute_sdk.sdk.login_manager import AuthorizerLoginManager, LoginManager
+from globus_compute_sdk.sdk.web_client import WebClient
+from globus_sdk import AuthClient, RefreshTokenAuthorizer
 from globus_sdk.scopes import AuthScopes
 
 CID_KEY = "GLOBUS_COMPUTE_CLIENT_ID"
 CSC_KEY = "GLOBUS_COMPUTE_CLIENT_SECRET"
 _MOCK_BASE = "globus_compute_sdk.sdk.login_manager."
+
+
+@pytest.fixture
+def mock_authorizers():
+    mock_authorizer = mock.Mock(spec=RefreshTokenAuthorizer)
+    return {
+        AuthScopes.resource_server: mock_authorizer,
+        ComputeScopes.resource_server: mock_authorizer,
+    }
 
 
 @pytest.fixture
@@ -21,17 +36,32 @@ def test_auth_client_requires_authorizer_openid_scope(mocker):
     alm = AuthorizerLoginManager({})
     with pytest.raises(KeyError) as pyt_exc:
         alm.get_auth_client()
-    assert AuthScopes.openid in str(pyt_exc)
+    assert AuthScopes.resource_server in str(pyt_exc)
 
 
-def test_does_not_open_local_cred_storage(mocker, randomstring):
-    test_authorizer = randomstring()
+def test_get_auth_client(mock_authorizers: dict[str, RefreshTokenAuthorizer]):
+    alm = AuthorizerLoginManager(mock_authorizers)
+    auth_client = alm.get_auth_client()
+    assert isinstance(auth_client, AuthClient)
+    assert auth_client.authorizer == mock_authorizers[AuthScopes.resource_server]
+
+
+def test_get_web_client(mock_authorizers: dict[str, RefreshTokenAuthorizer]):
+    alm = AuthorizerLoginManager(mock_authorizers)
+    web_client = alm.get_web_client()
+    assert isinstance(web_client, WebClient)
+    assert web_client.authorizer == mock_authorizers[ComputeScopes.resource_server]
+
+
+def test_does_not_open_local_cred_storage(
+    mocker, randomstring, mock_authorizers: dict[str, RefreshTokenAuthorizer]
+):
     mock_lm = mocker.patch(f"{_MOCK_BASE}authorizer_login_manager.LoginManager")
-    mock_lm.SCOPES = {test_authorizer}
+    mock_lm.SCOPES = {key: [randomstring()] for key in mock_authorizers.keys()}
     with pytest.raises(LookupError):
         AuthorizerLoginManager({}).ensure_logged_in()
 
-    alm = AuthorizerLoginManager({test_authorizer: "asdf"})
+    alm = AuthorizerLoginManager(mock_authorizers)
     assert alm.ensure_logged_in() is None, "Test setup: verified SCOPES is checked"
     assert not mock_lm.called, "Do not instantiate; do not create creds storage"
 

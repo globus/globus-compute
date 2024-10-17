@@ -25,7 +25,9 @@ class AuthorizerLoginManager(LoginManagerProtocol):
         self.authorizers = authorizers
 
     def get_auth_client(self) -> globus_sdk.AuthClient:
-        return globus_sdk.AuthClient(authorizer=self.authorizers[AuthScopes.openid])
+        return globus_sdk.AuthClient(
+            authorizer=self.authorizers[AuthScopes.resource_server]
+        )
 
     def get_web_client(
         self, *, base_url: str | None = None, app_name: str | None = None
