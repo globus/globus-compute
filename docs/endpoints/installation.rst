@@ -1,8 +1,8 @@
 Installing the Compute Endpoint
 *******************************
 
-The Globus Compute Endpoint is offered both as a PyPI package, and as pre-built DEB and
-RPM packages.
+The Globus Compute Endpoint is available as a PyPI package or as a native system
+package (DEB and RPM).
 
 Operating System Support
 ========================
@@ -70,14 +70,20 @@ Prerequisites
 What is Installed
 -----------------
 
-The package manager packages rely on Globus' supplied Python.  As of this writing, that
-is Python3.9, and is installed to ``/opt/globus-python/``.  This version of Python is
-not critical to the Globus Compute Endpoint software in general, but it is the version
-of Python against which the DEB and RPM packages were built.
-
 The Globus Compute Endpoint software will be installed in
 ``/opt/globus-compute-agent/`` and a shell-script wrapper will be installed to
-``/usr/sbin/globus-compute-endpoint``
+``/usr/sbin/globus-compute-endpoint``.
+
+The packages also rely on Globus' supplied Python.  As of this writing, that
+is Python3.9, and is installed to ``/opt/globus-python/``.  While Globus Compute is
+supported on any `Python version that is not EOL`_, the Compute agent packages are built
+against Globus' Python.  As the Python version has implications for
+:ref:`function and data serialization consistency <avoiding-serde-errors>`,
+administrators may want to consider supporting :ref:`multiple Python versions in the
+configuration template <configure-multiple-python-versions>`.
+
+.. _Python version that is not EOL: https://devguide.python.org/versions/
+
 
 RPM Installation
 ----------------
@@ -119,5 +125,5 @@ SUSE Installation
 
 .. |pipx for library isolation| replace:: ``pipx`` for library isolation
 .. _pipx for library isolation: https://pipx.pypa.io/stable/
-.. _`same Linux distributions as does Globus Connect Server`: https://docs.globus.org/globus-connect-server/v5/#supported_linux_distributions
+.. _same Linux distributions as does Globus Connect Server: https://docs.globus.org/globus-connect-server/v5/#supported_linux_distributions
 

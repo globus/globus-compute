@@ -340,6 +340,8 @@ objects, while ``JSONData`` can only serialize JSON-able objects: generally ``st
 ``list``\s containing only those data types. ``JSONData`` is ideal for low-trust
 workflows, because deserialization via dill can result in arbitrary code execution.
 
+.. _avoiding-serde-errors:
+
 Avoiding Serialization Errors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -353,9 +355,9 @@ versions.  Thus a function serialized in an older version of python or dill
 may not deserialize correctly in later versions, and the opposite is even more
 problematic.
 
-Even a single number difference in python minor versions, ie from 3.10 --> 3.11,
-can generate issues.  Micro version differences, ie from 3.11.8 to 3.11.9,
-are mostly safe, though not universally.
+Even a single number difference in python minor versions (e.g., from 3.12 |rarr| 3.13)
+can generate issues.  Micro version differences (e.g., from 3.11.8 |rarr| 3.11.9)
+are usually safe, though not universally.
 
 Errors may surface as serialization/deserialization Exceptions, Globus
 Compute task workers lost due to SEGFAULT, or even incorrect results.
@@ -368,6 +370,8 @@ is submitted (possibly from a different SDK environment) using the Client's
 ``.run()`` or the Executor's ``.submit_to_registered_function()`` methods.
 On the other hand, the |Executor|_ 's ``.submit()`` takes a function argument
 and serializes a fresh copy each time it is invoked.
+
+.. |rarr| unicode:: 0x2192
 
 .. |Client| replace:: ``Client``
 .. _Client: reference/client.html
