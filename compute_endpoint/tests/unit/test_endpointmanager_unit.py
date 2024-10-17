@@ -50,7 +50,7 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_GOOD_EC = 87  # SPoA for "good/happy-path" exit code
+_GOOD_EC = 88  # SPoA for "good/happy-path" exit code
 
 _mock_rootuser_rec = pwd.struct_passwd(
     ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
@@ -221,6 +221,7 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = 0
     mock_os.getgid.return_value = 0
+    mock_os.setuid.side_effect = PermissionError("[unit test] Operation not permitted")
 
     mock_os.fork.return_value = 0
     mock_os.pipe.return_value = 40, 41
@@ -1707,6 +1708,61 @@ def test_start_endpoint_privileges_dropped(successful_exec_from_mocked_root):
     assert mock_os.setresuid.called, "Do NOT save uid; truly change user"
     a, _ = mock_os.setresuid.call_args
     assert a == (expected_uid, expected_uid, expected_uid)
+
+
+@pytest.mark.parametrize(
+    "priv_func,ec",
+    (
+        # manual accounting for exit code at failure points
+        ("initgroups", 71),
+        ("setresgid", 72),
+        ("setresuid", 73),
+    ),
+)
+def test_start_endpoint_drop_privileges_fails_dies(
+    mocker, priv_func, ec, successful_exec_from_mocked_root, randomstring
+):
+    exc_text = randomstring()
+    exc = MemoryError(exc_text)
+    mock_os, *_, em = successful_exec_from_mocked_root
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
+
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
+    mocked_func = getattr(mock_os, priv_func)
+    mocked_func.side_effect = exc
+    with pytest.raises(SystemExit) as pyt_e:
+        em._event_loop()
+
+    found_ec = pyt_e.value.code
+    a, _k = mock_log.error.call_args
+    assert f"({type(exc).__name__})" in a[0]
+    assert exc_text in a[0]
+    assert found_ec == ec, "Expect each point of failure to increase exit code"
+    assert mocked_func.called
+    assert em.send_failure_notice.called, "Expect privilege failure to send notice"
+
+
+def test_start_endpoint_paranoid_reassumption_check(
+    mocker, successful_exec_from_mocked_root
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+    mock_os.setuid.side_effect = None
+    mock_log = mocker.patch(f"{_MOCK_BASE}log")
+    mock_log.getEffectiveLevel.return_value = random.randint(0, 60)  # some int
+    em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
+
+    with pytest.raises(SystemExit):
+        em._event_loop()
+
+    assert em.send_failure_notice.called, "Expect privilege failure to send notice"
+    _a, k = em.send_failure_notice.call_args
+    m = k["msg"]
+    exp_msg = "PermissionError: failed to start endpoint]"
+    assert m.endswith(exp_msg), "Expect terse user msg, that doesn't include details"
+
+    a, _k = mock_log.critical.call_args
+    assert "regained original privileges" in a[0], "Expect explanation in logs"
 
 
 def test_start_endpoint_logs_to_std(mocker, successful_exec_from_mocked_root):
