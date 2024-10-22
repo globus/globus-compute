@@ -2506,6 +2506,7 @@ New Functionality
 .. |nbsp| unicode:: 0xA0
    :trim:
 
+.. |Batch| replace:: :class:`Batch <globus_compute_sdk.sdk.batch.Batch>`
 .. |Executor| replace:: :class:`Executor <globus_compute_sdk.sdk.executor.Executor>`
 .. |MPIFunction| replace:: :class:`MPIFunction <globus_compute_sdk.sdk.mpi_function.MPIFunction>`
 .. |ShellFunction| replace:: :class:`ShellFunction <globus_compute_sdk.sdk.shell_function.ShellFunction>`

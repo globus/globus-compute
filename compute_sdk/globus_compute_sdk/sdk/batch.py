@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import typing as t
+import uuid
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 
-from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
+from globus_compute_sdk.sdk.utils.uuid_like import (
+    UUID_LIKE_T,
+    as_optional_uuid,
+    as_uuid,
+)
 from globus_compute_sdk.serialize import ComputeSerializer
 
 _default_serde = ComputeSerializer()
@@ -49,10 +54,10 @@ class Batch:
         :param user_runtime: Information about the runtime used to create and prepare
             this batch, such as Python and Globus Compute SDK versions
         """
-        self.task_group_id = task_group_id
+        self.task_group_id = as_optional_uuid(task_group_id)
         self.resource_specification = resource_specification
         self.user_endpoint_config = user_endpoint_config
-        self.tasks: dict[str, list[str]] = defaultdict(list)
+        self.tasks: dict[uuid.UUID, list[str]] = defaultdict(list)
         self._serde = serializer or _default_serde
         self.request_queue = request_queue
         self.user_runtime = user_runtime
@@ -68,6 +73,14 @@ class Batch:
         """Return the total number of tasks in batch (includes all functions)"""
         return sum(len(fns) for fns in self.tasks.values())
 
+    @property
+    def task_group_id(self) -> uuid.UUID | None:
+        return self._task_group_id
+
+    @task_group_id.setter
+    def task_group_id(self, new_id: UUID_LIKE_T):
+        self._task_group_id = as_optional_uuid(new_id)
+
     def add(
         self,
         function_id: UUID_LIKE_T,
@@ -77,19 +90,31 @@ class Batch:
         """
         Add a function invocation to a batch submission
 
-        :param function_id : UUID of registered function as registered.  (Required)
+        :param function_id: UUID of registered function.  (Required)
         :param args: arguments as required by the function signature
         :param kwargs: Keyword arguments as required by the function signature
         """
         if args is None:
             args = ()
+        if not isinstance(args, (list, tuple)):
+            raise TypeError(f"args: expected `tuple`, got: {type(args).__name__}")
+
         if kwargs is None:
             kwargs = {}
+        if not isinstance(kwargs, dict):
+            k_type = type(kwargs).__name__  # type: ignore[unreachable]
+            raise TypeError(f"kwargs: expected dict, got: {k_type}")
+        elif not all(isinstance(k, str) for k in kwargs):
+            k = next(_k for _k in kwargs if not isinstance(_k, str))
+            k_type = type(k).__name__
+            raise TypeError(f"kwargs: expected kwargs with `str` keys, got: {k_type}")
+
         ser_args = self._serde.serialize(args)
         ser_kwargs = self._serde.serialize(kwargs)
         payload = self._serde.pack_buffers([ser_args, ser_kwargs])
 
-        self.tasks[str(function_id)].append(payload)
+        # as_uuid to check type (per user typo identified in #help)
+        self.tasks[as_uuid(function_id)].append(payload)
 
     def prepare(self) -> dict[str, str | list[tuple[str, str, str]]]:
         """
@@ -99,7 +124,7 @@ class Batch:
         """
         data = {
             "create_queue": self.request_queue,
-            "tasks": dict(self.tasks),
+            "tasks": {str(fn_id): tasks for fn_id, tasks in self.tasks.items()},
         }
         if self.task_group_id:
             data["task_group_id"] = str(self.task_group_id)
