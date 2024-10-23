@@ -13,7 +13,7 @@ Installation
 
 The pre-requisites for the `Globus Compute endpoint` and the `Globus Compute client` are
 
-  1. Python3.8+
+  1. Python3.9+
   2. The machine must have outbound network access
 
 The ``-V`` or ``--version`` arguments to the Python executable will return the version on the local system.  An example
