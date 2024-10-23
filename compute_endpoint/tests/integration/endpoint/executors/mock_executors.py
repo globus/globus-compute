@@ -8,9 +8,7 @@ import uuid
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_sdk import Client
-from parsl.executors.high_throughput.mpi_prefix_composer import (
-    InvalidResourceSpecification,
-)
+from parsl.executors.errors import InvalidResourceSpecification
 
 
 class MockExecutor(unittest.mock.Mock):
@@ -42,7 +40,7 @@ class MockExecutor(unittest.mock.Mock):
 
         # This is a hack to trigger an InvalidResourceSpecification
         if "BAD_KEY" in resource_specification:
-            raise InvalidResourceSpecification("BAD_KEY")
+            raise InvalidResourceSpecification({"BAD_KEY"})
 
         packed_result = messagepack.pack(res)
         msg = {"task_id": str(task_id), "message": packed_result}
