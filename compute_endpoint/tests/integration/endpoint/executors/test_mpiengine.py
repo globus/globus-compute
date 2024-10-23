@@ -6,9 +6,7 @@ from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusMPIEngine
 from globus_compute_sdk.sdk.mpi_function import MPIFunction
 from globus_compute_sdk.sdk.shell_function import ShellResult
-from parsl.executors.high_throughput.mpi_prefix_composer import (
-    InvalidResourceSpecification,
-)
+from parsl.executors.errors import InvalidResourceSpecification
 from tests.utils import get_env_vars
 
 

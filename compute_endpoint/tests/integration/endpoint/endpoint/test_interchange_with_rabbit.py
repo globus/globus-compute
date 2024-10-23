@@ -326,5 +326,5 @@ def test_bad_resource_specification(
                 result = unpack(mbody)
                 break
     assert result.task_id == task_uuid
-    assert "Invalid resource specification options supplied: BAD_KEY" in result.data
+    assert "Invalid Resource Specification Supplied: {'BAD_KEY'}" in result.data
     assert result.error_details.code == "RemoteExecutionError"
