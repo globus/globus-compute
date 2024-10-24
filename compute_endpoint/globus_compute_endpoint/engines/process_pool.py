@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
+import os
 import queue
 import typing as t
 import uuid
@@ -22,13 +23,19 @@ logger = logging.getLogger(__name__)
 
 
 class ProcessPoolEngine(GlobusComputeEngineBase):
-    def __init__(self, *args, label: str = "ProcessPoolEngine", **kwargs):
+    def __init__(
+        self,
+        *args,
+        working_dir: t.Union[str, os.PathLike] = "tasks_working_dir",
+        label: str = "ProcessPoolEngine",
+        **kwargs,
+    ):
         self.label = label
         self.executor: t.Optional[NativeExecutor] = None
         self._executor_args = args
         self._executor_kwargs = kwargs
         self._status_report_thread = ReportingThread(target=self.report_status, args=[])
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, working_dir=working_dir, **kwargs)
 
     def start(
         self,
