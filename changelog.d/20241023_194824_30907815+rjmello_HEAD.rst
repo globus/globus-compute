@@ -1,5 +1,0 @@
-Changed
-^^^^^^^
-
-- Drop support for Python 3.8, which entered the end-of-life phase on
-  10-07-2024 (https://peps.python.org/pep-0569/).
