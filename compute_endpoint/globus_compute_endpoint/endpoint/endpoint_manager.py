@@ -17,19 +17,14 @@ import time
 import typing as t
 import uuid
 from concurrent.futures import Future
+from contextlib import contextmanager
 from datetime import datetime
 from http import HTTPStatus
 
 import globus_compute_sdk as GC
-from cachetools import TTLCache
-from globus_compute_endpoint.endpoint.identity_mapper import PosixIdentityMapper
-
-try:
-    import pyprctl
-except AttributeError as e:
-    raise ImportError("pyprctl is not supported on this system") from e
 import setproctitle
 import yaml
+from cachetools import TTLCache
 from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_common.pydantic_v1 import BaseModel
@@ -42,6 +37,7 @@ from globus_compute_endpoint.endpoint.config.utils import (
     serialize_config,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.identity_mapper import PosixIdentityMapper
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     CommandQueueSubscriber,
     ResultPublisher,
@@ -67,6 +63,23 @@ class InvalidCommandError(Exception):
 
 class InvalidUserError(Exception):
     pass
+
+
+def _import_pyprctl():
+    # Enable conditional import, and create a hook-point for testing to mock
+    try:
+        import pyprctl
+    except AttributeError as e:
+        raise ImportError("pyprctl is not supported on this system") from e
+
+    return pyprctl
+
+
+def _import_pamhandle():
+    # Enable conditional import, and create a hook-point for testing to mock
+    from globus_compute_endpoint.pam import PamHandle
+
+    return PamHandle
 
 
 class UserEndpointRecord(BaseModel):
@@ -761,6 +774,76 @@ class EndpointManager:
         finally:
             sys.exit()
 
+    @contextmanager
+    def do_host_auth(self, username: str):
+        def _affix_logd(prefix: str = "", suffix: str = ""):
+            def _wrap(msg, *a, **k):
+                log.debug(f"{prefix}{msg}{suffix}", *a, **k)
+
+            return _wrap
+
+        if not self._config.pam.enable:
+            try:
+                logd = _affix_logd(f"PRCTL ({username}): ")
+                logd("Importing module")
+                pyprctl = _import_pyprctl()
+            except Exception:
+                log.exception(f"({username}) Failed to import PRCTL library")
+                raise PermissionError("see your system administrator") from None
+
+            yield
+
+            try:
+                # If the administrator has *not* enabled PAM, then assume the
+                # intention is for a paranoid safe process and drop all
+                # privileges now ...
+                logd("Dropping all process capabilities")
+                pyprctl.CapState().set_current()
+
+                # ... and stating that even if exec'ing might return some
+                # privileges, "no."  In particular after this, SETUID executables
+                # invoked from this process root will not get privileges
+                logd("Allowing no new process privileges (no setuid executables!)")
+
+                pyprctl.set_no_new_privs()
+            except Exception:
+                log.exception(f"({username}) Failed to import PRCTL library")
+                raise PermissionError("see your system administrator") from None
+
+            return
+
+        sname = self._config.pam.service_name
+        try:
+            logd = _affix_logd(f"PAM ({sname}, {username}): ")
+            logd("Importing library")
+            PamHandle = _import_pamhandle()
+
+            logd("Creating handle")
+            with PamHandle(sname, username=username) as pamh:
+                logd("Invoking account stage")
+                pamh.pam_acct_mgmt()
+                logd("Creating credentials")
+                pamh.credentials_establish()
+                logd("Opening session")
+                pamh.pam_open_session()
+
+                yield
+
+                # wiped by initgroups, so reinitialize
+                logd("Recreating credentials")
+                pamh.credentials_establish()
+                logd("Closing session")
+                pamh.pam_close_session()
+                logd("Removing credentials")
+                pamh.credentials_delete()
+
+                logd("Closing handle")
+        except Exception as e:
+            log.error(str(e))  # Share (very likely) pamlib error with admin ...
+
+            # ... but be opaque with user.
+            raise PermissionError("see your system administrator") from None
+
     def cmd_start_endpoint(
         self,
         user_record: pwd.struct_passwd,
@@ -898,25 +981,25 @@ class EndpointManager:
                 # who run the multi-user setup as a non-privileged user, there is
                 # no need to change the user: they're already executing _as that
                 # uid_!
-                log.debug("Initializing groups for %s, %s", uname, gid)
-                os.initgroups(uname, gid)  # raises (good!) on error
-                exit_code += 1
 
-                # But actually becoming the correct UID is _not_ fungible.  If we
-                # can't -- for whatever reason -- that's a problem.  So do NOT
-                # ignore the potential error.
-                log.debug("Setting process group for %s to %s", pid, gid)
-                os.setresgid(gid, gid, gid)  # raises (good!) on error
-                exit_code += 1
-                log.debug("Setting process uid for %s to %s (%s)", pid, uid, uname)
-                os.setresuid(uid, uid, uid)  # raises (good!) on error
-                exit_code += 1
+                with self.do_host_auth(uname):
+                    log.debug("Setting process group for %s to %s", pid, gid)
+                    os.setresgid(gid, gid, gid)  # raises (good!) on error
+                    exit_code += 1
+
+                    log.debug("Initializing groups for %s, %s", uname, gid)
+                    os.initgroups(uname, gid)  # raises (good!) on error
+                    exit_code += 1
+
+                    log.debug("Setting process uid for %s to %s (%s)", pid, uid, uname)
+                    os.setresuid(uid, uid, uid)  # raises (good!) on error
+                    exit_code += 1
 
                 try:
                     # Be paranoid by testing that we *can't* get back to orig_uid
                     os.setuid(orig_uid)
                 except PermissionError:
-                    pass  # good; the kernel has our backs now
+                    pass  # good; the kernel has our back now
                 else:
                     log.critical(
                         "Unexpectedly regained original privileges!  (Should not have"
@@ -926,16 +1009,10 @@ class EndpointManager:
                     # This message is potentially (likely) sent back to the SDK; no
                     # sense in sharing the specifics (i.e., `msg`) beyond the
                     # administrator.
-                    raise PermissionError("PermissionError: failed to start endpoint")
+                    raise PermissionError("failed to start endpoint")
                 del orig_uid, orig_gid
 
                 exit_code += 1
-
-            # If we had any capabilities, we drop them now.
-            pyprctl.CapState().set_current()
-
-            # Even if exec'ing might return some privileges, "no."
-            pyprctl.set_no_new_privs()
 
             # some Q&D verification for admin debugging purposes
             if not shutil.which(proc_args[0], path=env["PATH"]):
