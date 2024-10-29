@@ -35,6 +35,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
 )
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.pam import PamHandle
 from globus_sdk import GlobusAPIError, NetworkError
 
 try:
@@ -947,7 +948,7 @@ def test_iterates_even_if_no_commands(mocker, epmanager_as_root):
 @pytest.mark.parametrize("hb", (-100, -5, 0, 0.1, 4, 7, 11, None))
 def test_heartbeat_period_minimum(conf_dir, mock_conf, hb, ep_uuid, mock_reg_info):
     if hb is not None:
-        mock_conf._heartbeat_period = hb  #
+        mock_conf._heartbeat_period = hb
         assert mock_conf.heartbeat_period == hb, "Avoid config setter"
     em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     exp_hb = 30.0 if hb is None else max(MINIMUM_HEARTBEAT, hb)
@@ -1710,8 +1711,8 @@ def test_start_endpoint_privileges_dropped(successful_exec_from_mocked_root):
     "priv_func,ec",
     (
         # manual accounting for exit code at failure points
-        ("initgroups", 71),
-        ("setresgid", 72),
+        ("setresgid", 71),
+        ("initgroups", 72),
         ("setresuid", 73),
     ),
 )
@@ -1754,7 +1755,7 @@ def test_start_endpoint_paranoid_reassumption_check(
     assert em.send_failure_notice.called, "Expect privilege failure to send notice"
     _a, k = em.send_failure_notice.call_args
     m = k["msg"]
-    exp_msg = "PermissionError: failed to start endpoint]"
+    exp_msg = "failed to start endpoint]"
     assert m.endswith(exp_msg), "Expect terse user msg, that doesn't include details"
 
     a, _k = mock_log.critical.call_args
@@ -1781,7 +1782,8 @@ def test_run_as_same_user_disabled_if_admin(
     ep_uuid, mock_gcc = mock_client
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
-    mock_prctl = mocker.patch(f"{_MOCK_BASE}pyprctl")
+    mock_prctl = mocker.patch(f"{_MOCK_BASE}_import_pyprctl")
+    mock_prctl.return_value = mock_prctl
     mock_prctl.CapState.get_current.return_value.effective = set()
 
     mock_pwd.getpwuid.return_value = namedtuple("getent", "pw_name,pw_uid")("asdf", 0)
@@ -2054,3 +2056,145 @@ def test_port_is_respected(mocker, mock_client, mock_conf, conf_dir, port):
     EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert mock_update_url_port.call_args[0][1] == port
+
+
+def test_pam_disabled(conf_dir, mock_conf, mock_ep_uuid, mock_reg_info):
+    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+
+    mock_conf.pam.enable = False
+    with mock.patch(f"{_MOCK_BASE}_import_pyprctl") as mock_ctl:
+        mock_ctl.return_value = mock_ctl
+        with mock.patch(f"{_MOCK_BASE}_import_pamhandle") as mock_pam:
+            mock_pam.return_value = mock_pam
+            with em.do_host_auth("some user name"):
+                pass
+    assert not mock_pam.called, "PAM was disable; should *not* attempt PAM"
+    assert mock_ctl.CapState.called, "No PAM?  No privileges."
+    assert mock_ctl.set_no_new_privs.called, "No PAM?  No privileges."
+
+
+def test_pam_enabled(conf_dir, mock_conf, mock_ep_uuid, mock_reg_info):
+    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+
+    def install_next_pamf():
+        # ensure PAM functions called in appropriate order
+        fns = [  # reversed because we pop() to get each fn
+            "credentials_delete",
+            "pam_close_session",
+            "pam_open_session",
+            "credentials_establish",
+        ]
+
+        def _install_next_test_func():
+            if not fns:
+                return
+            fn = fns.pop()
+            getattr(pamh, fn).side_effect = _install_next_test_func
+
+        return _install_next_test_func
+
+    mock_conf.pam.enable = True
+    pamh = mock.Mock(spec=PamHandle)
+    with mock.patch(f"{_MOCK_BASE}_import_pyprctl") as mock_ctl:
+        mock_ctl.return_value = mock_ctl
+        with mock.patch(f"{_MOCK_BASE}_import_pamhandle") as mock_pam:
+            mock_pam.return_value = mock_pam
+            mock_pam.return_value.__enter__.return_value = pamh
+            pamh.pam_acct_mgmt.side_effect = install_next_pamf()
+            pamh.credentials_establish.side_effect = AssertionError("Out of order")
+            pamh.pam_open_session.side_effect = AssertionError("Out of order")
+            pamh.pam_close_session.side_effect = AssertionError("Out of order")
+            pamh.credentials_delete.side_effect = AssertionError("Out of order")
+            with em.do_host_auth("some user name"):
+                assert pamh.pam_open_session.called, "Complete authentication"
+                assert not pamh.credentials_delete.called, "PAM session *not* over yet"
+            assert pamh.credentials_delete.called, "PAM session completes"
+
+    assert not mock_ctl.CapState.called, "Using PAM; admin manages privs"
+    assert not mock_ctl.set_no_new_privs.called, "Using PAM; admin manages privs"
+
+
+@pytest.mark.parametrize(
+    "fn_name",
+    (
+        "pam_acct_mgmt",
+        "credentials_establish",
+        "pam_open_session",
+        "pam_close_session",
+        "credentials_delete",
+    ),
+)
+def test_pam_error(
+    mock_log, conf_dir, mock_conf, mock_ep_uuid, mock_reg_info, fn_name, randomstring
+):
+    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+
+    exc_text = randomstring()
+    exc = MemoryError(exc_text)
+
+    mock_conf.pam.enable = True
+    pamh = mock.Mock(spec=PamHandle)
+    with mock.patch(f"{_MOCK_BASE}_import_pamhandle") as mock_pam:
+        mock_pam.return_value = mock_pam
+        mock_pam.return_value.__enter__.return_value = pamh
+        getattr(pamh, fn_name).side_effect = exc
+        with pytest.raises(PermissionError) as pyt_e:
+            with em.do_host_auth("some user name"):
+                pass
+
+    e_str = str(pyt_e.value)
+    assert "PAM" not in e_str, "User-visible exception should be opaque"
+    assert "see your system administrator" in e_str
+
+    a, _k = mock_log.error.call_args
+
+    assert exc_text in a[0], "Admin logs should specific error msg"
+
+
+def test_do_auth_change_uid_then_close(
+    mock_conf_root, successful_exec_from_mocked_root
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    def this_func(fn_opener, fn_name: str):
+        def _mark_called(*_a, **_k):
+            fn_opener(fn_name)
+
+        return _mark_called
+
+    def set_called():
+        fn_calls = {"setresuid", "setresgid", "initgroups"}
+
+        def _called(fn_name):
+            if fn_name == "pam_open_session":
+                # these are now allowed
+                mock_os.setresuid.side_effect = this_func(fn_opener, "setresuid")
+                mock_os.setresgid.side_effect = this_func(fn_opener, "setresgid")
+                mock_os.initgroups.side_effect = this_func(fn_opener, "initgroups")
+                return
+
+            fn_calls.discard(fn_name)
+            if not fn_calls:
+                # once we've become the new user, pam session may close
+                pamh.pam_close_session.side_effect = None
+
+        return _called
+
+    mock_conf_root.pam.enable = True
+    pamh = mock.Mock(spec=PamHandle)
+    fn_opener = set_called()
+
+    with mock.patch(f"{_MOCK_BASE}_import_pamhandle") as mock_pam:
+        mock_pam.return_value = mock_pam
+        mock_pam.return_value.__enter__.return_value = pamh
+        pamh.pam_open_session.side_effect = this_func(fn_opener, "pam_open_session")
+        pamh.pam_close_session.side_effect = AssertionError("Out of order")
+        mock_os.setresuid.side_effect = AssertionError("Out of order")
+        mock_os.setresgid.side_effect = AssertionError("Out of order")
+        mock_os.initgroups.side_effect = AssertionError("Out of order")
+
+        with pytest.raises(SystemExit) as pyexc:
+            em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert pamh.pam_close_session.called

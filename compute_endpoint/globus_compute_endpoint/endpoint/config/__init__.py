@@ -9,3 +9,4 @@ from .model import (  # noqa: F401
     ManagerEndpointConfigModel,
     UserEndpointConfigModel,
 )
+from .pam import PamConfiguration  # noqa: F401

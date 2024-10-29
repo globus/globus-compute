@@ -4,7 +4,7 @@ import shutil
 import textwrap
 
 from click import ClickException
-from globus_compute_endpoint.endpoint.config import UserEndpointConfig
+from globus_compute_endpoint.endpoint.config.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_sdk import GlobusApp

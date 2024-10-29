@@ -7,6 +7,7 @@ import typing as t
 import uuid
 
 import pytest
+from globus_compute_endpoint.endpoint.config import PamConfiguration
 from globus_compute_endpoint.engines.helper import execute_task
 from tests.conftest import randomstring_impl
 
@@ -50,6 +51,7 @@ known_manager_config_opts = {
     "debug": True,
     "public": True,
     "identity_mapping_config_path": os.PathLike,
+    "pam": PamConfiguration,
     "force_mu_allow_same_user": True,
     "mu_child_ep_grace_period_s": float,
     "local_compute_services": True,
@@ -80,6 +82,8 @@ def get_random_of_datatype_impl(cls):
         return random.randint(10_000, 1_000_000)
     elif issubclass(cls, float):
         return random.random() * 1_000_000
+    elif issubclass(cls, PamConfiguration):
+        return PamConfiguration(True, "some-service-name")
 
     raise NotImplementedError(f"Missing test branch for type: {repr(cls)}")
 
