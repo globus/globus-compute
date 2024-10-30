@@ -3,7 +3,7 @@ from __future__ import annotations
 import platform
 import sys
 
-from globus_sdk import ClientApp, GlobusAppConfig, UserApp
+from globus_sdk import ClientApp, GlobusApp, GlobusAppConfig, UserApp
 
 from .client_login import get_client_creds
 from .token_storage import get_token_storage
@@ -22,8 +22,10 @@ def get_globus_app(environment: str | None = None):
     client_id, client_secret = get_client_creds()
     config = GlobusAppConfig(token_storage=get_token_storage(environment=environment))
 
+    app: GlobusApp  # silly mypy
+
     if client_id and client_secret:
-        return ClientApp(
+        app = ClientApp(
             app_name=app_name,
             client_id=client_id,
             client_secret=client_secret,
@@ -37,16 +39,22 @@ def get_globus_app(environment: str | None = None):
             "variables, or unset them to use a normal login."
         )
 
-    # The authorization-via-web-link flow requires stdin; the user must visit
-    # the web link and enter generated code.
-    elif (not sys.stdin.isatty() or sys.stdin.closed) and not _is_jupyter():
-        # Not technically necessary; the login flow would just die with an EOF
-        # during input(), but adding this message here is much more direct --
-        # handle the non-happy path by letting the user know precisely the issue
-        raise RuntimeError(
-            "Unable to run native app login flow: stdin is closed or is not a TTY."
-        )
-
     else:
         client_id = client_id or DEFAULT_CLIENT_ID
-        return UserApp(app_name=app_name, client_id=client_id, config=config)
+        app = UserApp(app_name=app_name, client_id=client_id, config=config)
+
+        # The authorization-via-web-link flow requires stdin; the user must visit
+        # the web link and enter generated code.
+        if (
+            app.login_required()
+            and (not sys.stdin.isatty() or sys.stdin.closed)
+            and not _is_jupyter()
+        ):
+            # Not technically necessary; the login flow would just die with an EOF
+            # during input(), but adding this message here is much more direct --
+            # handle the non-happy path by letting the user know precisely the issue
+            raise RuntimeError(
+                "Unable to run native app login flow: stdin is closed or is not a TTY."
+            )
+
+    return app
