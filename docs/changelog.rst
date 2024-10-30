@@ -3,6 +3,33 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.30.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.30.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add runtime type-checking to |Batch| class; per user typo-induced question.
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed a ``KeyError`` that occurred when using an ``AuthorizerLoginManager`` with
+  a ``Client``, or when calling the ``AuthorizerLoginManager.get_auth_client()``
+  method directly.
+
+Changed
+^^^^^^^
+
+- Bumped ``globus-sdk`` dependency to at least 3.46.0.
+
+- Bumped ``parsl`` dependency version to `2024.10.21 <https://pypi.org/project/parsl/2024.10.21/>`_.
+
+- Drop support for Python 3.8, which entered the end-of-life phase on
+  10-07-2024 (https://peps.python.org/pep-0569/).
+
 .. _changelog-2.29.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.29.0
