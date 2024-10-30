@@ -3,7 +3,6 @@ heartbeat_threshold: 200
 
 engine:
     type: GlobusComputeEngine
-    label: kube
     max_workers_per_node: 1
 
     # Encryption is not currently supported for KubernetesProvider
@@ -24,10 +23,6 @@ engine:
 
         # e.g., default
         namespace: {{ NAMESPACE }}
-
-        # Must follow Kubernetes naming rules
-        # e.g., globus-compute-pod
-        pod_name: {{ POD_NAME }}
 
         # e.g., python:3.12-bookworm
         image: {{ IMAGE }}
