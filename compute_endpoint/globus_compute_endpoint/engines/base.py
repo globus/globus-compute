@@ -20,6 +20,7 @@ from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
+from parsl.utils import RepresentationMixin
 
 logger = logging.getLogger(__name__)
 _EXC_HISTORY_TMPL = "+" * 68 + "\nTraceback from attempt: {ndx}\n{exc}\n" + "-" * 68
@@ -69,7 +70,7 @@ class ReportingThread:
             self._thread.join(timeout=0.1)
 
 
-class GlobusComputeEngineBase(ABC):
+class GlobusComputeEngineBase(ABC, RepresentationMixin):
     """Shared functionality and interfaces required by all GlobusCompute Engines.
     This is designed to plug-in executors following the concurrent.futures.Executor
     interface as execution backends to GlobusCompute

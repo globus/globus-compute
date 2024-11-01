@@ -4,6 +4,7 @@ import shutil
 import textwrap
 
 from click import ClickException
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import get_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_sdk import GlobusApp
@@ -49,7 +50,7 @@ def enable_on_boot(ep_dir: pathlib.Path, app: GlobusApp):
     ep_name = ep_dir.name
 
     config = get_config(ep_dir)
-    if not config.multi_user:
+    if isinstance(config, UserEndpointConfig):  # aka: not multi_user
         if config.detach_endpoint:
             # config.py takes priority if it exists
             if (ep_dir / "config.py").is_file():

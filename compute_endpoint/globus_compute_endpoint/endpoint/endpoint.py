@@ -21,7 +21,7 @@ import setproctitle
 import texttable
 import yaml
 from globus_compute_endpoint import __version__
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import BaseConfig, UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
@@ -317,7 +317,7 @@ class Endpoint:
         return None
 
     @staticmethod
-    def get_funcx_client(config: Config | None) -> Client:
+    def get_funcx_client(config: BaseConfig | None) -> Client:
         if config:
             return Client(
                 local_compute_services=config.local_compute_services,
@@ -330,7 +330,7 @@ class Endpoint:
         self,
         endpoint_dir: pathlib.Path,
         endpoint_uuid,
-        endpoint_config: Config,
+        endpoint_config: UserEndpointConfig,
         log_to_console: bool,
         no_color: bool,
         reg_info: dict,
@@ -428,7 +428,6 @@ class Endpoint:
                     allowed_functions=endpoint_config.allowed_functions,
                     auth_policy=endpoint_config.authentication_policy,
                     subscription_id=endpoint_config.subscription_id,
-                    public=endpoint_config.public,
                 )
 
             except GlobusAPIError as e:
@@ -570,7 +569,7 @@ class Endpoint:
     def daemon_launch(
         endpoint_uuid,
         endpoint_dir,
-        endpoint_config: Config,
+        endpoint_config: UserEndpointConfig,
         reg_info,
         result_store: ResultStore,
         parent_pid: int,
@@ -594,7 +593,7 @@ class Endpoint:
     @staticmethod
     def stop_endpoint(
         endpoint_dir: pathlib.Path,
-        endpoint_config: Config | None,
+        endpoint_config: BaseConfig | None,
         remote: bool = False,
     ):
         pid_path = endpoint_dir / "daemon.pid"
@@ -618,10 +617,10 @@ class Endpoint:
 
         log.debug(f"{ep_name} has a daemon.pid file")
 
-        if endpoint_config and endpoint_config.endpoint_teardown:
-            Endpoint._run_command(
-                "endpoint_teardown", endpoint_config.endpoint_teardown
-            )
+        if isinstance(endpoint_config, UserEndpointConfig):
+            teardown = endpoint_config.endpoint_teardown
+            if teardown:
+                Endpoint._run_command("endpoint_teardown", teardown)
 
         pid = int(pid_path.read_text().strip())
         try:
@@ -656,7 +655,7 @@ class Endpoint:
     @staticmethod
     def delete_endpoint(
         ep_dir: pathlib.Path | None,
-        ep_config: Config | None = None,
+        ep_config: BaseConfig | None = None,
         force: bool = False,
         ep_uuid: str | None = None,
     ):
@@ -864,7 +863,7 @@ class Endpoint:
         print(table.draw(), file=ofile)
 
     @staticmethod
-    def get_metadata(config: Config) -> dict:
+    def get_metadata(config: UserEndpointConfig) -> dict:
         metadata: dict = {
             "endpoint_version": __version__,
             "hostname": socket.getfqdn(),

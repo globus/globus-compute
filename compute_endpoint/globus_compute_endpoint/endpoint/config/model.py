@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+import uuid
 from types import ModuleType
 
 from globus_compute_common.pydantic_v1 import (
@@ -42,8 +43,16 @@ def _validate_params(field: str):
 
 
 class BaseConfigModel(BaseModel):
-    class Config:
-        extra = "allow"
+    multi_user: t.Optional[bool]
+    display_name: t.Optional[str]
+    allowed_functions: t.Optional[t.List[uuid.UUID]]
+    authentication_policy: t.Optional[uuid.UUID]
+    subscription_id: t.Optional[uuid.UUID]
+    amqp_port: t.Optional[int]
+    heartbeat_period: t.Optional[int]
+    environment: t.Optional[str]
+    local_compute_services: t.Optional[bool]
+    debug: t.Optional[bool]
 
 
 class AddressModel(BaseConfigModel):
@@ -71,6 +80,9 @@ class ChannelModel(BaseConfigModel):
 
 
 class ProviderModel(BaseConfigModel):
+    class Config:
+        extra = "allow"
+
     type: str
     channel: t.Optional[ChannelModel]
     launcher: t.Optional[LauncherModel]
@@ -96,6 +108,7 @@ class EngineModel(BaseConfigModel):
     _validate_address = _validate_params("address")
 
     class Config:
+        extra = "allow"
         validate_all = True
 
     @root_validator(pre=True)
@@ -140,15 +153,9 @@ class EngineModel(BaseConfigModel):
         return values
 
 
-class ConfigModel(BaseConfigModel):
-    engine: t.Optional[EngineModel]
-    display_name: t.Optional[str]
-    environment: t.Optional[str]
-    multi_user: t.Optional[bool]
-    allowed_functions: t.Optional[t.List[str]]
-    heartbeat_period: t.Optional[int]
+class UserEndpointConfigModel(BaseConfigModel):
+    engine: EngineModel
     heartbeat_threshold: t.Optional[int]
-    identity_mapping_config_path: t.Optional[FilePath]
     idle_heartbeats_soft: t.Optional[int]
     idle_heartbeats_hard: t.Optional[int]
     detach_endpoint: t.Optional[bool]
@@ -157,24 +164,11 @@ class ConfigModel(BaseConfigModel):
     log_dir: t.Optional[str]
     stdout: t.Optional[str]
     stderr: t.Optional[str]
-    debug: t.Optional[bool]
-    amqp_port: t.Optional[int]
 
     _validate_engine = _validate_params("engine")
 
-    @root_validator
-    @classmethod
-    def _validate(cls, values):
-        is_mu = values.get("multi_user") is True
-
-        if is_mu:
-            msg_engine = "no engine if multi-user"
-        else:
-            msg_engine = "missing engine"
-            msg_identity = "identity_mapping_config_path should not be specified"
-            assert not bool(values.get("identity_mapping_config_path")), msg_identity
-        assert is_mu is not bool(values.get("engine")), msg_engine
-        return values
+    class Config:
+        extra = "forbid"
 
     def dict(self, *args, **kwargs):
         # Slight modification is needed here since we still
@@ -184,3 +178,13 @@ class ConfigModel(BaseConfigModel):
         engine = ret.pop("engine", None)
         ret["executors"] = [engine] if engine else None
         return ret
+
+
+class ManagerEndpointConfigModel(BaseConfigModel):
+    public: t.Optional[bool]
+    identity_mapping_config_path: t.Optional[FilePath]
+    force_mu_allow_same_user: t.Optional[bool]
+    mu_child_ep_grace_period_s: t.Optional[float]
+
+    class Config:
+        extra = "forbid"

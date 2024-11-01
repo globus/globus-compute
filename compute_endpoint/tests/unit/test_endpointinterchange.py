@@ -5,7 +5,7 @@ from multiprocessing.synchronize import Event as EventType
 from unittest import mock
 
 import pytest
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.rabbit_mq import TaskQueueSubscriber
 
@@ -34,7 +34,7 @@ def test_main_exception_always_quiesces(mocker, fs, randomstring, reset_signals)
     mocker.patch(f"{_mock_base}time.sleep")
     mocker.patch(f"{_mock_base}multiprocessing")
     ei = EndpointInterchange(
-        config=Config(executors=[mocker.Mock()]),
+        config=UserEndpointConfig(executors=[mocker.Mock()]),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=num_iterations + 10,
     )
@@ -67,7 +67,7 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit, reset_sign
     mocker.patch(f"{_mock_base}multiprocessing")
     mock_log = mocker.patch(f"{_mock_base}log")
     ei = EndpointInterchange(
-        config=Config(executors=[mocker.Mock()]),
+        config=UserEndpointConfig(executors=[mocker.Mock()]),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
         reconnect_attempt_limit=reconnect_attempt_limit,
     )
@@ -87,7 +87,7 @@ def test_reset_reconnect_attempt_limit_when_stable(mocker, fs, mock_tqs):
     mocker.patch(f"{_mock_base}threading.Thread")
     mocker.patch(f"{_mock_base}multiprocessing")
     ei = EndpointInterchange(
-        config=Config(executors=[mocker.Mock()]),
+        config=UserEndpointConfig(executors=[mocker.Mock()]),
         endpoint_id=str(uuid.uuid4()),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
     )
@@ -123,7 +123,7 @@ def test_rundir_passed_to_gcengine(mocker, fs):
     mock_gcengine.start = mocker.Mock()
 
     ei = EndpointInterchange(
-        config=Config(executors=[mock_gcengine]),
+        config=UserEndpointConfig(executors=[mock_gcengine]),
         endpoint_id=str(uuid.uuid4()),
         reg_info={"task_queue_info": {}, "result_queue_info": {}},
     )

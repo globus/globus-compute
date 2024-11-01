@@ -1,9 +1,20 @@
+import pathlib
 import typing as t
+from unittest import mock
 
 import pytest
 from globus_compute_common.pydantic_v1 import ValidationError
-from globus_compute_endpoint.endpoint.config import Config
-from globus_compute_endpoint.endpoint.config.model import ConfigModel
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    ManagerEndpointConfigModel,
+    UserEndpointConfig,
+    UserEndpointConfigModel,
+)
+from globus_compute_endpoint.endpoint.config.model import EngineModel
+from globus_compute_endpoint.engines import GlobusComputeEngine
+from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
+
+_MOCK_BASE = "globus_compute_endpoint.endpoint.config."
 
 
 @pytest.fixture
@@ -12,14 +23,21 @@ def config_dict():
 
 
 @pytest.fixture
-def config_dict_mu(tmp_path):
-    idc = tmp_path / "idconf.json"
+def config_dict_mu(fs):
+    p = pathlib.Path("/some/dir")
+    p.mkdir(parents=True)
+    idc = p / "idconf.json"
     idc.write_text("[]")
     return {
         "identity_mapping_config_path": idc,
         "multi_user": True,
-        "executors": [],  # remove unnecessary DNS calls; given historical design
     }
+
+
+@pytest.fixture
+def mock_log():
+    with mock.patch(f"{_MOCK_BASE}config.log") as m:
+        yield m
 
 
 @pytest.mark.parametrize(
@@ -33,70 +51,84 @@ def config_dict_mu(tmp_path):
 def test_config_model_tuple_conversions(config_dict: dict, data: t.Tuple[str, t.Tuple]):
     field, expected_val = data
 
-    config_dict["engine"][field] = expected_val
-    model = ConfigModel(**config_dict)
-    assert getattr(model.engine.executor, field) == expected_val
+    e_conf = config_dict["engine"]
+    e_conf[field] = expected_val
+    model = EngineModel(**e_conf)
+    assert getattr(model, field) == expected_val
 
-    config_dict["engine"][field] = list(expected_val)
-    model = ConfigModel(**config_dict)
-    assert getattr(model.engine.executor, field) == expected_val
+    e_conf[field] = list(expected_val)
+    model = EngineModel(**e_conf)
+    assert getattr(model, field) == expected_val
 
-    config_dict["engine"][field] = 50000
-    with pytest.raises(ValueError):
-        ConfigModel(**config_dict)
+    e_conf[field] = 50000
+    with pytest.raises(ValueError) as pyt_e:
+        EngineModel(**e_conf)
+
+    e_str = str(pyt_e)
+    assert field in e_str, "Verify test; are we testing what we think?"
+    assert "not a valid tuple" in e_str, "Verify test; are we testing what we think?"
 
 
-def test_config_enforces_engine(config_dict):
+def test_config_model_enforces_engine(config_dict):
     del config_dict["engine"]
     with pytest.raises(ValidationError) as pyt_exc:
-        ConfigModel(**config_dict)
+        UserEndpointConfigModel(**config_dict)
 
-    assert "missing engine" in str(pyt_exc.value)
-
-
-def test_config_enforces_no_identity_mapping_conf(config_dict, tmp_path):
-    conf_p = tmp_path / "some file"
-    conf_p.write_text("[]")
-    config_dict["identity_mapping_config_path"] = conf_p
-    with pytest.raises(ValidationError) as pyt_exc:
-        ConfigModel(**config_dict)
-
-    assert "identity_mapping_config_path should not be specified" in str(pyt_exc.value)
+    assert "engine\n  field required" in str(pyt_exc.value)
 
 
-def test_mu_config_enforces_no_engine(config_dict_mu):
-    config_dict_mu["engine"] = {"type": "ThreadPoolEngine"}
-    with pytest.raises(ValidationError) as pyt_exc:
-        ConfigModel(**config_dict_mu)
-
-    assert "no engine if multi-user" in str(pyt_exc), pyt_exc
-
-
-def test_mu_config_requires_identity_mapping_exists(config_dict_mu, tmp_path):
-    config_dict_mu["identity_mapping_config_path"] = tmp_path / "not exists file"
-    with pytest.raises(ValidationError) as pyt_exc:
-        ConfigModel(**config_dict_mu)
-
-    assert "not exists file" in str(pyt_exc.value)
-    assert "does not exist" in str(pyt_exc.value)
-
-
-def test_config_warns_bad_identity_mapping_path(mocker, config_dict_mu, tmp_path):
-    conf_p = tmp_path / "not exists file"
+def test_mu_config_verifies_identity_mapping(config_dict_mu):
+    conf_p = pathlib.Path("/some/path/not exists file")
     config_dict_mu["identity_mapping_config_path"] = conf_p
-    mock_warn = mocker.patch("globus_compute_endpoint.endpoint.config.config.warnings")
-    Config(**config_dict_mu)
+    with pytest.raises(ValidationError) as pyt_e:
+        ManagerEndpointConfigModel(**config_dict_mu)
 
-    warn_a = mock_warn.warn.call_args[0][0]
-    assert mock_warn.warn.called
-    assert "Identity mapping config" in warn_a
-    assert "path not found" in warn_a
-    assert str(conf_p) in warn_a, "expect include location of file in warning"
+    e_str = str(pyt_e.value)
+    assert "does not exist" in e_str
+    assert str(conf_p) in e_str, "expect location in exc to help human out"
+
+    del config_dict_mu["identity_mapping_config_path"]
+    ManagerEndpointConfigModel(
+        **config_dict_mu
+    )  # doesn't raise; conditional validation
+
+
+def test_mu_config_warns_idmapping_ignored(mock_log, config_dict_mu):
+    config_dict_mu["identity_mapping_config_path"] = "not exists file"
+    ManagerEndpointConfig(**config_dict_mu)
+
+    a, _k = mock_log.warning.call_args
+    assert "Identity mapping specified" in a[0]
+    assert "is not privileged" in a[0]
+
+
+def test_mu_config_privileged_requires_idmapping(config_dict_mu):
+    del config_dict_mu["identity_mapping_config_path"]
+    with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
+        with pytest.raises(ValueError) as pyt_e:
+            ManagerEndpointConfig(**config_dict_mu)
+
+    assert "identity mapping" in str(pyt_e).lower()
+    assert "required" in str(pyt_e).lower()
+    assert "Hint: identity_mapping_config_path" in str(pyt_e), "Expect config item hint"
+
+
+def test_mu_config_privileged_verifies_idmapping(config_dict_mu):
+    p = config_dict_mu["identity_mapping_config_path"]
+    with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
+        ManagerEndpointConfig(**config_dict_mu)  # Verify for test: doesn't raise!
+
+        p.unlink(missing_ok=True)
+        with pytest.raises(ValueError) as pyt_e:
+            ManagerEndpointConfig(**config_dict_mu)
+
+        assert "not found" in str(pyt_e)
+        assert str(p) in str(pyt_e), "Expect invalid path shared"
 
 
 @pytest.mark.parametrize("public", (None, True, False, "a", 1))
-def test_public(public: t.Any):
-    c = Config(public=public, executors=[])
+def test_mu_public(public: t.Any):
+    c = ManagerEndpointConfig(multi_user=True, public=public)
     assert c.public is (public is True)
 
 
@@ -111,18 +143,18 @@ def test_conditional_engine_strategy(
 
     if engine_type == "GlobusComputeEngine":
         if isinstance(strategy, str) or strategy is None:
-            ConfigModel(**config_dict)
+            UserEndpointConfigModel(**config_dict)
         elif isinstance(strategy, dict):
             with pytest.raises(ValidationError) as pyt_e:
-                ConfigModel(**config_dict)
+                UserEndpointConfigModel(**config_dict)
             assert "object is incompatible" in str(pyt_e.value)
 
     elif engine_type == "HighThroughputEngine":
         if isinstance(strategy, dict) or strategy is None:
-            ConfigModel(**config_dict)
+            UserEndpointConfigModel(**config_dict)
         elif isinstance(strategy, str):
             with pytest.raises(ValidationError) as pyt_e:
-                ConfigModel(**config_dict)
+                UserEndpointConfigModel(**config_dict)
             assert "string is incompatible" in str(pyt_e.value)
 
 
@@ -143,8 +175,55 @@ def test_provider_container_compatibility(
     config_dict["engine"]["address"] = "127.0.0.1"
 
     if compatible:
-        ConfigModel(**config_dict)
+        UserEndpointConfigModel(**config_dict)
     else:
         with pytest.raises(ValueError) as pyt_e:
-            ConfigModel(**config_dict)
+            UserEndpointConfigModel(**config_dict)
         assert f"not compatible with {provider_type}" in str(pyt_e.value)
+
+
+def test_configs_repr_default_kwargs():
+    gce_path = "globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine."
+    with mock.patch(f"{gce_path}__init__", return_value=None):
+        # mock == don't make a default executor
+        gce_repr = repr(GlobusComputeEngine())
+        assert (
+            repr(UserEndpointConfig()) == f"UserEndpointConfig(executors=({gce_repr},))"
+        ), "adds default"
+    assert (
+        repr(ManagerEndpointConfig()) == "ManagerEndpointConfig(multi_user=True)"
+    ), "mu is on base"
+
+
+@pytest.mark.parametrize("kw,cls", known_user_config_opts.items())
+def test_userconfig_repr_nondefault_kwargs(
+    randomstring, kw, cls, get_random_of_datatype
+):
+    val = get_random_of_datatype(cls)
+    kwds = {"executors": ()}  # Don't create an engine, please
+    if kw == "executors":
+        val = ()
+    kwds[kw] = val
+
+    repr_c = repr(UserEndpointConfig(**kwds))
+
+    if kw == "multi_user":
+        assert f"{kw}={repr(val)}" not in repr_c, "Multi user *off* by default"
+    else:
+        assert f"{kw}={repr(val)}" in repr_c
+
+
+@pytest.mark.parametrize("kw,cls", known_manager_config_opts.items())
+def test_managerconfig_repr_nondefault_kwargs(
+    randomstring, fs, kw, cls, get_random_of_datatype
+):
+    val = get_random_of_datatype(cls)
+
+    if kw == "identity_mapping_config_path":
+        val = pathlib.Path(val)
+        with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
+            repr_c = repr(ManagerEndpointConfig(**{kw: val}))
+    else:
+        repr_c = repr(ManagerEndpointConfig(**{kw: val}))
+
+    assert f"{kw}={repr(val)}" in repr_c

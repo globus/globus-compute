@@ -1,221 +1,240 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 import pathlib
 import typing as t
-import warnings
 
 from globus_compute_endpoint.engines import GlobusComputeEngine
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
-from parsl.utils import RepresentationMixin
+from globus_compute_sdk.sdk.utils.uuid_like import (
+    UUID_LIKE_T,
+    as_optional_uuid,
+    as_uuid,
+)
+
+from ..utils import is_privileged
+
+MINIMUM_HEARTBEAT: float = 5.0
+log = logging.getLogger(__name__)
 
 
-class Config(RepresentationMixin):
-    """Specification of Globus Compute configuration options.
+class BaseConfig:
+    """
+    :param multi_user: If true, the endpoint will spawn child endpoint processes based
+        upon a configuration template.
 
-    Parameters
-    ----------
+    :param display_name: The display name for the endpoint.  If ``None``, defaults to
+        the endpoint name (i.e., the directory name in ``~/.globus_compute/``)
 
-    executors
-        A list of executors which serve as the backend for function execution.
-        As of 0.2.2, this list should contain only one executor.  If ``None``,
-        then use a default-instantiation of ``GlobusComputeEngine``.
-        Default: None
+    :param allowed_functions: List of identifiers of functions that are allowed to be
+        run on the endpoint
 
-    environment: str
-        Environment the endpoint should connect to. If not specified, the endpoint
-        connects to production.
-        Default: None
+    :param authentication_policy: Endpoint users are evaluated against this Globus
+        authentication policy
 
-    local_compute_services: bool
-        Point the endpoint to a local instance of the Compute services (for Compute
-        developers).
-        Default: None
+    :param subscription_id: Subscription ID associated with this endpoint
 
-    heartbeat_period: int (seconds)
-        The interval at which heartbeat messages are sent from the endpoint to the
-        Globus Compute web service
-        Default: 30s
+    :param amqp_port: Port to use for AMQP connections. Note that only 5671, 5672, and
+        443 are supported by the Compute web services. If None, the port is assigned by
+        the services (which default to 443).
 
-    heartbeat_threshold: int (seconds)
-        Seconds since the last hearbeat message from the Globus Compute web service
-        after which the connection is assumed to be disconnected.
-        Default: 120s
+    :param heartbeat_period: The interval (in seconds) at which heartbeat messages are
+        sent from the endpoint to the Globus Compute web service
 
-    idle_heartbeats_soft: int (count)
-        Number of heartbeats after an endpoint is idle (no outstanding tasks or
-        results, and at least 1 task or result has been forwarded) before the
-        endpoint shuts down.  If 0, then the endpoint must be manually triggered
-        to shut down (e.g., SIGINT or SIGTERM).
-        Default: 0
+    :param environment: Environment the endpoint should connect to. If not specified,
+        the endpoint connects to production.
 
-    idle_heartbeats_hard: int (count)
-        Number of heartbeats after no task or result has moved before the endpoint
-        shuts down.  Unlike `idle_heartbeats_soft`, this idle timer does not require
-        that there are no outstanding tasks or results.  If no task or result has
-        moved in this many heartbeats, then the endpoint will shut down.  In
-        particular, this is intended to catch the error condition that a worker
-        has gone missing, and will thus _never_ return the task it was sent.
-        Note that this setting is only enabled if the `idle_heartbeats_soft` is a
-        value greater than 0.  Suggested value: a multiplier of heartbeat_period
-        equivalent to two days.  For example, if `heartbeat_period` is 30s, then
-        suggest 5760.
-        Default: 5760
+    :param local_compute_services: Point the endpoint to a local instance of the Compute
+        services (for Compute developers).
 
-    stdout : str
-        Path where the endpoint's stdout should be written
-        Default: ./interchange.stdout
-
-    stderr : str
-        Path where the endpoint's stderr should be written
-        Default: ./interchange.stderr
-
-    debug : bool
-        If set emit debug-level log messages.
+    :param debug: If set emit debug-level log messages.
 
         This is a configuration implementation of the CLI's ``--debug`` flag.  Note
         that if this value is explicitly False, then the CLI flag, if utilized, will
         still put the EP into "debug mode."  The CLI wins.
-        Default: False
-
-    detach_endpoint : Bool
-        Should the endpoint daemon be run as a detached process? This is good for
-        a real edge node, but an anti-pattern for kubernetes pods
-        Default: True
-
-    log_dir : str
-        Optional path string to the top-level directory where logs should be written to.
-        Default: None
-
-    multi_user : bool | None
-        Designates the endpoint as a multi-user endpoint
-        Default: None
-
-    public : bool | None
-        Indicates if all users can discover the multi-user endpoint via our web UI and
-        API. This field is only supported on multi-user endpoints and does not control
-        access to the endpoint; therefore, it should not be used as a security feature.
-        Default: None
-
-    allowed_functions : list[str] | None
-        List of functions that are allowed to be run on the endpoint
-
-    authentication_policy : str | None
-        Endpoint users are evaluated against this Globus authentication policy
-
-    subscription_id : str | None
-        Subscription ID associated with this endpoint
-
-    force_mu_allow_same_user : bool
-        If set, override the heuristic that determines whether the uid running the
-        multi-user endpoint may also run single-user endpoints.
-
-        Normally, the multi-user endpoint disallows starting single-user endpoints with
-        the same UID as the parent process unless the UID has no privileges.  That
-        means that the UID is not 0 (root), or that the UID does *not* have (among
-        many others) the capability to change the user (otherwise known as "drop
-        privileges").
-
-        Default: False
-
-    display_name : str | None
-        The display name for the endpoint.  If None, defaults to name
-        Default: None
-
-    endpoint_setup : str | None
-        Command or commands to be run during the endpoint initialization process.
-
-    endpoint_teardown : str | None
-        Command or commands to be run during the endpoint shutdown process.
-
-    mu_child_ep_grace_period_s : float
-        If a single-user endpoint dies, and then the multi-user endpoint receives a
-        start command for that single-user endpoint within this timeframe, the
-        single-user endpoint is started back up again.
-        Default: 30 seconds
-
-    amqp_port : int | None
-        Port to use for AMQP connections. Note that only 5671, 5672, and 443 are
-        supported by the Compute web services. If None, the port is assigned by the
-        services (which default to 443).
-        Default: None
     """
 
     def __init__(
         self,
-        # Execution backed
-        executors: t.Iterable[GlobusComputeEngineBase] | None = None,
-        # Connection info
+        *,
+        multi_user: bool = False,
+        display_name: str | None = None,
+        allowed_functions: t.Iterable[UUID_LIKE_T] | None = None,
+        authentication_policy: UUID_LIKE_T | None = None,
+        subscription_id: UUID_LIKE_T | None = None,
+        amqp_port: int | None = None,
+        heartbeat_period: float | int = 30,
         environment: str | None = None,
         local_compute_services: bool = False,
-        multi_user: bool | None = None,
-        public: bool | None = None,
-        allowed_functions: list[str] | None = None,
-        authentication_policy: str | None = None,
-        subscription_id: str | None = None,
-        amqp_port: int | None = None,
-        # Tuning info
-        heartbeat_period=30,
-        heartbeat_threshold=120,
-        identity_mapping_config_path: os.PathLike | None = None,
-        idle_heartbeats_soft=0,
-        idle_heartbeats_hard=5760,  # Two days, divided by `heartbeat_period`
-        detach_endpoint=True,
-        endpoint_setup: str | None = None,
-        endpoint_teardown: str | None = None,
-        force_mu_allow_same_user: bool = False,
-        mu_child_ep_grace_period_s: float = 30,
-        # Misc info
-        display_name: str | None = None,
-        # Logging info
-        log_dir=None,
-        stdout="./endpoint.log",
-        stderr="./endpoint.log",
         debug: bool = False,
-        **kwargs,
     ):
-
-        for unknown_arg in kwargs:
-            # Calculated multiple times, but only in errant case -- nominally
-            # fixed and then "not an issue."
-            caller_filename = inspect.stack()[1].filename
-            cls_name = self.__class__.__name__
-            msg = (
-                f"Unknown argument to {cls_name} ignored: {unknown_arg}"
-                f"\n  Specified in: {caller_filename}"
-            )
-            warnings.warn(msg)
-
-        # Execution backends
-        if executors is None:
-            executors = (GlobusComputeEngine(),)
-        self.executors: list[GlobusComputeEngineBase] = [e for e in executors]
-
-        # Connection info
-        self.environment = environment
-        self.local_compute_services = local_compute_services
-
-        # Multi-user tuning
+        # Misc
+        self.display_name = display_name
+        self.debug = debug is True
         self.multi_user = multi_user is True
-        self.force_mu_allow_same_user = force_mu_allow_same_user is True
-        self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
-        self.identity_mapping_config_path = identity_mapping_config_path
-        if self.identity_mapping_config_path:
-            _p = pathlib.Path(self.identity_mapping_config_path)
-            if not _p.exists():
-                warnings.warn(f"Identity mapping config path not found ({_p})")
-        self.public = public is True
+
+        # Connection info and tuning
+        self.amqp_port = amqp_port
+        self.heartbeat_period = heartbeat_period
+        self.environment = environment
+        self.local_compute_services = local_compute_services is True
 
         # Auth
         self.allowed_functions = allowed_functions
         self.authentication_policy = authentication_policy
         self.subscription_id = subscription_id
 
-        self.amqp_port = amqp_port
+        # Used to store the raw content of the YAML or Python config file
+        self.source_content: str | None = None
+
+    def __repr__(self) -> str:
+        kwds: dict[str, t.Any] = {}
+        for cls in type(self).__mro__:
+            fargspec = inspect.getfullargspec(cls.__init__)  # type: ignore[misc]
+            kwdefs = fargspec.kwonlydefaults
+            for kw in fargspec.kwonlyargs:
+                curval = getattr(self, kw)
+                if kwdefs and curval != kwdefs.get(kw):
+                    kwds.setdefault(kw, curval)
+
+        self_name = type(self).__name__
+        kwargs = (f"{k}={repr(v)}" for k, v in sorted(kwds.items()))
+        return f"{self_name}({', '.join(kwargs)})"
+
+    @property
+    def heartbeat_period(self):
+        return self._heartbeat_period
+
+    @heartbeat_period.setter
+    def heartbeat_period(self, val: float | int):
+        if val < MINIMUM_HEARTBEAT:
+            log.warning(f"Heartbeat minimum is {MINIMUM_HEARTBEAT}s (requested: {val})")
+        self._heartbeat_period = max(MINIMUM_HEARTBEAT, val)
+
+    @property
+    def allowed_functions(self):
+        if self._allowed_functions:
+            return tuple(map(str, self._allowed_functions))
+        return None
+
+    @allowed_functions.setter
+    def allowed_functions(self, val: t.Iterable[UUID_LIKE_T] | None):
+        if val is None:
+            self._allowed_functions = None
+        else:
+            self._allowed_functions = tuple(as_uuid(f_uuid) for f_uuid in val)
+
+    @property
+    def authentication_policy(self):
+        return self._authentication_policy and str(self._authentication_policy) or None
+
+    @authentication_policy.setter
+    def authentication_policy(self, val: UUID_LIKE_T | None):
+        self._authentication_policy = as_optional_uuid(val)
+
+    @property
+    def subscription_id(self):
+        return self._subscription_id and str(self._subscription_id) or None
+
+    @subscription_id.setter
+    def subscription_id(self, val: UUID_LIKE_T | None):
+        self._subscription_id = as_optional_uuid(val)
+
+
+class UserEndpointConfig(BaseConfig):
+    """Holds the configuration items for a task-processing endpoint.
+
+    Typically, one does not instantiate this configuration directly, but specifies
+    the relevant options in the endpoint's ``config.yaml`` file.  For example, to
+    specify an endpoint that only uses threads on the endpoint host, the configuration
+    might look like:
+
+    .. code-block:: yaml
+       :caption: ``config.yaml``
+
+       display_name: My single-block, host-only EP at site ABC
+       engine:
+         type: GlobusComputeEngine
+         provider:
+           type: LocalProvider
+           max_blocks: 1
+
+    Please see the |BaseConfig| class for a list of options that both
+    |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
+
+    :param executors: A tuple of executors which serve as the backend for function
+        execution.  If ``None``, then use a default-instantiation of
+        ``GlobusComputeEngine``.
+
+        N.B. this field, for historical reasons, accepts an iterable.  However,
+        Compute only supports a single executor.
+
+    :param heartbeat_threshold: Seconds since the last heartbeat message from the
+        Globus Compute web service after which the connection is assumed to be
+        disconnected.
+
+    :param idle_heartbeats_soft: Number of heartbeats after an endpoint is idle (no
+        outstanding tasks or results, and at least 1 task or result has been
+        forwarded) before the endpoint shuts down.  If 0, then the endpoint must be
+        manually triggered to shut down (e.g., SIGINT [Ctrl+C] or SIGTERM).
+
+    :param idle_heartbeats_hard: Number of heartbeats after no task or result has moved
+        before the endpoint shuts down.  Unlike `idle_heartbeats_soft`, this idle timer
+        does not require that there are no outstanding tasks or results.  If no task or
+        result has moved in this many heartbeats, then the endpoint will shut down.  In
+        particular, this is intended to catch the error condition that a worker has
+        gone missing, and will thus _never_ return the task it was sent.  Note that
+        this setting is only enabled if the `idle_heartbeats_soft` is a value greater
+        than 0.  Suggested value: a multiplier of heartbeat_period equivalent to two
+        days.  For example, if `heartbeat_period` is 30s, then suggest 5760.
+
+    :param detach_endpoint: Whether the endpoint daemon be run as a detached process.
+        This is good for a real edge node, but an anti-pattern for kubernetes pods
+
+    :param endpoint_setup: Command(s) to be run during the endpoint initialization
+        process
+
+    :param endpoint_teardown: Command(s) to be run during the endpoint
+        shutdown process
+
+    :param log_dir: path to the top-level directory where logs should be written
+
+    :param stdout: Path where the endpoint's stdout should be written
+
+    :param stderr: Path where the endpoint's stderr should be written
+
+    """
+
+    def __init__(
+        self,
+        *,
+        # Execution backend
+        executors: t.Iterable[GlobusComputeEngineBase] | None = None,
+        # Tuning info
+        heartbeat_threshold: int = 120,
+        idle_heartbeats_soft: int = 0,
+        idle_heartbeats_hard: int = 5760,  # Two days, divided by `heartbeat_period`
+        detach_endpoint: bool = True,
+        endpoint_setup: str | None = None,
+        endpoint_teardown: str | None = None,
+        # Logging info
+        log_dir: str | None = None,
+        stdout: str = "./endpoint.log",
+        stderr: str = "./endpoint.log",
+        **kwargs,
+    ) -> None:
+        kwargs["multi_user"] = False
+        super().__init__(**kwargs)
+
+        # gymnastics to satisfy mypy
+        if executors is None:
+            self.executors = (GlobusComputeEngine(),)
+        else:
+            self.executors = tuple(e for e in executors)[:1]
 
         # Single-user tuning
-        self.heartbeat_period = heartbeat_period
         self.heartbeat_threshold = heartbeat_threshold
         self.idle_heartbeats_soft = int(max(0, idle_heartbeats_soft))
         self.idle_heartbeats_hard = int(max(0, idle_heartbeats_hard))
@@ -228,10 +247,125 @@ class Config(RepresentationMixin):
         self.log_dir = log_dir
         self.stdout = stdout
         self.stderr = stderr
-        self.debug = debug
 
-        # Misc info
-        self.display_name = display_name
+    @property
+    def executors(self) -> tuple[GlobusComputeEngineBase, ...]:
+        return self._executors
 
-        # Used to store the raw content of the YAML or Python config file
-        self.source_content: str | None = None
+    @executors.setter
+    def executors(self, val: t.Iterable[GlobusComputeEngineBase] | None):
+        if val is None:
+            self._executors: tuple[GlobusComputeEngineBase, ...] = ()
+        else:
+            self._executors = tuple(e for e in val)[:1]  # enforce len() == 0 or 1
+
+    @property
+    def heartbeat_threshold(self):
+        return self._heartbeat_threshold
+
+    @heartbeat_threshold.setter
+    def heartbeat_threshold(self, val: int):
+        self._heartbeat_threshold = max(self.heartbeat_period * 2, val)
+
+    @property
+    def idle_heartbeats_soft(self) -> int:
+        return self._idle_heartbeats_soft
+
+    @idle_heartbeats_soft.setter
+    def idle_heartbeats_soft(self, val: int):
+        self._idle_heartbeats_soft = max(0, val)
+
+    @property
+    def idle_heartbeats_hard(self) -> int:
+        return self._idle_heartbeats_hard
+
+    @idle_heartbeats_hard.setter
+    def idle_heartbeats_hard(self, val: int):
+        self._idle_heartbeats_hard = max(0, val)
+
+
+# for backwards compatibility
+Config = UserEndpointConfig
+
+
+class ManagerEndpointConfig(BaseConfig):
+    """Holds the configuration items for an endpoint manager.
+
+    Please see the |BaseConfig| class for a list of options that both
+    |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
+
+    :param public: Whether all users can discover the multi-user endpoint via the
+        Globus Compute web API and user interface (https://app.globus.org/compute).
+        This does not control access to the endpoint; therefore, it should not be used
+        as a security feature.
+
+    :param identity_mapping_config_path: Path to the identity mapping configuration for
+        this endpoint.  If the process is not privileged, a warning will be emitted to
+        the logs and this item will be ignored; conversely, if privileged, this
+        configuration item is required, and a ``ValueError`` will be raised if the path
+        does not exist.
+
+    :param mu_child_ep_grace_period_s: If a single-user endpoint dies, and then the
+        multi-user endpoint receives a start command for that single-user endpoint
+        within this timeframe (in seconds), the single-user endpoint is started back up
+        again.
+
+    :param force_mu_allow_same_user:  If set, override the heuristic that determines
+        whether the uid running the multi-user endpoint may also run single-user
+        endpoints.
+
+        Normally, the multi-user endpoint disallows starting single-user endpoints with
+        the same UID as the parent process unless the UID has no privileges.  That
+        means that the UID is not 0 (root), or that the UID does *not* have (among
+        many others) the capability to change the user (otherwise known as "drop
+        privileges").
+
+    .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
+    .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
+    .. |UserEndpointConfig| replace:: :class:`UserEndpointConfig <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
+    """  # noqa
+
+    def __init__(
+        self,
+        *,
+        public: bool = False,
+        identity_mapping_config_path: os.PathLike | str | None = None,
+        force_mu_allow_same_user: bool = False,
+        mu_child_ep_grace_period_s: float = 30.0,
+        **kwargs,
+    ):
+        kwargs["multi_user"] = True
+        super().__init__(**kwargs)
+        self.public = public is True
+
+        # Identity mapping
+        self.force_mu_allow_same_user = force_mu_allow_same_user is True
+        self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
+
+        _tmp = identity_mapping_config_path  # work with both mypy and flake8
+        self.identity_mapping_config_path = _tmp  # type: ignore[assignment]
+
+    @property
+    def identity_mapping_config_path(self) -> pathlib.Path | None:
+        return self._identity_mapping_config_path
+
+    @identity_mapping_config_path.setter
+    def identity_mapping_config_path(self, val: os.PathLike | str | None):
+        self._identity_mapping_config_path: pathlib.Path | None
+        if is_privileged():
+            if not val:
+                raise ValueError(
+                    "Identity mapping required.  (Hint: identity_mapping_config_path)"
+                )
+
+            _p = pathlib.Path(val)
+            if not _p.exists():
+                raise ValueError(f"Identity mapping config path not found ({_p})")
+            self._identity_mapping_config_path = _p
+        else:
+            self._identity_mapping_config_path = None
+            if val:
+                log.warning(
+                    "Identity mapping specified, but process is not privileged;"
+                    " ignoring identity mapping configuration."
+                )

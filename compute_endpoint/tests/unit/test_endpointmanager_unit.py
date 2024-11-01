@@ -27,7 +27,8 @@ import responses
 import yaml
 from globus_compute_common.messagepack import unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
+from globus_compute_endpoint.endpoint.config.config import MINIMUM_HEARTBEAT
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     CommandQueueSubscriber,
@@ -43,7 +44,6 @@ except AttributeError:
 else:
     # these imports also import pyprctl later
     from globus_compute_endpoint.endpoint.endpoint_manager import (
-        _MINIMUM_HEARTBEAT,
         EndpointManager,
         InvalidUserError,
     )
@@ -80,8 +80,8 @@ def mock_log():
 
 
 @pytest.fixture
-def conf_dir(fs):
-    conf_dir = pathlib.Path("/some/path/mock_endpoint")
+def conf_dir(fs, request):
+    conf_dir = pathlib.Path(f"/{request.node.name}/mock_endpoint")
     conf_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     g_and_o_perms = (conf_dir.stat().st_mode | 0o00) & 0o77  # get G and O perms
     assert g_and_o_perms == 0, "Tests should work with protective permissions"
@@ -100,7 +100,17 @@ def identity_map_path(conf_dir):
 
 @pytest.fixture
 def mock_conf(identity_map_path):
-    yield Config(executors=[], identity_mapping_config_path=identity_map_path)
+    yield ManagerEndpointConfig(multi_user=True)
+
+
+@pytest.fixture
+def mock_conf_root(identity_map_path):
+    to_mock = "globus_compute_endpoint.endpoint.config.config.is_privileged"
+    with mock.patch(to_mock) as m:
+        m.return_value = True
+        yield ManagerEndpointConfig(
+            multi_user=True, identity_mapping_config_path=identity_map_path
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -217,7 +227,7 @@ def mock_unprivileged_epmanager(mocker, conf_dir, mock_client, mock_conf):
 
 
 @pytest.fixture
-def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
+def epmanager_as_root(mocker, conf_dir, mock_conf_root, mock_client, mock_pim):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = 0
     mock_os.getgid.return_value = 0
@@ -255,11 +265,11 @@ def epmanager_as_root(mocker, conf_dir, mock_conf, mock_client, mock_pim):
     ident = "epmanager_some_identity"
     mock_gcc.auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf_root)
     em._command = mock.Mock(spec=CommandQueueSubscriber)
     em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
 
-    yield conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em
+    yield conf_dir, mock_conf_root, mock_client, mock_os, mock_pwd, em
     if em.identity_mapper:
         em.identity_mapper.stop_watching()
     em.request_shutdown(None, None)
@@ -405,7 +415,7 @@ def test_gracefully_exits_if_registration_blocked(
 def test_handles_provided_endpoint_id_no_json(
     mock_client: t.Tuple[uuid.UUID, mock.Mock],
     conf_dir: pathlib.Path,
-    mock_conf: Config,
+    mock_conf: ManagerEndpointConfig,
 ):
     ep_uuid, mock_gcc = mock_client
 
@@ -418,7 +428,7 @@ def test_handles_provided_endpoint_id_no_json(
 def test_handles_provided_endpoint_id_with_json(
     mock_client: t.Tuple[uuid.UUID, mock.Mock],
     conf_dir: pathlib.Path,
-    mock_conf: Config,
+    mock_conf: ManagerEndpointConfig,
 ):
     ep_uuid, mock_gcc = mock_client
     provided_ep_uuid_str = str(uuid.uuid4())
@@ -434,10 +444,9 @@ def test_handles_provided_endpoint_id_with_json(
 
 @pytest.mark.parametrize("public", (True, False))
 def test_sends_data_during_registration(
-    conf_dir, mock_conf: Config, mock_client, public: bool
+    conf_dir, mock_conf: ManagerEndpointConfig, mock_client, public: bool
 ):
     ep_uuid, mock_gcc = mock_client
-    mock_conf.multi_user = True
     mock_conf.public = public
     mock_conf.source_content = "foo: bar"
     EndpointManager(conf_dir, ep_uuid, mock_conf)
@@ -471,8 +480,6 @@ def test_sends_data_during_registration(
     for key in (
         "type",
         "multi_user",
-        "stdout",
-        "stderr",
         "environment",
     ):
         assert key in k["metadata"]["config"]
@@ -821,37 +828,36 @@ def test_as_root_and_no_identity_mapper_configuration_fails(
         assert "identity_mapping_config_path" in a, "Expected required config item"
 
 
-def test_no_identity_mapper_if_unprivileged(mocker, conf_dir, mock_conf, mock_client):
+def test_no_identity_mapper_if_unprivileged(
+    mocker, conf_dir, mock_conf_root, mock_client
+):
     mock_privilege = mocker.patch(f"{_MOCK_BASE}is_privileged")
     mock_privilege.return_value = True
 
-    em = EndpointManager(conf_dir, None, mock_conf)
+    em = EndpointManager(conf_dir, None, mock_conf_root)
     assert em.identity_mapper is not None
     em.identity_mapper.stop_watching()
 
     mock_privilege.return_value = False
-    em = EndpointManager(conf_dir, None, mock_conf)
+    em = EndpointManager(conf_dir, None, mock_conf_root)
     assert em.identity_mapper is None
 
 
 def test_unprivileged_warns_if_identity_conf_specified(
-    mocker, mock_log, conf_dir, mock_conf, mock_client
+    mocker, mock_log, conf_dir, mock_conf, mock_conf_root, mock_client
 ):
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
 
     em = EndpointManager(conf_dir, None, mock_conf)
     assert em.identity_mapper is None
+    assert not mock_log.warning.called
+
+    em = EndpointManager(conf_dir, None, mock_conf_root)
+    assert em.identity_mapper is None
 
     a, _ = mock_log.warning.call_args
     assert "specified, but process is not privileged" in a[0]
     assert "identity mapping configuration will be ignored" in a[0]
-
-    mock_log.reset_mock()
-    mock_conf.identity_mapping_config_path = None
-
-    em = EndpointManager(conf_dir, None, mock_conf)
-    assert em.identity_mapper is None
-    assert not mock_log.warning.called
 
 
 def test_quits_if_not_privileged_and_no_identity_set(
@@ -897,7 +903,7 @@ def test_clean_exit_on_identity_collection_error(
 
 @pytest.mark.no_mock_pim
 def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
-    mocker, mock_log, conf_dir, mock_conf
+    mocker, mock_log, conf_dir, mock_conf_root, identity_map_path
 ):
     mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
@@ -907,11 +913,9 @@ def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
         "endpoint_id": ep_uuid,
         "command_queue_info": {"connection_url": 1, "queue": 1},
     }
-    conf_p = conf_dir / "idmap.json"
-    conf_p.touch(mode=0o000)
-    mock_conf.identity_mapping_config_path = conf_p
+    identity_map_path.chmod(mode=0o000)
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, mock_conf, reg_info)
+        EndpointManager(conf_dir, ep_uuid, mock_conf_root, reg_info)
 
     assert pyt_exc.value.code == os.EX_NOPERM
     assert mock_log.error.called
@@ -919,10 +923,10 @@ def test_as_root_gracefully_handles_unreadable_identity_mapper_conf(
     for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
         assert "PermissionError" in a
 
-    conf_p.chmod(mode=0o644)
-    conf_p.write_text("[{asfg")
+    identity_map_path.chmod(mode=0o644)
+    identity_map_path.write_text("[{asfg")
     with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, mock_conf, reg_info)
+        EndpointManager(conf_dir, ep_uuid, mock_conf_root, reg_info)
 
     assert pyt_exc.value.code == os.EX_CONFIG
     assert mock_log.error.called
@@ -946,26 +950,28 @@ def test_iterates_even_if_no_commands(mocker, epmanager_as_root):
 
 
 @pytest.mark.parametrize("hb", (-100, -5, 0, 0.1, 4, 7, 11, None))
-def test_heartbeat_period_minimum(mocker, conf_dir, hb, mock_ep_uuid, mock_reg_info):
-    conf = Config(executors=[])
+def test_heartbeat_period_minimum(conf_dir, mock_conf, hb, mock_ep_uuid, mock_reg_info):
     if hb is not None:
-        conf.heartbeat_period = hb
-    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
-    exp_hb = 30.0 if hb is None else max(_MINIMUM_HEARTBEAT, hb)
+        mock_conf._heartbeat_period = hb  #
+        assert mock_conf.heartbeat_period == hb, "Avoid config setter"
+    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+    exp_hb = 30.0 if hb is None else max(MINIMUM_HEARTBEAT, hb)
     assert exp_hb == em._heartbeat_period, "Expected a reasonable minimum heartbeat"
 
 
-def test_send_heartbeat_verifies_thread(mocker, conf_dir, mock_ep_uuid, mock_reg_info):
-    conf = Config(executors=[])
-    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
+def test_send_heartbeat_verifies_thread(
+    mock_conf, conf_dir, mock_ep_uuid, mock_reg_info
+):
+    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
     f = em.send_heartbeat()
     exc = f.exception()
     assert "publisher is not running" in str(exc)
 
 
-def test_send_heartbeat_honors_shutdown(mocker, conf_dir, mock_ep_uuid, mock_reg_info):
-    conf = Config(executors=[])
-    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
+def test_send_heartbeat_honors_shutdown(
+    mock_conf, conf_dir, mock_ep_uuid, mock_reg_info
+):
+    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
     em._heartbeat_period = random.randint(1, 10000)
     em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
 
@@ -981,11 +987,10 @@ def test_send_heartbeat_honors_shutdown(mocker, conf_dir, mock_ep_uuid, mock_reg
 
 
 def test_send_heartbeat_shares_exception(
-    mock_log, conf_dir, mock_ep_uuid, mock_reg_info, randomstring
+    mock_log, mock_conf, conf_dir, mock_ep_uuid, mock_reg_info, randomstring
 ):
     exc_text = randomstring()
-    conf = Config(executors=[])
-    em = EndpointManager(conf_dir, mock_ep_uuid, conf, mock_reg_info)
+    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
     em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
     em._heartbeat_publisher.publish.return_value = Future()
     f = em.send_heartbeat()
@@ -997,7 +1002,7 @@ def test_send_heartbeat_shares_exception(
     assert exc_text in str(a[0])
 
 
-def test_sends_heartbeat_at_shutdown(mocker, epmanager_as_root, noop, reset_signals):
+def test_sends_heartbeat_at_shutdown(epmanager_as_root, noop, reset_signals):
     *_, em = epmanager_as_root
     hb_fut = mock.Mock(spec=Future)
     em.send_heartbeat = mock.Mock(spec=EndpointManager.send_heartbeat)
@@ -1015,7 +1020,7 @@ def test_sends_heartbeat_at_shutdown(mocker, epmanager_as_root, noop, reset_sign
 
 
 def test_heartbeat_publisher_stopped_at_shutdown(
-    mocker, epmanager_as_root, noop, reset_signals
+    epmanager_as_root, noop, reset_signals
 ):
     *_, em = epmanager_as_root
     em._event_loop = noop
@@ -1799,7 +1804,7 @@ def test_run_as_same_user_disabled_if_admin(
 
 @pytest.mark.parametrize("cap", (pyprctl.Cap.SYS_ADMIN, pyprctl.Cap.SETUID))
 def test_run_as_same_user_disabled_if_privileged(
-    mocker, conf_dir, mock_conf, mock_client, cap
+    mocker, conf_dir, mock_conf_root, mock_client, cap
 ):
     # spot-check a couple of capabilities: if set, then same user is *disallowed*
     ep_uuid, mock_gcc = mock_client
@@ -1809,7 +1814,7 @@ def test_run_as_same_user_disabled_if_privileged(
     mock_prctl = mocker.patch(f"{_test_mock_base}_pyprctl")
 
     mock_prctl.CapState.get_current.return_value.effective = {cap}
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf_root)
     assert em._allow_same_user is False
 
 

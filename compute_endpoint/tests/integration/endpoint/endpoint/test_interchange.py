@@ -13,13 +13,13 @@ from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport, Result
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.cli import get_config
+from globus_compute_endpoint.endpoint.config.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
     TaskQueueSubscriber,
 )
-from globus_compute_endpoint.endpoint.utils.config import Config
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
@@ -50,7 +50,7 @@ def mock_ex(mocker, endpoint_uuid):
 
 @pytest.fixture
 def mock_conf(mock_ex):
-    yield Config(executors=[mock_ex])
+    yield UserEndpointConfig(executors=[mock_ex])
 
 
 @pytest.fixture
@@ -140,7 +140,7 @@ def test_endpoint_id_conveyed_to_executor(funcx_dir):
 def test_start_requires_pre_registered(mocker, funcx_dir):
     with pytest.raises(TypeError):
         EndpointInterchange(
-            config=Config(executors=[mocker.Mock()]),
+            config=UserEndpointConfig(executors=[mocker.Mock()]),
             reg_info=None,
             endpoint_id="mock_endpoint_id",
         )

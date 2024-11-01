@@ -34,7 +34,8 @@ from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_common.pydantic_v1 import BaseModel
 from globus_compute_endpoint import __version__
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
+from globus_compute_endpoint.endpoint.config.config import MINIMUM_HEARTBEAT
 from globus_compute_endpoint.endpoint.config.utils import (
     load_user_config_template,
     render_config_user_template,
@@ -58,8 +59,6 @@ if t.TYPE_CHECKING:
 
 
 log = logging.getLogger(__name__)
-
-_MINIMUM_HEARTBEAT: float = 5.0
 
 
 class InvalidCommandError(Exception):
@@ -98,7 +97,7 @@ class EndpointManager:
         self,
         conf_dir: pathlib.Path,
         endpoint_uuid: str | None,
-        config: Config,
+        config: ManagerEndpointConfig,
         reg_info: dict | None = None,
     ):
         log.debug("Endpoint Manager initialization")
@@ -109,7 +108,7 @@ class EndpointManager:
         self._time_to_stop = False
         self._kill_event = threading.Event()
 
-        self._heartbeat_period: float = max(_MINIMUM_HEARTBEAT, config.heartbeat_period)
+        self._heartbeat_period: float = max(MINIMUM_HEARTBEAT, config.heartbeat_period)
 
         self._children: dict[int, UserEndpointRecord] = {}
 
@@ -298,9 +297,7 @@ class EndpointManager:
         self._heartbeat_publisher = ResultPublisher(queue_info=rq_info)
 
     @staticmethod
-    def get_metadata(config: Config, conf_dir: pathlib.Path) -> dict:
-        # Piecemeal Config settings because for MU, most of the SU items are
-        # unrelated -- the MU (aka EndpointManager) does not execute tasks
+    def get_metadata(config: ManagerEndpointConfig, conf_dir: pathlib.Path) -> dict:
         user_config_template, user_config_schema = load_user_config_template(conf_dir)
         return {
             "endpoint_version": __version__,

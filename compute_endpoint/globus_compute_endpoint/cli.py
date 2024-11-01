@@ -15,7 +15,10 @@ import click
 from click import ClickException
 from click_option_group import optgroup
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.utils import (
@@ -90,7 +93,7 @@ def get_globus_app_with_scopes() -> GlobusApp:
     return app
 
 
-def get_cli_endpoint(conf: Config) -> Endpoint:
+def get_cli_endpoint(conf: UserEndpointConfig) -> Endpoint:
     # this getter creates an Endpoint object from the CommandState
     # it takes its various configurable values from the current CommandState
     # as a result, any number of CLI options may be used to tweak the CommandState
@@ -673,13 +676,7 @@ def _do_start_endpoint(
             log.critical(msg)
             raise
 
-        if die_with_parent:
-            # The endpoint cannot die with its parent if it
-            # doesn't have one :)
-            ep_config.detach_endpoint = False
-            log.debug("The --die-with-parent flag has set detach_endpoint to False")
-
-        if ep_config.multi_user:
+        if isinstance(ep_config, ManagerEndpointConfig):
             if not _has_multi_user:
                 raise ClickException(
                     "multi-user endpoints are not supported on this system"
@@ -687,6 +684,12 @@ def _do_start_endpoint(
             epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
             epm.start()
         else:
+            assert isinstance(ep_config, UserEndpointConfig)
+            if die_with_parent:
+                # The endpoint cannot die with its parent if it doesn't have one :)
+                ep_config.detach_endpoint = False
+                log.debug("The --die-with-parent flag has set detach_endpoint to False")
+
             get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
                 endpoint_uuid,
