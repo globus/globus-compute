@@ -55,13 +55,18 @@ class FunctionRegistrationData:
         serializer: t.Optional[ComputeSerializer] = None,
     ):
         if function is not None:
+            if function_name is not None or function_code is not None:
+                raise ValueError(
+                    "Cannot specify 'function_name' or 'function_code'"
+                    " if 'function' is provided."
+                )
             function_name = function.__name__
             function_code = _get_packed_code(function, serializer=serializer)
 
         if function_name is None or function_code is None:
             raise ValueError(
                 "Either 'function' must be provided, or "
-                "both of 'function_name' and 'function_code'"
+                "both of 'function_name' and 'function_code'."
             )
 
         self.function_name = function_name

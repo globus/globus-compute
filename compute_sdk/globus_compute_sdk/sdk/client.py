@@ -587,6 +587,7 @@ class Client:
             The function to be registered for remote execution
         function_name : str
             The entry point (function name) of the function. Default: None
+            DEPRECATED - functions' names are derived from their ``__name__`` attribute
         container_uuid : str
             Container UUID from registration with Globus Compute
         description : str
@@ -608,11 +609,14 @@ class Client:
         function uuid : str
             UUID identifier for the registered function
         """
-        if searchable is not None:
-            warnings.warn(
-                "The 'searchable' argument is deprecated and no longer functional. "
-                "It will be removed in a future release."
-            )
+        deprecated = ["searchable", "function_name"]
+        for arg in deprecated:
+            if locals()[arg] is not None:
+                warnings.warn(
+                    f"The '{arg}' argument is deprecated and no longer functional. "
+                    "It will be removed in a future release.",
+                    DeprecationWarning,
+                )
 
         data = FunctionRegistrationData(
             function=function,

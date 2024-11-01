@@ -13,6 +13,7 @@ from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
     FunctionRegistrationMetadata,
     WebClient,
+    _get_packed_code,
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
@@ -36,6 +37,10 @@ def gcc():
     )
 
     yield _gcc
+
+
+def funk():
+    return "Funky"
 
 
 @pytest.mark.parametrize(
@@ -302,9 +307,6 @@ def test_container_build_status_failure(gcc):
 def test_register_function(gcc):
     gcc.web_client = mock.MagicMock()
 
-    def funk():
-        return "Funky"
-
     metadata = {"python_version": "3.11.3", "sdk_version": "2.3.3"}
     gcc.register_function(funk, metadata=metadata)
 
@@ -317,11 +319,20 @@ def test_register_function(gcc):
     assert func_data.metadata.sdk_version == metadata["sdk_version"]
 
 
-def test_register_function_no_metadata(gcc):
+@pytest.mark.parametrize("dep_arg", ["searchable", "function_name"])
+def test_register_function_deprecated_args(gcc, dep_arg):
     gcc.web_client = mock.MagicMock()
 
-    def funk():
-        return "Funky"
+    with pytest.deprecated_call() as pyt_wrn:
+        gcc.register_function(funk, **{dep_arg: "foo"})
+
+    warning = pyt_wrn.pop(DeprecationWarning)
+    assert "deprecated" in str(warning).lower()
+    assert dep_arg in str(warning)
+
+
+def test_register_function_no_metadata(gcc):
+    gcc.web_client = mock.MagicMock()
 
     gcc.register_function(funk)
 
@@ -329,6 +340,63 @@ def test_register_function_no_metadata(gcc):
     func_data = a[0]
     assert isinstance(func_data, FunctionRegistrationData)
     assert func_data.metadata is None
+
+
+def test_register_function_no_function(gcc):
+    gcc.web_client = mock.MagicMock()
+
+    with pytest.raises(ValueError) as pyt_exc:
+        gcc.register_function(None)
+
+    assert "either" in str(pyt_exc).lower()
+    assert "'function'" in str(pyt_exc).lower()
+    assert "'function_name'" in str(pyt_exc).lower()
+    assert "'function_code'" in str(pyt_exc).lower()
+
+
+def test_function_registration_data_function():
+    frd = FunctionRegistrationData(function=funk)
+
+    assert frd.function_name == "funk"
+    assert frd.function_code == _get_packed_code(funk)
+
+
+def test_function_registration_data_function_name_and_code():
+    frd = FunctionRegistrationData(
+        function=None, function_name="foo", function_code="bar"
+    )
+
+    assert frd.function_name == "foo"
+    assert frd.function_code == "bar"
+
+
+@pytest.mark.parametrize(
+    "function_name, function_code", [("foo", None), (None, "bar"), (None, None)]
+)
+def test_function_registration_data_must_have_both_function_name_and_function_code(
+    function_name, function_code
+):
+    with pytest.raises(ValueError) as pyt_exc:
+        FunctionRegistrationData(
+            function=None, function_name=function_name, function_code=function_code
+        )
+
+    assert "either" in str(pyt_exc).lower()
+    assert "'function'" in str(pyt_exc).lower()
+    assert "'function_name'" in str(pyt_exc).lower()
+    assert "'function_code'" in str(pyt_exc).lower()
+
+
+def test_function_registration_data_cant_have_both_function_and_name_code(randomstring):
+    with pytest.raises(ValueError) as pyt_exc:
+        FunctionRegistrationData(
+            function=funk, function_name=randomstring(), function_code=randomstring()
+        )
+
+    assert "cannot specify" in str(pyt_exc).lower()
+    assert "'function'" in str(pyt_exc).lower()
+    assert "'function_name'" in str(pyt_exc).lower()
+    assert "'function_code'" in str(pyt_exc).lower()
 
 
 def test_get_function(gcc):
