@@ -1,3 +1,4 @@
+import inspect
 import json
 import pathlib
 import shlex
@@ -9,15 +10,21 @@ import jinja2
 import jsonschema
 import pytest
 import yaml
-from globus_compute_endpoint.endpoint.config import Config
+from click import ClickException
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
 from globus_compute_endpoint.endpoint.config.utils import (
     RESERVED_USER_CONFIG_TEMPLATE_VARIABLES,
     _validate_user_opts,
+    load_config_yaml,
     load_user_config_schema,
     load_user_config_template,
     render_config_user_template,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config.utils."
 
@@ -35,7 +42,58 @@ def use_fs(fs):
 
 @pytest.fixture
 def conf_no_exec():
-    yield Config(executors=[])  # empty list to avoid unnecessary network lookup
+    # empty so as to avoid unnecessary network lookup
+    yield UserEndpointConfig(executors=())
+
+
+def _get_cls_kwds(cls):
+    fas = (inspect.getfullargspec(c.__init__) for c in cls.__mro__)
+
+    return {k for f in fas for k in f.kwonlyargs}
+
+
+def test_config_opts_accounted_for_in_tests():
+    kwds = _get_cls_kwds(UserEndpointConfig)
+    assert set(known_user_config_opts) == kwds
+    kwds = _get_cls_kwds(ManagerEndpointConfig)
+    assert set(known_manager_config_opts) == kwds
+
+
+def test_extra_opts_disallowed():
+    conf = {"does_not_exist": True, "engine": {"type": "ThreadPoolEngine"}}
+    serde_yaml = yaml.safe_dump(conf)
+    with pytest.raises(ClickException) as pyt_e:
+        load_config_yaml(serde_yaml)
+    assert "does_not_exist" in str(pyt_e.value)
+
+    conf = {"does_not_exist": True, "multi_user": True}
+    serde_yaml = yaml.safe_dump(conf)
+    with pytest.raises(ClickException) as pyt_e:
+        load_config_yaml(serde_yaml)
+    assert "does_not_exist" in str(pyt_e.value)
+
+
+def test_load_user_endpoint_config(get_random_of_datatype):
+    conf = {
+        kw: get_random_of_datatype(tval) for kw, tval in known_user_config_opts.items()
+    }
+    conf.pop("executors")
+    conf["engine"] = {"type": "ThreadPoolEngine"}
+    serde_yaml = yaml.safe_dump(conf)
+    conf = load_config_yaml(serde_yaml)
+    assert isinstance(conf, UserEndpointConfig)
+
+
+def test_load_manager_endpoint_config(get_random_of_datatype, fs):
+    conf = {
+        kw: get_random_of_datatype(tval)
+        for kw, tval in known_manager_config_opts.items()
+    }
+    serde_yaml = yaml.safe_dump(conf)
+    to_mock = "globus_compute_endpoint.endpoint.config.config.is_privileged"
+    with mock.patch(to_mock, return_value=True):
+        conf = load_config_yaml(serde_yaml)
+    assert isinstance(conf, ManagerEndpointConfig)
 
 
 def test_render_user_config_escape_strings(conf_no_exec):

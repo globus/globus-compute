@@ -10,7 +10,7 @@ import globus_compute_endpoint.endpoint
 import pytest
 import requests
 import yaml
-from globus_compute_endpoint.endpoint.endpoint import Config, Endpoint
+from globus_compute_endpoint.endpoint.endpoint import Endpoint, UserEndpointConfig
 from globus_sdk import GlobusAPIError
 
 logger = logging.getLogger("mock_funcx")
@@ -330,10 +330,9 @@ class TestStart:
         # Allow this mock to be used in a with statement
         mock_context.return_value.__enter__.return_value = None
         mock_context.return_value.__exit__.return_value = None
-
         mock_context.return_value.pidfile.path = ""
 
-        config = Config(executors=[], detach_endpoint=False)
+        config = UserEndpointConfig(executors=[], detach_endpoint=False)
 
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")

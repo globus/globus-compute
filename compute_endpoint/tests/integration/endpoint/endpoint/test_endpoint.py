@@ -17,7 +17,7 @@ from globus_compute_endpoint.cli import (
     app,
 )
 from globus_compute_endpoint.endpoint import endpoint
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_sdk.sdk.web_client import WebClient
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
@@ -65,7 +65,7 @@ def test_start_endpoint_display_name(mocker, fs, display_name):
     )
 
     ep = endpoint.Endpoint()
-    ep_conf = Config()
+    ep_conf = UserEndpointConfig()
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
     ep_dir.mkdir(parents=True, exist_ok=True)
     ep_conf.display_name = display_name
@@ -88,7 +88,7 @@ def test_start_endpoint_data_passthrough(fs):
     )
 
     ep = endpoint.Endpoint()
-    ep_conf = Config()
+    ep_conf = UserEndpointConfig()
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
     ep_dir.mkdir(parents=True, exist_ok=True)
     ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
@@ -104,10 +104,9 @@ def test_start_endpoint_data_passthrough(fs):
     req_json = json.loads(req.body)
 
     assert len(req_json["allowed_functions"]) == 2
-    assert req_json["allowed_functions"][1] == ep_conf.allowed_functions[1]
-    assert req_json["authentication_policy"] == ep_conf.authentication_policy
-    assert req_json["subscription_uuid"] == ep_conf.subscription_id
-    assert req_json["public"] is ep_conf.public
+    assert req_json["allowed_functions"][1] == str(ep_conf.allowed_functions[1])
+    assert req_json["authentication_policy"] == str(ep_conf.authentication_policy)
+    assert req_json["subscription_uuid"] == str(ep_conf.subscription_id)
 
 
 @mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
@@ -238,7 +237,7 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
 
     endpoint_dir = None
     endpoint_uuid = None
-    endpoint_config = Config(endpoint_setup=command, detach_endpoint=False)
+    endpoint_config = UserEndpointConfig(endpoint_setup=command, detach_endpoint=False)
     log_to_console = False
     no_color = True
     reg_info = {}
@@ -279,7 +278,7 @@ def test_endpoint_teardown_execution(mocker, tmp_path, randomstring):
     command = f"cat {tmp_file}\nexit {exit_code}"
 
     endpoint_dir = tmp_path
-    endpoint_config = Config(endpoint_teardown=command)
+    endpoint_config = UserEndpointConfig(endpoint_teardown=command)
 
     with mock.patch(f"{_MOCK_BASE}log") as mock_log:
         with pytest.raises(SystemExit) as e:

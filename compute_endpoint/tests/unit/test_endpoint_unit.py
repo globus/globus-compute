@@ -16,7 +16,7 @@ from unittest import mock
 import pytest
 import responses
 from globus_compute_endpoint.endpoint import endpoint
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import (
     get_config,
     load_user_config_template,
@@ -111,7 +111,7 @@ def register_endpoint_failure_response(endpoint_uuid):
 
 @pytest.fixture
 def conf():
-    yield Config(executors=[ThreadPoolEngine])
+    yield UserEndpointConfig(executors=[ThreadPoolEngine])
 
 
 @pytest.fixture
@@ -532,7 +532,7 @@ def test_endpoint_get_metadata(mocker, engine_cls):
     if engine_cls is GlobusComputeEngine:
         k["address"] = "127.0.0.1"
     executors = [engine_cls(**k)]
-    test_config = Config(executors=executors)
+    test_config = UserEndpointConfig(executors=executors)
     test_config.source_content = "foo: bar"
     meta = Endpoint.get_metadata(test_config)
 
@@ -718,11 +718,12 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data, mock_reg_in
 
 
 def test_serialize_config_field_types():
-    ep_config = Config(executors=[GlobusComputeEngine(address="127.0.0.1")])
+    fns = [str(uuid.uuid4()) for _ in range(5)]
 
+    ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address="127.0.0.1")])
     ep_config._hidden_attr = "123"
     ep_config.rando_attr = "howdy"
-    ep_config.allowed_functions = ["a", "b", "c"]
+    ep_config.allowed_functions = fns
     ep_config.heartbeat_threshold = float("inf")
 
     class Foo:
@@ -747,7 +748,8 @@ def test_serialize_config_field_types():
 
     # Most values should retain their type
     assert isinstance(result["allowed_functions"], list)
-    assert len(result["allowed_functions"]) == 3
+    assert len(result["allowed_functions"]) == len(fns)
+    assert result["allowed_functions"] == fns
     assert isinstance(result["heartbeat_period"], int)
     assert isinstance(result["detach_endpoint"], bool)
     assert result["environment"]["foo"] == "bar"
@@ -839,7 +841,7 @@ def test_get_endpoint_id(tmp_path: pathlib.Path, json_exists: bool):
 
 def test_handles_provided_endpoint_id_no_json(
     mocker: MockFixture,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
     mock_reg_info: dict,
 ):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
@@ -865,7 +867,7 @@ def test_handles_provided_endpoint_id_no_json(
 
 def test_handles_provided_endpoint_id_with_json(
     mocker: MockFixture,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
     mock_reg_info: dict,
 ):
     ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
@@ -895,7 +897,7 @@ def test_handles_provided_endpoint_id_with_json(
 
 def test_delete_remote_endpoint_no_local_offline(
     mocker: MockFixture,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
 ):
     ep = mock_ep_data[0]
     ep_uuid = str(uuid.uuid4())
@@ -914,7 +916,7 @@ def test_delete_remote_endpoint_no_local_offline(
 def test_delete_endpoint_with_uuid_happy(
     ep_status: str,
     mocker: MockFixture,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
 ):
     ep, ep_dir, *_, ep_config = mock_ep_data
     ep_uuid = str(uuid.uuid4())
@@ -984,7 +986,7 @@ def test_delete_endpoint_with_uuid_errors(
     exc: Exception | None,
     exit_code: bool,
     mocker: MockFixture,
-    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
+    mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, UserEndpointConfig],
 ):
     ep = mock_ep_data[0]
     ep_dir = mock_ep_data[1] if ep_dir_exists else None

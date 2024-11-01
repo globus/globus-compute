@@ -26,7 +26,7 @@ from globus_compute_endpoint.cli import (
     get_globus_app_with_scopes,
     init_config_dir,
 )
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.engines import ThreadPoolEngine
@@ -281,7 +281,7 @@ def test_start_ep_reads_stdin(
 ):
     data_is_valid, data = stdin_data
 
-    conf = Config(executors=[ThreadPoolEngine])
+    conf = UserEndpointConfig(executors=[ThreadPoolEngine])
     mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
     mock_load_conf.return_value = conf
     mock_get_config = mocker.patch(f"{_MOCK_BASE}get_config")
@@ -457,9 +457,7 @@ def test_configure_ep_subscription_id_in_config(
 
 
 @pytest.mark.parametrize("display_name", [None, "None"])
-def test_config_yaml_display_none(
-    run_line, mock_command_ensure, make_endpoint_dir, display_name
-):
+def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
     ep_name = "test_display_none"
 
     conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
@@ -486,13 +484,6 @@ def test_start_ep_incorrect_config_yaml(
     conf.write_text("asdf")
     res = run_line(f"start {ep_name}", assert_exit_code=1)
     assert "Invalid config syntax" in res.stderr
-
-    # `coverage` demands a valid syntax file.  FBOW, then, the ordering and
-    # commingling of these two tests is intentional.  Bit of a meta problem ...
-    conf.unlink()
-    conf.write_text("asdf: asdf")
-    res = run_line(f"start {ep_name}", assert_exit_code=1)
-    assert "missing engine" in res.stderr, "Engine: specification required!"
 
 
 def test_start_ep_incorrect_config_py(
@@ -528,9 +519,9 @@ def test_start_ep_config_py_takes_precedence(
     conf_py = ep_dir / "config.py"
     mock_ep, *_ = mock_cli_state
     conf_py.write_text(
-        "from globus_compute_endpoint.endpoint.config import Config"
+        "from globus_compute_endpoint.endpoint.config import UserEndpointConfig"
         "\nfrom globus_compute_endpoint.engines import ThreadPoolEngine"
-        "\nconfig = Config(executors=[ThreadPoolEngine()])"
+        "\nconfig = UserEndpointConfig(executors=[ThreadPoolEngine()])"
     )
 
     run_line(f"start {ep_name}")
@@ -547,16 +538,16 @@ def test_single_user_requires_engine_configured(mock_command_ensure, ep_name, ru
     data["config"] = yaml.safe_dump(config)
     rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
     assert "validation error" in rc.stderr
-    assert "missing engine" in rc.stderr
+    assert "engine\n  field required" in rc.stderr
 
     config = {"multi_user": False}
     data["config"] = yaml.safe_dump(config)
     rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
     assert "validation error" in rc.stderr
-    assert "missing engine" in rc.stderr
+    assert "engine\n  field required" in rc.stderr
 
 
-def test_multi_user_enforces_no_engine(mock_command_ensure, ep_name, run_line):
+def test_multi_user_config_enforces_no_engine(mock_command_ensure, ep_name, run_line):
     ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
     ep_dir.mkdir(parents=True)
     data = {"config": ""}
@@ -564,8 +555,9 @@ def test_multi_user_enforces_no_engine(mock_command_ensure, ep_name, run_line):
     config = {"engine": {"type": "ThreadPoolEngine"}, "multi_user": True}
     data["config"] = yaml.safe_dump(config)
     rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
-    assert "validation error" in rc.stderr
-    assert "no engine if multi" in rc.stderr
+
+    assert "validation error" in rc.stderr, (rc.stdout, rc.stderr)
+    assert "engine\n" in rc.stderr, (rc.stdout, rc.stderr)
 
 
 def test_multi_user_instantiates_no_engine(mock_command_ensure, ep_name, run_line):
@@ -635,7 +627,7 @@ def test_die_with_parent_detached(
     ep_name,
     make_endpoint_dir,
 ):
-    config = Config(executors=[ThreadPoolEngine()])
+    config = UserEndpointConfig(executors=[ThreadPoolEngine()])
     mock_get_config.return_value = config
     make_endpoint_dir()
 

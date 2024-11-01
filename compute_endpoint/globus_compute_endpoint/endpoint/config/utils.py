@@ -7,13 +7,13 @@ import logging
 import pathlib
 import re
 import shlex
+import uuid
 
 import yaml
 from click import ClickException
 from globus_compute_common.pydantic_v1 import ValidationError
 
-from .config import Config
-from .model import ConfigModel
+from .config import ManagerEndpointConfig, UserEndpointConfig
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +28,9 @@ def _read_config_file(config_path: pathlib.Path) -> str:
     return config_path.read_text()
 
 
-def _load_config_py(conf_path: pathlib.Path) -> Config | None:
+def _load_config_py(
+    conf_path: pathlib.Path,
+) -> UserEndpointConfig | ManagerEndpointConfig | None:
     if not conf_path.exists():
         return None
 
@@ -41,6 +43,16 @@ def _load_config_py(conf_path: pathlib.Path) -> Config | None:
             raise Exception(f"Unable to import configuration (no config): {conf_path}")
         spec.loader.exec_module(config)
         config.config.source_content = _read_config_file(conf_path)
+        if not isinstance(config.config, (UserEndpointConfig, ManagerEndpointConfig)):
+            tname = type(config.config).__name__
+            exp = ", ".join(
+                f"`{type(cls).__name__}`"
+                for cls in (
+                    UserEndpointConfig,
+                    ManagerEndpointConfig,
+                )  # no hard-code in str
+            )
+            raise AttributeError(f"Received type `{tname}`; expected one of: {exp}")
         return config.config
 
     except FileNotFoundError as err:
@@ -68,28 +80,32 @@ def _load_config_py(conf_path: pathlib.Path) -> Config | None:
         raise
 
 
-def load_config_yaml(config_str: str) -> Config:
+def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointConfig:
     try:
         config_dict = dict(yaml.safe_load(config_str))
     except Exception as err:
         raise ClickException(f"Invalid config syntax: {str(err)}") from err
 
+    is_templatable = config_dict.get("multi_user", False) is True
     try:
-        config_schema = ConfigModel(**config_dict)
+        ConfigClass: type[UserEndpointConfig | ManagerEndpointConfig]
+        if is_templatable:
+            from . import BaseConfigModel, ManagerEndpointConfigModel
+
+            ConfigClass = ManagerEndpointConfig
+            config_schema: BaseConfigModel = ManagerEndpointConfigModel(**config_dict)
+        else:
+            from . import UserEndpointConfigModel
+
+            ConfigClass = UserEndpointConfig
+            config_schema = UserEndpointConfigModel(**config_dict)
     except ValidationError as err:
         raise ClickException(str(err)) from err
 
     config_dict = config_schema.dict(exclude_unset=True)
 
     try:
-        if config_dict.get("multi_user") is True:
-            # Temporary hack to not instantiate executor for MU; necessary due to the
-            # historical design to default-instantiate an executor in the Config
-            # object; this hack will no longer be necessary when MEP and UEP configs
-            # are cleanly separated rather than the current sharing of the same basal
-            # data structure
-            config_dict["executors"] = []
-        config = Config(**config_dict)
+        config = ConfigClass(**config_dict)
     except Exception as err:
         raise ClickException(str(err)) from err
 
@@ -105,7 +121,9 @@ def load_config_yaml(config_str: str) -> Config:
     return config
 
 
-def get_config(endpoint_dir: pathlib.Path) -> Config:
+def get_config(
+    endpoint_dir: pathlib.Path,
+) -> UserEndpointConfig | ManagerEndpointConfig:
     config_py_path = endpoint_dir / "config.py"
     config_yaml_path = endpoint_dir / "config.yaml"
 
@@ -141,8 +159,7 @@ def get_config(endpoint_dir: pathlib.Path) -> Config:
             )
         raise ClickException(msg) from err
 
-    config = load_config_yaml(config_str)
-    return config
+    return load_config_yaml(config_str)
 
 
 def load_user_config_schema(endpoint_dir: pathlib.Path) -> dict | None:
@@ -239,7 +256,7 @@ def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | N
 
 
 def render_config_user_template(
-    parent_config: Config,
+    parent_config: ManagerEndpointConfig,
     user_config_template: str,
     user_config_schema: dict | None = None,
     user_opts: dict | None = None,
@@ -271,11 +288,14 @@ def render_config_user_template(
         raise
 
 
-def serialize_config(config: Config) -> dict:
-    """Converts a Config object into a dict that matches the
-    standard YAML config schema.
+def serialize_config(config: UserEndpointConfig | ManagerEndpointConfig) -> dict:
+    """Converts a configuration object into a dict that matches the standard YAML
+    config schema.
 
-    E.g.,
+    N.B. the output of this method is ignored by the web service's API; the field
+         is deprecated since Aug 2024.
+
+    Example structure partial:
     {
         ...
         "display_name": "My Endpoint",
@@ -295,6 +315,8 @@ def serialize_config(config: Config) -> dict:
     def _prep(val):
         if hasattr(val, "__dict__") and hasattr(val, "__init__"):
             return _to_dict(val)
+        if isinstance(val, uuid.UUID):
+            val = str(val)
         try:
             json.dumps(val, allow_nan=False)
             return val
@@ -306,9 +328,15 @@ def serialize_config(config: Config) -> dict:
 
         # We only want to include attributes that are
         # configurable as constructor arguments
-        sig = inspect.signature(obj.__init__)
+        signatures = [
+            # abuse knowledge of class structure, knowing that some attributes are
+            # stated in the parent signature
+            inspect.signature(super(type(obj), obj).__init__),
+            inspect.signature(obj.__init__),
+        ]
+        params = [k for sig in signatures for k in sig.parameters.keys()]
 
-        for param in sig.parameters.keys():
+        for param in params:
             val = getattr(obj, param, 0)
             if val == 0:
                 continue

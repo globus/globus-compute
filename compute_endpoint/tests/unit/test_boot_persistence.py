@@ -80,7 +80,7 @@ def test_enable_on_boot_no_systemd(fake_ep_dir, mocker):
 
 @pytest.mark.parametrize("mu", (True, False))
 def test_enable_on_boot_detach_endpoint(
-    mocker, fake_ep_dir, systemd_unit_dir, mu: bool, fs: fakefs.FakeFilesystem
+    mocker, fake_ep_dir, systemd_unit_dir, mu: bool
 ):
     mock_app = mock.Mock(spec=UserApp)
     cfg_path = fake_ep_dir / "config.yaml"

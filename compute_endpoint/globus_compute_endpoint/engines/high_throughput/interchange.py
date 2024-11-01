@@ -128,7 +128,7 @@ class Interchange:
         """
         Parameters
         ----------
-        config : globus_compute_sdk.Config object
+        config : globus_compute_sdk.UserEndpointConfig object
              Globus Compute config object that describes how compute should
              be provisioned
 

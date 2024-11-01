@@ -1,8 +1,8 @@
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.engines import GlobusComputeEngine
 from parsl.providers import LocalProvider
 
-config = Config(
+config = UserEndpointConfig(
     display_name=None,  # If None, defaults to the endpoint name
     executors=[
         GlobusComputeEngine(

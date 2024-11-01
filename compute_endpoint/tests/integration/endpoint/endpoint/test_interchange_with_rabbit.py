@@ -11,10 +11,12 @@ import pika
 import pytest
 from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import Result, Task
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from tests.integration.endpoint.executors.mock_executors import MockExecutor
 from tests.utils import try_for_timeout
+
+_test_func_ids = [str(uuid.uuid4()) for i in range(3)]
 
 
 @pytest.fixture
@@ -39,7 +41,7 @@ def run_interchange_process(
         if hasattr(request, "param") and request.param:
             config = request.param
         else:
-            config = Config()
+            config = UserEndpointConfig(executors=[])
         config.executors = [mock_exe]
 
         ix = EndpointInterchange(
@@ -156,9 +158,9 @@ def test_epi_forwards_tasks_and_results(
     "run_interchange_process",
     [
         None,
-        Config(allowed_functions=None),
-        Config(allowed_functions=["allowed_func_1", "allowed_func_2"]),
-        Config(allowed_functions=["allowed_func_3"]),
+        UserEndpointConfig(executors=(), allowed_functions=None),
+        UserEndpointConfig(executors=(), allowed_functions=_test_func_ids[:2]),
+        UserEndpointConfig(executors=(), allowed_functions=_test_func_ids[-1:]),
     ],
     indirect=True,
 )
@@ -170,7 +172,7 @@ def test_epi_rejects_allowlist_task(
     this test also doubles up as checking for not specifying the
     resource_specification field.
     """
-    _, _, endpoint_uuid, reg_info = run_interchange_process
+    *_, endpoint_uuid, reg_info = run_interchange_process
 
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
@@ -179,7 +181,7 @@ def test_epi_rejects_allowlist_task(
     task_q_name = task_q["queue"]
     task_exch = task_q["exchange"]
 
-    func_to_run = "allowed_func_3"
+    func_to_run = _test_func_ids[-1]
 
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:
@@ -193,7 +195,7 @@ def test_epi_rejects_allowlist_task(
                     content_type="application/json",
                     content_encoding="utf-8",
                     headers={
-                        "function_uuid": func_to_run,
+                        "function_uuid": str(func_to_run),
                         "task_uuid": str(task_uuid),
                     },
                 ),
@@ -209,8 +211,10 @@ def test_epi_rejects_allowlist_task(
                 ):
                     assert result.data == task_msg.task_buffer
                 else:
-                    assert f"Function {func_to_run} not permitted" in result.data
-                    assert f"on endpoint {endpoint_uuid}" in result.data
+                    assert (
+                        f"Function {func_to_run} not permitted" in result.data
+                    ), config
+                    assert f"on endpoint {endpoint_uuid}" in result.data, result
                 break
 
 

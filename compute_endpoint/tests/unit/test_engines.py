@@ -11,7 +11,7 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.endpoint.config import Config
+from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.engines import (
     GlobusComputeEngine,
@@ -146,7 +146,7 @@ def test_gc_engine_system_failure(ez_pack_task, task_uuid, engine_runner):
 def test_serialized_engine_config_has_provider(
     engine_type: t.Type[GlobusComputeEngineBase],
 ):
-    ep_config = Config(executors=[engine_type(address="127.0.0.1")])
+    ep_config = UserEndpointConfig(executors=[engine_type(address="127.0.0.1")])
 
     res = serialize_config(ep_config)
     executor = res["executors"][0].get("executor") or res["executors"][0]
