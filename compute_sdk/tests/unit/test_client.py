@@ -1,3 +1,4 @@
+import inspect
 import sys
 import uuid
 from unittest import mock
@@ -329,6 +330,77 @@ def test_register_function_deprecated_args(gcc, dep_arg):
     warning = pyt_wrn.pop(DeprecationWarning)
     assert "deprecated" in str(warning).lower()
     assert dep_arg in str(warning)
+
+
+def _docstring_test_case_no_docstring():
+    pass
+
+
+def _docstring_test_case_single_line():
+    """This is a docstring"""
+
+
+def _docstring_test_case_multi_line():
+    """This is a docstring
+    that spans multiple lines
+    and those lines are indented
+    """
+
+
+def _docstring_test_case_real_world():
+    """
+    Register a task function with this Executor's cache.
+
+    All function execution submissions (i.e., ``.submit()``) communicate which
+    pre-registered function to execute on the endpoint by the function's
+    identifier, the ``function_id``.  This method makes the appropriate API
+    call to the Globus Compute web services to first register the task function, and
+    then stores the returned ``function_id`` in the Executor's cache.
+
+    In the standard workflow, ``.submit()`` will automatically handle invoking
+    this method, so the common use-case will not need to use this method.
+    However, some advanced use-cases may need to fine-tune the registration
+    of a function and so may manually set the registration arguments via this
+    method.
+
+    If a function has already been registered (perhaps in a previous
+    iteration), the upstream API call may be avoided by specifying the known
+    ``function_id``.
+
+    If a function already exists in the Executor's cache, this method will
+    raise a ValueError to help track down the errant double registration
+    attempt.
+
+    :param fn: function to be registered for remote execution
+    :param function_id: if specified, associate the ``function_id`` to the
+        ``fn`` immediately, short-circuiting the upstream registration call.
+    :param func_register_kwargs: all other keyword arguments are passed to
+        the ``Client.register_function()``.
+    :returns: the function's ``function_id`` string, as returned by
+        registration upstream
+    :raises ValueError: raised if a function has already been registered with
+        this Executor
+    """
+
+
+@pytest.mark.parametrize(
+    "func",
+    [
+        _docstring_test_case_no_docstring,
+        _docstring_test_case_single_line,
+        _docstring_test_case_multi_line,
+        _docstring_test_case_real_world,
+    ],
+)
+def test_register_function_docstring(gcc, func):
+    gcc.web_client = mock.MagicMock()
+
+    gcc.register_function(func)
+    expected = inspect.getdoc(func)
+
+    a, _ = gcc.web_client.register_function.call_args
+    func_data = a[0]
+    assert func_data.description == expected
 
 
 def test_register_function_no_metadata(gcc):

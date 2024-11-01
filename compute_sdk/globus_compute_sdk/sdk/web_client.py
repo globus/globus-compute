@@ -6,6 +6,7 @@ It also implements data helpers for building complex payloads. Most notably,
 `FunctionRegistrationData` which can be constructed from an arbitrary callable.
 """
 
+import inspect
 import json
 import typing as t
 import warnings
@@ -62,6 +63,8 @@ class FunctionRegistrationData:
                 )
             function_name = function.__name__
             function_code = _get_packed_code(function, serializer=serializer)
+            if description is None:
+                description = inspect.getdoc(function)
 
         if function_name is None or function_code is None:
             raise ValueError(

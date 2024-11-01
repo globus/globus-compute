@@ -51,6 +51,8 @@ is defined in the same way as any Python function before being registered with G
 .. code-block:: python
 
   def platform_func():
+    """Get platform information about this system."""
+
     import platform
     return platform.platform()
 
@@ -106,6 +108,8 @@ The following example shows how strings can be passed to and from a function.
 .. code-block:: python
 
   def hello(firstname, lastname):
+    """Say hello to someone."""
+
     return 'Hello {} {}'.format(firstname, lastname)
 
   func_id = gcc.register_function(hello)
@@ -127,7 +131,7 @@ To share with a group, set ``group=<globus_group_id>`` when registering a functi
 
 .. code-block:: python
 
-  gcc.register_function(func, description="My function", group=<globus_group_id>)
+  gcc.register_function(func, group=<globus_group_id>)
 
 
 Upon execution, Globus Compute will check group membership to ensure that the user is authorized to execute the function.
@@ -136,7 +140,28 @@ You can also set a function to be publicly accessible by setting ``public=True``
 
 .. code-block:: python
 
-  gcc.register_function(func, description="My function", public=True)
+  gcc.register_function(func, public=True)
+
+
+To add a description to a function, you can either set ``description=<my_description>``
+when calling ``register_function``, or add a docstring to the function. Note that the
+latter also works with the ``Executor`` class.
+
+.. code-block:: python
+
+  gcc.register_function(func, description="My function")
+
+  def function_with_docstring():
+    """My function, with a docstring"""
+    return "foo"
+
+  gcc.register_function(func)  # description is automatically read from the docstring
+
+  gcx = Executor()
+  fut = gcx.submit(function_with_docstring)  # automatically registers the function with its docstring
+
+  # if both are specified, the argument wins
+  gcc.register_function(function_with_docstring, description="this has priority over docstrings")
 
 
 .. _batching:
@@ -307,6 +332,8 @@ method:
   from globus_compute_sdk.serialize import ComputeSerializer, DillCodeSource, JSONData
 
   def greet(name, greeting = "greetings"):
+    """Greet someone."""
+
     return f"{greeting} {name}"
 
   serializer = ComputeSerializer(
