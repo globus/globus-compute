@@ -591,7 +591,10 @@ class Client:
         container_uuid : str
             Container UUID from registration with Globus Compute
         description : str
-            Description of the file
+            Description of the function. If this is None, and the function has a
+            docstring, that docstring is uploaded as the function's description instead;
+            otherwise, if this has a value, it's uploaded as the description, even if
+            the function has a docstring.
         metadata : dict
             Function metadata (E.g., Python version used when serializing the function)
         public : bool
