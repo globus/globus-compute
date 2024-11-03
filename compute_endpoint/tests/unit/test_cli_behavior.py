@@ -29,6 +29,7 @@ from globus_compute_endpoint.cli import (
 from globus_compute_endpoint.endpoint.config import Config
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.engines import ThreadPoolEngine
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
@@ -103,6 +104,7 @@ def make_endpoint_dir(mock_command_ensure, ep_name):
 display_name: null
 engine:
     type: GlobusComputeEngine
+    address: 127.0.0.1
     provider:
         type: LocalProvider
         init_blocks: 1
@@ -115,6 +117,7 @@ engine:
 heartbeat_period: {{ heartbeat }}
 engine:
     type: GlobusComputeEngine
+    address: 127.0.0.1
     provider:
         type: LocalProvider
         init_blocks: 1
@@ -278,7 +281,7 @@ def test_start_ep_reads_stdin(
 ):
     data_is_valid, data = stdin_data
 
-    conf = Config()
+    conf = Config(executors=[ThreadPoolEngine])
     mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
     mock_load_conf.return_value = conf
     mock_get_config = mocker.patch(f"{_MOCK_BASE}get_config")
@@ -466,10 +469,11 @@ def test_config_yaml_display_none(
         config_cmd += f" --display-name {display_name}"
     run_line(config_cmd)
 
-    with open(conf) as f:
-        conf_dict = load_config_yaml(f)
+    conf_dict = dict(yaml.safe_load(conf.read_text()))
+    conf_dict["engine"]["address"] = "127.0.0.1"  # avoid unnecessary DNS lookup
+    conf = load_config_yaml(yaml.safe_dump(conf_dict))
 
-    assert conf_dict.display_name is None
+    assert conf.display_name is None, conf.display_name
 
 
 def test_start_ep_incorrect_config_yaml(
@@ -525,7 +529,8 @@ def test_start_ep_config_py_takes_precedence(
     mock_ep, *_ = mock_cli_state
     conf_py.write_text(
         "from globus_compute_endpoint.endpoint.config import Config"
-        "\nconfig = Config()"
+        "\nfrom globus_compute_endpoint.engines import ThreadPoolEngine"
+        "\nconfig = Config(executors=[ThreadPoolEngine()])"
     )
 
     run_line(f"start {ep_name}")
@@ -630,7 +635,7 @@ def test_die_with_parent_detached(
     ep_name,
     make_endpoint_dir,
 ):
-    config = Config()
+    config = Config(executors=[ThreadPoolEngine()])
     mock_get_config.return_value = config
     make_endpoint_dir()
 

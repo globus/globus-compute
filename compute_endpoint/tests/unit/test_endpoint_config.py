@@ -8,7 +8,7 @@ from globus_compute_endpoint.endpoint.config.model import ConfigModel
 
 @pytest.fixture
 def config_dict():
-    return {"engine": {"type": "GlobusComputeEngine"}}
+    return {"engine": {"type": "GlobusComputeEngine", "address": "127.0.0.1"}}
 
 
 @pytest.fixture
@@ -18,6 +18,7 @@ def config_dict_mu(tmp_path):
     return {
         "identity_mapping_config_path": idc,
         "multi_user": True,
+        "executors": [],  # remove unnecessary DNS calls; given historical design
     }
 
 
@@ -95,7 +96,7 @@ def test_config_warns_bad_identity_mapping_path(mocker, config_dict_mu, tmp_path
 
 @pytest.mark.parametrize("public", (None, True, False, "a", 1))
 def test_public(public: t.Any):
-    c = Config(public=public)
+    c = Config(public=public, executors=[])
     assert c.public is (public is True)
 
 
@@ -106,6 +107,7 @@ def test_conditional_engine_strategy(
 ):
     config_dict["engine"]["type"] = engine_type
     config_dict["engine"]["strategy"] = strategy
+    config_dict["engine"]["address"] = "127.0.0.1"
 
     if engine_type == "GlobusComputeEngine":
         if isinstance(strategy, str) or strategy is None:
@@ -138,6 +140,7 @@ def test_provider_container_compatibility(
 ):
     config_dict["engine"]["container_uri"] = "docker://ubuntu"
     config_dict["engine"]["provider"] = {"type": provider_type}
+    config_dict["engine"]["address"] = "127.0.0.1"
 
     if compatible:
         ConfigModel(**config_dict)

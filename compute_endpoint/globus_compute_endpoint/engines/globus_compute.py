@@ -504,5 +504,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
     def shutdown(self, /, **kwargs) -> None:
         self._status_report_thread.stop()
-        self.job_status_poller.close()
+        if hasattr(self, "job_status_poller"):
+            self.job_status_poller.close()
         self.executor.shutdown()

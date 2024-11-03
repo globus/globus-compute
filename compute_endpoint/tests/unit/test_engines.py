@@ -155,7 +155,7 @@ def test_serialized_engine_config_has_provider(
 
 
 def test_gcengine_compute_launch_cmd():
-    engine = GlobusComputeEngine()
+    engine = GlobusComputeEngine(address="127.0.0.1")
     assert engine.executor.launch_cmd.startswith(
         "globus-compute-endpoint python-exec"
         " parsl.executors.high_throughput.process_worker_pool"
@@ -164,7 +164,7 @@ def test_gcengine_compute_launch_cmd():
 
 
 def test_gcengine_compute_interchange_launch_cmd():
-    engine = GlobusComputeEngine()
+    engine = GlobusComputeEngine(address="127.0.0.1")
     assert engine.executor.interchange_launch_cmd[:3] == [
         "globus-compute-endpoint",
         "python-exec",
@@ -250,12 +250,12 @@ def test_gcengine_encrypted(encrypted: bool, engine_runner):
 
 
 def test_gcengine_new_executor_not_exceptional():
-    gce = GlobusComputeEngine()
+    gce = GlobusComputeEngine(address="127.0.0.1")
     assert gce.executor_exception is None, "Expect no exception from fresh Executor"
 
 
 def test_gcengine_executor_exception_passthrough(randomstring):
-    gce = GlobusComputeEngine()
+    gce = GlobusComputeEngine(address="127.0.0.1")
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
     assert isinstance(gce.executor_exception, ZeroDivisionError)
@@ -263,7 +263,7 @@ def test_gcengine_executor_exception_passthrough(randomstring):
 
 
 def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
-    gce = GlobusComputeEngine()
+    gce = GlobusComputeEngine(address="127.0.0.1")
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
 
@@ -278,7 +278,7 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
 
 
 def test_gcengine_exception_report_from_bad_state(task_uuid):
-    gce = GlobusComputeEngine()
+    gce = GlobusComputeEngine(address="127.0.0.1")
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
     gce.submit(
@@ -300,19 +300,19 @@ def test_gcengine_exception_report_from_bad_state(task_uuid):
 
 def test_gcengine_rejects_mpi_mode(randomstring):
     with pytest.raises(ValueError) as pyt_exc_1:
-        GlobusComputeEngine(enable_mpi_mode=True)
+        GlobusComputeEngine(enable_mpi_mode=True, address="127.0.0.1")
 
     assert "is not supported" in str(pyt_exc_1)
 
     with pytest.raises(ValueError) as pyt_exc_2:
-        GlobusComputeEngine(mpi_launcher=randomstring())
+        GlobusComputeEngine(mpi_launcher=randomstring(), address="127.0.0.1")
 
     assert "is not supported" in str(pyt_exc_2)
 
 
 def test_gcengine_rejects_resource_specification(task_uuid):
     with pytest.raises(ValueError) as pyt_exc:
-        GlobusComputeEngine().submit(
+        GlobusComputeEngine(address="127.0.0.1").submit(
             str(task_uuid),
             packed_task=b"packed_task",
             resource_specification={"foo": "bar"},
@@ -342,7 +342,7 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
     with mock.patch.object(GlobusMPIEngine, "_ExecutorClass") as mock_ex:
         mock_ex.__name__ = "ClassName"
         mock_ex.return_value = mock.Mock(launch_cmd="")
-        engine = GlobusMPIEngine()
+        engine = GlobusMPIEngine(address="127.0.0.1")
         engine.submit(str(task_uuid), b"some task", resource_specification=spec)
 
     assert engine.executor.submit.called, "Verify test: correct internal method invoked"

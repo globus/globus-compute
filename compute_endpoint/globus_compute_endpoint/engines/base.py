@@ -65,7 +65,8 @@ class ReportingThread:
 
     def stop(self) -> None:
         self._shutdown_event.set()
-        self._thread.join(timeout=0.1)
+        if self._thread.is_alive():
+            self._thread.join(timeout=0.1)
 
 
 class GlobusComputeEngineBase(ABC):

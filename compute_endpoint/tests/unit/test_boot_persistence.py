@@ -33,6 +33,7 @@ detach_endpoint: false
 display_name: null
 engine:
     type: GlobusComputeEngine
+    address: 127.0.0.1
     provider:
         type: LocalProvider
         init_blocks: 1

@@ -24,6 +24,11 @@ from globus_compute_endpoint.endpoint.config.utils import (
     serialize_config,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.engines import (
+    GlobusComputeEngine,
+    ProcessPoolEngine,
+    ThreadPoolEngine,
+)
 from globus_sdk import GlobusAPIError, NetworkError
 from pytest_mock import MockFixture
 
@@ -105,14 +110,18 @@ def register_endpoint_failure_response(endpoint_uuid):
 
 
 @pytest.fixture
-def mock_ep_data(fs):
+def conf():
+    yield Config(executors=[ThreadPoolEngine])
+
+
+@pytest.fixture
+def mock_ep_data(fs, conf):
     ep = endpoint.Endpoint()
     ep_dir = pathlib.Path("/some/path/mock_endpoint")
     ep_dir.mkdir(parents=True, exist_ok=True)
     log_to_console = False
     no_color = True
-    ep_conf = Config()
-    yield ep, ep_dir, log_to_console, no_color, ep_conf
+    yield ep, ep_dir, log_to_console, no_color, conf
 
 
 @pytest.fixture
@@ -498,7 +507,10 @@ def test_pid_file_check(pid_info, fs):
     assert should_active == pid_status["active"]
 
 
-def test_endpoint_get_metadata(mocker):
+@pytest.mark.parametrize(
+    "engine_cls", (GlobusComputeEngine, ThreadPoolEngine, ProcessPoolEngine)
+)
+def test_endpoint_get_metadata(mocker, engine_cls):
     mock_data = {
         "endpoint_version": "106.7",
         "hostname": "oneohtrix.never",
@@ -516,9 +528,16 @@ def test_endpoint_get_metadata(mocker):
     mock_pwuid = mocker.patch("globus_compute_endpoint.endpoint.endpoint.pwd.getpwuid")
     mock_pwuid.return_value = SimpleNamespace(pw_name=mock_data["local_user"])
 
-    test_config = Config()
+    k = {}
+    if engine_cls is GlobusComputeEngine:
+        k["address"] = "127.0.0.1"
+    executors = [engine_cls(**k)]
+    test_config = Config(executors=executors)
     test_config.source_content = "foo: bar"
     meta = Endpoint.get_metadata(test_config)
+
+    for e in test_config.executors:
+        e.shutdown()
 
     for k, v in mock_data.items():
         assert meta[k] == v
@@ -526,8 +545,9 @@ def test_endpoint_get_metadata(mocker):
     assert meta["endpoint_config"] == test_config.source_content
     config = meta["config"]
     assert len(config["executors"]) == 1
-    assert config["executors"][0]["type"] == "GlobusComputeEngine"
-    assert config["executors"][0]["executor"]["provider"]["type"] == "LocalProvider"
+    assert config["executors"][0]["type"] == engine_cls.__name__
+    if engine_cls is GlobusComputeEngine:
+        assert config["executors"][0]["executor"]["provider"]["type"] == "LocalProvider"
 
 
 @pytest.mark.parametrize("env", [None, "blar", "local", "production"])
@@ -698,7 +718,7 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data, mock_reg_in
 
 
 def test_serialize_config_field_types():
-    ep_config = Config()
+    ep_config = Config(executors=[GlobusComputeEngine(address="127.0.0.1")])
 
     ep_config._hidden_attr = "123"
     ep_config.rando_attr = "howdy"
@@ -896,9 +916,7 @@ def test_delete_endpoint_with_uuid_happy(
     mocker: MockFixture,
     mock_ep_data: tuple[Endpoint, pathlib.Path, bool, bool, Config],
 ):
-    ep = mock_ep_data[0]
-    ep_dir = mock_ep_data[1]
-    ep_config = mock_ep_data[4]
+    ep, ep_dir, *_, ep_config = mock_ep_data
     ep_uuid = str(uuid.uuid4())
     mock_log = mocker.patch(f"{_mock_base}log")
     mock_gcc = mocker.Mock()
