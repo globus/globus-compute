@@ -255,18 +255,15 @@ def test_executor_context_manager(gc_executor):
     assert _is_stopped(gce._task_submitter)
 
 
-def test_executor_shutdown_idempotent(
-    mocker: MockerFixture, gc_executor: t.Tuple[Client, Executor]
-):
+def test_executor_shutdown_idempotent(gc_executor: t.Tuple[Client, Executor]):
     _, gce = gc_executor
     assert not gce._stopped, "Verify test setup"
     assert gce._task_submitter.is_alive(), "Verify test setup"
 
-    mock_shutdown_lock = mocker.patch.object(
+    with mock.patch.object(
         gce, "_shutdown_lock", wraps=gce._shutdown_lock
-    )
-
-    gce.shutdown()
+    ) as mock_shutdown_lock:
+        gce.shutdown()
     assert mock_shutdown_lock.__enter__.call_count == 1
 
     for _ in range(10):
@@ -274,15 +271,13 @@ def test_executor_shutdown_idempotent(
     assert mock_shutdown_lock.__enter__.call_count == 1
 
 
-def test_executor_shutdown_idempotent_with(
-    mocker: MockerFixture, gc_executor: t.Tuple[Client, Executor]
-):
+def test_executor_shutdown_idempotent_with(gc_executor: t.Tuple[Client, Executor]):
     _, gce = gc_executor
     with gce:
-        mock_shutdown_lock = mocker.patch.object(
+        with mock.patch.object(
             gce, "_shutdown_lock", wraps=gce._shutdown_lock
-        )
-        gce.shutdown()
+        ) as mock_shutdown_lock:
+            gce.shutdown()
         assert mock_shutdown_lock.__enter__.call_count == 1
     assert mock_shutdown_lock.__enter__.call_count == 1
 
