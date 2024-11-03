@@ -104,18 +104,21 @@ def mock_result_watcher(mocker: MockerFixture):
 
 
 @pytest.fixture
-def gc_executor(mock_result_watcher):
-    gce = MockedExecutor()
+def gce(mock_result_watcher):
+    gc_executor = MockedExecutor()
 
-    yield gce.client, gce
+    yield gc_executor
 
-    gce.shutdown(wait=False, cancel_futures=True)
-    try_for_timeout(_is_stopped(gce._task_submitter))
+    gc_executor.shutdown(wait=False, cancel_futures=True)
+    try_for_timeout(_is_stopped(gc_executor._task_submitter))
 
-    if not _is_stopped(gce._task_submitter)():
-        trepr = repr(gce._task_submitter)
+    if not _is_stopped(gc_executor._task_submitter)():
+        trepr = repr(gc_executor._task_submitter)
         raise RuntimeError(
-            "Executor still running: _task_submitter thread alive: %s" % trepr
+            "Executor still running:"
+            f"\n  _task_submitter thread alive: {trepr}"
+            f"\n  Executor._stopped         : {gc_executor._stopped}"
+            f"\n  Executor._stopped_in_error: {gc_executor._stopped_in_error} "
         )
 
     while _RESULT_WATCHERS:
@@ -242,16 +245,14 @@ def test_multiple_executors_multiple_task_groups():
     assert gce_3.task_group_id == tg_id_2
 
 
-def test_executor_shutdown(gc_executor):
-    _, gce = gc_executor
+def test_executor_shutdown(gce):
     gce.shutdown()
 
     assert gce._stopped
     assert _is_stopped(gce._task_submitter)
 
 
-def test_executor_context_manager(gc_executor):
-    _, gce = gc_executor
+def test_executor_context_manager(gce):
     with gce:
         pass
 
@@ -259,8 +260,7 @@ def test_executor_context_manager(gc_executor):
     assert _is_stopped(gce._task_submitter)
 
 
-def test_executor_shutdown_idempotent(gc_executor: t.Tuple[Client, Executor]):
-    _, gce = gc_executor
+def test_executor_shutdown_idempotent(gce: Executor):
     assert not gce._stopped, "Verify test setup"
     assert gce._task_submitter.is_alive(), "Verify test setup"
 
@@ -275,8 +275,7 @@ def test_executor_shutdown_idempotent(gc_executor: t.Tuple[Client, Executor]):
     assert mock_shutdown_lock.__enter__.call_count == 1
 
 
-def test_executor_shutdown_idempotent_with(gc_executor: t.Tuple[Client, Executor]):
-    _, gce = gc_executor
+def test_executor_shutdown_idempotent_with(gce: Executor):
     with gce:
         with mock.patch.object(
             gce, "_shutdown_lock", wraps=gce._shutdown_lock
@@ -290,10 +289,9 @@ def test_executor_shutdown_idempotent_with(gc_executor: t.Tuple[Client, Executor
 def test_executor_shutdown_wait(
     wait: bool,
     mocker: MockerFixture,
-    gc_executor: t.Tuple[Client, Executor],
+    gce: Executor,
     mock_result_watcher: mock.Mock,
 ):
-    _, gce = gc_executor
     gce.task_group_id = uuid.uuid4()
 
     task_ids = [str(uuid.uuid4()) for _ in range(random.randint(1, 2))]
@@ -314,10 +312,8 @@ def test_executor_shutdown_wait(
 
 
 @pytest.mark.parametrize("cancel_futures", (True, False))
-def test_executor_shutdown_cancel_futures(
-    cancel_futures: bool, gc_executor: t.Tuple[Client, Executor]
-):
-    gcc, gce = gc_executor
+def test_executor_shutdown_cancel_futures(cancel_futures: bool, gce: Executor):
+    gcc = gce.client
     gce.endpoint_id = uuid.uuid4()
     gce.task_group_id = uuid.uuid4()
 
@@ -348,14 +344,14 @@ def test_executor_shutdown_cancel_futures(
 
 @pytest.mark.parametrize("num_submits", (random.randint(1, 1000),))
 def test_executor_stuck_submitter_doesnt_hold_shutdown_if_cancel_futures(
-    gc_executor: t.Tuple[Client, Executor], num_submits: int
+    gce: Executor, num_submits: int
 ):
     def some_func(*a, **k):
         return None
 
     fn_id = uuid.uuid4()
 
-    gcc, gce = gc_executor
+    gcc = gce.client
     gce._tasks_to_send.put((None, None))  # shutdown actual thread before ...
     try_assert(lambda: not gce._task_submitter.is_alive(), "Verify test setup")
 
@@ -378,9 +374,8 @@ def test_executor_stuck_submitter_doesnt_hold_shutdown_if_cancel_futures(
     gce._task_submitter.is_alive.return_value = False  # allow test cleanup
 
 
-def test_multiple_register_function_fails(gc_executor, mock_log):
-    gcc, gce = gc_executor
-
+def test_multiple_register_function_fails(gce, mock_log):
+    gcc = gce.client
     gcc.register_function.return_value = "abc"
 
     exp_f_id = gce.register_function(noop)
@@ -403,8 +398,8 @@ def test_multiple_register_function_fails(gc_executor, mock_log):
     assert not gce._stopped
 
 
-def test_shortcut_register_function(gc_executor):
-    gcc, gce = gc_executor
+def test_shortcut_register_function(gce):
+    gcc = gce.client
 
     fn_id = str(uuid.uuid4())
     other_id = str(uuid.uuid4())
@@ -422,8 +417,8 @@ def test_shortcut_register_function(gc_executor):
     assert not gcc.register_function.called
 
 
-def test_failed_registration_shuts_down_executor(gc_executor, randomstring):
-    gcc, gce = gc_executor
+def test_failed_registration_shuts_down_executor(gce, randomstring):
+    gcc = gce.client
 
     exc = RuntimeError(randomstring())
     gcc.register_function.side_effect = exc
@@ -443,8 +438,7 @@ def test_failed_registration_shuts_down_executor(gc_executor, randomstring):
 
 
 @pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
-def test_container_id_as_id(gc_executor, container_id):
-    _, gce = gc_executor
+def test_container_id_as_id(gce, container_id):
     assert gce.container_id is None, "Default value is None"
     gce.container_id = container_id
     if container_id is None:
@@ -455,8 +449,8 @@ def test_container_id_as_id(gc_executor, container_id):
 
 
 @pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
-def test_register_function_sends_container_id(gc_executor, container_id):
-    gcc, gce = gc_executor
+def test_register_function_sends_container_id(gce, container_id):
+    gcc = gce.client
 
     gce.container_id = container_id
     gce.register_function(noop)
@@ -467,8 +461,8 @@ def test_register_function_sends_container_id(gc_executor, container_id):
     assert k["container_uuid"] == expected_container_id
 
 
-def test_register_function_sends_metadata(gc_executor):
-    gcc, gce = gc_executor
+def test_register_function_sends_metadata(gce):
+    gcc = gce.client
 
     gce.register_function(noop)
 
@@ -489,9 +483,7 @@ def test_register_function_sends_metadata(gc_executor):
         (False, 1),
     ),
 )
-def test_resource_specification(gc_executor, is_valid: bool, res_spec):
-    _, gce = gc_executor
-
+def test_resource_specification(gce, is_valid: bool, res_spec):
     assert gce.resource_specification is None, "Default value is None"
 
     if is_valid:
@@ -517,9 +509,7 @@ def test_resource_specification(gc_executor, is_valid: bool, res_spec):
         (False, 1),
     ),
 )
-def test_user_endpoint_config(gc_executor, is_valid: bool, uep_config):
-    _, gce = gc_executor
-
+def test_user_endpoint_config(gce, is_valid: bool, uep_config):
     assert gce.user_endpoint_config is None, "Default value is None"
 
     if is_valid:
@@ -534,8 +524,8 @@ def test_user_endpoint_config(gc_executor, is_valid: bool, uep_config):
         assert gce.user_endpoint_config is None
 
 
-def test_resource_specification_added_to_batch(gc_executor):
-    gcc, gce = gc_executor
+def test_resource_specification_added_to_batch(gce):
+    gcc = gce.client
 
     gce.endpoint_id = uuid.uuid4()
     gce.resource_specification = {"foo": "bar"}
@@ -548,8 +538,8 @@ def test_resource_specification_added_to_batch(gc_executor):
     assert gce.resource_specification in args
 
 
-def test_user_endpoint_config_added_to_batch(gc_executor):
-    gcc, gce = gc_executor
+def test_user_endpoint_config_added_to_batch(gce):
+    gcc = gce.client
 
     gce.endpoint_id = uuid.uuid4()
     gce.user_endpoint_config = {"foo": "bar"}
@@ -562,8 +552,7 @@ def test_user_endpoint_config_added_to_batch(gc_executor):
     assert gce.user_endpoint_config in args
 
 
-def test_submit_raises_if_thread_stopped(gc_executor):
-    _, gce = gc_executor
+def test_submit_raises_if_thread_stopped(gce):
     gce.shutdown()
 
     try_assert(_is_stopped(gce._task_submitter), "Test prerequisite")
@@ -575,8 +564,8 @@ def test_submit_raises_if_thread_stopped(gc_executor):
     assert " is shutdown;" in str(err)
 
 
-def test_submit_auto_registers_function(gc_executor):
-    gcc, gce = gc_executor
+def test_submit_auto_registers_function(gce):
+    gcc = gce.client
 
     fn_id = uuid.uuid4()
     gcc.register_function.return_value = str(fn_id)
@@ -590,9 +579,7 @@ def test_submit_auto_registers_function(gc_executor):
     assert gcc.register_function.called
 
 
-def test_submit_value_error_if_no_endpoint(gc_executor):
-    _, gce = gc_executor
-
+def test_submit_value_error_if_no_endpoint(gce):
     with pytest.raises(ValueError) as pytest_exc:
         gce.submit(noop)
 
@@ -602,8 +589,7 @@ def test_submit_value_error_if_no_endpoint(gc_executor):
     try_assert(_is_stopped(gce._task_submitter), "Expected graceful shutdown on error")
 
 
-def test_same_function_different_containers_allowed(gc_executor):
-    _, gce = gc_executor
+def test_same_function_different_containers_allowed(gce):
     c1_id, c2_id = str(uuid.uuid4()), str(uuid.uuid4())
 
     gce.container_id = c1_id
@@ -614,16 +600,12 @@ def test_same_function_different_containers_allowed(gc_executor):
         gce.register_function(noop)
 
 
-def test_map_raises(gc_executor):
-    _, gce = gc_executor
-
+def test_map_raises(gce):
     with pytest.raises(NotImplementedError):
         gce.map(noop)
 
 
-def test_reload_tasks_requires_task_group_id(gc_executor):
-    _, gce = gc_executor
-
+def test_reload_tasks_requires_task_group_id(gce):
     assert gce.task_group_id is None, "verify test setup"
     with pytest.raises(Exception) as e:
         gce.reload_tasks()
@@ -631,8 +613,8 @@ def test_reload_tasks_requires_task_group_id(gc_executor):
     assert "must specify a task_group_id in order to reload tasks" in str(e.value)
 
 
-def test_reload_tasks_sets_passed_task_group_id(gc_executor):
-    gcc, gce = gc_executor
+def test_reload_tasks_sets_passed_task_group_id(gce):
+    gcc = gce.client
 
     # for less mocking:
     gcc.web_client.get_taskgroup_tasks.side_effect = RuntimeError("bailing out early")
@@ -646,8 +628,8 @@ def test_reload_tasks_sets_passed_task_group_id(gc_executor):
 
 
 @pytest.mark.parametrize("num_tasks", [0, 1, 2, 10])
-def test_reload_tasks_none_completed(gc_executor, mock_log, num_tasks):
-    gcc, gce = gc_executor
+def test_reload_tasks_none_completed(gce, mock_log, num_tasks):
+    gcc = gce.client
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
@@ -673,8 +655,8 @@ def test_reload_tasks_none_completed(gc_executor, mock_log, num_tasks):
 
 
 @pytest.mark.parametrize("num_tasks", [1, 2, 10])
-def test_reload_tasks_some_completed(gc_executor, mock_log, num_tasks):
-    gcc, gce = gc_executor
+def test_reload_tasks_some_completed(gce, mock_log, num_tasks):
+    gcc = gce.client
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
@@ -710,8 +692,8 @@ def test_reload_tasks_some_completed(gc_executor, mock_log, num_tasks):
     assert sum(1 for fut in client_futures if fut.done()) == num_completed
 
 
-def test_reload_tasks_all_completed(gc_executor: t.Tuple[Client, Executor]):
-    gcc, gce = gc_executor
+def test_reload_tasks_all_completed(gce: Executor):
+    gcc = gce.client
 
     serialize = ComputeSerializer().serialize
     num_tasks = 5
@@ -763,8 +745,8 @@ def test_reload_tasks_all_completed(gc_executor: t.Tuple[Client, Executor]):
         3 * _chunk_size + 1,
     ),
 )
-def test_reload_chunks_tasks_requested(mock_log, gc_executor, num_tasks):
-    gcc, gce = gc_executor
+def test_reload_chunks_tasks_requested(mock_log, gce, num_tasks):
+    gcc = gce.client
 
     exp_num_chunks = num_tasks // _chunk_size
     exp_num_chunks += num_tasks % _chunk_size > 0
@@ -808,8 +790,8 @@ def test_reload_chunks_tasks_requested(mock_log, gc_executor, num_tasks):
         assert all(a[3] == chunk_num for chunk_num, a in enumerate(dbgs, start=1))
 
 
-def test_reload_does_not_start_new_watcher(gc_executor: t.Tuple[Client, Executor]):
-    gcc, gce = gc_executor
+def test_reload_does_not_start_new_watcher(gce: Executor):
+    gcc = gce.client
 
     num_tasks = 3
 
@@ -839,11 +821,10 @@ def test_reload_does_not_start_new_watcher(gc_executor: t.Tuple[Client, Executor
 
 
 def test_reload_tasks_ignores_existing_futures(
-    mocker: MockerFixture,
-    gc_executor: t.Tuple[Client, Executor],
+    gce: Executor,
     mock_result_watcher: mock.Mock,
 ):
-    gcc, gce = gc_executor
+    gcc = gce.client
     gce.task_group_id = uuid.uuid4()
 
     def update_mock_data(task_ids: t.List[str]):
@@ -876,8 +857,8 @@ def test_reload_tasks_ignores_existing_futures(
     assert all(fut.task_id in task_ids_2 for fut in futures_2)
 
 
-def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
-    gcc, gce = gc_executor
+def test_reload_client_taskgroup_tasks_fails_gracefully(gce):
+    gcc = gce.client
 
     gce.task_group_id = uuid.uuid4()
     mock_datum = (
@@ -895,8 +876,8 @@ def test_reload_client_taskgroup_tasks_fails_gracefully(gc_executor):
             gce.reload_tasks()
 
 
-def test_reload_sets_failed_tasks(gc_executor):
-    gcc, gce = gc_executor
+def test_reload_sets_failed_tasks(gce):
+    gcc = gce.client
 
     gce.task_group_id = uuid.uuid4()
     mock_data = {
@@ -918,8 +899,8 @@ def test_reload_sets_failed_tasks(gc_executor):
     assert all("doh!" in str(fut.exception()) for fut in futs)
 
 
-def test_reload_handles_deseralization_error_gracefully(gc_executor):
-    gcc, gce = gc_executor
+def test_reload_handles_deseralization_error_gracefully(gce):
+    gcc = gce.client
     gcc.fx_serializer = ComputeSerializer()
 
     gce.task_group_id = uuid.uuid4()
@@ -943,8 +924,8 @@ def test_reload_handles_deseralization_error_gracefully(gc_executor):
 
 
 @pytest.mark.parametrize("batch_size", tuple(range(1, 11)))
-def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
-    gcc, gce = gc_executor
+def test_task_submitter_respects_batch_size(gce, batch_size: int):
+    gcc = gce.client
 
     # make a new MagicMock every time create_batch is called
     gcc.create_batch.side_effect = lambda *_args, **_kwargs: mock.MagicMock()
@@ -970,19 +951,14 @@ def test_task_submitter_respects_batch_size(gc_executor, batch_size: int):
         assert 0 < batch.add.call_count <= batch_size
 
 
-def test_task_submitter_stops_executor_on_exception(gc_executor):
-    _, gce = gc_executor
+def test_task_submitter_stops_executor_on_exception(gce):
     gce._tasks_to_send.put(("too", "much", "destructuring", "!!"))
 
     try_assert(lambda: gce._stopped)
     try_assert(lambda: isinstance(gce._test_task_submitter_exception, ValueError))
 
 
-def test_task_submitter_stops_executor_on_upstream_error_response(
-    gc_executor, randomstring
-):
-    _, gce = gc_executor
-
+def test_task_submitter_stops_executor_on_upstream_error_response(gce, randomstring):
     upstream_error = Exception(f"Upstream error {randomstring}!!")
     gce.client.batch_run.side_effect = upstream_error
     gce.task_group_id = uuid.uuid4()
@@ -1005,8 +981,8 @@ def test_task_submitter_stops_executor_on_upstream_error_response(
     assert gce._test_task_submitter_exception is None, "handled by future"
 
 
-def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(mocker, gc_executor):
-    gcc, gce = gc_executor
+def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(mocker, gce):
+    gcc = gce.client
     gce.endpoint_id = uuid.uuid4()
     gcc.register_function.return_value = uuid.uuid4()
 
@@ -1041,10 +1017,7 @@ def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(mocker, gc_execut
 
 @pytest.mark.parametrize("burst_limit", (2, 3, 4))
 @pytest.mark.parametrize("burst_window", (2, 3, 4))
-def test_task_submitter_api_rate_limit(
-    gc_executor, mock_log, burst_limit, burst_window
-):
-    gcc, gce = gc_executor
+def test_task_submitter_api_rate_limit(gce, mock_log, burst_limit, burst_window):
     gce.endpoint_id = uuid.uuid4()
     gce._submit_tasks = mock.Mock()
 
@@ -1075,10 +1048,8 @@ def test_task_submitter_api_rate_limit(
     assert exp_perc_text == a[-1], "Expect to share batch utilization %"
 
 
-def test_task_submit_handles_multiple_user_endpoint_configs(
-    mocker: MockerFixture, gc_executor
-):
-    gcc, gce = gc_executor
+def test_task_submit_handles_multiple_user_endpoint_configs(mocker: MockerFixture, gce):
+    gcc = gce.client
     gce.endpoint_id = uuid.uuid4()
 
     func_uuid_str = str(uuid.uuid4())
@@ -1116,10 +1087,8 @@ def test_task_submit_handles_multiple_user_endpoint_configs(
         assert found_uep_config == expected
 
 
-def test_task_submitter_handles_stale_result_watcher_gracefully(
-    gc_executor: t.Tuple[Client, Executor]
-):
-    gcc, gce = gc_executor
+def test_task_submitter_handles_stale_result_watcher_gracefully(gce: Executor):
+    gcc = gce.client
     gcc.register_function.return_value = uuid.uuid4()
     gce.endpoint_id = uuid.uuid4()
 
@@ -1144,8 +1113,8 @@ def test_task_submitter_handles_stale_result_watcher_gracefully(
     try_assert(lambda: watcher_1 is not _RESULT_WATCHERS.get(gce.task_group_id))
 
 
-def test_task_submitter_sets_future_task_ids(gc_executor):
-    gcc, gce = gc_executor
+def test_task_submitter_sets_future_task_ids(gce):
+    gcc = gce.client
 
     num_tasks = random.randint(2, 20)
     futs = [ComputeFuture() for _ in range(num_tasks)]
@@ -1167,9 +1136,8 @@ def test_task_submitter_sets_future_task_ids(gc_executor):
 
 
 @pytest.mark.parametrize("batch_response", [{"tasks": "foo"}, {"task_group_id": "foo"}])
-def test_submit_tasks_stops_futures_on_bad_response(gc_executor, batch_response):
-    gcc, gce = gc_executor
-
+def test_submit_tasks_stops_futures_on_bad_response(gce, batch_response):
+    gcc = gce.client
     gcc.batch_run.return_value = batch_response
 
     num_tasks = random.randint(2, 20)
@@ -1186,8 +1154,8 @@ def test_submit_tasks_stops_futures_on_bad_response(gc_executor, batch_response)
         assert fut.exception() is pyt_exc.value
 
 
-def test_one_resultwatcher_per_task_group(gc_executor: t.Tuple[Client, Executor]):
-    gcc, gce = gc_executor
+def test_one_resultwatcher_per_task_group(gce: Executor):
+    gcc = gce.client
     gce.endpoint_id = uuid.uuid4()
 
     def runit(tg_id: uuid.UUID, num_watchers: int):
@@ -1552,10 +1520,8 @@ def test_resultwatcher_amqp_acks_in_bulk():
     mrw.shutdown()
 
 
-def test_result_queue_watcher_custom_port(
-    mocker, gc_executor: t.Tuple[Client, Executor]
-):
-    gcc, gce = gc_executor
+def test_result_queue_watcher_custom_port(mocker, gce: Executor):
+    gcc = gce.client
     custom_port_no = random.randint(1, 65536)
     rw = _ResultWatcher(gce.task_group_id, gcc, port=custom_port_no)
     gcc.get_result_amqp_url.return_value = {
