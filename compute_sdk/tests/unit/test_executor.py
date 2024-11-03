@@ -75,7 +75,11 @@ class MockedResultWatcher(_ResultWatcher):
 
     def start(self) -> None:
         super().start()
+
+        # important for tests to ensure the `.run()` has had a chance to be invoked
+        # before the tests poke at the internals.
         try_assert(lambda: self._connection is not None)
+        try_assert(lambda: self._channel is not None)
 
     def run(self):
         self._connection = mock.MagicMock()
