@@ -82,6 +82,13 @@ def load_config_yaml(config_str: str) -> Config:
     config_dict = config_schema.dict(exclude_unset=True)
 
     try:
+        if config_dict.get("multi_user") is True:
+            # Temporary hack to not instantiate executor for MU; necessary due to the
+            # historical design to default-instantiate an executor in the Config
+            # object; this hack will no longer be necessary when MEP and UEP configs
+            # are cleanly separated rather than the current sharing of the same basal
+            # data structure
+            config_dict["executors"] = []
         config = Config(**config_dict)
     except Exception as err:
         raise ClickException(str(err)) from err

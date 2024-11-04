@@ -563,6 +563,23 @@ def test_multi_user_enforces_no_engine(mock_command_ensure, ep_name, run_line):
     assert "no engine if multi" in rc.stderr
 
 
+def test_multi_user_instantiates_no_engine(mock_command_ensure, ep_name, run_line):
+    """different from *enforces* no engine because of historical Config()
+    implementation that default instantiates an Executor, if it's not specified"""
+    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
+    ep_dir.mkdir(parents=True)
+    data = {"config": ""}
+
+    config = {"multi_user": True}
+    data["config"] = yaml.safe_dump(config)
+
+    to_patch = "globus_compute_endpoint.endpoint.config.config.GlobusComputeEngine"
+    with mock.patch(to_patch) as mock_gce_cls:
+        rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
+
+    assert not mock_gce_cls.called, (rc.stdout, rc.stderr)
+
+
 @pytest.mark.parametrize("use_uuid", (True, False))
 @mock.patch(f"{_MOCK_BASE}get_config")
 @mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id")
