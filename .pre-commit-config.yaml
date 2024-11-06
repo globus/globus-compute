@@ -4,21 +4,21 @@ repos:
     - id: check-hooks-apply
     - id: check-useless-excludes
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.5.0
+  rev: v5.0.0
   hooks:
     - id: check-merge-conflict
     - id: trailing-whitespace
 - repo: https://github.com/python-jsonschema/check-jsonschema
-  rev: 0.28.1
+  rev: 0.29.4
   hooks:
     - id: check-github-workflows
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.15.2
+  rev: v3.19.0
   hooks:
     - id: pyupgrade
       args: ["--py39-plus"]
 - repo: https://github.com/psf/black-pre-commit-mirror
-  rev: 24.3.0
+  rev: 24.10.0
   hooks:
     - id: black
 - repo: https://github.com/PyCQA/isort
@@ -29,7 +29,7 @@ repos:
       # which settings to use based on a file's directory
       args: ["--settings-path", ".isort.cfg"]
 - repo: https://github.com/PyCQA/flake8
-  rev: 7.0.0
+  rev: 7.1.1
   hooks:
     - id: flake8
       additional_dependencies: ['flake8-bugbear==22.10.27']
