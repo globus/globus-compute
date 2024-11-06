@@ -43,17 +43,18 @@ class BaseConfig:
     :param heartbeat_period: The interval (in seconds) at which heartbeat messages are
         sent from the endpoint to the Globus Compute web service
 
-    :param environment: Environment the endpoint should connect to. If not specified,
-        the endpoint connects to production.
+    :param environment: Environment the endpoint should connect to.  If not specified,
+        the endpoint connects to production.  (Listed here for completeness, but only
+        used internally by the dev team.)
 
     :param local_compute_services: Point the endpoint to a local instance of the Compute
-        services (for Compute developers).
+        services.  (Listed here for completeness, but only used internally by the dev
+        team.)
 
-    :param debug: If set emit debug-level log messages.
-
-        This is a configuration implementation of the CLI's ``--debug`` flag.  Note
-        that if this value is explicitly False, then the CLI flag, if utilized, will
-        still put the EP into "debug mode."  The CLI wins.
+    :param debug: If set, emit debug-level log messages.  This is a configuration
+        implementation of the CLI's ``--debug`` flag.  Note that if this value is
+        explicitly False, then the CLI flag, if utilized, will still put the EP into
+        "debug mode."  The CLI wins.
     """
 
     def __init__(
@@ -168,7 +169,7 @@ class UserEndpointConfig(BaseConfig):
         execution.  If ``None``, then use a default-instantiation of
         ``GlobusComputeEngine``.
 
-        N.B. this field, for historical reasons, accepts an iterable.  However,
+        N.B. this field, for historical reasons, requires an iterable.  However,
         Compute only supports a single executor.
 
     :param heartbeat_threshold: Seconds since the last heartbeat message from the
@@ -204,7 +205,6 @@ class UserEndpointConfig(BaseConfig):
     :param stdout: Path where the endpoint's stdout should be written
 
     :param stderr: Path where the endpoint's stderr should be written
-
     """
 
     def __init__(
@@ -291,6 +291,28 @@ Config = UserEndpointConfig
 class ManagerEndpointConfig(BaseConfig):
     """Holds the configuration items for an endpoint manager.
 
+    Typically, one does not instantiate this configuration directly, but specifies
+    the relevant options in the endpoint's ``config.yaml`` file.  For example, to
+    specify an endpoint as multi-user (this class) the YAML config might be just 1
+    line:
+
+    .. code-block:: yaml
+       :caption: ``config.yaml``
+
+       multi_user: true
+
+    Note that for multi-user endpoints that will not be run with privileges, identity
+    mapping is disabled (hence not specified above).  Conversely, if the process will
+    have elevated privileges (e.g., run by ``root`` user or has |setuid(2)|_
+    privileges) then identity mapping is required:
+
+    .. code-block:: yaml
+       :caption: ``config.yaml`` (for a ``root``-owned process)
+
+       display_name: Debug queue, 1-block max
+       multi_user: true
+       identity_mapping_config_path: /path/to/this/idmap_conf.json
+
     Please see the |BaseConfig| class for a list of options that both
     |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
 
@@ -305,24 +327,29 @@ class ManagerEndpointConfig(BaseConfig):
         configuration item is required, and a ``ValueError`` will be raised if the path
         does not exist.
 
-    :param mu_child_ep_grace_period_s: If a single-user endpoint dies, and then the
-        multi-user endpoint receives a start command for that single-user endpoint
-        within this timeframe (in seconds), the single-user endpoint is started back up
-        again.
+    :param mu_child_ep_grace_period_s: The web-services send a start-user-endpoint to
+        the endpoint manager ahead of tasks for the target user endpoint.  If the
+        user-endpoint is already running, these requests are ignored.  To account for
+        the inherent race-condition of receiving a start request just before the
+        user-endpoint shuts down, the endpoint manager will hold on to the most recent
+        start request for the user-endpoint for this grace period.
 
     :param force_mu_allow_same_user:  If set, override the heuristic that determines
-        whether the uid running the multi-user endpoint may also run single-user
+        whether the UID running the multi-user endpoint may also run single-user
         endpoints.
 
         Normally, the multi-user endpoint disallows starting single-user endpoints with
-        the same UID as the parent process unless the UID has no privileges.  That
-        means that the UID is not 0 (root), or that the UID does *not* have (among
-        many others) the capability to change the user (otherwise known as "drop
-        privileges").
+        the same UID as the parent process unless the UID has no privileges.  In other
+        words, ``root`` may not process tasks.  This flag is for those niche setups that
+        require the ``root`` user to process tasks.  Be very careful if setting this
+        flag.
 
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
     .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
     .. |UserEndpointConfig| replace:: :class:`UserEndpointConfig <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
+
+    .. |setuid(2)| replace:: ``setuid(2)``
+    .. _setuid(2): https://www.man7.org/linux/man-pages/man2/setuid.2.html
     """  # noqa
 
     def __init__(
