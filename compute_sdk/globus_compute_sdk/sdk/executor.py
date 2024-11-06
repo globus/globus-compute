@@ -15,16 +15,7 @@ import typing as t
 import uuid
 import warnings
 from collections import defaultdict
-
-from globus_compute_sdk.sdk.hardware_report import run_hardware_report
-
-if sys.version_info >= (3, 8):
-    from concurrent.futures import InvalidStateError
-else:
-
-    class InvalidStateError(Exception):
-        pass
-
+from concurrent.futures import InvalidStateError
 
 import pika
 from globus_compute_common import messagepack
@@ -33,6 +24,7 @@ from globus_compute_sdk import __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.client import Client
+from globus_compute_sdk.sdk.hardware_report import run_hardware_report
 from globus_compute_sdk.sdk.utils import chunk_by
 from globus_compute_sdk.sdk.utils.uuid_like import (
     UUID_LIKE_T,
