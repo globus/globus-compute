@@ -589,15 +589,7 @@ def _upgrade_funcx_imports_in_config(ep_dir: pathlib.Path, force=False) -> str:
         tmp_output_path.write_text(upd_config_text)
 
         # Rename files last, as it's the least likely to err
-        if sys.version_info < (3, 8):
-            try:
-                # Dropping support for Python 3.7 "real soon", so this branch will
-                # soon go away
-                config_backup.unlink()
-            except FileNotFoundError:
-                pass
-        else:
-            config_backup.unlink(missing_ok=True)
+        config_backup.unlink(missing_ok=True)
         shutil.move(config_path, config_backup)  # Preserve file timestamp
         shutil.move(tmp_output_path, config_path)
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections
 import json
 import os
-import sys
 import time
 
 import pytest
@@ -158,9 +157,8 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
 
         login_manager = TestsuiteLoginManager()
 
-        # check runtime-checkable protocol on python versions which support it
-        if sys.version_info >= (3, 8):
-            assert isinstance(login_manager, LoginManagerProtocol)
+        # check runtime-checkable protocol
+        assert isinstance(login_manager, LoginManagerProtocol)
 
         client_args["login_manager"] = login_manager
 

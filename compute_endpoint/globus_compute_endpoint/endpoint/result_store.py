@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import pathlib
-import sys
 import typing as t
 
 
@@ -96,13 +95,7 @@ class ResultStore:
         ----------
         key - the key for the result
         """
-        if sys.version_info < (3, 8):
-            try:
-                (self.data_path / key).unlink()
-            except FileNotFoundError:
-                pass
-        else:
-            (self.data_path / key).unlink(missing_ok=True)
+        (self.data_path / key).unlink(missing_ok=True)
 
     def _iter_result_paths(self) -> t.Iterable[pathlib.Path]:
         yield from self.data_path.glob("[!.]*")
@@ -154,12 +147,5 @@ class ResultStore:
         storage for all non-hidden files (those that don't begin with a dot)
         and safely unlinks them.
         """
-        if sys.version_info < (3, 8):
-            for result_path in self._iter_result_paths():
-                try:
-                    result_path.unlink()
-                except FileNotFoundError:
-                    pass
-        else:
-            for result_path in self._iter_result_paths():
-                result_path.unlink(missing_ok=True)
+        for result_path in self._iter_result_paths():
+            result_path.unlink(missing_ok=True)

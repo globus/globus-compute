@@ -2,7 +2,7 @@ import logging
 import os
 import queue
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import typeguard
 from globus_compute_endpoint.providers.kubernetes.template import template_string
@@ -96,7 +96,7 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         run_as_non_root: bool = False,
         secret: Optional[str] = None,
         incluster_config: Optional[bool] = True,
-        persistent_volumes: Optional[List[Tuple[str, str]]] = None,
+        persistent_volumes: Optional[list[tuple[str, str]]] = None,
     ) -> None:
         if persistent_volumes is None:
             persistent_volumes = []
@@ -138,9 +138,9 @@ class KubernetesProvider(ExecutionProvider, RepresentationMixin):
         self.kube_client = client.CoreV1Api()
 
         # Dictionary that keeps track of jobs, keyed on job_id
-        self.resources_by_pod_name: Dict[str, Any] = {}
+        self.resources_by_pod_name: dict[str, Any] = {}
         # Dictionary that keeps track of jobs, keyed on task_type
-        self.resources_by_task_type: Dict[str, Any] = {}
+        self.resources_by_task_type: dict[str, Any] = {}
 
     def submit(
         self, cmd_string, tasks_per_node, task_type, job_name="globus-compute-worker"

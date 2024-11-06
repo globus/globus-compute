@@ -116,15 +116,15 @@ def succeed_after_n_runs(dirpath: pathlib.Path, fail_count: int = 1):
     from glob import glob
 
     prior_run_count = len(glob(os.path.join(dirpath, "foo.*.txt")))
-    with open(os.path.join(dirpath, f"foo.{prior_run_count+1}.txt"), "w+") as f:
-        f.write(f"Hello at {time} counter={prior_run_count+1}")
+    with open(os.path.join(dirpath, f"foo.{prior_run_count + 1}.txt"), "w+") as f:
+        f.write(f"Hello at {time} counter={prior_run_count + 1}")
 
     if prior_run_count < fail_count:
         manager_pid = os.getppid()
         manager_pgid = os.getpgid(manager_pid)
         os.killpg(manager_pgid, signal.SIGKILL)
 
-    return f"Success on attempt: {prior_run_count+1}"
+    return f"Success on attempt: {prior_run_count + 1}"
 
 
 def get_env_vars():

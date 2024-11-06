@@ -26,7 +26,9 @@ def print_table(
             max_columns = len(row)
 
     if len(headers) < max_columns:
-        headers = headers + [f"Column {i+1}" for i in range(max_columns - len(headers))]
+        headers = headers + [
+            f"Column {i + 1}" for i in range(max_columns - len(headers))
+        ]
 
     table = texttable.Texttable()
     table.header(headers)
