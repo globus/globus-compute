@@ -8,3 +8,4 @@ Globus Compute Endpoints
    multi_user
    installation
    endpoint_examples
+   config_reference
