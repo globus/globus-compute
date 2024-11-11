@@ -1300,7 +1300,7 @@ class _ResultWatcher(threading.Thread):
                     self._open_futures_empty.set()
         log.debug("%r AMQP thread complete.", self)
 
-    def shutdown(self, wait=True, *, cancel_futures=False):
+    def shutdown(self, wait=True, *, cancel_futures=False) -> None:
         if not self.is_alive():
             return
 
