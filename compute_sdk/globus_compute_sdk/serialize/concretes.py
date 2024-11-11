@@ -73,8 +73,9 @@ class DillCodeSource(SerializationStrategy):
     def deserialize(self, payload: str):
         chomped = self.chomp(payload)
         name, body = dill.loads(codecs.decode(chomped.encode(), "base64"))
-        exec(body)
-        return locals()[name]
+        exec_ns: dict = {}
+        exec(body, exec_ns)
+        return exec_ns[name]
 
 
 class DillCodeTextInspect(SerializationStrategy):
@@ -102,8 +103,9 @@ class DillCodeTextInspect(SerializationStrategy):
     def deserialize(self, payload: str):
         chomped = self.chomp(payload)
         name, body = dill.loads(codecs.decode(chomped.encode(), "base64"))
-        exec(body)
-        return locals()[name]
+        exec_ns: dict = {}
+        exec(body, exec_ns)
+        return exec_ns[name]
 
 
 class PickleCode(SerializationStrategy):
