@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import queue
@@ -27,9 +29,7 @@ _EXC_HISTORY_TMPL = "+" * 68 + "\nTraceback from attempt: {ndx}\n{exc}\n" + "-" 
 
 
 class ReportingThread:
-    def __init__(
-        self, target: t.Callable, args: t.List, reporting_period: float = 30.0
-    ):
+    def __init__(self, target: t.Callable, args: list, reporting_period: float = 30.0):
         """This class wraps threading.Thread to run a callable in a loop
         periodically until the user calls `stop`. A status attribute can
         report exceptions to the parent thread upon failure.
@@ -79,23 +79,23 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
     def __init__(
         self,
         *args: object,
-        endpoint_id: t.Optional[uuid.UUID] = None,
+        endpoint_id: uuid.UUID | None = None,
         max_retries_on_system_failure: int = 0,
         **kwargs: object,
     ):
         self._shutdown_event = threading.Event()
         self.endpoint_id = endpoint_id
         self.max_retries_on_system_failure = max_retries_on_system_failure
-        self._retry_table: t.Dict[str, t.Dict] = {}
+        self._retry_table: dict[str, dict] = {}
         # remove these unused vars that we are adding to just keep
         # endpoint interchange happy
-        self.container_type: t.Optional[str] = None
-        self.run_dir: t.Optional[str] = None
-        self.working_dir: t.Union[str, os.PathLike] = "tasks_working_dir"
+        self.container_type: str | None = None
+        self.run_dir: str | None = None
+        self.working_dir: str | os.PathLike = "tasks_working_dir"
         self.run_in_sandbox: bool = False
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
-        self.results_passthrough: queue.Queue[dict[str, t.Union[bytes, str, None]]] = (
+        self.results_passthrough: queue.Queue[dict[str, bytes | str | None]] = (
             queue.Queue()
         )
 
@@ -200,7 +200,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
     def _submit(
         self,
         func: t.Callable,
-        resource_specification: t.Dict,
+        resource_specification: dict,
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
@@ -211,7 +211,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self,
         task_id: str,
         packed_task: bytes,
-        resource_specification: t.Dict,
+        resource_specification: dict,
     ) -> Future:
         """GC Endpoints should submit tasks via this method so that tasks are
         tracked properly.
