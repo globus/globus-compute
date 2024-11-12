@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 import os
+import pathlib
 import time
-import typing as t
 import uuid
 
 from globus_compute_common import messagepack
@@ -21,14 +23,16 @@ from parsl.app.python import timeout
 log = logging.getLogger(__name__)
 
 _serde = ComputeSerializer()
+_RESULT_SIZE_LIMIT = 10 * 1024 * 1024  # 10 MiB
 
 
 def execute_task(
     task_id: uuid.UUID,
     task_body: bytes,
-    endpoint_id: t.Optional[uuid.UUID],
-    result_size_limit: int = 10 * 1024 * 1024,
-    run_dir: t.Optional[t.Union[str, os.PathLike]] = None,
+    endpoint_id: uuid.UUID | None = None,
+    *,
+    run_dir: str | os.PathLike,
+    result_size_limit: int = _RESULT_SIZE_LIMIT,
     run_in_sandbox: bool = False,
 ) -> bytes:
     """Execute task is designed to enable any executor to execute a Task payload
@@ -38,7 +42,7 @@ def execute_task(
     ----------
     task_id: uuid string
     task_body: packed message as bytes
-    endpoint_id: uuid string or None
+    endpoint_id: uuid.UUID or None
     result_size_limit: result size in bytes
     run_dir: directory to run function in
     run_in_sandbox: if enabled run task under run_dir/<task_uuid>
@@ -56,21 +60,26 @@ def execute_task(
         uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
     ]
 
+    task_id_str = str(task_id)
     os.environ.pop("GC_TASK_SANDBOX_DIR", None)
-    os.environ["GC_TASK_UUID"] = str(task_id)
+    os.environ["GC_TASK_UUID"] = task_id_str
 
-    if not run_dir or not os.path.isabs(run_dir):
-        raise RuntimeError(
-            f"execute_task requires an absolute path for run_dir, got {run_dir=}"
+    if result_size_limit < 128:
+        raise ValueError(
+            f"Invalid result limit; must be at least 128 bytes ({result_size_limit=})"
         )
 
-    os.makedirs(run_dir, exist_ok=True)
-    os.chdir(run_dir)
+    task_dir = pathlib.Path(run_dir)
+    if not task_dir.is_absolute():
+        raise ValueError(f"Absolute path required.  Received: {run_dir=}")
+
+    task_dir = task_dir.resolve()  # strict=False (default); path may not exist yet
     if run_in_sandbox:
-        os.makedirs(str(task_id))  # task_id is expected to be unique
-        os.chdir(str(task_id))
+        task_dir = task_dir / task_id_str
         # Set sandbox dir so that apps can use it
-        os.environ["GC_TASK_SANDBOX_DIR"] = os.getcwd()
+        os.environ["GC_TASK_SANDBOX_DIR"] = str(task_dir)
+    task_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(task_dir)
 
     env_details = get_env_details()
     try:
@@ -116,7 +125,7 @@ def execute_task(
     return messagepack.pack(Result(**result_message))
 
 
-def _unpack_messagebody(message: bytes) -> t.Tuple[Task, str]:
+def _unpack_messagebody(message: bytes) -> tuple[Task, str]:
     """Unpack messagebody as a messagepack message with
     some legacy handling
     Parameters

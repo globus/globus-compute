@@ -5,7 +5,6 @@ from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_endpoint.engines.high_throughput.messages import Task
 from globus_compute_endpoint.engines.high_throughput.worker import Worker
 
@@ -124,39 +123,12 @@ def test_execute_failing_function(test_worker):
     )
 
 
-def test_execute_function_exceeding_result_size_limit(
-    test_worker, endpoint_uuid, task_uuid, ez_pack_task, tmp_path
-):
-    return_size = 10
-
-    task_bytes = ez_pack_task(large_result, return_size)
-
-    with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
-        s_result = execute_task(
-            task_uuid,
-            task_bytes,
-            endpoint_uuid,
-            result_size_limit=return_size - 2,
-            run_dir=tmp_path,
-        )
-    result = messagepack.unpack(s_result)
-
-    assert isinstance(result, messagepack.message_types.Result)
-    assert result.error_details
-    assert result.task_id == task_uuid
-    assert result.error_details
-    assert result.error_details.code == "MaxResultSizeExceeded"
-    assert mock_log.exception.called
-
-
-def test_app_timeout(test_worker, endpoint_uuid, task_uuid, ez_pack_task, tmp_path):
+def test_app_timeout(test_worker, execute_task_runner, task_uuid, ez_pack_task):
     task_bytes = ez_pack_task(sleeper, 1)
 
     with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
         with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
-            packed_result = execute_task(
-                task_uuid, task_bytes, endpoint_uuid, run_dir=tmp_path
-            )
+            packed_result = execute_task_runner(task_bytes)
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
