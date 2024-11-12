@@ -1,3 +1,4 @@
+import functools
 import inspect
 import os
 import pathlib
@@ -6,6 +7,7 @@ import typing as t
 import uuid
 
 import pytest
+from globus_compute_endpoint.engines.helper import execute_task
 from tests.conftest import randomstring_impl
 
 
@@ -85,3 +87,8 @@ def get_random_of_datatype_impl(cls):
 @pytest.fixture
 def get_random_of_datatype():
     return get_random_of_datatype_impl
+
+
+@pytest.fixture
+def execute_task_runner(task_uuid, tmp_path):
+    return functools.partial(execute_task, task_uuid, run_dir=tmp_path)
