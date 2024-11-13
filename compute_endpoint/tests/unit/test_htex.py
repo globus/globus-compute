@@ -14,7 +14,7 @@ from globus_compute_endpoint.engines.high_throughput.messages import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from pytest_mock import MockFixture
-from tests.utils import div_zero, double, ez_pack_function, kill_manager, try_assert
+from tests.utils import double, ez_pack_function, try_assert
 
 
 @pytest.fixture
@@ -35,97 +35,6 @@ def htex():
     yield executor
     executor.shutdown()
     # shutil.rmtree(tempdir, ignore_errors=True)
-
-
-@pytest.mark.skip("Skip until HTEX has been fixed up")
-def test_htex_submit_raw(htex, serde, task_uuid, ez_pack_task):
-    """Testing the HighThroughputExecutor/Engine"""
-    engine = htex
-
-    q = engine.results_passthrough
-    task_bytes = ez_pack_task(double, 3)
-
-    # HTEX doesn't give you a future back
-    engine.submit_raw(task_bytes)
-
-    # Confirm that the same result got back though the queue
-    for _i in range(3):
-        packed_result_q = q.get(timeout=5)
-        assert isinstance(
-            packed_result_q, bytes
-        ), "Expected bytes from the passthrough_q"
-
-        result = messagepack.unpack(packed_result_q)
-        # Handle a sneaky EPStatusReport that popped in ahead of the result
-        if isinstance(result, messagepack.message_types.EPStatusReport):
-            continue
-
-        # At this point the message should be the result
-        assert result.task_id == task_uuid
-
-        final_result = serde.deserialize(result.data)
-        assert final_result == 6, f"Expected 6, but got: {final_result}"
-        break
-
-
-@pytest.mark.skip("Skip until HTEX has been fixed up")
-def test_htex_submit_raw_exception(htex, task_uuid, ez_pack_task):
-    """Testing the HighThroughputExecutor/Engine with a remote side exception"""
-    engine = htex
-
-    q = engine.results_passthrough
-    task_bytes = ez_pack_task(div_zero, 3)
-    # HTEX doesn't give you a future back
-    engine.submit_raw(task_bytes)
-
-    # Confirm that the same result got back though the queue
-    for _i in range(3):
-        packed_result_q = q.get(timeout=5)
-        assert isinstance(
-            packed_result_q, bytes
-        ), "Expected bytes from the passthrough_q"
-
-        result = messagepack.unpack(packed_result_q)
-        # Handle a sneaky EPStatusReport that popped in ahead of the result
-        if isinstance(result, messagepack.message_types.EPStatusReport):
-            continue
-
-        # At this point the message should be the result
-        assert result.task_id == task_uuid
-        assert result.error_details
-        break
-
-
-@pytest.mark.skip("Skip until HTEX has been fixed up")
-def test_htex_manager_lost(htex, task_uuid, ez_pack_task):
-    """Testing the HighThroughputExecutor/Engine"""
-    engine = htex
-
-    q = engine.results_passthrough
-    task_bytes = ez_pack_task(kill_manager)
-
-    # HTEX doesn't give you a future back
-    engine.submit_raw(task_bytes)
-
-    # Confirm that the same result got back though the queue
-    for _i in range(10):
-        # We need a longer timeout to detect manager fail
-        packed_result_q = q.get(timeout=5)
-        assert isinstance(
-            packed_result_q, bytes
-        ), "Expected bytes from the passthrough_q"
-
-        result = messagepack.unpack(packed_result_q)
-        # Handle a sneaky EPStatusReport that popped in ahead of the result
-        if isinstance(result, messagepack.message_types.EPStatusReport):
-            continue
-
-        # At this point the message should be the result
-        assert result.task_id == task_uuid
-
-        assert result.error_details.code == "RemoteExecutionError"
-        assert "ManagerLost" in result.data
-        break
 
 
 def test_engine_submit_container_location(
