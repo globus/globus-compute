@@ -269,6 +269,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         # Add executor to poller *after* executor has started
         self.job_status_poller = JobStatusPoller(**self._job_status_kwargs)
         self.job_status_poller.add_executors([self.executor])
+        self._engine_ready = True
 
     def _submit(
         self,

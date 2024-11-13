@@ -49,6 +49,7 @@ def mock_gce(tmp_path):
             working_dir=scripts_dir,
             provider=LocalProvider(min_blocks=0, max_blocks=0, init_blocks=0),
         )
+        engine._engine_ready = True
         engine.results_passthrough = queue.Queue()
         yield engine
 
