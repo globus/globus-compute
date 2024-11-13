@@ -7,7 +7,7 @@ _MOCK_BASE = "globus_compute_endpoint.engines.high_throughput.engine."
 
 
 @pytest.mark.parametrize("address", ("localhost", "login1.theta.alcf.anl.gov", "*"))
-def test_invalid_address(address):
+def test_invalid_address(address, htex_warns):
     with mock.patch(f"{_MOCK_BASE}log") as mock_log:
         with pytest.raises(ValueError):
             HighThroughputEngine(address=address)
@@ -17,5 +17,5 @@ def test_invalid_address(address):
 @pytest.mark.parametrize(
     "address", ("192.168.64.12", "fe80::e643:4bff:fe61:8f72", "129.114.44.12")
 )
-def test_valid_address(address):
+def test_valid_address(address, htex_warns):
     HighThroughputEngine(address=address)

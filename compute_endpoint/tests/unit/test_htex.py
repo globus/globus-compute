@@ -16,6 +16,11 @@ from pytest_mock import MockFixture
 from tests.utils import double, ez_pack_function, try_assert
 
 
+@pytest.fixture(autouse=True)
+def warning_invoked(htex_warns):
+    yield
+
+
 @pytest.fixture
 def htex(tmp_path):
     ep_id = uuid.uuid4()
@@ -99,12 +104,3 @@ def test_engine_invalid_result_data(task_id: t.Optional[str]):
     htex.is_alive = False
     htex._engine_bad_state.set()
     queue_mgmt_thread.join()
-
-
-def test_deprecation_notice(mocker):
-    mock_warn = mocker.patch(
-        "globus_compute_endpoint.engines.high_throughput.engine.warnings"
-    )
-    HighThroughputEngine()
-    assert mock_warn.warn.called
-    assert "HighThroughputEngine is deprecated" in mock_warn.warn.call_args[0][0]

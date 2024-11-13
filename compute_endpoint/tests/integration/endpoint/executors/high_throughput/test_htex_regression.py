@@ -9,7 +9,7 @@ from tests.utils import double
 
 
 @pytest.fixture
-def engine(tmp_path):
+def engine(tmp_path, htex_warns):
     ep_id = uuid.uuid4()
     engine = HighThroughputEngine(
         label="HTEXEngine",
