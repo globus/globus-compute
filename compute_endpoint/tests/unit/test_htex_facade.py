@@ -15,7 +15,7 @@ def test_deprecation_notice(mocker):
     assert "deprecated" in mock_warn.warn.call_args[0][0]
 
 
-def test_htex_returns_engine():
+def test_htex_returns_engine(htex_warns):
     """An instance of HighThroughputExecutor should now return
     a HighThroughputEngine object
     """
