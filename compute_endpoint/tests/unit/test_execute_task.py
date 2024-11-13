@@ -1,17 +1,15 @@
 import logging
+import random
 from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines.helper import execute_task
+from tests.utils import divide
 
 logger = logging.getLogger(__name__)
 
 _MOCK_BASE = "globus_compute_endpoint.engines.helper."
-
-
-def divide(x, y):
-    return x / y
 
 
 @pytest.mark.parametrize("run_dir", ("tmp", None, "$HOME"))
@@ -21,9 +19,10 @@ def test_bad_run_dir(endpoint_uuid, task_uuid, run_dir):
 
 
 def test_execute_task(endpoint_uuid, serde, task_uuid, ez_pack_task, tmp_path):
-    inp, outp = (10, 2), 5
+    out = random.randint(1, 100_000)
+    divisor = random.randint(1, 100_000)
 
-    task_bytes = ez_pack_task(divide, *inp)
+    task_bytes = ez_pack_task(divide, divisor * out, divisor)
 
     packed_result = execute_task(task_uuid, task_bytes, endpoint_uuid, run_dir=tmp_path)
     assert isinstance(packed_result, bytes)
@@ -35,7 +34,7 @@ def test_execute_task(endpoint_uuid, serde, task_uuid, ez_pack_task, tmp_path):
     assert "python_version" in result.details
     assert "dill_version" in result.details
     assert "endpoint_id" in result.details
-    assert serde.deserialize(result.data) == outp
+    assert serde.deserialize(result.data) == out
 
 
 def test_execute_task_with_exception(endpoint_uuid, task_uuid, ez_pack_task, tmp_path):

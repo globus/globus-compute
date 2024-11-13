@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import itertools
 import pathlib
 import sys
@@ -106,8 +108,8 @@ def kill_manager():
     os.killpg(manager_pgid, signal.SIGKILL)
 
 
-def div_zero(x: int):
-    return x / 0
+def divide(x: int | float, y: int | float):
+    return x / y
 
 
 def succeed_after_n_runs(dirpath: pathlib.Path, fail_count: int = 1):
