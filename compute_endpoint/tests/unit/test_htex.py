@@ -1,4 +1,3 @@
-import os
 import queue
 import threading
 import typing as t
@@ -18,7 +17,7 @@ from tests.utils import double, ez_pack_function, try_assert
 
 
 @pytest.fixture
-def htex():
+def htex(tmp_path):
     ep_id = uuid.uuid4()
     executor = HighThroughputEngine(
         address="127.0.0.1",
@@ -27,14 +26,10 @@ def htex():
         worker_debug=True,
     )
     q = queue.Queue()
-    tempdir = "/tmp/HTEX_logs"
-
-    os.makedirs(tempdir, exist_ok=True)
-    executor.start(endpoint_id=ep_id, run_dir=tempdir, results_passthrough=q)
+    executor.start(endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=q)
 
     yield executor
     executor.shutdown()
-    # shutil.rmtree(tempdir, ignore_errors=True)
 
 
 def test_engine_submit_container_location(
