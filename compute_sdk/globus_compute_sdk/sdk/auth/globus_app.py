@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import platform
-import sys
 
 from globus_sdk import ClientApp, GlobusApp, GlobusAppConfig, UserApp
 
@@ -11,21 +10,13 @@ from .token_storage import get_token_storage
 DEFAULT_CLIENT_ID = "4cf29807-cf21-49ec-9443-ff9a3fb9f81c"
 
 
-def _is_jupyter():
-    # Simplest way to find out if we are in Jupyter without having to
-    # check imports
-    return "jupyter_core" in sys.modules
-
-
-def get_globus_app(environment: str | None = None):
+def get_globus_app(environment: str | None = None) -> GlobusApp:
     app_name = platform.node()
     client_id, client_secret = get_client_creds()
     config = GlobusAppConfig(token_storage=get_token_storage(environment=environment))
 
-    app: GlobusApp  # silly mypy
-
     if client_id and client_secret:
-        app = ClientApp(
+        return ClientApp(
             app_name=app_name,
             client_id=client_id,
             client_secret=client_secret,
@@ -41,20 +32,4 @@ def get_globus_app(environment: str | None = None):
 
     else:
         client_id = client_id or DEFAULT_CLIENT_ID
-        app = UserApp(app_name=app_name, client_id=client_id, config=config)
-
-        # The authorization-via-web-link flow requires stdin; the user must visit
-        # the web link and enter generated code.
-        if (
-            app.login_required()
-            and (not sys.stdin.isatty() or sys.stdin.closed)
-            and not _is_jupyter()
-        ):
-            # Not technically necessary; the login flow would just die with an EOF
-            # during input(), but adding this message here is much more direct --
-            # handle the non-happy path by letting the user know precisely the issue
-            raise RuntimeError(
-                "Unable to run native app login flow: stdin is closed or is not a TTY."
-            )
-
-    return app
+        return UserApp(app_name=app_name, client_id=client_id, config=config)
