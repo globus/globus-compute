@@ -60,6 +60,30 @@ def test_result_message_packing(serde, task_uuid):
 @pytest.mark.parametrize(
     "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
 )
+def test_engine_start(
+    engine_type: GlobusComputeEngineBase, engine_runner, endpoint_uuid, tmp_path
+):
+    """Engine.submit should fail before engine is started"""
+
+    engine = engine_type()
+    assert not engine._engine_ready, "Engine should not be ready before start"
+
+    engine.executor = mock.Mock()
+    engine.executor.status_polling_interval = 0
+
+    # task submit should raise Exception if it was not started
+    with pytest.raises(RuntimeError):
+        engine.submit(str(endpoint_uuid), b"", {})
+
+    engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
+    assert engine._engine_ready, "Engine should be ready after start"
+
+    engine.shutdown()
+
+
+@pytest.mark.parametrize(
+    "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
+)
 def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
     """Test engine.submit with multiple engines"""
     engine = engine_runner(engine_type)
@@ -145,20 +169,6 @@ def test_engine_submit_internal(
         final_result = serde.deserialize(result.data)
         assert final_result == 6
         break
-
-
-def test_proc_pool_engine_not_started(task_uuid, ez_pack_task):
-    engine = ProcessPoolEngine(max_workers=1)
-    task_bytes = ez_pack_task(double, 10)
-
-    with pytest.raises(AssertionError) as pyt_exc:
-        future = engine.submit(str(task_uuid), task_bytes, resource_specification={})
-        future.result()
-    assert "engine has not been started" in str(pyt_exc)
-
-    with pytest.raises(AssertionError):
-        engine.get_status_report()
-    assert "engine has not been started" in str(pyt_exc)
 
 
 def test_gc_engine_system_failure(ez_pack_task, task_uuid, engine_runner):
@@ -295,6 +305,7 @@ def test_gcengine_executor_exception_passthrough(randomstring):
 
 def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
     gce = GlobusComputeEngine(address="127.0.0.1")
+    gce._engine_ready = True
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
 
@@ -310,6 +321,7 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
 
 def test_gcengine_exception_report_from_bad_state(task_uuid):
     gce = GlobusComputeEngine(address="127.0.0.1")
+    gce._engine_ready = True
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
     gce.submit(
@@ -343,7 +355,9 @@ def test_gcengine_rejects_mpi_mode(randomstring):
 
 def test_gcengine_rejects_resource_specification(task_uuid):
     with pytest.raises(ValueError) as pyt_exc:
-        GlobusComputeEngine(address="127.0.0.1").submit(
+        gce = GlobusComputeEngine(address="127.0.0.1")
+        gce._engine_ready = True
+        gce.submit(
             str(task_uuid),
             packed_task=b"packed_task",
             resource_specification={"foo": "bar"},
@@ -374,6 +388,7 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
         mock_ex.__name__ = "ClassName"
         mock_ex.return_value = mock.Mock(launch_cmd="")
         engine = GlobusMPIEngine(address="127.0.0.1")
+        engine._engine_ready = True
         engine.submit(str(task_uuid), b"some task", resource_specification=spec)
 
     assert engine.executor.submit.called, "Verify test: correct internal method invoked"

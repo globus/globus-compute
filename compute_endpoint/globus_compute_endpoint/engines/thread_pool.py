@@ -54,6 +54,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         self.set_working_dir(run_dir=run_dir)
         # mypy think the thread can be none
         self._status_report_thread.start()
+        self._engine_ready = True
 
     def get_status_report(self) -> EPStatusReport:
         """

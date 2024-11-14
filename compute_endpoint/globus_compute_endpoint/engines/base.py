@@ -121,6 +121,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self.results_passthrough: queue.Queue[dict[str, bytes | str | None]] = (
             queue.Queue()
         )
+        self._engine_ready: bool = False
 
     @abstractmethod
     def start(
@@ -235,6 +236,11 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         """Subclass should use the internal execution system to implement this"""
         raise NotImplementedError()
 
+    def _ensure_ready(self):
+        """Raises a RuntimeError if engine is not started"""
+        if not self._engine_ready:
+            raise RuntimeError("Engine not started and cannot execute tasks")
+
     def submit(
         self,
         task_id: str,
@@ -251,6 +257,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         -------
         future
         """
+        self._ensure_ready()
 
         if task_id not in self._retry_table:
             self._retry_table[task_id] = {
