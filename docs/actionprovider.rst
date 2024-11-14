@@ -1,25 +1,146 @@
 Globus Flows Action Provider
 ============================
 
-Globus Compute exposes an asynchronous `Action Provider <https://globus-automate-client.readthedocs.io/en/latest/globus_action_providers.html>`_
-interface to allow functions to be used in a `Globus Flow <https://www.globus.org/platform/services/flows>`_.
+Globus Compute exposes asynchronous `Action Provider <https://globus-automate-client.readthedocs.io/en/latest/globus_action_providers.html>`_
+interfaces to allow functions to be used in a `Globus Flow <https://www.globus.org/platform/services/flows>`_.
 
-The Globus Compute Action Provider interface uses:
+There are currently two supported action providers for Globus Compute: [1]_
 
-* ``ActionUrl`` -- 'https://compute.actions.globus.org'  *Updated Apr 2023* [1]_
+* V3 Action Provider: https://compute.actions.globus.org/v3
+* V2 Action Provider: https://compute.actions.globus.org
 
-.. [1] The previous version of the Action Provider, deprecated April 2023,
-   had an ActionUrl of https://dev.funcx.org/automate along with
-   a required ``ActionScope``.  The current Action Provider is backwards
-   compatible, provided the ``ActionUrl`` is updated to the new URL and the
-   ``ActionScope`` removed.  (The ActionScope is now populated from the
-   Action Provider's metadata URL)
+Both Action Providers return their outputs in the same format. The V3 Action Provider
+generally supports more functionality than the V2 Action Provider, with some caveats;
+see below for details and migration.
+
+V3 Action Input Schema
+----------------------
+
+The V3 Action Provider supports all of the same input options as the |V3SubmitRoute|_
+in the Compute hosted web service, with two major differences. The V3 Action Provider
+accepts task input as JSON data, while the web service route only accepts task input as
+Compute-serialized strings. The V3 Action Provider also takes the endpoint ID as a JSON
+parameter, rather than in the URL.
+
+A complete task submission might look like this:
+
+.. code-block:: json
+
+  {
+    "endpoint_id": "0c48c27a-0c2d-4028-a71b-d78697abbc4a",
+    "tasks": [
+      {
+        "function_id": "ff960aba-fa23-43d5-9cbe-3f4f91a066e1",
+        "args": [ "..." ],
+        "kwargs": { "...": "..." }
+      },
+      {
+        "function_id": "0a98fd06-edbd-11ed-abcd-0d705ebb4c49",
+        "args": [ "..." ],
+        "kwargs": { "...": "..." }
+      }
+    ],
+    "task_group_id": "97241626-8ff4-4550-9938-5909bd221869",
+    "user_endpoint_config": {
+      "min_blocks": 0,
+      "max_blocks": 1,
+      "scheduler_options": "#SBATCH --constraint=knl,quad,cache"
+    },
+    "resource_specification": {
+      "num_nodes": 2,
+      "ranks_per_node": 2,
+      "num_ranks": 4,
+      "launcher_options": "--cpu-bind quiet --mem 3072"
+    },
+    "create_queue": false
+  }
+
+The two required arguments are ``endpoint_id`` and ``tasks``. The former must be a valid
+UUID, and should point to an endpoint you have access to; the latter is a list of
+objects that represent the tasks to execute on that endpoint. Submissions must contain at
+least one task.
+
+Each task object must have a valid ``function_id``, while ``args`` and ``kwargs`` are
+optional (although if a function expects either, the flow will fail when the endpoint
+attempts to execute it). The ``args`` option is a list of arbitrary JSON data, and the
+``kwargs`` option is an object that maps argument keywords to argument values as
+arbitrary JSON data.
+
+For each task, the given endpoint will call the given function with any given arguments
+and keyword arguments, and the V3 Action Provider will return with the results of those
+calls.
+
+The other top-level arguments, such as ``resource_specification`` and
+``user_endpoint_config``, are optional - see the |V3SubmitRoute|_ for more information
+on what they each mean.
+
+Migrating from V2 Actions
+.........................
+
+The major differences between the V2 and V3 Action Providers are as follows:
+
+* The V2 Action Provider accepts its ``args`` and ``kwargs`` as *strings* containing
+  JSON data, while the V3 Action Provider accepts those as raw JSON data.
+
+* With the V3 Action Provider, ``endpoint`` and ``function`` are now ``endpoint_id`` and
+  ``function_id``, to better match the web service submit route.
+
+* Unlike the V2 Action Provider, the V3 Action Provider only allows for submission to a
+  single endpoint at a time. If multiple endpoint submissions are needed, separate those
+  into multiple action calls, one per endpoint.
+
+* The V3 Action Provider has no top-level ``function``, ``args`` or ``kwargs`` arguments.
+  Instead, each task, including the first, goes into the ``tasks`` array.
+
+* The V3 Action Provider no longer supports the ``payload`` argument aliasing ``kwargs``,
+  which was included in V2 for backward compatibility. Use ``kwargs`` directly instead.
+
+Taking these points in mind, this V2 input:
+
+.. code-block:: json
+
+  {
+    "endpoint": "0c48c27a-0c2d-4028-a71b-d78697abbc4a",
+    "function": "ff960aba-fa23-43d5-9cbe-3f4f91a066e1",
+    "args": "['arg1', 'arg2']",
+    "payload": "{ 'foo': 'bar', 'fuzz': 'buzz' }",
+    "tasks": [
+      {
+        "endpoint": "0c48c27a-0c2d-4028-a71b-d78697abbc4a",
+        "function": "0a98fd06-edbd-11ed-abcd-0d705ebb4c49",
+        "args": "['arg1', 'arg2']",
+        "payload": "{ 'foo': 'bar', 'fuzz': 'buzz' }",
+      }
+    ]
+  }
+
+maps to this V3 input:
+
+.. code-block:: json
+
+  {
+    "endpoint_id": "0c48c27a-0c2d-4028-a71b-d78697abbc4a",
+    "tasks": [
+      {
+        "function_id": "ff960aba-fa23-43d5-9cbe-3f4f91a066e1",
+        "args": ["arg1", "arg2"],
+        "kwargs": { "foo": "bar", "fuzz": "buzz" }
+      },
+      {
+        "function_id": "0a98fd06-edbd-11ed-abcd-0d705ebb4c49",
+        "args": ["arg1", "arg2"],
+        "kwargs": { "foo": "bar", "fuzz": "buzz" }
+      }
+    ]
 
 
-Action Input Schema
--------------------
+.. |V3SubmitRoute| replace:: V3 submit batch route
+.. _V3SubmitRoute: https://compute.api.globus.org/redoc#tag/Endpoints/operation/submit_batch_v3_endpoints__endpoint_uuid__submit_post
 
-The Action Provider input schema accepts input for a single task, plus,
+V2 Action Input Schema
+----------------------
+
+The V2 Action Provider input schema accepts input for a single task, plus,
 optionally, a list of task objects each with a similar schema.
 
 Each run input consists of the required ``'endpoint'`` and ``'function'``
@@ -126,4 +247,5 @@ the development of flows that use Globus Compute. For example, Gladier validates
 functions when they are modified. Additionally, it includes capabilities to automatically
 generate flow definitions.
 
-
+.. [1] Early users might be aware of another Action Provider under the URL
+   https://dev.funcx.org/automate; this was deprecated in April of 2023.
