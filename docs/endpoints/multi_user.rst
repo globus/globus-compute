@@ -254,30 +254,30 @@ A Globus Auth identity (input) document might look something like:
    [
      {
        "id": "00000000-0000-4444-8888-111111111111",
-       "email": "joe.schmoe@legal.your_institution.com",
+       "email": "alicia@legal.your_institution.com",
        "identity_provider": "abcd7238-f917-4eb2-9ace-c523fa9b1234",
        "identity_type": "login",
-       "name": "Joe Blow",
+       "name": "Alicia",
        "organization": null,
        "status": "used",
-       "username": "joe@legal.your_institution.com"
+       "username": "alicia@legal.your_institution.com"
      },
      {
        "id": "00000000-0000-4444-8888-222222222222",
-       "email": "blow@cs.your_institution.com",
+       "email": "roberto@cs.your_institution.com",
        "identity_provider": "ef345063-bffd-41f7-b403-24f97e325678",
        "identity_type": "login",
-       "name": "Joe Blow",
+       "name": "Roberto",
        "organization": "Your Institution, GmbH",
        "status": "used",
-       "username": "blow@your_institution.com"
+       "username": "roberto@your_institution.com"
      }
    ]
 
 This user has linked both identities, so both identities are in the identity set.  Per
 the configuration, the first identity will not match either regex, but the second
-(``blow@your_institution.com``) will, and the returned username would be
-``blow``.  Note that any field could be tested, but this example used ``email``.
+(``roberto@your_institution.com``) will, and the returned username would be
+``roberto``.  Note that any field could be tested, but this example used ``email``.
 
 ``external_identity_mapping#1.0.0``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -297,30 +297,30 @@ logic.  The script will be passed a ``identity_mapping_input#1.0.0`` JSON docume
      "identities": [
        {
          "id": "00000000-0000-4444-8888-111111111111",
-         "email": "joe.schmoe@legal.your_institution.com",
+         "email": "alicia@legal.your_institution.com",
          "identity_provider": "abcd7238-f917-4eb2-9ace-c523fa9b1234",
          "identity_type": "login",
-         "name": "Joe Blow",
+         "name": "Alicia",
          "organization": null,
          "status": "used",
-         "username": "joe@legal.your_institution.com"
+         "username": "alicia@legal.your_institution.com"
        },
        {
          "id": "00000000-0000-4444-8888-222222222222",
-         "email": "blow@cs.your_institution.com",
+         "email": "roberto@cs.your_institution.com",
          "identity_provider": "ef345063-bffd-41f7-b403-24f97e325678",
          "identity_type": "login",
-         "name": "Joe Blow",
+         "name": "Roberto",
          "organization": "Your Institution, GmbH",
          "status": "used",
-         "username": "blow@your_institution.com"
+         "username": "roberto@your_institution.com"
        }
      ]
    }
 
 The executable must identify the successfully mapped identity in the output document by
-the ``id`` field.  For example, if an LDAP lookup of ``joe@legal.your_institution.com``
-were to result in ``schmoe.joe`` for this MEP host, then the output document might read:
+the ``id`` field.  For example, if an LDAP lookup of ``alicia@legal.your_institution.com``
+were to result in ``Alicia`` for this MEP host, then the output document might read:
 
 .. code-block:: json
    :caption: Hypothetical ``identity_mapping_output#1.0.0`` document from an external
@@ -329,7 +329,7 @@ were to result in ``schmoe.joe`` for this MEP host, then the output document mig
    {
      "DATA_TYPE": "identity_mapping_output#1.0.0",
      "result": [
-       {"id": "1234567c-cf51-4032-afb8-05986708abcd", "output": "schmoe.joe"}
+       {"id": "1234567c-cf51-4032-afb8-05986708abcd", "output": "alicia"}
      ]
    }
 
