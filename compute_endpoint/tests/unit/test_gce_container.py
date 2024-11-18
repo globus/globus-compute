@@ -19,7 +19,7 @@ def gce_factory(tmp_path, randomstring) -> t.Callable:
         expect_uri = randomstring(length=random.randint(1, 20))
         expect_opts = randomstring(length=random.randint(1, 20))
         k = {
-            "address": "127.0.0.1",
+            "address": "::1",
             "max_workers_per_node": 1,
             "label": "GCE_TEST",
             "container_uri": expect_uri,
@@ -66,7 +66,7 @@ def test_custom_missing_options(tmp_path):
     with pytest.raises(AssertionError) as pyt_e:
         with mock.patch(f"{_MOCK_BASE}ReportingThread"):
             GlobusComputeEngine(
-                address="127.0.0.1",
+                address="::1",
                 max_workers_per_node=1,
                 label="GCE_TEST",
                 container_type="custom",
@@ -88,4 +88,4 @@ def test_custom(gce_factory, randomstring):
 
 def test_bad_container():
     with pytest.raises(AssertionError):
-        GlobusComputeEngine(address="127.0.0.1", container_type="BAD")
+        GlobusComputeEngine(address="::1", container_type="BAD")

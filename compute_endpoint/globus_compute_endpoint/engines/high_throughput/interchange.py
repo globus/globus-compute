@@ -134,11 +134,11 @@ class Interchange:
 
         client_address : str
              The ip address at which the parsl client can be reached.
-             Default: "127.0.0.1"
+             Default: "localhost"
 
         interchange_address : str
              The ip address at which the workers will be able to reach the Interchange.
-             Default: "127.0.0.1"
+             Default: "localhost"
 
         client_ports : tuple[int, int, int]
              The ports at which the client can be reached

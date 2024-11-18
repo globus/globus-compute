@@ -10,6 +10,7 @@ import logging
 import multiprocessing
 import os
 import queue
+import socket
 import threading
 import time
 import typing as t
@@ -299,14 +300,13 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
         self.endpoint_id = endpoint_id
         self._task_counter = 0
 
-        try:
-            ipaddress.ip_address(address=address)
-        except Exception:
-            log.critical(
-                f"Invalid address supplied: {address}. "
-                "Please use a valid IPv4 or IPv6 address"
+        if not HighThroughputEngine.is_hostname_or_ip(address):
+            err_msg = (
+                "Expecting an interface name, hostname, IPv4 address, or IPv6 address."
             )
-            raise
+            log.critical(err_msg)
+            raise ValueError(err_msg)
+
         self.address = address
         self.worker_ports = worker_ports
         self.worker_port_range = worker_port_range
@@ -418,6 +418,27 @@ class HighThroughputEngine(GlobusComputeEngineBase, RepresentationMixin):
             log.debug("Starting HighThroughputEngine with no provider")
 
         return self.outgoing_q.port, self.incoming_q.port, self.command_client.port
+
+    @staticmethod
+    def is_hostname_or_ip(hostname_or_ip: str) -> bool:
+        """
+        Utility method to verify that the input is a valid hostname or
+        IP address.
+        """
+        if not hostname_or_ip:
+            return False
+        else:
+            try:
+                socket.gethostbyname(hostname_or_ip)
+                return True
+            except socket.gaierror:
+                # Not a hostname, now check IP
+                pass
+            try:
+                ipaddress.ip_address(address=hostname_or_ip)
+            except ValueError:
+                return False
+        return True
 
     def _start_local_interchange_process(self):
         """Starts the interchange process locally

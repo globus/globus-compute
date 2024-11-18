@@ -6,7 +6,7 @@ from globus_compute_endpoint.engines import HighThroughputEngine
 _MOCK_BASE = "globus_compute_endpoint.engines.high_throughput.engine."
 
 
-@pytest.mark.parametrize("address", ("localhost", "login1.theta.alcf.anl.gov", "*"))
+@pytest.mark.parametrize("address", ("example", "a.b.c.d.e", "*"))
 def test_invalid_address(address, htex_warns):
     with mock.patch(f"{_MOCK_BASE}log") as mock_log:
         with pytest.raises(ValueError):

@@ -49,7 +49,7 @@ make clean html || exit 2
 # quick and dirty display clean up from inaugural run; highlight python
 # 'http.server' message
 echo -en "\033[;H\033[J\033[40;92;1m"
-(cd _build/html/; python3 -m http.server -b 127.0.0.1 $PORT) &
+(cd _build/html/; python3 -m http.server -b localhost $PORT) &
 sleep 1
 echo -en "\033[m"
 

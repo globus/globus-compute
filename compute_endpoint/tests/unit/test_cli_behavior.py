@@ -491,7 +491,7 @@ def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
     run_line(config_cmd)
 
     conf_dict = dict(yaml.safe_load(conf.read_text()))
-    conf_dict["engine"]["address"] = "127.0.0.1"  # avoid unnecessary DNS lookup
+    conf_dict["engine"]["address"] = "::1"  # avoid unnecessary DNS lookup
     conf = load_config_yaml(yaml.safe_dump(conf_dict))
 
     assert conf.display_name is None, conf.display_name

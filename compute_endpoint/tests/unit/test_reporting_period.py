@@ -24,7 +24,7 @@ def test_default_period():
     thread = thread_pool._status_report_thread
     assert thread.reporting_period == 30.0
 
-    gce = GlobusComputeEngine(address="127.0.0.1", heartbeat_period=1)
+    gce = GlobusComputeEngine(address="::1", heartbeat_period=1)
     thread = gce._status_report_thread
     assert thread.reporting_period == 30.0
     assert gce.executor.heartbeat_period == 1

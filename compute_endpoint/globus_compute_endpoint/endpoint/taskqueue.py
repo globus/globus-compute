@@ -91,6 +91,8 @@ class TaskQueue:
         if linger is not None:
             self.zmq_socket.setsockopt(zmq.LINGER, linger)
 
+        self.zmq_socket.setsockopt(zmq.IPV6, True)
+
         # all zmq setsockopt calls must be done before bind/connect is called
         if self.mode == "server":
             self.zmq_socket.bind(f"tcp://*:{port}")
@@ -122,6 +124,7 @@ class TaskQueue:
         self.auth = ThreadAuthenticator(self.context)
         self.auth.start()
         self.auth.allow("127.0.0.1")
+        self.auth.allow("::1")
         # Tell the authenticator how to handle CURVE requests
 
         if not self.ironhouse:

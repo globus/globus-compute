@@ -100,5 +100,5 @@ def test_repeated_fail(mock_gce, ez_pack_task):
 
 
 def test_default_retries_is_0():
-    engine = GlobusComputeEngine(address="127.0.0.1")
+    engine = GlobusComputeEngine(address="localhost")
     assert engine.max_retries_on_system_failure == 0, "Users must knowingly opt-in"

@@ -530,7 +530,7 @@ def test_endpoint_get_metadata(mocker, engine_cls):
 
     k = {}
     if engine_cls is GlobusComputeEngine:
-        k["address"] = "127.0.0.1"
+        k["address"] = "::1"
     executors = [engine_cls(**k)]
     test_config = UserEndpointConfig(executors=executors)
     test_config.source_content = "foo: bar"
@@ -720,7 +720,7 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data, mock_reg_in
 def test_serialize_config_field_types():
     fns = [str(uuid.uuid4()) for _ in range(5)]
 
-    ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address="127.0.0.1")])
+    ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address="::1")])
     ep_config._hidden_attr = "123"
     ep_config.rando_attr = "howdy"
     ep_config.allowed_functions = fns
