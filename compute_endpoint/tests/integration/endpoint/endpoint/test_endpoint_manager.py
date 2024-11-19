@@ -2,7 +2,6 @@ import logging
 import os
 import pathlib
 import shutil
-import uuid
 from importlib.machinery import SourceFileLoader
 from unittest.mock import ANY, patch
 
@@ -437,10 +436,9 @@ class TestStart:
 
     @pytest.mark.parametrize("web_svc_ok", (True, False))
     @pytest.mark.parametrize("force", (True, False))
-    def test_delete_endpoint(self, mocker, web_svc_ok, force):
+    def test_delete_endpoint(self, mocker, web_svc_ok, force, ep_uuid):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
-        ep_uuid_str = str(uuid.uuid4())
 
         mock_stop_endpoint = mocker.patch.object(Endpoint, "stop_endpoint")
         mock_rmtree = mocker.patch.object(shutil, "rmtree")
@@ -458,9 +456,7 @@ class TestStart:
 
             if not force:
                 with pytest.raises(SystemExit), patch(f"{_MOCK_BASE}log") as mock_log:
-                    manager.delete_endpoint(
-                        config_dir, force=force, ep_uuid=ep_uuid_str
-                    )
+                    manager.delete_endpoint(config_dir, force=force, ep_uuid=ep_uuid)
                 a, _k = mock_log.critical.call_args
                 assert "without deleting the local endpoint" in a[0], "expected notice"
 
@@ -475,16 +471,13 @@ class TestStart:
 
         try:
             manager.delete_endpoint(
-                config_dir,
-                ep_config=None,
-                force=force,
-                ep_uuid=ep_uuid_str,
+                config_dir, ep_config=None, force=force, ep_uuid=ep_uuid
             )
 
             if web_svc_ok:
                 mock_stop_endpoint.assert_called_with(config_dir, None, remote=False)
             assert mock_gcc.delete_endpoint.called
-            assert mock_gcc.delete_endpoint.call_args[0][0] == ep_uuid_str
+            assert mock_gcc.delete_endpoint.call_args[0][0] == ep_uuid
             mock_rmtree.assert_called_with(config_dir)
         except SystemExit as e:
             # If currently running, error out if force is not specified

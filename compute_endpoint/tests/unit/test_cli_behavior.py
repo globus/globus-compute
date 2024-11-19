@@ -51,11 +51,6 @@ def ep_name(randomstring):
 
 
 @pytest.fixture
-def fake_ep_uuid():
-    yield str(uuid.uuid4())
-
-
-@pytest.fixture
 def mock_app(mocker: MockFixture):
     mock_app = mock.Mock(spec=UserApp)
     mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=mock_app)
@@ -586,17 +581,17 @@ def test_delete_endpoint(
     run_line,
     mock_cli_state,
     ep_name,
-    fake_ep_uuid,
+    ep_uuid,
     make_endpoint_dir,
     use_uuid,
 ):
-    get_endpoint_id.return_value = fake_ep_uuid
+    get_endpoint_id.return_value = ep_uuid
 
-    make_endpoint_dir(ep_uuid=fake_ep_uuid)
-    run_line(f"delete {fake_ep_uuid if use_uuid else ep_name} --yes")
+    make_endpoint_dir(ep_uuid=ep_uuid)
+    run_line(f"delete {ep_uuid if use_uuid else ep_name} --yes")
     mock_ep, _ = mock_cli_state
     mock_ep.delete_endpoint.assert_called_once()
-    assert mock_ep.delete_endpoint.call_args[1]["ep_uuid"] == fake_ep_uuid
+    assert mock_ep.delete_endpoint.call_args[1]["ep_uuid"] == ep_uuid
     if use_uuid:
         get_endpoint_id.assert_not_called()
     else:

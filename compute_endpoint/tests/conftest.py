@@ -65,6 +65,11 @@ def other_endpoint_id():
     return str(uuid.UUID(int=2))
 
 
+@pytest.fixture
+def ep_uuid() -> str:
+    return str(uuid.uuid4())
+
+
 @pytest.fixture(scope="session")
 def tod_session_num():
     yield round(time.time()) % 86400

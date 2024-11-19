@@ -139,14 +139,9 @@ def mock_setproctitle(mocker, randomstring):
 
 
 @pytest.fixture
-def mock_ep_uuid() -> str:
-    yield str(uuid.uuid4())
-
-
-@pytest.fixture
-def mock_reg_info(mock_ep_uuid) -> str:
+def mock_reg_info(ep_uuid) -> str:
     yield {
-        "endpoint_id": mock_ep_uuid,
+        "endpoint_id": ep_uuid,
         "command_queue_info": {"connection_url": "", "queue": ""},
         "result_queue_info": {
             "connection_url": "",
@@ -157,11 +152,11 @@ def mock_reg_info(mock_ep_uuid) -> str:
 
 
 @pytest.fixture
-def mock_client(mocker, mock_ep_uuid, mock_reg_info):
+def mock_client(mocker, ep_uuid, mock_reg_info):
     mock_gcc = mock.Mock()
     mock_gcc.register_endpoint.return_value = mock_reg_info
     mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
-    yield mock_ep_uuid, mock_gcc
+    yield ep_uuid, mock_gcc
 
 
 @pytest.fixture(autouse=True)
@@ -950,28 +945,24 @@ def test_iterates_even_if_no_commands(mocker, epmanager_as_root):
 
 
 @pytest.mark.parametrize("hb", (-100, -5, 0, 0.1, 4, 7, 11, None))
-def test_heartbeat_period_minimum(conf_dir, mock_conf, hb, mock_ep_uuid, mock_reg_info):
+def test_heartbeat_period_minimum(conf_dir, mock_conf, hb, ep_uuid, mock_reg_info):
     if hb is not None:
         mock_conf._heartbeat_period = hb  #
         assert mock_conf.heartbeat_period == hb, "Avoid config setter"
-    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     exp_hb = 30.0 if hb is None else max(MINIMUM_HEARTBEAT, hb)
     assert exp_hb == em._heartbeat_period, "Expected a reasonable minimum heartbeat"
 
 
-def test_send_heartbeat_verifies_thread(
-    mock_conf, conf_dir, mock_ep_uuid, mock_reg_info
-):
-    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+def test_send_heartbeat_verifies_thread(mock_conf, conf_dir, ep_uuid, mock_reg_info):
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     f = em.send_heartbeat()
     exc = f.exception()
     assert "publisher is not running" in str(exc)
 
 
-def test_send_heartbeat_honors_shutdown(
-    mock_conf, conf_dir, mock_ep_uuid, mock_reg_info
-):
-    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+def test_send_heartbeat_honors_shutdown(mock_conf, conf_dir, ep_uuid, mock_reg_info):
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     em._heartbeat_period = random.randint(1, 10000)
     em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
 
@@ -987,10 +978,10 @@ def test_send_heartbeat_honors_shutdown(
 
 
 def test_send_heartbeat_shares_exception(
-    mock_log, mock_conf, conf_dir, mock_ep_uuid, mock_reg_info, randomstring
+    mock_log, mock_conf, conf_dir, ep_uuid, mock_reg_info, randomstring
 ):
     exc_text = randomstring()
-    em = EndpointManager(conf_dir, mock_ep_uuid, mock_conf, mock_reg_info)
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf, mock_reg_info)
     em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
     em._heartbeat_publisher.publish.return_value = Future()
     f = em.send_heartbeat()

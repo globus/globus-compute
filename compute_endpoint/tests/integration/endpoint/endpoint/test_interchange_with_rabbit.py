@@ -25,6 +25,7 @@ def run_interchange_process(
     setup_register_endpoint_response,
     tmp_path,
     request,  # Allows a custom config to be passed in if needed
+    ep_uuid,
 ):
     """
     Start and stop a subprocess that executes the EndpointInterchange class.
@@ -53,22 +54,21 @@ def run_interchange_process(
 
         ix.start()
 
-    endpoint_uuid = str(uuid.uuid4())
     endpoint_name = "endpoint_foo"
     gcc = get_standard_compute_client()
-    setup_register_endpoint_response(endpoint_uuid)
-    reg_info = gcc.register_endpoint(endpoint_name, endpoint_uuid)
+    setup_register_endpoint_response(ep_uuid)
+    reg_info = gcc.register_endpoint(endpoint_name, ep_uuid)
     assert isinstance(reg_info, dict), "Test setup verification"
-    assert reg_info["endpoint_id"] == endpoint_uuid, "Test setup verification"
+    assert reg_info["endpoint_id"] == ep_uuid, "Test setup verification"
     assert "task_queue_info" in reg_info
     assert "result_queue_info" in reg_info
 
     ix_proc = multiprocessing.Process(
-        target=run_it, args=(reg_info, endpoint_uuid), kwargs={"endpoint_dir": tmp_path}
+        target=run_it, args=(reg_info, ep_uuid), kwargs={"endpoint_dir": tmp_path}
     )
     ix_proc.start()
 
-    yield ix_proc, tmp_path, endpoint_uuid, reg_info
+    yield ix_proc, tmp_path, ep_uuid, reg_info
 
     if ix_proc.is_alive():
         ix_proc.terminate()
@@ -84,14 +84,14 @@ def run_interchange_process(
 
 
 def test_epi_graceful_shutdown(run_interchange_process):
-    ix_proc, tmp_path, endpoint_uuid, _reg_info = run_interchange_process
+    ix_proc, tmp_path, ep_uuid, _reg_info = run_interchange_process
     time.sleep(2)  # simple test approach for now: assume it's up after 2s
     ix_proc.terminate()
     assert try_for_timeout(lambda: ix_proc.exitcode is not None), "Failed to shutdown"
 
 
 def test_epi_stored_results_processed(run_interchange_process):
-    ix_proc, tmp_path, endpoint_uuid, _reg_info = run_interchange_process
+    ix_proc, tmp_path, ep_uuid, _reg_info = run_interchange_process
 
     unacked_results_dir = tmp_path / "unacked_results"
     unacked_results_dir.mkdir(exist_ok=True)
@@ -113,7 +113,7 @@ def test_epi_forwards_tasks_and_results(
     appropriate queue, and results are put into appropriate queue with the correct
     routing_key.
     """
-    ix_proc, tmp_path, endpoint_uuid, reg_info = run_interchange_process
+    ix_proc, tmp_path, ep_uuid, reg_info = run_interchange_process
 
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
@@ -172,7 +172,7 @@ def test_epi_rejects_allowlist_task(
     this test also doubles up as checking for not specifying the
     resource_specification field.
     """
-    *_, endpoint_uuid, reg_info = run_interchange_process
+    *_, ep_uuid, reg_info = run_interchange_process
 
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
@@ -214,7 +214,7 @@ def test_epi_rejects_allowlist_task(
                     assert (
                         f"Function {func_to_run} not permitted" in result.data
                     ), config
-                    assert f"on endpoint {endpoint_uuid}" in result.data, result
+                    assert f"on endpoint {ep_uuid}" in result.data, result
                 break
 
 
@@ -235,7 +235,7 @@ def test_resource_specification(
     appropriate queue, and results are put into appropriate queue with the correct
     routing_key.
     """
-    ix_proc, tmp_path, endpoint_uuid, reg_info = run_interchange_process
+    ix_proc, tmp_path, ep_uuid, reg_info = run_interchange_process
 
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
@@ -288,7 +288,7 @@ def test_bad_resource_specification(
     a bad resource_spec, in this case we use {"BAD_KEY": ...}
     to trigger an exception in the MockExecutor
     """
-    ix_proc, tmp_path, endpoint_uuid, reg_info = run_interchange_process
+    ix_proc, tmp_path, ep_uuid, reg_info = run_interchange_process
 
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
