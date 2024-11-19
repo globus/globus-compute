@@ -14,6 +14,7 @@ import socket
 import sys
 import threading
 import time
+import types
 import typing as t
 import uuid
 from concurrent.futures import Future
@@ -75,11 +76,11 @@ def _import_pyprctl():
     return pyprctl
 
 
-def _import_pamhandle():
+def _import_pam() -> types.ModuleType:
     # Enable conditional import, and create a hook-point for testing to mock
-    from globus_compute_endpoint.pam import PamHandle
+    from globus_compute_endpoint import pam
 
-    return PamHandle
+    return pam
 
 
 class UserEndpointRecord(BaseModel):
@@ -117,6 +118,14 @@ class EndpointManager:
 
         self.conf_dir = conf_dir
         self._config = config
+
+        # UX - test conditional imports *now*, rather than when a request comes in;
+        # this gives immediate feedback to an implementing admin if something is awry
+        if config.pam.enable:
+            _import_pam()
+        else:
+            _import_pyprctl()
+
         self._reload_requested = False
         self._time_to_stop = False
         self._kill_event = threading.Event()
@@ -815,11 +824,11 @@ class EndpointManager:
         sname = self._config.pam.service_name
         try:
             logd = _affix_logd(f"PAM ({sname}, {username}): ")
-            logd("Importing library")
-            PamHandle = _import_pamhandle()
+            logd("Importing module")
+            pam = _import_pam()
 
             logd("Creating handle")
-            with PamHandle(sname, username=username) as pamh:
+            with pam.PamHandle(sname, username=username) as pamh:
                 logd("Invoking account stage")
                 pamh.pam_acct_mgmt()
                 logd("Creating credentials")
@@ -838,10 +847,17 @@ class EndpointManager:
                 pamh.credentials_delete()
 
                 logd("Closing handle")
-        except Exception as e:
-            log.error(str(e))  # Share (very likely) pamlib error with admin ...
+
+        except pam.PamError as e:
+            log.error(str(e))  # Share pamlib error with admin ...
 
             # ... but be opaque with user.
+            raise PermissionError("see your system administrator") from None
+
+        except Exception:
+            log.exception(f"Unhandled error during PAM session for {username}")
+
+            # Regardless, be opaque with user.
             raise PermissionError("see your system administrator") from None
 
     def cmd_start_endpoint(
