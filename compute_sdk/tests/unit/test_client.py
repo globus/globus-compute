@@ -729,3 +729,19 @@ def test_client_handles_login_manager():
     assert mock_lm.get_auth_client.call_count == 1
     assert mock_lm.get_web_client.call_count == 1
     assert mock_lm.get_web_client.call_args[1]["base_url"] == client.web_service_address
+
+
+def test_client_logout_with_app(mocker):
+    mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
+    mocker.patch(f"{_MOCK_BASE}WebClient")
+    mock_app = mock.Mock(spec=UserApp)
+    client = gc.Client(do_version_check=False, app=mock_app)
+    client.logout()
+    assert mock_app.logout.called
+
+
+def test_client_logout_with_login_manager():
+    mock_lm = mock.Mock(spec=LoginManager)
+    client = gc.Client(do_version_check=False, login_manager=mock_lm)
+    client.logout()
+    assert mock_lm.logout.called
