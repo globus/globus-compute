@@ -109,6 +109,9 @@ class Client:
 
         self._task_status_table: dict[str, dict] = {}
 
+        self.app: GlobusApp | None = None
+        self.login_manager: LoginManagerProtocol | None = None
+
         if app and login_manager:
             raise ValueError("'app' and 'login_manager' are mutually exclusive.")
         elif login_manager:
@@ -150,7 +153,9 @@ class Client:
 
     def logout(self):
         """Remove credentials from your local system"""
-        self.login_manager.logout()
+        auth_obj = self.app or self.login_manager
+        if auth_obj:
+            auth_obj.logout()
 
     def _log_version_mismatch(self, worker_details: dict | None) -> None:
         """
