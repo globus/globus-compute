@@ -3,6 +3,48 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.31.0:
+
+globus-compute-sdk & globus-compute-endpoint v2.31.0
+------------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- ``GlobusComputeEngine``, ``ThreadPoolEngine``, and ``ProcessPoolEngine`` can
+  now be configured with ``working_dir`` to specify the tasks working directory.
+  If a relative path is specified, it is set in relation to the endpoint
+  run directory (usually ``~/.globus_compute/<endpoint_name>``). Here's an example
+  config file:
+
+  .. code-block:: yaml
+
+    engine:
+      type: GlobusComputeEngine
+      working_dir: /absolute/path/to/tasks_working_dir
+
+- Function docstrings are now read and used as the description for the function when it
+  is uploaded. This will support future UI changes to the webapp.
+
+- The ``globus-compute-sdk`` and ``globus-compute-endpoint`` packages now support
+  Python version 3.12.
+
+- Added a new runtime check to ``globus_compute_endpoint.engines`` that will raise a `RuntimeError`
+  if a task is submitted before ``engine.start()`` was called.
+
+Bug Fixes
+^^^^^^^^^
+
+ - Fixed a bug where functions run with ``ThreadPoolEngine`` and ``ProcessPoolEngine``
+   create and switch into the ``tasks_working_dir`` creating endless nesting.
+
+Deprecated
+^^^^^^^^^^
+
+- Before this version, the ``function_name`` argument to ``Client.register_function``
+  was not used, so it has now been deprecated. As before, function names are
+  determined by the function's ``__name__`` and cannot be manually specified.
+
 .. _changelog-2.30.1:
 
 globus-compute-sdk & globus-compute-endpoint v2.30.1
