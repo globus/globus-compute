@@ -855,6 +855,13 @@ Administrators can create new authentication policies via the `Globus Auth API
   occurred to satisfy the policy.  Setting this will also set ``high_assurance`` to
   ``true``.
 
+  .. attention::
+
+     For performance reasons, the web-service caches lookups for 60s.  Pragmatically,
+     this means that smallest timeout that Compute supports is 1 minute, even though it
+     is possible to set required authorizations for high assurance policies to smaller
+     time intervals.
+
 
 Apply an Existing Authentication Policy
 ---------------------------------------
