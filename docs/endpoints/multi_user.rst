@@ -1,9 +1,18 @@
 Multi-User Compute Endpoints
 ****************************
 
+.. attention::
+
   This chapter describes Multi-user Compute Endpoints (MEP) for site administrators.
   For those not running MEPs with ``root`` privileges, please instead consult the
   :ref:`endpoints_templating_configuration` section in the previous chapter.
+
+
+.. tip::
+
+   For those just looking to get up and running, see the `Administrator Quickstart`_,
+   below.
+
 
 Multi-user Compute Endpoints (MEP) enable administrators to securely offer compute
 resources to users without mandating the typical shell access (i.e., ssh).  The basic
@@ -21,11 +30,6 @@ the same time lowering the barrier to use of the resource.
    for discussion so as to differentiate the two different starting contexts.  An
    endpoint is started manually by a human, while a UEP will always have a
    parent MEP process.
-
-.. tip::
-
-   For those just looking to get up and running, see the `Administrator Quickstart`_,
-   below.
 
 
 User Endpoint Startup Overview
@@ -57,52 +61,115 @@ request), and immediately let the web service know it is ready to receive tasks.
 (For those who prefer lists over prose, please see :ref:`tracing-a-task-to-mep`.)
 
 
-Security Posture
-================
+Key Benefits
+============
 
-The current security model of the MEP relies heavily upon Identity Mapping and POSIX
-user support.  The only job of the MEP is to start UEPs for users on request from the
-Globus Compute web service.  The actual processing of tasks is left to the individual
-UEPs.  This is accomplished through the well-known ``fork()`` |rarr| *drop privileges*
-|rarr| ``exec()`` Unix workflow, mimicking the approach of many other services
-(including Secure Shell [ssh], Globus GridFTP, and the Apache Web server).  In this
-manner, all of the standard Unix administrative user controls can be enforced.
+For Administrators
+------------------
 
-Additionally, administrators may further limit access to MEP installations via Globus
-authentication policies, which can verify that users have site-appropriate identities
-linked to their Globus account with recent authentications.
+This biggest benefit of a MEP setup is a lowering of the barrier for legitimate users of
+a site.  To date, knowledge of the command line has been critical to most users of High
+Performance Computing (HPC) systems, though only as a necessity of infrastructure rather
+than a legitimate scientific purpose.  A MEP allows a user to ignore many of the
+important-but-not-really details of plumbing, like logging in through SSH, restarting
+user-only daemons, or, in the case of Globus Compute, fine-tuning scheduler options by
+managing multiple endpoint configurations.  The only thing they need to do is run their
+scripts locally on their own workstation, and the rest "just works."
 
+Another boon for administrators is the ability to fine-tune and pre-configure what
+resources UEPs may utilize.  For example, many users struggle to discover which
+interface is routed to a cluster's internal network; the administrator can preset that,
+completely bypassing the question.  Using `ALCF's Polaris
+<https://www.alcf.anl.gov/polaris>`_ as an example, the administrator could use the
+following user configuration template (``user_config_template.yaml.j2``) to place all
+jobs sent to this MEP on the ``debug-scaling`` queue, and pre-select the obvious
+defaults (`per the documentation <https://docs.alcf.anl.gov/polaris/running-jobs/>`_):
 
-.. _identity-mapping:
+.. code-block:: yaml+jinja
+   :caption: ``/root/.globus_compute/mep_debug_scaling/user_config_template.yaml.j2``
 
-Identity Mapping
-----------------
+   display_name: Polaris at ALCF - debug-scaling queue
+   engine:
+     type: GlobusComputeEngine
+     address:
+       type: address_by_interface
+       ifname: bond0
 
-"Mapping an identity" is the site-specific process of verifying that one identity is
-equivalent to another for the purposes of a given action.  In the Globus Compute case,
-this means translating a Globus Auth identity set to a local POSIX user account on the
-MEP host for each start-UEP message.  For an administrator-run MEP (i.e., running as the
-``root`` user), an identity mapping configuration is required, and is the main
-difference from a :ref:`non-root MEP <endpoints_templating_configuration>` |nbsp| ---
-|nbsp| a ``root``-owned MEP first maps the Globus Auth identity set from each start-UEP
-message to a local POSIX user (i.e., a local username), before ``fork()``-ing a new
-process, dropping privileges to that user, and starting the requested UEP.
+     strategy:
+       type: SimpleStrategy
+       max_idletime: 30
 
-Please reference the discussion with :ref:`example-idmap-config` (below) for specifics
-and examples.
+     provider:
+       type: PBSProProvider
+       queue: debug-scaling
 
+       account: {{ ACCOUNT_ID }}
 
-Authentication Policies
------------------------
+       # Command to be run before starting a worker
+       # e.g., "module load Anaconda; source activate parsl_env"
+       worker_init: {{ WORKER_INIT_COMMAND|default() }}
 
-In addition to the identity mapping access control, administrators may also use Globus
-authentication policies to narrow which identities can even send tasks to a MEP.  An
-authentication policy can enforce details such as that a user has an identity from a
-specific domain or has authenticated with the Globus Auth recently.  Refer to the
-`Authentication Policies documentation`_ for more background and specifics on what
-Globus authentication policies can do and how they fit in to a site's security posture.
+       init_blocks: 0
+       min_blocks: 0
+       max_blocks: 1
+       nodes_per_block: {{ NODES_PER_BLOCK|default(1) }}
 
-Please reference the larger :ref:`auth-policies` section (below) for more information.
+       walltime: 1:00:00
+
+       launcher:
+         type: MpiExecLauncher
+
+   idle_heartbeats_soft: 10
+   idle_heartbeats_hard: 5760
+
+The user must specify the ``ACCOUNT_ID``, and could optionally specify the
+``WORKER_INIT_COMMAND`` and ``NODES_PER_BLOCK`` variables.  If the user's jobs finish
+and no more work comes in after ``max_idletime`` seconds (30s), the UEP will scale down
+and consume no more wall time.
+
+Another benefit is a cleaner process table on the login nodes.  Rather than having user
+endpoints sit idle on a login-node for days after a run has completed (perhaps until the
+next machine reboot), a MEP setup automatically shuts down idle UEPs (as defined in
+``user_config_template.yaml.j2``).  When the UEP has had no movement for 48h (by
+default; see ``idle_heartbeat_hard``), or has no outstanding work for 5m (by default;
+see ``idle_heartbeats_soft``), it will shut itself down.
+
+For Users
+---------
+
+Under the MEP paradigm, users largely benefit from not having to be quite so aware of an
+endpoint and its configuration.  As the administrator will have taken care of most of
+the smaller details (c.f., installation, internal interfaces, queue policies), the user
+is able to write a consuming script, knowing only the endpoint id and their system
+accounting username:
+
+.. code-block:: python
+
+   import concurrent.futures
+   from globus_compute_sdk import Executor
+
+   def jitter_double(task_num):
+       import random
+       return task_num, task_num * (1.5 + random.random())
+
+   polaris_site_id = "..."  # as acquired from the admin in the previous section
+   with Executor(
+       endpoint_id=polaris_site_id,
+       user_endpoint_config={
+           "ACCOUNT_ID": "user_allocation_account_id",
+           "NODES_PER_BLOCK": 2,
+       }
+   ) as ex:
+       futs = [ex.submit(jitter_double, task_num) for task_num in range(100)]
+       for fut in concurrent.futures.as_completed(futs):
+           print("Result:", fut.result())
+
+It is a boon for the researcher to see the relevant configuration variables immediately
+adjacent to the code, as opposed to hidden in the endpoint configuration and behind an
+opaque endpoint id.  An MEP removes almost half of the infrastructure plumbing that the
+user must manage |nbsp| --- |nbsp| many users will barely even need to open their own
+terminal, much less an SSH terminal on a login node.
+
 
 Configuration
 =============
@@ -463,6 +530,67 @@ behave as expected.  Example:
    SITE_SPECIFIC_VAR: --additional_flag_for_frobnicator
 
 That will be injected into the UEP process as an environment variable.
+
+
+Security Posture
+================
+
+The current security model of the MEP relies heavily upon Identity Mapping and POSIX
+user support.  The only job of the MEP is to start UEPs for users on request from the
+Globus Compute web service.  The actual processing of tasks is left to the individual
+UEPs.  This is accomplished through the well-known ``fork()`` |rarr| *drop privileges*
+|rarr| ``exec()`` Unix workflow, mimicking the approach of many other services
+(including Secure Shell [ssh], Globus GridFTP, and the Apache Web server).  In this
+manner, all of the standard Unix administrative user controls can be enforced.
+
+Additionally, administrators may further limit access to MEP installations via Globus
+authentication policies (which can verify that users have site-appropriate identities
+linked to their Globus account with recent authentications), and limiting tasks to an
+approved list of functions.
+
+
+.. _identity-mapping:
+
+Identity Mapping
+----------------
+
+"Mapping an identity" is the site-specific process of verifying that one identity is
+equivalent to another for the purposes of a given action.  In the Globus Compute case,
+this means translating a Globus Auth identity set to a local POSIX user account on the
+MEP host for each start-UEP message.  For an administrator-run MEP (i.e., running as the
+``root`` user), an identity mapping configuration is required, and is the main
+difference from a :ref:`non-root MEP <endpoints_templating_configuration>` |nbsp| ---
+|nbsp| a ``root``-owned MEP first maps the Globus Auth identity set from each start-UEP
+message to a local POSIX user (i.e., a local username), before ``fork()``-ing a new
+process, dropping privileges to that user, and starting the requested UEP.
+
+Please reference the discussion with :ref:`example-idmap-config` (above) for specifics
+and examples.
+
+
+Authentication Policies
+-----------------------
+
+In addition to the identity mapping access control, administrators may also use Globus
+authentication policies to narrow which identities can even send tasks to a MEP.  An
+authentication policy can enforce details such as that a user has an identity from a
+specific domain or has authenticated with the Globus Auth recently.  Refer to the
+`Authentication Policies documentation`_ for more background and specifics on what
+Globus authentication policies can do and how they fit in to a site's security posture.
+
+Please reference the larger :ref:`auth-policies` section (below) for more information.
+
+
+Function Allow Listing
+----------------------
+
+Administrators can further narrow MEP usage by limiting what functions may be invoked
+by tasks.  At task submission time, the web-service will reject any submissions that
+request functions not in the MEP's configured ``allowed_functions`` list.  Then, child
+UEPs will again verify each task against the same list |nbsp| --- |nbsp| a check at the
+web-service and a check on-site.
+
+Please reference :ref:`function-allowlist` (below) for more detailed information.
 
 
 Running the MEP
@@ -886,7 +1014,7 @@ make the necessary changes to ``config.yaml``:
 Function Allow Listing
 ======================
 
-To require that UEPs only invoke certain functions, specify the ``allowed_functions``
+To require that UEPs only allow certain functions, specify the ``allowed_functions``
 top-level configuration item:
 
 .. code-block:: yaml
@@ -897,41 +1025,60 @@ top-level configuration item:
       - e552e7f2-c007-4671-8ca4-3a4fd84f3805
 
 At registration, the web service will be apprised of these function identifiers, and
-tasks that are to run other functions on any of the UEPs will be rebuffed with
-exceptions like:
+only tasks that invoke these functions will be sent to the UEPs of the MEP.  Any
+submission that specifies non-approved function identifiers will be rebuffed with
+HTTP 403 response like:
+
+.. code-block:: text
+   :caption: *Example HTTP invalid function error response via the SDK; edited for clarity*
+
+   403
+   FUNCTION_NOT_PERMITTED
+   Function <function_identifier> not permitted on endpoint <MEP_identifier>
+
+Additionally, UEPs of a function-restricted MEP will verify that tasks only use
+functions from the allow list.  Given the guarantees of the API, this is a redundant
+verification, but is performed locally as a precautionary measure.
+
+There are some instances where an administrator may want to restrict different users to
+different functions.  In this scenario, the administrator must specify the restricted
+functions within the :ref:`Jinja template logic for the UEP configuration
+<user-config-template-yaml-j2>`, and *specifically not specify any restrictions in the
+parent MEP*.  In this setup, the web-service will not verify task-requested functions
+as this check will be done locally by the UEP.  An example UEP configuration template
+snippet might be:
+
+.. code-block:: yaml+jinja
+
+   engine:
+      ...
+   allowed_functions:
+   {% if '3.13' in user_runtime.python_version %}
+     - c01ebede-06f5-4647-9712-e5649d0f573a
+     - 701fc11a-69b5-4e97-899b-58c3cb56334d
+   {% elif '3.12' in user_runtime.python_version %}
+     - 8dea796f-67cd-49ba-92b9-c9763d76a21d
+     - 0a6e8bed-ae93-4fd5-bb60-11c45bc1f42d
+   {% endif %}
+
+Rejections to the SDK from the UEP look slightly different:
 
 .. code-block:: text
 
-   Function 3b3f5d38-4a9f-475a-81b8-eb7c8b7e9934 not permitted on endpoint 97c42385-dcbc-4599-b5f2-60bac94aec3f
+   Function <function_identifier> not permitted on endpoint <UEP_internal_identifier>
 
+In the web-response, the task is not sent to the MEP site at all and the listed
+endpoint identifier belongs to the MEP.  In this second error message, the UEP was
+started, received the task and rejected it; the mentioned endpoint is the internal UEP
+identifier, not the parent MEP identifier.
 
-An Open Endpoint
-================
+.. attention::
 
-As mentioned in the discussion of the ``example_identity_mapping_config.json`` file,
-the mapping of identities is a critical piece of the puzzle, and the configuration is
-completely up to the administrator.  If one wanted to freely share a Compute resource,
-one possible avenue is to map all incoming identities to a single local POSIX user.
-
-A configuration for that would look like:
-
-.. code-block:: json
-   :caption: WARNING: an OPEN endpoint configuration.  Do not use unless prepared to run
-       code from arbitrary sources.
-
-   [
-     {
-       "DATA_TYPE": "expression_identity_mapping#1.0.0",
-       "mappings": [
-         {"source": "{username}", "match": ".*", "output": "root"}
-       ]
-     }
-   ]
-
-This configuration will map all incoming identities to the ``root`` user and proceed
-to start the UEP.  One could of course change ``root`` to another local POSIX user, but
-the larger point is that the identity mapping configuration *is really important* to get
-right.
+   By design, it is not possible to further restrict a UEP's set of allowed functions
+   if the MEP has specified ``allowed_functions``.  If the template configuration
+   sets ``allowed_functions`` and the MEP's ``config.yaml`` also specifies
+   ``allowed_functions``, then the UEP's configuration is ignored.  The only exception
+   to this is if the MEP does *not* restrict the functions, as discussed above.
 
 
 .. _tracing-a-task-to-mep:
@@ -1033,116 +1180,6 @@ to the Executor constructor or for later submissions:
 
 N.B. this is example code highlighting the ``user_endpoint_config`` attribute of the
 ``Executor`` class; please generally consult the :doc:`../executor` documentation.
-
-
-Key Benefits
-============
-
-For Administrators
-------------------
-
-This biggest benefit of a MEP setup is a lowering of the barrier for legitimate users of
-a site.  To date, knowledge of the command line has been critical to most users of High
-Performance Computing (HPC) systems, though only as a necessity of infrastructure rather
-than a legitimate scientific purpose.  A MEP allows a user to ignore many of the
-important-but-not-really details of plumbing, like logging in through SSH, restarting
-user-only daemons, or, in the case of Globus Compute, fine-tuning scheduler options by
-managing multiple endpoint configurations.  The only thing they need to do is run their
-scripts locally on their own workstation, and the rest "just works."
-
-Another boon for administrators is the ability to fine-tune and pre-configure what
-resources UEPs may utilize.  For example, many users struggle to discover which
-interface is routed to a cluster's internal network; the administrator can preset that,
-completely bypassing the question.  Using `ALCF's Polaris
-<https://www.alcf.anl.gov/polaris>`_ as an example, the administrator could use the
-following user configuration template (``user_config_template.yaml.j2``) to place all
-jobs sent to this MEP on the ``debug-scaling`` queue, and pre-select the obvious
-defaults (`per the documentation <https://docs.alcf.anl.gov/polaris/running-jobs/>`_):
-
-.. code-block:: yaml+jinja
-   :caption: ``/root/.globus_compute/mep_debug_scaling/user_config_template.yaml.j2``
-
-   display_name: Polaris at ALCF - debug-scaling queue
-   engine:
-     type: GlobusComputeEngine
-     address:
-       type: address_by_interface
-       ifname: bond0
-
-     strategy:
-       type: SimpleStrategy
-       max_idletime: 30
-
-     provider:
-       type: PBSProProvider
-       queue: debug-scaling
-
-       account: {{ ACCOUNT_ID }}
-
-       # Command to be run before starting a worker
-       # e.g., "module load Anaconda; source activate parsl_env"
-       worker_init: {{ WORKER_INIT_COMMAND|default() }}
-
-       init_blocks: 0
-       min_blocks: 0
-       max_blocks: 1
-       nodes_per_block: {{ NODES_PER_BLOCK|default(1) }}
-
-       walltime: 1:00:00
-
-       launcher:
-         type: MpiExecLauncher
-
-   idle_heartbeats_soft: 10
-   idle_heartbeats_hard: 5760
-
-The user must specify the ``ACCOUNT_ID``, and could optionally specify the
-``WORKER_INIT_COMMAND`` and ``NODES_PER_BLOCK`` variables.  If the user's jobs finish
-and no more work comes in after ``max_idletime`` seconds (30s), the UEP will scale down
-and consume no more wall time.
-
-Another benefit is a cleaner process table on the login nodes.  Rather than having user
-endpoints sit idle on a login-node for days after a run has completed (perhaps until the
-next machine reboot), a MEP setup automatically shuts down idle UEPs (as defined in
-``user_config_template.yaml.j2``).  When the UEP has had no movement for 48h (by
-default; see ``idle_heartbeat_hard``), or has no outstanding work for 5m (by default;
-see ``idle_heartbeats_soft``), it will shut itself down.
-
-For Users
----------
-
-Under the MEP paradigm, users largely benefit from not having to be quite so aware of an
-endpoint and its configuration.  As the administrator will have taken care of most of
-the smaller details (c.f., installation, internal interfaces, queue policies), the user
-is able to write a consuming script, knowing only the endpoint id and their system
-accounting username:
-
-.. code-block:: python
-
-   import concurrent.futures
-   from globus_compute_sdk import Executor
-
-   def jitter_double(task_num):
-       import random
-       return task_num, task_num * (1.5 + random.random())
-
-   polaris_site_id = "..."  # as acquired from the admin in the previous section
-   with Executor(
-       endpoint_id=polaris_site_id,
-       user_endpoint_config={
-           "ACCOUNT_ID": "user_allocation_account_id",
-           "NODES_PER_BLOCK": 2,
-       }
-   ) as ex:
-       futs = [ex.submit(jitter_double, task_num) for task_num in range(100)]
-       for fut in concurrent.futures.as_completed(futs):
-           print("Result:", fut.result())
-
-It is a boon for the researcher to see the relevant configuration variables immediately
-adjacent to the code, as opposed to hidden in the endpoint configuration and behind an
-opaque endpoint id.  An MEP removes almost half of the infrastructure plumbing that the
-user must manage |nbsp| --- |nbsp| many users will barely even need to open their own
-terminal, much less an SSH terminal on a login node.
 
 
 Administrator Quickstart
