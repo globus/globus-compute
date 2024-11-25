@@ -356,10 +356,7 @@ class Interchange:
             self.provider.channel.script_dir = os.path.join(
                 working_dir, "submit_scripts"
             )
-            self.provider.channel.makedirs(
-                self.provider.channel.script_dir, exist_ok=True
-            )
-            os.makedirs(self.provider.script_dir, exist_ok=True)
+            os.makedirs(self.provider.channel.script_dir, exist_ok=True)
 
         debug_opts = "--debug" if self.worker_debug else ""
         max_workers = (
