@@ -356,9 +356,7 @@ class Interchange:
             self.provider.channel.script_dir = os.path.join(
                 working_dir, "submit_scripts"
             )
-            os.makedirs(
-                self.provider.channel.script_dir, exist_ok=True
-            )
+            os.makedirs(self.provider.channel.script_dir, exist_ok=True)
             os.makedirs(self.provider.script_dir, exist_ok=True)
 
         debug_opts = "--debug" if self.worker_debug else ""
