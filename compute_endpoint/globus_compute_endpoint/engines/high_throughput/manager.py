@@ -214,7 +214,7 @@ class Manager:
         self.funcx_task_socket = self.context.socket(zmq.ROUTER)
         self.funcx_task_socket.setsockopt(zmq.IPV6, True)
         self.funcx_task_socket.set_hwm(0)
-        self.address = "::1"
+        self.address = "127.0.0.1"
         self.worker_port = self.funcx_task_socket.bind_to_random_port(
             "tcp://*",
             min_port=self.internal_worker_port_range[0],

@@ -90,7 +90,7 @@ class TaskQueue:
             self.zmq_socket.setsockopt(zmq.SNDTIMEO, SNDTIMEO)
         if linger is not None:
             self.zmq_socket.setsockopt(zmq.LINGER, linger)
-        self.zmq_socket.setsockopt(zmq.IPV6, True)
+#        self.zmq_socket.setsockopt(zmq.IPV6, True)
 
         # all zmq setsockopt calls must be done before bind/connect is called
         if self.mode == "server":
