@@ -232,16 +232,19 @@ class Interchange:
         self.context = zmq.Context()
         self.task_incoming = self.context.socket(zmq.DEALER)
         self.task_incoming.set_hwm(0)
+        self.task_incoming.setsockopt(zmq.IPV6, True)
         self.task_incoming.RCVTIMEO = 10  # in milliseconds
         log.info(f"Task incoming on tcp://{client_address}:{client_ports[0]}")
         self.task_incoming.connect(f"tcp://{client_address}:{client_ports[0]}")
 
         self.results_outgoing = self.context.socket(zmq.DEALER)
         self.results_outgoing.set_hwm(0)
+        self.results_outgoing.setsockopt(zmq.IPV6, True)
         log.info(f"Results outgoing on tcp://{client_address}:{client_ports[1]}")
         self.results_outgoing.connect(f"tcp://{client_address}:{client_ports[1]}")
 
         self.command_channel = self.context.socket(zmq.DEALER)
+        self.command_channel.setsockopt(zmq.IPV6, True)
         self.command_channel.RCVTIMEO = 1000  # in milliseconds
         # self.command_channel.set_hwm(0)
         log.info(f"Command _channel on tcp://{client_address}:{client_ports[2]}")
@@ -260,8 +263,10 @@ class Interchange:
 
         self.task_outgoing = self.context.socket(zmq.ROUTER)
         self.task_outgoing.set_hwm(0)
+        self.task_outgoing.setsockopt(zmq.IPV6, True)
         self.results_incoming = self.context.socket(zmq.ROUTER)
         self.results_incoming.set_hwm(0)
+        self.results_incoming.setsockopt(zmq.IPV6, True)
 
         self.endpoint_id = endpoint_id
         worker_bind_address = f"tcp://{self.interchange_address}"
