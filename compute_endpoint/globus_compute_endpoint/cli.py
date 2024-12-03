@@ -642,6 +642,8 @@ def _do_start_endpoint(
             reg_info = stdin_data.get("amqp_creds", {})
             config_str = stdin_data.get("config", None)
 
+            del stdin_data  # clarity for intended scope
+
         except Exception as e:
             exc_type = e.__class__.__name__
             log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
