@@ -1073,10 +1073,11 @@ class EndpointManager:
                 self._config, template_str, user_config_schema, user_opts, user_runtime
             )
             stdin_data_dict = {
+                "allowed_functions": self._config.allowed_functions,
                 "amqp_creds": kwargs.get("amqp_creds"),
                 "config": user_config,
             }
-            stdin_data = json.dumps(stdin_data_dict)
+            stdin_data = json.dumps(stdin_data_dict, separators=(",", ":"))
             exit_code += 1
 
             # Reminder: this is *os*.open, not *open*.  Descriptors will not be closed
