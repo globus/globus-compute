@@ -626,8 +626,10 @@ def _do_start_endpoint(
             no_color=state.no_color,
         )
 
+    _no_fn_list_canary = -15  # an arbitrary random integer; invalid as an allow_list
     reg_info = {}
-    config_str = None
+    config_str: str | None = None
+    fn_allow_list: list[str] | None | int = _no_fn_list_canary
     if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
         try:
             stdin_data = json.loads(sys.stdin.read())
@@ -641,6 +643,7 @@ def _do_start_endpoint(
 
             reg_info = stdin_data.get("amqp_creds", {})
             config_str = stdin_data.get("config", None)
+            fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
 
             del stdin_data  # clarity for intended scope
 
@@ -655,6 +658,9 @@ def _do_start_endpoint(
             else:
                 ep_config = get_config(ep_dir)
             del config_str
+
+            if fn_allow_list != _no_fn_list_canary:
+                ep_config.allowed_functions = fn_allow_list
 
             if not state.debug and ep_config.debug:
                 setup_logging(

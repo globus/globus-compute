@@ -117,7 +117,7 @@ class BaseConfig:
 
     @property
     def allowed_functions(self):
-        if self._allowed_functions:
+        if self._allowed_functions is not None:
             return tuple(map(str, self._allowed_functions))
         return None
 

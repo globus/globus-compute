@@ -2006,8 +2006,7 @@ def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, con
 
     conf_str = "v: " + "$" * (conf_size - 3)
 
-    # Add 34 bytes for dict keys, etc.
-    stdin_data_size = conf_size + 34
+    stdin_data_size = conf_size + 56  # overhead for JSON dict keys, etc.
     pipe_buffer_size = 512
     # Subtract 256 for hard-coded buffer in-code
     is_valid = pipe_buffer_size - 256 - stdin_data_size >= 0
@@ -2037,6 +2036,30 @@ def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, co
         em._event_loop()
 
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+
+
+@pytest.mark.parametrize("fn_count", (0, 1, 2, 3, random.randint(4, 100)))
+def test_set_uep_allowed_functions(
+    successful_exec_from_mocked_root, mock_conf_root, fn_count
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    m = mock.Mock()
+    mock_os.fdopen.return_value.__enter__.return_value = m
+
+    fns = [str(uuid.uuid4()) for _ in range(fn_count)]
+    mock_conf_root.allowed_functions = fns
+    with mock.patch.object(fcntl, "fcntl", return_value=2**20):
+        # 2**20 == plenty for test
+        with pytest.raises(SystemExit) as pyexc:
+            em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    (received_stdin,), _k = m.write.call_args
+    parsed_stdin = json.loads(received_stdin)
+    assert "allowed_functions" in parsed_stdin, "Even empty list should be stated"
+    assert parsed_stdin["allowed_functions"] == fns
 
 
 def test_redirect_stdstreams_to_user_log(

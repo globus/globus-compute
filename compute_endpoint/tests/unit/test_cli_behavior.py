@@ -313,6 +313,34 @@ def test_start_ep_reads_stdin(
         assert reg_info_found == {}
 
 
+@pytest.mark.parametrize("fn_count", range(-1, 5))
+def test_start_ep_stdin_allowed_fns_overrides_conf(
+    mocker, run_line, mock_cli_state, make_endpoint_dir, ep_name, fn_count
+):
+    if fn_count == -1:
+        allowed_fns = None
+    else:
+        allowed_fns = tuple(str(uuid.uuid4()) for _ in range(fn_count))
+
+    conf = UserEndpointConfig(executors=[ThreadPoolEngine])
+    conf.allowed_functions = [uuid.uuid4() for _ in range(5)]  # to be overridden
+    mock_get_config = mocker.patch(f"{_MOCK_BASE}get_config")
+    mock_get_config.return_value = conf
+
+    mock_sys = mocker.patch(f"{_MOCK_BASE}sys")
+    mock_sys.stdin.closed = False
+    mock_sys.stdin.isatty.return_value = False
+    mock_sys.stdin.read.return_value = json.dumps({"allowed_functions": allowed_fns})
+
+    make_endpoint_dir()
+
+    run_line(f"start {ep_name}")
+    mock_ep, _ = mock_cli_state
+    assert mock_ep.start_endpoint.called
+    (_, _, found_conf, *_), _k = mock_ep.start_endpoint.call_args
+    assert found_conf.allowed_functions == allowed_fns, "allowed field not overridden!"
+
+
 @pytest.mark.parametrize("use_uuid", (True, False))
 @mock.patch(f"{_MOCK_BASE}get_config")
 def test_stop_endpoint(
