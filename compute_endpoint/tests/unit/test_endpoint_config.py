@@ -227,3 +227,20 @@ def test_managerconfig_repr_nondefault_kwargs(
         repr_c = repr(ManagerEndpointConfig(**{kw: val}))
 
     assert f"{kw}={repr(val)}" in repr_c
+
+
+def test_engine_model_objects_allow_extra():
+    config_dict = {
+        "engine": {
+            "type": "GlobusComputeEngine",
+            "address": {
+                "type": "address_by_interface",
+                "ifname": "lo",  # Not specified in model
+            },
+            "provider": {
+                "type": "LocalProvider",
+                "max_blocks": 2,  # Not specified in model
+            },
+        }
+    }
+    UserEndpointConfigModel(**config_dict)
