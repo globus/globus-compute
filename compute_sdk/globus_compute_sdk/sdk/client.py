@@ -429,6 +429,7 @@ class Client:
         auth_policy: UUID_LIKE_T | None = None,
         subscription_id: UUID_LIKE_T | None = None,
         public: bool | None = None,
+        high_assurance: bool | None = None,
     ):
         """Register an endpoint with the Globus Compute service.
 
@@ -442,6 +443,8 @@ class Client:
             Endpoint metadata
         multi_user : bool | None
             Whether the endpoint supports multiple users
+        high_assurance : bool | None
+            Whether the endpoint should be high assurance capable
         display_name : str | None
             The display name of the endpoint
         allowed_functions: list[str | UUID] | None
@@ -472,6 +475,7 @@ class Client:
             auth_policy=auth_policy,
             subscription_id=subscription_id,
             public=public,
+            high_assurance=high_assurance,
         )
         return r.data
 
