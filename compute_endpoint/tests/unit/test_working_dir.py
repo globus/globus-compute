@@ -23,7 +23,7 @@ def reset_cwd():
 
 @pytest.mark.parametrize(
     "engine",
-    (GlobusComputeEngine(address="127.0.0.1"), ThreadPoolEngine(), ProcessPoolEngine()),
+    (GlobusComputeEngine(address="::1"), ThreadPoolEngine(), ProcessPoolEngine()),
 )
 def test_set_working_dir_default(engine, tmp_path):
     """Verify that working dir is set to tasks dir in the run_dir by default for all
@@ -36,7 +36,7 @@ def test_set_working_dir_default(engine, tmp_path):
 
 @pytest.mark.parametrize(
     "engine",
-    (GlobusComputeEngine(address="127.0.0.1"), ThreadPoolEngine(), ProcessPoolEngine()),
+    (GlobusComputeEngine(address="::1"), ThreadPoolEngine(), ProcessPoolEngine()),
 )
 def test_set_working_dir_called(engine, tmp_path, endpoint_uuid):
     """Verify that set_working_dir is called when engine.start() is called"""
@@ -50,7 +50,7 @@ def test_set_working_dir_called(engine, tmp_path, endpoint_uuid):
 
 @pytest.mark.parametrize(
     "engine",
-    (GlobusComputeEngine(address="127.0.0.1"), ThreadPoolEngine(), ProcessPoolEngine()),
+    (GlobusComputeEngine(address="::1"), ThreadPoolEngine(), ProcessPoolEngine()),
 )
 def test_set_working_dir_relative(engine, tmp_path):
     """Working_dir should be absolute and set relative to the endpoint run_dir"""
@@ -64,7 +64,7 @@ def test_set_working_dir_relative(engine, tmp_path):
 def test_default_working_dir(tmp_path):
     """Test working_dir relative to run_dir"""
     gce = GlobusComputeEngine(
-        address="127.0.0.1",
+        address="::1",
     )
     gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
     gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
@@ -75,7 +75,7 @@ def test_default_working_dir(tmp_path):
 def test_relative_working_dir(tmp_path):
     """Test working_dir relative to run_dir"""
     gce = GlobusComputeEngine(
-        address="127.0.0.1",
+        address="::1",
         working_dir="relative_path",
     )
     gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
@@ -87,7 +87,7 @@ def test_relative_working_dir(tmp_path):
 def test_absolute_working_dir(tmp_path):
     """Test absolute path for working_dir"""
     gce = GlobusComputeEngine(
-        address="127.0.0.1",
+        address="::1",
         working_dir="/absolute/path",
     )
     gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
@@ -99,7 +99,7 @@ def test_absolute_working_dir(tmp_path):
 def test_submit_pass(tmp_path, task_uuid):
     """Test absolute path for working_dir"""
     gce = GlobusComputeEngine(
-        address="127.0.0.1",
+        address="::1",
     )
     gce.executor.start = mock.Mock(spec=HighThroughputExecutor.start)
     gce.executor.submit = mock.Mock(spec=HighThroughputExecutor.submit)

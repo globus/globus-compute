@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def gc_engine_scaling(tmp_path):
     ep_id = uuid.uuid4()
     engine = GlobusComputeEngine(
-        address="127.0.0.1",
+        address="::1",
         heartbeat_period=1,
         heartbeat_threshold=2,
         provider=LocalProvider(
@@ -37,7 +37,7 @@ def gc_engine_scaling(tmp_path):
 def gc_engine_non_scaling(tmp_path):
     ep_id = uuid.uuid4()
     engine = GlobusComputeEngine(
-        address="127.0.0.1",
+        address="::1",
         heartbeat_period=1,
         heartbeat_threshold=2,
         provider=LocalProvider(

@@ -20,7 +20,7 @@ _MOCK_BASE = "globus_compute_endpoint.endpoint.config."
 
 @pytest.fixture
 def config_dict():
-    return {"engine": {"type": "GlobusComputeEngine", "address": "127.0.0.1"}}
+    return {"engine": {"type": "GlobusComputeEngine", "address": "localhost"}}
 
 
 @pytest.fixture
@@ -140,7 +140,9 @@ def test_conditional_engine_strategy(
 ):
     config_dict["engine"]["type"] = engine_type
     config_dict["engine"]["strategy"] = strategy
-    config_dict["engine"]["address"] = "127.0.0.1"
+    config_dict["engine"]["address"] = (
+        "::1" if engine_type != "HighThroughputEngine" else "127.0.0.1"
+    )
 
     if engine_type == "GlobusComputeEngine":
         if isinstance(strategy, str) or strategy is None:
@@ -173,7 +175,7 @@ def test_provider_container_compatibility(
 ):
     config_dict["engine"]["container_uri"] = "docker://ubuntu"
     config_dict["engine"]["provider"] = {"type": provider_type}
-    config_dict["engine"]["address"] = "127.0.0.1"
+    config_dict["engine"]["address"] = "::1"
 
     if compatible:
         UserEndpointConfigModel(**config_dict)

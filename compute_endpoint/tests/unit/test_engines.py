@@ -187,7 +187,8 @@ def test_gc_engine_system_failure(ez_pack_task, task_uuid, engine_runner):
 def test_serialized_engine_config_has_provider(
     engine_type: t.Type[GlobusComputeEngineBase],
 ):
-    ep_config = UserEndpointConfig(executors=[engine_type(address="127.0.0.1")])
+    loopback = "127.0.0.1" if engine_type != "HighThroughputEngine" else "::1"
+    ep_config = UserEndpointConfig(executors=[engine_type(address=loopback)])
 
     res = serialize_config(ep_config)
     executor = res["executors"][0].get("executor") or res["executors"][0]
@@ -196,7 +197,7 @@ def test_serialized_engine_config_has_provider(
 
 
 def test_gcengine_compute_launch_cmd():
-    engine = GlobusComputeEngine(address="127.0.0.1")
+    engine = GlobusComputeEngine(address="::1")
     assert engine.executor.launch_cmd.startswith(
         "globus-compute-endpoint python-exec"
         " parsl.executors.high_throughput.process_worker_pool"
@@ -205,7 +206,7 @@ def test_gcengine_compute_launch_cmd():
 
 
 def test_gcengine_compute_interchange_launch_cmd():
-    engine = GlobusComputeEngine(address="127.0.0.1")
+    engine = GlobusComputeEngine(address="::1")
     assert engine.executor.interchange_launch_cmd[:3] == [
         "globus-compute-endpoint",
         "python-exec",
@@ -218,7 +219,7 @@ def test_gcengine_pass_through_to_executor(randomstring):
     args = ("arg1", 2)
     kwargs = {
         "label": "VroomEngine",
-        "address": "127.0.0.1",
+        "address": "::1",
         "encrypted": False,
         "max_workers_per_node": 1,
         "foo": "bar",
@@ -291,12 +292,12 @@ def test_gcengine_encrypted(encrypted: bool, engine_runner):
 
 
 def test_gcengine_new_executor_not_exceptional():
-    gce = GlobusComputeEngine(address="127.0.0.1")
+    gce = GlobusComputeEngine(address="::1")
     assert gce.executor_exception is None, "Expect no exception from fresh Executor"
 
 
 def test_gcengine_executor_exception_passthrough(randomstring):
-    gce = GlobusComputeEngine(address="127.0.0.1")
+    gce = GlobusComputeEngine(address="::1")
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
     assert isinstance(gce.executor_exception, ZeroDivisionError)
@@ -304,7 +305,7 @@ def test_gcengine_executor_exception_passthrough(randomstring):
 
 
 def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
-    gce = GlobusComputeEngine(address="127.0.0.1")
+    gce = GlobusComputeEngine(address="::1")
     gce._engine_ready = True
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
@@ -320,7 +321,7 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
 
 
 def test_gcengine_exception_report_from_bad_state(task_uuid):
-    gce = GlobusComputeEngine(address="127.0.0.1")
+    gce = GlobusComputeEngine(address="::1")
     gce._engine_ready = True
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
@@ -343,19 +344,19 @@ def test_gcengine_exception_report_from_bad_state(task_uuid):
 
 def test_gcengine_rejects_mpi_mode(randomstring):
     with pytest.raises(ValueError) as pyt_exc_1:
-        GlobusComputeEngine(enable_mpi_mode=True, address="127.0.0.1")
+        GlobusComputeEngine(enable_mpi_mode=True, address="::1")
 
     assert "is not supported" in str(pyt_exc_1)
 
     with pytest.raises(ValueError) as pyt_exc_2:
-        GlobusComputeEngine(mpi_launcher=randomstring(), address="127.0.0.1")
+        GlobusComputeEngine(mpi_launcher=randomstring(), address="::1")
 
     assert "is not supported" in str(pyt_exc_2)
 
 
 def test_gcengine_rejects_resource_specification(task_uuid):
     with pytest.raises(ValueError) as pyt_exc:
-        gce = GlobusComputeEngine(address="127.0.0.1")
+        gce = GlobusComputeEngine(address="::1")
         gce._engine_ready = True
         gce.submit(
             str(task_uuid),
@@ -387,7 +388,7 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
     with mock.patch.object(GlobusMPIEngine, "_ExecutorClass") as mock_ex:
         mock_ex.__name__ = "ClassName"
         mock_ex.return_value = mock.Mock(launch_cmd="")
-        engine = GlobusMPIEngine(address="127.0.0.1")
+        engine = GlobusMPIEngine(address="::1")
         engine._engine_ready = True
         engine.submit(str(task_uuid), b"some task", resource_specification=spec)
 
@@ -395,3 +396,23 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
 
     a, _k = engine.executor.submit.call_args
     assert spec in a
+
+
+@pytest.mark.parametrize(
+    ("input", "is_valid"),
+    (
+        [None, False],
+        ["", False],
+        ["localhost.1", False],
+        ["localhost", True],
+        ["1.2.3.4.5", False],
+        ["127.0.0.1", True],
+        ["example.com", True],
+        ["0:0:0:0:0:0:0:1", True],
+        ["11111:0:0:0:0:0:0:1", False],
+        ["::1", True],
+        ["abc", False],
+    ),
+)
+def test_hostname_or_ip_validation(input, is_valid):
+    assert HighThroughputEngine.is_hostname_or_ip(input) is is_valid

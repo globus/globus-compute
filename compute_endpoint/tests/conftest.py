@@ -139,7 +139,7 @@ def engine_runner(
             k = dict(max_workers=2)
         elif engine_type is engines.GlobusComputeEngine:
             k = dict(
-                address="127.0.0.1",
+                address="::1",
                 heartbeat_period=engine_heartbeat,
                 heartbeat_threshold=2,
                 job_status_kwargs=dict(max_idletime=0, strategy_period=0.1),
@@ -153,7 +153,7 @@ def engine_runner(
                 """
 
             k = dict(
-                address="127.0.0.1",
+                address="::1",
                 heartbeat_period=engine_heartbeat,
                 heartbeat_threshold=1,
                 mpi_launcher="mpiexec",

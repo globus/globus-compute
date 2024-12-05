@@ -38,7 +38,8 @@ class Worker:
      Worker id string
 
     address : str
-     Address at which the manager might be reached. This is usually 127.0.0.1
+     Address at which the manager might be reached. This is usually the ipv4
+     or ipv6 loopback address 127.0.0.1 or ::1
 
     port : int
      Port at which the manager can be reached
@@ -79,6 +80,7 @@ class Worker:
 
         self.task_socket = self.context.socket(zmq.DEALER)
         self.task_socket.setsockopt(zmq.IDENTITY, self.identity)
+        self.task_socket.setsockopt(zmq.IPV6, True)
 
         log.info(f"Trying to connect to : tcp://{self.address}:{self.port}")
         self.task_socket.connect(f"tcp://{self.address}:{self.port}")

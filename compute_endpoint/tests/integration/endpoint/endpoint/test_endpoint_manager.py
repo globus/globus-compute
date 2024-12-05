@@ -394,10 +394,10 @@ class TestStart:
         mock_interchange.return_value.stop.return_value = None
 
         mock_optionals = {}
-        mock_optionals["interchange_address"] = "127.0.0.1"
+        mock_optionals["interchange_address"] = "::1"
 
         mock_funcx_config = {}
-        mock_funcx_config["endpoint_address"] = "127.0.0.1"
+        mock_funcx_config["endpoint_address"] = "::1"
 
         manager = Endpoint(funcx_dir=os.getcwd())
         manager.name = "test"

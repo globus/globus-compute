@@ -80,8 +80,8 @@ class Manager:
 
     def __init__(
         self,
-        task_q_url="tcp://127.0.0.1:50097",
-        result_q_url="tcp://127.0.0.1:50098",
+        task_q_url="tcp://localhost:50097",
+        result_q_url="tcp://localhost:50098",
         max_queue_size=10,
         cores_per_worker=1,
         available_accelerators: list[str] | None = None,
@@ -171,6 +171,7 @@ class Manager:
         # Linger is set to 0, so that the manager can exit even when there might be
         # messages in the pipe
         self.task_incoming.setsockopt(zmq.LINGER, 0)
+        self.task_incoming.setsockopt(zmq.IPV6, True)
         self.task_incoming.connect(task_q_url)
 
         self.logdir = logdir
@@ -179,6 +180,7 @@ class Manager:
         self.result_outgoing = self.context.socket(zmq.DEALER)
         self.result_outgoing.setsockopt(zmq.IDENTITY, uid.encode("utf-8"))
         self.result_outgoing.setsockopt(zmq.LINGER, 0)
+        self.result_outgoing.setsockopt(zmq.IPV6, True)
         self.result_outgoing.connect(result_q_url)
 
         log.info("Manager connected")
@@ -213,7 +215,8 @@ class Manager:
 
         self.funcx_task_socket = self.context.socket(zmq.ROUTER)
         self.funcx_task_socket.set_hwm(0)
-        self.address = "127.0.0.1"
+        self.funcx_task_socket.setsockopt(zmq.IPV6, True)
+        self.address = "localhost"
         self.worker_port = self.funcx_task_socket.bind_to_random_port(
             "tcp://*",
             min_port=self.internal_worker_port_range[0],

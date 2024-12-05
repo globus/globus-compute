@@ -45,7 +45,7 @@ def test_worker():
         # the worker will receive tasks and send messages on this mock socket
         mock_socket = mock.Mock()
         mock_context.return_value.socket.return_value = mock_socket
-        yield Worker("0", "127.0.0.1", 50001)
+        yield Worker("0", "::1", 50001)
 
 
 def test_register_and_kill(test_worker):
