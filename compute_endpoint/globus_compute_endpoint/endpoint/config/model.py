@@ -43,16 +43,8 @@ def _validate_params(field: str):
 
 
 class BaseConfigModel(BaseModel):
-    multi_user: t.Optional[bool]
-    display_name: t.Optional[str]
-    allowed_functions: t.Optional[t.List[uuid.UUID]]
-    authentication_policy: t.Optional[uuid.UUID]
-    subscription_id: t.Optional[uuid.UUID]
-    amqp_port: t.Optional[int]
-    heartbeat_period: t.Optional[int]
-    environment: t.Optional[str]
-    local_compute_services: t.Optional[bool]
-    debug: t.Optional[bool]
+    class Config:
+        extra = "allow"
 
 
 class AddressModel(BaseConfigModel):
@@ -80,9 +72,6 @@ class ChannelModel(BaseConfigModel):
 
 
 class ProviderModel(BaseConfigModel):
-    class Config:
-        extra = "allow"
-
     type: str
     channel: t.Optional[ChannelModel]
     launcher: t.Optional[LauncherModel]
@@ -153,7 +142,23 @@ class EngineModel(BaseConfigModel):
         return values
 
 
-class UserEndpointConfigModel(BaseConfigModel):
+class BaseEndpointConfigModel(BaseModel):
+    multi_user: t.Optional[bool]
+    display_name: t.Optional[str]
+    allowed_functions: t.Optional[t.List[uuid.UUID]]
+    authentication_policy: t.Optional[uuid.UUID]
+    subscription_id: t.Optional[uuid.UUID]
+    amqp_port: t.Optional[int]
+    heartbeat_period: t.Optional[int]
+    environment: t.Optional[str]
+    local_compute_services: t.Optional[bool]
+    debug: t.Optional[bool]
+
+    class Config:
+        extra = "forbid"
+
+
+class UserEndpointConfigModel(BaseEndpointConfigModel):
     engine: EngineModel
     heartbeat_threshold: t.Optional[int]
     idle_heartbeats_soft: t.Optional[int]
@@ -167,9 +172,6 @@ class UserEndpointConfigModel(BaseConfigModel):
 
     _validate_engine = _validate_params("engine")
 
-    class Config:
-        extra = "forbid"
-
     def dict(self, *args, **kwargs):
         # Slight modification is needed here since we still
         # store the engine/executor in a list named executors
@@ -180,11 +182,8 @@ class UserEndpointConfigModel(BaseConfigModel):
         return ret
 
 
-class ManagerEndpointConfigModel(BaseConfigModel):
+class ManagerEndpointConfigModel(BaseEndpointConfigModel):
     public: t.Optional[bool]
     identity_mapping_config_path: t.Optional[FilePath]
     force_mu_allow_same_user: t.Optional[bool]
     mu_child_ep_grace_period_s: t.Optional[float]
-
-    class Config:
-        extra = "forbid"

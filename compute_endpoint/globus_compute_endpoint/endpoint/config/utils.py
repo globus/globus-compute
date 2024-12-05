@@ -90,10 +90,12 @@ def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointCon
     try:
         ConfigClass: type[UserEndpointConfig | ManagerEndpointConfig]
         if is_templatable:
-            from . import BaseConfigModel, ManagerEndpointConfigModel
+            from . import BaseEndpointConfigModel, ManagerEndpointConfigModel
 
             ConfigClass = ManagerEndpointConfig
-            config_schema: BaseConfigModel = ManagerEndpointConfigModel(**config_dict)
+            config_schema: BaseEndpointConfigModel = ManagerEndpointConfigModel(
+                **config_dict
+            )
         else:
             from . import UserEndpointConfigModel
 
