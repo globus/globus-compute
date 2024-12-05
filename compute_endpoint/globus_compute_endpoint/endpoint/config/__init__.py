@@ -6,6 +6,7 @@ from .config import (  # noqa: F401
 )
 from .model import (  # noqa: F401
     BaseConfigModel,
+    BaseEndpointConfigModel,
     ManagerEndpointConfigModel,
     UserEndpointConfigModel,
 )

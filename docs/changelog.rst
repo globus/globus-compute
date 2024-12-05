@@ -3,6 +3,17 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-2.32.1:
+
+globus-compute-sdk & globus-compute-endpoint v2.32.1
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed an issue where valid endpoint configuration variables were ignored,
+  causing spurious validation errors.
+
 .. _changelog-2.32.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.32.0
