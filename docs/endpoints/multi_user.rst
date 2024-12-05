@@ -173,7 +173,7 @@ regex before searching, so the actual regular expression used would be
 ``^(.*)@example.com$``.  Finally, if a match is found, the first saved group is the
 output (i.e., ``{0}``).  If the ``username`` field contained ``mickey97@example.com``,
 then this configuration would return ``mickey97``, and the MEP would then use
-`getpwnam(3)`_ to look up ``mickey97``.  But if the username field(s) did not end with
+|getpwnam(3)|_ to look up ``mickey97``.  But if the username field(s) did not end with
 ``@example.com``, then it would not match and the start-UEP request would fail.
 
 .. code-block:: json
@@ -661,6 +661,150 @@ Installing the MEP as a service is the same :ref:`procedure as with a regular en
 install a systemd unit file.
 
 
+.. _pam:
+
+Pluggable Authentication Modules (PAM)
+======================================
+
+`Pluggable Authentication Modules`_ (PAM) allows administrators to configure
+site-specific authentication schemes with arbitrary requirements.  For example, where
+one site might require users to use `MFA`_, another site could disallow use of the
+system for some users at certain times of the day.  Rather than rewrite or modify
+software to accommodate each site's needs, administrators can simply change their site
+configuration.
+
+As a brief intro to PAM, the architecture is designed with four phases:
+
+- authentication
+- account management
+- session management
+- password management
+
+The MEP implements *account* and *session management*.  If enabled, then the child
+process will create a PAM session, check the account (|pam_acct_mgmt(3)|_), and then
+open a session (|pam_open_session(3)|_).  If these two steps succeed, then the MEP will
+continue to drop privileges and become the UEP.  But in these two steps is where the
+administrator can implement custom configuration.
+
+PAM is configured in two parts.  For the MEP, use the ``pam`` field:
+
+.. code-block:: yaml
+   :caption: ``config.yaml`` to show PAM
+   :emphasize-lines: 3,4
+
+   multi_user: true
+   identity_mapping_config_path: .../some/idmap.json
+   pam:
+     enable: true
+
+This configuration will choose the default PAM service name,
+``globus-compute-endpoint`` (see |PamConfiguration|).  The service name is the name of
+the PAM configuration file in ``/etc/pam.d/``.  Use ``service_name`` to tell the MEP
+to authorize users against a different PAM configuration:
+
+.. code-block:: yaml
+   :caption: ``config.yaml`` with a custom PAM service name
+   :emphasize-lines: 7
+
+   multi_user: true
+   identity_mapping_config_path: .../some/idmap.json
+   pam:
+     enable: true
+
+     # the PAM routines will look for `/etc/pam.d/gce-mep123-specific-requirements`
+     service_name: gce-mep123-specific-requirements
+
+For clarity, note that the service name is simply passed to |pam_start(3)|_, to tell
+PAM which service configuration to apply.
+
+.. important::
+
+  If PAM is not enabled, then before starting user endpoints, the child process drops
+  all capabilities and sets the no-new-privileges flag with the kernel.  (See
+  |prctl(2)|_ and reference ``PR_SET_NO_NEW_PRIVS``).  In particular, this will
+  preclude use of SETUID executables, which can break some schedulers.  If your site
+  requires use of SETUID executables, then PAM must be enabled.
+
+Though configuring PAM itself is outside the scope of this document (e.g., see
+|PAM_SAG|_), we briefly discuss a couple of modules to share a taste of what PAM can
+do.  For example, if the administrator were to implement a configuration of:
+
+.. code-block:: text
+   :caption: ``/etc/pam.d/globus-compute-endpoint``
+
+   account   requisite     pam_shells.so
+   session   required      pam_limits.so
+
+then, per |pam_shells(8)|_, any UEP for a user whose shell is not listed in
+``/etc/shells`` will not start and the logs will have a line like:
+
+.. code-block:: text
+
+   ... (error code: 7 [PAM_AUTH_ERR]) Authentication failure
+
+On the other end, the user's SDK would receive a message like:
+
+.. code-block:: text
+
+   Request payload failed validation: Unable to start user endpoint process for jessica [exit code: 71; (PermissionError) see your system administrator]
+
+Similarly, for users who are administratively allowed (i.e., have a valid shell), the
+|pam_limits(8)|_ module will install the admin-configured process limits.
+
+.. hint::
+
+   The Globus Compute Endpoint software implements the account management and session
+   phases of PAM.  As authentication is enacted via Globua Auth and
+   :ref:`Identity Mapping <identity-mapping>`, it does not use PAM's authentication
+   (|pam_authenticate(3)|_) phase, nor does it attempt to manage the user's password.
+   Functionally, this means that only PAM configuration lines that begin with
+   ``account`` and ``session`` will be utilized.
+
+Look to PAM for a number of tasks (which we tease here, but are similarly out of scope
+of this documentation):
+
+- Setting UEP process capabilities (|pam_cap(8)|_)
+- Setting UEP process limits (|pam_limits(8)|_)
+- Setting environment variables (|pam_env(8)|_)
+- Enforcing ``/var/run/nologin`` (|pam_nologin(8)|_)
+- Updating ``/var/log/lastlog`` (|pam_lastlog(8)|_)
+- Create user home directory on demand (|pam_mkhomedir(8)|_)
+
+(If the available PAM modules do not fit the bill, it is also possible to write a
+custom module!  But sadly, that is also out of scope of this documentation; please see
+|PAM_MWG|_.)
+
+.. _MFA: https://en.wikipedia.org/wiki/Multi-factor_authentication
+.. |PAM_SAG| replace:: The Linux-PAM System Administrators' Guide
+.. _PAM_SAG: https://www.chiark.greenend.org.uk/doc/libpam-doc/html/Linux-PAM_SAG.html
+.. |PAM_MWG| replace:: The Linux-PAM Module Writers' Guide
+.. _PAM_MWG: https://www.chiark.greenend.org.uk/doc/libpam-doc/html/Linux-PAM_MWG.html
+.. |pam_acct_mgmt(3)| replace:: ``pam_acct_mgmt(3)``
+.. _pam_acct_mgmt(3): https://www.man7.org/linux/man-pages/man3/pam_acct_mgmt.3.html
+.. |pam_open_session(3)| replace:: ``pam_open_session(3)``
+.. _pam_open_session(3): https://www.man7.org/linux/man-pages/man3/pam_open_session.3.html
+.. |pam_authenticate(3)| replace:: ``pam_authenticate(3)``
+.. _pam_authenticate(3): https://www.man7.org/linux/man-pages/man3/pam_authenticate.3.html
+.. |pam_start(3)| replace:: ``pam_start(3)``
+.. _pam_start(3): https://www.man7.org/linux/man-pages/man3/pam_start.3.html
+.. |pam_shells(8)| replace:: ``pam_shells(8)``
+.. _pam_shells(8): https://www.man7.org/linux/man-pages/man8/pam_shells.8.html
+.. |pam_limits(8)| replace:: ``pam_limits(8)``
+.. _pam_limits(8): https://www.man7.org/linux/man-pages/man8/pam_limits.8.html
+.. |pam_cap(8)| replace:: ``pam_cap(8)``
+.. _pam_cap(8): https://www.man7.org/linux/man-pages/man8/pam_cap.8.html
+.. |pam_env(8)| replace:: ``pam_env(8)``
+.. _pam_env(8): https://www.man7.org/linux/man-pages/man8/pam_env.8.html
+.. |pam_nologin(8)| replace:: ``pam_nologin(8)``
+.. _pam_nologin(8): https://www.man7.org/linux/man-pages/man8/pam_nologin.8.html
+.. |pam_lastlog(8)| replace:: ``pam_lastlog(8)``
+.. _pam_lastlog(8): https://www.man7.org/linux/man-pages/man8/pam_lastlog.8.html
+.. |pam_mkhomedir(8)| replace:: ``pam_mkhomedir(8)``
+.. _pam_mkhomedir(8): https://www.man7.org/linux/man-pages/man8/pam_mkhomedir.8.html
+
+.. |prctl(2)| replace:: ``prctl(2)``
+.. _prctl(2): https://www.man7.org/linux/man-pages/man2/prctl.2.html
+
 .. _auth-policies:
 
 Authentication Policies
@@ -711,6 +855,13 @@ Administrators can create new authentication policies via the `Globus Auth API
   occurred to satisfy the policy.  Setting this will also set ``high_assurance`` to
   ``true``.
 
+  .. attention::
+
+     For performance reasons, the web-service caches lookups for 60s.  Pragmatically,
+     this means that smallest timeout that Compute supports is 1 minute, even though it
+     is possible to set required authorizations for high assurance policies to smaller
+     time intervals.
+
 
 Apply an Existing Authentication Policy
 ---------------------------------------
@@ -730,8 +881,10 @@ make the necessary changes to ``config.yaml``:
    $ globus-compute-endpoint configure my-mep --multi-user --auth-policy 2340174a-1a0e-46d8-a958-7c3ddf2c834a
 
 
-Function Whitelisting
-=====================
+.. _function-allowlist:
+
+Function Allow Listing
+======================
 
 To require that UEPs only invoke certain functions, specify the ``allowed_functions``
 top-level configuration item:
@@ -837,7 +990,7 @@ The workflow for a task sent to a MEP roughly follows these steps:
 #. The MEP maps the Globus Auth identity in the start-UEP-request to a local (POSIX)
    username.
 
-#. The MEP ascertains the host-specific UID based on a `getpwnam(3)`_ call with the
+#. The MEP ascertains the host-specific UID based on a |getpwnam(3)|_ call with the
    local username from the previous step.
 
 #. The MEP starts a UEP as the UID from the previous step.
@@ -1028,7 +1181,7 @@ Administrator Quickstart
 #. Setup the identity mapping configuration |nbsp| --- |nbsp| this depends on your
    site's specific requirements and may take some trial and error.  The key point is to
    be able to take a Globus Auth Identity set, and map it to a local username *on this
-   resource* |nbsp| --- |nbsp| this resulting username will be passed to `getpwnam(3)`_
+   resource* |nbsp| --- |nbsp| this resulting username will be passed to |getpwnam(3)|_
    to ascertain a UID for the user.  This file is linked in ``config.yaml`` (from the
    previous step's output), and, per initial configuration, is set to
    ``example_identity_mapping_config.json``.  While the configuration is syntactically
@@ -1119,6 +1272,7 @@ Administrator Quickstart
 .. _Authentication Policies documentation: https://docs.globus.org/api/auth/developer-guide/#authentication_policy_fields
 .. |globus-identity-mapping| replace:: ``globus-identity-mapping``
 .. _globus-identity-mapping: https://pypi.org/project/globus-identity-mapping/
+.. |getpwnam(3)| replace:: ``getpwnam(3)``
 .. _getpwnam(3): https://www.man7.org/linux/man-pages/man3/getpwnam.3.html
 .. _Jinja template: https://jinja.palletsprojects.com/en/3.1.x/
 .. _Globus Connect Server Identity Mapping Guide: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#mapping_recipes
@@ -1126,7 +1280,10 @@ Administrator Quickstart
 .. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
 .. _JSON schema: https://json-schema.org/
 
+.. |PamConfiguration| replace:: :class:`PamConfiguration <globus_compute_endpoint.endpoint.config.pam.PamConfiguration>`
+
 .. _virtualenv: https://pypi.org/project/virtualenv/
 .. _pipx: https://pypa.github.io/pipx/
 .. _conda: https://docs.conda.io/en/latest/
 .. _dill: https://pypi.org/project/dill/
+.. _Pluggable Authentication Modules: https://en.wikipedia.org/wiki/Linux_PAM

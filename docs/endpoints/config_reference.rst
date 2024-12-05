@@ -89,10 +89,10 @@ But both engines will only run tasks *on the endpoint host machine*.  If the end
 strictly limited to a single host (e.g., a home desktop, an idle workstation), then
 these engines may be the simplest option.
 
-For running in a multi-node setup (e.g., clusters, with scheduling software like PBS or
-Slurm), the ``GlobusComputeEngine`` enables much more concurrency.  This engine has more
-options and is similarly more complicated to configure.  A rough equivalent to the
-``ProcessPoolEngine`` example would be:
+For running in a multi-node setup (e.g., clusters, with scheduling software like `PBS`_
+or `Slurm`_), the ``GlobusComputeEngine`` enables much more concurrency.  This engine
+has more options and is similarly more complicated to configure.  A rough equivalent to
+the ``ProcessPoolEngine`` example would be:
 
 .. code-block:: yaml
    :caption: ``~/.globus_compute/my_first_cluster_setup/config.yaml``
@@ -223,6 +223,7 @@ the |HighThroughputExecutor|_ and the `available providers`_.
 .. |SlurmProvider| replace:: ``SlurmProvider``
 .. _SlurmProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.SlurmProvider.html
 
+.. _PBS: https://openpbs.org/
 .. _Slurm: https://slurm.schedmd.com/overview.html
 .. _Parsl implements a number of providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
 .. _available providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
@@ -244,16 +245,104 @@ This flag tells the Compute endpoint logic to instantiate a |ManagerEndpointConf
 instance and thereby to start an MEP and not a UEP.  The other configuration items of
 note are:
 
-- ``identity_mapping_config_path`` |nbsp| --- |nbsp| necessary if the MEP will be run
-  with ``root`` privileges
-- ``display_name`` |nbsp| --- |nbsp| for a more approachable name in the
-  `Web UI <https://app.globus.org/compute>`_
-- ``allowed_functions`` |nbsp| --- |nbsp| to restrict what functions may be run by
-  UEPs
-- ``authentication_policy`` |nbsp| --- |nbsp| for restricting who can use the MEP at
-  the web service
+- ``identity_mapping_config_path``
+
+  A path to an identity mapping configuration, per the Globus Connect Server `Identity
+  Mapping Guide`_.  The configuration file must be a JSON-list of identity mapping
+  configurations.  The MEP documentation :ref:`discusses the
+  content<example-idmap-config>` of this file in detail.
+
+  This field is required for MEPs run by the ``root`` user.  For MEPs run by
+  non-``root`` users (or those without ``setuid`` capabilities), this field is
+  ignored.
+
+  .. code-block:: yaml
+     :caption: Example MEP ``config.yaml`` with an identity mapping path
+
+     multi_user: true
+     identity_mapping_config_path: /path/to/idmap_config.json
+
+- ``public``
+
+  A boolean value, dictating whether other users can discover this MEP in the Globus
+  Compute web API and Globus `Web UI`_.  It defaults to ``false``.
+
+  .. warning::
+
+     This field does **not** prevent access to the endpoint.  It determines only
+     whether this MEP is easily discoverable |nbsp| --- |nbsp| do not use this field as
+     a security control.
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- example public MEP
+
+     multi_user: true
+     public: true
+
+- ``display_name``
+
+  If not specified, the endpoint will show up in the `Web UI`_ as the given local name.
+  (In other words, the same name as used to create the endpoint with the ``configure``
+  subcommand, and as used for the directory name inside of ``~/.globus_compute/``.)
+  This field is free-form (accepting space characters, for example).
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- naming a public MEP
+
+     display_name: Debug queue, 10m max job time (RCC, Midway, UChicago)
+     multi_user: true
+     public: true
+
+- ``allowed_functions``
+
+  This field specifies an allow-list of functions that may be run by child UEPs.  As
+  this list is available at MEP registration time, not only do the UEPs verify that
+  each task requests a valid function, but the web-service enforces the allowed
+  functions list at task submission as well.  For more information, see :ref:`MEP §
+  Function Allow Listing <function-allowlist>`.
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- allowing UEPs to only run certain functions
+
+     multi_user: true
+     allowed_functions:
+       - 00911703-e76b-4d0b-7b98-6f2e25ab9943
+       - e552e7f2-c007-4671-6ca4-3a4fd84f3805
+
+- ``authentication_policy``
+
+  Use a Globus `Authentication Policy`_ to restrict who can use the MEP at the web
+  service.  (Note that authentication policies require a subscription.)  See
+  :ref:`MEP § Authentication Policies <auth-policies>` for more information.
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- allowing only valid identities to use the MEP
+
+     multi_user: true
+     authentication_policy: 498c7327-9c6a-4847-c954-1eafa923da8e
+     subscription_id: 600ba9ac-ef16-4387-30ad-60c6cc3a6853
+
+- ``pam``
+
+  Use `Pluggable Authentication Modules`_ (PAM) for site-specific authorization
+  requirements.  A structure with ``enable`` and ``service_name`` options.  Defaults to
+  disabled and ``globus-compute-endpoint``.  See :ref:`MEP § PAM <pam>` for more
+  information.
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- enabling PAM
+
+     multi_user: true
+     pam:
+       enable: true
 
 These options are all described in detail in :doc:`multi_user`
+
+
+.. _Identity Mapping Guide: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/
+.. _Web UI: https://app.globus.org/compute
+.. _Authentication Policy: https://docs.globus.org/api/auth/developer-guide/#authentication-policies
+.. _Pluggable Authentication Modules: https://en.wikipedia.org/wiki/Linux_PAM
 
 ----
 
@@ -280,6 +369,10 @@ available options.
    :show-inheritance:
 
 .. autoclass:: globus_compute_endpoint.endpoint.config.config.BaseConfig
+   :members:
+   :member-order: bysource
+
+.. autoclass:: globus_compute_endpoint.endpoint.config.pam.PamConfiguration
    :members:
    :member-order: bysource
 

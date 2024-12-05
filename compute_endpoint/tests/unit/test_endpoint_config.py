@@ -7,6 +7,7 @@ from globus_compute_common.pydantic_v1 import ValidationError
 from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
     ManagerEndpointConfigModel,
+    PamConfiguration,
     UserEndpointConfig,
     UserEndpointConfigModel,
 )
@@ -190,8 +191,9 @@ def test_configs_repr_default_kwargs():
         assert (
             repr(UserEndpointConfig()) == f"UserEndpointConfig(executors=({gce_repr},))"
         ), "adds default"
+    defs = f"multi_user=True, pam={PamConfiguration(enable=False)!r}"
     assert (
-        repr(ManagerEndpointConfig()) == "ManagerEndpointConfig(multi_user=True)"
+        repr(ManagerEndpointConfig()) == f"ManagerEndpointConfig({defs})"
     ), "mu is on base"
 
 

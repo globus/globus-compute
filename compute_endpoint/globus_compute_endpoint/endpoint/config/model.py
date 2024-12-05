@@ -11,6 +11,7 @@ from globus_compute_common.pydantic_v1 import (
     validator,
 )
 from globus_compute_endpoint import engines, strategies
+from globus_compute_endpoint.endpoint.config.pam import PamConfiguration
 from parsl import addresses as parsl_addresses
 from parsl import channels as parsl_channels
 from parsl import launchers as parsl_launchers
@@ -187,3 +188,4 @@ class ManagerEndpointConfigModel(BaseEndpointConfigModel):
     identity_mapping_config_path: t.Optional[FilePath]
     force_mu_allow_same_user: t.Optional[bool]
     mu_child_ep_grace_period_s: t.Optional[float]
+    pam: t.Optional[PamConfiguration]

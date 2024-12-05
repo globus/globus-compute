@@ -15,6 +15,7 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
 )
 
 from ..utils import is_privileged
+from .pam import PamConfiguration
 
 MINIMUM_HEARTBEAT: float = 5.0
 log = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ class BaseConfig:
 
     @property
     def allowed_functions(self):
-        if self._allowed_functions:
+        if self._allowed_functions is not None:
             return tuple(map(str, self._allowed_functions))
         return None
 
@@ -327,6 +328,10 @@ class ManagerEndpointConfig(BaseConfig):
         configuration item is required, and a ``ValueError`` will be raised if the path
         does not exist.
 
+    :param pam: Whether to enable authorization of user-endpoints via PAM routines, and
+        optionally specify the PAM service name.  See |PamConfiguration|.  If not
+        specified, PAM authorization defaults to disabled.
+
     :param mu_child_ep_grace_period_s: The web-services send a start-user-endpoint to
         the endpoint manager ahead of tasks for the target user endpoint.  If the
         user-endpoint is already running, these requests are ignored.  To account for
@@ -347,6 +352,7 @@ class ManagerEndpointConfig(BaseConfig):
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
     .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
     .. |UserEndpointConfig| replace:: :class:`UserEndpointConfig <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
+    .. |PamConfiguration| replace:: :class:`PamConfiguration <globus_compute_endpoint.endpoint.config.pam.PamConfiguration>`
 
     .. |setuid(2)| replace:: ``setuid(2)``
     .. _setuid(2): https://www.man7.org/linux/man-pages/man2/setuid.2.html
@@ -357,6 +363,7 @@ class ManagerEndpointConfig(BaseConfig):
         *,
         public: bool = False,
         identity_mapping_config_path: os.PathLike | str | None = None,
+        pam: PamConfiguration | None = None,
         force_mu_allow_same_user: bool = False,
         mu_child_ep_grace_period_s: float = 30.0,
         **kwargs,
@@ -371,6 +378,8 @@ class ManagerEndpointConfig(BaseConfig):
 
         _tmp = identity_mapping_config_path  # work with both mypy and flake8
         self.identity_mapping_config_path = _tmp  # type: ignore[assignment]
+
+        self.pam = pam or PamConfiguration(enable=False)
 
     @property
     def identity_mapping_config_path(self) -> pathlib.Path | None:
