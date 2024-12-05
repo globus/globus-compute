@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Fixed an issue where valid endpoint configuration variables were ignored,
-  causing spurious validation errors.
