@@ -238,8 +238,10 @@ def connection_tests():
 
     return [
         test_conn(web_svc_host, 443),
-        test_conn(amqp_svc_host, 5671),
         test_ssl_conn(web_svc_host, 443),
+        test_conn(amqp_svc_host, 443),
+        test_ssl_conn(amqp_svc_host, 443),
+        test_conn(amqp_svc_host, 5671),
         test_ssl_conn(amqp_svc_host, 5671),
         print_service_versions(web_svc_url),
     ]
