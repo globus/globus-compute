@@ -32,14 +32,18 @@ if ! grep '^globus\-compute\-sdk \& globus\-compute\-endpoint v'"$VERSION"'$' do
 fi
 
 echo "releasing v$VERSION"
-if git tag -s -m "v$VERSION" "$VERSION" ; then
+TAG_STDERR="$(git tag -s -m v$VERSION $VERSION 2>&1 > /dev/null)"
+if [[ $? == 0 ]]; then
   echo "Git tagged $VERSION"
   git push origin "$VERSION"
-else
+elif [[ "$TAG_STDERR" =~ "already exists" ]]; then
   read -p "Tag $VERSION already exists.  Release packages with this tag anyway? [y/n] " -n 1 -r
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     [[ $0 = $BASH_SOURCE ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
   fi
+else
+  echo "Git tag failed: $TAG_STDERR"
+  [[ $0 = $BASH_SOURCE ]] && exit 1
 fi
 
 pushd compute_sdk
