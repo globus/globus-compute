@@ -4,7 +4,7 @@ import logging
 import typing as t
 
 from globus_compute_sdk.errors import DeserializationError, SerializationError
-from globus_compute_sdk.serialize.base import SerializationStrategy
+from globus_compute_sdk.serialize.base import IDENTIFIER_LENGTH, SerializationStrategy
 from globus_compute_sdk.serialize.concretes import (
     DEFAULT_STRATEGY_CODE,
     DEFAULT_STRATEGY_DATA,
@@ -41,9 +41,7 @@ class ComputeSerializer:
             validate(strategy_data) if strategy_data else DEFAULT_STRATEGY_DATA
         )
 
-        # grab a randomish ID from the map (all identifiers should be the same length)
-        identifier = next(iter(STRATEGIES_MAP.keys()))
-        self.header_size = len(identifier)
+        self.header_size = IDENTIFIER_LENGTH
 
         self.strategies = {
             header: strategy_class()
