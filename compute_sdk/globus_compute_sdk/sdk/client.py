@@ -29,7 +29,7 @@ from .auth.globus_app import get_globus_app
 from .batch import Batch, UserRuntime
 from .login_manager import LoginManagerProtocol, requires_login
 from .utils import get_env_var_with_deprecation
-from .web_client import WebClient
+from .web_client import WebClient, _ComputeWebClient
 
 logger = logging.getLogger(__name__)
 
@@ -118,12 +118,18 @@ class Client:
             self.login_manager = login_manager
             self.auth_client = login_manager.get_auth_client()
             self.web_client = self.login_manager.get_web_client(
-                base_url=self.web_service_address
+                base_url=self.web_service_address,
+            )
+            self._web_client = _ComputeWebClient(
+                base_url=self.web_service_address, authorizer=self.web_client.authorizer
             )
         else:
             self.app = app if app else get_globus_app(environment=environment)
             self.auth_client = ComputeAuthClient(app=self.app)
             self.web_client = WebClient(base_url=self.web_service_address, app=self.app)
+            self._web_client = _ComputeWebClient(
+                base_url=self.web_service_address, app=self.app
+            )
 
         self.fx_serializer = ComputeSerializer(
             strategy_code=code_serialization_strategy,
@@ -140,7 +146,7 @@ class Client:
 
         Raises a VersionMismatch error on failure.
         """
-        data = self.web_client.get_version()
+        data = self._web_client.get_version(service="all")
 
         min_ep_version = data["min_ep_version"]
         min_sdk_version = data["min_sdk_version"]
@@ -247,7 +253,7 @@ class Client:
         if task.get("pending", True) is False:
             return task
 
-        r = self.web_client.get_task(task_id)
+        r = self._web_client.get_task(task_id)
         logger.debug(f"Response string : {r}")
         return self._update_task_table(r.text, task_id)
 
@@ -294,7 +300,7 @@ class Client:
         results = {}
 
         if pending_task_ids:
-            r = self.web_client.get_batch_status(pending_task_ids)
+            r = self._web_client.get_task_batch(pending_task_ids)
             logger.debug(f"Response string : {r}")
 
         pending_task_ids = set(pending_task_ids)
@@ -415,7 +421,7 @@ class Client:
             raise ValueError("No tasks specified for batch run")
 
         # Send the data to Globus Compute
-        return self.web_client.submit(endpoint_id, batch.prepare()).data
+        return self._web_client.submit(endpoint_id, batch.prepare()).data
 
     @requires_login
     def register_endpoint(

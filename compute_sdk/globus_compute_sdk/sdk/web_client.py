@@ -17,7 +17,13 @@ from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
-from globus_sdk import GlobusAPIError, GlobusApp, Scope
+from globus_sdk import (
+    ComputeClientV2,
+    ComputeClientV3,
+    GlobusAPIError,
+    GlobusApp,
+    Scope,
+)
 
 from .auth.scopes import ComputeScopes
 
@@ -275,3 +281,27 @@ class WebClient(globus_sdk.BaseClient):
         self, function_id: UUID_LIKE_T
     ) -> globus_sdk.GlobusHTTPResponse:
         return self.delete(f"/v2/functions/{function_id}")
+
+
+class _ComputeWebClient(ComputeClientV3, ComputeClientV2):
+    def __init__(
+        *args,
+        environment: str | None = None,
+        base_url: str | None = None,
+        app_name: str | None = None,
+        **kwargs,
+    ):
+        if base_url is None:
+            base_url = get_web_service_url(environment)
+        base_url = remove_url_path(base_url)
+
+        if app_name is None:
+            app_name = user_agent_substring(__version__)
+
+        ComputeClientV3.__init__(
+            *args,
+            environment=environment,
+            base_url=base_url,
+            app_name=app_name,
+            **kwargs,
+        )
