@@ -18,7 +18,7 @@ from globus_compute_endpoint.cli import (
 )
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
-from globus_compute_sdk.sdk.web_client import WebClient
+from globus_compute_sdk.sdk.client import _ComputeWebClient
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
 _SVC_ADDY = "http://api.funcx.fqdn"  # something clearly not correct
@@ -38,7 +38,7 @@ def patch_compute_client(mocker):
         login_manager=mock.Mock(),
     )
     gcc.web_service_address = _SVC_ADDY
-    gcc.web_client = WebClient(base_url=_SVC_ADDY)
+    gcc._compute_web_client = _ComputeWebClient(base_url=_SVC_ADDY)
 
     yield mocker.patch(f"{_MOCK_BASE}Client", return_value=gcc)
 
