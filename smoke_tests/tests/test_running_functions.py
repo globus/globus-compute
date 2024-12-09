@@ -1,16 +1,15 @@
 import concurrent.futures
-import time
+import typing as t
 
 import globus_compute_sdk as gc
 import pytest
-from globus_compute_sdk import Executor
+from globus_compute_sdk import Client, Executor
 from packaging.version import Version
 
 try:
     from globus_compute_sdk.errors import TaskPending
 except ImportError:
     from globus_compute_sdk.utils.errors import TaskPending
-
 
 sdk_version = Version(gc.version.__version__)
 
@@ -35,7 +34,7 @@ def ohai():
 
 
 @pytest.mark.skipif(sdk_version.release < (2, 2, 5), reason="batch.add iface updated")
-def test_batch(compute_client, endpoint):
+def test_batch(compute_client: Client, endpoint: str, linear_backoff: t.Callable):
     """Test batch submission and get_batch_result"""
 
     double_fn_id = compute_client.register_function(double)
@@ -49,9 +48,7 @@ def test_batch(compute_client, endpoint):
     batch_res = compute_client.batch_run(endpoint, batch)
     tasks = [t for tl in batch_res["tasks"].values() for t in tl]
 
-    total = 0
-    for _i in range(12):
-        time.sleep(5)
+    while linear_backoff():
         results = compute_client.get_batch_result(tasks)
         try:
             total = sum(results[tid]["result"] for tid in results)
@@ -62,32 +59,29 @@ def test_batch(compute_client, endpoint):
     assert total == 2 * (sum(inputs)), "Batch run results do not add up"
 
 
-def test_wait_on_new_hello_world_func(compute_client, endpoint):
+def test_wait_on_new_hello_world_func(
+    compute_client: Client, endpoint, linear_backoff: t.Callable
+):
     func_id = compute_client.register_function(ohai)
     task_id = compute_client.run(endpoint_id=endpoint, function_id=func_id)
 
-    got_result = False
-    for _ in range(30):
+    while linear_backoff():
         try:
             result = compute_client.get_result(task_id)
-            got_result = True
+            break
         except TaskPending:
-            time.sleep(1)
+            pass
 
-    assert got_result
     assert result == "ohai"
 
 
-def test_executor(compute_client, endpoint, tutorial_function_id):
+def test_executor(compute_client, endpoint, tutorial_function_id, timeout_s: int):
     """Test using Executor to retrieve results."""
     res = compute_client.web_client.get_version()
     assert res.http_status == 200, f"Received {res.http_status} instead!"
 
     num_tasks = 10
     submit_count = 2  # we've had at least one bug that prevented executor re-use
-
-    # 30s sometimes fails, trying with 60 to see if that makes a difference
-    timeout_s = 60
 
     # use client on newer versions and funcx_client on older
     try:
