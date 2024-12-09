@@ -8,17 +8,17 @@ import pytest
 from globus_compute_sdk import ContainerSpec, __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
+from globus_compute_sdk.sdk.client import _ComputeWebClient
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
-    FunctionRegistrationMetadata,
     WebClient,
     _get_packed_code,
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
-from globus_sdk import UserApp
+from globus_sdk import ComputeClientV2, ComputeClientV3, UserApp
 from globus_sdk import __version__ as __version_globus__
 from pytest_mock import MockerFixture
 
@@ -35,6 +35,11 @@ def gcc():
     _gcc = gc.Client(
         do_version_check=False,
         login_manager=mock.Mock(spec=LoginManager),
+    )
+    _gcc._compute_web_client = mock.Mock(
+        spec=_ComputeWebClient,
+        v2=mock.Mock(spec=ComputeClientV2),
+        v3=mock.Mock(spec=ComputeClientV3),
     )
 
     yield _gcc
@@ -55,6 +60,7 @@ def funk():
 def test_client_warns_on_unknown_kwargs(kwargs, mocker: MockerFixture):
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
     mocker.patch(f"{_MOCK_BASE}WebClient")
+    mocker.patch(f"{_MOCK_BASE}_ComputeWebClient")
 
     known_kwargs = [
         "funcx_home",
@@ -83,6 +89,7 @@ def test_client_init_sets_addresses_by_env(
 ):
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
     mocker.patch(f"{_MOCK_BASE}WebClient")
+    mocker.patch(f"{_MOCK_BASE}_ComputeWebClient")
 
     if env in (None, "production"):
         web_uri = "https://compute.api.globus.org"
@@ -111,6 +118,13 @@ def test_client_init_sets_addresses_by_env(
 
     # finally, confirm that the address was set correctly
     assert client.web_service_address == web_uri
+
+
+def test_compute_web_client():
+    gcc = gc.Client(do_version_check=False)
+    assert isinstance(gcc._compute_web_client, _ComputeWebClient)
+    assert isinstance(gcc._compute_web_client.v2, ComputeClientV2)
+    assert isinstance(gcc._compute_web_client.v3, ComputeClientV3)
 
 
 @pytest.mark.parametrize(
@@ -158,7 +172,7 @@ def test_pending_tasks_always_fetched(gcc):
     should_fetch_02 = str(uuid.uuid4())
     no_fetch = str(uuid.uuid4())
 
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
     gcc._task_status_table.update(
         {
             should_fetch_01: {"pending": True, "task_id": should_fetch_01},
@@ -170,7 +184,7 @@ def test_pending_tasks_always_fetched(gcc):
     # bulk avenue
     gcc.get_batch_result(task_id_list)
 
-    args, _ = gcc.web_client.get_batch_status.call_args
+    args, _ = gcc._compute_web_client.v2.get_task_batch.call_args
     assert should_fetch_01 in args[0]
     assert should_fetch_02 in args[0]
     assert no_fetch not in args[0]
@@ -181,11 +195,11 @@ def test_pending_tasks_always_fetched(gcc):
         (True, should_fetch_02),
         (False, no_fetch),
     ):
-        gcc.web_client.get_task.reset_mock()
+        gcc._compute_web_client.v2.get_task.reset_mock()
         gcc.get_task(sf)
-        assert should_fetch is gcc.web_client.get_task.called
+        assert should_fetch is gcc._compute_web_client.v2.get_task.called
         if should_fetch:
-            args, _ = gcc.web_client.get_task.call_args
+            args, _ = gcc._compute_web_client.v2.get_task.call_args
             assert sf == args[0]
 
 
@@ -204,8 +218,8 @@ def test_batch_created_websocket_queue(gcc, create_result_queue):
 
     gcc.batch_run(eid, batch)
 
-    assert gcc.web_client.submit.called
-    *_, submit_data = gcc.web_client.submit.call_args[0]
+    assert gcc._compute_web_client.v3.submit.called
+    *_, submit_data = gcc._compute_web_client.v3.submit.call_args[0]
     assert "create_queue" in submit_data
     assert submit_data["create_queue"] is bool(create_result_queue)
 
@@ -244,7 +258,7 @@ def test_batch_includes_user_runtime_info(gcc):
 def test_build_container(mocker, gcc, randomstring):
     expected_container_id = randomstring()
     mock_data = mocker.Mock(data={"container_id": expected_container_id})
-    gcc.web_client.post.return_value = mock_data
+    gcc._compute_web_client.v2.post.return_value = mock_data
     spec = ContainerSpec(
         name="MyContainer",
         pip=["matplotlib==3.5.1", "numpy==1.18.5"],
@@ -255,8 +269,8 @@ def test_build_container(mocker, gcc, randomstring):
     container_id = gcc.build_container(spec)
 
     assert container_id == expected_container_id
-    assert gcc.web_client.post.called
-    a, k = gcc.web_client.post.call_args
+    assert gcc._compute_web_client.v2.post.called
+    a, k = gcc._compute_web_client.v2.post.call_args
     assert a[0] == "/v2/containers/build"
     assert k == {"data": spec.to_json()}
 
@@ -270,7 +284,7 @@ def test_container_build_status(gcc, randomstring):
             self["status"] = expected_status
             self.http_status = 200
 
-    gcc.web_client.get.return_value = MockData()
+    gcc._compute_web_client.v2.get.return_value = MockData()
     status = gcc.get_container_build_status("123-434")
     assert status == expected_status
 
@@ -281,7 +295,7 @@ def test_container_build_status_not_found(gcc, randomstring):
             super().__init__()
             self.http_status = 404
 
-    gcc.web_client.get.return_value = MockData()
+    gcc._compute_web_client.v2.get.return_value = MockData()
 
     look_for = randomstring()
     with pytest.raises(ValueError) as excinfo:
@@ -297,7 +311,7 @@ def test_container_build_status_failure(gcc):
             self.http_status = 500
             self.http_reason = "This is a reason"
 
-    gcc.web_client.get.return_value = MockData()
+    gcc._compute_web_client.v2.get.return_value = MockData()
 
     with pytest.raises(SystemError) as excinfo:
         gcc.get_container_build_status("123-434")
@@ -306,23 +320,21 @@ def test_container_build_status_failure(gcc):
 
 
 def test_register_function(gcc):
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     metadata = {"python_version": "3.11.3", "sdk_version": "2.3.3"}
     gcc.register_function(funk, metadata=metadata)
 
-    a, _ = gcc.web_client.register_function.call_args
+    a, _ = gcc._compute_web_client.v2.register_function.call_args
     func_data = a[0]
-    assert isinstance(func_data, FunctionRegistrationData)
-    assert func_data.function_code is not None
-    assert isinstance(func_data.metadata, FunctionRegistrationMetadata)
-    assert func_data.metadata.python_version == metadata["python_version"]
-    assert func_data.metadata.sdk_version == metadata["sdk_version"]
+    assert func_data["function_code"] is not None
+    assert func_data["metadata"]["python_version"] == metadata["python_version"]
+    assert func_data["metadata"]["sdk_version"] == metadata["sdk_version"]
 
 
 @pytest.mark.parametrize("dep_arg", ["searchable", "function_name"])
 def test_register_function_deprecated_args(gcc, dep_arg):
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     with pytest.deprecated_call() as pyt_wrn:
         gcc.register_function(funk, **{dep_arg: "foo"})
@@ -393,29 +405,28 @@ def _docstring_test_case_real_world():
     ],
 )
 def test_register_function_docstring(gcc, func):
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     gcc.register_function(func)
     expected = inspect.getdoc(func)
 
-    a, _ = gcc.web_client.register_function.call_args
+    a, _ = gcc._compute_web_client.v2.register_function.call_args
     func_data = a[0]
-    assert func_data.description == expected
+    assert func_data["description"] == expected
 
 
 def test_register_function_no_metadata(gcc):
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     gcc.register_function(funk)
 
-    a, _ = gcc.web_client.register_function.call_args
+    a, _ = gcc._compute_web_client.v2.register_function.call_args
     func_data = a[0]
-    assert isinstance(func_data, FunctionRegistrationData)
-    assert func_data.metadata is None
+    assert func_data["metadata"] is None
 
 
 def test_register_function_no_function(gcc):
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     with pytest.raises(ValueError) as pyt_exc:
         gcc.register_function(None)
@@ -473,29 +484,29 @@ def test_function_registration_data_cant_have_both_function_and_name_code(random
 
 def test_get_function(gcc):
     func_uuid_str = str(uuid.uuid4())
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     gcc.get_function(func_uuid_str)
 
-    gcc.web_client.get_function.assert_called_with(func_uuid_str)
+    gcc._compute_web_client.v2.get_function.assert_called_with(func_uuid_str)
 
 
 def test_get_allowed_functions(gcc):
     ep_uuid_str = str(uuid.uuid4())
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     gcc.get_allowed_functions(ep_uuid_str)
 
-    gcc.web_client.get_allowed_functions.assert_called_with(ep_uuid_str)
+    gcc._compute_web_client.v3.get_endpoint_allowlist.assert_called_with(ep_uuid_str)
 
 
 def test_delete_function(gcc):
     func_uuid_str = str(uuid.uuid4())
-    gcc.web_client = mock.MagicMock()
+    gcc._compute_web_client = mock.MagicMock()
 
     gcc.delete_function(func_uuid_str)
 
-    gcc.web_client.delete_function.assert_called_with(func_uuid_str)
+    gcc._compute_web_client.v2.delete_function.assert_called_with(func_uuid_str)
 
 
 def test_missing_task_info(gcc):
@@ -516,7 +527,7 @@ def test_missing_task_info(gcc):
             },
         },
     }
-    gcc.web_client.get_batch_status.return_value = mock_resp
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_resp
 
     res = gcc.get_batch_result([tid1, tid2])  # dev note: gcc.gbr, not gcc.web_client
 
@@ -575,7 +586,7 @@ def test_version_mismatch_from_details(
     }
 
     mock_warn = mocker.patch("globus_compute_sdk.sdk.client.warnings")
-    gcc.web_client.get_task.return_value = mock_response(200, returned_task)
+    gcc._compute_web_client.v2.get_task.return_value = mock_response(200, returned_task)
 
     assert gcc.get_result(tid) == result
 
@@ -614,7 +625,7 @@ def test_version_mismatch_warns_on_failure_and_success(
         returned_task["result"] = gcc.fx_serializer.serialize(result)
 
     mock_warn = mocker.patch("globus_compute_sdk.sdk.client.warnings")
-    gcc.web_client.get_task.return_value = mock_response(200, returned_task)
+    gcc._compute_web_client.v2.get_task.return_value = mock_response(200, returned_task)
 
     if should_fail:
         with pytest.raises(TaskExecutionFailed) as exc_info:
@@ -672,7 +683,9 @@ def test_version_mismatch_only_warns_once_per_ep(mocker, gcc, mock_response, ep_
         tid = str(uuid.uuid4())
         returned_task["task_id"] = tid
         returned_task["details"]["endpoint_id"] = ep_id
-        gcc.web_client.get_task.return_value = mock_response(200, returned_task)
+        gcc._compute_web_client.v2.get_task.return_value = mock_response(
+            200, returned_task
+        )
 
         assert gcc.get_result(tid) == result
 
@@ -691,10 +704,15 @@ def test_client_globus_app_and_login_manager_mutually_exclusive():
 def test_client_handles_globus_app(
     custom_app: bool, mocker: MockerFixture, randomstring
 ):
-    mock_auth_client = mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
-    mock_auth_client.return_value = mock.Mock(spec=ComputeAuthClient)
-    mock_web_client = mocker.patch(f"{_MOCK_BASE}WebClient")
-    mock_web_client.return_value = mock.Mock(spec=WebClient)
+    mock_auth_client = mocker.patch(
+        f"{_MOCK_BASE}ComputeAuthClient", return_value=mock.Mock(spec=ComputeAuthClient)
+    )
+    mock_web_client = mocker.patch(
+        f"{_MOCK_BASE}WebClient", return_value=mock.Mock(spec=WebClient)
+    )
+    mock_compute_web_client = mocker.patch(
+        f"{_MOCK_BASE}_ComputeWebClient", return_value=mock.Mock(spec=_ComputeWebClient)
+    )
     mock_get_globus_app = mocker.patch(f"{_MOCK_BASE}get_globus_app")
 
     mock_app = mock.Mock(spec=UserApp)
@@ -715,7 +733,11 @@ def test_client_handles_globus_app(
 
     assert client.app is mock_app
     assert client.web_client is mock_web_client.return_value
+    assert client._compute_web_client is mock_compute_web_client.return_value
     mock_web_client.assert_called_once_with(
+        base_url=client.web_service_address, app=mock_app
+    )
+    mock_compute_web_client.assert_called_once_with(
         base_url=client.web_service_address, app=mock_app
     )
     assert client.auth_client is mock_auth_client.return_value
@@ -734,6 +756,7 @@ def test_client_handles_login_manager():
 def test_client_logout_with_app(mocker):
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
     mocker.patch(f"{_MOCK_BASE}WebClient")
+    mocker.patch(f"{_MOCK_BASE}_ComputeWebClient")
     mock_app = mock.Mock(spec=UserApp)
     client = gc.Client(do_version_check=False, app=mock_app)
     client.logout()
