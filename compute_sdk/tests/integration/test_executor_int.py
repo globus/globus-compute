@@ -6,6 +6,7 @@ from unittest import mock
 
 import pytest
 from globus_compute_sdk import Client
+from globus_compute_sdk.sdk.client import _ComputeWebClient
 from globus_compute_sdk.sdk.executor import Executor, _ResultWatcher
 from tests.utils import try_assert
 
@@ -17,7 +18,7 @@ def test_resultwatcher_graceful_shutdown():
     service_url = os.environ["COMPUTE_INTEGRATION_TEST_WEB_URL"]
     gcc = Client()
     gcc.web_service_address = service_url
-    gcc.web_client = gcc.login_manager.get_web_client(service_url)
+    gcc._compute_web_client = _ComputeWebClient(service_url, app=gcc.app)
     gce = Executor(client=gcc)
     rw = _ResultWatcher(gce)
     rw._start_consuming = mock.Mock()

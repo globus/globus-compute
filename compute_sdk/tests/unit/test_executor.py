@@ -15,6 +15,7 @@ from globus_compute_common.messagepack.message_types import Result, ResultErrorD
 from globus_compute_sdk import Client, Executor, __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
+from globus_compute_sdk.sdk.client import _ComputeWebClient
 from globus_compute_sdk.sdk.executor import (
     _RESULT_WATCHERS,
     _ResultWatcher,
@@ -24,6 +25,7 @@ from globus_compute_sdk.sdk.utils import chunk_by
 from globus_compute_sdk.sdk.utils.uuid_like import as_optional_uuid, as_uuid
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize.facade import ComputeSerializer
+from globus_sdk import ComputeClientV2, ComputeClientV3
 from pytest_mock import MockerFixture
 from tests.utils import try_assert, try_for_timeout
 
@@ -47,6 +49,11 @@ class MockedExecutor(Executor):
         mock_client = mock.Mock(
             spec=Client,
             web_client=mock.Mock(spec=WebClient),
+            _compute_web_client=mock.Mock(
+                spec=_ComputeWebClient,
+                v2=mock.Mock(ComputeClientV2),
+                v3=mock.Mock(ComputeClientV3),
+            ),
             fx_serializer=mock.Mock(spec=ComputeSerializer),
         )
         # Unless test overrides, set default response:
@@ -644,7 +651,9 @@ def test_reload_tasks_sets_passed_task_group_id(gce):
     gcc = gce.client
 
     # for less mocking:
-    gcc.web_client.get_taskgroup_tasks.side_effect = RuntimeError("bailing out early")
+    gcc._compute_web_client.v2.get_task_group.side_effect = RuntimeError(
+        "bailing out early"
+    )
 
     tg_id = uuid.uuid4()
     with pytest.raises(RuntimeError) as e:
@@ -666,8 +675,8 @@ def test_reload_tasks_none_completed(gce, mock_log, num_tasks):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
-    gcc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc._compute_web_client.v2.get_task_group.return_value = mock_data
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_batch_result
 
     client_futures = list(gce.reload_tasks())
     if num_tasks == 0:
@@ -704,8 +713,8 @@ def test_reload_tasks_some_completed(gce, mock_log, num_tasks):
         mock_batch_result[t_id]["result"] = serialize("abc")
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
-    gcc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc._compute_web_client.v2.get_task_group.return_value = mock_data
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_batch_result
 
     client_futures = list(gce.reload_tasks())
     if num_tasks == 0:
@@ -742,8 +751,8 @@ def test_reload_tasks_all_completed(gce: Executor):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
-    gcc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc._compute_web_client.v2.get_task_group.return_value = mock_data
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_batch_result
 
     client_futures = list(gce.reload_tasks())
 
@@ -794,8 +803,8 @@ def test_reload_chunks_tasks_requested(mock_log, gce, num_tasks):
 
     mock_batch_result = mock.Mock(data={"results": {}})
 
-    gbs: mock.Mock = gcc.web_client.get_batch_status  # convenience
-    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
+    gbs: mock.Mock = gcc._compute_web_client.v2.get_task_batch  # convenience
+    gcc._compute_web_client.v2.get_task_group.return_value = mock_data
     gbs.return_value = mock_batch_result
 
     gce.reload_tasks()
@@ -830,8 +839,8 @@ def test_reload_does_not_start_new_watcher(gce: Executor):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
-    gcc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc._compute_web_client.v2.get_task_group.return_value = mock_data
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_batch_result
 
     client_futures = list(gce.reload_tasks())
     assert len(client_futures) == num_tasks
@@ -860,8 +869,8 @@ def test_reload_tasks_ignores_existing_futures(
             "tasks": [{"id": task_id} for task_id in task_ids],
         }
         mock_batch_status = {_t["id"]: {} for _t in mock_data["tasks"]}
-        gcc.web_client.get_taskgroup_tasks.return_value = mock_data
-        gcc.web_client.get_batch_status.return_value = mock.Mock(
+        gcc._compute_web_client.v2.get_task_group.return_value = mock_data
+        gcc._compute_web_client.v2.get_task_batch.return_value = mock.Mock(
             data={"results": mock_batch_status}
         )
 
@@ -884,7 +893,7 @@ def test_reload_tasks_ignores_existing_futures(
     assert all(fut.task_id in task_ids_2 for fut in futures_2)
 
 
-def test_reload_client_taskgroup_tasks_fails_gracefully(gce):
+def test_reload_client_taskgroup_tasks_fails_gracefully(gce: Executor):
     gcc = gce.client
 
     gce.task_group_id = uuid.uuid4()
@@ -895,7 +904,7 @@ def test_reload_client_taskgroup_tasks_fails_gracefully(gce):
     )
 
     for expected_exc_class, md in mock_datum:
-        gcc.web_client.get_taskgroup_tasks.return_value = md
+        gcc._compute_web_client.v2.get_task_group.return_value = md
         if expected_exc_class:
             with pytest.raises(expected_exc_class):
                 gce.reload_tasks()
@@ -903,7 +912,7 @@ def test_reload_client_taskgroup_tasks_fails_gracefully(gce):
             gce.reload_tasks()
 
 
-def test_reload_sets_failed_tasks(gce):
+def test_reload_sets_failed_tasks(gce: Executor):
     gcc = gce.client
 
     gce.task_group_id = uuid.uuid4()
@@ -918,15 +927,15 @@ def test_reload_sets_failed_tasks(gce):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
-    gcc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc._compute_web_client.v2.get_task_group.return_value = mock_data
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_batch_result
 
     futs = list(gce.reload_tasks())
 
     assert all("doh!" in str(fut.exception()) for fut in futs)
 
 
-def test_reload_handles_deseralization_error_gracefully(gce):
+def test_reload_handles_deseralization_error_gracefully(gce: Executor):
     gcc = gce.client
     gcc.fx_serializer = ComputeSerializer()
 
@@ -942,8 +951,8 @@ def test_reload_handles_deseralization_error_gracefully(gce):
     mock_batch_result = {t["id"]: t for t in mock_data["tasks"]}
     mock_batch_result = mock.MagicMock(data={"results": mock_batch_result})
 
-    gcc.web_client.get_taskgroup_tasks.return_value = mock_data
-    gcc.web_client.get_batch_status.return_value = mock_batch_result
+    gcc._compute_web_client.v2.get_task_group.return_value = mock_data
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_batch_result
 
     futs = list(gce.reload_tasks())
 
@@ -951,7 +960,7 @@ def test_reload_handles_deseralization_error_gracefully(gce):
 
 
 @pytest.mark.parametrize("batch_size", tuple(range(1, 11)))
-def test_task_submitter_respects_batch_size(gce, batch_size: int):
+def test_task_submitter_respects_batch_size(gce: Executor, batch_size: int):
     gcc = gce.client
 
     # make a new MagicMock every time create_batch is called
@@ -982,7 +991,7 @@ def test_task_submitter_respects_batch_size(gce, batch_size: int):
         assert 0 < batch.add.call_count <= batch_size
 
 
-def test_task_submitter_stops_executor_on_exception(gce):
+def test_task_submitter_stops_executor_on_exception(gce: Executor):
     gce._tasks_to_send.put(("too", "much", "destructuring", "!!"))
 
     try_assert(lambda: gce._stopped)
@@ -990,8 +999,10 @@ def test_task_submitter_stops_executor_on_exception(gce):
     gce._test_task_submitter_exception = None  # exception was test-intentional
 
 
-def test_task_submitter_stops_executor_on_upstream_error_response(gce, randomstring):
-    upstream_error = Exception(f"Upstream error {randomstring()}!!")
+def test_task_submitter_stops_executor_on_upstream_error_response(
+    gce: Executor, randomstring
+):
+    upstream_error = Exception(f"Upstream error {randomstring}!!")
     gce.client.batch_run.side_effect = upstream_error
     gce.task_group_id = uuid.uuid4()
     tsi = _TaskSubmissionInfo(
@@ -1014,7 +1025,7 @@ def test_task_submitter_stops_executor_on_upstream_error_response(gce, randomstr
     gce._submitter_thread_exception_captured = False
 
 
-def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(gce):
+def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(gce: Executor):
     gcc = gce.client
 
     gce._tasks_to_send.put((None, None))  # stop thread
@@ -1044,7 +1055,10 @@ def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(gce):
 
 @pytest.mark.parametrize("burst_limit", (2, 3, 4))
 @pytest.mark.parametrize("burst_window", (2, 3, 4))
-def test_task_submitter_api_rate_limit(gce, mock_log, burst_limit, burst_window):
+def test_task_submitter_api_rate_limit(
+    gce: Executor, mock_log, burst_limit, burst_window
+):
+    gce.endpoint_id = uuid.uuid4()
     gce._submit_tasks = mock.Mock()
 
     gce._function_registry[gce._fn_cache_key(noop)] = str(uuid.uuid4())
@@ -1074,7 +1088,7 @@ def test_task_submitter_api_rate_limit(gce, mock_log, burst_limit, burst_window)
     assert exp_perc_text == a[-1], "Expect to share batch utilization %"
 
 
-def test_task_submit_handles_multiple_user_endpoint_configs(gce):
+def test_task_submit_handles_multiple_user_endpoint_configs(gce: Executor):
     gcc = gce.client
     gce._tasks_to_send.put((None, None))  # stop internal thread
     try_assert(_is_stopped(gce._task_submitter), "Verify test setup")

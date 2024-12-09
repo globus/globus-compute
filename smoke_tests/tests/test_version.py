@@ -3,7 +3,7 @@ from packaging.version import Version
 
 def test_web_service(compute_client, endpoint, compute_test_config):
     """This test checks 1) web-service is online, 2) version of the web-service"""
-    response = compute_client.web_client.get_version()
+    response = compute_client._compute_web_client.v2.get_version(service="all")
 
     assert response.http_status == 200, (
         "Request to version expected status_code=200, "

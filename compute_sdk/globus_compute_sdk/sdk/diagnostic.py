@@ -24,6 +24,7 @@ from globus_compute_sdk.sdk._environments import (
     get_amqp_service_host,
     get_web_service_url,
 )
+from globus_compute_sdk.sdk.client import _ComputeWebClient
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.executor import _RESULT_WATCHERS
 from globus_compute_sdk.sdk.hardware_report import hardware_commands_list
@@ -31,7 +32,6 @@ from globus_compute_sdk.sdk.utils import display_name
 from globus_compute_sdk.sdk.utils.sample_function import (
     sdk_tutorial_sample_simple_function,
 )
-from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.serialize.concretes import DillCodeTextInspect
 from rich import get_console
 from rich.console import Console
@@ -122,7 +122,9 @@ def print_service_versions(base_url: str):
     @display_name(f"get_service_versions({base_url})")
     def kernel():
         # Just adds a newline to the version info for better formatting
-        version_info = WebClient(base_url=base_url).get_version(service="all")
+        version_info = _ComputeWebClient(base_url=base_url).v2.get_version(
+            service="all"
+        )
         print(f"{version_info}\n")
 
     return kernel
