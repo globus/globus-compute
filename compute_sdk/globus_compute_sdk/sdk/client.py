@@ -6,6 +6,8 @@ import sys
 import typing as t
 import warnings
 
+import globus_sdk
+from globus_compute_common.sdk_version_sharing import user_agent_substring
 from globus_compute_sdk.errors import (
     SerializationError,
     TaskExecutionFailed,
@@ -21,7 +23,6 @@ from globus_compute_sdk.sdk.web_client import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
 from globus_compute_sdk.version import __version__, compare_versions
-from globus_sdk import GlobusApp
 from globus_sdk.version import __version__ as __version_globus__
 
 from .auth.auth_client import ComputeAuthClient
@@ -32,6 +33,17 @@ from .utils import get_env_var_with_deprecation
 from .web_client import WebClient
 
 logger = logging.getLogger(__name__)
+
+
+class _ComputeWebClient:
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+        kwargs["app_name"] = user_agent_substring(__version__)
+        self.v2 = globus_sdk.ComputeClientV2(*args, **kwargs)
+        self.v3 = globus_sdk.ComputeClientV3(*args, **kwargs)
 
 
 class Client:
@@ -60,7 +72,7 @@ class Client:
         code_serialization_strategy: SerializationStrategy | None = None,
         data_serialization_strategy: SerializationStrategy | None = None,
         login_manager: LoginManagerProtocol | None = None,
-        app: GlobusApp | None = None,
+        app: globus_sdk.GlobusApp | None = None,
         **kwargs,
     ):
         """
@@ -109,7 +121,7 @@ class Client:
 
         self._task_status_table: dict[str, dict] = {}
 
-        self.app: GlobusApp | None = None
+        self.app: globus_sdk.GlobusApp | None = None
         self.login_manager: LoginManagerProtocol | None = None
 
         if app and login_manager:
@@ -120,10 +132,16 @@ class Client:
             self.web_client = self.login_manager.get_web_client(
                 base_url=self.web_service_address
             )
+            self._compute_web_client = _ComputeWebClient(
+                base_url=self.web_service_address, authorizer=self.web_client.authorizer
+            )
         else:
             self.app = app if app else get_globus_app(environment=environment)
             self.auth_client = ComputeAuthClient(app=self.app)
             self.web_client = WebClient(base_url=self.web_service_address, app=self.app)
+            self._compute_web_client = _ComputeWebClient(
+                base_url=self.web_service_address, app=self.app
+            )
 
         self.fx_serializer = ComputeSerializer(
             strategy_code=code_serialization_strategy,
@@ -140,7 +158,7 @@ class Client:
 
         Raises a VersionMismatch error on failure.
         """
-        data = self.web_client.get_version()
+        data = self._compute_web_client.v2.get_version(service="all")
 
         min_ep_version = data["min_ep_version"]
         min_sdk_version = data["min_sdk_version"]
@@ -248,7 +266,7 @@ class Client:
         if task.get("pending", True) is False:
             return task
 
-        r = self.web_client.get_task(tid)
+        r = self._compute_web_client.v2.get_task(task_id)
         logger.debug(f"Response string : {r}")
         return self._update_task_table(r.text, tid)
 
@@ -326,7 +344,7 @@ class Client:
         results = {tid: tst[tid] for tid in result_ids}
 
         if pending_task_ids:
-            r = self.web_client.get_batch_status(pending_task_ids)
+            r = self._compute_web_client.v2.get_task_batch(pending_task_ids)
             logger.debug(f"Response string : {r}")
 
             statuses = r["results"]
@@ -443,7 +461,7 @@ class Client:
             raise ValueError("No tasks specified for batch run")
 
         # Send the data to Globus Compute
-        return self.web_client.submit(endpoint_id, batch.prepare()).data
+        return self._compute_web_client.v3.submit(endpoint_id, batch.prepare()).data
 
     @requires_login
     def register_endpoint(
@@ -493,23 +511,34 @@ class Client:
         """
         self.version_check()
 
-        r = self.web_client.register_endpoint(
-            endpoint_name=name,
-            endpoint_id=endpoint_id,
-            metadata=metadata,
-            multi_user=multi_user,
-            display_name=display_name,
-            allowed_functions=allowed_functions,
-            auth_policy=auth_policy,
-            subscription_id=subscription_id,
-            public=public,
-            high_assurance=high_assurance,
-        )
+        data: t.Dict[str, t.Any] = {"endpoint_name": name}
+        if display_name is not None:
+            data["display_name"] = display_name
+        if multi_user:
+            data["multi_user"] = multi_user
+        if metadata:
+            data["metadata"] = metadata
+        if allowed_functions:
+            data["allowed_functions"] = allowed_functions
+        if auth_policy:
+            data["authentication_policy"] = auth_policy
+        if subscription_id:
+            data["subscription_uuid"] = subscription_id
+        if public is not None:
+            data["public"] = public
+        if high_assurance is not None:
+            data["high_assurance"] = high_assurance
+
+        if endpoint_id:
+            r = self._compute_web_client.v3.update_endpoint(endpoint_id, data)
+        else:
+            r = self._compute_web_client.v3.register_endpoint(data)
+
         return r.data
 
     @requires_login
     def get_result_amqp_url(self) -> dict[str, str]:
-        r = self.web_client.get_result_amqp_url()
+        r = self._compute_web_client.v2.get_result_amqp_url()
         return r.data
 
     @requires_login
@@ -531,8 +560,7 @@ class Client:
             The port to connect to and a list of containers
         """
         data = {"endpoint_name": name, "description": description}
-
-        r = self.web_client.post("/v2/get_containers", data=data)
+        r = self._compute_web_client.v2.post("/v2/get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
     @requires_login
@@ -553,7 +581,9 @@ class Client:
         """
         self.version_check()
 
-        r = self.web_client.get(f"/v2/containers/{container_uuid}/{container_type}")
+        r = self._compute_web_client.v2.get(
+            f"/v2/containers/{container_uuid}/{container_type}"
+        )
         return r.data["container"]
 
     @requires_login
@@ -570,7 +600,7 @@ class Client:
         dict
             The details of the endpoint's stats
         """
-        r = self.web_client.get_endpoint_status(endpoint_uuid)
+        r = self._compute_web_client.v2.get_endpoint_status(endpoint_uuid)
         return r.data
 
     @requires_login
@@ -589,7 +619,7 @@ class Client:
             configuration values. If there were any issues deserializing this data, may
             also include an "errors" key.
         """
-        r = self.web_client.get_endpoint_metadata(endpoint_uuid)
+        r = self._compute_web_client.v2.get_endpoint(endpoint_uuid)
         return r.data
 
     @requires_login
@@ -601,7 +631,7 @@ class Client:
         list
             A list of dictionaries which contain endpoint info
         """
-        r = self.web_client.get_endpoints()
+        r = self._compute_web_client.v2.get_endpoints()
         return r.data
 
     @requires_login
@@ -668,7 +698,7 @@ class Client:
             serializer=self.fx_serializer,
         )
         logger.info(f"Registering function : {data}")
-        r = self.web_client.register_function(data)
+        r = self._compute_web_client.v2.register_function(data.to_dict())
         return r.data["function_uuid"]
 
     @requires_login
@@ -686,7 +716,7 @@ class Client:
             Information about the registered function, such as name, description,
             serialized source code, python version, etc.
         """
-        r = self.web_client.get_function(function_id)
+        r = self._compute_web_client.v2.get_function(function_id)
         return r.data
 
     @requires_login
@@ -718,7 +748,7 @@ class Client:
             "type": container_type,
         }
 
-        r = self.web_client.post("/v2/containers", data=payload)
+        r = self._compute_web_client.v2.post("/v2/containers", data=payload)
         return r.data["container_id"]
 
     @requires_login
@@ -747,11 +777,13 @@ class Client:
         ContainerBuildForbidden
             User is not in the globus group that protects the build
         """
-        r = self.web_client.post("/v2/containers/build", data=container_spec.to_json())
+        r = self._compute_web_client.v2.post(
+            "/v2/containers/build", data=container_spec.to_json()
+        )
         return r.data["container_id"]
 
     def get_container_build_status(self, container_id):
-        r = self.web_client.get(f"/v2/containers/build/{container_id}")
+        r = self._compute_web_client.v2.get(f"/v2/containers/build/{container_id}")
         if r.http_status == 200:
             return r["status"]
         elif r.http_status == 404:
@@ -776,7 +808,7 @@ class Client:
         json
             The response of the request
         """
-        return self.web_client.get_allowed_functions(endpoint_id).data
+        return self._compute_web_client.v3.get_endpoint_allowlist(endpoint_id).data
 
     @requires_login
     def stop_endpoint(self, endpoint_id: str):
@@ -792,7 +824,7 @@ class Client:
         json
             The response of the request
         """
-        return self.web_client.stop_endpoint(endpoint_id)
+        return self._compute_web_client.v2.lock_endpoint(endpoint_id)
 
     @requires_login
     def delete_endpoint(self, endpoint_id: str):
@@ -808,7 +840,7 @@ class Client:
         json
             The response of the request
         """
-        return self.web_client.delete_endpoint(endpoint_id)
+        return self._compute_web_client.v2.delete_endpoint(endpoint_id)
 
     @requires_login
     def delete_function(self, function_id: str):
@@ -824,7 +856,7 @@ class Client:
         json
             The response of the request
         """
-        return self.web_client.delete_function(function_id)
+        return self._compute_web_client.v2.delete_function(function_id)
 
     @requires_login
     def get_worker_hardware_details(self, endpoint_id: UUID_LIKE_T) -> str:

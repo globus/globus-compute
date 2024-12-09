@@ -684,7 +684,7 @@ class Executor(concurrent.futures.Executor):
         assert task_group_id is not None  # mypy: we _just_ proved this
 
         # step 1: from server, acquire list of related task ids and make futures
-        r = self.client.web_client.get_taskgroup_tasks(task_group_id)
+        r = self.client._compute_web_client.v2.get_task_group(task_group_id)
         if r["taskgroup_id"] != str(task_group_id):
             msg = (
                 "Server did not respond with requested TaskGroup Tasks.  "
@@ -720,7 +720,7 @@ class Executor(concurrent.futures.Executor):
                         len(id_chunk),
                     )
 
-                res = self.client.web_client.get_batch_status(id_chunk)
+                res = self.client._compute_web_client.v2.get_task_batch(id_chunk)
                 for task_id, task in res.data.get("results", {}).items():
                     if task_id in open_futures:
                         continue
