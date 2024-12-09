@@ -2,14 +2,9 @@ import concurrent.futures
 import typing as t
 
 import globus_compute_sdk as gc
-import pytest
 from globus_compute_sdk import Client, Executor
+from globus_compute_sdk.errors import TaskPending
 from packaging.version import Version
-
-try:
-    from globus_compute_sdk.errors import TaskPending
-except ImportError:
-    from globus_compute_sdk.utils.errors import TaskPending
 
 sdk_version = Version(gc.version.__version__)
 
@@ -33,7 +28,6 @@ def ohai():
     return "ohai"
 
 
-@pytest.mark.skipif(sdk_version.release < (2, 2, 5), reason="batch.add iface updated")
 def test_batch(compute_client: Client, endpoint: str, linear_backoff: t.Callable):
     """Test batch submission and get_batch_result"""
 
@@ -77,19 +71,10 @@ def test_wait_on_new_hello_world_func(
 
 def test_executor(compute_client, endpoint, tutorial_function_id, timeout_s: int):
     """Test using Executor to retrieve results."""
-    res = compute_client.web_client.get_version()
-    assert res.http_status == 200, f"Received {res.http_status} instead!"
-
     num_tasks = 10
     submit_count = 2  # we've had at least one bug that prevented executor re-use
 
-    # use client on newer versions and funcx_client on older
-    try:
-        gce = Executor(endpoint_id=endpoint, client=compute_client)
-    except TypeError:
-        gce = Executor(endpoint_id=endpoint, funcx_client=compute_client)
-
-    with gce:
+    with Executor(endpoint_id=endpoint, client=compute_client) as gce:
         for _ in range(submit_count):
             futures = [
                 gce.submit_to_registered_function(tutorial_function_id)
