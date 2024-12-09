@@ -21,7 +21,11 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return WebClient(base_url="https://api.funcx", transport_params={"max_retries": 0})
+    return WebClient(
+        base_url="https://api.funcx",
+        transport_params={"max_retries": 0},
+        _deprecation_warning=False,
+    )
 
 
 @pytest.mark.parametrize("http_status", [400, 500])

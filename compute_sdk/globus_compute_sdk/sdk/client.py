@@ -129,7 +129,7 @@ class Client:
         elif login_manager:
             self.login_manager = login_manager
             self.auth_client = login_manager.get_auth_client()
-            self.web_client = self.login_manager.get_web_client(
+            self._web_client = self.login_manager.get_web_client(
                 base_url=self.web_service_address
             )
             self._compute_web_client = _ComputeWebClient(
@@ -138,7 +138,11 @@ class Client:
         else:
             self.app = app if app else get_globus_app(environment=environment)
             self.auth_client = ComputeAuthClient(app=self.app)
-            self.web_client = WebClient(base_url=self.web_service_address, app=self.app)
+            self._web_client = WebClient(
+                base_url=self.web_service_address,
+                app=self.app,
+                _deprecation_warning=False,
+            )
             self._compute_web_client = _ComputeWebClient(
                 base_url=self.web_service_address, app=self.app
             )
@@ -152,6 +156,20 @@ class Client:
 
         if do_version_check:
             self.version_check()
+
+    @property
+    def web_client(self):
+        warnings.warn(
+            "The 'Client.web_client' attribute is deprecated"
+            " and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._web_client
+
+    @web_client.setter
+    def web_client(self, val: WebClient):
+        self._web_client = val
 
     def version_check(self, endpoint_version: str | None = None) -> None:
         """Check this client version meets the service's minimum supported version.

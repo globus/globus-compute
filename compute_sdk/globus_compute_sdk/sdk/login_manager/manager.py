@@ -170,4 +170,5 @@ class LoginManager:
             base_url=base_url,
             app_name=app_name,
             authorizer=self._get_authorizer(ComputeScopes.resource_server),
+            _deprecation_warning=False,
         )
