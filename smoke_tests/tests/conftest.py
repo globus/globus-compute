@@ -4,6 +4,7 @@ import collections
 import json
 import os
 import time
+import typing as t
 
 import pytest
 from globus_compute_sdk import Client
@@ -228,10 +229,39 @@ FuncResult = collections.namedtuple(
 
 
 @pytest.fixture
-def submit_function_and_get_result(compute_client):
-    def submit_fn(
-        endpoint_id, func=None, func_args=None, func_kwargs=None, initial_sleep=0
-    ):
+def timeout_s():
+    return 60
+
+
+class LinearBackoff:
+    def __init__(self, timeout_s: int, base_delay_s: int):
+        self.timeout_s = timeout_s
+        self.delay_s = base_delay_s
+        self.start_time: float | None = None
+
+    def backoff(self):
+        if self.start_time is None:
+            self.start_time = time.monotonic()
+
+        elapsed_s = time.monotonic() - self.start_time
+        assert elapsed_s < self.timeout_s, f"Hit {self.timeout_s} second test timeout"
+
+        remaining_s = max(self.timeout_s - elapsed_s, 0)
+        self.delay_s = round(min(self.delay_s, remaining_s))
+        time.sleep(self.delay_s)
+
+        self.delay_s += 1
+        return True
+
+
+@pytest.fixture(scope="function")
+def linear_backoff(timeout_s: int):
+    return LinearBackoff(timeout_s, 1).backoff
+
+
+@pytest.fixture
+def submit_function_and_get_result(compute_client: Client, linear_backoff: t.Callable):
+    def submit_fn(endpoint_id, func=None, func_args=None, func_kwargs=None):
         if callable(func):
             func_id = compute_client.register_function(func)
         else:
@@ -246,17 +276,11 @@ def submit_function_and_get_result(compute_client):
             *func_args, endpoint_id=endpoint_id, function_id=func_id, **func_kwargs
         )
 
-        if initial_sleep:
-            time.sleep(initial_sleep)
-
-        result = None
-        response = None
-        for attempt in range(10):
+        while linear_backoff():
             response = compute_client.get_task(task_id)
             if response.get("pending") is False:
                 result = response.get("result")
-            else:
-                time.sleep(attempt)
+                break
 
         return FuncResult(func_id, task_id, result, response)
 
