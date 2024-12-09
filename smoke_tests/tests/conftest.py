@@ -136,32 +136,27 @@ def _add_args_for_client_creds_login(api_client_id, api_client_secret, client_ar
     funcx_authorizer = AccessTokenAuthorizer(funcx_token)
     auth_authorizer = AccessTokenAuthorizer(auth_token)
 
-    try:
-        from globus_compute_sdk.sdk.login_manager import LoginManagerProtocol
-    except ImportError:
-        client_args["fx_authorizer"] = funcx_authorizer
-        client_args["openid_authorizer"] = auth_authorizer
-    else:
+    from globus_compute_sdk.sdk.login_manager import LoginManagerProtocol
 
-        class TestsuiteLoginManager:
-            def ensure_logged_in(self) -> None:
-                pass
+    class TestsuiteLoginManager:
+        def ensure_logged_in(self) -> None:
+            pass
 
-            def logout(self) -> None:
-                pass
+        def logout(self) -> None:
+            pass
 
-            def get_auth_client(self) -> AuthClient:
-                return AuthClient(authorizer=auth_authorizer)
+        def get_auth_client(self) -> AuthClient:
+            return AuthClient(authorizer=auth_authorizer)
 
-            def get_web_client(self, *, base_url: str | None = None) -> WebClient:
-                return WebClient(base_url=base_url, authorizer=funcx_authorizer)
+        def get_web_client(self, *, base_url: str | None = None) -> WebClient:
+            return WebClient(base_url=base_url, authorizer=funcx_authorizer)
 
-        login_manager = TestsuiteLoginManager()
+    login_manager = TestsuiteLoginManager()
 
-        # check runtime-checkable protocol
-        assert isinstance(login_manager, LoginManagerProtocol)
+    # check runtime-checkable protocol
+    assert isinstance(login_manager, LoginManagerProtocol)
 
-        client_args["login_manager"] = login_manager
+    client_args["login_manager"] = login_manager
 
 
 @pytest.fixture(scope="session")

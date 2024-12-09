@@ -1,11 +1,5 @@
 import pytest
-
-try:
-    from globus_compute_sdk.errors import TaskExecutionFailed
-
-    has_task_exec_error_type = True
-except ImportError:
-    has_task_exec_error_type = False
+from globus_compute_sdk.errors import TaskExecutionFailed
 
 
 def large_result_producer(size: int) -> str:
@@ -25,9 +19,6 @@ def test_allowed_result_sizes(submit_function_and_get_result, endpoint, size):
     assert len(r.result) == size
 
 
-@pytest.mark.skipif(
-    not has_task_exec_error_type, reason="Test requires newer execution exception type"
-)
 def test_result_size_too_large(submit_function_and_get_result, endpoint):
     """
     Globus Compute should raise a MaxResultSizeExceeded exception when results exceeds
@@ -38,8 +29,8 @@ def test_result_size_too_large(submit_function_and_get_result, endpoint):
         submit_function_and_get_result(
             endpoint, func=large_result_producer, func_args=(11 * 1024 * 1024,)
         )
-        # ...so unwrap the exception to verify that it's the right type
-        assert "MaxResultSizeExceeded" in excinfo.value.remote_data
+    # ...so unwrap the exception to verify that it's the right type
+    assert "MaxResultSizeExceeded" in excinfo.value.remote_data
 
 
 @pytest.mark.parametrize("size", [200, 2000, 20000, 200000])
