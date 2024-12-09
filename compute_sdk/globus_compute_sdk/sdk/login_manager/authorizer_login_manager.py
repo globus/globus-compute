@@ -36,6 +36,7 @@ class AuthorizerLoginManager(LoginManagerProtocol):
             base_url=base_url,
             app_name=app_name,
             authorizer=self.authorizers[ComputeScopes.resource_server],
+            _deprecation_warning=False,
         )
 
     def ensure_logged_in(self):

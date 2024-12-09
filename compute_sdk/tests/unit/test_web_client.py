@@ -30,12 +30,23 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return WebClient(base_url=_BASE_URL, transport_params={"max_retries": 0})
+    return WebClient(
+        base_url=_BASE_URL,
+        transport_params={"max_retries": 0},
+        _deprecation_warning=False,
+    )
+
+
+def test_web_client_deprecated():
+    with pytest.warns(DeprecationWarning) as record:
+        WebClient(base_url="blah")
+    msg = "'WebClient' class is deprecated"
+    assert any(msg in str(r.message) for r in record)
 
 
 def test_web_client_can_set_explicit_base_url():
-    c1 = WebClient(base_url="https://foo.example.com/")
-    c2 = WebClient(base_url="https://bar.example.com/")
+    c1 = WebClient(base_url="https://foo.example.com/", _deprecation_warning=False)
+    c2 = WebClient(base_url="https://bar.example.com/", _deprecation_warning=False)
     assert c1.base_url == "https://foo.example.com/"
     assert c2.base_url == "https://bar.example.com/"
 
@@ -64,7 +75,7 @@ def test_get_version_service_param(client, service_param):
 
 @pytest.mark.parametrize("app_name", [None, str(uuid.uuid4())])
 def test_app_name_value(app_name: str | None):
-    wc = WebClient(base_url=_BASE_URL, app_name=app_name)
+    wc = WebClient(base_url=_BASE_URL, app_name=app_name, _deprecation_warning=False)
     if app_name is None:
         assert wc.app_name == f"globus-compute-sdk-{__version__}"
     else:

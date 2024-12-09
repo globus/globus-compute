@@ -87,6 +87,7 @@ class FakeLoginManager:
         return WebClient(
             base_url="https://compute.api.globus.org",
             authorizer=globus_sdk.NullAuthorizer(),
+            _deprecation_warning=False,
         )
 
 

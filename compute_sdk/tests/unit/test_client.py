@@ -735,7 +735,7 @@ def test_client_handles_globus_app(
     assert client.web_client is mock_web_client.return_value
     assert client._compute_web_client is mock_compute_web_client.return_value
     mock_web_client.assert_called_once_with(
-        base_url=client.web_service_address, app=mock_app
+        base_url=client.web_service_address, app=mock_app, _deprecation_warning=False
     )
     mock_compute_web_client.assert_called_once_with(
         base_url=client.web_service_address, app=mock_app
@@ -768,3 +768,11 @@ def test_client_logout_with_login_manager():
     client = gc.Client(do_version_check=False, login_manager=mock_lm)
     client.logout()
     assert mock_lm.logout.called
+
+
+def test_web_client_deprecated():
+    gcc = gc.Client(do_version_check=False)
+    with pytest.warns(DeprecationWarning) as record:
+        assert gcc.web_client, "Client.web_client needed for backward compatibility"
+    msg = "'Client.web_client' attribute is deprecated"
+    assert any(msg in str(r.message) for r in record)
