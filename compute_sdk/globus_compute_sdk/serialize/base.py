@@ -21,6 +21,11 @@ class SerializationStrategy(metaclass=ABCMeta):
     def identifier(self):
         pass
 
+    @property
+    @abstractmethod
+    def for_code(self):
+        pass
+
     def chomp(self, payload: str) -> str:
         """If the payload starts with the identifier, return the remaining block
 
