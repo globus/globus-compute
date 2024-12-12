@@ -959,6 +959,14 @@ class Executor(concurrent.futures.Executor):
                         api_burst_fill.append(fill_percent)
 
                     to_watch = [f for f in fut_list if f.task_id and not f.done()]
+                    log.debug(
+                        "%r (tid:%s): Submission complete (to %s);"
+                        " count to watcher: %d",
+                        self,
+                        _tid,
+                        ep_uuid,
+                        len(to_watch),
+                    )
                     if not to_watch:
                         continue
 
@@ -1043,6 +1051,8 @@ class Executor(concurrent.futures.Executor):
             set when function completes successfully.
         :param tasks: a list of tasks to submit upstream in a batch.
         """
+        assert len(futs) == len(tasks), "Developer reminder"
+
         _tid = threading.get_ident()
         if taskgroup_uuid is None and self.task_group_id:
             taskgroup_uuid = self.task_group_id
@@ -1083,10 +1093,12 @@ class Executor(concurrent.futures.Executor):
 
         try:
             received_tasks_by_fn: dict[str, list[str]] = batch_response["tasks"]
-            new_tg_id: str = batch_response["task_group_id"]
+            new_tg_id = uuid.UUID(batch_response["task_group_id"])
+            _request_id = uuid.UUID(batch_response["request_id"])
+            _endpoint_id = uuid.UUID(batch_response["endpoint_id"])
         except Exception as e:
             log.debug(
-                f"Server response ({batch_response}) missing an expected field"
+                f"Invalid or unexpected server response ({batch_response})"
                 f" [({type(e).__name__}) {e}]"
             )
             for fut_list in submitted_futs_by_fn.values():
@@ -1095,7 +1107,7 @@ class Executor(concurrent.futures.Executor):
             self._submitter_thread_exception_captured = True
             raise
 
-        if str(self.task_group_id) != new_tg_id:
+        if self.task_group_id != new_tg_id:
             log.info(f"Updating task_group_id from {self.task_group_id} to {new_tg_id}")
             self.task_group_id = new_tg_id
 
@@ -1113,17 +1125,15 @@ class Executor(concurrent.futures.Executor):
         for fn_id, fut_list in submitted_futs_by_fn.items():
             task_uuids = received_tasks_by_fn.get(fn_id)
 
+            fut_exc = None
             if task_uuids is None:
                 fut_exc = Exception(
                     f"The Globus Compute Service ignored tasks for function {fn_id}!"
                     "  This 'should not happen,' so please reach out to the Globus"
                     " Compute team if you are able to recreate this behavior."
                 )
-                for fut in fut_list:
-                    fut.set_exception(fut_exc)
-                continue
 
-            if len(fut_list) != len(task_uuids):
+            elif len(fut_list) != len(task_uuids):
                 fut_exc = Exception(
                     "The Globus Compute Service only partially initiated requested"
                     f" tasks for function {fn_id}!  It is unclear which tasks it"
@@ -1131,12 +1141,22 @@ class Executor(concurrent.futures.Executor):
                     " to the Globus Compute team if you are able to recreate this"
                     " behavior."
                 )
+
+            if fut_exc:
                 for fut in fut_list:
+                    fut._metadata["request_uuid"] = _request_id
+                    fut._metadata["endpoint_uuid"] = _endpoint_id
+                    fut._metadata["task_group_uuid"] = new_tg_id
                     fut.set_exception(fut_exc)
                 continue
 
+            assert task_uuids is not None, "2nd order logic, mypy. :facepalm:"
+
             # Happy -- expected -- path
             for fut, task_id in zip(fut_list, task_uuids):
+                fut._metadata["request_uuid"] = _request_id
+                fut._metadata["endpoint_uuid"] = _endpoint_id
+                fut._metadata["task_group_uuid"] = new_tg_id
                 fut.task_id = task_id
 
 
