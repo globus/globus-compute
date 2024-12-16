@@ -9,10 +9,11 @@ from globus_compute_sdk.serialize.concretes import (
     DillDataBase64,
     JSONData,
 )
-from globus_compute_sdk.serialize.facade import ComputeSerializer
+from globus_compute_sdk.serialize.facade import AllowlistWildcard, ComputeSerializer
 
 __all__ = [
     "ComputeSerializer",
+    "AllowlistWildcard",
     "SerializationStrategy",
     "DEFAULT_STRATEGY_CODE",
     "DEFAULT_STRATEGY_DATA",
