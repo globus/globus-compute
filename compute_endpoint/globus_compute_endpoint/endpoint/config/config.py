@@ -183,14 +183,15 @@ class UserEndpointConfig(BaseConfig):
         manually triggered to shut down (e.g., SIGINT [Ctrl+C] or SIGTERM).
 
     :param idle_heartbeats_hard: Number of heartbeats after no task or result has moved
-        before the endpoint shuts down.  Unlike `idle_heartbeats_soft`, this idle timer
-        does not require that there are no outstanding tasks or results.  If no task or
-        result has moved in this many heartbeats, then the endpoint will shut down.  In
-        particular, this is intended to catch the error condition that a worker has
-        gone missing, and will thus _never_ return the task it was sent.  Note that
-        this setting is only enabled if the `idle_heartbeats_soft` is a value greater
-        than 0.  Suggested value: a multiplier of heartbeat_period equivalent to two
-        days.  For example, if `heartbeat_period` is 30s, then suggest 5760.
+        before the endpoint shuts down.  Unlike ``idle_heartbeats_soft``, this idle
+        timer does not require that there are no outstanding tasks or results.  If no
+        task or result has moved in this many heartbeats, then the endpoint will shut
+        down.  In particular, this is intended to catch the error condition that a
+        worker has gone missing and will thus *never* return the task it was sent.
+        Note that this setting is only enabled if the ``idle_heartbeats_soft`` is a
+        value greater than 0.  Suggested value: a multiplier of heartbeat_period
+        equivalent to two days.  For example, if ``heartbeat_period`` is 30s, then
+        suggest 5760.
 
     :param detach_endpoint: Whether the endpoint daemon be run as a detached process.
         This is good for a real edge node, but an anti-pattern for kubernetes pods
@@ -318,9 +319,12 @@ class ManagerEndpointConfig(BaseConfig):
     |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
 
     :param public: Whether all users can discover the multi-user endpoint via the
-        Globus Compute web API and user interface (https://app.globus.org/compute).
-        This does not control access to the endpoint; therefore, it should not be used
-        as a security feature.
+        `Globus Compute web user interface <https://app.globus.org/compute>`_ and API.
+
+        .. warning::
+
+           Do not use this flag as a means of security.  It controls *visibility* in
+           the web user interface.  It does **not control access** to the endpoint.
 
     :param identity_mapping_config_path: Path to the identity mapping configuration for
         this endpoint.  If the process is not privileged, a warning will be emitted to
