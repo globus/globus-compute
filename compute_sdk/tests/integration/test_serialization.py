@@ -5,7 +5,11 @@ from unittest.mock import patch
 
 import globus_compute_sdk.serialize.concretes as concretes
 import pytest
-from globus_compute_sdk.errors import SerializationError
+from globus_compute_sdk.errors import (
+    DeserializationError,
+    SerdeError,
+    SerializationError,
+)
 from globus_compute_sdk.serialize.base import SerializationStrategy
 from globus_compute_sdk.serialize.facade import ComputeSerializer
 
@@ -337,6 +341,18 @@ def test_selectable_serialization(strategy):
     assert ser_data[:ID_LEN] == strategy.identifier
 
 
+@pytest.mark.parametrize("strategy", concretes.SELECTABLE_STRATEGIES)
+def test_selectable_serialization_enforces_for_code(strategy):
+    with pytest.raises(SerdeError) as pyt_exc:
+        ComputeSerializer(strategy_code=strategy(), strategy_data=strategy())
+
+    if strategy.for_code:
+        e = "is a code serialization strategy, expected a data strategy"
+    else:
+        e = "is a data serialization strategy, expected a code strategy"
+    assert e in str(pyt_exc)
+
+
 def test_serializer_errors_on_unknown_strategy():
     class NewStrategy(SerializationStrategy):
         identifier = "aa\n"
@@ -350,12 +366,12 @@ def test_serializer_errors_on_unknown_strategy():
 
     strategy = NewStrategy()
 
-    with pytest.raises(SerializationError):
+    with pytest.raises(SerdeError):
         ComputeSerializer(strategy_code=strategy)
 
     NewStrategy.for_code = False
 
-    with pytest.raises(SerializationError):
+    with pytest.raises(SerdeError):
         ComputeSerializer(strategy_data=strategy)
 
 
@@ -382,3 +398,139 @@ def test_check_strategies(strategy_code, strategy_data, function, args, kwargs):
     new_result = new_fn(*new_args, **new_kwargs)
 
     assert original_result == new_result
+
+
+@pytest.mark.parametrize("disallowed_strategy", concretes.SELECTABLE_STRATEGIES)
+def test_allowed_deserializers(disallowed_strategy):
+    allowlist = [
+        strategy
+        for strategy in concretes.SELECTABLE_STRATEGIES
+        if strategy.for_code == disallowed_strategy.for_code
+        and strategy != disallowed_strategy
+    ]
+
+    assert allowlist, "expect to have at least one allowed deserializer"
+    assert disallowed_strategy not in allowlist, "sanity check"
+
+    if disallowed_strategy.for_code:
+        serializer = ComputeSerializer(allowed_code_deserializer_types=allowlist)
+        payload = disallowed_strategy().serialize(foo)
+    else:
+        serializer = ComputeSerializer(allowed_data_deserializer_types=allowlist)
+        payload = disallowed_strategy().serialize("foo")
+
+    with pytest.raises(DeserializationError) as pyt_exc:
+        serializer.deserialize(payload)
+    assert f"deserializer {disallowed_strategy.__name__} is not allowed" in str(pyt_exc)
+
+
+@pytest.mark.parametrize(
+    "list, valid",
+    [
+        (["globus_compute_sdk.serialize.concretes.DillCode"], True),
+        (["my_malicious_package.my_malicious_serializer"], False),
+        (["invalid_path_1"], False),
+        (["invalid path 2"], False),
+        ([""], False),
+        (
+            [
+                "globus_compute_sdk.serialize.concretes.DillCode",
+                "globus_compute_sdk.serialize.concretes.DillCodeTextInspect",
+                "globus_compute_sdk.serialize.concretes.DillCodeSource",
+                "globus_compute_sdk.serialize.concretes.CombinedCode",
+            ],
+            True,
+        ),
+        (
+            [
+                "globus_compute_sdk.serialize.concretes.DillCode",
+                "my_malicious_package.my_malicious_serializer",
+            ],
+            False,
+        ),
+        (
+            [
+                "globus_compute_sdk.serialize.concretes.DillCode",
+                "invalid path",
+            ],
+            False,
+        ),
+    ],
+)
+def test_allowed_deserializers_checks_imports(list, valid):
+    if valid:
+        ComputeSerializer(allowed_code_deserializer_types=list)
+    else:
+        with pytest.raises(SerdeError) as pyt_exc:
+            ComputeSerializer(allowed_code_deserializer_types=list)
+        assert "is not a valid path to a strategy" in str(pyt_exc)
+
+
+@pytest.mark.parametrize(
+    "list, for_code",
+    [
+        (
+            [
+                "globus_compute_sdk.serialize.concretes.DillCode",
+                "globus_compute_sdk.serialize.concretes.DillCodeTextInspect",
+                "globus_compute_sdk.serialize.concretes.DillCodeSource",
+                "globus_compute_sdk.serialize.concretes.CombinedCode",
+            ],
+            True,
+        ),
+        (
+            [
+                concretes.DillCode,
+                concretes.DillCodeTextInspect,
+                concretes.DillCodeSource,
+                concretes.CombinedCode,
+            ],
+            True,
+        ),
+        (
+            [
+                "globus_compute_sdk.serialize.concretes.DillDataBase64",
+                "globus_compute_sdk.serialize.concretes.JSONData",
+            ],
+            False,
+        ),
+        (
+            [
+                concretes.DillDataBase64,
+                concretes.JSONData,
+            ],
+            False,
+        ),
+    ],
+)
+def test_allowed_deserializers_enforces_for_code(list, for_code):
+    with pytest.raises(SerdeError) as pyt_exc:
+        ComputeSerializer(
+            allowed_code_deserializer_types=list, allowed_data_deserializer_types=list
+        )
+
+    if for_code:
+        e = "is a code serialization strategy, expected a data strategy"
+    else:
+        e = "is a data serialization strategy, expected a code strategy"
+    assert e in str(pyt_exc)
+
+
+def test_allowed_deserializers_errors_on_unknown_strategy():
+    class NewStrategy(SerializationStrategy):
+        identifier = "aa\n"
+        for_code = True
+
+        def serialize(self, data):
+            pass
+
+        def deserialize(self, payload):
+            pass
+
+    with pytest.raises(SerdeError):
+        ComputeSerializer(allowed_code_deserializer_types=[NewStrategy])
+
+    NewStrategy.for_code = False
+
+    with pytest.raises(SerdeError):
+        ComputeSerializer(allowed_data_deserializer_types=[NewStrategy])

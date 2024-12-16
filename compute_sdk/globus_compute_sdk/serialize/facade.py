@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import importlib
 import logging
 import typing as t
 
-from globus_compute_sdk.errors import DeserializationError, SerializationError
+from globus_compute_sdk.errors import (
+    DeserializationError,
+    SerdeError,
+    SerializationError,
+)
 from globus_compute_sdk.serialize.base import IDENTIFIER_LENGTH, SerializationStrategy
 from globus_compute_sdk.serialize.concretes import (
     DEFAULT_STRATEGY_CODE,
@@ -14,6 +19,61 @@ from globus_compute_sdk.serialize.concretes import (
 
 logger = logging.getLogger(__name__)
 
+DeserializerAllowlist = t.Iterable[t.Union[type[SerializationStrategy], str]]
+
+
+def assert_strategy_type_valid(
+    strategy_type: type[SerializationStrategy], for_code: bool
+) -> None:
+    if strategy_type not in SELECTABLE_STRATEGIES:
+        raise SerdeError(
+            f"{strategy_type.__name__} is not a known serialization strategy"
+            f" (must be one of {SELECTABLE_STRATEGIES})"
+        )
+
+    if strategy_type.for_code != for_code:
+        etype = "code" if for_code else "data"
+        gtype = "code" if strategy_type.for_code else "data"
+        raise SerdeError(
+            f"{strategy_type.__name__} is a {gtype} serialization strategy,"
+            f" expected a {etype} strategy"
+        )
+
+
+def validate_strategy(
+    strategy: SerializationStrategy, for_code: bool
+) -> SerializationStrategy:
+    assert_strategy_type_valid(type(strategy), for_code)
+    return strategy
+
+
+def validate_allowlist(
+    unvalidated: DeserializerAllowlist, for_code: bool
+) -> set[type[SerializationStrategy]]:
+    validated = set()
+    for value in unvalidated:
+        resolved_strategy_class = None
+        if isinstance(value, str):
+            try:
+                mod_name, class_name = value.rsplit(".", 1)
+                mod = importlib.import_module(mod_name)
+                resolved_strategy_class = getattr(mod, class_name)
+            except Exception as e:
+                raise SerdeError(f"`{value}` is not a valid path to a strategy") from e
+        else:
+            resolved_strategy_class = value
+
+        if not issubclass(resolved_strategy_class, SerializationStrategy):
+            raise SerdeError(
+                "Allowed deserializers must either be SerializationStrategies"
+                f" or valid paths to them (got {value})"
+            )
+
+        assert_strategy_type_valid(resolved_strategy_class, for_code)
+        validated.add(resolved_strategy_class)
+
+    return validated
+
 
 class ComputeSerializer:
     """Provides uniform interface to underlying serialization strategies"""
@@ -22,23 +82,23 @@ class ComputeSerializer:
         self,
         strategy_code: SerializationStrategy | None = None,
         strategy_data: SerializationStrategy | None = None,
+        *,
+        allowed_code_deserializer_types: DeserializerAllowlist | None = None,
+        allowed_data_deserializer_types: DeserializerAllowlist | None = None,
     ):
         """Instantiate the appropriate classes"""
 
-        def validate(strategy: SerializationStrategy) -> SerializationStrategy:
-            if type(strategy) not in SELECTABLE_STRATEGIES:
-                raise SerializationError(
-                    f"{strategy} is not a known serialization strategy "
-                    f"(must be one of {SELECTABLE_STRATEGIES})"
-                )
-
-            return strategy
-
-        self.strategy_code = (
-            validate(strategy_code) if strategy_code else DEFAULT_STRATEGY_CODE
+        self.code_serializer = validate_strategy(
+            strategy_code or DEFAULT_STRATEGY_CODE, True
         )
-        self.strategy_data = (
-            validate(strategy_data) if strategy_data else DEFAULT_STRATEGY_DATA
+        self.data_serializer = validate_strategy(
+            strategy_data or DEFAULT_STRATEGY_DATA, False
+        )
+        self.allowed_code_deserializer_types = validate_allowlist(
+            allowed_code_deserializer_types or [], True
+        )
+        self.allowed_data_deserializer_types = validate_allowlist(
+            allowed_data_deserializer_types or [], False
         )
 
         self.header_size = IDENTIFIER_LENGTH
@@ -50,9 +110,9 @@ class ComputeSerializer:
 
     def serialize(self, data):
         if callable(data):
-            stype, strategy = "Code", self.strategy_code
+            stype, strategy = "Code", self.code_serializer
         else:
-            stype, strategy = "Data", self.strategy_data
+            stype, strategy = "Data", self.data_serializer
 
         try:
             return strategy.serialize(data)
@@ -73,6 +133,8 @@ class ComputeSerializer:
 
         if not strategy:
             raise DeserializationError(f"Invalid header: {header} in data payload")
+
+        self.assert_deserializer_allowed(strategy)
 
         return strategy.deserialize(payload)
 
@@ -149,3 +211,25 @@ class ComputeSerializer:
             return self.unpack_and_deserialize(packed)
         except Exception as e:
             raise DeserializationError("check_strategies failed to deserialize") from e
+
+    def assert_deserializer_allowed(self, strategy: SerializationStrategy) -> None:
+        allowlist = (
+            self.allowed_code_deserializer_types
+            if strategy.for_code
+            else self.allowed_data_deserializer_types
+        )
+
+        if not allowlist or type(strategy) in allowlist:
+            return
+
+        allowed_names = [t.__name__ for t in allowlist]
+        dtype = "Code" if strategy.for_code else "Data"
+        htype = "function" if strategy.for_code else "arguments"
+        help_url = "https://globus-compute.readthedocs.io/en/stable/sdk.html#specifying-a-serialization-strategy"  # noqa
+
+        raise DeserializationError(
+            f"{dtype} deserializer {type(strategy).__name__} is not allowed; expected "
+            f"one of {allowed_names}. (Hint: reserialize the {htype} with one of the "
+            f"allowed serialization strategies and resubmit. For more information, see "
+            f"{help_url}.)"
+        )
