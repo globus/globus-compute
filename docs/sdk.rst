@@ -74,7 +74,7 @@ monitor status and retrieve results.
 
 .. note::
    Globus Compute places limits on the size of the functions and the rate at which functions can be submitted.
-   Please refer to the limits section for TODO:YADU
+   Please refer to the :doc:`limits` section for details.
 
 
 Retrieving Results
