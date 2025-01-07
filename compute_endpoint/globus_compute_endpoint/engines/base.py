@@ -44,7 +44,7 @@ class ReportingThread:
         self._shutdown_event = threading.Event()
         self.reporting_period = reporting_period
         self._thread = threading.Thread(
-            target=self.run_in_loop, args=[target] + args, name="GCReportingThread"
+            target=self.run_in_loop, args=(target, *args), name="GCReportingThread"
         )
 
     def start(self):
@@ -52,15 +52,13 @@ class ReportingThread:
         self._thread.start()
 
     def run_in_loop(self, target: t.Callable, *args) -> None:
-        while True:
-            try:
+        try:
+            target(*args)
+            while not self._shutdown_event.wait(self.reporting_period):
                 target(*args)
-            except Exception as e:
-                # log and update future before exiting, if it is not already set
-                self.status.set_exception(exception=e)
-                self._shutdown_event.set()
-            if self._shutdown_event.wait(timeout=self.reporting_period):
-                break
+            self.status.set_result(None)
+        except Exception as e:
+            self.status.set_exception(exception=e)
 
         logger.warning("ReportingThread exiting")
 
