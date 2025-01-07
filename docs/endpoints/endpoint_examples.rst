@@ -206,6 +206,27 @@ scheduler, and uses the ``SrunLauncher`` to launch workers.
 .. literalinclude:: configs/faster.yaml
    :language: yaml
 
+
+Open Science Pool
+^^^^^^^^^^^^^^^^^
+
+The `Open Science Pool <https://osg-htc.org/services/open_science_pool.html>`_ is a pool of opportunistic
+computing resources operated for all US-associated open science by the
+`OSG consortium <https://osg-htc.org/about/introduction/>`_.
+Unlike traditional HPC clusters, these computational resources are offered from campus and research cluster
+resources that are loosely connected. The configuration below uses the ``CondorProvider``
+to interface with the scheduler, and uses ``apptainer`` to distribute the computational environment
+to the workers.
+
+.. warning::
+   ``GlobusComputeEngine`` relies on a shared-filesystem to distribute keys used for encrypting
+   communication between the endpoint and workers. Since OSPool does not support a writable
+   shared-filesystem, **encryption** is disabled in the configuration below.
+
+.. literalinclude:: configs/ospool.yaml
+   :language: yaml
+
+
 Pinning Workers to devices
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
