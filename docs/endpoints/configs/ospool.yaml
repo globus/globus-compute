@@ -1,0 +1,39 @@
+display_name: OSPool
+engine:
+  type: GlobusComputeEngine
+  max_workers_per_node: 1
+
+  # This config uses apptainer containerization to ensure a consistent
+  # python environment on the worker side. Since apptainer limits writable
+  # directory paths, set working directory paths paths used by the worker to /tmp
+  # P.S: These filepaths remain private to the container and will not be
+  #      accessible on the host system
+  worker_logdir_root: /tmp/logs
+  working_dir: /tmp/tasks_dir
+
+  # GlobusComputeEngine relies on a shared-filesystem to distribute keys used
+  # for encrypting communication between the endpoint and workers.
+  # Since OSPool does not support a writable shared-filesystem,
+  # **encryption** is disabled in the configuration below.
+  encrypted: False
+
+  provider:
+
+    type: CondorProvider
+    init_blocks: 1
+    max_blocks: 1
+    min_blocks: 0
+
+    # Specify ProjectName and Apptainer image
+    scheduler_options: >
+      +ProjectName = {{ PROJECT_NAME }}
+
+      # To use apptainer on OSPool, build an apptainer image and copy it to
+      # OSDF and specify the full Specify the apptainer image path for eg.:
+      # "osdf:///ospool/ap20/data/USERNAME/globus_compute_py3.11.v1.sif"
+
+      +SingularityImage = {{ APPTAINER_IMAGE_PATH }}
+
+      # Add a condor requirement to guarantee that worker nodes support apptainer
+
+      Requirements = HAS_SINGULARITY == True && OSG_HOST_KERNEL_VERSION >= 31000
