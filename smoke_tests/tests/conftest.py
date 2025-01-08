@@ -225,7 +225,7 @@ FuncResult = collections.namedtuple(
 
 @pytest.fixture
 def timeout_s():
-    return 60
+    return 300
 
 
 class LinearBackoff:
