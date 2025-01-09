@@ -9,7 +9,6 @@ import uuid
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task, TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
-from globus_compute_endpoint.engines.high_throughput.messages import Message
 from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
@@ -135,22 +134,12 @@ def _unpack_messagebody(message: bytes) -> tuple[Task, str]:
     -------
     tuple(task, task_buffer)
     """
-    try:
-        task = messagepack.unpack(message)
-        if not isinstance(task, messagepack.message_types.Task):
-            raise CouldNotExecuteUserTaskError(
-                f"wrong type of message in worker: {type(task)}"
-            )
-        task_buffer = task.task_buffer
-    # on parse errors, failover to trying the "legacy" message reading
-    except (
-        messagepack.InvalidMessageError,
-        messagepack.UnrecognizedProtocolVersion,
-    ):
-        task = Message.unpack(message)
-        assert isinstance(task, Task)
-        task_buffer = task.task_buffer.decode("utf-8")  # type: ignore[attr-defined]
-    return task, task_buffer
+    task = messagepack.unpack(message)
+    if not isinstance(task, messagepack.message_types.Task):
+        raise CouldNotExecuteUserTaskError(
+            f"wrong type of message in worker: {type(task)}"
+        )
+    return task, task.task_buffer
 
 
 def _call_user_function(task_buffer: str, serde: ComputeSerializer = _serde) -> str:
