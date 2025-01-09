@@ -253,12 +253,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
                 f"Containerized launch cmd template: {self.executor.launch_cmd}"
             )
 
-        if (
-            getattr(self.executor.provider, "channel", None)
-            and not self.executor.provider.channel.script_dir
-        ):
-            self.executor.provider.channel.script_dir = script_dir
-
         os.makedirs(self.executor.provider.script_dir, exist_ok=True)
         if results_passthrough:
             # Only update the default queue in GCExecutorBase if

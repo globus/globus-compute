@@ -13,7 +13,6 @@ from globus_compute_common.pydantic_v1 import (
 from globus_compute_endpoint import engines, strategies
 from globus_compute_endpoint.endpoint.config.pam import PamConfiguration
 from parsl import addresses as parsl_addresses
-from parsl import channels as parsl_channels
 from parsl import launchers as parsl_launchers
 from parsl import providers as parsl_providers
 
@@ -66,19 +65,11 @@ class LauncherModel(BaseConfigModel):
     _validate_type = _validate_import("type", parsl_launchers)
 
 
-class ChannelModel(BaseConfigModel):
-    type: str
-
-    _validate_type = _validate_import("type", parsl_channels)
-
-
 class ProviderModel(BaseConfigModel):
     type: str
-    channel: t.Optional[ChannelModel]
     launcher: t.Optional[LauncherModel]
 
     _validate_type = _validate_import("type", parsl_providers)
-    _validate_channel = _validate_params("channel")
     _validate_launcher = _validate_params("launcher")
 
 
