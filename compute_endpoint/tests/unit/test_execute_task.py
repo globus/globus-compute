@@ -14,6 +14,16 @@ logger = logging.getLogger(__name__)
 _MOCK_BASE = "globus_compute_endpoint.engines.helper."
 
 
+def sleeper(t: float):
+    import time
+
+    now = start = time.monotonic()
+    while now - start < t:
+        time.sleep(0.0001)
+        now = time.monotonic()
+    return True
+
+
 @pytest.mark.parametrize("run_dir", ("", ".", "./", "../", "tmp", "$HOME"))
 def test_bad_run_dir(endpoint_uuid, task_uuid, run_dir):
     with pytest.raises(ValueError):  # not absolute
@@ -137,3 +147,17 @@ def test_execute_task_with_exception(ez_pack_task, execute_task_runner):
     assert "dill_version" in result.details
     assert "endpoint_id" in result.details
     assert "ZeroDivisionError" in result.data
+
+
+def test_execute_task_timeout(execute_task_runner, task_uuid, ez_pack_task):
+    task_bytes = ez_pack_task(sleeper, 1)
+
+    with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
+        with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
+            packed_result = execute_task_runner(task_bytes)
+
+    result = messagepack.unpack(packed_result)
+    assert isinstance(result, messagepack.message_types.Result)
+    assert result.task_id == task_uuid
+    assert "AppTimeout" in result.data
+    assert mock_log.exception.called

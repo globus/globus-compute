@@ -3,7 +3,6 @@ import logging
 import pathlib
 import random
 import time
-import typing as t
 from queue import Queue
 from unittest import mock
 
@@ -16,7 +15,6 @@ from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.engines import (
     GlobusComputeEngine,
     GlobusMPIEngine,
-    HighThroughputEngine,
     ProcessPoolEngine,
     ThreadPoolEngine,
 )
@@ -183,12 +181,9 @@ def test_gc_engine_system_failure(ez_pack_task, task_uuid, engine_runner):
         future.result()
 
 
-@pytest.mark.parametrize("engine_type", (GlobusComputeEngine, HighThroughputEngine))
-def test_serialized_engine_config_has_provider(
-    engine_type: t.Type[GlobusComputeEngineBase],
-):
-    loopback = "127.0.0.1" if engine_type != "HighThroughputEngine" else "::1"
-    ep_config = UserEndpointConfig(executors=[engine_type(address=loopback)])
+def test_serialized_engine_config_has_provider():
+    loopback = "::1"
+    ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address=loopback)])
 
     res = serialize_config(ep_config)
     executor = res["executors"][0].get("executor") or res["executors"][0]
@@ -396,23 +391,3 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
 
     a, _k = engine.executor.submit.call_args
     assert spec in a
-
-
-@pytest.mark.parametrize(
-    ("input", "is_valid"),
-    (
-        [None, False],
-        ["", False],
-        ["localhost.1", False],
-        ["localhost", True],
-        ["1.2.3.4.5", False],
-        ["127.0.0.1", True],
-        ["example.com", True],
-        ["0:0:0:0:0:0:0:1", True],
-        ["11111:0:0:0:0:0:0:1", False],
-        ["::1", True],
-        ["abc", False],
-    ),
-)
-def test_hostname_or_ip_validation(input, is_valid):
-    assert HighThroughputEngine.is_hostname_or_ip(input) is is_valid

@@ -133,32 +133,20 @@ def test_mu_public(public: t.Any):
     assert c.public is (public is True)
 
 
-@pytest.mark.parametrize("engine_type", ("GlobusComputeEngine", "HighThroughputEngine"))
 @pytest.mark.parametrize("strategy", ("simple", {"type": "SimpleStrategy"}, None))
 def test_conditional_engine_strategy(
-    engine_type: str, strategy: t.Union[str, dict, None], config_dict: dict
+    strategy: t.Union[str, dict, None], config_dict: dict
 ):
-    config_dict["engine"]["type"] = engine_type
+    config_dict["engine"]["type"] = "GlobusComputeEngine"
     config_dict["engine"]["strategy"] = strategy
-    config_dict["engine"]["address"] = (
-        "::1" if engine_type != "HighThroughputEngine" else "127.0.0.1"
-    )
+    config_dict["engine"]["address"] = "::1"
 
-    if engine_type == "GlobusComputeEngine":
-        if isinstance(strategy, str) or strategy is None:
+    if isinstance(strategy, str) or strategy is None:
+        UserEndpointConfigModel(**config_dict)
+    elif isinstance(strategy, dict):
+        with pytest.raises(ValidationError) as pyt_e:
             UserEndpointConfigModel(**config_dict)
-        elif isinstance(strategy, dict):
-            with pytest.raises(ValidationError) as pyt_e:
-                UserEndpointConfigModel(**config_dict)
-            assert "object is incompatible" in str(pyt_e.value)
-
-    elif engine_type == "HighThroughputEngine":
-        if isinstance(strategy, dict) or strategy is None:
-            UserEndpointConfigModel(**config_dict)
-        elif isinstance(strategy, str):
-            with pytest.raises(ValidationError) as pyt_e:
-                UserEndpointConfigModel(**config_dict)
-            assert "string is incompatible" in str(pyt_e.value)
+        assert "object is incompatible" in str(pyt_e.value)
 
 
 @pytest.mark.parametrize(
