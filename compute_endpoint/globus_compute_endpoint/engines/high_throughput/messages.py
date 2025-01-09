@@ -104,10 +104,11 @@ class Task(Message):
             #
             # all of this code is going to be eliminated soonish by
             # globus_compute_common.messagepack in part because of issues like this
-            add_ons = (
-                f"TID={self.task_id};CID={self.container_id};"  # type: ignore
-                f"{self.task_buffer}"
-            )
+            if isinstance(self.task_buffer, bytes):
+                buf = self.task_buffer.decode()
+            else:
+                buf = self.task_buffer
+            add_ons = f"TID={self.task_id};CID={self.container_id};{buf}"
             self.raw_buffer = add_ons.encode("utf-8")
 
         return self.type.pack() + self.raw_buffer
