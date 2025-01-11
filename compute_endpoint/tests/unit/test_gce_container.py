@@ -15,6 +15,8 @@ _LAUNCH_CMD_PREFIX = (
 
 @pytest.fixture
 def gce_factory(tmp_path, randomstring) -> t.Callable:
+    engines: list[GlobusComputeEngine] = []
+
     def _kernel(**k):
         expect_uri = randomstring(length=random.randint(1, 20))
         expect_opts = randomstring(length=random.randint(1, 20))
@@ -27,15 +29,20 @@ def gce_factory(tmp_path, randomstring) -> t.Callable:
             **k,
         }
         with mock.patch(f"{_MOCK_BASE}ReportingThread"):
-            gce = GlobusComputeEngine(**k)
-        with mock.patch.object(gce.executor, "start"):
-            gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
-            assert gce.executor.start.called
+            with mock.patch(f"{_MOCK_BASE}JobStatusPoller"):
+                gce = GlobusComputeEngine(**k)
+                gce.executor.start = mock.Mock()
+                gce.start(endpoint_id=uuid.uuid4(), run_dir=str(tmp_path))
+                assert gce.executor.start.called
 
-        # No cleanup necessary because executor not started
+                engines.append(gce)
+
         return gce, expect_uri, expect_opts
 
     yield _kernel
+
+    for e in engines:
+        e.shutdown()
 
 
 def test_docker(tmp_path, gce_factory):
