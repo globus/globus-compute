@@ -82,6 +82,7 @@ class EngineModel(BaseConfigModel):
     worker_port_range: t.Optional[t.Tuple[int, int]]
     interchange_port_range: t.Optional[t.Tuple[int, int]]
     max_retries_on_system_failure: t.Optional[int]
+    allowed_serializers: t.Optional[t.List[str]]
 
     _validate_type = _validate_import("type", engines)
     _validate_provider = _validate_params("provider")
