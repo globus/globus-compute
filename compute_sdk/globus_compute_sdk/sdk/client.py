@@ -243,30 +243,29 @@ class Client:
         dict
             Task block containing "status" key.
         """
-        task = self._task_status_table.get(task_id, {})
+        tid = str(task_id)
+        task = self._task_status_table.get(tid, {})
         if task.get("pending", True) is False:
             return task
 
-        r = self.web_client.get_task(task_id)
+        r = self.web_client.get_task(tid)
         logger.debug(f"Response string : {r}")
-        return self._update_task_table(r.text, task_id)
+        return self._update_task_table(r.text, tid)
 
     @requires_login
-    def get_result(self, task_id):
+    def get_result(self, task_id: UUID_LIKE_T):
         """Get the result of a Globus Compute task
 
-        Parameters
-        ----------
-        task_id: str
-            UUID of the task
+        This method is a convenience intended for simple |REPL|_ interactions.  In
+        general, strongly prefer :func:`get_batch_result` to collect task
+        information in bulk, rather than a loop around this method.
 
-        Returns
-        -------
-        Result obj: If task completed
+        .. |REPL| replace:: :abbr:`REPL (Read-Eval-Print Loop)`
+        .. _REPL: https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
 
-        Raises
-        ------
-        Exception obj: Exception due to which the task failed
+        :param task_id: a task identifer, as returned a submission to the web-service
+        :return: a dictionary containing the task status and result information
+        :raises: If task failed, the task exception (reconstituted from remote source)
         """
         task = self.get_task(task_id)
         if task["pending"] is True:
@@ -279,40 +278,69 @@ class Client:
                 task["exception"].reraise()
 
     @requires_login
-    def get_batch_result(self, task_id_list):
-        """Request status for a batch of task_ids"""
-        assert isinstance(
-            task_id_list, list
-        ), "get_batch_result expects a list of task ids"
+    def get_batch_result(self, task_id_list: list[UUID_LIKE_T]) -> dict[str, dict]:
+        """Request status of list of tasks
 
-        pending_task_ids = [
-            task_id
-            for task_id in task_id_list
-            if self._task_status_table.get(task_id, {}).get("pending", True) is True
-        ]
+        The returned dictionary maps task identifiers to the task state.  An
+        example interaction:
 
-        results = {}
+        .. code-block:: python
+
+           # Task identifiers are UUIDs, as returned by the API for tasks previously
+           # submitted.
+           >>> previously_submitted_task_identifiers = [
+           ...   "00000000-0000-0000-0000-000000000000",
+           ...   "00000000-0000-0000-0000-000000000001"
+           ... ]
+           >>> c = Client()
+           >>> c.get_batch_result(previously_submitted_task_identifiers)
+           {
+               '00000000-0000-0000-0000-000000000000': {
+                   'pending': True,
+                   'status': 'unknown'
+               },
+               '00000000-0000-0000-0000-000000000001': {
+                   'pending': False,
+                   'status': 'success',
+                   'result': None,
+                   'completion_t': '1234567890.9876543'
+               },
+           }
+
+        The ``pending`` field states whether the task has completed.  In this example,
+        ``0...0`` is not yet finished, while ``0...1`` has a ``status`` of ``success``,
+        a ``result`` of ``None``, and completed at unixtime of ``1234567890``.
+
+        Note that the order in the returned dictionary is not guaranteed.
+
+        :param task_id_list: a list of strings -- task identifiers for
+            previously-submitted tasks
+        """
+        _task_ids = set(map(str, task_id_list))
+
+        tst = self._task_status_table
+        result_ids = {
+            tid for tid in _task_ids if tst.get(tid, {}).get("pending", True) is False
+        }
+        pending_task_ids = _task_ids - result_ids
+        results = {tid: tst[tid] for tid in result_ids}
 
         if pending_task_ids:
             r = self.web_client.get_batch_status(pending_task_ids)
             logger.debug(f"Response string : {r}")
 
-        pending_task_ids = set(pending_task_ids)
-
-        for task_id in task_id_list:
-            if task_id in pending_task_ids:
+            statuses = r["results"]
+            for task_id in pending_task_ids:
+                task = statuses.get(task_id)
+                if not task:
+                    logger.debug("Requested task not in service response: %s", task_id)
+                    continue
                 try:
-                    data = r["results"][task_id]
-                    rets = self._update_task_table(data, task_id)
-                    results[task_id] = rets
-                except KeyError:
-                    logger.debug("Task {} info was not available in the batch status")
+                    results[task_id] = self._update_task_table(task, task_id)
                 except Exception:
                     logger.exception(
                         "Failure while unpacking results fom get_batch_result"
                     )
-            else:
-                results[task_id] = self._task_status_table[task_id]
 
         return results
 
