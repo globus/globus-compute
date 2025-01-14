@@ -81,6 +81,7 @@ def run_interchange_process(
     if rc is None:
         warnings.warn("Interchange process did not shut down cleanly - send SIGKILL")
         ix_proc.kill()
+    ix_proc.close()
 
 
 def test_epi_graceful_shutdown(run_interchange_process):
