@@ -125,9 +125,7 @@ def test_broken_connection(
         rp.stop()
 
 
-def test_disconnect_from_client_side(
-    start_result_q_publisher, start_result_q_subscriber
-):
+def test_disconnect_from_client_side(start_result_q_publisher):
     """Confirm that an exception is raised when the connection is closed
     Ideally we use rabbitmqadmin to close the connection, but that is less reliable here
     since the test env may not be have the util, and

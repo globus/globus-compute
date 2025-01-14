@@ -81,7 +81,7 @@ class ResultPublisher(threading.Thread):
         self._thread_id = 0  # 0 == not yet started
         self._mq_chan: Channel | None = None
         self._awaiting_confirmation: dict[int, Future] = {}
-        self._outstanding: queue.Queue[tuple[Future, bytes]] = queue.Queue()
+        self._outstanding: queue.SimpleQueue[tuple[Future, bytes]] = queue.SimpleQueue()
         self._total_published = 0
         self._delivery_tag_index = 0
         self._stop_event = threading.Event()
@@ -202,7 +202,8 @@ class ResultPublisher(threading.Thread):
         if self._connection_tries == 1:
             # if 1, then we've not been stable for more than 60s (see _event_watcher)
             log.info(msg_fmt, self, exc)
-            log.warning(f"{self!r} Unable to sustain connection; retrying ...")
+            if not self._stop_event.is_set():
+                log.warning(f"{self!r} Unable to sustain connection; retrying ...")
 
         self.status = RabbitPublisherStatus.closed
         mq_conn.ioloop.stop()
