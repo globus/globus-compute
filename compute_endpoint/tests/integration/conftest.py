@@ -10,7 +10,6 @@ import pika
 import pika.exceptions
 import pytest
 from globus_compute_endpoint.endpoint.rabbit_mq import (
-    RabbitPublisherStatus,
     ResultPublisher,
     TaskQueueSubscriber,
 )
@@ -115,29 +114,6 @@ def task_queue_info(rabbitmq_conn_url, tod_session_num, request) -> dict:
     }
 
 
-@pytest.fixture
-def running_subscribers(request):
-    run_list = []
-
-    def cleanup():
-        for x in run_list:
-            try:  # cannot check is_alive on closed proc
-                is_alive = x.is_alive()
-            except ValueError:
-                is_alive = False
-            if is_alive:
-                try:
-                    x.stop()
-                except Exception as e:
-                    x.terminate()
-                    raise Exception(
-                        f"{x.__class__.__name__} did not shutdown correctly"
-                    ) from e
-
-    request.addfinalizer(cleanup)
-    return run_list
-
-
 @pytest.fixture(scope="session")
 def ensure_result_queue(pika_conn_params):
     queues_created = []
@@ -180,7 +156,7 @@ def start_task_q_subscriber(
     task_queue_info,
     ensure_task_queue,
 ):
-    running_subscribers: list[TaskQueueSubscriber] = []
+    qs_list: list[TaskQueueSubscriber] = []
 
     def func(
         *,
@@ -192,16 +168,17 @@ def start_task_q_subscriber(
         q_info = task_queue_info if override_params is None else override_params
         ensure_task_queue(queue_opts={"queue": q_info["queue"]})
 
-        tqs = TaskQueueSubscriber(queue_info=q_info, pending_task_queue=task_queue)
-        tqs.start()
-        running_subscribers.append(tqs)
-        return tqs
+        qs = TaskQueueSubscriber(queue_info=q_info, pending_task_queue=task_queue)
+        qs.start()
+        qs_list.append(qs)
+        return qs
 
     yield func
 
-    for sub in running_subscribers:
-        sub._stop_event.set()
-        sub.join()
+    while qs_list:
+        qs = qs_list.pop()
+        qs.stop()
+        qs.join()
 
 
 @pytest.fixture
@@ -236,27 +213,12 @@ def start_result_q_subscriber(pika_conn_params):
 
 
 @pytest.fixture
-def running_publishers(request):
-    run_list = []
-
-    def cleanup():
-        for x in run_list:
-            if x.status is RabbitPublisherStatus.connected:
-                if hasattr(x, "stop"):
-                    x.stop()  # ResultPublisher
-                else:
-                    x.close()  # TaskQueuePublisher (from tests)
-
-    request.addfinalizer(cleanup)
-    return run_list
-
-
-@pytest.fixture
 def start_result_q_publisher(
-    running_publishers,
     result_queue_info,
     ensure_result_queue,
 ):
+    qp_list: list[ResultPublisher] = []
+
     def func(
         *,
         override_params: dict | None = None,
@@ -273,24 +235,28 @@ def start_result_q_publisher(
             queue_opts = {"queue": queue_name, "durable": True}
             ensure_result_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
 
-        result_pub = ResultPublisher(queue_info=q_info)
-        result_pub.start()
+        qp = ResultPublisher(queue_info=q_info)
+        qp.start()
+        qp_list.append(qp)
         if queue_purge:  # Make sure queue is empty
-            try_assert(lambda: result_pub._mq_chan is not None)
-            result_pub._mq_chan.queue_purge(q_info["queue"])
-        running_publishers.append(result_pub)
-        return result_pub
+            try_assert(lambda: qp._mq_chan is not None)
+            qp._mq_chan.queue_purge(q_info["queue"])
+        return qp
 
-    return func
+    yield func
+
+    while qp_list:
+        qp_list.pop().stop(timeout=None)
 
 
 @pytest.fixture
 def start_task_q_publisher(
-    running_publishers,
     task_queue_info,
     ensure_task_queue,
     default_endpoint_id,
 ):
+    qp_list: list[TaskQueuePublisher] = []
+
     def func(
         *,
         override_params: pika.connection.Parameters | None = None,
@@ -306,14 +272,17 @@ def start_task_q_publisher(
             queue_opts = {"queue": queue_name, "arguments": {"x-expires": 30 * 1000}}
             ensure_task_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
 
-        task_pub = TaskQueuePublisher(queue_info=q_info)
-        task_pub.connect()
+        qp = TaskQueuePublisher(queue_info=q_info)
+        qp.connect()
+        qp_list.append(qp)
         if queue_purge:  # Make sure queue is empty
-            task_pub._channel.queue_purge(q_info["queue"])
-        running_publishers.append(task_pub)
-        return task_pub
+            qp._channel.queue_purge(q_info["queue"])
+        return qp
 
-    return func
+    yield func
+
+    while qp_list:
+        qp_list.pop().close()
 
 
 @pytest.fixture(scope="session")

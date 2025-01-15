@@ -5,6 +5,7 @@ import queue
 import threading
 
 import pika
+import pika.exceptions
 from globus_compute_endpoint.endpoint.rabbit_mq.base import SubscriberProcessStatus
 
 logger = logging.getLogger(__name__)
@@ -88,24 +89,8 @@ class ResultQueueSubscriber(threading.Thread):
             exception, pika.exceptions.ConnectionClosedByClient
         ):
             logger.info("Closing connection from client")
-        elif isinstance(exception, pika.exceptions.ConnectionClosedByBroker):
-            logger.warning(f"Connection closed, reopening in 5 seconds: {exception}")
-            self._connection.ioloop.call_later(5, self.reconnect)
-
-    def reconnect(self):
-        """Will be invoked by the IOLoop timer if the connection is
-        closed. See the on_connection_closed method.
-
-        """
-        # This is the old connection IOLoop instance, stop its ioloop
-        self._connection.ioloop.stop()
-
-        if self.status is not SubscriberProcessStatus.closing:
-            # Create a new connection
-            self._connection = self._connect()
-
-            # There is now a new connection, needs a new ioloop to run
-            self._connection.ioloop.start()
+        else:
+            logger.warning(f"Connection unexpectedly closed: {exception}")
 
     def _on_channel_open(self, channel):
         """This method is invoked by pika when the channel has been opened.
@@ -223,7 +208,7 @@ class ResultQueueSubscriber(threading.Thread):
         if self._channel:
             self._channel.close()
 
-    def on_message(self, _unused_channel, basic_deliver, _properties, body):
+    def on_message(self, _unused_channel, basic_deliver, _properties, body: bytes):
         """on_message pushes a message upon receipt into the external_queue
         for async consumption. The message pushed to the external_queue
         is of the following type : Tuple[str, bytes]
@@ -303,6 +288,7 @@ class ResultQueueSubscriber(threading.Thread):
         finally:
             if self._connection and self._connection.ioloop:
                 self._connection.ioloop.close()
+            self._connection = None
 
     def stop(self) -> None:
         """stop() is called by the parent to shutdown the subscriber"""
