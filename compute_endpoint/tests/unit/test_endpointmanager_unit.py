@@ -153,6 +153,11 @@ def mock_reg_info(ep_uuid) -> str:
             "queue": "",
             "queue_publish_kwargs": {},
         },
+        "heartbeat_queue_info": {
+            "connection_url": "",
+            "queue": "",
+            "queue_publish_kwargs": {},
+        },
     }
 
 
@@ -605,20 +610,20 @@ def test_mismatched_id_gracefully_exits(
     (
         (False, {"command_queue_info": {"connection_url": ""}}),
         (False, {"command_queue_info": {"queue": ""}}),
-        (False, {"result_queue_info": {"connection_url": ""}}),
-        (False, {"result_queue_info": {"queue": ""}}),
+        (False, {"heartbeat_queue_info": {"connection_url": ""}}),
+        (False, {"heartbeat_queue_info": {"queue": ""}}),
         (
             False,
             {
                 "typo-ed_cqi": {"connection_url": "", "queue": ""},
-                "result_queue_info": {"connection_url": "", "queue": ""},
+                "heartbeat_queue_info": {"connection_url": "", "queue": ""},
             },
         ),
         (
             True,
             {
                 "command_queue_info": {"connection_url": "", "queue": ""},
-                "result_queue_info": {
+                "heartbeat_queue_info": {
                     "connection_url": "",
                     "queue": "",
                     "queue_publish_kwargs": {},

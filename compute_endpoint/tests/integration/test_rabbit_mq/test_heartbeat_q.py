@@ -5,7 +5,10 @@ import pytest
 
 @pytest.mark.parametrize("use_heartbeat", [None, 1])
 def test_no_heartbeat(
-    start_result_q_publisher, rabbitmq_conn_url, create_result_queue_info, use_heartbeat
+    start_heartbeat_q_publisher,
+    rabbitmq_conn_url,
+    create_result_queue_info,
+    use_heartbeat,
 ):
     """Confirm that result_q_publisher does not disconnect when delay
     between messages exceed heartbeat period
@@ -20,19 +23,19 @@ def test_no_heartbeat(
 
     q_info = create_result_queue_info(connection_url=conn_url)
 
-    result_pub = start_result_q_publisher(override_params=q_info)
+    hb_pub = start_heartbeat_q_publisher(override_params=q_info)
 
     # simply ensure no crash between two message sends
-    f = result_pub.publish(b"Hello test_no_heartbeat: 1")
+    f = hb_pub.publish(b"Hello test_no_heartbeat: 1")
     f.result(timeout=5)
-    f = result_pub.publish(b"Hello test_no_heartbeat: 2")
+    f = hb_pub.publish(b"Hello test_no_heartbeat: 2")
     f.result(timeout=5)
 
 
-def test_reconnect_after_disconnect(start_result_q_publisher):
-    rp = start_result_q_publisher()
-    f = rp.publish(b"Hello test_reconnect_after_disconnect: before")
+def test_reconnect_after_disconnect(start_heartbeat_q_publisher):
+    hb_pub = start_heartbeat_q_publisher()
+    f = hb_pub.publish(b"Hello test_reconnect_after_disconnect: before")
     f.result(timeout=5)
-    rp._mq_chan.close()
-    f = rp.publish(b"Hello test_reconnect_after_disconnect: afterward")
+    hb_pub._mq_chan.close()
+    f = hb_pub.publish(b"Hello test_reconnect_after_disconnect: afterward")
     f.result(timeout=5)

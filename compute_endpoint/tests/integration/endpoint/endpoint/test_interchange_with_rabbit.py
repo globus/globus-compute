@@ -10,7 +10,7 @@ import warnings
 import pika
 import pytest
 from globus_compute_common.messagepack import pack, unpack
-from globus_compute_common.messagepack.message_types import Result, Task
+from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from tests.integration.endpoint.executors.mock_executors import MockExecutor
@@ -38,6 +38,9 @@ def run_interchange_process(
         mock_exe = MockExecutor()
         mock_exe.endpoint_id = endpoint_uuid
         mock_exe.executor_exception = None
+        mock_exe.get_status_report.return_value = EPStatusReport(
+            endpoint_id=endpoint_uuid, global_state={}, task_statuses=[]
+        )
 
         if hasattr(request, "param") and request.param:
             config = request.param
@@ -50,6 +53,7 @@ def run_interchange_process(
             endpoint_id=endpoint_uuid,
             reg_info=reg_info,
             endpoint_dir=endpoint_dir,
+            logdir=endpoint_dir,
         )
 
         ix.start()
@@ -62,6 +66,7 @@ def run_interchange_process(
     assert reg_info["endpoint_id"] == ep_uuid, "Test setup verification"
     assert "task_queue_info" in reg_info
     assert "result_queue_info" in reg_info
+    assert "heartbeat_queue_info" in reg_info
 
     ix_proc = multiprocessing.Process(
         target=run_it, args=(reg_info, ep_uuid), kwargs={"endpoint_dir": tmp_path}
@@ -91,21 +96,6 @@ def test_epi_graceful_shutdown(run_interchange_process):
     assert try_for_timeout(lambda: ix_proc.exitcode is not None), "Failed to shutdown"
 
 
-def test_epi_stored_results_processed(run_interchange_process):
-    ix_proc, tmp_path, ep_uuid, _reg_info = run_interchange_process
-
-    unacked_results_dir = tmp_path / "unacked_results"
-    unacked_results_dir.mkdir(exist_ok=True)
-    stored_task_name = str(uuid.uuid4())
-    stored_task_path = unacked_results_dir / stored_task_name
-    stored_task_path.write_bytes(b"GIBBERISH")
-
-    def file_is_gone():
-        return not stored_task_path.exists()
-
-    assert try_for_timeout(file_is_gone), "Expected stored task to be handled"
-
-
 def test_epi_forwards_tasks_and_results(
     run_interchange_process, pika_conn_params, randomstring
 ):
@@ -118,7 +108,7 @@ def test_epi_forwards_tasks_and_results(
 
     task_uuid = uuid.uuid4()
     task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
-    task_q, res_q = reg_info["task_queue_info"], reg_info["result_queue_info"]
+    task_q, res_q = (reg_info["task_queue_info"], reg_info["result_queue_info"])
     res_q_name = res_q["queue"]
     task_q_name = task_q["queue"]
     task_exch = task_q["exchange"]

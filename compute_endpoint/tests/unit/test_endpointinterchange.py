@@ -41,7 +41,11 @@ def test_main_exception_always_quiesces(mocker, fs, randomstring, reset_signals)
     mocker.patch(f"{_mock_base}multiprocessing")
     ei = EndpointInterchange(
         config=UserEndpointConfig(executors=[mocker.Mock()]),
-        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+        reg_info={
+            "task_queue_info": {},
+            "result_queue_info": {},
+            "heartbeat_queue_info": {},
+        },
         reconnect_attempt_limit=num_iterations + 10,
     )
     ei._main_loop = mock.Mock()
@@ -74,7 +78,11 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit, reset_sign
     mock_log = mocker.patch(f"{_mock_base}log")
     ei = EndpointInterchange(
         config=UserEndpointConfig(executors=[mocker.Mock()]),
-        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+        reg_info={
+            "task_queue_info": {},
+            "result_queue_info": {},
+            "heartbeat_queue_info": {},
+        },
         reconnect_attempt_limit=reconnect_attempt_limit,
     )
     ei._main_loop = mock.Mock(spec=ei._main_loop)
@@ -95,7 +103,11 @@ def test_reset_reconnect_attempt_limit_when_stable(mocker, fs, mock_tqs, mock_pa
     ei = EndpointInterchange(
         config=UserEndpointConfig(executors=[mocker.Mock()]),
         endpoint_id=str(uuid.uuid4()),
-        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+        reg_info={
+            "task_queue_info": {},
+            "result_queue_info": {},
+            "heartbeat_queue_info": {},
+        },
     )
     ei._quiesce_event = mock.Mock(spec=EventType)
 
@@ -131,7 +143,11 @@ def test_rundir_passed_to_gcengine(mocker, fs):
     ei = EndpointInterchange(
         config=UserEndpointConfig(executors=[mock_gcengine]),
         endpoint_id=str(uuid.uuid4()),
-        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+        reg_info={
+            "task_queue_info": {},
+            "result_queue_info": {},
+            "heartbeat_queue_info": {},
+        },
     )
     ei._quiesce_event = mock.Mock(spec=EventType)
 

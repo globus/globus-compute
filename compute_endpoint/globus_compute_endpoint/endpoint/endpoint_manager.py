@@ -276,9 +276,9 @@ class EndpointManager:
             cq_info = reg_info["command_queue_info"]
             _ = cq_info["connection_url"], cq_info["queue"]
 
-            rq_info = reg_info["result_queue_info"]
-            _ = rq_info["connection_url"], rq_info["queue"]
-            _ = rq_info["queue_publish_kwargs"]
+            hbq_info = reg_info["heartbeat_queue_info"]
+            _ = hbq_info["connection_url"], hbq_info["queue"]
+            _ = hbq_info["queue_publish_kwargs"]
         except Exception as e:
             log_reg_info = _redact_url_creds(str(reg_info))
             log.debug("%s", log_reg_info)
@@ -318,7 +318,7 @@ class EndpointManager:
             stop_event=self._command_stop_event,
             thread_name="CQS",
         )
-        self._heartbeat_publisher = ResultPublisher(queue_info=rq_info)
+        self._heartbeat_publisher = ResultPublisher(queue_info=hbq_info)
 
     @staticmethod
     def get_metadata(config: ManagerEndpointConfig, conf_dir: pathlib.Path) -> dict:

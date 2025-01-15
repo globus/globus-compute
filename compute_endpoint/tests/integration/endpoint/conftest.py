@@ -31,9 +31,11 @@ def _mock_logging_config(monkeypatch):
 @pytest.fixture
 def setup_register_endpoint_response(
     create_result_queue_info,
+    create_heartbeat_queue_info,
     task_queue_info,
     ensure_task_queue,
     ensure_result_queue,
+    ensure_heartbeat_queue,
 ) -> t.Callable[[str], None]:
     ensure_task_queue(queue_opts={"queue": task_queue_info["queue"]})
 
@@ -49,6 +51,17 @@ def setup_register_endpoint_response(
         queue_opts = {"queue": queue_name, "durable": True}
         ensure_result_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
 
+        hbq_info = create_heartbeat_queue_info(queue_id=endpoint_uuid)
+        exchange_name = hbq_info["exchange"]
+        queue_name = hbq_info["test_routing_key"]
+        exchange_opts = {
+            "exchange": exchange_name,
+            "exchange_type": ExchangeType.topic.value,
+            "durable": True,
+        }
+        queue_opts = {"queue": queue_name, "durable": True}
+        ensure_heartbeat_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
+
         responses.add(
             method=responses.POST,
             url="https://compute.api.globus.org/v3/endpoints",
@@ -57,6 +70,7 @@ def setup_register_endpoint_response(
                 "endpoint_id": endpoint_uuid,
                 "task_queue_info": task_queue_info,
                 "result_queue_info": rq_info,
+                "heartbeat_queue_info": hbq_info,
             },
         )
 
@@ -68,6 +82,7 @@ def setup_register_endpoint_response(
                 "endpoint_id": endpoint_uuid,
                 "task_queue_info": task_queue_info,
                 "result_queue_info": rq_info,
+                "heartbeat_queue_info": hbq_info,
             },
         )
 

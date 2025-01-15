@@ -131,6 +131,13 @@ def test_cmd_send_failure_publishes_message(mock_mq_chan, randomstring, err_msg)
                 "routing_key": mock_routing_key,
             },
         },
+        "heartbeat_queue_info": {
+            "connection_url": "abc",
+            "queue_publish_kwargs": {
+                "exchange": mock_exchange_name,
+                "routing_key": mock_routing_key,
+            },
+        },
     }
     send_endpoint_startup_failure_to_amqp(amqp_creds, msg=err_msg)
 
