@@ -149,6 +149,11 @@ class ResultPublisher(threading.Thread):
 
             except Exception:
                 log.exception("%r Unhandled error; event loop stopped", self)
+
+            finally:
+                if self._mq_conn and self._mq_conn.ioloop:
+                    self._mq_conn.ioloop.close()
+
         self._stop_event.set()
 
         log.debug("%r thread ends.", self)

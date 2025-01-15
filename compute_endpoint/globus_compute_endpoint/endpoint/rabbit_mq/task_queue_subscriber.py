@@ -142,10 +142,16 @@ class TaskQueueSubscriber(threading.Thread):
                 self._connection = self._connect()
                 self._event_watcher()
                 self._connection.ioloop.start()
+
             except Exception:
                 logger.exception(
                     "%s Unhandled exception: shutting down connection.", self
                 )
+
+            finally:
+                if self._connection and self._connection.ioloop:
+                    self._connection.ioloop.close()
+
         self._stop_event.set()
         logger.debug("%s Shutdown complete", self)
 
