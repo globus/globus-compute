@@ -323,6 +323,9 @@ class ResultQueueSubscriber(multiprocessing.Process):
             self._connection.ioloop.start()
         except Exception:
             logger.exception("Failed to start subscriber")
+        finally:
+            if self._connection and self._connection.ioloop:
+                self._connection.ioloop.close()
 
     def stop(self) -> None:
         """stop() is called by the parent to shutdown the subscriber"""
