@@ -151,6 +151,7 @@ class TaskQueueSubscriber(threading.Thread):
             finally:
                 if self._connection and self._connection.ioloop:
                     self._connection.ioloop.close()
+                self._connection = None
 
         self._stop_event.set()
         logger.debug("%s Shutdown complete", self)
@@ -346,7 +347,6 @@ class TaskQueueSubscriber(threading.Thread):
                     self._connection.close()
             elif self._connection.is_closed:
                 self._connection.ioloop.stop()
-                self._connection = None
 
     def _event_watcher(self):
         """Polls the stop_event periodically to trigger a shutdown"""

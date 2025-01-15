@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import logging
-
 import pika
 import pika.channel
 from globus_compute_endpoint.endpoint.rabbit_mq.base import RabbitPublisherStatus
-
-logger = logging.getLogger(__name__)
 
 
 class TaskQueuePublisher:
@@ -37,7 +33,6 @@ class TaskQueuePublisher:
         self.status = RabbitPublisherStatus.closed
 
     def connect(self):
-        logger.debug("Connecting as server")
         params = pika.URLParameters(self.queue_info["connection_url"])
         self._connection = pika.BlockingConnection(params)
         self._channel = self._connection.channel()
@@ -62,5 +57,8 @@ class TaskQueuePublisher:
 
     def close(self):
         """Close the connection and channels"""
-        self._connection.close()
+        if self._connection and self._connection.is_open:
+            self._connection.close()
+        self._channel = None
+        self._connection = None
         self.status = RabbitPublisherStatus.closed

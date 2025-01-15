@@ -165,7 +165,7 @@ def test_connection_closed_shuts_down(start_task_q_subscriber):
     try_assert(lambda: tqs._connection, "Ensure we establish a connection")
 
     assert not tqs._stop_event.is_set()
-    tqs._on_connection_closed(tqs._connection, MemoryError())
+    tqs._connection.close()
     try_assert(lambda: tqs._stop_event.is_set())
 
     tqs.join(timeout=3)
