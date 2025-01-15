@@ -70,6 +70,12 @@ def register_endpoint_response(endpoint_uuid):
                 "args": queue_kwargs,
                 "routing_key": f"{endpoint_uuid}.results",
             },
+            "heartbeat_queue_info": {
+                "exchange_name": "heartbeats",
+                "connection_url": f"amqp://{creds}{rmq_fqdn}",
+                "args": queue_kwargs,
+                "routing_key": f"{endpoint_uuid}.heartbeats",
+            },
         }
 
         responses.add(
@@ -157,6 +163,7 @@ def mock_reg_info():
         "endpoint_id": str(uuid.uuid4()),
         "task_queue_info": {"connection_url": "amqp://some.domain:1234"},
         "result_queue_info": {"connection_url": "amqp://some.domain"},
+        "heartbeat_queue_info": {"connection_url": "amqp://some.domain"},
     }
 
 
@@ -591,11 +598,13 @@ def test_endpoint_respects_port(mocker, fs, mock_ep_data, port):
 
     tq_url = "amqp://some.domain:1234"
     rq_url = "amqp://some.domain"
+    hbq_url = "amqp://some.domain"
 
     mock_reg_info = {
         "endpoint_id": ep_id,
         "task_queue_info": {"connection_url": tq_url},
         "result_queue_info": {"connection_url": rq_url},
+        "heartbeat_queue_info": {"connection_url": hbq_url},
     }
 
     mock_update_url_port = mocker.patch(f"{_mock_base}update_url_port")

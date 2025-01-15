@@ -20,6 +20,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
     TaskQueueSubscriber,
 )
+from globus_compute_endpoint.engines import GlobusComputeEngine
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
@@ -43,8 +44,12 @@ def mock_log(mocker):
 
 
 @pytest.fixture
-def mock_ex(mocker, endpoint_uuid):
-    ex = mocker.Mock(endpoint_id=endpoint_uuid, executor_exception=None)
+def mock_ex(endpoint_uuid):
+    ex = mock.Mock(spec=GlobusComputeEngine, endpoint_id=endpoint_uuid)
+    ex.get_status_report.return_value = EPStatusReport(
+        endpoint_id=endpoint_uuid, global_state={}, task_statuses=[]
+    )
+    ex.executor_exception = None
     yield ex
 
 
@@ -74,15 +79,21 @@ def mock_pack():
 
 
 @pytest.fixture
-def ep_ix_factory(endpoint_uuid, mock_conf):
+def ep_ix_factory(endpoint_uuid, mock_conf, mock_quiesce):
     to_stop: t.List[EndpointInterchange] = []
 
     def _f(*a, **k):
-        reg_info = {"task_queue_info": {}, "result_queue_info": {}}
+        reg_info = {
+            "task_queue_info": {},
+            "result_queue_info": {},
+            "heartbeat_queue_info": {},
+        }
         kw = {"endpoint_id": endpoint_uuid, "config": mock_conf, "reg_info": reg_info}
         kw.update(k)
-        to_stop.append(EndpointInterchange(*a, **kw))
-        return to_stop[-1]
+        ei = EndpointInterchange(*a, **kw)
+        ei._quiesce_event = mock_quiesce
+        to_stop.append(ei)
+        return ei
 
     yield _f
 
@@ -134,7 +145,11 @@ def test_endpoint_id_conveyed_to_executor(funcx_dir):
 
     ic = EndpointInterchange(
         endpoint_config,
-        reg_info={"task_queue_info": {}, "result_queue_info": {}},
+        reg_info={
+            "task_queue_info": {},
+            "result_queue_info": {},
+            "heartbeat_queue_info": {},
+        },
         endpoint_id=expected_ep_id,
     )
     ic.executor = engines.ThreadPoolEngine()  # test does not need a child process
@@ -436,37 +451,45 @@ def test_gracefully_handles_final_status_message_timeout(
     assert mock_rp
 
 
-def test_faithfully_handles_status_report_messages(
-    mocker,
-    ep_ix,
-    endpoint_uuid,
-    randomstring,
-    mock_quiesce,
-    mock_rp,
-    mock_tqs,
-    mock_pack,
+def test_sends_status_reports(
+    mocker, ep_ix, endpoint_uuid, randomstring, mock_quiesce, mock_rp, mock_tqs
 ):
-    status_report = EPStatusReport(
-        endpoint_id=endpoint_uuid, global_state={"sentinel": "foo"}, task_statuses=[]
-    )
-    status_report_msg = {"message": pack(status_report)}
-
-    ep_ix.results_passthrough = mocker.Mock(spec=queue.Queue)
-    ep_ix.results_passthrough.get.side_effect = (status_report_msg, queue.Empty)
-    ep_ix.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
-    ep_ix.pending_task_queue.get.side_effect = queue.Empty
+    status_reports = [
+        EPStatusReport(endpoint_id=uuid.uuid4(), global_state={}, task_statuses=[])
+        for i in range(4)
+    ]
+    ep_ix.executor.get_status_report.side_effect = status_reports
+    ep_ix.config.idle_heartbeats_soft = 1
+    ep_ix.config.idle_heartbeats_hard = 0  # will be set to soft + 1
     ep_ix._quiesce_event = mock_quiesce
+    num_hbs = ep_ix.config.idle_heartbeats_soft + 4
+    with mock.patch(f"{_MOCK_BASE}threading.Thread"):
+        ep_ix._main_loop()
+    assert mock_rp.publish.call_count == num_hbs, "pre/post-loop(2) + hard idle(3)"
+
+    status_reports.append(
+        EPStatusReport(endpoint_id=endpoint_uuid, global_state={}, task_statuses=[])
+    )
+
+    for exp_sr, (a, _) in zip(status_reports, mock_rp.publish.call_args_list):
+        found_sr: EPStatusReport = unpack(a[0])
+        assert isinstance(found_sr, EPStatusReport)
+        assert found_sr.endpoint_id == exp_sr.endpoint_id
+
+
+def test_epi_stored_results_processed(ep_ix_factory, tmp_path, mock_rp, mock_tqs):
+    tid = str(uuid.uuid4())
+    ep_ix: EndpointInterchange = ep_ix_factory(endpoint_dir=tmp_path)
+    ep_ix.result_store[tid] = b"GIBBERISH"
+
+    unacked_results_dir = tmp_path / "unacked_results"
+    res_f = unacked_results_dir / tid
+    assert res_f.exists(), "Ensure file exists beforehand"
 
     t = threading.Thread(target=ep_ix._main_loop, daemon=True)
     t.start()
 
-    try_assert(lambda: mock_rp.publish.called)
+    try_assert(lambda: not res_f.exists())
+
     ep_ix.time_to_quit = True
     t.join()
-
-    assert mock_rp.publish.call_count > 1, "Test packet, then the final status report"
-    packed_bytes = mock_rp.publish.call_args_list[0][0][0]
-    found_epsr = unpack(packed_bytes)
-    assert isinstance(found_epsr, EPStatusReport)
-    assert found_epsr.endpoint_id == uuid.UUID(endpoint_uuid)
-    assert found_epsr.global_state["sentinel"] == status_report.global_state["sentinel"]

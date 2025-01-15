@@ -104,6 +104,38 @@ def result_queue_info(create_result_queue_info) -> dict:
 
 
 @pytest.fixture
+def create_heartbeat_queue_info(rabbitmq_conn_url, tod_session_num, request):
+    def _do_it(connection_url=None, queue_id=None) -> dict:
+        exchange_name = "heartbeats"
+        if not queue_id:
+            queue_id = f"test_heartbeat_queue_{tod_session_num}__{request.node.name}"
+        if not connection_url:
+            connection_url = rabbitmq_conn_url
+        routing_key = f"{queue_id}.heartbeats"
+        return {
+            "connection_url": connection_url,
+            "exchange": exchange_name,
+            "queue": exchange_name,
+            "queue_publish_kwargs": {
+                "exchange": exchange_name,
+                "routing_key": routing_key,
+                "mandatory": True,
+                "properties": {
+                    "delivery_mode": pika.spec.PERSISTENT_DELIVERY_MODE,
+                },
+            },
+            "test_routing_key": queue_id,
+        }
+
+    return _do_it
+
+
+@pytest.fixture
+def heartbeat_queue_info(create_heartbeat_queue_info) -> dict:
+    return create_heartbeat_queue_info()
+
+
+@pytest.fixture
 def task_queue_info(rabbitmq_conn_url, tod_session_num, request) -> dict:
     queue_id = f"test_task_queue_{tod_session_num}__{request.node.name}"
     return {
@@ -143,6 +175,43 @@ def ensure_result_queue(pika_conn_params):
                 )
 
     _do_ensure()  # The main "results" should always exist for our tests
+    yield _do_ensure
+
+    with pika.BlockingConnection(pika_conn_params) as mq_conn:
+        with mq_conn.channel() as chan:
+            for q_name in queues_created:
+                chan.queue_delete(q_name)
+
+
+@pytest.fixture(scope="session")
+def ensure_heartbeat_queue(pika_conn_params):
+    queues_created = []
+
+    def _do_ensure(exchange_opts=None, queue_opts=None):
+        if not exchange_opts:
+            exchange_opts = {
+                "exchange": "heartbeats",
+                "exchange_type": ExchangeType.topic.value,
+                "durable": True,
+            }
+        if not queue_opts:
+            queue_opts = {"queue": "heartbeats", "durable": True}
+            routing_key = "*.heartbeats"
+        else:
+            routing_key = queue_opts["queue"]
+
+        with pika.BlockingConnection(pika_conn_params) as mq_conn:
+            with mq_conn.channel() as chan:
+                chan.exchange_declare(**exchange_opts)
+                chan.queue_declare(**queue_opts)
+                queues_created.append(queue_opts["queue"])
+                chan.queue_bind(
+                    queue=queue_opts["queue"],
+                    exchange=exchange_opts["exchange"],
+                    routing_key=routing_key,
+                )
+
+    _do_ensure()  # The main "heartbeats" should always exist for our tests
     yield _do_ensure
 
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
@@ -234,6 +303,40 @@ def start_result_q_publisher(
             }
             queue_opts = {"queue": queue_name, "durable": True}
             ensure_result_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
+
+        qp = ResultPublisher(queue_info=q_info)
+        qp.start()
+        qp_list.append(qp)
+        if queue_purge:  # Make sure queue is empty
+            try_assert(lambda: qp._mq_chan is not None)
+            qp._mq_chan.queue_purge(q_info["queue"])
+        return qp
+
+    yield func
+
+    while qp_list:
+        qp_list.pop().stop(timeout=None)
+
+
+@pytest.fixture
+def start_heartbeat_q_publisher(heartbeat_queue_info, ensure_heartbeat_queue):
+    qp_list: list[ResultPublisher] = []
+
+    def func(
+        *,
+        override_params: dict | None = None,
+        queue_purge: bool = True,
+    ):
+        q_info = heartbeat_queue_info if override_params is None else override_params
+        exchange_name, queue_name = q_info.get("exchange"), q_info.get("queue")
+        if exchange_name:  # We'll call it an error to specify only one
+            exchange_opts = {
+                "exchange": exchange_name,
+                "exchange_type": ExchangeType.topic.value,
+                "durable": True,
+            }
+            queue_opts = {"queue": queue_name, "durable": True}
+            ensure_heartbeat_queue(exchange_opts=exchange_opts, queue_opts=queue_opts)
 
         qp = ResultPublisher(queue_info=q_info)
         qp.start()

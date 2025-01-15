@@ -41,7 +41,7 @@ log = logging.getLogger(__name__)
 
 class _ResultPassthroughType(t.TypedDict):
     message: bytes
-    task_id: str | None
+    task_id: str
 
 
 class EndpointInterchange:
@@ -74,8 +74,8 @@ class EndpointInterchange:
              Globus Compute config object describing how compute should be provisioned
 
         reg_info : dict[str, dict]
-             Dictionary containing connection information for both the task and
-             result queues.  The required data structure is returned from the
+             Dictionary containing connection information for the task, result, and
+             heartbeat queues.  The required data structure is returned from the
              Endpoint registration API call, encapsulated in the SDK by
              `Client.register_endpoint()`.
 
@@ -100,6 +100,7 @@ class EndpointInterchange:
 
         self.task_q_info = reg_info["task_queue_info"]
         self.result_q_info = reg_info["result_queue_info"]
+        self.heartbeat_q_info = reg_info["heartbeat_queue_info"]
 
         self.time_to_quit = False
         self.heartbeat_period = self.config.heartbeat_period
@@ -293,6 +294,9 @@ class EndpointInterchange:
         results_publisher = ResultPublisher(queue_info=self.result_q_info)
         results_publisher.start()
 
+        heartbeat_publisher = ResultPublisher(queue_info=self.heartbeat_q_info)
+        heartbeat_publisher.start()
+
         executor = self.executor
 
         num_tasks_forwarded = 0
@@ -406,15 +410,14 @@ class EndpointInterchange:
             # iterating the loop regardless.
             nonlocal num_results_forwarded
 
-            def _create_done_cb(mq_msg: bytes, tid: str | None):
+            def _create_done_cb(mq_msg: bytes, tid: str):
                 def _done_cb(pub_fut: Future):
                     _exc = pub_fut.exception()
                     if _exc:
                         # Publishing didn't work -- quiesce and see if a simple
                         # restart fixes the issue.
-                        if tid:
-                            log.info(f"Storing result for later: {tid}")
-                            self.result_store[tid] = mq_msg
+                        log.info(f"Storing result for later: {tid}")
+                        self.result_store[tid] = mq_msg
 
                         self._quiesce_event.set()
                         log.error("Failed to publish results", exc_info=_exc)
@@ -425,7 +428,7 @@ class EndpointInterchange:
                 try:
                     msg = self.results_passthrough.get(timeout=1)
                     packed_message: bytes = msg["message"]
-                    task_id: str | None = msg.get("task_id")
+                    task_id: str = msg["task_id"]
 
                 except queue.Empty:
                     continue
@@ -437,9 +440,8 @@ class EndpointInterchange:
                     )
                     continue
 
-                if task_id:
-                    num_results_forwarded += 1
-                    log.debug("Forwarding result for task: %s", task_id)
+                num_results_forwarded += 1
+                log.debug("Forwarding result for task: %s", task_id)
 
                 try:
                     f = results_publisher.publish(packed_message)
@@ -454,9 +456,8 @@ class EndpointInterchange:
                         "Something broke while forwarding results; setting quiesce"
                         " event"
                     )
-                    if task_id:
-                        log.info("Storing result for later: %s", task_id)
-                        self.result_store[task_id] = packed_message
+                    log.info("Storing result for later: %s", task_id)
+                    self.result_store[task_id] = packed_message
                     continue  # just be explicit
 
             log.debug("Thread exit")
@@ -470,14 +471,12 @@ class EndpointInterchange:
                     self._quiesce_event.set()
                     log.error("Failed to publish heartbeat", exc_info=_exc)
 
-            def _beat() -> None:
+            try:
                 sr = self.executor.get_status_report()
                 msg: bytes = pack(sr)
-                f = results_publisher.publish(msg)
+                f = heartbeat_publisher.publish(msg)
                 f.add_done_callback(_done_cb)
 
-            try:
-                _beat()
             except Exception:
                 # Publishing didn't work -- quiesce and see if a simple restart
                 # fixes the issue.
@@ -507,6 +506,7 @@ class EndpointInterchange:
 
         live_proc_title = setproctitle.getproctitle()
         log.debug("_main_loop entered running state")
+        heartbeat()
         while not self._quiesce_event.wait(self.heartbeat_period):
             # Possibly TOCTOU here, but we don't need to be super precise.  The
             # point here is to mention "still alive" and that we're still working
@@ -612,7 +612,7 @@ class EndpointInterchange:
             task_statuses={},
         )
         try:
-            f = results_publisher.publish(pack(message))
+            f = heartbeat_publisher.publish(pack(message))
             f.result(timeout=5)
         except concurrent.futures.TimeoutError:
             log.warning(
@@ -621,5 +621,6 @@ class EndpointInterchange:
 
         task_q_subscriber.stop()
         results_publisher.stop()
+        heartbeat_publisher.stop()
 
         log.debug("_main_loop exits")
