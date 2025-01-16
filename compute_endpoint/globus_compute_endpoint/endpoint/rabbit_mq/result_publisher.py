@@ -153,6 +153,7 @@ class ResultPublisher(threading.Thread):
             finally:
                 if self._mq_conn and self._mq_conn.ioloop:
                     self._mq_conn.ioloop.close()
+                self._mq_conn = None
 
         self._stop_event.set()
 
@@ -378,7 +379,6 @@ class ResultPublisher(threading.Thread):
                     self._mq_conn.close()
             elif self._mq_conn.is_closed:
                 self._mq_conn.ioloop.stop()
-                self._mq_conn = None
 
     def publish(self, message: bytes) -> Future[None]:
         """

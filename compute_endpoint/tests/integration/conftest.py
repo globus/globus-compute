@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import multiprocessing
 import os
 import queue
 import random
 import string
+import threading
 
 import pika
 import pika.exceptions
@@ -205,29 +205,34 @@ def start_task_q_subscriber(
 
 
 @pytest.fixture
-def start_result_q_subscriber(running_subscribers, pika_conn_params):
+def start_result_q_subscriber(pika_conn_params):
+    qs_list: list[ResultQueueSubscriber] = []
+
     def func(
         *,
-        queue: multiprocessing.Queue | None = None,
-        kill_event: multiprocessing.Event | None = None,
+        result_q: queue.SimpleQueue | None = None,
+        kill_event: threading.Event | None = None,
         override_params: pika.connection.Parameters | None = None,
     ):
         if kill_event is None:
-            kill_event = multiprocessing.Event()
-        if queue is None:
-            queue = multiprocessing.Queue()
-        result_q = ResultQueueSubscriber(
+            kill_event = threading.Event()
+        if result_q is None:
+            result_q = queue.SimpleQueue()
+        qs = ResultQueueSubscriber(
             conn_params=pika_conn_params if not override_params else override_params,
-            external_queue=queue,
+            external_queue=result_q,
             kill_event=kill_event,
         )
-        result_q.start()
-        running_subscribers.append(result_q)
-        if not result_q.test_class_ready.wait(10):
+        qs.start()
+        qs_list.append(qs)
+        if not qs.test_class_ready.wait(10):
             raise AssertionError("Result Queue subscriber failed to initialize")
-        return result_q
+        return qs
 
-    return func
+    yield func
+
+    while qs_list:
+        qs_list.pop().stop()
 
 
 @pytest.fixture

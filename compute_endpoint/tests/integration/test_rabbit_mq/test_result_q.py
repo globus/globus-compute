@@ -1,6 +1,6 @@
 import json
 import logging
-import multiprocessing
+import queue
 import uuid
 
 import pika
@@ -38,7 +38,7 @@ def test_result_queue_basic(start_result_q_publisher):
 def test_message_integrity_across_sizes(
     size, start_result_q_publisher, start_result_q_subscriber, default_endpoint_id
 ):
-    """Publish count messages from endpoint_1
+    """Publish messages from endpoint_1 of different sizes;
     Confirm that the subscriber gets all of them.
     """
     result_pub = start_result_q_publisher()
@@ -47,8 +47,8 @@ def test_message_integrity_across_sizes(
     b_message = json.dumps(message).encode()
     result_pub.publish(b_message)
 
-    results_q = multiprocessing.Queue()
-    start_result_q_subscriber(queue=results_q)
+    results_q = queue.SimpleQueue()
+    start_result_q_subscriber(result_q=results_q)
 
     result_message = results_q.get(timeout=2)
     assert result_message == (result_pub.queue_info["test_routing_key"], b_message)
@@ -72,8 +72,8 @@ def test_publish_multiple_then_subscribe(
     publish_messages(result_pub1, count=10)
     publish_messages(result_pub2, count=10)
 
-    results_q = multiprocessing.Queue()
-    start_result_q_subscriber(queue=results_q)
+    results_q = queue.SimpleQueue()
+    start_result_q_subscriber(result_q=results_q)
 
     all_results = {}
     for _i in range(total_messages):

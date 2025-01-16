@@ -1,13 +1,8 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing
 import queue
-
-# multiprocessing.Event is a method, not a class
-# to annotate, we need the "real" class
-# see: https://github.com/python/typeshed/issues/4266
-from multiprocessing.synchronize import Event as EventType
+import threading
 
 import pika
 from globus_compute_endpoint.endpoint.rabbit_mq.base import SubscriberProcessStatus
@@ -15,7 +10,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq.base import SubscriberProcessSta
 logger = logging.getLogger(__name__)
 
 
-class ResultQueueSubscriber(multiprocessing.Process):
+class ResultQueueSubscriber(threading.Thread):
     """The ResultQueueSubscriber is a direct rabbitMQ pipe subscriber that uses
     the SelectConnection adaptor to enable performance consumption of messages
     from the service
@@ -31,21 +26,21 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self,
         *,
         conn_params: pika.connection.Parameters,
-        external_queue: multiprocessing.Queue,
-        kill_event: EventType,
+        external_queue: queue.SimpleQueue,
+        kill_event: threading.Event,
     ):
         """
 
         Parameters
         ----------
-        conn_params: Connection Params
+        conn_params
 
-        external_queue: multiprocessing.Queue
+        external_queue
              Each incoming message will be pushed to the queue.
              Please note that upon pushing a message into this queue, it will be
              marked as delivered.
 
-        kill_event: multiprocessing.Event
+        kill_event
              An event object used to signal shutdown to the subscriber process.
         """
         super().__init__()
@@ -54,9 +49,7 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self.conn_params = conn_params
         self.external_queue = external_queue
         self.kill_event = kill_event
-        self.test_class_ready = multiprocessing.Event()
-        self._channel_closed = multiprocessing.Event()
-        self._cleanup_complete = multiprocessing.Event()
+        self.test_class_ready = threading.Event()
         self._watcher_poll_period_s = 0.1  # seconds
 
         self._connection = None
@@ -158,8 +151,6 @@ class ResultQueueSubscriber(multiprocessing.Process):
                 f"Channel closed with code:{exception.reply_code}, "
                 f"error:{exception.reply_text}"
             )
-        logger.debug("marking channel as closed")
-        self._channel_closed.set()
 
     def _on_exchange_declareok(self, unused_frame):
         """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
@@ -280,36 +271,22 @@ class ResultQueueSubscriber(multiprocessing.Process):
         self._channel.close()
 
     def _shutdown(self):
-        logger.debug("set status to 'closing'")
         self.status = SubscriberProcessStatus.closing
         logger.debug("closing connection")
         self._connection.close()
-        logger.debug("stopping ioloop")
-        self._connection.ioloop.stop()
-        logger.debug("waiting until channel is closed (timeout=1 second)")
-        if not self._channel_closed.wait(1.0):
-            logger.warning("reached timeout while waiting for channel closed")
-        logger.debug("closing connection to mp queue")
-        self.external_queue.close()
-        logger.debug("joining mp queue background thread")
-        self.external_queue.join_thread()
-        logger.info("shutdown done, setting cleanup event")
-        self._cleanup_complete.set()
 
     def event_watcher(self):
         """Polls the kill_event periodically to trigger a shutdown"""
+        self._connection.ioloop.call_later(
+            self._watcher_poll_period_s, self.event_watcher
+        )
         if self.kill_event.is_set():
-            logger.info("Kill event is set. Start subscriber shutdown")
-            try:
+            if self._connection.is_open:
+                logger.info("Kill event is set. Start subscriber shutdown")
                 self._shutdown()
-            except Exception:
-                logger.exception("error while shutting down")
-                raise
-            logger.info("Shutdown complete")
-        else:
-            self._connection.ioloop.call_later(
-                self._watcher_poll_period_s, self.event_watcher
-            )
+                logger.info("Shutdown complete")
+            elif self._connection.is_closed:
+                self._connection.ioloop.stop()
 
     def run(self):
         """Run the example consumer by connecting to RabbitMQ and then
@@ -331,10 +308,5 @@ class ResultQueueSubscriber(multiprocessing.Process):
         """stop() is called by the parent to shutdown the subscriber"""
         logger.info("Stopping")
         self.kill_event.set()
-        logger.info("Waiting for cleanup_complete")
-        if not self._cleanup_complete.wait(2 * self._watcher_poll_period_s):
-            logger.warning("Reached timeout while waiting for cleanup complete")
-        # join shouldn't block if the above did not raise a timeout
-        self.join()
-        self.close()
+        self.join()  # thread stops or test busts/hangs.  Very intentional
         logger.info("Cleanup done")
