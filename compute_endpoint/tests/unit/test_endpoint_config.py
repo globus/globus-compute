@@ -199,8 +199,8 @@ def test_userconfig_repr_nondefault_kwargs(
 
     repr_c = repr(UserEndpointConfig(**kwds))
 
-    if kw == "multi_user":
-        assert f"{kw}={repr(val)}" not in repr_c, "Multi user *off* by default"
+    if kw in ["multi_user", "high_assurance"]:
+        assert f"{kw}={repr(val)}" not in repr_c, "Multi-user and HA *off* by default"
     else:
         assert f"{kw}={repr(val)}" in repr_c
 

@@ -181,6 +181,7 @@ class EndpointManager:
                     auth_policy=config.authentication_policy,
                     subscription_id=config.subscription_id,
                     public=config.public,
+                    high_assurance=config.high_assurance,
                 )
 
                 # Mostly to appease mypy, but also a useful text if it ever

@@ -144,6 +144,7 @@ class BaseEndpointConfigModel(BaseModel):
     heartbeat_period: t.Optional[int]
     environment: t.Optional[str]
     local_compute_services: t.Optional[bool]
+    high_assurance: t.Optional[bool]
     debug: t.Optional[bool]
 
     class Config:

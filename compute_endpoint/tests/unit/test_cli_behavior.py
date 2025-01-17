@@ -449,6 +449,37 @@ def test_start_ep_display_name_in_config(
     assert conf_dict["display_name"] == display_name
 
 
+@pytest.mark.parametrize(
+    ("ep_name", "set_ha"),
+    (
+        ["ep0", None],
+        ["ep1", False],
+        ["ep2", True],
+    ),
+)
+def test_start_ep_high_assurance_in_config(
+    run_line, mock_command_ensure, make_endpoint_dir, ep_name, set_ha
+):
+    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
+    configure_arg = ""
+    auth_policy = str(uuid.uuid4())
+    sub_id = str(uuid.uuid4())
+    if set_ha is not None:
+        configure_arg = (
+            f" --subscription-id {sub_id} --auth-policy "
+            f"{auth_policy} {'--high-assurance' if set_ha else ''}"
+        )
+    run_line(f"configure {ep_name}{configure_arg}")
+
+    with open(conf) as f:
+        conf_dict = yaml.safe_load(f)
+
+    if set_ha is True:
+        assert conf_dict["high_assurance"] == set_ha
+    else:
+        assert conf_dict.get("high_assurance", False) is False
+
+
 def test_configure_ep_auth_policy_in_config(
     run_line, mock_command_ensure, make_endpoint_dir
 ):
@@ -1049,6 +1080,72 @@ def test_configure_ep_auth_policy_timeout_sets_ha(
     assert mock_auth_client.create_policy.call_args.kwargs["high_assurance"] == bool(
         timeout
     )
+
+
+@pytest.mark.parametrize(
+    ("is_ha", "policy_id", "auth_desc", "allowed_domains", "sub_id", "exc_text"),
+    (
+        (
+            [True, "pid", None, None, "sub_id", None],
+            [True, "pid", "desc", "globus.org", "sub_id", "Cannot specify an existing"],
+            [True, "pid", "desc", None, "sub_id", "Cannot specify an existing"],
+            [True, None, None, None, "sub_id", "require both a HA policy and a HA sub"],
+            [True, "pid", None, None, None, "require both a HA policy and a HA sub"],
+            [
+                True,
+                None,
+                "auth_desc",
+                "globus.org",
+                None,
+                "require both a HA policy and a HA sub",
+            ],
+            [False, None, "auth_desc", "globus.org", None, None],
+            [False, "pid", None, None, None, None],
+        )
+    ),
+)
+def test_configure_ha_ep_requirements(
+    mocker,
+    run_line,
+    mock_cli_state,
+    make_endpoint_dir,
+    ep_name,
+    mock_app,
+    mock_auth_client,
+    is_ha,
+    policy_id,
+    auth_desc,
+    allowed_domains,
+    sub_id,
+    exc_text,
+):
+    mock_auth_client.create_policy.return_value = {"policy": {"id": "foo"}}
+    mock_auth_client.get_projects.return_value = []
+    mocker.patch(f"{_MOCK_BASE}create_or_choose_auth_project")
+
+    mock_ep, _ = mock_cli_state
+
+    args = ["configure"]
+    if is_ha:
+        args.append("--high-assurance")
+    if policy_id:
+        args.append(f"--auth-policy {policy_id}")
+    if auth_desc:
+        args.append(f"--auth-policy-description {auth_desc}")
+    if allowed_domains:
+        args.append(f"--allowed-domains {allowed_domains}")
+    if sub_id:
+        args.append(f"--subscription-id {sub_id}")
+
+    args.append("ep_name")
+
+    line = " ".join(args)
+    if exc_text:
+        res = run_line(line, assert_exit_code=1)
+        assert exc_text in res.stderr
+    else:
+        run_line(line)
+        assert mock_ep.configure_endpoint.called
 
 
 @pytest.mark.parametrize(

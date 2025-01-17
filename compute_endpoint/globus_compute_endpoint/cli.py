@@ -301,6 +301,13 @@ def version_command():
     help="Configure endpoint as multi-user capable",
 )
 @click.option(
+    "--high-assurance",
+    is_flag=True,
+    default=False,
+    hidden=True,  # Until HA features are complete
+    help="Configure endpoint as high assurance capable",
+)
+@click.option(
     "--display-name",
     help="A human readable display name for the endpoint, if desired",
 )
@@ -352,7 +359,7 @@ def version_command():
     "--auth-timeout",
     help=(
         "How old (in seconds) a login session can be and still be compliant. "
-        "Makes the auth policy high assurance"
+        "If set, the auth policy will be high assurance"
     ),
     type=click.IntRange(min=0),
     default=None,
@@ -366,6 +373,7 @@ def configure_endpoint(
     name: str,
     endpoint_config: str | None,
     multi_user: bool,
+    high_assurance: bool,
     display_name: str | None,
     auth_policy: str | None,
     auth_policy_project_id: str | None,
@@ -389,20 +397,26 @@ def configure_endpoint(
     if multi_user and not _has_multi_user:
         raise ClickException("multi-user endpoints are not supported on this system")
 
-    if (
+    create_policy = (
         auth_policy_project_id is not None
         or auth_policy_display_name != _AUTH_POLICY_DEFAULT_NAME
         or auth_policy_description != _AUTH_POLICY_DEFAULT_DESC
         or allowed_domains is not None
         or excluded_domains is not None
         or auth_timeout is not None
-    ):
-        if auth_policy:
-            raise ClickException(
-                "Cannot specify an existing auth policy and "
-                "create a new one at the same time"
-            )
+    )
 
+    if create_policy and auth_policy:
+        raise ClickException(
+            "Cannot specify an existing auth policy and "
+            "create a new one at the same time"
+        )
+    elif high_assurance and not (subscription_id and (create_policy or auth_policy)):
+        raise ClickException(
+            "high-assurance(HA) endpoints require both a HA policy and "
+            "a HA subscription id"
+        )
+    elif create_policy:
         app = get_globus_app_with_scopes()
         ac = ComputeAuthClient(app=app)
 
@@ -433,6 +447,7 @@ def configure_endpoint(
         ep_dir,
         endpoint_config,
         multi_user,
+        high_assurance,
         display_name,
         auth_policy,
         subscription_id,
