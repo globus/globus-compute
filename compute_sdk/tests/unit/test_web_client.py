@@ -33,6 +33,13 @@ def client():
     return WebClient(base_url=_BASE_URL, transport_params={"max_retries": 0})
 
 
+def test_web_client_deprecated():
+    with pytest.warns(DeprecationWarning) as record:
+        WebClient(base_url="blah")
+    msg = "'WebClient' class is deprecated"
+    assert any(msg in str(r.message) for r in record)
+
+
 def test_web_client_can_set_explicit_base_url():
     c1 = WebClient(base_url="https://foo.example.com/")
     c2 = WebClient(base_url="https://bar.example.com/")

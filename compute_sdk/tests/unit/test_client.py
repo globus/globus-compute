@@ -768,3 +768,11 @@ def test_client_logout_with_login_manager():
     client = gc.Client(do_version_check=False, login_manager=mock_lm)
     client.logout()
     assert mock_lm.logout.called
+
+
+def test_web_client_deprecated():
+    gcc = gc.Client(do_version_check=False)
+    with pytest.warns(DeprecationWarning) as record:
+        assert gcc.web_client, "Client.web_client needed for backward compatibility"
+    msg = "'Client.web_client' attribute is deprecated"
+    assert any(msg in str(r.message) for r in record)
