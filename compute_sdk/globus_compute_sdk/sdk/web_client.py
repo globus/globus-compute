@@ -17,7 +17,6 @@ from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
-from globus_sdk import GlobusAPIError, GlobusApp, Scope
 
 from .auth.scopes import ComputeScopes
 
@@ -104,20 +103,27 @@ class WebClient(globus_sdk.BaseClient):
     # it does not have any other effects
     service_name: str = "funcx"
     # use the Globus Compute-specific error class
-    error_class = GlobusAPIError
+    error_class = globus_sdk.GlobusAPIError
 
     scopes = ComputeScopes
-    default_scope_requirements = [Scope(ComputeScopes.all)]
+    default_scope_requirements = [globus_sdk.Scope(ComputeScopes.all)]
 
     def __init__(
         self,
         *,
         environment: t.Optional[str] = None,
         base_url: t.Optional[str] = None,
-        app: t.Optional[GlobusApp] = None,
+        app: t.Optional[globus_sdk.GlobusApp] = None,
         app_name: t.Optional[str] = None,
         **kwargs,
     ):
+        warnings.warn(
+            "The 'WebClient' class is deprecated."
+            " Please use globus_sdk.ComputeClient instead.",
+            category=DeprecationWarning,
+            stacklevel=10,
+        )
+
         if base_url is None:
             base_url = get_web_service_url(environment)
         base_url = remove_url_path(base_url)
