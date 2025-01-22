@@ -1,6 +1,7 @@
 import inspect
 import random
 import sys
+import typing as t
 from unittest.mock import patch
 
 import globus_compute_sdk.serialize.concretes as concretes
@@ -11,11 +12,8 @@ from globus_compute_sdk.errors import (
     SerdeError,
     SerializationError,
 )
-from globus_compute_sdk.serialize.base import SerializationStrategy
+from globus_compute_sdk.serialize.base import IDENTIFIER_LENGTH, SerializationStrategy
 from globus_compute_sdk.serialize.facade import ComputeSerializer
-
-# length of serializer identifier
-ID_LEN = 3
 
 
 def foo(x, y=3):
@@ -41,7 +39,7 @@ def decorated_add(a, b, c):
     return a + b
 
 
-def check_deserialized_foo(f):
+def check_deserialized_foo(f: t.Callable):
     p1, p2 = inspect.signature(f).parameters.items()
 
     param_1: inspect.Parameter = p1[1]
@@ -54,7 +52,7 @@ def check_deserialized_foo(f):
     assert 3 == param_2.default
 
 
-def check_deserialized_bar(f):
+def check_deserialized_bar(f: t.Callable):
     p1, p2 = inspect.signature(f).parameters.items()
 
     param_1: inspect.Parameter = p1[1]
@@ -321,12 +319,13 @@ def test_compute_serializer_defaults():
     serializer = ComputeSerializer()
 
     assert (
-        serializer.serialize("something non-callable")[:ID_LEN]
+        serializer.serialize("something non-callable")[:IDENTIFIER_LENGTH]
         == concretes.DEFAULT_STRATEGY_DATA.identifier
     )
 
     assert (
-        serializer.serialize(foo)[:ID_LEN] == concretes.DEFAULT_STRATEGY_CODE.identifier
+        serializer.serialize(foo)[:IDENTIFIER_LENGTH]
+        == concretes.DEFAULT_STRATEGY_CODE.identifier
     )
 
 
@@ -339,7 +338,7 @@ def test_selectable_serialization(strategy):
         serializer = ComputeSerializer(strategy_data=strategy())
         data = "foo"
     ser_data = serializer.serialize(data)
-    assert ser_data[:ID_LEN] == strategy.identifier
+    assert ser_data[:IDENTIFIER_LENGTH] == strategy.identifier
 
 
 @pytest.mark.parametrize("strategy", concretes.SELECTABLE_STRATEGIES)
