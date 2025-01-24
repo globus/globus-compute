@@ -95,6 +95,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             Functions will run in a sandbox directory under the working_dir
             if this option is enabled. Default: False
 
+        allowed_serializers: DeserializerAllowlist | None
+            If specified, any submissions that were not serialized using the
+            strategies given in this list will cause an error to be raised.
+            Passed to the engine's ``ComputeSerializer`` as ``allowed_deserializers``.
+
         """  # noqa: E501
 
         if self._ExecutorClass is HighThroughputExecutor:
