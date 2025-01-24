@@ -398,6 +398,40 @@ is submitted (possibly from a different SDK environment) using the Client's
 On the other hand, the |Executor|_ 's ``.submit()`` takes a function argument
 and serializes a fresh copy each time it is invoked.
 
+Restricting Deserialization Methods
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- The ``ComputeSerializer`` can be restricted to specific serialization
+  strategies when deserializing payloads. For example:
+
+  .. code-block:: python
+
+    import os
+    from globus_compute_sdk.serialize import ComputeSerializer, JSONData, AllowlistWildcard
+
+
+    class MaliciousPayload():
+        def __reduce__(self):
+            # this method returns a 2-tuple (callable, arguments) that dill calls to reconstruct the object
+            return os.system, ("<your favorite arbitrary code execution script>",)
+
+    evil_serializer = ComputeSerializer()  # uses DillDataBase64 by default
+    payload = evil_serializer.serialize(MaliciousPayload())
+
+
+    safe_deserializer = ComputeSerializer(
+        # allow only JSON for data (argument serialization) but any Compute strategy for code (functions)
+        allowed_deserializer_types=[JSONData, AllowlistWildcard.CODE]
+    )
+    safe_deserializer.deserialize(payload)
+    # globus_compute_sdk.errors.error_types.DeserializationError: Deserialization failed:
+    #
+    #   Data serializer DillDataBase64 is not allowed in this ComputeSerializer.
+    #   The only allowed data serializer is JSONData.
+    #
+    #   (Hint: re-serialize the arguments with JSONData and try again.)
+
+
 .. |rarr| unicode:: 0x2192
 
 .. |Client| replace:: ``Client``

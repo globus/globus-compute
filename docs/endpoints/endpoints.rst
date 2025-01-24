@@ -359,6 +359,26 @@ Here's an example configuration:
            max_idletime: 60.0      # Default = 120s
            strategy_period: 120.0  # Default = 5s
 
+Restricting Serialization Strategies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Compute Endpoints can be configured to only deserialize and execute submissions that
+  were serialized with specific serialization strategies. For example, with the
+  following config:
+
+  .. code-block:: yaml
+
+    engine:
+        allowed_serializers:
+            - globus_compute_sdk.serialize.DillCodeSource
+            - globus_compute_sdk.serialize.DillCodeTextInspect
+            - globus_compute_sdk.serialize.JSONData
+        type: ThreadPoolEngine
+
+  any submissions that used the default serialization strategies (``DillCode``,
+  ``DillDataBase64``) would be rejected, and users would be informed to use one of the
+  allowed strategies.
+
 
 Ensuring Execution Environment
 ------------------------------
