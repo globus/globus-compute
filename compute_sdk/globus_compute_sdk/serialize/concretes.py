@@ -16,61 +16,85 @@ logger = logging.getLogger(__name__)
 
 
 class DillDataBase64(SerializationStrategy):
-    identifier = "00\n"
-    for_code = False
+    """
+    Serializes Python data to binary via |dill.dumps|_, and then
+    encodes that binary to a string using base 64 representation.
+    """
+
+    identifier = "00\n"  #:
+    for_code = False  #:
 
     def __init__(self):
         super().__init__()
 
-    def serialize(self, data) -> str:
+    def serialize(self, data: t.Any) -> str:
+        ":meta private:"
         x = codecs.encode(dill.dumps(data), "base64").decode()
         return self.identifier + x
 
-    def deserialize(self, payload: str):
+    def deserialize(self, payload: str) -> t.Any:
+        ":meta private:"
         chomped = self.chomp(payload)
         data = dill.loads(codecs.decode(chomped.encode(), "base64"))
         return data
 
 
 class JSONData(SerializationStrategy):
-    identifier = "11\n"
-    for_code = False
+    """
+    Serializes Python data to a string via :func:`json.dumps`.
+    """
+
+    identifier = "11\n"  #:
+    for_code = False  #:
 
     def __init__(self):
         super().__init__()
 
-    def serialize(self, data) -> str:
+    def serialize(self, data: t.Any) -> str:
+        ":meta private:"
         return self.identifier + json.dumps(data)
 
-    def deserialize(self, payload: str):
+    def deserialize(self, payload: str) -> t.Any:
+        ":meta private:"
         chomped = self.chomp(payload)
         data = json.loads(chomped)
         return data
 
 
 class DillCodeSource(SerializationStrategy):
-    """This strategy uses dill's getsource method to extract the function body and
-    then serializes it.
+    """
+    Extracts a function's body via |dill.getsource|_, serializes it
+    with |dill.dumps|_, then encodes it via base 64.
 
-    Code from interpreter/main        : Yes
-    Code from notebooks               : No
-    Works with mismatching py versions: Yes
-    Decorated fns                     : No
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ✅
+          - ❌
+          - ⚠️
+          - ❌
     """
 
-    identifier = "04\n"
-    for_code = True
+    identifier = "04\n"  #:
+    for_code = True  #:
 
     def __init__(self):
         super().__init__()
 
     def serialize(self, data) -> str:
+        ":meta private:"
         name = data.__name__
         body = dill.source.getsource(data, lstrip=True)
         x = codecs.encode(dill.dumps((name, body)), "base64").decode()
         return self.identifier + x
 
     def deserialize(self, payload: str):
+        ":meta private:"
         chomped = self.chomp(payload)
         name, body = dill.loads(codecs.decode(chomped.encode(), "base64"))
         exec_ns: dict = {}
@@ -79,28 +103,39 @@ class DillCodeSource(SerializationStrategy):
 
 
 class DillCodeTextInspect(SerializationStrategy):
-    """This strategy uses the inspect library to extract the function body and
-    then serializes it.
+    """
+    Extracts a function's body via :func:`inspect.getsource`, serializes it
+    with |dill.dumps|_, then encodes it via base 64.
 
-    Code from interpreter/main        : ?
-    Code from notebooks               : Yes
-    Works with mismatching py versions: Yes
-    Decorated fns                     : No
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ❌
+          - ✅
+          - ⚠️
+          - ❌
     """
 
-    identifier = "03\n"
-    for_code = True
+    identifier = "03\n"  #:
+    for_code = True  #:
 
     def __init__(self):
         super().__init__()
 
     def serialize(self, data) -> str:
+        ":meta private:"
         name = data.__name__
         body = inspect.getsource(data)
         x = codecs.encode(dill.dumps((name, body)), "base64").decode()
         return self.identifier + x
 
     def deserialize(self, payload: str):
+        ":meta private:"
         chomped = self.chomp(payload)
         name, body = dill.loads(codecs.decode(chomped.encode(), "base64"))
         exec_ns: dict = {}
@@ -110,68 +145,93 @@ class DillCodeTextInspect(SerializationStrategy):
 
 class PickleCode(SerializationStrategy):
     """
-    Deprecated in favor of just using dill, but deserialization is
-    supported for legacy functions
-    Code from interpreter/main        : No
-    Code from notebooks               : Yes
-    Works with mismatching py versions: No
-    Decorated fns                     : Yes
+    This strategy is deprecated and new submissions cannot use it to
+    serialize functions. Very old functions that were serialized with
+    this can still be deserialized.
+
+    :meta private:
     """
 
-    identifier = "02\n"
-    for_code = True
+    identifier = "02\n"  #:
+    for_code = True  #:
 
     def __init__(self):
         super().__init__()
 
     def serialize(self, data) -> str:
+        ":meta private:"
         raise NotImplementedError("Pickle serialization is no longer supported")
         # x = codecs.encode(pickle.dumps(data), "base64").decode()
         # return self.identifier + x
 
     def deserialize(self, payload: str):
+        ":meta private:"
         chomped = self.chomp(payload)
         data = pickle.loads(codecs.decode(chomped.encode(), "base64"))
         return data
 
 
 class DillCode(SerializationStrategy):
-    """This strategy uses dill to directly serialize a function.
+    """
+    Directly serializes the function via |dill.dumps|_, then encodes it in base 64.
 
-    Code from interpreter/main        : No
-    Code from notebooks               : Yes
-    Works with mismatching py versions: No
-    Decorated fns                     : Yes
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ❌
+          - ✅
+          - ❌
+          - ✅
     """
 
-    identifier = "01\n"
-    for_code = True
+    identifier = "01\n"  #:
+    for_code = True  #:
 
     def __init__(self):
         super().__init__()
 
     def serialize(self, data) -> str:
+        ":meta private:"
         x = codecs.encode(dill.dumps(data), "base64").decode()
         return self.identifier + x
 
     def deserialize(self, payload: str):
+        ":meta private:"
         chomped = self.chomp(payload)
         function = dill.loads(codecs.decode(chomped.encode(), "base64"))
         return function
 
 
 class CombinedCode(SerializationStrategy):
-    """This strategy uses multiple strategies to serialize a function
+    """
+    This strategy attempts to serialize the function via the :class:`DillCodeSource`,
+    :class:`DillCode`, and :class:`DillCodeTextInspect` strategies, combining the
+    results of each sub-strategy as the final serialized payload. When deserializing,
+    it tries each sub-strategy in order until one successfully deserializes its part of
+    the payload. Intended for maximum compatibility, but is slightly slower and
+    generates larger payloads than the other strategies.
 
-    # These should be a superset of the strategies
-    Code from interpreter/main        : Yes
-    Code from notebooks               : Yes
-    Works with mismatching py versions: Yes
-    Decorated fns                     : Yes
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ✅
+          - ✅
+          - ⚠️
+          - ✅
     """
 
-    identifier = "10\n"
-    for_code = True
+    identifier = "10\n"  #:
+    for_code = True  #:
 
     # Functions are serialized using the following strategies and the resulting encoded
     # versions are stored as chunks.  Allows redundancy if one of the strategies fails
@@ -200,6 +260,7 @@ class CombinedCode(SerializationStrategy):
         return tuple(zip(ai, ai))
 
     def serialize(self, data) -> str:
+        ":meta private:"
         chunks = []
         for id, cls in CombinedCode._chunk_strategies.items():
             strategy = cls()
@@ -217,7 +278,7 @@ class CombinedCode(SerializationStrategy):
 
         return self.identifier + CombinedCode._separator.join(chunks)
 
-    def deserialize(self, payload: str, variation: int = 0):
+    def deserialize(self, payload: str, variation: int = 0) -> t.Any:
         """
         If a variation is specified, try that strategy/payload if
         present.
@@ -225,7 +286,7 @@ class CombinedCode(SerializationStrategy):
         one that deserializes successfully.  If none works, raise
 
         Note variation is 1-indexed (ie. 2 means 2nd strategy), not
-        the .identifier/serial_id of the strategy like 04\n or 01\n
+        the ``identifier`` of the strategy (like ``"04\\n"``, ``"01\\n"``).
         """
         count = 0
         for serial_id, encoded_func in self.get_multiple_payloads(payload):
@@ -266,5 +327,9 @@ SELECTABLE_STRATEGIES: list[type[SerializationStrategy]] = [
     CombinedCode,
 ]
 
-DEFAULT_STRATEGY_CODE = DillCode()
-DEFAULT_STRATEGY_DATA = DillDataBase64()
+#: The *code* serialization strategy used by :class:`ComputeSerializer`
+#: when one is not specified.
+DEFAULT_STRATEGY_CODE: DillCode = DillCode()
+#: The *data* serialization strategy used by :class:`ComputeSerializer`
+#: when one is not specified.
+DEFAULT_STRATEGY_DATA: DillDataBase64 = DillDataBase64()

@@ -8,6 +8,8 @@ Globus Compute SDK
 
     executor
     client
+    serializer
+    serialization_strategies
     engine
     mpi_engine
     shell_function
