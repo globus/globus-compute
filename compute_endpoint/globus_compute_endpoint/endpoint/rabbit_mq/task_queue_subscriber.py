@@ -196,7 +196,8 @@ class TaskQueueSubscriber(threading.Thread):
         if self._connection_tries == 1:
             # if 1, then we've not been stable for more than 60s (see _event_watcher)
             logger.info(msg_fmt, self, exc)
-            logger.warning(f"{self!r} Unable to sustain connection; retrying ...")
+            if not self._stop_event.is_set():
+                logger.warning(f"{self!r} Unable to sustain connection; retrying ...")
 
         self._consumer_tag = None
         mq_conn.ioloop.stop()
