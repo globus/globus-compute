@@ -121,7 +121,7 @@ class WebClient(globus_sdk.BaseClient):
             "The 'WebClient' class is deprecated."
             " Please use globus_sdk.ComputeClient instead.",
             category=DeprecationWarning,
-            stacklevel=10,
+            stacklevel=2,
         )
 
         if base_url is None:
