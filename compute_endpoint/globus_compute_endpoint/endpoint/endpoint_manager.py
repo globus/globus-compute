@@ -49,6 +49,7 @@ from globus_compute_endpoint.endpoint.utils import (
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
+from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:
@@ -522,8 +523,9 @@ class EndpointManager:
             log.debug("Ascertaining user identity set (%s)", client_options)
 
             gcc = GC.Client(**client_options)
+            ac = ComputeAuthClient(app=gcc.app)
             try:
-                userinfo = gcc.auth_client.userinfo()
+                userinfo = ac.userinfo()
                 ids = userinfo["identity_set"]
                 parent_identities.update(ident["sub"] for ident in ids)
                 log.debug(

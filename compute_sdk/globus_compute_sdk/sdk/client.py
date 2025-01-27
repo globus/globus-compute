@@ -124,18 +124,17 @@ class Client:
         self.app: globus_sdk.GlobusApp | None = None
         self.login_manager: LoginManagerProtocol | None = None
         self._web_client: WebClient | None = None
+        self._auth_client: globus_sdk.AuthClient | None = None
 
         if app and login_manager:
             raise ValueError("'app' and 'login_manager' are mutually exclusive.")
         elif login_manager:
             self.login_manager = login_manager
-            self.auth_client = login_manager.get_auth_client()
             self._compute_web_client = _ComputeWebClient(
                 base_url=self.web_service_address, authorizer=self.web_client.authorizer
             )
         else:
             self.app = app if app else get_globus_app(environment=environment)
-            self.auth_client = ComputeAuthClient(app=self.app)
             self._compute_web_client = _ComputeWebClient(
                 base_url=self.web_service_address, app=self.app
             )
@@ -149,6 +148,25 @@ class Client:
 
         if do_version_check:
             self.version_check()
+
+    @property
+    def auth_client(self):
+        warnings.warn(
+            "The 'Client.auth_client' attribute is deprecated.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if self._auth_client:
+            return self._auth_client
+        elif self.login_manager:
+            self._auth_client = self.login_manager.get_auth_client()
+        else:
+            self._auth_client = ComputeAuthClient(app=self.app)
+        return self._auth_client
+
+    @auth_client.setter
+    def auth_client(self, val: globus_sdk.AuthClient):
+        self._auth_client = val
 
     @property
     def web_client(self):
