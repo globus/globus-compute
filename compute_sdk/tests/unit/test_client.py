@@ -748,7 +748,6 @@ def test_client_handles_login_manager():
     mock_lm = mock.Mock(spec=LoginManager)
     client = gc.Client(do_version_check=False, login_manager=mock_lm)
     assert client.login_manager is mock_lm
-    assert mock_lm.get_auth_client.call_count == 1
     assert mock_lm.get_web_client.call_count == 1
     assert mock_lm.get_web_client.call_args[1]["base_url"] == client.web_service_address
 
@@ -775,4 +774,12 @@ def test_web_client_deprecated():
     with pytest.warns(DeprecationWarning) as record:
         assert gcc.web_client, "Client.web_client needed for backward compatibility"
     msg = "'Client.web_client' attribute is deprecated"
+    assert any(msg in str(r.message) for r in record)
+
+
+def test_auth_client_deprecated():
+    gcc = gc.Client(do_version_check=False)
+    with pytest.warns(DeprecationWarning) as record:
+        assert gcc.auth_client, "Client.auth_client needed for backward compatibility"
+    msg = "'Client.auth_client' attribute is deprecated"
     assert any(msg in str(r.message) for r in record)

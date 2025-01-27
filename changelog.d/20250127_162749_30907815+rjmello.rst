@@ -1,0 +1,4 @@
+Deprecated
+^^^^^^^^^^
+
+- The ``Client.auth_client`` attribute is now deprecated.

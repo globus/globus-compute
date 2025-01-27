@@ -164,6 +164,13 @@ def mock_client(mocker, ep_uuid, mock_reg_info):
     yield ep_uuid, mock_gcc
 
 
+@pytest.fixture
+def mock_auth_client(mocker):
+    mock_ac = mock.Mock()
+    mocker.patch(f"{_MOCK_BASE}ComputeAuthClient", return_value=mock_ac)
+    yield mock_ac
+
+
 @pytest.fixture(autouse=True)
 def mock_pim(request):
     if "no_mock_pim" in request.keywords:
@@ -186,7 +193,9 @@ def mock_props():
 
 
 @pytest.fixture
-def mock_unprivileged_epmanager(mocker, conf_dir, mock_client, mock_conf):
+def mock_unprivileged_epmanager(
+    mocker, conf_dir, mock_client, mock_auth_client, mock_conf
+):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = 123456
     mock_os.getgid.side_effect = (
@@ -210,9 +219,9 @@ def mock_unprivileged_epmanager(mocker, conf_dir, mock_client, mock_conf):
 
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
 
-    ep_uuid, mock_gcc = mock_client
+    ep_uuid, _ = mock_client
     ident = "some_identity_uuid"
-    mock_gcc.auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
+    mock_auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
     mock_conf.identity_mapping_config_path = None
     em = EndpointManager(conf_dir, ep_uuid, mock_conf)
@@ -227,7 +236,9 @@ def mock_unprivileged_epmanager(mocker, conf_dir, mock_client, mock_conf):
 
 
 @pytest.fixture
-def epmanager_as_root(mocker, conf_dir, mock_conf_root, mock_client, mock_pim):
+def epmanager_as_root(
+    mocker, conf_dir, mock_conf_root, mock_client, mock_auth_client, mock_pim
+):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = 0
     mock_os.getgid.return_value = 0
@@ -256,14 +267,14 @@ def epmanager_as_root(mocker, conf_dir, mock_conf_root, mock_client, mock_pim):
         side_effect=mock_ensure_compute_dir,
     )
 
-    ep_uuid, mock_gcc = mock_client
+    ep_uuid, _ = mock_client
 
     # Needed to mock the pipe buffer size
     mocker.patch.object(fcntl, "fcntl", return_value=512)
     mock_pim.map_identity.return_value = "an_account_that_doesnt_exist_abc123"
 
     ident = "epmanager_some_identity"
-    mock_gcc.auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
+    mock_auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
     em = EndpointManager(conf_dir, ep_uuid, mock_conf_root)
     em._command = mock.Mock(spec=CommandQueueSubscriber)
@@ -293,13 +304,17 @@ def command_payload(ident):
 
 @pytest.fixture
 def successful_exec_from_mocked_root(
-    mocker, epmanager_as_root, user_conf_template, mock_props, ident, command_payload
+    mocker,
+    epmanager_as_root,
+    mock_auth_client,
+    user_conf_template,
+    mock_props,
+    ident,
+    command_payload,
 ):
     conf_dir, mock_conf, mock_client, mock_os, mock_pwd, em = epmanager_as_root
 
-    _, mock_gcc = mock_client
-
-    mock_gcc.auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
+    mock_auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
     queue_item = (1, mock_props, json.dumps(command_payload).encode())
 
@@ -911,12 +926,11 @@ def test_unprivileged_warns_if_identity_conf_specified(
 
 
 def test_quits_if_not_privileged_and_no_identity_set(
-    mocker, mock_log, mock_client, epmanager_as_root
+    mocker, mock_log, mock_client, mock_auth_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
-    ep_uuid, mock_gcc = mock_client
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
-    mock_gcc.auth_client.userinfo.return_value = {"identity_set": []}
+    mock_auth_client.userinfo.return_value = {"identity_set": []}
     assert em._time_to_stop is False, "Verify test setup"
     em._event_loop()
 
@@ -927,12 +941,11 @@ def test_quits_if_not_privileged_and_no_identity_set(
 
 
 def test_clean_exit_on_identity_collection_error(
-    mocker, mock_log, mock_client, epmanager_as_root
+    mocker, mock_log, mock_client, mock_auth_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
-    ep_uuid, mock_gcc = mock_client
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
-    mock_gcc.auth_client.userinfo.return_value = {"not_identity_set": None}
+    mock_auth_client.userinfo.return_value = {"not_identity_set": None}
     assert em._time_to_stop is False, "Verify test setup"
     em._event_loop()
 
@@ -1327,7 +1340,13 @@ def test_handles_invalid_server_msg_gracefully(mock_log, epmanager_as_root, mock
     ),
 )
 def test_unprivileged_handles_identity_set_robustly(
-    mock_log, mock_props, mock_unprivileged_epmanager, is_invalid, idset, randomstring
+    mock_log,
+    mock_props,
+    mock_unprivileged_epmanager,
+    is_invalid,
+    idset,
+    randomstring,
+    mock_auth_client,
 ):
     cmd_payload = {
         "globus_effective_identity": f"abc{randomstring()}",
@@ -1357,11 +1376,10 @@ def test_unprivileged_handles_identity_set_robustly(
 
 
 def test_unprivileged_happy_path(
-    mocker, mock_props, mock_unprivileged_epmanager, mock_client
+    mocker, mock_props, mock_unprivileged_epmanager, mock_client, mock_auth_client
 ):
-    *_, mock_client, mock_os, _, em = mock_unprivileged_epmanager
-    _, mock_gcc = mock_client
-    ident_rv = mock_gcc.auth_client.userinfo.return_value
+    *_, em = mock_unprivileged_epmanager
+    ident_rv = mock_auth_client.userinfo.return_value
 
     mocker.patch(f"{_MOCK_BASE}log")
     cmd_payload = {
