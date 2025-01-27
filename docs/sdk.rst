@@ -298,16 +298,16 @@ Specifying a Serialization Strategy
 -----------------------------------
 
 When sending functions and arguments for execution on a Compute endpoint, the SDK uses
-the ``ComputeSerializer`` class to convert data to and from a format that can be easily
-sent over the wire. Internally, ``ComputeSerializer`` uses instances of
-``SerializationStrategy`` to do the actual work of serializing (converting function code
+the :class:`~globus_compute_sdk.serialize.ComputeSerializer` class to convert data to and from a format that can be easily
+sent over the wire. Internally, :class:`~globus_compute_sdk.serialize.ComputeSerializer` uses instances of
+:class:`~globus_compute_sdk.serialize.SerializationStrategy` to do the actual work of serializing (converting function code
 and arguments to strings) and deserializing (converting well-formatted strings back into
 function code and arguments).
 
-The default strategies are ``DillCode`` for function code and ``DillDataBase64`` for
+The default strategies are :class:`~globus_compute_sdk.serialize.DillCode` for function code and :class:`~globus_compute_sdk.serialize.DillDataBase64` for
 function ``*args`` and ``**kwargs``, which are both wrappers around |dill|_. To choose
 another serializer, use the ``code_serialization_strategy`` and
-``data_serialization_strategy`` members of the Compute ``Client``:
+``data_serialization_strategy`` members of the Compute :class:`~globus_compute_sdk.Client`:
 
 .. code:: python
 
@@ -322,9 +322,9 @@ another serializer, use the ``code_serialization_strategy`` and
 
   # do something with gcx
 
-Note that currently the only alternative data serialization strategy is ``JSONData``.
+:doc:`See here for a up-to-date list of serialization strategies. </reference/serialization_strategies>`
 
-To check whether a strategy works for a given use-case, use the ``check_strategies``
+To check whether a strategy works for a given use-case, use the :func:`~globus_compute_sdk.serialize.ComputeSerializer.check_strategies`
 method:
 
 .. code:: python
@@ -349,53 +349,35 @@ method:
   fn, args, kwargs = serializer.check_strategies(greet, "world", greeting="hello")
   assert fn(*args, **kwargs) == greet("world", greeting="hello")
 
-Supported Serialization Strategies
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Note that if ``DillCode`` does not work for your use case, whether it is due
-to differing python/dill version or because of the construction of your method,
-the other alternatives that we currently support are ``DillTextInspect`` and
-``DillCodeSource``.  ``CombinedCode`` serializes the payload in all available
-strategies and will use the first one that deserializes successfully at
-execution time.
-
-For data, the available strategies are ``DillDataBase64``, which serializes data to
-binary via dill and then to a string format via base-64 encoding, and ``JSONData``,
-which serializes data to JSON. ``DillDataBase64`` can serialize arbitrary python
-objects, while ``JSONData`` can only serialize JSON-able objects: generally ``str``,
-``int``, ``float``, ``bool``, and ``None``, and (potentially nested) ``dict``\s and
-``list``\s containing only those data types. ``JSONData`` is ideal for low-trust
-workflows, because deserialization via dill can result in arbitrary code execution.
-
 .. _avoiding-serde-errors:
 
 Avoiding Serialization Errors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We strongly recommend that you use the same python version as the target
+We strongly recommend that you use the same Python version as the target
 Endpoint when using the SDK to submit new functions.
 
-The serialization/deserialization mechanics in python and the pickle/dill
+The serialization/deserialization mechanics in Python and the pickle/dill
 libraries are implemented at the bytecode level and have evolved extensively
 over time.  There is no backward/forward compatability guarantee between
-versions.  Thus a function serialized in an older version of python or dill
+versions.  Thus a function serialized in an older version of Python or dill
 may not deserialize correctly in later versions, and the opposite is even more
 problematic.
 
-Even a single number difference in python minor versions (e.g., from 3.12 |rarr| 3.13)
+Even a single number difference in Python minor versions (e.g., from 3.12 |rarr| 3.13)
 can generate issues.  Micro version differences (e.g., from 3.11.8 |rarr| 3.11.9)
 are usually safe, though not universally.
 
-Errors may surface as serialization/deserialization Exceptions, Globus
-Compute task workers lost due to SEGFAULT, or even incorrect results.
+Errors may surface as serialization/deserialization ``Exception``s, Globus
+Compute task workers lost due to ``SEGFAULT``, or even incorrect results.
 
-Note that the |Client|_ class's ``register_function()`` method can be used
+Note that the |Client|_ class's :func:`~globus_compute_sdk.Client.register_function` method can be used
 to pre-serialize a function using the registering SDK's environment and
 return a UUID identifier.   The resulting bytecode will then be deserialized
 at run time by an Endpoint whenever a task that specifies this function UUID
 is submitted (possibly from a different SDK environment) using the Client's
-``.run()`` or the Executor's ``.submit_to_registered_function()`` methods.
-On the other hand, the |Executor|_ 's ``.submit()`` takes a function argument
+:func:`~globus_compute_sdk.Client.run` or the Executor's :func:`~globus_compute_sdk.Executor.submit_to_registered_function` methods.
+On the other hand, the |Executor|_ 's :func:`~globus_compute_sdk.Executor.submit` takes a function argument
 and serializes a fresh copy each time it is invoked.
 
 .. |rarr| unicode:: 0x2192

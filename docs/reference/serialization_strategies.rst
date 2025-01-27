@@ -17,8 +17,8 @@ Serialization Strategies
     version boundaries, as shown via the ⚠️ symbol. While they may work in many
     situations, there is no guarantee they will work in every situation or between
     every pair of versions. However, using the same Python version on the submit side
-    and execution side *is* guaranteed to work, and is the recommended approach whenever
-    possible.
+    and execution side *is* guaranteed to work, and :ref:`is the recommended approach
+    whenever possible.<avoiding-serde-errors>`
 
 .. this is just for strategies, so any non-strategy exports should be excluded
 .. automodule:: globus_compute_sdk.serialize

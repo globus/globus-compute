@@ -686,24 +686,15 @@ a custom ``globus-compute-endpoint`` wrapper:
 Configuring to Accept Multiple Python Versions
 ==============================================
 
-By default, Globus Compute serializes task submissions via `dill`_ with a method that
-uses Python bytecode.  That's to say it does *not* serialize the source code unless
-asked to, for both technical and historical reasons.  However, because the underlying
-representations that Python uses for bytecode are subject to change at the whim of the
-Python developers, if the Python version running the **SDK** that is used to serialize
-and submit a task is different from the Python version of the **worker** that
-deserializes and runs the task, the worker may error.  Such errors are often hard to
-debug because they happen at a low level in Python.
-
-As a result, our recommendation is to keep Python versions in sync between SDK
-invocations and endpoint workers.  This is limiting in workflows where admins have
-little control over their users' SDK environments, such as locally run Jupyter
-notebooks.  This can sometimes be alleviated with :ref:`an alternate serialization
-strategy <specifying-serde-strategy>`, but not all serialization strategies work in all
-environments, and admins can't enforce this automatically |nbsp| --- |nbsp| users must
-be educated on what strategy to use.  A more robust workaround is to use the
-``user_runtime`` config template variable to detect what Python version was used to
-submit the task.
+Due to issues with cross-version serialization, we recommend :ref:`keeping the Python
+version running on Endpoint workers in sync <avoiding-serde-errors>` with the version
+that functions are first submitted from. However, this can be limiting for
+workflows where admins have little control over their users' SDK environments, such as
+locally run Jupyter notebooks.  This can sometimes be alleviated with :ref:`an alternate
+serialization strategy <specifying-serde-strategy>` (e.g. :class:`~globus_compute_sdk.serialize.JSONData`,
+which doesn't rely on bytecode), but not all serialization strategies work in all
+environments.  A more robust workaround is to use the ``user_runtime`` config template
+variable to detect what Python version was used to submit the task.
 
 Suppose an admin wants to accept the four most recent Python versions (3.10-3.13).
 Using `conda`_, they can create an environment for each Python version they want to
