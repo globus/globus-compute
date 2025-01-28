@@ -365,12 +365,8 @@ class Endpoint:
         elif sys.stderr.isatty():
             ostream = sys.stderr
 
-        # This is to ensure that at least 1 executor is defined
-        if not endpoint_config.executors:
-            msg = (
-                "Endpoint configuration has no executors defined.  Endpoint will not"
-                " start."
-            )
+        if not endpoint_config.engine:
+            msg = "Configuration has no engines defined.  Endpoint will not start."
             log.critical(msg)
             raise ValueError(msg)
 

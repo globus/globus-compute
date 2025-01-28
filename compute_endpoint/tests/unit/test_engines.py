@@ -198,7 +198,7 @@ def test_serialized_engine_config_has_provider():
     ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address=loopback)])
 
     res = serialize_config(ep_config)
-    executor = res["executors"][0].get("executor") or res["executors"][0]
+    executor = res["engine"]["executor"]
 
     assert executor.get("provider")
 

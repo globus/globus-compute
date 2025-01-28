@@ -40,6 +40,7 @@ known_user_config_opts = {
     "multi_user": False,
     "high_assurance": False,
     "executors": None,
+    "engine": None,
 }
 
 known_manager_config_opts = {

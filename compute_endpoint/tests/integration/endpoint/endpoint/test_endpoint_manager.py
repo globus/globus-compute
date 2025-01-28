@@ -322,7 +322,7 @@ class TestStart:
             detach_process=True,
         )
 
-    def test_start_without_executors(self, mocker):
+    def test_start_without_engine(self, mocker):
         mock_client = mocker.patch(f"{_MOCK_BASE}Client")
         mock_client.return_value.register_endpoint.return_value = {
             "endpoint_id": "abcde12345",
@@ -337,13 +337,13 @@ class TestStart:
         mock_context.return_value.__exit__.return_value = None
         mock_context.return_value.pidfile.path = ""
 
-        config = UserEndpointConfig(executors=[], detach_endpoint=False)
+        config = UserEndpointConfig(detach_endpoint=False)
 
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
 
         manager.configure_endpoint(config_dir, None)
-        with pytest.raises(ValueError, match="has no executors defined"):
+        with pytest.raises(ValueError, match="has no engines defined"):
             log_to_console = False
             no_color = True
             manager.start_endpoint(

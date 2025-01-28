@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 class TaskQueue:
-    """Outgoing task queue from the executor to the Interchange"""
+    """Outgoing task queue from the engine to the Interchange"""
 
     def __init__(
         self,

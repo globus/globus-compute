@@ -75,7 +75,7 @@ def mock_launch():
 
 @pytest.fixture
 def conf():
-    _conf = UserEndpointConfig(executors=[ThreadPoolEngine])
+    _conf = UserEndpointConfig(engine=ThreadPoolEngine)
     _conf.source_content = "# test source content"
     _conf.source_content += "\nengine:\n  type: ThreadPoolEngine"
     yield _conf
@@ -448,23 +448,20 @@ def test_endpoint_get_metadata(mocker, engine_cls):
     k = {}
     if engine_cls is GlobusComputeEngine:
         k["address"] = "::1"
-    executors = [engine_cls(**k)]
-    test_config = UserEndpointConfig(executors=executors)
+    test_config = UserEndpointConfig(engine=engine_cls(**k))
     test_config.source_content = "foo: bar"
     meta = Endpoint.get_metadata(test_config)
 
-    for e in test_config.executors:
-        e.shutdown()
+    test_config.engine.shutdown()
 
     for k, v in mock_data.items():
         assert meta[k] == v
 
     assert meta["endpoint_config"] == test_config.source_content
     config = meta["config"]
-    assert len(config["executors"]) == 1
-    assert config["executors"][0]["type"] == engine_cls.__name__
+    assert config["engine"]["type"] == engine_cls.__name__
     if engine_cls is GlobusComputeEngine:
-        assert config["executors"][0]["executor"]["provider"]["type"] == "LocalProvider"
+        assert config["engine"]["executor"]["provider"]["type"] == "LocalProvider"
 
 
 @pytest.mark.parametrize("env", [None, "blar", "local", "production"])
@@ -601,7 +598,7 @@ def test_always_prints_endpoint_id_to_terminal(
 def test_serialize_config_field_types():
     fns = [str(uuid.uuid4()) for _ in range(5)]
 
-    ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address="::1")])
+    ep_config = UserEndpointConfig(engine=GlobusComputeEngine(address="::1"))
     ep_config._hidden_attr = "123"
     ep_config.rando_attr = "howdy"
     ep_config.allowed_functions = fns
@@ -621,7 +618,7 @@ def test_serialize_config_field_types():
     result = serialize_config(ep_config)
 
     # Objects with a __dict__ attr are expanded
-    assert "type" in result["executors"][0]["executor"]["provider"]
+    assert "type" in result["engine"]["executor"]["provider"]
 
     # Only constructor parameters should be included
     assert "_hidden_attr" not in result

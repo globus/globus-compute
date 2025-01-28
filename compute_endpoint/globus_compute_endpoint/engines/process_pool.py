@@ -63,7 +63,7 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
                 *self._executor_args, **self._executor_kwargs
             )
 
-        assert endpoint_id, "ProcessPoolExecutor requires kwarg:endpoint_id at start"
+        assert endpoint_id, "ProcessPoolEngine requires kwarg:endpoint_id at start"
         self.endpoint_id = endpoint_id
         if results_passthrough:
             self.results_passthrough = results_passthrough

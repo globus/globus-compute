@@ -91,6 +91,8 @@ class EndpointInterchange:
             )
         )
         self.config = config
+        if self.config.engine is None:
+            raise ValueError("No Compute Engine specified")
 
         self.endpoint_dir = endpoint_dir
 
@@ -130,12 +132,11 @@ class EndpointInterchange:
         log.info(f"Platform info: {self.current_platform}")
 
         self.results_passthrough: queue.Queue[_ResultPassthroughType] = queue.Queue()
-        # Rename self.executor -> self.engine in second round
-        self.executor: GlobusComputeEngineBase = self.config.executors[0]
+        self.engine: GlobusComputeEngineBase = self.config.engine
 
     def start_engine(self):
         log.info("Starting Engine")
-        self.executor.start(
+        self.engine.start(
             results_passthrough=self.results_passthrough,
             endpoint_id=self.endpoint_id,
             run_dir=self.logdir,
@@ -158,7 +159,7 @@ class EndpointInterchange:
         self._quiesce_event.set()
 
     def cleanup(self):
-        self.executor.shutdown(block=True)
+        self.engine.shutdown(block=True)
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
         log.warning("Received SIGTERM, setting termination flag.")
@@ -209,9 +210,8 @@ class EndpointInterchange:
 
         log.info("Starting EndpointInterchange")
 
-        # NOTE: currently we only start the executors once because
-        # the current behavior is to keep them running decoupled while
-        # the endpoint is waiting for reconnection
+        # NOTE: currently we only start the engine once because the current behavior
+        # is to keep it running decoupled while the endpoint is waits for reconnection
         self.start_engine()
 
         while not self.time_to_quit:
@@ -266,10 +266,10 @@ class EndpointInterchange:
     def _main_loop(self):
         """
         This is the "kernel" of the endpoint interchange process.  Conceptually, there
-        are three actions of consequence: forward task messages to the executors,
-        forward results from the executors back to the Globus Compute web services
-        (RMQ), and forward any previous results that may have failed to send previously
-        (e.g., if a RMQ connection was dropped).
+        are three actions of consequence: forward task messages to the engine, forward
+        results from the engine back to the Globus Compute web services (RMQ), and
+        forward any previous results that may have failed to send previously (e.g., if
+        a RMQ connection was dropped).
 
         We accomplish this via three threads, one each for each task.
 
@@ -294,7 +294,7 @@ class EndpointInterchange:
         heartbeat_publisher = ResultPublisher(queue_info=self.heartbeat_q_info)
         heartbeat_publisher.start()
 
-        executor = self.executor
+        engine = self.engine
 
         num_tasks_forwarded = 0
         num_results_forwarded = 0
@@ -303,8 +303,8 @@ class EndpointInterchange:
             # Handle any previously stored results, either from a previous run or
             # from a quarter of a second-ago.  Basically, check every second
             # (.wait()) if there are any items on disk to be sent.  If there are,
-            # don't treat them any differently than "fresh" results: put the into
-            # the same queue as results incoming directly from the executors.  The
+            # don't treat them any differently than "fresh" results: put them into
+            # the same queue as results coming directly from the engine.  The
             # normal processing by `process_pending_results()` will take over from
             # there.
             while not self._quiesce_event.wait(timeout=1):
@@ -326,9 +326,9 @@ class EndpointInterchange:
             # gracefully, iterate once a second whether a task has arrived.
             nonlocal num_tasks_forwarded
             while not self._quiesce_event.is_set():
-                if getattr(executor, "executor_exception", False):
+                if getattr(engine, "executor_exception", False):
                     self.time_to_quit = True
-                    log.exception(executor.executor_exception)
+                    log.exception(engine.executor_exception)
 
                 if self.time_to_quit:
                     self.stop()
@@ -378,7 +378,7 @@ class EndpointInterchange:
                     continue
 
                 try:
-                    executor.submit(
+                    engine.submit(
                         task_id=tid, packed_task=body, resource_specification=res_spec
                     )
                     num_tasks_forwarded += 1  # Safe given GIL
@@ -469,7 +469,7 @@ class EndpointInterchange:
                     log.error("Failed to publish heartbeat", exc_info=_exc)
 
             try:
-                sr = self.executor.get_status_report()
+                sr = self.engine.get_status_report()
                 sr.global_state.update(self._ep_info)
                 sr.global_state["heartbeat_period"] = self.heartbeat_period
                 sr.global_state["active"] = active
