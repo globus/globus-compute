@@ -330,9 +330,9 @@ class ComputeSerializer:
             sorted(t.__name__ for t in self.allowed_deserializer_types)
         )
         msg = (
-            f"{stype} serializer {type(strategy).__name__} disabled by current"
-            f" configuration. The current configuration requires the *{payload_type}*"
-            f" to be serialized with one of the allowed classes:\n\n"
+            f"\n{stype} serializer {type(strategy).__name__} disabled by current"
+            f" configuration.\nThe current configuration requires the *{payload_type}*"
+            f" to be serialized with one of the allowed {stype} classes:\n\n"
             f"    Allowed serializers: {allowed_names}"
             # note that there is (intentionally) no link to the documentation in this
             # error message - that's because the SDK appends its own hint to any
