@@ -3,10 +3,12 @@ from __future__ import annotations
 import random
 import signal
 import string
+import threading
 import time
 import typing as t
 import uuid
 from queue import Queue
+from unittest import mock
 
 import globus_compute_sdk as gc
 import globus_sdk
@@ -73,6 +75,28 @@ def ep_uuid() -> str:
 @pytest.fixture(scope="session")
 def tod_session_num():
     yield round(time.time()) % 86400
+
+
+@pytest.fixture
+def mock_quiesce():
+    quiesce_mock_wait = False
+
+    def mock_set():
+        nonlocal quiesce_mock_wait
+        quiesce_mock_wait = True
+
+    def mock_is_set():
+        nonlocal quiesce_mock_wait
+        return quiesce_mock_wait
+
+    def mock_wait(*a, **k):
+        return quiesce_mock_wait
+
+    m = mock.Mock(spec=threading.Event)
+    m.wait.side_effect = mock_wait
+    m.set.side_effect = mock_set
+    m.is_set.side_effect = mock_is_set
+    yield m
 
 
 class FakeLoginManager:

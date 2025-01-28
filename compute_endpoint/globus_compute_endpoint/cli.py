@@ -642,6 +642,7 @@ def _do_start_endpoint(
         )
 
     _no_fn_list_canary = -15  # an arbitrary random integer; invalid as an allow_list
+    ep_info = {}
     reg_info = {}
     config_str: str | None = None
     fn_allow_list: list[str] | None | int = _no_fn_list_canary
@@ -656,6 +657,7 @@ def _do_start_endpoint(
                     f" {type_name} instead"
                 )
 
+            ep_info = stdin_data.get("ep_info", {})
             reg_info = stdin_data.get("amqp_creds", {})
             config_str = stdin_data.get("config", None)
             fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
@@ -720,6 +722,7 @@ def _do_start_endpoint(
                 state.log_to_console,
                 state.no_color,
                 reg_info,
+                ep_info,
                 die_with_parent,
             )
 

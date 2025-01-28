@@ -73,23 +73,18 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         self._engine_ready = True
 
     def get_status_report(self) -> EPStatusReport:
-        assert self.executor, "The engine has not been started"
         executor_status: t.Dict[str, t.Any] = {
-            "task_id": -2,
-            "info": {
-                "total_cores": multiprocessing.cpu_count(),
-                "total_mem": round(psutil.virtual_memory().available / (2**30), 1),
-                "total_core_hrs": 0,
-                "total_workers": self.executor._max_workers,  # type: ignore
-                "pending_tasks": 0,
-                "outstanding_tasks": 0,
-                "scaling_enabled": False,
-                "max_blocks": 1,
-                "min_blocks": 1,
-                "max_workers_per_node": self.executor._max_workers,  # type: ignore
-                "nodes_per_block": 1,
-                "heartbeat_period": None,
-            },
+            "total_cores": multiprocessing.cpu_count(),
+            "total_mem": round(psutil.virtual_memory().available / (2**30), 1),
+            "total_core_hrs": 0,
+            "total_workers": self.executor._max_workers,  # type: ignore
+            "pending_tasks": 0,
+            "outstanding_tasks": 0,
+            "scaling_enabled": False,
+            "max_blocks": 1,
+            "min_blocks": 1,
+            "max_workers_per_node": self.executor._max_workers,  # type: ignore
+            "nodes_per_block": 1,
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}
 
@@ -106,12 +101,9 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
-        """We pass all params except the function to executor.submit()"""
+        """``resource_specification`` is not applicable to the ProcessPoolEngine"""
         assert self.executor, "The engine has not been started"
         return self.executor.submit(func, *args, **kwargs)
-
-    def status_polling_interval(self) -> int:
-        return 30
 
     def shutdown(self, /, block=False, **kwargs) -> None:
         if self.executor:

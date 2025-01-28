@@ -139,9 +139,9 @@ def send_endpoint_startup_failure_to_amqp(amqp_creds: dict, msg: str | None = No
     if msg is None:
         msg = "General or unknown failure starting user endpoint"
 
-    result_q_info = amqp_creds["result_queue_info"]
-    publish_kw = result_q_info["queue_publish_kwargs"]
-    urlp = pika.URLParameters(result_q_info["connection_url"])
+    q_info = amqp_creds["heartbeat_queue_info"]
+    publish_kw = q_info["queue_publish_kwargs"]
+    urlp = pika.URLParameters(q_info["connection_url"])
     status_report = EPStatusReport(
         endpoint_id=amqp_creds["endpoint_id"],
         global_state={"error": msg, "heartbeat_period": 3},

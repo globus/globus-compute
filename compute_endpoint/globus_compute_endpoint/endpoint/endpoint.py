@@ -12,6 +12,7 @@ import socket
 import subprocess
 import sys
 import typing as t
+from datetime import datetime
 from http import HTTPStatus
 
 import daemon
@@ -342,6 +343,7 @@ class Endpoint:
         log_to_console: bool,
         no_color: bool,
         reg_info: dict,
+        ep_info: dict,
         die_with_parent: bool = False,
     ):
         # If we are running a full detached daemon then we will send the output to
@@ -511,8 +513,8 @@ class Endpoint:
 
         # `endpoint_id` key kept for backward compatibility when
         # globus-compute-endpoint list is called
-        ep_info = {"endpoint_id": endpoint_uuid}
-        json_file.write_text(json.dumps(ep_info))
+        ep_save_uuid = {"endpoint_id": endpoint_uuid}
+        json_file.write_text(json.dumps(ep_save_uuid))
         log.debug(f"Registration info written to {json_file}")
 
         ptitle = f"Globus Compute Endpoint ({endpoint_uuid}, {endpoint_dir.name})"
@@ -565,6 +567,18 @@ class Endpoint:
                 no_color=no_color,
             )
 
+            if not ep_info:
+                ep_info = {
+                    "posix_pid": os.getpid(),
+                    "posix_uid": os.getuid(),
+                    "posix_gid": os.getgid(),
+                    "posix_username": pwd.getpwuid(os.getuid()).pw_name,
+                    "config.yaml": endpoint_config.source_content,
+                }
+            now_tz = datetime.now().astimezone()
+            ep_info["start_iso"] = now_tz.isoformat()
+            ep_info["start_unix"] = now_tz.timestamp()
+
             Endpoint.daemon_launch(
                 endpoint_uuid,
                 endpoint_dir,
@@ -572,6 +586,7 @@ class Endpoint:
                 reg_info,
                 result_store,
                 parent_pid,
+                ep_info,
             )
 
     @staticmethod
@@ -582,6 +597,7 @@ class Endpoint:
         reg_info,
         result_store: ResultStore,
         parent_pid: int,
+        ep_info: dict,
     ):
         log.info(f"\n\n========== Endpoint begins: {endpoint_uuid}")
 
@@ -593,6 +609,7 @@ class Endpoint:
             result_store=result_store,
             logdir=endpoint_dir,
             parent_pid=parent_pid,
+            ep_info=ep_info,
         )
 
         interchange.start()

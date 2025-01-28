@@ -18,11 +18,7 @@ from concurrent.futures import Future
 import pika.exceptions
 import setproctitle
 from globus_compute_common.messagepack import InvalidMessageError, pack
-from globus_compute_common.messagepack.message_types import (
-    EPStatusReport,
-    Result,
-    ResultErrorDetails,
-)
+from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
 from globus_compute_endpoint import __version__ as funcx_endpoint_version
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.rabbit_mq import (
@@ -60,6 +56,7 @@ class EndpointInterchange:
         self,
         config: UserEndpointConfig,
         reg_info: dict[str, dict],
+        ep_info: dict,
         logdir=".",
         endpoint_id=None,
         endpoint_dir=".",
@@ -107,6 +104,7 @@ class EndpointInterchange:
 
         self.pending_task_queue: queue.SimpleQueue = queue.SimpleQueue()
 
+        self._ep_info = ep_info
         self._reconnect_fail_counter = 0
         self.reconnect_attempt_limit = max(1, reconnect_attempt_limit)
         self._quiesce_event = multiprocessing.Event()
@@ -462,7 +460,7 @@ class EndpointInterchange:
 
             log.debug("Thread exit")
 
-        def heartbeat() -> None:
+        def heartbeat(active: bool = True) -> Future[None]:
             def _done_cb(pub_fut: Future):
                 _exc = pub_fut.exception()
                 if _exc:
@@ -473,15 +471,21 @@ class EndpointInterchange:
 
             try:
                 sr = self.executor.get_status_report()
+                sr.global_state.update(self._ep_info)
+                sr.global_state["heartbeat_period"] = self.heartbeat_period
+                sr.global_state["active"] = active
                 msg: bytes = pack(sr)
                 f = heartbeat_publisher.publish(msg)
                 f.add_done_callback(_done_cb)
 
-            except Exception:
+            except Exception as e:
                 # Publishing didn't work -- quiesce and see if a simple restart
                 # fixes the issue.
                 self._quiesce_event.set()
                 log.exception("Heartbeat failed; quiesce event set")
+                f = Future()
+                f.set_exception(e)
+            return f
 
         stored_processor_thread = threading.Thread(
             target=process_stored_results, daemon=True, name="Stored Result Handler"
@@ -599,21 +603,8 @@ class EndpointInterchange:
         result_processor_thread.join(timeout=5)
 
         # let higher-level error handling take over if the following excepts
-        message = EPStatusReport(
-            endpoint_id=self.endpoint_id,
-            global_state={
-                "managers": 0,
-                "total_workers": 0,
-                "idle_workers": 0,
-                "pending_tasks": 0,
-                "outstanding_tasks": {},
-                "heartbeat_period": 0,  # 0 == "shutting down now"
-            },
-            task_statuses={},
-        )
         try:
-            f = heartbeat_publisher.publish(pack(message))
-            f.result(timeout=5)
+            heartbeat(active=False).result(timeout=5)
         except concurrent.futures.TimeoutError:
             log.warning(
                 "Unable to send final heartbeat (timeout sending); ignoring for quiesce"

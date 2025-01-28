@@ -453,31 +453,35 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         Object containing info on the current status of the endpoint
         """
         managers = self.get_connected_managers()
+        manager_info: dict[str, list] = {}
+        for m in managers:
+            jid = self.executor.blocks_to_job_id[m["block_id"]]
+            m_info = {
+                "worker_count": m["worker_count"],
+                "idle_duration": m["idle_duration"],
+                "parsl_version": m["parsl_version"],
+                "python_version": m["python_version"],
+            }
+            manager_info.setdefault(jid, []).append(m_info)
+        for jid in list(manager_info):
+            if not manager_info[jid]:
+                del manager_info[jid]
         executor_status: t.Dict[str, t.Any] = {
-            "task_id": -2,  # Deprecated
-            "info": {
-                "total_cores": 0,  # TODO
-                "total_mem": 0,  # TODO
-                "new_core_hrs": 0,  # TODO
-                "total_core_hrs": 0,  # TODO
-                "managers": self.get_total_managers(managers=managers),
-                "active_managers": self.get_total_active_managers(managers=managers),
-                "total_workers": self.get_total_live_workers(managers=managers),
-                "idle_workers": self.get_total_idle_workers(managers=managers),
-                "pending_tasks": self.get_total_tasks_pending(managers=managers),
-                "outstanding_tasks": self.get_total_tasks_outstanding()["RAW"],
-                "worker_mode": 0,  # Deprecated
-                "scheduler_mode": 0,  # Deprecated
-                "scaling_enabled": self.scaling_enabled,
-                "mem_per_worker": self.executor.mem_per_worker,
-                "cores_per_worker": self.executor.cores_per_worker,
-                "prefetch_capacity": self.executor.prefetch_capacity,
-                "max_blocks": self.executor.provider.max_blocks,
-                "min_blocks": self.executor.provider.min_blocks,
-                "max_workers_per_node": self.executor.max_workers_per_node,
-                "nodes_per_block": self.executor.provider.nodes_per_block,
-                "heartbeat_period": self.executor.heartbeat_period,
-            },
+            "managers": self.get_total_managers(managers=managers),  # aka: nodes
+            "active_managers": self.get_total_active_managers(managers=managers),
+            "total_workers": self.get_total_live_workers(managers=managers),
+            "idle_workers": self.get_total_idle_workers(managers=managers),
+            "pending_tasks": self.get_total_tasks_pending(managers=managers),
+            "outstanding_tasks": self.get_total_tasks_outstanding()["RAW"],
+            "scaling_enabled": self.scaling_enabled,
+            "mem_per_worker": self.executor.mem_per_worker,
+            "cores_per_worker": self.executor.cores_per_worker,
+            "prefetch_capacity": self.executor.prefetch_capacity,
+            "max_blocks": self.executor.provider.max_blocks,
+            "min_blocks": self.executor.provider.min_blocks,
+            "max_workers_per_node": self.executor.max_workers_per_node,
+            "nodes_per_block": self.executor.provider.nodes_per_block,
+            "node_info": manager_info,
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}  # TODO
         return EPStatusReport(

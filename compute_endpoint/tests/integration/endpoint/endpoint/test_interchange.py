@@ -88,7 +88,12 @@ def ep_ix_factory(endpoint_uuid, mock_conf, mock_quiesce):
             "result_queue_info": {},
             "heartbeat_queue_info": {},
         }
-        kw = {"endpoint_id": endpoint_uuid, "config": mock_conf, "reg_info": reg_info}
+        kw = {
+            "endpoint_id": endpoint_uuid,
+            "config": mock_conf,
+            "reg_info": reg_info,
+            "ep_info": {},
+        }
         kw.update(k)
         ei = EndpointInterchange(*a, **kw)
         ei._quiesce_event = mock_quiesce
@@ -111,28 +116,6 @@ def mock_spt(mocker):
     yield mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
 
 
-@pytest.fixture
-def mock_quiesce(mocker):
-    quiesce_mock_wait = False
-
-    def mock_set():
-        nonlocal quiesce_mock_wait
-        quiesce_mock_wait = True
-
-    def mock_is_set():
-        nonlocal quiesce_mock_wait
-        return quiesce_mock_wait
-
-    def mock_wait(*a, **k):
-        return quiesce_mock_wait
-
-    m = mocker.Mock(spec=threading.Event)
-    m.wait.side_effect = mock_wait
-    m.set.side_effect = mock_set
-    m.is_set.side_effect = mock_is_set
-    yield m
-
-
 def test_endpoint_id_conveyed_to_executor(funcx_dir):
     manager = Endpoint()
     config_dir = funcx_dir / "mock_endpoint"
@@ -150,6 +133,7 @@ def test_endpoint_id_conveyed_to_executor(funcx_dir):
             "result_queue_info": {},
             "heartbeat_queue_info": {},
         },
+        ep_info={},
         endpoint_id=expected_ep_id,
     )
     ic.executor = engines.ThreadPoolEngine()  # test does not need a child process
@@ -163,6 +147,7 @@ def test_start_requires_pre_registered(mocker, funcx_dir):
         EndpointInterchange(
             config=UserEndpointConfig(executors=[mocker.Mock()]),
             reg_info=None,
+            ep_info={},
             endpoint_id="mock_endpoint_id",
         )
 
@@ -420,7 +405,7 @@ def test_sends_final_status_message_on_shutdown(
     epsr = unpack(packed_bytes)
     assert isinstance(epsr, EPStatusReport)
     assert epsr.endpoint_id == uuid.UUID(endpoint_uuid)
-    assert epsr.global_state["heartbeat_period"] == 0
+    assert epsr.global_state["active"] is False
 
 
 def test_gracefully_handles_final_status_message_timeout(
@@ -456,7 +441,7 @@ def test_sends_status_reports(
 ):
     status_reports = [
         EPStatusReport(endpoint_id=uuid.uuid4(), global_state={}, task_statuses=[])
-        for i in range(4)
+        for i in range(5)
     ]
     ep_ix.executor.get_status_report.side_effect = status_reports
     ep_ix.config.idle_heartbeats_soft = 1
@@ -467,14 +452,11 @@ def test_sends_status_reports(
         ep_ix._main_loop()
     assert mock_rp.publish.call_count == num_hbs, "pre/post-loop(2) + hard idle(3)"
 
-    status_reports.append(
-        EPStatusReport(endpoint_id=endpoint_uuid, global_state={}, task_statuses=[])
-    )
-
     for exp_sr, (a, _) in zip(status_reports, mock_rp.publish.call_args_list):
         found_sr: EPStatusReport = unpack(a[0])
         assert isinstance(found_sr, EPStatusReport)
         assert found_sr.endpoint_id == exp_sr.endpoint_id
+        assert "active" in found_sr.global_state
 
 
 def test_epi_stored_results_processed(ep_ix_factory, tmp_path, mock_rp, mock_tqs):
@@ -486,10 +468,16 @@ def test_epi_stored_results_processed(ep_ix_factory, tmp_path, mock_rp, mock_tqs
     res_f = unacked_results_dir / tid
     assert res_f.exists(), "Ensure file exists beforehand"
 
-    t = threading.Thread(target=ep_ix._main_loop, daemon=True)
-    t.start()
+    def _pub(packed_message):
+        if packed_message == b"GIBBERISH":
+            ep_ix.stop()
+        f = Future()
+        f.set_result(None)
+        return f
 
-    try_assert(lambda: not res_f.exists())
+    mock_rp.publish.side_effect = _pub
 
-    ep_ix.time_to_quit = True
-    t.join()
+    ep_ix.pending_task_queue = mock.Mock()
+    ep_ix.pending_task_queue.get.side_effect = queue.Empty
+    ep_ix._main_loop()
+    assert not res_f.exists()
