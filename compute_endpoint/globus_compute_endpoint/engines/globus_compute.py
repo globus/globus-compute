@@ -13,10 +13,7 @@ from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     TaskTransition,
 )
-from globus_compute_endpoint.engines.base import (
-    GlobusComputeEngineBase,
-    ReportingThread,
-)
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.serialize.facade import DeserializerAllowlist
 from parsl.executors.high_throughput.executor import HighThroughputExecutor
 from parsl.jobs.job_status_poller import JobStatusPoller
@@ -113,7 +110,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         ex_name = self._ExecutorClass.__name__
         self.run_dir = os.getcwd()
         self.label = label or type(self).__name__
-        self._status_report_thread = ReportingThread(target=self.report_status, args=[])
         super().__init__(
             *args,
             max_retries_on_system_failure=max_retries_on_system_failure,
@@ -152,13 +148,12 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         if strategy is None:
             strategy = "simple"
 
-        # Set defaults for JobStatusPoller
-        self._job_status_kwargs: JobStatusPollerKwargs = {
-            "max_idletime": 120.0,
-            "strategy": strategy,
-            "strategy_period": 5.0,
-        }
-        self._job_status_kwargs.update(job_status_kwargs or {})
+        job_status_kwargs = job_status_kwargs or {}
+        job_status_kwargs.setdefault("max_idletime", 120)
+        job_status_kwargs.setdefault("strategy", strategy)
+        job_status_kwargs.setdefault("strategy_period", 5.0)
+        self.job_status_poller = JobStatusPoller(**job_status_kwargs)
+        # N.B. save `.add_executor()` until after starting executor; see .start()
 
     @property
     def max_workers_per_node(self):
@@ -269,9 +264,8 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             # a queue is passed in
             self.results_passthrough = results_passthrough
         self.executor.start()
-        self._status_report_thread.start()
+
         # Add executor to poller *after* executor has started
-        self.job_status_poller = JobStatusPoller(**self._job_status_kwargs)
         self.job_status_poller.add_executors([self.executor])
         self._engine_ready = True
 
@@ -497,7 +491,5 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         return self.executor.executor_exception
 
     def shutdown(self, /, **kwargs) -> None:
-        self._status_report_thread.stop()
-        if hasattr(self, "job_status_poller"):
-            self.job_status_poller.close()
+        self.job_status_poller.close()
         self.executor.shutdown()

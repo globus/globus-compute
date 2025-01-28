@@ -13,10 +13,7 @@ from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     TaskTransition,
 )
-from globus_compute_endpoint.engines.base import (
-    GlobusComputeEngineBase,
-    ReportingThread,
-)
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.serialize.facade import DeserializerAllowlist
 
 logger = logging.getLogger(__name__)
@@ -32,7 +29,6 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
     ):
         self.label = label
         self.executor = NativeExecutor(*args, **kwargs)
-        self._status_report_thread = ReportingThread(target=self.report_status, args=[])
         super().__init__(
             *args,
             **kwargs,
@@ -64,7 +60,6 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
 
         self.set_working_dir(run_dir=run_dir)
         # mypy think the thread can be none
-        self._status_report_thread.start()
         self._engine_ready = True
 
     def get_status_report(self) -> EPStatusReport:
@@ -110,7 +105,6 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         """We basically pass all params except the resource_specification
         over to executor.submit
         """
-        logger.warning("Got task")
         return self.executor.submit(func, *args, **kwargs)
 
     def status_polling_interval(self) -> int:
@@ -126,5 +120,4 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         return {}
 
     def shutdown(self, /, block=False, **kwargs) -> None:
-        self._status_report_thread.stop()
         self.executor.shutdown(wait=block)

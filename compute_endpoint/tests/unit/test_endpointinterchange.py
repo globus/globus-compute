@@ -19,6 +19,12 @@ def mock_tqs():
         yield m
 
 
+@pytest.fixture
+def mock_pack():
+    with mock.patch(f"{_mock_base}pack") as m:
+        yield m
+
+
 def test_main_exception_always_quiesces(mocker, fs, randomstring, reset_signals):
     num_iterations = random.randint(1, 10)
     excepts_left = num_iterations
@@ -82,7 +88,7 @@ def test_reconnect_attempt_limit(mocker, fs, reconnect_attempt_limit, reset_sign
     assert excepts_left > 0, "expect reconnect limit to stop loop, not test backup"
 
 
-def test_reset_reconnect_attempt_limit_when_stable(mocker, fs, mock_tqs):
+def test_reset_reconnect_attempt_limit_when_stable(mocker, fs, mock_tqs, mock_pack):
     mocker.patch(f"{_mock_base}ResultPublisher")
     mocker.patch(f"{_mock_base}threading.Thread")
     mocker.patch(f"{_mock_base}multiprocessing")

@@ -29,46 +29,6 @@ logger = logging.getLogger(__name__)
 _EXC_HISTORY_TMPL = "+" * 68 + "\nTraceback from attempt: {ndx}\n{exc}\n" + "-" * 68
 
 
-class ReportingThread:
-    def __init__(self, target: t.Callable, args: list, reporting_period: float = 30.0):
-        """This class wraps threading.Thread to run a callable in a loop
-        periodically until the user calls `stop`. A status attribute can
-        report exceptions to the parent thread upon failure.
-        Parameters
-        ----------
-        target: Target function to be invoked to get report and post to queue
-        args: args to be passed to target fn
-        kwargs: kwargs to be passed to target fn
-        reporting_period: float, defaults to 30.0s
-        """
-        self.status: Future = Future()
-        self._shutdown_event = threading.Event()
-        self.reporting_period = reporting_period
-        self._thread = threading.Thread(
-            target=self.run_in_loop, args=(target, *args), name="GCReportingThread"
-        )
-
-    def start(self):
-        logger.info("Start called")
-        self._thread.start()
-
-    def run_in_loop(self, target: t.Callable, *args) -> None:
-        try:
-            target(*args)
-            while not self._shutdown_event.wait(self.reporting_period):
-                target(*args)
-            self.status.set_result(None)
-        except Exception as e:
-            self.status.set_exception(exception=e)
-
-        logger.warning("ReportingThread exiting")
-
-    def stop(self) -> None:
-        self._shutdown_event.set()
-        if self._thread.is_alive():
-            self._thread.join(timeout=0.1)
-
-
 class GlobusComputeEngineBase(ABC, RepresentationMixin):
     """Shared functionality and interfaces required by all GlobusCompute Engines.
     This is designed to plug-in executors following the concurrent.futures.Executor
@@ -146,11 +106,6 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         if not os.path.isabs(self.working_dir):
             run_dir = os.path.abspath(run_dir or os.getcwd())
             self.working_dir = os.path.join(run_dir, self.working_dir)
-
-    def report_status(self) -> None:
-        status_report = self.get_status_report()
-        packed: bytes = messagepack.pack(status_report)
-        self.results_passthrough.put({"message": packed})
 
     def _handle_task_exception(
         self,

@@ -28,14 +28,13 @@ def gce_factory(tmp_path, randomstring) -> t.Callable:
             "container_cmd_options": expect_opts,
             **k,
         }
-        with mock.patch(f"{_MOCK_BASE}ReportingThread"):
-            with mock.patch(f"{_MOCK_BASE}JobStatusPoller"):
-                gce = GlobusComputeEngine(**k)
-                gce.executor.start = mock.Mock()
-                gce.start(endpoint_id=uuid.uuid4(), run_dir=str(tmp_path))
-                assert gce.executor.start.called
+        with mock.patch(f"{_MOCK_BASE}JobStatusPoller"):
+            gce = GlobusComputeEngine(**k)
+            gce.executor.start = mock.Mock()
+            gce.start(endpoint_id=uuid.uuid4(), run_dir=str(tmp_path))
+            assert gce.executor.start.called
 
-                engines.append(gce)
+            engines.append(gce)
 
         return gce, expect_uri, expect_opts
 
@@ -71,13 +70,12 @@ def test_singularity(gce_factory, randomstring):
 
 def test_custom_missing_options(tmp_path):
     with pytest.raises(AssertionError) as pyt_e:
-        with mock.patch(f"{_MOCK_BASE}ReportingThread"):
-            GlobusComputeEngine(
-                address="::1",
-                max_workers_per_node=1,
-                label="GCE_TEST",
-                container_type="custom",
-            ).start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+        GlobusComputeEngine(
+            address="::1",
+            max_workers_per_node=1,
+            label="GCE_TEST",
+            container_type="custom",
+        ).start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
     assert "container_cmd_options is required" in str(pyt_e.value)
 
 
