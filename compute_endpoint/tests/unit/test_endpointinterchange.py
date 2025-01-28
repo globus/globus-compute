@@ -59,13 +59,13 @@ def mock_ep_info(randomstring):
 @pytest.fixture
 def ei(endpoint_uuid, mock_gce, mock_quiesce, mock_ep_info):
     _ei = EndpointInterchange(
-        config=UserEndpointConfig(executors=[mock_gce]),
+        config=UserEndpointConfig(engine=mock_gce),
         endpoint_id=endpoint_uuid,
         reg_info=empty_reg_info(),
         ep_info=mock_ep_info,
     )
     _ei._quiesce_event = mock_quiesce
-    _ei.executor.get_status_report.return_value = EPStatusReport(
+    _ei.engine.get_status_report.return_value = EPStatusReport(
         endpoint_id=_ei.endpoint_id, global_state={}, task_statuses=[]
     )
 
@@ -155,7 +155,7 @@ def test_rundir_passed_to_gcengine(mocker, fs, ei):
 
     ei.start_engine()
 
-    ei.executor.start.assert_called_with(
+    ei.engine.start.assert_called_with(
         results_passthrough=ei.results_passthrough,
         endpoint_id=ei.endpoint_id,
         run_dir=ei.logdir,
@@ -184,7 +184,7 @@ def test_heartbeat_includes_static_info(ei, mock_rp, mock_tqs, mock_pack, mock_e
     # Note that this is the "hooked up" test.  The content of `get_status_report`
     # is verified by the engine-specific unit tests.
     assert (
-        ei.executor.get_status_report.call_count == num_hbs_until_quit + 1
+        ei.engine.get_status_report.call_count == num_hbs_until_quit + 1
     ), f"Should be {num_hbs_until_quit} heartbeats and a final sign off"
     for a, k in mock_pack.call_args_list:
         assert all(a[0].global_state[k] == v for k, v in mock_ep_info.items())

@@ -136,15 +136,6 @@ class UserEndpointConfigModel(BaseEndpointConfigModel):
 
     _validate_engine = _validate_params("engine")
 
-    def dict(self, *args, **kwargs):
-        # Slight modification is needed here since we still
-        # store the engine/executor in a list named executors
-        ret = super().dict(*args, **kwargs)
-
-        engine = ret.pop("engine", None)
-        ret["executors"] = [engine] if engine else None
-        return ret
-
 
 class ManagerEndpointConfigModel(BaseEndpointConfigModel):
     public: t.Optional[bool]

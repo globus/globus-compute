@@ -18,6 +18,8 @@ Compute endpoints currently come in two flavors: one for processing tasks and on
 *managing* multiple task-processing endpoints.  We discuss the former first, backed by
 |UserEndpointConfig|, as it is typically the first entry into Compute for most people.
 
+.. _uep_conf:
+
 User Endpoint Configuration
 ---------------------------
 

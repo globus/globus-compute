@@ -5,6 +5,7 @@ import logging
 import os
 import pathlib
 import typing as t
+import warnings
 
 from globus_compute_endpoint.engines import GlobusComputeEngine
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
@@ -99,6 +100,10 @@ class BaseConfig:
             fargspec = inspect.getfullargspec(cls.__init__)  # type: ignore[misc]
             kwdefs = fargspec.kwonlydefaults
             for kw in fargspec.kwonlyargs:
+                if kw == "executors":
+                    # special case; remove when deprecation complete and removed
+                    # circa Aug, 2025 (but no rush)
+                    continue
                 curval = getattr(self, kw)
                 if kwdefs and curval != kwdefs.get(kw):
                     kwds.setdefault(kw, curval)
@@ -168,12 +173,18 @@ class UserEndpointConfig(BaseConfig):
     Please see the |BaseConfig| class for a list of options that both
     |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
 
+    :param engine: The GlobusComputeEngine for this endpoint to execute functions.
+        The currently known engines are ``GlobusComputeEngine``, ``ProcessPoolEngine``,
+        and ``ThreadPoolEngine``.  See :ref:`uep_conf` for more information.
+
     :param executors: A tuple of executors which serve as the backend for function
         execution.  If ``None``, then use a default-instantiation of
         ``GlobusComputeEngine``.
 
         N.B. this field, for historical reasons, requires an iterable.  However,
-        Compute only supports a single executor.
+        Compute only supports a single engine.
+
+        Deprecated; use ``engine`` instead
 
     :param heartbeat_threshold: Seconds since the last heartbeat message from the
         Globus Compute web service after which the connection is assumed to be
@@ -215,6 +226,7 @@ class UserEndpointConfig(BaseConfig):
         self,
         *,
         # Execution backend
+        engine: GlobusComputeEngineBase | None = None,
         executors: t.Iterable[GlobusComputeEngineBase] | None = None,
         # Tuning info
         heartbeat_threshold: int = 120,
@@ -232,11 +244,14 @@ class UserEndpointConfig(BaseConfig):
         kwargs["multi_user"] = False
         super().__init__(**kwargs)
 
-        # gymnastics to satisfy mypy
-        if executors is None:
-            self.executors = (GlobusComputeEngine(),)
+        if executors and engine:
+            raise ValueError("Only one of `engine` or `executors` may be specified")
+        elif executors:
+            _e = tuple(e for e in executors)[:1]
+            assert len(_e) == 1, "Oh, mypy.  We *just proved* that it's 1.  :facepalm:"
+            self.executors = _e
         else:
-            self.executors = tuple(e for e in executors)[:1]
+            self.engine = engine
 
         # Single-user tuning
         self.heartbeat_threshold = heartbeat_threshold
@@ -253,15 +268,25 @@ class UserEndpointConfig(BaseConfig):
         self.stderr = stderr
 
     @property
-    def executors(self) -> tuple[GlobusComputeEngineBase, ...]:
-        return self._executors
+    def engine(self) -> GlobusComputeEngineBase | None:
+        return self._engine
+
+    @engine.setter
+    def engine(self, val: GlobusComputeEngineBase | None):
+        self._engine = val
+
+    @property
+    def executors(self) -> tuple[GlobusComputeEngineBase | None]:
+        warnings.warn("`executors` is deprecated; use `engine`", stacklevel=2)
+        return (self.engine,)
 
     @executors.setter
     def executors(self, val: t.Iterable[GlobusComputeEngineBase] | None):
+        warnings.warn("`executors` is deprecated; use `engine`", stacklevel=2)
         if val is None:
-            self._executors: tuple[GlobusComputeEngineBase, ...] = ()
+            self.engine = GlobusComputeEngine()
         else:
-            self._executors = tuple(e for e in val)[:1]  # enforce len() == 0 or 1
+            self.engine = tuple(e for e in val)[0]
 
     @property
     def heartbeat_threshold(self):

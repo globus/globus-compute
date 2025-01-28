@@ -44,7 +44,7 @@ def mock_log(mocker):
 
 
 @pytest.fixture
-def mock_ex(endpoint_uuid):
+def mock_engine(endpoint_uuid):
     ex = mock.Mock(spec=GlobusComputeEngine, endpoint_id=endpoint_uuid)
     ex.get_status_report.return_value = EPStatusReport(
         endpoint_id=endpoint_uuid, global_state={}, task_statuses=[]
@@ -54,8 +54,8 @@ def mock_ex(endpoint_uuid):
 
 
 @pytest.fixture
-def mock_conf(mock_ex):
-    yield UserEndpointConfig(executors=[mock_ex])
+def mock_conf(mock_engine):
+    yield UserEndpointConfig(engine=mock_engine)
 
 
 @pytest.fixture
@@ -116,7 +116,7 @@ def mock_spt(mocker):
     yield mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
 
 
-def test_endpoint_id_conveyed_to_executor(funcx_dir):
+def test_endpoint_id_conveyed_to_engine(funcx_dir):
     manager = Endpoint()
     config_dir = funcx_dir / "mock_endpoint"
     expected_ep_id = str(uuid.uuid1())
@@ -124,7 +124,7 @@ def test_endpoint_id_conveyed_to_executor(funcx_dir):
     manager.configure_endpoint(config_dir, None)
 
     endpoint_config = get_config(pathlib.Path(config_dir))
-    endpoint_config.executors[0].passthrough = False
+    endpoint_config.engine.passthrough = False
 
     ic = EndpointInterchange(
         endpoint_config,
@@ -136,25 +136,22 @@ def test_endpoint_id_conveyed_to_executor(funcx_dir):
         ep_info={},
         endpoint_id=expected_ep_id,
     )
-    ic.executor = engines.ThreadPoolEngine()  # test does not need a child process
+    ic.engine = engines.ThreadPoolEngine()  # test does not need a child process
     ic.start_engine()
-    assert ic.executor.endpoint_id == expected_ep_id
-    ic.executor.shutdown()
+    assert ic.engine.endpoint_id == expected_ep_id
+    ic.engine.shutdown()
 
 
-def test_start_requires_pre_registered(mocker, funcx_dir):
+def test_start_requires_pre_registered(mock_conf, funcx_dir):
     with pytest.raises(TypeError):
         EndpointInterchange(
-            config=UserEndpointConfig(executors=[mocker.Mock()]),
-            reg_info=None,
-            ep_info={},
-            endpoint_id="mock_endpoint_id",
+            config=mock_conf, reg_info=None, ep_info={}, endpoint_id="mock_endpoint_id"
         )
 
 
 @pytest.mark.parametrize("num_iters", (1, 2, 5, 10))
 def test_detects_bad_executor_when_no_tasks(
-    mock_log, num_iters, ep_ix, mock_ex, randomstring, mock_rp, mock_tqs
+    mock_log, num_iters, ep_ix, mock_engine, randomstring, mock_rp, mock_tqs
 ):
     expected_iters = num_iters
     exc_text = randomstring()
@@ -163,7 +160,7 @@ def test_detects_bad_executor_when_no_tasks(
         nonlocal num_iters
         num_iters -= 1
         if not num_iters:
-            mock_ex.executor_exception = Exception(exc_text)
+            mock_engine.executor_exception = Exception(exc_text)
         raise queue.Empty
 
     with mock.patch.object(ep_ix, "pending_task_queue") as ptq:
@@ -443,7 +440,7 @@ def test_sends_status_reports(
         EPStatusReport(endpoint_id=uuid.uuid4(), global_state={}, task_statuses=[])
         for i in range(5)
     ]
-    ep_ix.executor.get_status_report.side_effect = status_reports
+    ep_ix.engine.get_status_report.side_effect = status_reports
     ep_ix.config.idle_heartbeats_soft = 1
     ep_ix.config.idle_heartbeats_hard = 0  # will be set to soft + 1
     ep_ix._quiesce_event = mock_quiesce

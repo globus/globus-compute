@@ -12,7 +12,6 @@ from globus_compute_endpoint.endpoint.config import (
     UserEndpointConfigModel,
 )
 from globus_compute_endpoint.endpoint.config.model import EngineModel
-from globus_compute_endpoint.engines import GlobusComputeEngine
 from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config."
@@ -158,13 +157,7 @@ def test_provider_container_compatibility(
 
 
 def test_configs_repr_default_kwargs():
-    gce_path = "globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine."
-    with mock.patch(f"{gce_path}__init__", return_value=None):
-        # mock == don't make a default executor
-        gce_repr = repr(GlobusComputeEngine())
-        assert (
-            repr(UserEndpointConfig()) == f"UserEndpointConfig(executors=({gce_repr},))"
-        ), "adds default"
+    assert repr(UserEndpointConfig()) == "UserEndpointConfig()"
     defs = f"multi_user=True, pam={PamConfiguration(enable=False)!r}"
     assert (
         repr(ManagerEndpointConfig()) == f"ManagerEndpointConfig({defs})"
@@ -175,11 +168,11 @@ def test_configs_repr_default_kwargs():
 def test_userconfig_repr_nondefault_kwargs(
     randomstring, kw, cls, get_random_of_datatype
 ):
+    if kw in ("engine", "executors"):
+        return
+
     val = get_random_of_datatype(cls)
-    kwds = {"executors": ()}  # Don't create an engine, please
-    if kw == "executors":
-        val = ()
-    kwds[kw] = val
+    kwds = {kw: val}
 
     repr_c = repr(UserEndpointConfig(**kwds))
 

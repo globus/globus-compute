@@ -60,7 +60,7 @@ def test_start_endpoint_display_name(mocker, fs, display_name):
     )
 
     ep = endpoint.Endpoint()
-    ep_conf = UserEndpointConfig()
+    ep_conf = UserEndpointConfig(engine=mock.Mock())
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
     ep_dir.mkdir(parents=True, exist_ok=True)
     ep_conf.display_name = display_name
@@ -83,7 +83,7 @@ def test_start_endpoint_data_passthrough(fs):
     )
 
     ep = endpoint.Endpoint()
-    ep_conf = UserEndpointConfig()
+    ep_conf = UserEndpointConfig(engine=mock.Mock())
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
     ep_dir.mkdir(parents=True, exist_ok=True)
     ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
@@ -132,7 +132,11 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
 
     endpoint_dir = None
     endpoint_uuid = None
-    endpoint_config = UserEndpointConfig(endpoint_setup=command, detach_endpoint=False)
+    endpoint_config = UserEndpointConfig(
+        endpoint_setup=command,
+        engine=mock.Mock(),
+        detach_endpoint=False,
+    )
     log_to_console = False
     no_color = True
     reg_info = {}
