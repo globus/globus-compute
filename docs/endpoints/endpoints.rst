@@ -543,6 +543,87 @@ We explain how to acquire the environment variable values in detail in
 :ref:`client credentials with globus compute clients`.
 
 
+Restricting Submission Serialization Methods
+--------------------------------------------
+
+When submitting to an endpoint, users may :ref:`select alternate strategies to
+serialize their code and data. <specifying-serde-strategy>` When that happens, the
+payload is serialized with the specified strategy in such a way that the executing
+worker knows to deserialize it with the same strategy.
+
+There are some cases where an admin might want to limit the strategies that users select
+|nbsp| --- |nbsp| :ref:`Python version errors <avoiding-serde-errors>` can be reduced by
+using a non-bytecode strategy for data such as :class:`~globus_compute_sdk.serialize.JSONData`,
+and there can be security concerns with `deserializing untrusted data via pickle,`_
+which is a dependency of the default serialization strategies used by Compute.
+
+The mechanism for restricting serialization strategies is the ``allowed_serializers``
+option under the ``engine`` section of the config, which accepts a list of fully-qualified
+import paths to :doc:`Globus Compute serialization strategies </reference/serialization_strategies>`:
+
+.. code-block:: yaml
+
+   engine:
+      type: GlobusComputeEngine
+      allowed_serializers:
+         - globus_compute_sdk.serialize.CombinedCode
+         - globus_compute_sdk.serialize.JSONData
+      ...
+
+With this config set, any time a worker encounters a payload that was not serialized
+by one of the allowed strategies, that worker raises an error which is sent back to
+the user who submitted that payload:
+
+.. code-block:: python
+
+   from globus_compute_sdk import Executor
+   # without any specified serializer, this will use the defaults
+   Executor("<restricted serializer endpoint>").submit(<some function>).result()
+   # TaskExecutionFailed:
+   #  Traceback (most recent call last):
+   # ...
+   #  globus_compute_sdk.errors.error_types.DeserializationError: Deserialization failed:
+   #   Code serializer DillCode disabled by current configuration.
+   #   The current configuration requires the *function* to be serialized with one of the allowed Code classes:
+   #
+   #       Allowed serializers: CombinedCode, JSONData
+
+.. tip:: For an up-to-date list of all available serialization strategies, see
+   the :doc:`serialization strategy reference. </reference/serialization_strategies>`
+
+If ``allowed_serializers`` is specified, it must contain at least one ``Code``-based
+strategy and one ``Data``-based strategy:
+
+.. code-block:: yaml
+
+   engine:
+      allowed_serializers: [globus_compute_sdk.serialize.DillCodeSource]
+
+.. code-block:: console
+
+   $ globus-compute-endpoint start not-enough-allowed-serializers
+   Error: 1 validation error for UserEndpointConfigModel
+   engine
+      Deserialization allowlists must contain at least one code and one data deserializer/wildcard (got: ['globus_compute_sdk.serialize.DillCodeSource']) (type=value_error)
+
+There are additionally two special values that the list accepts to allow all
+serializers of a certain type |nbsp| --- |nbsp| ``globus_compute_sdk.*Code`` allows all
+Globus-provided Compute Code serializers, and ``globus_compute_sdk.*Data`` allows all
+Globus-provided Compute Data serializers. For example, the following config is
+functionally equivalent to a config that omits ``allowed_serializers``:
+
+.. code-block:: yaml
+
+   engine:
+      allowed_serializers:
+         - globus_compute_sdk.*Code
+         - globus_compute_sdk.*Data
+
+.. note:: These values are *not* interpreted as wildcards |nbsp| --- |nbsp| they are
+   hard-coded values with special meaning in the Compute serialization system. No other
+   wildcard-style options are supported.
+
+
 .. _enable_on_boot:
 
 Starting the Compute Endpoint on Host Boot
@@ -745,3 +826,5 @@ documentation <https://json-schema.org/>`_ for more information.
 
 .. |Providers| replace:: ``Providers``
 .. _Providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
+
+.. _deserializing untrusted data via pickle,: https://github.com/swisskyrepo/PayloadsAllTheThings/blob/4.1/Insecure%20Deserialization/Python.md
