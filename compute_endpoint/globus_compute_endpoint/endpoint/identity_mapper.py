@@ -202,23 +202,41 @@ class PosixIdentityMapper:
     def identity_mappings(self):
         self.identity_mappings = None
 
-    def map_identity(
+    def map_identities(
         self, identity_set: t.Collection[t.Mapping[str, str]]
-    ) -> str | None:
+    ) -> list[list[dict[str, list[str]]]]:
+        """
+        Return a list of successful mappings; the index in the top-level list is the
+        index of the mapper in `self.identity_mappings`.  The sublevel lists contain
+        dictionaries of each identity's successful mappings (possibly plural) by that
+        mapper.
+
+        Every mapper will have at least one entry in the top-level list, though if it
+        failed to find a mapping, the list will be empty.  Example return value:
+
+            [
+                [],  # self.identity_mappings[0] found no mapping
+                [
+                    {"uuid_str1": ["alice", "bob"]},
+                    {"uuid_str3": ["charlie"]}
+                ],   # self.identity_mappings[1] found 3 mappings
+                [
+                    {"uuid_str3": ["charlie"]}
+                ]    # self.identity_mappings[2] found 1 mapping
+            ]
+        """
+        results: list[list[dict[str, list[str]]]] = []
         num_mappers = len(self.identity_mappings)
-        num_idents = len(identity_set)
         for m_i, mapper in enumerate(self.identity_mappings, start=1):
-            for id_i, ident_data in enumerate(identity_set, start=1):
-                try:
-                    identity = mapper.map_identity(ident_data)
-                except Exception as e:
-                    sub = ident_data.get("sub")
-                    log.warning(
-                        f"Identity mapper failed for mapper {m_i} [of {num_mappers}]"
-                        f" ({type(mapper).__name__}) with identity {id_i}"
-                        f" [of {num_idents}] ({sub}) -- ({type(e).__name__}) {e}"
-                    )
-                    continue
-                if identity:
-                    return identity
-        return None
+            results.append([])
+            try:
+                for mapping in mapper.map_identities(identity_set):
+                    if mapping:
+                        results[-1].append(mapping)
+            except Exception as e:
+                log.warning(
+                    f"Identity mapper {m_i} [of {num_mappers}]"
+                    f" ({type(mapper).__name__}) failed -- ({type(e).__name__}) {e}"
+                )
+
+        return results
