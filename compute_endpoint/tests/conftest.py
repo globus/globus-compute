@@ -169,7 +169,6 @@ def engine_runner(
             raise NotImplementedError(f"Unimplemented: {engine_type.__name__}")
         k.update(**kwargs)
         engine = engine_type(**k)
-        engine._status_report_thread.reporting_period = reporting_period
         engine.start(
             endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue
         )

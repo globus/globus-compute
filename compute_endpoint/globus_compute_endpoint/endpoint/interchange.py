@@ -317,7 +317,7 @@ class EndpointInterchange:
                         # important to check every iteration as well, so as not to
                         # potentially hang up the shutdown procedure
                         return
-            log.debug("Exit process-stored-results thread.")
+            log.debug("Thread exit")
 
         def process_pending_tasks() -> None:
             # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
@@ -397,12 +397,12 @@ class EndpointInterchange:
                     }
                     self.results_passthrough.put(res)
 
-            log.debug("Exit process-pending-tasks thread.")
+            log.debug("Thread exit")
 
         def process_pending_results() -> None:
             # Forward incoming results from the globus-compute-manager to the
             # Globus Compute services. For graceful handling of shutdown
-            # (or "reboot"), wait up to a second or incoming results before
+            # (or "reboot"), wait up to a second for incoming results before
             # iterating the loop regardless.
             nonlocal num_results_forwarded
 
@@ -459,7 +459,30 @@ class EndpointInterchange:
                         self.result_store[task_id] = packed_message
                     continue  # just be explicit
 
-            log.debug("Exit process-pending-results thread.")
+            log.debug("Thread exit")
+
+        def heartbeat() -> None:
+            def _done_cb(pub_fut: Future):
+                _exc = pub_fut.exception()
+                if _exc:
+                    # Publishing didn't work -- quiesce and see if a simple
+                    # restart fixes the issue.
+                    self._quiesce_event.set()
+                    log.error("Failed to publish heartbeat", exc_info=_exc)
+
+            def _beat() -> None:
+                sr = self.executor.get_status_report()
+                msg: bytes = pack(sr)
+                f = results_publisher.publish(msg)
+                f.add_done_callback(_done_cb)
+
+            try:
+                _beat()
+            except Exception:
+                # Publishing didn't work -- quiesce and see if a simple restart
+                # fixes the issue.
+                self._quiesce_event.set()
+                log.exception("Heartbeat failed; quiesce event set")
 
         stored_processor_thread = threading.Thread(
             target=process_stored_results, daemon=True, name="Stored Result Handler"
@@ -504,6 +527,7 @@ class EndpointInterchange:
                     log.info("Connection stable for 2 heartbeats; reset fail count")
                     self._reconnect_fail_counter = 0
 
+            heartbeat()
             if not soft_idle_limit:
                 # idle timeout not enabled; "always on"
                 continue

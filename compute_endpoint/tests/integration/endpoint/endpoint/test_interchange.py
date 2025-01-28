@@ -68,6 +68,12 @@ def mock_tqs():
 
 
 @pytest.fixture
+def mock_pack():
+    with mock.patch(f"{_MOCK_BASE}pack") as m:
+        yield m
+
+
+@pytest.fixture
 def ep_ix_factory(endpoint_uuid, mock_conf):
     to_stop: t.List[EndpointInterchange] = []
 
@@ -167,8 +173,8 @@ def test_detects_bad_executor_when_no_tasks(
 
         assert ep_ix.time_to_quit, "Sanity check"
         assert ep_ix.pending_task_queue.get.call_count == expected_iters
-    a, _k = mock_log.exception.call_args
-    assert exc_text in str(a[0]), "Expected faithful sharing of executor exception"
+    loglines = "\n".join(str(a[0]) for a, _k in mock_log.exception.call_args_list)
+    assert exc_text in loglines, "Expected faithful sharing of executor exception"
 
 
 def test_die_with_parent_refuses_to_start_if_not_parent(mocker, ep_ix_factory):
@@ -210,6 +216,7 @@ def test_no_idle_if_not_configured(
     mock_quiesce,
     mock_rp,
     mock_tqs,
+    mock_pack,
 ):
     mock_conf.idle_heartbeats_soft = 0
     mock_conf.heartbeat_period = 1
@@ -240,6 +247,7 @@ def test_soft_idle_honored(
     mock_quiesce,
     mock_rp,
     mock_tqs,
+    mock_pack,
 ):
     result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
     msg = {"task_id": str(result.task_id), "message": pack(result)}
@@ -287,6 +295,7 @@ def test_hard_idle_honored(
     mock_quiesce,
     mock_rp,
     mock_tqs,
+    mock_pack,
 ):
     idle_soft_limit = random.randrange(2, idle_limit)
 
@@ -330,6 +339,7 @@ def test_unidle_updates_proc_title(
     mock_quiesce,
     mock_rp,
     mock_tqs,
+    mock_pack,
 ):
     mock_conf.heartbeat_period = 1
     mock_conf.idle_heartbeats_soft = 1
@@ -371,7 +381,14 @@ def test_unidle_updates_proc_title(
 
 
 def test_sends_final_status_message_on_shutdown(
-    mocker, mock_conf, ep_ix_factory, endpoint_uuid, mock_quiesce, mock_rp, mock_tqs
+    mocker,
+    mock_log,
+    mock_conf,
+    ep_ix_factory,
+    endpoint_uuid,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
 ):
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
@@ -400,6 +417,7 @@ def test_gracefully_handles_final_status_message_timeout(
     mock_quiesce,
     mock_rp,
     mock_tqs,
+    mock_pack,
 ):
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
@@ -419,7 +437,14 @@ def test_gracefully_handles_final_status_message_timeout(
 
 
 def test_faithfully_handles_status_report_messages(
-    mocker, ep_ix, endpoint_uuid, randomstring, mock_quiesce, mock_rp, mock_tqs
+    mocker,
+    ep_ix,
+    endpoint_uuid,
+    randomstring,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
+    mock_pack,
 ):
     status_report = EPStatusReport(
         endpoint_id=endpoint_uuid, global_state={"sentinel": "foo"}, task_statuses=[]

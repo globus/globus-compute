@@ -13,10 +13,7 @@ from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     TaskTransition,
 )
-from globus_compute_endpoint.engines.base import (
-    GlobusComputeEngineBase,
-    ReportingThread,
-)
+from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.serialize.facade import DeserializerAllowlist
 
 logger = logging.getLogger(__name__)
@@ -34,7 +31,6 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         self.executor: t.Optional[NativeExecutor] = None
         self._executor_args = args
         self._executor_kwargs = kwargs
-        self._status_report_thread = ReportingThread(target=self.report_status, args=[])
         super().__init__(
             *args,
             **kwargs,
@@ -74,7 +70,6 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         assert self.results_passthrough
         self.set_working_dir(run_dir=run_dir)
 
-        self._status_report_thread.start()
         self._engine_ready = True
 
     def get_status_report(self) -> EPStatusReport:
@@ -119,6 +114,5 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
         return 30
 
     def shutdown(self, /, block=False, **kwargs) -> None:
-        self._status_report_thread.stop()
         if self.executor:
             self.executor.shutdown(wait=block)
