@@ -134,7 +134,6 @@ class EndpointInterchange:
         self.results_passthrough: queue.Queue[_ResultPassthroughType] = queue.Queue()
         # Rename self.executor -> self.engine in second round
         self.executor: GlobusComputeEngineBase = self.config.executors[0]
-        self._test_start = False
 
     def start_engine(self):
         log.info("Starting Engine")
