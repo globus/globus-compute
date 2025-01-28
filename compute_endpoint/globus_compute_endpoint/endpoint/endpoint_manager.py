@@ -652,7 +652,14 @@ class EndpointManager:
 
             else:
                 try:
-                    local_username = self.identity_mapper.map_identity(identity_set)
+                    idmaps = self.identity_mapper.map_identities(identity_set)
+                    for mapped in idmaps:
+                        if mapped:
+                            first_found: dict = mapped[0]
+                            ident, usernames = next(iter(first_found.items()))
+                            local_username = usernames[0]
+                            break
+
                     if not local_username:
                         raise LookupError()
                 except LookupError as e:

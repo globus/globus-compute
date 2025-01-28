@@ -30,6 +30,27 @@ def _external_identity_mapper_conf() -> str:
     }]""".strip()
 
 
+ab_identity_set = [{"uname": "a@a.local"}, {"uname": "b@b.local"}]
+ba_identity_set = [{"uname": "b@a.local"}, {"uname": "a@a.local"}]
+cb_identity_set = [{"uname": "a@c.local"}, {"uname": "b@b.local"}, {"uname": "c@c"}]
+b_identity_set = [{"uname": "b@b.local"}]
+empty_identity_set = []
+other_field_set = [{"other_field": "asdf"}]
+
+
+for s in (
+    ab_identity_set,
+    ba_identity_set,
+    cb_identity_set,
+    b_identity_set,
+    empty_identity_set,
+    other_field_set,
+):
+    for ident in s:
+        ident["status"] = "used"
+        ident["id"] = "some_auth_uuid"
+
+
 @pytest.fixture
 def conf_p(tmp_path):
     yield tmp_path / "some_file"
@@ -168,27 +189,31 @@ def test_delete_identity_mappings(conf_p):
 
 
 @pytest.mark.parametrize("idset", ((), ({"some": "id"}, {"other": "id"})))
-def test_map_identity_falls_back_to_none(conf_p, idset):
+def test_map_identities_falls_back_to_empty_list(conf_p, idset):
     conf_p.write_text(_expression_identity_mapper_conf())
     with NoWaitPosixIdentityMapper(conf_p, "some_id", poll_interval_s=0.001) as pim:
-        assert pim.map_identity(idset) is None
+        expected = [[] for _ in range(len(pim.identity_mappings))]
+        assert pim.map_identities(idset) == expected
 
 
 @pytest.mark.parametrize(
     "expected,idset",
     (
-        ("a", ({"uname": "a@a.local"}, {"uname": "b@b.local"})),
-        ("b", ({"uname": "b@b.local"}, {"uname": "a@a.local"})),
-        ("b", ({"uname": "a@c.local"}, {"uname": "b@b.local"})),
+        ([[{"some_auth_uuid": ["a"]}, {"some_auth_uuid": ["b"]}]], ab_identity_set),
+        ([[{"some_auth_uuid": ["b", "a"]}]], ba_identity_set),
+        ([[{"some_auth_uuid": ["b"]}]], cb_identity_set),
+        ([[{"some_auth_uuid": ["b"]}]], b_identity_set),
+        ([[]], empty_identity_set),
+        ([[]], other_field_set),
     ),
 )
-def test_map_identity_returns_first_found_identity(conf_p, expected, idset):
+def test_map_identities_returns_all_found_in_order(conf_p, expected, idset):
     conf_p.write_text(_expression_identity_mapper_conf())
     with NoWaitPosixIdentityMapper(conf_p, "some_id", poll_interval_s=0.001) as pim:
-        assert pim.map_identity(idset) == expected
+        assert pim.map_identities(idset) == expected
 
 
-def test_map_identity_error_logs_show_type_and_sub(mocker, conf_p):
+def test_map_identities_error_logs_show_type_and_mapper(mocker, conf_p):
     mock_log = mocker.patch(f"{_MOCK_BASE}log")
     idset = tuple({"sub": str(uuid.uuid4())} for _ in range(random.randint(1, 10)))
 
@@ -196,14 +221,13 @@ def test_map_identity_error_logs_show_type_and_sub(mocker, conf_p):
     ext_conf.extend(ext_conf[0] for _ in range(random.randint(0, 5)))
     conf_p.write_text(json.dumps(ext_conf))
     with NoWaitPosixIdentityMapper(conf_p, "some_id", poll_interval_s=0.001) as pim:
-        pim.map_identity(idset)
+        pim.map_identities(idset)
 
-    num_idents = len(idset)
     num_mappers = len(ext_conf)
     mapper_name = ExternalIdentityMapping.__name__
     log_iter = iter(mock_log.warning.call_args_list)
     for m_i, _conf in enumerate(ext_conf, start=1):
-        for id_i, ident in enumerate(idset, start=1):
-            a, _ = next(log_iter)
-            assert f"failed for mapper {m_i} [of {num_mappers}] ({mapper_name}" in a[0]
-            assert f"with identity {id_i} [of {num_idents}] ({ident['sub']})" in a[0]
+        a, _ = next(log_iter)
+
+        assert f"Identity mapper {m_i} [of {num_mappers}] ({mapper_name})" in a[0]
+        assert "(FileNotFoundError)" in a[0], "Expect underlying exception shared"

@@ -319,7 +319,9 @@ def successful_exec_from_mocked_root(
     queue_item = (1, mock_props, json.dumps(command_payload).encode())
 
     em.identity_mapper = mock.Mock()
-    em.identity_mapper.map_identity.return_value = "typicalglobusname@somehost.org"
+    em.identity_mapper.map_identities.return_value = [
+        [{"ident": ["typicalglobusname@somehost.org"]}]
+    ]
     em._command_queue = mock.Mock()
     em._command_stop_event.set()
     em._command_queue.get.side_effect = [queue_item, queue.Empty()]
@@ -1443,7 +1445,7 @@ def test_gracefully_handles_identity_mapping_error(
     exc_text = "Test engineered: " + randomstring()
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
-    em.identity_mapper.map_identity.side_effect = MemoryError(exc_text)
+    em.identity_mapper.map_identities.side_effect = MemoryError(exc_text)
     em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
     em._command_queue = mock.Mock()
     em._command_stop_event.set()
@@ -1476,7 +1478,7 @@ def test_handles_unknown_or_invalid_command_gracefully(
 
     mocker.patch(f"{_MOCK_BASE}pwd")
     em.identity_mapper = mock.Mock()
-    em.identity_mapper.map_identity.return_value = "a"
+    em.identity_mapper.map_identities.return_value = [[{"someuuid": ["a"]}]]
 
     pld = {
         "globus_username": randomstring(),
@@ -1518,7 +1520,7 @@ def test_handles_local_user_not_found_gracefully(
 
     invalid_user_name = "username_that_is_not_on_localhost6_" + randomstring()
     em.identity_mapper = mock.Mock()
-    em.identity_mapper.map_identity.return_value = invalid_user_name
+    em.identity_mapper.map_identities.return_value = [[{"uuid": [invalid_user_name]}]]
     mock_pwd.getpwnam.side_effect = KeyError(invalid_user_name)
 
     pld = {
@@ -1567,7 +1569,7 @@ def test_handles_failed_command(
     queue_item = (1, mock_props, json.dumps(pld).encode())
 
     em.identity_mapper = mock.Mock()
-    em.identity_mapper.map_identity.return_value = "a"
+    em.identity_mapper.map_identities.return_value = [[{"uuid": ["a"]}]]
     em.send_failure_notice = mock.Mock(spec=em.send_failure_notice)
     em._command_queue = mock.Mock()
     em._command_stop_event.set()
