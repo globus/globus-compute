@@ -9,7 +9,7 @@ engine:
 
   address:
     type: address_by_interface
-    ifname: bond0
+    ifname: hsn0
 
   provider:
     type: PBSProProvider
