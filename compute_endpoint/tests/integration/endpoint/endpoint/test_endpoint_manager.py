@@ -347,7 +347,13 @@ class TestStart:
             log_to_console = False
             no_color = True
             manager.start_endpoint(
-                config_dir, None, config, log_to_console, no_color, reg_info={}
+                config_dir,
+                None,
+                config,
+                log_to_console,
+                no_color,
+                reg_info={},
+                ep_info={},
             )
 
     @pytest.mark.skip("This test doesn't make much sense")

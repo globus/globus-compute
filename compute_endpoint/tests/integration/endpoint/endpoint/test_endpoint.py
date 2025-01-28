@@ -71,7 +71,7 @@ def test_start_endpoint_display_name(mocker, fs, display_name):
     ep_conf.display_name = display_name
 
     with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={})
+        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={}, ep_info={})
     assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
     req = pyt_exc.value.__cause__._underlying_response.request
@@ -97,7 +97,7 @@ def test_start_endpoint_data_passthrough(fs):
     ep_conf.public = True
 
     with pytest.raises(SystemExit) as pyt_exc:
-        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={})
+        ep.start_endpoint(ep_dir, None, ep_conf, False, True, reg_info={}, ep_info={})
     assert int(str(pyt_exc.value)) == os.EX_UNAVAILABLE, "Verify exit due to test 404"
 
     req = pyt_exc.value.__cause__._underlying_response.request
@@ -241,6 +241,7 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
     log_to_console = False
     no_color = True
     reg_info = {}
+    ep_info = {}
 
     ep = endpoint.Endpoint()
     with mock.patch(f"{_MOCK_BASE}log") as mock_log:
@@ -252,6 +253,7 @@ def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
                 log_to_console,
                 no_color,
                 reg_info,
+                ep_info,
             )
 
     assert e.value.code == os.EX_CONFIG

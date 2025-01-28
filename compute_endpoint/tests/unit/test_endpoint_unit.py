@@ -188,7 +188,9 @@ def test_start_endpoint(
     uname, pword = randomstring(), randomstring()
     register_endpoint_response(endpoint_id=ep_id, username=uname, password=pword)
 
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
+    ep.start_endpoint(
+        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={}, ep_info={}
+    )
 
     assert mock_epinterchange.called
     assert mock_daemon.DaemonContext.called
@@ -233,7 +235,13 @@ def test_start_endpoint_network_error(
     with redirect_stdout(f):
         with pytest.raises(SystemExit) as pytest_exc:
             ep.start_endpoint(
-                ep_dir, ep_uuid, ep_conf, log_to_console, no_color, reg_info={}
+                ep_dir,
+                ep_uuid,
+                ep_conf,
+                log_to_console,
+                no_color,
+                reg_info={},
+                ep_info={},
             )
 
     assert pytest_exc.value.code == os.EX_TEMPFAIL
@@ -308,7 +316,13 @@ def test_register_endpoint_invalid_response(
 
     with pytest.raises(SystemExit) as pytest_exc:
         ep.start_endpoint(
-            ep_dir, endpoint_uuid, ep_conf, log_to_console, no_color, reg_info={}
+            ep_dir,
+            endpoint_uuid,
+            ep_conf,
+            log_to_console,
+            no_color,
+            reg_info={},
+            ep_info={},
         )
     assert pytest_exc.value.code == os.EX_SOFTWARE
     assert "mismatched endpoint id" in mock_log.error.call_args[0][0]
@@ -361,7 +375,13 @@ def test_register_endpoint_blocked(
     with redirect_stdout(f):
         with pytest.raises((GlobusAPIError, SystemExit)) as pytexc:
             ep.start_endpoint(
-                ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={}
+                ep_dir,
+                ep_id,
+                ep_conf,
+                log_to_console,
+                no_color,
+                reg_info={},
+                ep_info={},
             )
         stdout_msg = f.getvalue()
 
@@ -404,7 +424,13 @@ def test_register_endpoint_already_active(
     with redirect_stdout(f):
         with pytest.raises(SystemExit) as pytest_exc:
             ep.start_endpoint(
-                ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={}
+                ep_dir,
+                ep_id,
+                ep_conf,
+                log_to_console,
+                no_color,
+                reg_info={},
+                ep_info={},
             )
         assert "is already active" in f.getvalue()
         assert pytest_exc.value.code == -1
@@ -434,7 +460,9 @@ def test_register_endpoint_is_not_multiuser(
     if multi_user is not None:
         ep_conf.multi_user = multi_user
 
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
+    ep.start_endpoint(
+        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={}, ep_info={}
+    )
 
     assert mock_epinterchange.called
     assert mock_daemon.DaemonContext.called
@@ -576,7 +604,9 @@ def test_endpoint_sets_process_title(
     mock_spt.setproctitle.side_effect = StopIteration("Sentinel")
 
     with pytest.raises(StopIteration, match="Sentinel"):
-        ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={})
+        ep.start_endpoint(
+            ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info={}, ep_info={}
+        )
 
     a, _k = mock_spt.setproctitle.call_args
     assert a[0].startswith(
@@ -612,7 +642,7 @@ def test_endpoint_respects_port(mocker, fs, mock_ep_data, port):
 
     with pytest.raises(StopIteration, match="Sentinel"):
         ep.start_endpoint(
-            ep_dir, ep_id, ep_conf, log_to_console, no_color, mock_reg_info
+            ep_dir, ep_id, ep_conf, log_to_console, no_color, mock_reg_info, ep_info={}
         )
 
     assert mock_update_url_port.call_args_list[0] == ((tq_url, port),)
@@ -634,14 +664,18 @@ def test_endpoint_needs_no_client_if_reg_info(
     mock_epinterchange = mocker.patch(f"{_mock_base}EndpointInterchange")
 
     reg_info = {**mock_reg_info, "endpoint_id": ep_id}
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+    ep.start_endpoint(
+        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+    )
 
     assert mock_epinterchange.called, "Has registration, should start."
     assert mock_daemon.DaemonContext.called
     assert not mock_get_compute_client.called, "No need for FXClient!"
 
     reg_info.clear()
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+    ep.start_endpoint(
+        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+    )
     assert mock_epinterchange.called, "Has registration, should start."
     assert mock_daemon.DaemonContext.called
     assert mock_get_compute_client.called, "Need registration info, need FXClient"
@@ -704,7 +738,9 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data, mock_reg_in
     reg_info = {**mock_reg_info, "endpoint_id": ep_id}
 
     mock_sys.stdout.isatty.return_value = True
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+    ep.start_endpoint(
+        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+    )
 
     assert mock_sys.stdout.write.called
     assert not mock_sys.stderr.write.called
@@ -713,14 +749,18 @@ def test_always_prints_endpoint_id_to_terminal(mocker, mock_ep_data, mock_reg_in
     mock_sys.reset_mock()
     mock_sys.stdout.isatty.return_value = False
     mock_sys.stderr.isatty.return_value = True
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+    ep.start_endpoint(
+        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+    )
 
     assert not mock_sys.stdout.write.called
     assert mock_sys.stderr.write.called
     assert any(expected_text == a[0] for a, _ in mock_sys.stderr.write.call_args_list)
     mock_sys.reset_mock()
     mock_sys.stderr.isatty.return_value = False
-    ep.start_endpoint(ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info)
+    ep.start_endpoint(
+        ep_dir, ep_id, ep_conf, log_to_console, no_color, reg_info, ep_info={}
+    )
 
     assert not mock_sys.stdout.write.called
     assert not mock_sys.stderr.write.called
@@ -865,7 +905,9 @@ def test_handles_provided_endpoint_id_no_json(
     }
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
 
-    ep.start_endpoint(ep_dir, ep_uuid, ep_conf, log_to_console, no_color, reg_info={})
+    ep.start_endpoint(
+        ep_dir, ep_uuid, ep_conf, log_to_console, no_color, reg_info={}, ep_info={}
+    )
 
     _a, k = mock_gcc.register_endpoint.call_args
     assert k["endpoint_id"] == ep_uuid
@@ -894,7 +936,13 @@ def test_handles_provided_endpoint_id_with_json(
     mocker.patch(f"{_mock_base}Endpoint.get_funcx_client").return_value = mock_gcc
 
     ep.start_endpoint(
-        ep_dir, provided_ep_uuid_str, ep_conf, log_to_console, no_color, reg_info={}
+        ep_dir,
+        provided_ep_uuid_str,
+        ep_conf,
+        log_to_console,
+        no_color,
+        reg_info={},
+        ep_info={},
     )
 
     _a, k = mock_gcc.register_endpoint.call_args

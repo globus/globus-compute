@@ -52,6 +52,7 @@ def run_interchange_process(
             config=config,
             endpoint_id=endpoint_uuid,
             reg_info=reg_info,
+            ep_info={},
             endpoint_dir=endpoint_dir,
             logdir=endpoint_dir,
         )

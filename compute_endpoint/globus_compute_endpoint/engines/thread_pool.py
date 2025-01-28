@@ -63,29 +63,18 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         self._engine_ready = True
 
     def get_status_report(self) -> EPStatusReport:
-        """
-        endpoint_id: uuid.UUID
-        ep_status_report: t.Dict[str, t.Any]
-        task_statuses: t.Dict[str, t.List[TaskTransition]]
-        Returns
-        -------
-        """
         executor_status: t.Dict[str, t.Any] = {
-            "task_id": -2,
-            "info": {
-                "total_cores": multiprocessing.cpu_count(),
-                "total_mem": round(psutil.virtual_memory().available / (2**30), 1),
-                "total_core_hrs": 0,
-                "total_workers": self.executor._max_workers,  # type: ignore
-                "pending_tasks": 0,
-                "outstanding_tasks": 0,
-                "scaling_enabled": False,
-                "max_blocks": 1,
-                "min_blocks": 1,
-                "max_workers_per_node": self.executor._max_workers,  # type: ignore
-                "nodes_per_block": 1,
-                "heartbeat_period": None,
-            },
+            "total_cores": multiprocessing.cpu_count(),
+            "total_mem": round(psutil.virtual_memory().available / (2**30), 1),
+            "total_core_hrs": 0,
+            "total_workers": self.executor._max_workers,  # type: ignore
+            "pending_tasks": 0,
+            "outstanding_tasks": 0,
+            "scaling_enabled": False,
+            "max_blocks": 1,
+            "min_blocks": 1,
+            "max_workers_per_node": self.executor._max_workers,  # type: ignore
+            "nodes_per_block": 1,
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}
 
@@ -102,13 +91,8 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         *args: t.Any,
         **kwargs: t.Any,
     ) -> Future:
-        """We basically pass all params except the resource_specification
-        over to executor.submit
-        """
+        """``resource_specification`` is not applicable to the ThreadPoolEngine"""
         return self.executor.submit(func, *args, **kwargs)
-
-    def status_polling_interval(self) -> int:
-        return 30
 
     def scale_out(self, blocks: int) -> list[str]:
         return []
