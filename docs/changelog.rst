@@ -3,6 +3,75 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.0.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.0.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The ``ComputeSerializer`` can now be told to only deserialize payloads that were
+  serialized with specific serialization strategies. For example:
+
+  .. code-block:: python
+
+    import os
+    from globus_compute_sdk.serialize import ComputeSerializer, JSONData, AllowlistWildcard
+
+    class MaliciousPayload():
+        def __reduce__(self):
+            # this method returns a 2-tuple (callable, arguments) that dill calls to reconstruct the object
+            return os.system, ("<your favorite arbitrary code execution script>",)
+
+    evil_serializer = ComputeSerializer()  # uses DillDataBase64 by default
+    payload = evil_serializer.serialize(MaliciousPayload())
+
+    safe_deserializer = ComputeSerializer(
+        # allow only JSON for data (argument serialization) but any Compute strategy for code (functions)
+        allowed_deserializer_types=[JSONData, AllowlistWildcard.CODE]
+    )
+    safe_deserializer.deserialize(payload)
+    # globus_compute_sdk.errors.error_types.DeserializationError: Deserialization failed:
+    #
+    #   Data serializer DillDataBase64 is not allowed in this ComputeSerializer.
+    #   The only allowed data serializer is JSONData.
+    #
+    #   (Hint: reserialize the arguments with JSONData and try again.)
+
+- Compute Endpoints can be configured to only deserialize and execute submissions that
+  were serialized with specific serialization strategies. For example, with the
+  following config:
+
+  .. code-block:: yaml
+
+    engine:
+        allowed_serializers:
+            - globus_compute_sdk.serialize.DillCodeSource
+            - globus_compute_sdk.serialize.DillCodeTextInspect
+            - globus_compute_sdk.serialize.JSONData
+        type: ThreadPoolEngine
+
+  any submissions that used the default serialization strategies (``DillCode``,
+  ``DillDataBase64``) would be rejected, and users would be informed to use one of the
+  allowed strategies.
+
+Removed
+^^^^^^^
+
+- Remove ``HighThroughputEngine``.  This class was deprecated in :ref:`v2.27.0
+  <changelog-2.27.0>`.  We recommend migrating relevant configurations to use
+  |GlobusComputeEngine|.
+
+Changed
+^^^^^^^
+
+- Update Parsl to `2025.1.6 <https://pypi.org/project/parsl/2025.1.6/>`_.  Note
+  that Parsl's Channels were deprecated in Aug, 2024, and now completely
+  removed (see `Parsl Issue #3515
+  <https://github.com/Parsl/parsl/issues/3515>`_); consequently, this will be a
+  breaking change for those using Parsl's Channels.
+
 .. _changelog-2.33.0:
 
 globus-compute-sdk & globus-compute-endpoint v2.33.0
