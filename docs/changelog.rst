@@ -3,6 +3,25 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.0.1:
+
+globus-compute-sdk & globus-compute-endpoint v3.0.1
+---------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Removed the ``globus-compute-interchange``, ``globus-compute-manager`` and ``globus-compute-worker``
+  CLI commands, which attempt to call modules that were removed in ``v3.0.0``.
+
+Deprecated
+^^^^^^^^^^
+
+- Removed modules that were utilized exclusively by the ``HighThroughputEngine``, which were removed
+  in ``v3.0.0``:
+    - ``globus_compute_endpoint.providers``
+    - ``globus_compute_endpoint.strategies``
+
 .. _changelog-3.0.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.0.0
