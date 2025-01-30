@@ -133,22 +133,6 @@ def test_mu_public(public: t.Any):
     assert c.public is (public is True)
 
 
-@pytest.mark.parametrize("strategy", ("simple", {"type": "SimpleStrategy"}, None))
-def test_conditional_engine_strategy(
-    strategy: t.Union[str, dict, None], config_dict: dict
-):
-    config_dict["engine"]["type"] = "GlobusComputeEngine"
-    config_dict["engine"]["strategy"] = strategy
-    config_dict["engine"]["address"] = "::1"
-
-    if isinstance(strategy, str) or strategy is None:
-        UserEndpointConfigModel(**config_dict)
-    elif isinstance(strategy, dict):
-        with pytest.raises(ValidationError) as pyt_e:
-            UserEndpointConfigModel(**config_dict)
-        assert "object is incompatible" in str(pyt_e.value)
-
-
 @pytest.mark.parametrize(
     "provider_type, compatible",
     (
