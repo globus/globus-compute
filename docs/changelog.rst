@@ -19,8 +19,8 @@ Deprecated
 
 - Removed modules that were utilized exclusively by the ``HighThroughputEngine``, which were removed
   in ``v3.0.0``:
-    - ``globus_compute_endpoint.providers``
-    - ``globus_compute_endpoint.strategies``
+  - ``globus_compute_endpoint.providers``
+  - ``globus_compute_endpoint.strategies``
 
 .. _changelog-3.0.0:
 
