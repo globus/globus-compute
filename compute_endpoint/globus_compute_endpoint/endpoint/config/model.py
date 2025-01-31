@@ -10,7 +10,7 @@ from globus_compute_common.pydantic_v1 import (
     root_validator,
     validator,
 )
-from globus_compute_endpoint import engines, strategies
+from globus_compute_endpoint import engines
 from globus_compute_endpoint.endpoint.config.pam import PamConfiguration
 from parsl import addresses as parsl_addresses
 from parsl import launchers as parsl_launchers
@@ -53,12 +53,6 @@ class AddressModel(BaseConfigModel):
     _validate_type = _validate_import("type", parsl_addresses)
 
 
-class StrategyModel(BaseConfigModel):
-    type: str
-
-    _validate_type = _validate_import("type", strategies)
-
-
 class LauncherModel(BaseConfigModel):
     type: str
 
@@ -76,7 +70,7 @@ class ProviderModel(BaseConfigModel):
 class EngineModel(BaseConfigModel):
     type: str = "HighThroughputEngine"
     provider: t.Optional[ProviderModel]
-    strategy: t.Optional[t.Union[str, StrategyModel]]
+    strategy: t.Optional[str]
     address: t.Optional[t.Union[str, AddressModel]]
     worker_ports: t.Optional[t.Tuple[int, int]]
     worker_port_range: t.Optional[t.Tuple[int, int]]
@@ -86,35 +80,11 @@ class EngineModel(BaseConfigModel):
 
     _validate_type = _validate_import("type", engines)
     _validate_provider = _validate_params("provider")
-    _validate_strategy = _validate_params("strategy")
     _validate_address = _validate_params("address")
 
     class Config:
         extra = "allow"
         validate_all = True
-
-    @root_validator(pre=True)
-    @classmethod
-    def _validate_engine_strategy(cls, values: dict):
-        engine_type = values.get("type")
-        strategy = values.get("strategy")
-        if engine_type == "GlobusComputeEngine" and isinstance(strategy, dict):
-            raise ValueError(
-                "strategy as an object is incompatible with the GlobusComputeEngine."
-                " Please update to the string value 'simple' or null.\n"
-                "  E.g.,\n"
-                "  strategy: simple\n"
-            )
-        elif engine_type == "HighThroughputEngine" and isinstance(strategy, str):
-            raise ValueError(
-                "strategy as a string is incompatible with the HighThroughputEngine."
-                " Please update to an object or null.\n"
-                "  E.g.,\n"
-                "  strategy:\n"
-                "      type: SimpleStrategy\n"
-                "      max_idletime: 300\n"
-            )
-        return values
 
     @root_validator(pre=True)
     @classmethod

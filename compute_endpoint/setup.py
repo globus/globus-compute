@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 REQUIRES = [
     "requests>=2.31.0,<3",
     "globus-sdk",  # version will be bounded by `globus-compute-sdk`
-    "globus-compute-sdk==3.0.0",
+    "globus-compute-sdk==3.0.1",
     "globus-compute-common==0.5.0",
     "globus-identity-mapping==0.4.0",
     # table printing used in list-endpoints
@@ -87,13 +87,7 @@ setup(
     keywords=["Globus Compute", "FaaS", "Function Serving"],
     entry_points={
         "console_scripts": [
-            "globus-compute-endpoint=globus_compute_endpoint.cli:cli_run",
-            "globus-compute-interchange"
-            "=globus_compute_endpoint.engines.high_throughput.interchange:cli_run",
-            "globus-compute-manager"
-            "=globus_compute_endpoint.engines.high_throughput.manager:cli_run",
-            "globus-compute-worker"
-            "=globus_compute_endpoint.engines.high_throughput.worker:cli_run",
+            "globus-compute-endpoint=globus_compute_endpoint.cli:cli_run"
         ]
     },
     include_package_data=True,
