@@ -491,16 +491,17 @@ class Endpoint:
             exit(os.EX_DATAERR)
 
         try:
-            tq_info, rq_info = (
+            tq_info, rq_info, hbq_info = (
                 reg_info["task_queue_info"],
                 reg_info["result_queue_info"],
+                reg_info["heartbeat_queue_info"],
             )
         except KeyError:
             log.error("Invalid credential structure")
             exit(os.EX_DATAERR)
 
         if endpoint_config.amqp_port is not None:
-            for q_info in tq_info, rq_info:
+            for q_info in tq_info, rq_info, hbq_info:
                 q_info["connection_url"] = update_url_port(
                     q_info["connection_url"], endpoint_config.amqp_port
                 )
