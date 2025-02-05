@@ -212,6 +212,33 @@ and a result if it is available.
   }
 
 
+.. _globus apps:
+
+GlobusApps
+-----------
+
+The ``Client`` uses `GlobusApp <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html>`_
+objects to handle authentication and authorization. By default, the ``Client`` will instantiate
+a `UserApp <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html#globus_sdk.UserApp>`_
+to facilitate a native app login flow. When you :ref:`specify client credentials <client credentials with globus compute clients>`,
+the ``Client`` will instantiate a `ClientApp <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html#globus_sdk.ClientApp>`_.
+
+You can also create a custom ``GlobusApp`` object then pass it to the ``Client`` constructor. For example, to specify
+the client ID for a custom thick client, you could do the following:
+
+.. code:: python
+
+  import globus_sdk
+  from globus_compute_sdk import Executor, Client
+
+  my_client_id = "..."
+  my_endpoint_id = "..."
+
+  app = globus_sdk.UserApp("MyNativeApp", client_id=my_client_id)
+  gcc = Client(app=app)
+  gce = Executor(endpoint_id=my_endpoint_id, client=gcc)
+
+
 .. _client credentials with globus compute clients:
 
 Client Credentials with Clients
