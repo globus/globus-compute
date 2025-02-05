@@ -783,3 +783,14 @@ def test_auth_client_deprecated():
         assert gcc.auth_client, "Client.auth_client needed for backward compatibility"
     msg = "'Client.auth_client' attribute is deprecated"
     assert any(msg in str(r.message) for r in record)
+
+
+def test_login_manager_deprecated():
+    mock_lm = mock.Mock(spec=LoginManager)
+    gcc = gc.Client(do_version_check=False, login_manager=mock_lm)
+    with pytest.warns(UserWarning) as record:
+        assert (
+            gcc.login_manager
+        ), "Client.login_manager needed for backward compatibility"
+    msg = "'Client.login_manager' attribute is deprecated"
+    assert any(msg in str(r.message) for r in record)
