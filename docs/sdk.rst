@@ -217,11 +217,11 @@ and a result if it is available.
 GlobusApps
 -----------
 
-The ``Client`` uses `GlobusApp <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html>`_
-objects to handle authentication and authorization. By default, the ``Client`` will instantiate
-a `UserApp <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html#globus_sdk.UserApp>`_
-to facilitate a native app login flow. When you :ref:`specify client credentials <client credentials with globus compute clients>`,
-the ``Client`` will instantiate a `ClientApp <https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html#globus_sdk.ClientApp>`_.
+The Compute |Client|_ uses |GlobusApp|_ objects to handle authentication and
+authorization.  By default, the |Client|_ will instantiate a |UserApp|_ to facilitate a
+native app login flow.  For headless setups that :ref:`export client credentials
+<client credentials with globus compute clients>`, the |Client|_ will instantiate a
+|ClientApp|_.
 
 You can also create a custom ``GlobusApp`` object then pass it to the ``Client`` constructor. For example, to specify
 the client ID for a custom thick client, you could do the following:
@@ -415,3 +415,10 @@ and serializes a fresh copy each time it is invoked.
 .. _Executor: reference/executor.html
 .. |dill| replace:: ``dill``
 .. _dill: https://dill.readthedocs.io/en/latest/#basic-usage
+
+.. |GlobusApp| replace:: ``GlobusApp``
+.. _GlobusApp: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html
+.. |UserApp| replace:: ``UserApp``
+.. _UserApp: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html#globus_sdk.UserApp
+.. |ClientApp| replace:: ``ClientApp``
+.. _ClientApp: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html#globus_sdk.ClientApp
