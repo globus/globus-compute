@@ -24,9 +24,9 @@ class AuthorizerLoginManager(LoginManagerProtocol):
 
     def __init__(self, authorizers: dict[str, globus_sdk.RefreshTokenAuthorizer]):
         warnings.warn(
-            "The `AuthorizerLoginManager` is deprecated. Please use `GlobusApp` objects"
-            "from the Globus SDK instead:"
-            " https://globus-compute.readthedocs.io/en/stable/sdk.html#globusapps",
+            "The `AuthorizerLoginManager` is deprecated. Please use an"
+            " `AccessTokenAuthorizer` object from the Globus SDK instead:"
+            " https://globus-compute.readthedocs.io/en/stable/sdk.html#using-an-existing-token",  # noqa: E501
             category=UserWarning,
             stacklevel=2,
         )
