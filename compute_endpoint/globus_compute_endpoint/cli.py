@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import difflib
 import json
 import logging
 import os
 import pathlib
-import re
-import shutil
 import sys
 import textwrap
 import uuid
@@ -548,84 +545,6 @@ def _do_logout_endpoints(force: bool) -> None:
         log.info("Logout succeeded and all cached credentials were revoked")
 
 
-FUNCX_COMPUTE_IMPORT_UPDATES = {
-    "from funcx_endpoint.endpoint.utils.config": "from globus_compute_endpoint.endpoint.config",  # noqa E501
-    "from funcx_endpoint.engines": "from globus_compute_endpoint.engines",  # noqa E501
-    "from funcx_endpoint.executors": "from globus_compute_endpoint.executors",  # noqa E501
-    "from funcx_endpoint.engines": "from globus_compute_endpoint.engines",  # noqa E501
-}
-
-
-def _upgrade_funcx_imports_in_config(ep_dir: pathlib.Path, force=False) -> str:
-    """
-    This only modifies unindented import lines, as are in the original
-    config.py.  Indented matching lines are user created and would have to be
-    updated manually by the user.
-
-    The force flag will overwrite an existing (non-directory) config.py.bak
-
-    This method uses a randomly generated intermediate output file in case
-    there are any permission or unforeseen file system issues
-    """
-    name = ep_dir.name
-    config_path = ep_dir / "config.py"
-    config_backup = ep_dir / "config.py.bak"
-
-    try:
-        config_text = config_path.read_text()
-        upd_config_text = config_text
-
-        for pattern, repl in FUNCX_COMPUTE_IMPORT_UPDATES.items():
-            upd_config_text = re.sub(f"^{pattern}", repl, upd_config_text, flags=re.M)
-
-        if upd_config_text == config_text:
-            return f"No funcX import statements found in config.py for {name}"
-
-        change_diff = "".join(
-            difflib.unified_diff(
-                config_text.splitlines(keepends=True),
-                upd_config_text.splitlines(keepends=True),
-                n=3,  # Typical 3 lines of context
-            )
-        )
-
-        if config_backup.exists() and not force:
-            msg = (
-                f"{config_backup} already exists.\n"
-                "Rename it or use the --force flag to update config."
-            )
-            raise ClickException(msg)
-        elif config_backup.is_dir():
-            msg = (
-                f"{config_backup} is a directory.\n"
-                "Rename it before proceeding with config update."
-            )
-            raise ClickException(msg)
-
-        # Write to temporary file in case of issues
-        tmp_output_path = ep_dir / ("config.py." + uuid.uuid4().hex)
-        tmp_output_path.write_text(upd_config_text)
-
-        # Rename files last, as it's the least likely to err
-        config_backup.unlink(missing_ok=True)
-        shutil.move(config_path, config_backup)  # Preserve file timestamp
-        shutil.move(tmp_output_path, config_path)
-
-        return (
-            f"Applied following diff for endpoint {name}:\n{change_diff}\n\n"
-            f"  The previous config has been renamed to {config_backup}"
-        )
-
-    except FileNotFoundError as err:
-        msg = f"No config.py was found for endpoint ({name}) in {ep_dir}"
-        raise ClickException(msg) from err
-    except ClickException:
-        raise
-    except Exception as err:
-        msg = f"Unknown Exception {err} attempting to reformat config.py in {ep_dir}"
-        raise ClickException(msg) from err
-
-
 def _do_start_endpoint(
     *,
     ep_dir: pathlib.Path,
@@ -752,23 +671,6 @@ def _do_start_endpoint(
 def stop_endpoint(*, ep_dir: pathlib.Path, remote: bool):
     """Stops an endpoint using the pidfile"""
     _do_stop_endpoint(ep_dir=ep_dir, remote=remote)
-
-
-@app.command("update_funcx_config")
-@name_or_uuid_arg
-@click.option(
-    "--force",
-    is_flag=True,
-    default=False,
-    help="update config and backup to config.py.bak even if it already exists",
-)
-def update_funcx_endpoint_config(*, ep_dir: pathlib.Path, force: bool):
-    """
-    Update imports file from funcx_endpoint.* to globus_compute_endpoint.*
-
-    Either should raise ClickException or returns modification result message
-    """
-    print(_upgrade_funcx_imports_in_config(ep_dir=ep_dir, force=force))
 
 
 def _do_stop_endpoint(*, ep_dir: pathlib.Path, remote: bool = False) -> None:

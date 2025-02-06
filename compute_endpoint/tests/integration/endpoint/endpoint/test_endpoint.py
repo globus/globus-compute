@@ -9,13 +9,8 @@ import globus_compute_sdk.sdk.client
 import globus_compute_sdk.sdk.login_manager
 import pytest
 import responses
-from click import ClickException
 from click.testing import CliRunner
-from globus_compute_endpoint.cli import (
-    _do_stop_endpoint,
-    _upgrade_funcx_imports_in_config,
-    app,
-)
+from globus_compute_endpoint.cli import _do_stop_endpoint, app
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_sdk.sdk.client import _ComputeWebClient
@@ -123,106 +118,6 @@ def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
 
     _do_stop_endpoint(ep_dir=ep_dir, remote=True)
     assert mock_stop_endpoint.called
-
-
-@mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
-@pytest.mark.parametrize(
-    "cur_config",
-    [
-        ["abc\nbcdcef", False, True, False],
-        ["abc\nbcdcef", False, True, True],
-        [
-            (
-                "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.engines import GlobusComputeEngine\n"
-                "from funcx_endpoint.executors import HighThroughputExecutor\n"
-                "from parsl.providers import LocalProvider\n"
-                "\n"
-                "config = Config(\n"
-                "    executors=[\n"
-                "        GlobusComputeEngine(\n"
-                "            provider=LocalProvider(\n"
-                "                init_blocks=1,\n"
-                "                min_blocks=0,\n"
-                "                max_blocks=1,\n"
-                "),\n"
-            ),
-            True,
-            False,
-            False,
-        ],
-        [
-            (
-                "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.engines import GlobusComputeEngine\n"
-                "from funcx_endpoint.executors import HighThroughputExecutor\n"
-                "from parsl.providers import LocalProvider\n"
-            ),
-            True,
-            False,
-            True,
-        ],
-        [
-            (
-                "from funcx_endpoint.endpoint.utils.config import Config\n"
-                "from funcx_endpoint.engines import GlobusComputeEngine\n"
-                "from funcx_endpoint.executors import HighThroughputExecutor\n"
-                "from parsl.providers import LocalProvider\n"
-            ),
-            True,
-            True,
-            True,
-        ],
-        [
-            (
-                "def abc():"
-                "    from funcx_endpoint.endpoint.utils.config import Config\n"
-                "    from funcx_endpoint.engines import GlobusComputeEngine\n"
-                "    from funcx_endpoint.executors import HighThroughputExecutor\n"
-                "    from parsl.providers import LocalProvider\n"
-                "    return 'hello'\n"
-            ),
-            False,
-            False,
-            False,
-        ],
-    ],
-)
-def test_endpoint_update_funcx(mock_get_id, mocker, fs, cur_config, randomstring):
-    mocker.patch(
-        "globus_compute_endpoint.cli.get_config_dir",
-        return_value=pathlib.Path(),
-    )
-
-    ep_name = randomstring()
-    file_content, modified, has_bak, do_force = cur_config
-    ep_dir = pathlib.Path(ep_name)
-    ep_dir.mkdir(parents=True, exist_ok=True)
-    with open(ep_dir / "config.py", "w") as f:
-        f.write(file_content)
-    if has_bak:
-        with open(ep_dir / "config.py.bak", "w") as f:
-            f.write("old backup data\n")
-
-    try:
-        msg = _upgrade_funcx_imports_in_config(ep_dir, force=do_force)
-        if modified:
-            config_backup = ep_dir / "config.py.bak"
-            assert "Applied following diff for endpoint" in msg
-            assert ep_name in msg
-            assert "renamed to" in msg
-            assert str(config_backup) in msg
-            assert (ep_dir / "config.py.bak").exists()
-        else:
-            assert "No funcX import statements" in msg
-        with open(ep_dir / "config.py") as f:
-            for line in f.readlines():
-                assert not line.startswith("from funcx_endpoint.")
-    except ClickException as e:
-        if has_bak and not do_force:
-            assert "Rename it or use" in str(e)
-        else:
-            raise AssertionError(f"Unexpected exception: ({type(e).__name__}) {e}")
 
 
 def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
