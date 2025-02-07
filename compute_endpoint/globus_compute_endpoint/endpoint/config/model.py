@@ -68,7 +68,7 @@ class ProviderModel(BaseConfigModel):
 
 
 class EngineModel(BaseConfigModel):
-    type: str = "HighThroughputEngine"
+    type: str = "GlobusComputeEngine"
     provider: t.Optional[ProviderModel]
     strategy: t.Optional[str]
     address: t.Optional[t.Union[str, AddressModel]]
