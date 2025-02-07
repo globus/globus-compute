@@ -28,6 +28,13 @@ from tests.utils import double, get_cwd, kill_manager
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture
+def gce():
+    e = GlobusComputeEngine(address="::1")
+    yield e
+    e.shutdown()
+
+
 def test_result_message_packing(serde, task_uuid):
     exec_start = TaskTransition(
         timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
@@ -198,28 +205,25 @@ def test_serialized_engine_config_has_provider():
     ep_config = UserEndpointConfig(executors=[GlobusComputeEngine(address=loopback)])
 
     res = serialize_config(ep_config)
-    executor = res["engine"]["executor"]
+    assert res["engine"]["executor"].get("provider")
+    ep_config.engine.shutdown()
 
-    assert executor.get("provider")
 
-
-def test_gcengine_compute_launch_cmd():
-    engine = GlobusComputeEngine(address="::1")
-    assert engine.executor.launch_cmd.startswith(
+def test_gcengine_compute_launch_cmd(gce):
+    assert gce.executor.launch_cmd.startswith(
         "globus-compute-endpoint python-exec"
         " parsl.executors.high_throughput.process_worker_pool"
     )
-    assert "process_worker_pool.py" not in engine.executor.launch_cmd
+    assert "process_worker_pool.py" not in gce.executor.launch_cmd
 
 
-def test_gcengine_compute_interchange_launch_cmd():
-    engine = GlobusComputeEngine(address="::1")
-    assert engine.executor.interchange_launch_cmd[:3] == [
+def test_gcengine_compute_interchange_launch_cmd(gce):
+    assert gce.executor.interchange_launch_cmd[:3] == [
         "globus-compute-endpoint",
         "python-exec",
         "parsl.executors.high_throughput.interchange",
     ]
-    assert "interchange.py" not in engine.executor.interchange_launch_cmd
+    assert "interchange.py" not in gce.executor.interchange_launch_cmd
 
 
 def test_gcengine_pass_through_to_executor(randomstring):
@@ -237,8 +241,9 @@ def test_gcengine_pass_through_to_executor(randomstring):
     with mock.patch.object(GlobusComputeEngine, "_ExecutorClass") as mock_ex:
         mock_ex.__name__ = randomstring()
         mock_ex.return_value = m
-        GlobusComputeEngine(*args, **kwargs)
+        engine = GlobusComputeEngine(*args, **kwargs)
         kwargs["label"] = f"{kwargs['label']}-{mock_ex.__name__}"
+        engine.shutdown()
     a, k = mock_ex.call_args
     assert a == args
     assert kwargs == k
@@ -298,21 +303,18 @@ def test_gcengine_encrypted(encrypted: bool, engine_runner):
     assert engine.encrypted is not encrypted
 
 
-def test_gcengine_new_executor_not_exceptional():
-    gce = GlobusComputeEngine(address="::1")
+def test_gcengine_new_executor_not_exceptional(gce):
     assert gce.executor_exception is None, "Expect no exception from fresh Executor"
 
 
-def test_gcengine_executor_exception_passthrough(randomstring):
-    gce = GlobusComputeEngine(address="::1")
+def test_gcengine_executor_exception_passthrough(randomstring, gce):
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
     assert isinstance(gce.executor_exception, ZeroDivisionError)
     assert exc_text in str(gce.executor_exception)
 
 
-def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
-    gce = GlobusComputeEngine(address="::1")
+def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid, gce):
     gce._engine_ready = True
     exc_text = randomstring()
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
@@ -327,8 +329,7 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid):
     assert all(exc_text in str(f.exception()) for f in futs)
 
 
-def test_gcengine_exception_report_from_bad_state(task_uuid):
-    gce = GlobusComputeEngine(address="::1")
+def test_gcengine_exception_report_from_bad_state(task_uuid, gce):
     gce._engine_ready = True
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
@@ -361,10 +362,9 @@ def test_gcengine_rejects_mpi_mode(randomstring):
     assert "is not supported" in str(pyt_exc_2)
 
 
-def test_gcengine_rejects_resource_specification(task_uuid):
+def test_gcengine_rejects_resource_specification(task_uuid, gce):
+    gce._engine_ready = True
     with pytest.raises(ValueError) as pyt_exc:
-        gce = GlobusComputeEngine(address="::1")
-        gce._engine_ready = True
         gce.submit(
             str(task_uuid),
             packed_task=b"packed_task",
@@ -385,6 +385,8 @@ def test_gcmpiengine_default_executor(randomstring):
     exp_en_label = GlobusMPIEngine.__name__
     exp_ex_label = f"{exp_en_label}-{mock_ex.__name__}"
     assert engine.label == exp_en_label, "Expect reasonable, explanatory default"
+
+    engine.shutdown()
     a, k = mock_ex.call_args
     assert k["label"] == exp_ex_label, "Expect distinct executor label"
     assert k["encrypted"] is True, "Expect encrypted by default"
@@ -400,6 +402,7 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
         engine.submit(str(task_uuid), b"some task", resource_specification=spec)
 
     assert engine.executor.submit.called, "Verify test: correct internal method invoked"
+    engine.shutdown()
 
     a, _k = engine.executor.submit.call_args
     assert spec in a

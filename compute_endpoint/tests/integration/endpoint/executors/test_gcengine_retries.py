@@ -52,6 +52,7 @@ def mock_gce(tmp_path):
         engine._engine_ready = True
         engine.results_passthrough = queue.Queue()
         yield engine
+        engine.shutdown()
 
 
 def test_success_after_1_fail(mock_gce, serde, ez_pack_task):
@@ -102,3 +103,4 @@ def test_repeated_fail(mock_gce, ez_pack_task):
 def test_default_retries_is_0():
     engine = GlobusComputeEngine(address="localhost")
     assert engine.max_retries_on_system_failure == 0, "Users must knowingly opt-in"
+    engine.shutdown()

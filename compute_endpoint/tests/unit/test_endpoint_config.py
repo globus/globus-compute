@@ -149,7 +149,8 @@ def test_provider_container_compatibility(
     config_dict["engine"]["address"] = "::1"
 
     if compatible:
-        UserEndpointConfigModel(**config_dict)
+        conf = UserEndpointConfigModel(**config_dict)
+        conf.engine.shutdown()
     else:
         with pytest.raises(ValueError) as pyt_e:
             UserEndpointConfigModel(**config_dict)
@@ -212,4 +213,4 @@ def test_engine_model_objects_allow_extra():
             },
         }
     }
-    UserEndpointConfigModel(**config_dict)
+    UserEndpointConfigModel(**config_dict).engine.shutdown()
