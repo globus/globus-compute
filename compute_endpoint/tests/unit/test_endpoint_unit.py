@@ -616,6 +616,7 @@ def test_serialize_config_field_types():
     ep_config.environment = Foo("bar")
 
     result = serialize_config(ep_config)
+    ep_config.engine.shutdown()
 
     # Objects with a __dict__ attr are expanded
     assert "type" in result["engine"]["executor"]["provider"]

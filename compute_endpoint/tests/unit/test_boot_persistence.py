@@ -32,13 +32,7 @@ def fake_ep_dir(fs: fakefs.FakeFilesystem, ep_name) -> pathlib.Path:
 detach_endpoint: false
 display_name: null
 engine:
-    type: GlobusComputeEngine
-    address: 127.0.0.1
-    provider:
-        type: LocalProvider
-        init_blocks: 1
-        min_blocks: 0
-        max_blocks: 1
+    type: ThreadPoolEngine
         """.strip()
     )
     return ep_dir

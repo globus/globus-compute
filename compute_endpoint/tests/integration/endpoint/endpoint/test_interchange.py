@@ -1,5 +1,4 @@
 import os
-import pathlib
 import queue
 import random
 import threading
@@ -12,9 +11,7 @@ import pytest
 from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport, Result
 from globus_compute_endpoint import engines
-from globus_compute_endpoint.cli import get_config
 from globus_compute_endpoint.endpoint.config.config import UserEndpointConfig
-from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
@@ -27,8 +24,8 @@ _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
 
 
 @pytest.fixture
-def funcx_dir(tmp_path):
-    fxdir = tmp_path / pathlib.Path("funcx")
+def gc_dir(tmp_path):
+    fxdir = tmp_path / ".globus_compute"
     fxdir.mkdir()
     yield fxdir
 
@@ -116,33 +113,24 @@ def mock_spt(mocker):
     yield mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
 
 
-def test_endpoint_id_conveyed_to_engine(funcx_dir):
-    manager = Endpoint()
-    config_dir = funcx_dir / "mock_endpoint"
-    expected_ep_id = str(uuid.uuid1())
-
-    manager.configure_endpoint(config_dir, None)
-
-    endpoint_config = get_config(pathlib.Path(config_dir))
-    endpoint_config.engine.passthrough = False
-
+def test_endpoint_id_conveyed_to_engine(gc_dir, mock_conf, ep_uuid):
+    mock_conf.engine = engines.ThreadPoolEngine()
     ic = EndpointInterchange(
-        endpoint_config,
+        mock_conf,
         reg_info={
             "task_queue_info": {},
             "result_queue_info": {},
             "heartbeat_queue_info": {},
         },
         ep_info={},
-        endpoint_id=expected_ep_id,
+        endpoint_id=ep_uuid,
     )
-    ic.engine = engines.ThreadPoolEngine()  # test does not need a child process
     ic.start_engine()
-    assert ic.engine.endpoint_id == expected_ep_id
-    ic.engine.shutdown()
+    assert ic.engine.endpoint_id == ep_uuid
+    ic.engine.shutdown(block=True)
 
 
-def test_start_requires_pre_registered(mock_conf, funcx_dir):
+def test_start_requires_pre_registered(mock_conf, gc_dir):
     with pytest.raises(TypeError):
         EndpointInterchange(
             config=mock_conf, reg_info=None, ep_info={}, endpoint_id="mock_endpoint_id"

@@ -41,8 +41,8 @@ _MOCK_BASE = "globus_compute_endpoint.cli."
 
 
 @pytest.fixture
-def funcx_dir_path(tmp_path):
-    yield tmp_path / "funcx-dir"
+def gc_dir(tmp_path):
+    yield tmp_path / ".globus_compute"
 
 
 @pytest.fixture
@@ -65,17 +65,17 @@ def mock_auth_client(mocker: MockFixture):
 
 
 @pytest.fixture
-def mock_command_ensure(funcx_dir_path):
+def mock_command_ensure(gc_dir):
     with mock.patch(f"{_MOCK_BASE}CommandState.ensure") as m_state:
         mock_state = mock.Mock()
-        mock_state.endpoint_config_dir = funcx_dir_path
+        mock_state.endpoint_config_dir = gc_dir
         m_state.return_value = mock_state
 
         yield mock_state
 
 
 @pytest.fixture
-def mock_cli_state(funcx_dir_path, mock_command_ensure, ep_name):
+def mock_cli_state(gc_dir, mock_command_ensure, ep_name):
     with mock.patch(f"{_MOCK_BASE}Endpoint") as mock_ep:
         mock_ep.return_value = mock_ep
         mock_ep.get_endpoint_by_name_or_uuid.return_value = (
@@ -98,27 +98,15 @@ def make_endpoint_dir(mock_command_ensure, ep_name):
             """
 display_name: null
 engine:
-    type: GlobusComputeEngine
-    address: 127.0.0.1
-    provider:
-        type: LocalProvider
-        init_blocks: 1
-        min_blocks: 0
-        max_blocks: 1
-            """
+    type: ThreadPoolEngine
+            """.strip()
         )
         ep_template.write_text(
             """
 heartbeat_period: {{ heartbeat }}
 engine:
-    type: GlobusComputeEngine
-    address: 127.0.0.1
-    provider:
-        type: LocalProvider
-        init_blocks: 1
-        min_blocks: 0
-        max_blocks: 1
-            """
+    type: ThreadPoolEngine
+            """.strip()
         )
         return ep_dir
 
@@ -526,6 +514,7 @@ def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
     conf = load_config_yaml(yaml.safe_dump(conf_dict))
 
     assert conf.display_name is None, conf.display_name
+    conf.engine.shutdown()
 
 
 def test_start_ep_incorrect_config_yaml(

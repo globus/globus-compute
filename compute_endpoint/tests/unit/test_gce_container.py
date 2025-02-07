@@ -69,13 +69,12 @@ def test_singularity(gce_factory, randomstring):
 
 
 def test_custom_missing_options(tmp_path):
+    gce = GlobusComputeEngine(
+        address="::1", max_workers_per_node=1, label="GCE_TEST", container_type="custom"
+    )
     with pytest.raises(AssertionError) as pyt_e:
-        GlobusComputeEngine(
-            address="::1",
-            max_workers_per_node=1,
-            label="GCE_TEST",
-            container_type="custom",
-        ).start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+        gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+    gce.shutdown()
     assert "container_cmd_options is required" in str(pyt_e.value)
 
 

@@ -10,15 +10,28 @@ from globus_compute_endpoint.engines import (
     ThreadPoolEngine,
 )
 from globus_compute_endpoint.engines.helper import execute_task
-from parsl.executors import HighThroughputExecutor
 from tests.utils import get_cwd
 
 
-@pytest.fixture()
+@pytest.fixture
 def reset_cwd():
     cwd = os.getcwd()
     yield
     os.chdir(cwd)
+
+
+@pytest.fixture
+def mock_gcengine():
+    mock_ex = mock.Mock(
+        status_polling_interval=5,
+        launch_cmd="foo-bar",
+        interchange_launch_cmd="foo-bar",
+    )
+
+    with mock.patch.object(GlobusComputeEngine, "_ExecutorClass", mock.Mock):
+        gce = GlobusComputeEngine(executor=mock_ex)
+        yield gce
+        gce.shutdown()
 
 
 @pytest.mark.parametrize(
@@ -32,6 +45,7 @@ def test_set_working_dir_default(engine, tmp_path):
     engine.set_working_dir(tmp_path)
     assert engine.working_dir == os.path.join(tmp_path, "tasks_working_dir")
     assert os.path.isabs(engine.working_dir) is True
+    engine.shutdown()
 
 
 @pytest.mark.parametrize(
@@ -46,6 +60,7 @@ def test_set_working_dir_called(engine, tmp_path, endpoint_uuid):
 
     engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
     assert engine.set_working_dir.called
+    engine.shutdown()
 
 
 @pytest.mark.parametrize(
@@ -57,63 +72,47 @@ def test_set_working_dir_relative(engine, tmp_path):
     os.chdir(tmp_path)
     engine.working_dir = "tasks_working_dir"
     engine.set_working_dir(run_dir="foo")
+    engine.shutdown()
     assert engine.working_dir == os.path.join(tmp_path, "foo", "tasks_working_dir")
     assert os.path.isabs(engine.working_dir) is True
 
 
-def test_default_working_dir(tmp_path):
+def test_default_working_dir(tmp_path, mock_gcengine):
     """Test working_dir relative to run_dir"""
-    gce = GlobusComputeEngine(
-        address="::1",
-    )
-    gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
-    gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
-    assert gce.run_dir == gce.executor.run_dir
-    assert gce.working_dir == os.path.join(tmp_path, "tasks_working_dir")
+    mock_gcengine.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+    assert mock_gcengine.run_dir == mock_gcengine.executor.run_dir
+    assert mock_gcengine.working_dir == os.path.join(tmp_path, "tasks_working_dir")
 
 
-def test_relative_working_dir(tmp_path):
+def test_relative_working_dir(tmp_path, mock_gcengine):
     """Test working_dir relative to run_dir"""
-    gce = GlobusComputeEngine(
-        address="::1",
-        working_dir="relative_path",
-    )
-    gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
-    gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
-    assert gce.run_dir == gce.executor.run_dir
-    assert gce.working_dir == os.path.join(tmp_path, "relative_path")
+    mock_gcengine.working_dir = "relative_path"
+    mock_gcengine.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+    assert mock_gcengine.run_dir == mock_gcengine.executor.run_dir
+    assert mock_gcengine.working_dir == os.path.join(tmp_path, "relative_path")
 
 
-def test_absolute_working_dir(tmp_path):
+def test_absolute_working_dir(tmp_path, mock_gcengine):
     """Test absolute path for working_dir"""
-    gce = GlobusComputeEngine(
-        address="::1",
-        working_dir="/absolute/path",
-    )
-    gce.executor.start = mock.MagicMock(spec=HighThroughputExecutor.start)
-    gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
-    assert gce.run_dir == gce.executor.run_dir
-    assert gce.working_dir == "/absolute/path"
+    mock_gcengine.working_dir = "/absolute/path"
+    mock_gcengine.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+    assert mock_gcengine.run_dir == mock_gcengine.executor.run_dir
+    assert mock_gcengine.working_dir == "/absolute/path"
 
 
-def test_submit_pass(tmp_path, task_uuid):
+def test_submit_pass(tmp_path, task_uuid, mock_gcengine):
     """Test absolute path for working_dir"""
-    gce = GlobusComputeEngine(
-        address="::1",
-    )
-    gce.executor.start = mock.Mock(spec=HighThroughputExecutor.start)
-    gce.executor.submit = mock.Mock(spec=HighThroughputExecutor.submit)
-    gce.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
+    mock_gcengine.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
 
-    gce.submit(
+    mock_gcengine.submit(
         task_id=task_uuid,
         packed_task=b"PACKED_TASK",
         resource_specification={},
     )
 
-    gce.executor.submit.assert_called()
+    mock_gcengine.executor.submit.assert_called()
     flag = False
-    for call in gce.executor.submit.call_args_list:
+    for call in mock_gcengine.executor.submit.call_args_list:
         args, kwargs = call
         assert "run_dir" in kwargs
         assert kwargs["run_dir"] == os.path.join(tmp_path, "tasks_working_dir")
