@@ -244,16 +244,3 @@ def serde():
 @pytest.fixture
 def ez_pack_task(serde, task_uuid, container_uuid):
     return create_task_packer(serde, task_uuid, container_uuid)
-
-
-@pytest.fixture
-def htex_warns():
-    with pytest.warns(DeprecationWarning) as pyt_w:
-        yield
-
-    def _warned(msg: str) -> bool:
-        test = "HighThroughputEngine is deprecated" in msg
-        test &= "Please use GlobusComputeEngine instead" in msg
-        return test
-
-    assert any(_warned(str(w)) for w in pyt_w.list)
