@@ -41,16 +41,26 @@ def mock_managers(mock_blocks, randomstring):
 
 
 @pytest.fixture
-def htex(mock_blocks, mock_managers):
-    _htex = parsl.HighThroughputExecutor(address="::1")
+def htex_factory(mock_blocks, mock_managers):
+    def _htex_factory(**kwargs):
+        kwargs.setdefault("address", "::1")
+        _htex = parsl.HighThroughputExecutor(**kwargs)
 
-    _htex.blocks_to_job_id.update((bid, str(int(bid) + 100)) for bid in mock_blocks)
-    _htex.job_ids_to_block.update(
-        (jid, bid) for bid, jid in _htex.blocks_to_job_id.items()
-    )
-    _htex.connected_managers = mock.Mock(spec=_htex.connected_managers)
-    _htex.connected_managers.return_value = mock_managers
+        _htex.blocks_to_job_id.update((bid, str(int(bid) + 100)) for bid in mock_blocks)
+        _htex.job_ids_to_block.update(
+            (jid, bid) for bid, jid in _htex.blocks_to_job_id.items()
+        )
+        _htex.connected_managers = mock.Mock(spec=_htex.connected_managers)
+        _htex.connected_managers.return_value = mock_managers
 
+        return _htex
+
+    yield _htex_factory
+
+
+@pytest.fixture
+def htex(htex_factory):
+    _htex = htex_factory()
     yield _htex
 
 
@@ -69,6 +79,8 @@ def test_status_report_content(htex, mock_managers):
     assert num_active_managers == sr.global_state["active_managers"]
     assert num_live_workers == sr.global_state["total_workers"]
     assert num_idle_workers == sr.global_state["idle_workers"]
+    assert type(gce).__name__ == sr.global_state["engine_type"]
+    assert type(gce.executor.provider).__name__ == sr.global_state["provider_type"]
 
     assert "pending_tasks" in sr.global_state
     assert "outstanding_tasks" in sr.global_state
@@ -80,6 +92,8 @@ def test_status_report_content(htex, mock_managers):
     assert "min_blocks" in sr.global_state
     assert "max_workers_per_node" in sr.global_state
     assert "nodes_per_block" in sr.global_state
+    assert "queue" in sr.global_state
+    assert "account" in sr.global_state
 
     assert len(sr.global_state["node_info"]) == num_managers
 
@@ -90,3 +104,27 @@ def test_status_report_content(htex, mock_managers):
         assert m["python_version"] == mock_m["python_version"]
         assert m["idle_duration"] == mock_m["idle_duration"]
         assert m["worker_count"] == mock_m["worker_count"]
+
+
+@pytest.mark.parametrize("queue_term", ("queue", "partition"))
+@pytest.mark.parametrize("account_term", ("account", "allocation", "project"))
+def test_status_report_provider_specific_terms(
+    htex_factory, queue_term: str, account_term: str, randomstring
+):
+    ep_id = uuid.uuid4()
+    queue_val = randomstring()
+    account_val = randomstring()
+
+    class TestProvider(parsl.providers.LocalProvider):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            setattr(self, queue_term, queue_val)
+            setattr(self, account_term, account_val)
+
+    provider = TestProvider()
+    htex = htex_factory(provider=provider)
+    gce = GlobusComputeEngine(endpoint_id=ep_id, executor=htex)
+    sr = gce.get_status_report()
+
+    assert sr.global_state["queue"] == queue_val
+    assert sr.global_state["account"] == account_val

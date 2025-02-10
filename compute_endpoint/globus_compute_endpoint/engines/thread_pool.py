@@ -75,6 +75,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
             "min_blocks": 1,
             "max_workers_per_node": self.executor._max_workers,  # type: ignore
             "nodes_per_block": 1,
+            "engine_type": type(self).__name__,
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}
 
