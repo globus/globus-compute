@@ -446,6 +446,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         max_blocks = self.executor.provider.max_blocks
         return max_blocks > 0
 
+    def _get_provider_attr(self, possible_names: t.Tuple[str, ...]) -> str | None:
+        for name in possible_names:
+            value = getattr(self.executor.provider, name, None)
+            if value:
+                return value
+        return None
+
     def get_status_report(self) -> EPStatusReport:
         """
         Returns
@@ -481,6 +488,10 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             "max_workers_per_node": self.executor.max_workers_per_node,
             "nodes_per_block": self.executor.provider.nodes_per_block,
             "node_info": manager_info,
+            "engine_type": type(self).__name__,
+            "provider_type": type(self.executor.provider).__name__,
+            "queue": self._get_provider_attr(("queue", "partition")),
+            "account": self._get_provider_attr(("account", "allocation", "project")),
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}  # TODO
         return EPStatusReport(
