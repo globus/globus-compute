@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import pathlib
+import platform
 import pwd
 import queue
 import re
@@ -342,6 +343,7 @@ class EndpointManager:
         user_config_template, user_config_schema = load_user_config_template(conf_dir)
         return {
             "endpoint_version": __version__,
+            "python_version": platform.python_version(),
             "hostname": socket.getfqdn(),
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
             "config": serialize_config(config),
