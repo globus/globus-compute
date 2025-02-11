@@ -304,7 +304,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Total number of managers
+        Total number of connected managers
         """
         return len(managers)
 
@@ -317,7 +317,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Number of managers that have capacity for new tasks
+        Number of managers that are accepting new tasks
         """
         return sum(1 for m in managers if m["active"])
 
@@ -360,7 +360,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Total number of pending tasks
+        Total number of tasks that are queued in the executor's interchange
         """
         outstanding = self.get_outstanding_breakdown(managers=managers)
         return outstanding[0][1]  # Queued in interchange
@@ -384,7 +384,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Total number of live workers
+        Total number of workers that are actively running tasks
         """
         if managers is None:
             managers = self.get_connected_managers()
