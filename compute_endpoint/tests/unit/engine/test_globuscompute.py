@@ -84,6 +84,7 @@ def test_status_report_content(htex, mock_managers):
 
     assert "pending_tasks" in sr.global_state
     assert "outstanding_tasks" in sr.global_state
+    assert "total_tasks" in sr.global_state
     assert "scaling_enabled" in sr.global_state
     assert "mem_per_worker" in sr.global_state
     assert "cores_per_worker" in sr.global_state
