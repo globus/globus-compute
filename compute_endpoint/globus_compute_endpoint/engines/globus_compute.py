@@ -479,6 +479,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             "idle_workers": self.get_total_idle_workers(managers=managers),
             "pending_tasks": self.get_total_tasks_pending(managers=managers),
             "outstanding_tasks": self.get_total_tasks_outstanding()["RAW"],
+            "total_tasks": self.executor._task_counter,
             "scaling_enabled": self.scaling_enabled,
             "mem_per_worker": self.executor.mem_per_worker,
             "cores_per_worker": self.executor.cores_per_worker,
