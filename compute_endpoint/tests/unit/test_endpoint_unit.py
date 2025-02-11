@@ -430,6 +430,7 @@ def test_pid_file_check(pid_info, fs):
 def test_endpoint_get_metadata(mocker, engine_cls):
     mock_data = {
         "endpoint_version": "106.7",
+        "python_version": "3.12.7",
         "hostname": "oneohtrix.never",
         "local_user": "daniel",
     }
@@ -438,6 +439,7 @@ def test_endpoint_get_metadata(mocker, engine_cls):
         "globus_compute_endpoint.endpoint.endpoint.__version__",
         mock_data["endpoint_version"],
     )
+    mocker.patch("platform.python_version", return_value=mock_data["python_version"])
 
     mock_fqdn = mocker.patch("globus_compute_endpoint.endpoint.endpoint.socket.getfqdn")
     mock_fqdn.return_value = mock_data["hostname"]

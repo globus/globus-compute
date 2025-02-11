@@ -550,6 +550,7 @@ def test_sends_data_during_registration(
 
     expected_keys = {
         "endpoint_version",
+        "python_version",
         "hostname",
         "local_user",
         "config",
