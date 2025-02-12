@@ -26,6 +26,10 @@ pipeline {
                     echo "env.BRANCH_NAME = ${env.BRANCH_NAME}"
                     sh "git clean -fdx"
 
+                    sh "git checkout jenkins310"
+                    env.TAG_NAME = "3.1.0"
+                    env.DEFAULT_BRANCH = "jenkins310"
+
                     dir("compute_endpoint/packaging/") {
                         sh(script: "make show_vars")
                         sh(script: "make setup_dist_for_deb setup_dist_for_rpm")
