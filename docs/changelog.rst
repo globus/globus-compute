@@ -3,6 +3,43 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.1.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.1.0
+-----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- The default engine is now ``GlobusComputeEngine`` when the engine ``type`` field is not specified.
+  Previously, the default was ``HighThroughputEngine``, which was removed in version ``3.0.0``.
+
+Removed
+^^^^^^^
+
+- Removed obsolete rebrand upgrade command.  The project rebranded from funcX
+  to Globus Compute at :ref:`v2.0.0 <changelog-2.0.0>`, in April, 2023, and this
+  command helped with the upgrade process for previously created endpoints.
+
+Deprecated
+^^^^^^^^^^
+
+- The ``WebClient`` class and ``Client.web_client`` attribute have been deprecated.
+  Please use the ``ComputeClient``, ``ComputeClientV2``, and ``ComputeClientV3``
+  classes from the `Globus Python SDK <https://globus-sdk-python.readthedocs.io/en/stable/services/compute.html>`_
+  to interact directly with the Globus Compute API.
+
+- The ``Client.auth_client`` attribute is now deprecated.
+
+Changed
+^^^^^^^
+
+- Bump ``globus-sdk`` dependency version to at least ``3.50.0``.
+
+- Bumped ``parsl`` dependency version to `2025.1.20 <https://pypi.org/project/parsl/2025.1.20/>`_.
+  This version bump avoids dependency version mismatch when using Parsl's newly added optional extra
+  `GlobusComputeExecutor <https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.GlobusComputeExecutor.html>`_
+
 .. _changelog-3.0.1:
 
 globus-compute-sdk & globus-compute-endpoint v3.0.1
