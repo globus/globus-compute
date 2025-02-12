@@ -1,0 +1,76 @@
+{
+  "type": "object",
+  "properties": {
+    "source_path": {
+      "type": "object",
+      "title": "Source",
+      "format": "globus-collection",
+      "required": [
+        "id",
+        "path"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "title": "Source Collection ID",
+          "format": "uuid",
+          "pattern": "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}",
+          "maxLength": 36,
+          "minLength": 36,
+          "description": "The UUID for the collection which serves as the source of the data"
+        },
+        "path": {
+          "type": "string",
+          "title": "Source Collection Path",
+          "description": "The path on the source collection for the data"
+        }
+      },
+      "description": "Globus-provided flows require that at least one collection is managed under a subscription.",
+      "propertyOrder": [
+        "id",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "destination_collection": {
+      "type": "object",
+      "title": "Destination",
+      "format": "globus-collection",
+      "required": [
+        "id",
+        "path"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "title": "Destination Collection ID",
+          "format": "uuid",
+          "pattern": "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}",
+          "maxLength": 36,
+          "minLength": 36,
+          "description": "The UUID for the collection which serves as the destination for the Move"
+        },
+        "path": {
+          "type": "string",
+          "title": "Destination Collection Path",
+          "description": "The path on the destination collection where the data will be stored"
+        }
+      },
+      "description": "Globus-provided flows require that at least one collection is managed under a subscription.",
+      "propertyOrder": [
+        "id",
+        "path"
+      ]
+    },
+    "zip_name": {
+      "type": "string",
+      "title": "Name of the intermediate compressed file before transfering out",
+      "description": "Absolute path"
+    },
+    "mapping_prefix": {
+      "type": "string",
+      "title": "Mapped collection prefix",
+      "description": "The prefix path for the mapped collection"
+    }
+  }
+}
