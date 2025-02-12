@@ -20,11 +20,22 @@ pipeline {
             agent {label "package_creator"}
             steps {
                 script {
+
+                    // scmVars.GIT_BRANCH comes from the Jenkins UI at Pipeline -> Definition -> SCM
+                    //   https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/configure
                     def scmVars = checkout scm
-                    env.BRANCH_NAME = scmVars.GIT_BRANCH.replaceFirst(/^.*origin\//, "")
+                    env.DEFAULT_BRANCH = scmVars.GIT_BRANCH.replaceFirst(/^.*origin\//, "")
                     env.SOURCE_STASH_NAME = "${UUID.randomUUID()}"
-                    echo "env.BRANCH_NAME = ${env.BRANCH_NAME}"
+                    echo "Using env.DEFAULT_BRANCH = ${env.BRANCH_NAME}"
+
+                    // BRANCH_OR_TAG and BUILD_FOR_STABLE comes from the Jenkins UI string and boolean
+                    //   parameters which are the two options presented on the main Compute build page
                     sh "git clean -fdx"
+                    env.BRANCH_NAME = params.BRANCH_OR_TAG
+                    env.BUILD_FOR_STABLE = params.BUILD_FOR_STABLE
+                    env.TAG_NAME = "${env.BRANCH_NAME}"
+                    echo "Checking out env.BRANCH_NAME = ${env.BRANCH_NAME} with BUILD_FOR_STABLE = ${env.BUILD_FOR_STABLE}"
+                    sh "git checkout ${env.BRANCH_NAME}"
 
                     dir("compute_endpoint/packaging/") {
                         sh(script: "make show_vars")
