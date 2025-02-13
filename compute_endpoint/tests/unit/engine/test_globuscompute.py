@@ -142,4 +142,3 @@ def test_status_poller_started_late(fs, htex, mock_jsp, ep_uuid):
     assert gce.job_status_poller is not None
     a, _ = gce.job_status_poller.add_executors.call_args
     assert a[0] == [htex], "Expect executor to be polled"
-
