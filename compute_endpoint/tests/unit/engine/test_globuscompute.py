@@ -45,6 +45,7 @@ def htex_factory(mock_blocks, mock_managers):
     def _htex_factory(**kwargs):
         kwargs.setdefault("address", "::1")
         _htex = parsl.HighThroughputExecutor(**kwargs)
+        _htex.start = mock.Mock(spec=_htex.start)
 
         _htex.blocks_to_job_id.update((bid, str(int(bid) + 100)) for bid in mock_blocks)
         _htex.job_ids_to_block.update(
@@ -62,6 +63,7 @@ def htex_factory(mock_blocks, mock_managers):
 def htex(htex_factory):
     _htex = htex_factory()
     yield _htex
+    _htex.shutdown()
 
 
 def test_status_report_content(htex, mock_managers):
@@ -129,3 +131,14 @@ def test_status_report_provider_specific_terms(
 
     assert sr.global_state["queue"] == queue_val
     assert sr.global_state["account"] == account_val
+
+
+def test_status_poller_started_late(fs, htex, mock_jsp, ep_uuid):
+    gce = GlobusComputeEngine(endpoint_id=ep_uuid, executor=htex)
+    assert gce.job_status_poller is None, "JSP must be started *after* daemonization"
+    assert not mock_jsp.called, "`.start()` not yet invoked."
+    gce.start(endpoint_id=ep_uuid, run_dir="/")
+    assert mock_jsp.called, "Expect JSP created in engine's process"
+    assert gce.job_status_poller is not None
+    a, _ = gce.job_status_poller.add_executors.call_args
+    assert a[0] == [htex], "Expect executor to be polled"

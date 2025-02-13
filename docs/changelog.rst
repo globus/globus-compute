@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.1.1:
+
+globus-compute-sdk & globus-compute-endpoint v3.1.1
+---------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fix bug introduced in :ref:`v3.1.0 <changelog-3.1.0>` that prevented the
+  |GlobusComputeEngine| from processing tasks if the endpoint was daemonized
+  (see: |detach_endpoint| configuration option)
+
 .. _changelog-3.1.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.1.0
@@ -2800,6 +2812,7 @@ New Functionality
 .. |ShellFunction| replace:: :class:`ShellFunction <globus_compute_sdk.sdk.shell_function.ShellFunction>`
 .. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
 
+.. |detach_endpoint| replace:: :class:`detach_endpoint <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
 .. |GlobusComputeEngine| replace:: :class:`GlobusComputeEngine <globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine>`
 .. |GlobusMPIEngine| replace:: :class:`GlobusMPIEngine <globus_compute_endpoint.engines.globus_mpi.GlobusMPIEngine>`
 
