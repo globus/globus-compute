@@ -283,7 +283,11 @@ def get_fds(pid):
     # For darwin FDs we normally exclude ' txt ' see
     # https://stackoverflow.com/questions/795236/in-mac-os-x-how-can-i-get-an-accurate-count-of-file-descriptor-usage # noqa E501
     # But if doing diffs, do not need to worry about unchanged FDs
-    return fd_output.stdout.decode().split("\n")
+
+    # /dev/urandom is leftover only on 3.9, it seems from parsl usage.
+    #   A temporary workaround is to exclude it til we can configure it
+    #   (turn off encryption?)
+    return [x for x in fd_output.stdout.decode().split("\n") if "/dev/urandom" not in x]
 
 
 @pytest.fixture(autouse=True)
