@@ -148,11 +148,14 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         if strategy is None:
             strategy = "simple"
 
-        job_status_kwargs = job_status_kwargs or {}
-        job_status_kwargs.setdefault("max_idletime", 120)
-        job_status_kwargs.setdefault("strategy", strategy)
-        job_status_kwargs.setdefault("strategy_period", 5.0)
-        self.job_status_poller = JobStatusPoller(**job_status_kwargs)
+        # Set defaults for JobStatusPoller
+        self._job_status_kwargs: JobStatusPollerKwargs = {
+            "max_idletime": 120.0,
+            "strategy": strategy,
+            "strategy_period": 5.0,
+        }
+        self._job_status_kwargs.update(job_status_kwargs or {})
+        self.job_status_poller: JobStatusPoller | None = None
         # N.B. call `.add_executor()` *after* starting executor; see .start()
 
     @property
@@ -266,6 +269,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.executor.start()
 
         # Add executor to poller *after* executor has started
+        self.job_status_poller = JobStatusPoller(**self._job_status_kwargs)
         self.job_status_poller.add_executors([self.executor])
         self._engine_ready = True
 
@@ -494,5 +498,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         return self.executor.executor_exception
 
     def shutdown(self, /, **kwargs) -> None:
-        self.job_status_poller.close()
+        if self.job_status_poller:
+            self.job_status_poller.close()
+            self.job_status_poller = None
         self.executor.shutdown()
