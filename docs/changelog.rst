@@ -2800,6 +2800,7 @@ New Functionality
 .. |ShellFunction| replace:: :class:`ShellFunction <globus_compute_sdk.sdk.shell_function.ShellFunction>`
 .. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
 
+.. |detach_endpoint| replace:: :class:`detach_endpoint <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
 .. |GlobusComputeEngine| replace:: :class:`GlobusComputeEngine <globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine>`
 .. |GlobusMPIEngine| replace:: :class:`GlobusMPIEngine <globus_compute_endpoint.engines.globus_mpi.GlobusMPIEngine>`
 
