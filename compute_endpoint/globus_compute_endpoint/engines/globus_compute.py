@@ -308,7 +308,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Total number of managers
+        Total number of connected managers
         """
         return len(managers)
 
@@ -321,7 +321,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Number of managers that have capacity for new tasks
+        Number of managers that are accepting new tasks
         """
         return sum(1 for m in managers if m["active"])
 
@@ -364,7 +364,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Total number of pending tasks
+        Total number of tasks that are queued in the executor's interchange
         """
         outstanding = self.get_outstanding_breakdown(managers=managers)
         return outstanding[0][1]  # Queued in interchange
@@ -388,7 +388,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         Returns
         -------
-        Total number of live workers
+        Total number of workers that are actively running tasks
         """
         if managers is None:
             managers = self.get_connected_managers()
@@ -450,6 +450,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         max_blocks = self.executor.provider.max_blocks
         return max_blocks > 0
 
+    def _get_provider_attr(self, possible_names: t.Tuple[str, ...]) -> str | None:
+        for name in possible_names:
+            value = getattr(self.executor.provider, name, None)
+            if value:
+                return value
+        return None
+
     def get_status_report(self) -> EPStatusReport:
         """
         Returns
@@ -476,6 +483,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             "idle_workers": self.get_total_idle_workers(managers=managers),
             "pending_tasks": self.get_total_tasks_pending(managers=managers),
             "outstanding_tasks": self.get_total_tasks_outstanding()["RAW"],
+            "total_tasks": self.executor._task_counter,
             "scaling_enabled": self.scaling_enabled,
             "mem_per_worker": self.executor.mem_per_worker,
             "cores_per_worker": self.executor.cores_per_worker,
@@ -485,6 +493,10 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             "max_workers_per_node": self.executor.max_workers_per_node,
             "nodes_per_block": self.executor.provider.nodes_per_block,
             "node_info": manager_info,
+            "engine_type": type(self).__name__,
+            "provider_type": type(self.executor.provider).__name__,
+            "queue": self._get_provider_attr(("queue", "partition")),
+            "account": self._get_provider_attr(("account", "allocation", "project")),
         }
         task_status_deltas: t.Dict[str, t.List[TaskTransition]] = {}  # TODO
         return EPStatusReport(

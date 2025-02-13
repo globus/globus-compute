@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import pathlib
+import platform
 import pwd
 import re
 import shutil
@@ -890,6 +891,7 @@ class Endpoint:
     def get_metadata(config: UserEndpointConfig) -> dict:
         metadata: dict = {
             "endpoint_version": __version__,
+            "python_version": platform.python_version(),
             "hostname": socket.getfqdn(),
             # should be more accurate than `getpass.getuser()` in non-login situations
             "local_user": pwd.getpwuid(os.getuid()).pw_name,
