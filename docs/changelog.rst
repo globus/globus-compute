@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.1.1:
+
+globus-compute-sdk & globus-compute-endpoint v3.1.1
+---------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fix bug introduced in :ref:`v3.1.0 <changelog-3.1.0>` that prevented the
+  |GlobusComputeEngine| from processing tasks if the endpoint was daemonized
+  (see: |detach_endpoint| configuration option)
+
 .. _changelog-3.1.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.1.0
