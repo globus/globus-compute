@@ -1,0 +1,68 @@
+{
+  "StartAt": "SetConstants",
+  "States" : {
+    "SetConstants": {
+      "Type": "ExpressionEval",
+      "Parameters": {
+        "gcs_compute_endpoint_id": "582af87d-9ee6-4f30-8ec3-bac82e6d9a09",
+        "destination_id.$": "$.destination_collection.id",
+        "compute_endpoint_id": "a0818863-72a3-48b0-b577-840be42916e6",
+        "compute_func_id": "74f51dde-ac40-4c74-b28a-bb02b5a9c16d",
+        "src_dir_prefix.$": "$.mapping_prefix",
+        "compute_paths_src_1.$": "$.source_path.path"
+      },
+      "ResultPath": "$.constants",
+      "Next" : "RunComputeFunction"
+    },
+    "RunComputeFunction": {
+      "Type": "Action",
+      "ActionUrl": "https://compute.actions.globus.org/v3",
+      "Parameters": {
+        "endpoint_id.$": "$.constants.compute_endpoint_id",
+        "tasks": [
+          {
+            "function_id.$": "$.constants.compute_func_id",
+            "args": ["/"],
+            "kwargs": {
+              "src_path.$": "$.constants.compute_paths_src_1",
+              "dest_path.$": "$.zip_name"
+            }
+          }
+        ]
+      },
+      "ResultPath": "$.compute_result",
+      "Next" : "TransferFromComputeEndpoint"
+    },
+    "TransferFromComputeEndpoint": {
+      "Type": "Action",
+      "ActionUrl": "https://transfer.actions.globus.org/transfer",
+      "Parameters": {
+        "source_endpoint.$": "$.constants.gcs_compute_endpoint_id",
+        "destination_endpoint.$": "$.constants.destination_id",
+        "DATA": [
+          {
+            "source_path.=": "compute_result.details.result[0][0]",
+            "destination_path.$": "$.destination_collection.path"
+          }
+        ]
+      },
+      "ResultPath": "$.transfer_to_dest_result",
+      "Next" : "DeleteComputeOutput"
+    },
+    "DeleteComputeOutput": {
+      "Type": "Action",
+      "ActionUrl": "https://transfer.actions.globus.org/delete",
+      "Parameters": {
+        "endpoint.$": "$.constants.gcs_compute_endpoint_id",
+        "recursive": true,
+        "DATA": [
+          {
+            "path.=": "compute_result.details.result[0][0]"
+          }
+        ]
+      },
+      "ResultPath": "$.delete_compute_output_result",
+      "End" : true
+    }
+  }
+}
