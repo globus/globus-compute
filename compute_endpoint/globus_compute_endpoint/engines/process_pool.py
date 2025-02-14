@@ -37,6 +37,10 @@ class ProcessPoolEngine(GlobusComputeEngineBase):
             allowed_serializers=allowed_serializers,
         )
 
+    def assert_ha_compliant(self):
+        # HA compliant by default
+        pass
+
     def start(
         self,
         *args,

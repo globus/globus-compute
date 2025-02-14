@@ -371,6 +371,19 @@ class Endpoint:
             log.critical(msg)
             raise ValueError(msg)
 
+        if endpoint_config.high_assurance:
+            try:
+                endpoint_config.engine.assert_ha_compliant()
+            except Exception as e:
+                log.critical(
+                    "Engine configuration is not High Assurance compliant:\n%s",
+                    str(e),
+                )
+                raise ValueError(
+                    "Engine configuration is not High Assurance compliant."
+                    "  Endpoint will not start."
+                ) from e
+
         pid_check = Endpoint.check_pidfile(endpoint_dir)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
