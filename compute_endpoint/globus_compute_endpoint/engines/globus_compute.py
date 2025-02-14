@@ -299,6 +299,15 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         """
         return self.executor.connected_managers()
 
+    def get_connected_managers_packages(self) -> t.Dict[str, t.Dict[str, str]]:
+        """
+        Returns
+        -------
+        Dict mapping each connected manager ID to a dict of installed packages
+        and versions
+        """
+        return self.executor.connected_managers_packages()
+
     def get_total_managers(self, managers: t.List[t.Dict[str, t.Any]]) -> int:
         """
         Parameters
@@ -464,15 +473,19 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         Object containing info on the current status of the endpoint
         """
         managers = self.get_connected_managers()
-
+        managers_packages = self.get_connected_managers_packages()
         manager_info: dict[str, list] = {}
         for m in managers:
             jid = self.executor.blocks_to_job_id[m["block_id"]]
+            endpoint_version = managers_packages[m["manager"]][
+                "globus-compute-endpoint"
+            ]
             m_info = {
                 "worker_count": m["worker_count"],
                 "idle_duration": m["idle_duration"],
                 "parsl_version": m["parsl_version"],
                 "python_version": m["python_version"],
+                "endpoint_version": endpoint_version,
             }
             manager_info.setdefault(jid, []).append(m_info)
 
