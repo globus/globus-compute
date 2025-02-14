@@ -10,6 +10,7 @@ import pytest
 import requests
 import yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint, UserEndpointConfig
+from globus_compute_endpoint.engines.globus_compute import GlobusComputeEngine
 from globus_sdk import GlobusAPIError
 
 logger = logging.getLogger("mock_funcx")
@@ -344,6 +345,47 @@ class TestStart:
 
         manager.configure_endpoint(config_dir, None)
         with pytest.raises(ValueError, match="has no engines defined"):
+            log_to_console = False
+            no_color = True
+            manager.start_endpoint(
+                config_dir,
+                None,
+                config,
+                log_to_console,
+                no_color,
+                reg_info={},
+                ep_info={},
+            )
+
+    def test_start_ha_without_encryption(self, mocker):
+        mock_client = mocker.patch(f"{_MOCK_BASE}Client")
+        mock_client.return_value.register_endpoint.return_value = {
+            "endpoint_id": "abcde12345",
+            "address": "localhost",
+            "client_ports": "8080",
+        }
+
+        mock_context = mocker.patch("daemon.DaemonContext")
+
+        # Allow this mock to be used in a with statement
+        mock_context.return_value.__enter__.return_value = None
+        mock_context.return_value.__exit__.return_value = None
+        mock_context.return_value.pidfile.path = ""
+
+        mock_engine = mocker.Mock(spec=GlobusComputeEngine)
+        mock_engine.encrypted = False
+
+        config = UserEndpointConfig(
+            detach_endpoint=False, high_assurance=True, engine=mock_engine
+        )
+
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
+
+        manager.configure_endpoint(config_dir, None)
+        with pytest.raises(
+            ValueError, match="High assurance endpoints must use encrypted engines."
+        ):
             log_to_console = False
             no_color = True
             manager.start_endpoint(
