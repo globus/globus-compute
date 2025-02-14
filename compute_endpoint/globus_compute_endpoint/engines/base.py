@@ -91,6 +91,18 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self._engine_ready: bool = False
 
     @abstractmethod
+    def assert_ha_compliant(self):
+        """
+        Signal to endpoint initialization code whether or not this engine, in its
+        current configuration, complies with Globus's High Assurance policies. This
+        must be evaluated on a case-by-case basis. Some example criteria:
+
+        * All manager-worker communication happens within one host machine
+        * Network traffic is encrypted
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def start(
         self,
         *args,

@@ -158,6 +158,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.job_status_poller: JobStatusPoller | None = None
         # N.B. call `.add_executor()` *after* starting executor; see .start()
 
+    def assert_ha_compliant(self):
+        if not self.encrypted:
+            raise ValueError(
+                "High-Assurance GlobusComputeEngines must enable the"
+                " `encrypted` configuration value"
+            )
+
     @property
     def max_workers_per_node(self):
         # Needed for strategies (e.g., SimpleStrategy)

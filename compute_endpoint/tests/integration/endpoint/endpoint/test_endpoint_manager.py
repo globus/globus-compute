@@ -356,6 +356,47 @@ class TestStart:
                 ep_info={},
             )
 
+    def test_start_ha_non_compliant(self, mocker):
+        mock_client = mocker.patch(f"{_MOCK_BASE}Client")
+        mock_client.return_value.register_endpoint.return_value = {
+            "endpoint_id": "abcde12345",
+            "address": "localhost",
+            "client_ports": "8080",
+        }
+
+        mock_context = mocker.patch("daemon.DaemonContext")
+
+        # Allow this mock to be used in a with statement
+        mock_context.return_value.__enter__.return_value = None
+        mock_context.return_value.__exit__.return_value = None
+        mock_context.return_value.pidfile.path = ""
+
+        mock_engine = mocker.Mock()
+        mock_engine.assert_ha_compliant = mocker.Mock(side_effect=ValueError("foo"))
+
+        config = UserEndpointConfig(
+            detach_endpoint=False, high_assurance=True, engine=mock_engine
+        )
+
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
+
+        manager.configure_endpoint(config_dir, None)
+        with pytest.raises(
+            ValueError, match="Engine configuration is not High Assurance compliant"
+        ):
+            log_to_console = False
+            no_color = True
+            manager.start_endpoint(
+                config_dir,
+                None,
+                config,
+                log_to_console,
+                no_color,
+                reg_info={},
+                ep_info={},
+            )
+
     @pytest.mark.skip("This test doesn't make much sense")
     def test_daemon_launch(self, mocker):
         mock_interchange = mocker.patch(f"{_MOCK_BASE}EndpointInterchange")
