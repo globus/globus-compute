@@ -371,6 +371,16 @@ class Endpoint:
             log.critical(msg)
             raise ValueError(msg)
 
+        if endpoint_config.high_assurance and not getattr(
+            endpoint_config.engine, "encrypted", False
+        ):
+            msg = (
+                "High assurance endpoints must use encrypted engines.  "
+                "Endpoint will not start."
+            )
+            log.critical(msg)
+            raise ValueError(msg)
+
         pid_check = Endpoint.check_pidfile(endpoint_dir)
         # if the pidfile exists, we should return early because we don't
         # want to attempt to create a new daemon when one is already
