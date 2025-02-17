@@ -32,6 +32,26 @@ def _clear_sdk_env(monkeypatch):
 
 
 @pytest.fixture
+def fake_py_version():
+    return "3.99.99"
+
+
+@pytest.fixture
+def fake_sdk_version():
+    return "1.1.1"
+
+
+@pytest.fixture
+def fake_dill_version():
+    return "0.0.0"
+
+
+@pytest.fixture
+def fake_serialization_method():
+    return "BestCode"
+
+
+@pytest.fixture
 def gcc():
     _gcc = gc.Client(
         do_version_check=False,
@@ -320,17 +340,42 @@ def test_container_build_status_failure(gcc):
     assert type(excinfo.value) is SystemError
 
 
-def test_register_function(gcc):
+@pytest.mark.parametrize(
+    "func_metadata",
+    [
+        None,
+        {},
+        {
+            "python_version": fake_py_version,
+            "sdk_version": fake_sdk_version,
+            "dill_version": fake_dill_version,
+        },
+        {
+            "python_version": fake_py_version,
+            "sdk_version": fake_sdk_version,
+            "dill_version": fake_dill_version,
+            "serialization_method": fake_serialization_method,
+        },
+    ],
+)
+def test_register_function(gcc, func_metadata):
     gcc._compute_web_client = mock.MagicMock()
 
-    metadata = {"python_version": "3.11.3", "sdk_version": "2.3.3"}
-    gcc.register_function(funk, metadata=metadata)
+    gcc.register_function(funk, metadata=func_metadata)
 
     a, _ = gcc._compute_web_client.v2.register_function.call_args
+    # a, _ = gcc._compute_web_client.v3.register_function.call_args
     func_data = a[0]
     assert func_data["function_code"] is not None
-    assert func_data["metadata"]["python_version"] == metadata["python_version"]
-    assert func_data["metadata"]["sdk_version"] == metadata["sdk_version"]
+    assert func_data["metadata"]["python_version"] == func_metadata["python_version"]
+    assert func_data["metadata"]["sdk_version"] == func_metadata["sdk_version"]
+    assert func_data["metadata"]["dill_version"] == func_metadata["dill_version"]
+
+    serde = func_metadata.get("serialization_method")
+    if serde:
+        assert func_data["metadata"]["serialization_method"] == serde
+    else:
+        assert func_data["metadata"].get("serialization_method") is None
 
 
 @pytest.mark.parametrize("dep_arg", ["searchable", "function_name"])

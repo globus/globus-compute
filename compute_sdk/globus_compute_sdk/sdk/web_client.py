@@ -6,11 +6,15 @@ It also implements data helpers for building complex payloads. Most notably,
 `FunctionRegistrationData` which can be constructed from an arbitrary callable.
 """
 
+from __future__ import annotations
+
 import inspect
 import json
 import typing as t
 import warnings
+from platform import python_version as platform_python_version
 
+import dill
 import globus_sdk
 from globus_compute_common.sdk_version_sharing import user_agent_substring
 from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url_path
@@ -29,14 +33,32 @@ def _get_packed_code(
 
 
 class FunctionRegistrationMetadata:
-    def __init__(self, python_version: str, sdk_version: str):
+    def __init__(
+        self,
+        python_version: str | None = None,
+        sdk_version: str | None = None,
+        dill_version: str | None = None,
+        serialization_method: str | None = None,
+    ):
         self.python_version = python_version
+        if not self.python_version:
+            self.python_version = platform_python_version()
         self.sdk_version = sdk_version
+        if not self.sdk_version:
+            self.sdk_version = __version__
+        self.dill_version = dill_version
+        if not self.dill_version:
+            self.dill_version = dill.__version__
+
+        # Should we make this auto-populate as well?
+        self.serialization_method = serialization_method
 
     def to_dict(self):
         return {
             "python_version": self.python_version,
             "sdk_version": self.sdk_version,
+            "dill_version": self.dill_version,
+            "serialization_method": self.serialization_method,
         }
 
 
@@ -47,7 +69,6 @@ class FunctionRegistrationData:
         function: t.Optional[t.Callable] = None,
         function_name: t.Optional[str] = None,
         function_code: t.Optional[str] = None,
-        container_uuid: t.Optional[UUID_LIKE_T] = None,
         description: t.Optional[str] = None,
         metadata: t.Optional[FunctionRegistrationMetadata] = None,
         public: bool = False,
@@ -73,9 +94,6 @@ class FunctionRegistrationData:
 
         self.function_name = function_name
         self.function_code = function_code
-        self.container_uuid = (
-            str(container_uuid) if container_uuid is not None else container_uuid
-        )
         self.description = description
         self.metadata = metadata
         self.public = public
@@ -85,7 +103,6 @@ class FunctionRegistrationData:
         return {
             "function_name": self.function_name,
             "function_code": self.function_code,
-            "container_uuid": self.container_uuid,
             "description": self.description,
             "metadata": self.metadata.to_dict() if self.metadata else None,
             "public": self.public,
@@ -262,7 +279,7 @@ class WebClient(globus_sdk.BaseClient):
             if isinstance(function_registration_data, FunctionRegistrationData)
             else function_registration_data
         )
-        return self.post("/v2/functions", data=data)
+        return self.post("/v3/functions", data=data)
 
     def get_function(self, function_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/functions/{function_id}")

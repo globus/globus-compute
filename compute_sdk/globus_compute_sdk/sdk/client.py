@@ -46,6 +46,29 @@ class _ComputeWebClient:
         self.v3 = globus_sdk.ComputeClientV3(*args, **kwargs)
 
 
+# # Following would be added to globus_sdk.services.compute.client
+# class ComputeClientV3(client.BaseClient):
+#     ...
+#
+#     def register_function(
+#             self,
+#             function_data: dict[str, t.Any],
+#     ) -> GlobusHTTPResponse:
+#         """Register a new function.
+#
+#         :param function_data: A function registration document.
+#
+#         .. tab-set::
+#
+#             .. tab-item:: API Info
+#
+#                 .. extdoclink:: Register Function
+#                     :service: compute
+#                     :ref: Functions/operation/register_function_v3_functions_post
+#         """  # noqa: E501
+#         return self.post("/v2/functions", data=function_data)
+
+
 class Client:
     """Main class for interacting with the Globus Compute service
 
@@ -715,12 +738,10 @@ class Client:
         self,
         function,
         function_name=None,
-        container_uuid=None,
         description=None,
         metadata: dict | None = None,
         public=False,
         group=None,
-        searchable=None,
     ) -> str:
         """Register a function code with the Globus Compute service.
 
@@ -731,8 +752,6 @@ class Client:
         function_name : str
             The entry point (function name) of the function. Default: None
             DEPRECATED - functions' names are derived from their ``__name__`` attribute
-        container_uuid : str
-            Container UUID from registration with Globus Compute
         description : str
             Description of the function. If this is None, and the function has a
             docstring, that docstring is uploaded as the function's description instead;
@@ -744,18 +763,13 @@ class Client:
             Whether or not the function is publicly accessible. Default = False
         group : str
             A globus group uuid to share this function with
-        searchable : bool
-            If true, the function will be indexed into globus search with the
-            appropriate permissions
-
-            DEPRECATED - ingesting functions to Globus Search is not currently supported
 
         Returns
         -------
         function uuid : str
             UUID identifier for the registered function
         """
-        deprecated = ["searchable", "function_name"]
+        deprecated = ["function_name"]
         for arg in deprecated:
             if locals()[arg] is not None:
                 warnings.warn(
@@ -764,17 +778,19 @@ class Client:
                     DeprecationWarning,
                 )
 
+        if metadata is None:
+            metadata = {}
         data = FunctionRegistrationData(
             function=function,
-            container_uuid=container_uuid,
             description=description,
-            metadata=FunctionRegistrationMetadata(**metadata) if metadata else None,
+            metadata=FunctionRegistrationMetadata(**metadata),
             public=public,
             group=group,
             serializer=self.fx_serializer,
         )
         logger.info(f"Registering function : {data}")
         r = self._compute_web_client.v2.register_function(data.to_dict())
+        # r = self._compute_web_client.v3.register_function(data.to_dict())
         return r.data["function_uuid"]
 
     @requires_login
