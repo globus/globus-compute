@@ -1,0 +1,4 @@
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency to `2025.2.17 <https://pypi.org/project/parsl/2025.2.17/>`_.
