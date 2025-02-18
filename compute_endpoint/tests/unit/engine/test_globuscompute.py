@@ -41,7 +41,18 @@ def mock_managers(mock_blocks, randomstring):
 
 
 @pytest.fixture
-def htex_factory(mock_blocks, mock_managers):
+def mock_managers_packages(mock_managers):
+    return {
+        m["manager"]: {
+            "globus-compute-endpoint": "3.1.1",
+            "globus-compute-sdk": "3.1.1",
+        }
+        for m in mock_managers
+    }
+
+
+@pytest.fixture
+def htex_factory(mock_blocks, mock_managers, mock_managers_packages):
     def _htex_factory(**kwargs):
         kwargs.setdefault("address", "::1")
         _htex = parsl.HighThroughputExecutor(**kwargs)
@@ -53,6 +64,10 @@ def htex_factory(mock_blocks, mock_managers):
         )
         _htex.connected_managers = mock.Mock(spec=_htex.connected_managers)
         _htex.connected_managers.return_value = mock_managers
+        _htex.connected_managers_packages = mock.Mock(
+            spec=_htex.connected_managers_packages
+        )
+        _htex.connected_managers_packages.return_value = mock_managers_packages
 
         return _htex
 
@@ -66,7 +81,7 @@ def htex(htex_factory):
     _htex.shutdown()
 
 
-def test_status_report_content(htex, mock_managers):
+def test_status_report_content(htex, mock_managers, mock_managers_packages):
     ep_id = uuid.uuid4()
     gce = GlobusComputeEngine(endpoint_id=ep_id, executor=htex)
     sr = gce.get_status_report()
@@ -102,8 +117,11 @@ def test_status_report_content(htex, mock_managers):
 
     for mock_m in mock_managers:
         jid = htex.blocks_to_job_id[mock_m["block_id"]]
+        packages = mock_managers_packages[mock_m["manager"]]
         m = sr.global_state["node_info"][jid][0]  # for now, test assumes one worker
         assert m["parsl_version"] == mock_m["parsl_version"]
+        assert m["endpoint_version"] == packages["globus-compute-endpoint"]
+        assert m["sdk_version"] == packages["globus-compute-sdk"]
         assert m["python_version"] == mock_m["python_version"]
         assert m["idle_duration"] == mock_m["idle_duration"]
         assert m["worker_count"] == mock_m["worker_count"]
