@@ -357,7 +357,7 @@ class Client:
         .. |REPL| replace:: :abbr:`REPL (Read-Eval-Print Loop)`
         .. _REPL: https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
 
-        :param task_id: a task identifer, as returned a submission to the web-service
+        :param task_id: a task identifier, as returned a submission to the web-service
         :return: a dictionary containing the task status and result information
         :raises: If task failed, the task exception (reconstituted from remote source)
         """
@@ -433,7 +433,7 @@ class Client:
                     results[task_id] = self._update_task_table(task, task_id)
                 except Exception:
                     logger.exception(
-                        "Failure while unpacking results fom get_batch_result"
+                        "Failure while unpacking results from get_batch_result"
                     )
 
         return results

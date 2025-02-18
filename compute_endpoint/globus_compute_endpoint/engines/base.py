@@ -174,7 +174,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         Callback to post result to the passthrough queue
         Parameters
         ----------
-        future: Future for which the callback is triggerd
+        future: Future for which the callback is triggered
         """
 
         exec_beg = TaskTransition(  # Reminder: used by *closure*, below

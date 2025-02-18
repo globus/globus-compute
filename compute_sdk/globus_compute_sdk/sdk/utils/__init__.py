@@ -52,7 +52,7 @@ def get_env_details() -> t.Dict[str, t.Any]:
 def check_version(task_details: dict | None, check_py_micro: bool = True) -> str | None:
     """
     This method adds an optional string to some Exceptions below to
-    warn of differing environments as a possible cause.  It is pre-pended
+    warn of differing environments as a possible cause.  It is prepended
 
     :param task_details:    Task details from worker environment
     :param check_py_minor:  Whether Python micro version mismatches should

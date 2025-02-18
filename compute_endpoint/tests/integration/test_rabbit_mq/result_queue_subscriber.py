@@ -115,7 +115,7 @@ class ResultQueueSubscriber(threading.Thread):
     def _on_channel_closed(self, channel, exception):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
         Channels are usually closed if you attempt to do something that
-        violates the protocol, such as re-declare an EXCHANGE_NAME or queue with
+        violates the protocol, such as redeclare an EXCHANGE_NAME or queue with
         different parameters. In this case, we'll close the connection
         to shutdown the object.
 

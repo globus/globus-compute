@@ -358,7 +358,7 @@ Endpoint when using the SDK to submit new functions.
 
 The serialization/deserialization mechanics in Python and the pickle/dill
 libraries are implemented at the bytecode level and have evolved extensively
-over time.  There is no backward/forward compatability guarantee between
+over time.  There is no backward/forward compatibility guarantee between
 versions.  Thus a function serialized in an older version of Python or dill
 may not deserialize correctly in later versions, and the opposite is even more
 problematic.

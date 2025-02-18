@@ -471,7 +471,7 @@ Every template also has access to the following variables:
   submitting the task request, such as Python version. See |UserRuntime| for a complete
   list of available information.
 
-These are reserved words and their values cannot be overidden by the user or admin,
+These are reserved words and their values cannot be overridden by the user or admin,
 and an error is thrown if a user tries to send it as a user option:
 
 .. code-block:: python
@@ -1265,7 +1265,7 @@ Administrator Quickstart
       ========== Endpoint Manager begins: 1ed568ab-79ec-4f7c-be78-a704439b2266
               >>> Multi-User Endpoint ID: 1ed568ab-79ec-4f7c-be78-a704439b2266 <<<
 
-   Additionally, for even noiser output, there is ``--debug``.
+   Additionally, for even noisier output, there is ``--debug``.
 
 #. When ready to install as an on-boot service, install it with a ``systemd`` unit file:
 
