@@ -935,7 +935,7 @@ def test_reload_sets_failed_tasks(gce: Executor):
     assert all("doh!" in str(fut.exception()) for fut in futs)
 
 
-def test_reload_handles_deseralization_error_gracefully(gce: Executor):
+def test_reload_handles_deserialization_error_gracefully(gce: Executor):
     gcc = gce.client
     gcc.fx_serializer = ComputeSerializer()
 

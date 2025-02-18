@@ -242,7 +242,7 @@ def _shell_escape_filter(val):
 
 def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | None]:
     # Reminder: this method _reads from the filesystem_, so will need appropriate
-    # priviliges.  Per sc-28360, separate out from the rendering so that we can
+    # privileges.  Per sc-28360, separate out from the rendering so that we can
     # load the file data into a string before dropping privileges.
     from globus_compute_endpoint.endpoint.endpoint import Endpoint
 

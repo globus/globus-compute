@@ -126,7 +126,7 @@ arbitrary arguments and returned parameters. Globus Compute will
 serialize any ``*args`` and ``**kwargs`` when executing a function and
 it will serialize any return parameters or exceptions.
 
-Note: Globus Compute uses standard Python serilaization libraries (i.e.,
+Note: Globus Compute uses standard Python serialization libraries (i.e.,
 Dill). It also limits the size of input arguments and returned
 parameters to 10 MB. For larger input or output data we suggest using
 Globus.
@@ -235,7 +235,7 @@ square with side length :math:`2r`, the area of the circle is
 :math:`\pi r^2` and the area of the square is :math:`(2r)^2`. Thus, if
 :math:`N` uniformly-distributed points are dropped at random locations
 within the square, approximately :math:`N\pi/4` will be inside the
-circle and therfore we can estimate the value of :math:`\pi`.
+circle and therefore we can estimate the value of :math:`\pi`.
 
 .. code:: python
 

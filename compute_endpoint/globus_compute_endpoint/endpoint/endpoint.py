@@ -250,7 +250,7 @@ class Endpoint:
         # taking the basename, ensuring it's not Unix hidden (initial dot [.]), and
         # has no whitespace.  The path name is used deep within Parsl, which uses
         # raw shell to perform some actions ... and is not robust about it at all.
-        # The path of least resistence, then, is to restrict this EP name upfront.
+        # The path of least resistance, then, is to restrict this EP name upfront.
         # Examples:
         #
         # Good: "nice_normal_name"
@@ -265,8 +265,8 @@ class Endpoint:
         # Bad: "/absolute_path"
         # Bad: "contains...\r\v\t\n...other_whitespace"
         # Bad: "we_\\_do_not_accept_escapes"
-        # Bad: "we_don't_accept_single_qoutes"
-        # Bad: 'we_do_not_accept_"double_qoutes"'
+        # Bad: "we_don't_accept_single_quotes"
+        # Bad: 'we_do_not_accept_"double_quotes"'
         err_msg = "Invalid endpoint name: "
         pathname_re = re.compile(r"[\\/\s'\"]")
         if not path_name:
@@ -663,7 +663,7 @@ class Endpoint:
         pid = int(pid_path.read_text().strip())
         try:
             log.debug(f"Signaling process: {pid}")
-            # For all the processes, including the deamon and its descendants,
+            # For all the processes, including the daemon and its descendants,
             # send SIGTERM, wait for 10s, and then SIGKILL any still alive.
             grace_period_s = 10
             parent = psutil.Process(pid)

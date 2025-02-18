@@ -549,7 +549,7 @@ class EndpointManager:
                 ids = userinfo["identity_set"]
                 parent_identities.update(ident["sub"] for ident in ids)
                 log.debug(
-                    "User-endpoint start requests are valid from identites: %s",
+                    "User-endpoint start requests are valid from identities: %s",
                     parent_identities,
                 )
                 del gcc, client_options, ids

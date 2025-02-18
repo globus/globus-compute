@@ -13,7 +13,7 @@ from globus_compute_sdk.version import compare_versions
         ("1.2.3-dev", "1.2.3", True),
         ("1.2.3a1", "1.2.3-dev", True),
         ("1.2.3-dev", "1.2.3b2", True),
-        # dev versions take a back-seat to mistmatched MAJOR.MINOR.PATCH
+        # dev versions take a back-seat to mismatched MAJOR.MINOR.PATCH
         ("1.2.3", "1.2.4-dev", False),  # dev vs non-pre
     ],
 )

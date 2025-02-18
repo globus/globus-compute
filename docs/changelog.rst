@@ -161,7 +161,7 @@ New Functionality
 
   As authentication is implemented via Globus Auth and identity mapping, the
   Globus Compute Endpoint does not implement the authorization or password
-  managment phases of PAM.  It implements account
+  management phases of PAM.  It implements account
   (|pam_acct_mgmt(3)|_) and session (|pam_open_session(3)|) management.
 
   For more information, consult :ref:`the PAM section <pam>` of the
@@ -1423,7 +1423,7 @@ Deprecated
 - The ``HighThroughputExecutor`` is now marked for deprecation.
   Importing and using this class will raise a warning.
   Upgrade to the ``globus_compute_endpoint.engines.GlobusComputeEngine`` which
-  supercedes the ``HighThroughputExecutor``.
+  supersedes the ``HighThroughputExecutor``.
 
   Please note that the |GlobusComputeEngine| has the following limitations:
 
@@ -1672,7 +1672,7 @@ Bug Fixes
 Security
 ^^^^^^^^
 
-- Previously, the main configuraton directory (typically ``~/.funcx/``) would
+- Previously, the main configuration directory (typically ``~/.funcx/``) would
   be created honoring the users umask, typically resulting in
   world-readability.  In a typical administration, this may be mitigated by
   stronger permissions on the user's home directory, but still isn't robust.
@@ -2177,7 +2177,7 @@ Changed
 
 - Endpoint logs have been reduced in verbosity. A number of noisy log lines have been
   lowered to TRACE level. [PREFIXES] have been removed from many messages as they
-  contain information more reliably availale in log metadata.
+  contain information more reliably available in log metadata.
 
 - `FuncXExecutor <https://funcx.readthedocs.io/en/latest/executor.html>`_
   now uses batched submission by default.  This typically significantly
@@ -2248,7 +2248,7 @@ New Functionality
 
 - Capture, log, and report execution time information. The time a function takes to execute is now logged in worker debug logs and reported to the funcX service.
 
-- Added Helm options to specify Kuberenetes workerDebug, imagePullSecret and maxIdleTime values.
+- Added Helm options to specify Kubernetes workerDebug, imagePullSecret and maxIdleTime values.
 
 Changed
 ^^^^^^^

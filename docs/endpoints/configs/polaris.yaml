@@ -16,7 +16,7 @@ engine:
 
     launcher:
       type: MpiExecLauncher
-      # Ensures 1 manger per node, work on all 64 cores
+      # Ensures 1 manager per node, work on all 64 cores
       bind_cmd: --cpu-bind
       overrides: --depth=64 --ppn 1
 

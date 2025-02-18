@@ -329,7 +329,8 @@ def test_diagnostic_gzip(
         assert len(captured_stdout) == 2
 
     assert captured_stdout[-2].startswith(
-        "Compressed diagnostic output successfully writen to globus_compute_diagnostic_"
+        "Compressed diagnostic output successfully written"
+        " to globus_compute_diagnostic_"
     )
     # Ends with line break
     assert not captured_stdout[-1]
