@@ -19,7 +19,7 @@ engine:
 
         # string to prepend to #SBATCH blocks in the submit
         # script to the scheduler
-        # For GPUs in the debug qos eg: "#SBATCH --constraint=gpu"
+        # For GPUs in the debug qos eg: "#SBATCH --constraint=gpu\n#SBATCH --gpus-per-node=4"
         scheduler_options: {{ OPTIONS }}
 
         # Your NERSC account, eg: "m0000"
