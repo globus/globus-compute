@@ -648,7 +648,8 @@ class Client:
         container_uuid : str
             UUID of the container in question
         container_type : str
-            The type of containers that will be used (Singularity, Shifter, Docker)
+            The type of containers that will be used (Singularity, Shifter, Docker,
+            Podman)
 
         Returns
         -------
@@ -804,9 +805,8 @@ class Client:
         location : str
             The location of the container (e.g., its docker url). Required
         container_type : str
-            The type of containers that will be used (Singularity, Shifter, Docker).
-            Required
-
+            The type of containers that will be used (Singularity, Shifter, Docker,
+            Podman). Required
         name : str
             A name for the container. Default = ''
         description : str
