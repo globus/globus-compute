@@ -68,6 +68,16 @@ def test_singularity(gce_factory, randomstring):
     assert container_launch_cmd.startswith(expected)
 
 
+def test_podman(tmp_path, gce_factory):
+    gce, exp_uri, exp_opts = gce_factory(container_type="podman")
+    container_launch_cmd = gce.executor.launch_cmd
+    expected = (
+        f"podman run {exp_opts} -v {tmp_path}:{tmp_path} -t"
+        f" {exp_uri} {_LAUNCH_CMD_PREFIX}"
+    )
+    assert container_launch_cmd.startswith(expected)
+
+
 def test_custom_missing_options(tmp_path):
     gce = GlobusComputeEngine(
         address="::1", max_workers_per_node=1, label="GCE_TEST", container_type="custom"

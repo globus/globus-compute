@@ -442,6 +442,7 @@ following options:
     * ``apptainer``
     * ``docker``
     * ``singularity``
+    * ``podman``
     * ``custom``
     * ``None``
 

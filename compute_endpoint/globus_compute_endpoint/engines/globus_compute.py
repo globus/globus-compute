@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 DOCKER_CMD_TEMPLATE = "docker run {options} -v {rundir}:{rundir} -t {image} {command}"
 APPTAINER_CMD_TEMPLATE = "apptainer run {options} {image} {command}"
 SINGULARITY_CMD_TEMPLATE = "singularity run {options} {image} {command}"
-VALID_CONTAINER_TYPES = ("docker", "singularity", "apptainer", "custom", None)
+PODMAN_CMD_TEMPLATE = "podman run {options} -v {rundir}:{rundir} -t {image} {command}"
+VALID_CONTAINER_TYPES = ("docker", "singularity", "apptainer", "podman", "custom", None)
 
 
 class JobStatusPollerKwargs(t.TypedDict, total=False):
@@ -228,6 +229,13 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         elif self.container_type == "singularity":
             launch_cmd = SINGULARITY_CMD_TEMPLATE.format(
                 image=self.container_uri,
+                command=launch_cmd,
+                options=self.container_cmd_options or "",
+            )
+        elif self.container_type == "podman":
+            launch_cmd = PODMAN_CMD_TEMPLATE.format(
+                image=self.container_uri,
+                rundir=self.run_dir,
                 command=launch_cmd,
                 options=self.container_cmd_options or "",
             )
