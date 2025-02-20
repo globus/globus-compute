@@ -13,10 +13,16 @@ class SerializationStrategy(ABC):
     arguments into string data and back again.
     """
 
+    _CACHE: t.ClassVar[t.Dict[str, "SerializationStrategy"]] = {}
+
     def __init_subclass__(cls):
         super().__init_subclass__()
         if len(cls.identifier) != IDENTIFIER_LENGTH:
             raise ValueError(f"Identifiers must be {IDENTIFIER_LENGTH} characters long")
+        if cls.identifier[-1] != "\n":
+            raise ValueError("Identifiers must end with a newline character")
+
+        SerializationStrategy._CACHE[cls.identifier] = cls()
 
     #: The unique, 3-character string that identifies this strategy. The first two
     #: characters are the effective identifier; the third must always be the newline
@@ -28,6 +34,10 @@ class SerializationStrategy(ABC):
     #: Note that a single ``SerializationStrategy`` cannot support both callables and
     #: non-callables.
     for_code: t.ClassVar[bool]
+
+    @classmethod
+    def get_cached(cls, identifier: str) -> t.Optional["SerializationStrategy"]:
+        return cls._CACHE.get(identifier)
 
     @abstractmethod
     def serialize(self, data: t.Any) -> str:

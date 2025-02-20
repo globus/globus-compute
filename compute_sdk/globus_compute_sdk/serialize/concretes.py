@@ -152,6 +152,8 @@ class PickleCode(SerializationStrategy):
     :meta private:
     """
 
+    _DEPRECATED = True
+
     identifier = "02\n"  #:
     for_code = True  #:
 
@@ -308,23 +310,10 @@ class CombinedCode(SerializationStrategy):
         raise DeserializationError(f"Deserialization failed after {count} tries")
 
 
-STRATEGIES_MAP: dict[str, t.Type[SerializationStrategy]] = {
-    DillDataBase64.identifier: DillDataBase64,
-    JSONData.identifier: JSONData,
-    DillCodeSource.identifier: DillCodeSource,
-    DillCode.identifier: DillCode,
-    DillCodeTextInspect.identifier: DillCodeTextInspect,
-    PickleCode.identifier: PickleCode,
-    CombinedCode.identifier: CombinedCode,
-}
-
-SELECTABLE_STRATEGIES: list[type[SerializationStrategy]] = [
-    DillDataBase64,
-    JSONData,
-    DillCodeSource,
-    DillCode,
-    DillCodeTextInspect,
-    CombinedCode,
+SELECTABLE_STRATEGIES = [
+    t.__class__
+    for t in SerializationStrategy._CACHE.values()
+    if not getattr(t, "_DEPRECATED", False)
 ]
 
 #: The *code* serialization strategy used by :class:`ComputeSerializer`

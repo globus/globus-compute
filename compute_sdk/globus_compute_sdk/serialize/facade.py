@@ -17,7 +17,6 @@ from globus_compute_sdk.serialize.concretes import (
     DEFAULT_STRATEGY_CODE,
     DEFAULT_STRATEGY_DATA,
     SELECTABLE_STRATEGIES,
-    STRATEGIES_MAP,
 )
 
 logger = logging.getLogger(__name__)
@@ -160,11 +159,6 @@ class ComputeSerializer:
 
         self.allowed_deserializer_types = parse_allowlist(allowed_deserializer_types)
 
-        self.strategies = {
-            header: strategy_class()
-            for header, strategy_class in STRATEGIES_MAP.items()
-        }
-
     def serialize(self, data: t.Any) -> str:
         """
         Converts Python data to a string representation, using this serializer's
@@ -203,7 +197,7 @@ class ComputeSerializer:
             with an allowed strategy.
         """
         header = payload[:IDENTIFIER_LENGTH]
-        strategy = self.strategies.get(header)
+        strategy = SerializationStrategy.get_cached(header)
 
         if not strategy:
             raise DeserializationError(f"Invalid header: {header} in data payload")
