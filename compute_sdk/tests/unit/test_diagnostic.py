@@ -328,11 +328,12 @@ def test_diagnostic_gzip(
     else:
         assert len(captured_stdout) == 2
 
-    assert captured_stdout[-2].startswith(
-        "Compressed diagnostic output successfully writen to globus_compute_diagnostic_"
+    exp_msg = (
+        "Compressed diagnostic output successfully written to"
+        " globus_compute_diagnostic_"
     )
-    # Ends with line break
-    assert not captured_stdout[-1]
+    assert captured_stdout[-2].startswith(exp_msg), "Expect output file shared to user"
+    assert not captured_stdout[-1], "Expect ends with newline, for clarity"
 
     for random_file_data in mock_endpoint_config_dir_data.values():
         assert random_file_data in contents
