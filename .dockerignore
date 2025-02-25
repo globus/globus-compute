@@ -57,11 +57,15 @@
 
 # Sphinx documentation
 docs/_build/
+.venv-docs/
 
 # PyBuilder
-target/
+**/target/
 
 # Virtual environment
-.env/
-.venv/
-venv/
+**/.env/
+**/.venv/
+**/venv/
+
+# local_dev mounted data
+local_dev/
