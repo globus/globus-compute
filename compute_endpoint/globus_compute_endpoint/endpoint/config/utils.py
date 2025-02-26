@@ -259,6 +259,7 @@ def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | N
 
 def render_config_user_template(
     parent_config: ManagerEndpointConfig,
+    parent_config_dir: pathlib.Path,
     user_config_template: str,
     user_config_schema: dict | None = None,
     user_opts: dict | None = None,
@@ -274,7 +275,21 @@ def render_config_user_template(
     _validate_user_opts(_user_opts, user_config_schema)
     _user_opts = _sanitize_user_opts(_user_opts)
 
-    environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
+    env_kwargs = {"undefined": jinja2.StrictUndefined}
+    try:
+        # Check if the UEP can access the MEP config dir
+        list(parent_config_dir.iterdir())
+    except PermissionError:
+        log.debug(
+            f"User endpoint does not have permissions to access {parent_config_dir};"
+            " rendering template in a sandboxed environment"
+        )
+    else:
+        # If the UEP can access the MEP config dir, allow it to load
+        # additional template fragments within the MEP config dir
+        env_kwargs["loader"] = jinja2.FileSystemLoader(parent_config_dir)
+
+    environment = SandboxedEnvironment(**env_kwargs)
     environment.filters["shell_escape"] = _shell_escape_filter
     template = environment.from_string(user_config_template)
 

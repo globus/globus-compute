@@ -1112,7 +1112,12 @@ class EndpointManager:
             user_opts = kwargs.get("user_opts", {})
             user_runtime = kwargs.get("user_runtime", {})
             user_config = render_config_user_template(
-                self._config, template_str, user_config_schema, user_opts, user_runtime
+                self._config,
+                self.conf_dir,
+                template_str,
+                user_config_schema,
+                user_opts,
+                user_runtime,
             )
             exit_code += 1
 
