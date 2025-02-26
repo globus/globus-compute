@@ -3,6 +3,32 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.2.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.2.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added an optional ``authorizer`` parameter to the ``Client`` initializer to support
+  using a ``GlobusAuthorizer`` for authentication. This parameter is mutually exclusive
+  with ``app``.
+
+Deprecated
+^^^^^^^^^^
+
+- The ``LoginManager`` and ``AuthorizerLoginManager`` classes are now deprecated. Use
+  `GlobusApp <https://globus-compute.readthedocs.io/en/stable/sdk.html#globusapps>`_
+  objects from the Globus SDK instead.
+
+- The ``Client.login_manager`` attribute is now deprecated.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency to `2025.2.17 <https://pypi.org/project/parsl/2025.2.17/>`_.
+
 .. _changelog-3.1.1:
 
 globus-compute-sdk & globus-compute-endpoint v3.1.1
