@@ -21,6 +21,12 @@ class SerializationStrategy(ABC):
             raise ValueError(f"Identifiers must be {IDENTIFIER_LENGTH} characters long")
         if cls.identifier[-1] != "\n":
             raise ValueError("Identifiers must end with a newline character")
+        existing = SerializationStrategy._CACHE.get(cls.identifier)
+        if existing:
+            raise ValueError(
+                f"Identifier {cls.identifier!r} is already used by"
+                f" {type(existing).__name__}"
+            )
 
         SerializationStrategy._CACHE[cls.identifier] = cls()
 

@@ -374,6 +374,8 @@ def test_serializer_errors_on_unknown_strategy():
     with pytest.raises(SerdeError):
         ComputeSerializer(strategy_data=strategy)
 
+    SerializationStrategy._CACHE.pop(NewStrategy.identifier)
+
 
 @pytest.mark.parametrize(
     "strategy_code", (s for s in concretes.SELECTABLE_STRATEGIES if s.for_code)
@@ -619,3 +621,5 @@ def test_allowed_deserializers_errors_on_unknown_strategy():
 
     for e in (pyt_exc1, pyt_exc2):
         assert "is not a known serialization strategy" in str(e)
+
+    SerializationStrategy._CACHE.pop(NewStrategy.identifier)
