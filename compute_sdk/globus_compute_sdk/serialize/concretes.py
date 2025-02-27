@@ -310,6 +310,86 @@ class CombinedCode(SerializationStrategy):
         raise DeserializationError(f"Deserialization failed after {count} tries")
 
 
+class PureSourceTextInspect(SerializationStrategy):
+    """
+    Extracts a function's definition via :func:`inspect.getsource` and sends the
+    resulting string directly over the wire.
+
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ❌
+          - ✅
+          - ⚠️
+          - ❌
+    """
+
+    identifier = "st\n"  # "Source TextInspect"
+    for_code = True
+
+    _separator = ":"
+
+    def serialize(self, data) -> str:
+        ":meta private:"
+        name = data.__name__
+        body = inspect.getsource(data)
+        x = name + self._separator + body
+        return self.identifier + x
+
+    def deserialize(self, payload: str):
+        ":meta private:"
+        chomped = self.chomp(payload)
+        name, body = chomped.split(self._separator, 1)
+        exec_ns: dict = {}
+        exec(body, exec_ns)
+        return exec_ns[name]
+
+
+class PureSourceDill(SerializationStrategy):
+    """
+    Extracts a function's definition via |dill.getsource|_ and sends the resulting
+    string directly over the wire.
+
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ✅
+          - ❌
+          - ⚠️
+          - ❌
+    """
+
+    identifier = "sd\n"  # "Source Dill"
+    for_code = True
+
+    _separator = ":"
+
+    def serialize(self, data) -> str:
+        ":meta private:"
+        name = data.__name__
+        body = dill.source.getsource(data, lstrip=True)
+        x = name + self._separator + body
+        return self.identifier + x
+
+    def deserialize(self, payload: str):
+        ":meta private:"
+        chomped = self.chomp(payload)
+        name, body = chomped.split(self._separator, 1)
+        exec_ns: dict = {}
+        exec(body, exec_ns)
+        return exec_ns[name]
+
+
 SELECTABLE_STRATEGIES = [
     t.__class__
     for t in SerializationStrategy._CACHE.values()

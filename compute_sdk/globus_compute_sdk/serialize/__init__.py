@@ -8,6 +8,8 @@ from globus_compute_sdk.serialize.concretes import (
     DillCodeTextInspect,
     DillDataBase64,
     JSONData,
+    PureSourceDill,
+    PureSourceTextInspect,
 )
 from globus_compute_sdk.serialize.facade import AllowlistWildcard, ComputeSerializer
 
@@ -22,6 +24,8 @@ __all__ = [
     "DillCode",
     "DillCodeSource",
     "DillCodeTextInspect",
+    "PureSourceDill",
+    "PureSourceTextInspect",
     "DillDataBase64",
     "JSONData",
 ]
