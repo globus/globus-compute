@@ -8,6 +8,7 @@ services:
       dockerfile: endpoint_dev.Dockerfile
       args:
         LOCAL_USER: ${LOCAL_USER:-${USER}}
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
     volumes:
       - ../:/opt/globus-compute
       - ./docker_data/.globus_compute:/home/${LOCAL_USER:-${USER}}/.globus_compute
