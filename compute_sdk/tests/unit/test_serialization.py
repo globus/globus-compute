@@ -623,3 +623,55 @@ def test_allowed_deserializers_errors_on_unknown_strategy():
         assert "is not a known serialization strategy" in str(e)
 
     SerializationStrategy._CACHE.pop(NewStrategy.identifier)
+
+
+@pytest.mark.parametrize("wrong_length_id", ["", "1", "12", "1234"])
+def test_init_subclass_requires_correct_length(wrong_length_id):
+    with pytest.raises(ValueError) as pyt_exc:
+
+        class NewStrategy(SerializationStrategy):
+            identifier = wrong_length_id
+            for_code = True
+
+            def serialize(self, data):
+                pass
+
+            def deserialize(self, payload):
+                pass
+
+    assert "must be 3 characters long" in str(pyt_exc.value)
+
+
+def test_init_subclass_requires_newline():
+    with pytest.raises(ValueError) as pyt_exc:
+
+        class NewStrategy(SerializationStrategy):
+            identifier = "123"
+            for_code = True
+
+            def serialize(self, data):
+                pass
+
+            def deserialize(self, payload):
+                pass
+
+    assert "must end with a newline character" in str(pyt_exc.value)
+
+
+@pytest.mark.parametrize(
+    "existing_id", [s.identifier for s in SerializationStrategy._CACHE.values()]
+)
+def test_init_subclass_requires_unique_identifier(existing_id):
+    with pytest.raises(ValueError) as pyt_exc:
+
+        class NewStrategy(SerializationStrategy):
+            identifier = existing_id
+            for_code = True
+
+            def serialize(self, data):
+                pass
+
+            def deserialize(self, payload):
+                pass
+
+    assert f"{existing_id!r} is already used by" in str(pyt_exc.value)
