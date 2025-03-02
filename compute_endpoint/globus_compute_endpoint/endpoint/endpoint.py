@@ -98,6 +98,12 @@ class Endpoint:
         if multi_user:
             config_dict["multi_user"] = multi_user
             config_dict.pop("engine", None)
+            config_dict["user_config_template_path"] = str(
+                Endpoint.user_config_template_path(target_path.parent)
+            )
+            config_dict["user_config_schema_path"] = str(
+                Endpoint.user_config_schema_path(target_path.parent)
+            )
             config_dict["identity_mapping_config_path"] = str(
                 Endpoint._example_identity_mapping_configuration_path(
                     target_path.parent

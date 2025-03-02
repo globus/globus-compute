@@ -164,19 +164,14 @@ def get_config(
     return load_config_yaml(config_str)
 
 
-def load_user_config_schema(endpoint_dir: pathlib.Path) -> dict | None:
-    from globus_compute_endpoint.endpoint.endpoint import Endpoint
-
-    user_config_schema_path = Endpoint.user_config_schema_path(endpoint_dir)
-    if not user_config_schema_path.exists():
+def load_user_config_schema(schema_path: pathlib.Path) -> dict | None:
+    if not schema_path.exists():
         return None
 
     try:
-        return json.loads(user_config_schema_path.read_text())
+        return json.loads(schema_path.read_text())
     except json.JSONDecodeError:
-        log.error(
-            f"\n\nThe user config schema is not valid JSON: {user_config_schema_path}\n"
-        )
+        log.error(f"\n\nThe user config schema is not valid JSON: {schema_path}\n")
         raise
 
 
@@ -240,25 +235,19 @@ def _shell_escape_filter(val):
     return json.dumps(shlex.quote(loaded))
 
 
-def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | None]:
+def load_user_config_template(template_path: pathlib.Path) -> str:
     # Reminder: this method _reads from the filesystem_, so will need appropriate
     # privileges.  Per sc-28360, separate out from the rendering so that we can
     # load the file data into a string before dropping privileges.
-    from globus_compute_endpoint.endpoint.endpoint import Endpoint
-
-    user_config_path = Endpoint.user_config_template_path(endpoint_dir)
-    if not user_config_path.exists():
+    if not template_path.exists():
         log.info("user_config_template.yaml.j2 does not exist; trying .yaml")
-        user_config_path = pathlib.Path(re.sub(r"\.j2$", "", str(user_config_path)))
-    template_str = _read_config_file(user_config_path)
-
-    user_config_schema = load_user_config_schema(endpoint_dir)
-
-    return template_str, user_config_schema
+        template_path = pathlib.Path(re.sub(r"\.j2$", "", str(template_path)))
+    return _read_config_file(template_path)
 
 
 def render_config_user_template(
     parent_config: ManagerEndpointConfig,
+    user_config_template_dir: pathlib.Path,
     user_config_template: str,
     user_config_schema: dict | None = None,
     user_opts: dict | None = None,
@@ -274,7 +263,18 @@ def render_config_user_template(
     _validate_user_opts(_user_opts, user_config_schema)
     _user_opts = _sanitize_user_opts(_user_opts)
 
-    environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
+    loader = None
+    try:
+        list(user_config_template_dir.iterdir())
+    except PermissionError:
+        log.debug(
+            "User endpoint does not have permissions to load templates"
+            f"from directory {user_config_template_dir}"
+        )
+    else:
+        loader = jinja2.FileSystemLoader(user_config_template_dir)
+
+    environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined, loader=loader)
     environment.filters["shell_escape"] = _shell_escape_filter
     template = environment.from_string(user_config_template)
 

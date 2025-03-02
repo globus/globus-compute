@@ -139,6 +139,8 @@ class UserEndpointConfigModel(BaseEndpointConfigModel):
 
 class ManagerEndpointConfigModel(BaseEndpointConfigModel):
     public: t.Optional[bool]
+    user_config_template_path: t.Optional[FilePath]
+    user_config_schema_path: t.Optional[FilePath]
     identity_mapping_config_path: t.Optional[FilePath]
     force_mu_allow_same_user: t.Optional[bool]
     mu_child_ep_grace_period_s: t.Optional[float]
