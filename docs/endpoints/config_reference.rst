@@ -264,6 +264,32 @@ note are:
      multi_user: true
      identity_mapping_config_path: /path/to/idmap_config.json
 
+- ``user_config_template_path``
+
+  The path to the user endpoint configuration Jinja2 template YAML file.  If not specified,
+  the default template path will be used: ``~/.globus_compute/user_config_template.yaml.j2``.
+
+  See :ref:`user-config-template-yaml-j2` for more information.
+
+  .. code-block:: yaml
+     :caption: Example MEP ``config.yaml`` with a custom user config template path
+
+     multi_user: true
+     user_config_template_path: /path/to/my_template.yaml.j2
+
+- ``user_config_schema_path``
+
+  The path to the user endpoint configuration JSON schema file.  If not specified, the
+  default schema path will be used: ``~/.globus_compute/user_config_schema.json``.
+
+  See :ref:`user-config-schema-json` for more information.
+
+  .. code-block:: yaml
+     :caption: Example MEP ``config.yaml`` with a custom user config schema path
+
+     multi_user: true
+     user_config_schema_path: /path/to/my_schema.json
+
 - ``public``
 
   A boolean value, dictating whether other users can discover this MEP in the Globus

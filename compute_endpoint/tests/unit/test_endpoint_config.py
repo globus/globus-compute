@@ -1,3 +1,4 @@
+import os
 import pathlib
 import typing as t
 from unittest import mock
@@ -77,9 +78,17 @@ def test_config_model_enforces_engine(config_dict):
     assert "engine\n  field required" in str(pyt_exc.value)
 
 
-def test_mu_config_verifies_identity_mapping(config_dict_mu):
+@pytest.mark.parametrize(
+    "field",
+    (
+        "identity_mapping_config_path",
+        "user_config_template_path",
+        "user_config_schema_path",
+    ),
+)
+def test_mu_config_verifies_path_like_fields(config_dict_mu, field: str):
     conf_p = pathlib.Path("/some/path/not exists file")
-    config_dict_mu["identity_mapping_config_path"] = conf_p
+    config_dict_mu[field] = conf_p
     with pytest.raises(ValidationError) as pyt_e:
         ManagerEndpointConfigModel(**config_dict_mu)
 
@@ -87,7 +96,7 @@ def test_mu_config_verifies_identity_mapping(config_dict_mu):
     assert "does not exist" in e_str
     assert str(conf_p) in e_str, "expect location in exc to help human out"
 
-    del config_dict_mu["identity_mapping_config_path"]
+    del config_dict_mu[field]
     ManagerEndpointConfigModel(
         **config_dict_mu
     )  # doesn't raise; conditional validation
@@ -188,9 +197,10 @@ def test_managerconfig_repr_nondefault_kwargs(
     randomstring, fs, kw, cls, get_random_of_datatype
 ):
     val = get_random_of_datatype(cls)
+    if cls == os.PathLike:
+        val = pathlib.Path(val)
 
     if kw == "identity_mapping_config_path":
-        val = pathlib.Path(val)
         with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
             repr_c = repr(ManagerEndpointConfig(**{kw: val}))
     else:

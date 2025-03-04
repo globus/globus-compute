@@ -1,0 +1,11 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Multi-user endpoint administrators can now specify custom user configuration
+  template and schema paths with the ``user_config_template_path`` and
+  ``user_config_schema_path`` configuration options.
+
+  .. code-block:: yaml
+     multi_user: true
+     user_config_template_path: /path/to/my_template.yaml.j2
+     user_config_schema_path: /path/to/my_schema.json

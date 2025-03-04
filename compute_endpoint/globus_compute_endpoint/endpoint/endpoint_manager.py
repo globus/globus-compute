@@ -35,6 +35,7 @@ from globus_compute_endpoint import __version__
 from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
 from globus_compute_endpoint.endpoint.config.config import MINIMUM_HEARTBEAT
 from globus_compute_endpoint.endpoint.config.utils import (
+    load_user_config_schema,
     load_user_config_template,
     render_config_user_template,
     serialize_config,
@@ -138,6 +139,15 @@ class EndpointManager:
         self.conf_dir = conf_dir
         self._config = config
 
+        self.user_config_template_path = (
+            self._config.user_config_template_path
+            or Endpoint.user_config_template_path(self.conf_dir)
+        )
+        self.user_config_schema_path = (
+            self._config.user_config_schema_path
+            or Endpoint.user_config_schema_path(self.conf_dir)
+        )
+
         # UX - test conditional imports *now*, rather than when a request comes in;
         # this gives immediate feedback to an implementing admin if something is awry
         if config.pam.enable:
@@ -193,7 +203,7 @@ class EndpointManager:
                 reg_info = gcc.register_endpoint(
                     name=conf_dir.name,
                     endpoint_id=endpoint_uuid,
-                    metadata=EndpointManager.get_metadata(config, conf_dir),
+                    metadata=self.get_metadata(config),
                     multi_user=True,
                     display_name=config.display_name,
                     allowed_functions=config.allowed_functions,
@@ -338,9 +348,9 @@ class EndpointManager:
         )
         self._heartbeat_publisher = ResultPublisher(queue_info=hbq_info)
 
-    @staticmethod
-    def get_metadata(config: ManagerEndpointConfig, conf_dir: pathlib.Path) -> dict:
-        user_config_template, user_config_schema = load_user_config_template(conf_dir)
+    def get_metadata(self, config: ManagerEndpointConfig) -> dict:
+        user_config_template = load_user_config_template(self.user_config_template_path)
+        user_config_schema = load_user_config_schema(self.user_config_schema_path)
         return {
             "endpoint_version": __version__,
             "python_version": platform.python_version(),
@@ -986,7 +996,8 @@ class EndpointManager:
             setup_logging(logfile=None, debug=log.getEffectiveLevel() <= logging.DEBUG)
 
             # load prior to dropping privileges
-            template_str, user_config_schema = load_user_config_template(self.conf_dir)
+            template_str = load_user_config_template(self.user_config_template_path)
+            user_config_schema = load_user_config_schema(self.user_config_schema_path)
 
             pybindir = pathlib.Path(sys.executable).parent
             default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)

@@ -312,15 +312,15 @@ def test_load_user_config_schema(mock_log, data: t.Tuple[bool, str]):
     is_valid, schema_json = data
 
     conf_dir = pathlib.Path("/")
-    template = Endpoint.user_config_schema_path(conf_dir)
-    template.write_text(schema_json)
+    template_path = Endpoint.user_config_schema_path(conf_dir)
+    template_path.write_text(schema_json)
 
     if is_valid:
-        schema = load_user_config_schema(conf_dir)
+        schema = load_user_config_schema(template_path)
         assert schema == json.loads(schema_json)
     else:
         with pytest.raises(json.JSONDecodeError):
-            load_user_config_schema(conf_dir)
+            load_user_config_schema(template_path)
         assert mock_log.error.called
         a, *_ = mock_log.error.call_args
         assert "user config schema is not valid JSON" in str(a)
@@ -338,14 +338,15 @@ def test_load_user_config_template_valid_extensions(
     template_str = "multi_user: true"
     template_path.write_text(template_str)
 
-    assert load_user_config_template(conf_dir) == (template_str, None)
+    assert load_user_config_template(template_path) == template_str
 
 
-def test_load_user_config_template_prefer_j2():
+def test_load_user_config_template_tries_yaml_if_j2_not_found():
     conf_dir = pathlib.Path("/")
-    (conf_dir / "user_config_template.yaml").write_text("yaml")
-    (conf_dir / "user_config_template.yaml.j2").write_text("j2")
-    assert load_user_config_template(conf_dir) == ("j2", None)
+    template_path_yaml = conf_dir / "user_config_template.yaml"
+    template_path_yaml.write_text("yaml")
+    template_path_j2 = conf_dir / "user_config_template.yaml.j2"
+    assert load_user_config_template(template_path_j2) == "yaml"
 
 
 @pytest.mark.parametrize(
