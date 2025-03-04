@@ -9,7 +9,6 @@ import queue
 import random
 import re
 import resource
-import shutil
 import signal
 import sys
 import time
@@ -2160,6 +2159,40 @@ def test_all_files_closed(successful_exec_from_mocked_root):
     assert closed == [0, 1, 2]
 
 
+def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked_root):
+    mock_os, conf_dir, _, _, _, em = successful_exec_from_mocked_root
+
+    template_path = conf_dir / "my_template.yaml.j2"
+    schema_path = conf_dir / "my_schema.json"
+    em.user_config_template_path = template_path
+    em.user_config_schema_path = schema_path
+
+    template = "foo: {{ foo }}"
+    schema = {"type": "object", "properties": {"foo": {"type": "string"}}}
+    config = "foo: bar"
+
+    template_path.write_text(template)
+    schema_path.write_text(json.dumps(schema))
+    mock_render = mocker.patch(
+        f"{_MOCK_BASE}render_config_user_template", return_value=config
+    )
+
+    m = mock.Mock()
+    mock_os.fdopen.return_value.__enter__.return_value = m
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+    a, _ = mock_render.call_args
+    assert a[1] == template
+    assert a[2] == template_path
+    assert a[3] == schema
+
+    (received_stdin,), _k = m.write.call_args
+    parsed_stdin = json.loads(received_stdin)
+    assert parsed_stdin["config"] == config
+
+
 @pytest.mark.parametrize("is_valid", (True, False))
 def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_valid):
     *_, em = successful_exec_from_mocked_root
@@ -2182,13 +2215,12 @@ def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_
 
 
 def test_able_to_render_user_config_sc28360(successful_exec_from_mocked_root, conf_dir):
-    def _remove_user_config_template(*args, **kwargs):
-        shutil.rmtree(conf_dir)
+    def _restrict_template_dir(*args, **kwargs):
+        conf_dir.chmod(0o000)
 
     mock_os, *_, em = successful_exec_from_mocked_root
 
-    # simulate no-permission-access to root-owned directory by removing entire dir
-    mock_os.setresuid.side_effect = _remove_user_config_template
+    mock_os.setresuid.side_effect = _restrict_template_dir
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 

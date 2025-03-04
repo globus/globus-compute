@@ -249,6 +249,7 @@ def load_user_config_template(template_path: pathlib.Path) -> str:
 def render_config_user_template(
     parent_config: ManagerEndpointConfig,
     user_config_template: str,
+    user_config_template_path: pathlib.Path,
     user_config_schema: dict | None = None,
     user_opts: dict | None = None,
     user_runtime: dict | None = None,
@@ -263,7 +264,20 @@ def render_config_user_template(
     _validate_user_opts(_user_opts, user_config_schema)
     _user_opts = _sanitize_user_opts(_user_opts)
 
-    environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
+    user_config_template_dir = user_config_template_path.parent
+    try:
+        list(user_config_template_dir.iterdir())
+    except PermissionError:
+        loader = None
+        log.debug(
+            "User endpoint does not have permissions to load templates"
+            f" from {user_config_template_dir}; extends, include, and import"
+            " Jinja tags will not be supported"
+        )
+    else:
+        loader = jinja2.FileSystemLoader(user_config_template_dir)
+
+    environment = SandboxedEnvironment(undefined=jinja2.StrictUndefined, loader=loader)
     environment.filters["shell_escape"] = _shell_escape_filter
     template = environment.from_string(user_config_template)
 
