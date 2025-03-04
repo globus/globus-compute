@@ -427,7 +427,20 @@ the Globus Connect Server's `Identity Mapping documentation`_.
 This file is the template that will be interpolated with user-specific variables for
 successful start-UEP requests.  More than simple interpolation, the MEP treats this file
 as a `Jinja template`_, so there is a good bit of flexibility available to the motivated
-administrator.  The initial user config template implements two user-specifiable
+administrator.
+
+.. tip::
+
+   Administrators can combine multiple templates with the ``extends``, ``include``, and
+   ``import`` Jinja tags.  However, since these templates are rendered in user space,
+   the administrator must:
+
+   1. Move the template files to a directory that every mapped local user account has
+      read access to.
+   2. Specify the main template file path with the ``user_config_template_path``
+      configuration option.
+
+The initial user config template implements two user-specifiable
 variables, ``endpoint_setup`` and ``worker_init``.  Both of these default to the empty
 string if not specified by the user (i.e., ``...|default()``).
 
@@ -498,7 +511,7 @@ and an error is thrown if a user tries to send it as a user option:
 
 If this file exists, then the MEP will validate the user's input against the JSON
 schema.  The default schema is quite permissive, allowing strings for the two defined
-variables to be strings, and then any other properties. Example:
+variables to be strings, and then any other properties.  Example:
 
 .. code-block:: json
 

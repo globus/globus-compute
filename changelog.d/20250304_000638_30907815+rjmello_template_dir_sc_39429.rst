@@ -9,3 +9,12 @@ New Functionality
      multi_user: true
      user_config_template_path: /path/to/my_template.yaml.j2
      user_config_schema_path: /path/to/my_schema.json
+
+-  Administrators can now combine multiple user configuration templates with the
+   ``extends``, ``include``, and ``import`` Jinja tags. However, since the templates
+   are rendered in user space, the administrator must:
+
+   1. Move the template files to a directory that every mapped local user account has
+      read access to.
+   2. Specify the main template file path with the ``user_config_template_path``
+      configuration option.
