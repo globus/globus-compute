@@ -10,6 +10,7 @@ import typing as t
 
 import pika
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.logging_config import file_log
 
 if t.TYPE_CHECKING:
     from pika.channel import Channel
@@ -97,6 +98,7 @@ class CommandQueueSubscriber(threading.Thread):
 
     def run(self):
         log.debug("%s AMQP thread begins", self)
+        file_log("AMQP thread for command_queue_subscriber begins")
         idle_for_s = 0.0
         while (
             not self._stop_event.is_set()
@@ -140,6 +142,9 @@ class CommandQueueSubscriber(threading.Thread):
 
     def _connect(self) -> pika.SelectConnection:
         pika_params = pika.URLParameters(self.queue_info["connection_url"])
+        file_log(
+            f"Connecting CommandQueueSubscriber to {self.queue_info['connection_url']}"
+        )
         return pika.SelectConnection(
             pika_params,
             on_close_callback=self._on_connection_closed,
@@ -266,6 +271,10 @@ class CommandQueueSubscriber(threading.Thread):
                 properties.app_id,
                 _redact_url_creds(body),
             )
+            bmsg = body.decode()
+            if "cmd_start_endpoint" in bmsg:
+                file_log("", reset=True)
+            file_log(f"Received message in CQS: {bmsg}")
             self._command_queue.put((d_tag, properties, body))
         except Exception:
             # No sense in waiting for the RMQ default 30m timeout; let it know

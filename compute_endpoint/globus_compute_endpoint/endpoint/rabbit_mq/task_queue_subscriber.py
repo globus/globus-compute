@@ -10,6 +10,7 @@ import typing as t
 
 import pika
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
+from globus_compute_endpoint.logging_config import file_log
 
 if t.TYPE_CHECKING:
     from pika.channel import Channel
@@ -164,6 +165,9 @@ class TaskQueueSubscriber(threading.Thread):
         self._stop_event.set()
 
     def _connect(self) -> pika.SelectConnection:
+        file_log(
+            f"TaskQueueSubscriber connecting to {self.queue_info['connection_url']}"
+        )
         pika_params = pika.URLParameters(self.queue_info["connection_url"])
         return pika.SelectConnection(
             pika_params,
@@ -318,6 +322,8 @@ class TaskQueueSubscriber(threading.Thread):
                 properties.app_id,
                 _redact_url_creds(body),
             )
+            bm = _redact_url_creds(body)
+            file_log(f"Task Queue Subscriber message received {str(bm)[:100]}...")
             headers = properties.headers if properties.headers else {}
             self.pending_task_queue.put((d_tag, headers, body))
         except Exception:

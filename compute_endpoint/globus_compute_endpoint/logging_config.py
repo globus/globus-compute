@@ -4,14 +4,19 @@ This module contains logging configuration for the globus-compute-endpoint appli
 
 from __future__ import annotations
 
+import json
 import logging
 import logging.config
 import logging.handlers
 import pathlib
 import re
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime
+from getpass import getuser
+from pathlib import Path
+from threading import get_ident
 
 log = logging.getLogger(__name__)
 
@@ -266,3 +271,44 @@ def setup_logging(
         config = _get_stream_dict_config(debug, no_color)
 
     logging.config.dictConfig(config)
+
+
+TMP_LOG_FILE = Path("/tmp/mutime.log")
+EPOCH_FILE = Path("/tmp/epoch.txt")
+
+
+def reset_epoch() -> None:
+    with open(EPOCH_FILE, "w") as f:
+        f.write(str(time.time()))
+
+
+def get_epoch() -> float:
+    if EPOCH_FILE.exists():
+        with open(EPOCH_FILE) as f:
+            existing = f.read()
+            if existing and str(existing).strip():
+                return float(existing)
+    reset_epoch()
+    return time.time()
+
+
+def file_log(s: str, reset: bool = False) -> None:
+    if reset:
+        reset_epoch()
+    elif s:
+        elapsed = time.time() - get_epoch()
+        with open(TMP_LOG_FILE, "a") as f:
+            if isinstance(s, list) or isinstance(s, tuple) or isinstance(s, dict):
+                s = json.dumps(s, indent=2)
+            s = re.sub(
+                r"amqps://([^:]+):([^@]+)@compute.amqps",
+                r"amqps://\1:xxx@compute.amqps",
+                s,
+            )
+            user = getuser()
+            if len(s) > 100:
+                s = s[:100] + "..."
+            tid = get_ident()
+            ts = datetime.now().isoformat()[:-3]
+
+            f.write(f"{ts} {user:5} thread({tid:11}) {elapsed:7.3f} {s}\n")

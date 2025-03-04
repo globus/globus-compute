@@ -51,6 +51,7 @@ from globus_compute_endpoint.endpoint.utils import (
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
+from globus_compute_endpoint.logging_config import file_log
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_sdk import GlobusAPIError, NetworkError
 
@@ -743,6 +744,7 @@ class EndpointManager:
                     f"Command process successfully forked for '{local_username}'"
                     f" (Globus effective identity: {effective_identity})."
                 )
+                file_log("Just after command_func sent")
             except (InvalidCommandError, InvalidUserError) as e:
                 exc_type = type(e).__name__
                 log.error(f"({exc_type}) {e}{identity_for_log}")

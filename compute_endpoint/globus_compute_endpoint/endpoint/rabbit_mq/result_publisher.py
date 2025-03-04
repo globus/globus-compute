@@ -22,6 +22,8 @@ if t.TYPE_CHECKING:
     from pika.spec import Exchange
     from pika.spec import Queue as pikaQueue
 
+from globus_compute_endpoint.logging_config import file_log
+
 log = logging.getLogger(__name__)
 
 
@@ -170,6 +172,7 @@ class ResultPublisher(threading.Thread):
 
     def _connect(self) -> pika.SelectConnection:
         pika_params = pika.URLParameters(self.queue_info["connection_url"])
+        file_log(f"ResultPublisher connecting to {self.queue_info['connection_url']}")
         return pika.SelectConnection(
             pika_params,
             on_open_callback=self._on_connection_open,
@@ -333,6 +336,11 @@ class ResultPublisher(threading.Thread):
             while True:
                 f, msg_bytes = self._outstanding.get(block=False)
                 try:
+                    msg = msg_bytes.decode("utf-8")
+                    if "ep_status_report" not in msg:
+                        file_log(f"Result publish in ResultPublisher: {msg}")
+                    else:
+                        file_log("<HEARTBEAT>")
                     self._mq_chan.basic_publish(body=msg_bytes, **self._publish_kwargs)
                     self._delivery_tag_index += 1
                     self._awaiting_confirmation[self._delivery_tag_index] = f

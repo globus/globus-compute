@@ -13,6 +13,7 @@ import threading
 import time
 import typing as t
 from concurrent.futures import Future
+from getpass import getuser
 
 import pika.exceptions
 import setproctitle
@@ -27,6 +28,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_endpoint.exception_handling import get_result_error_details
+from globus_compute_endpoint.logging_config import file_log
 from globus_compute_sdk import __version__ as funcx_sdk_version
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from parsl.version import VERSION as PARSL_VERSION
@@ -281,6 +283,7 @@ class EndpointInterchange:
         """
         log.debug("_main_loop begins")
 
+        file_log(f"Main loop begins for {getuser()}")
         task_q_subscriber = TaskQueueSubscriber(
             queue_info=self.task_q_info,
             pending_task_queue=self.pending_task_queue,
