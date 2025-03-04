@@ -164,19 +164,14 @@ def get_config(
     return load_config_yaml(config_str)
 
 
-def load_user_config_schema(endpoint_dir: pathlib.Path) -> dict | None:
-    from globus_compute_endpoint.endpoint.endpoint import Endpoint
-
-    user_config_schema_path = Endpoint.user_config_schema_path(endpoint_dir)
-    if not user_config_schema_path.exists():
+def load_user_config_schema(schema_path: pathlib.Path) -> dict | None:
+    if not schema_path.exists():
         return None
 
     try:
-        return json.loads(user_config_schema_path.read_text())
+        return json.loads(schema_path.read_text())
     except json.JSONDecodeError:
-        log.error(
-            f"\n\nThe user config schema is not valid JSON: {user_config_schema_path}\n"
-        )
+        log.error(f"\n\nThe user config schema is not valid JSON: {schema_path}\n")
         raise
 
 
@@ -240,21 +235,15 @@ def _shell_escape_filter(val):
     return json.dumps(shlex.quote(loaded))
 
 
-def load_user_config_template(endpoint_dir: pathlib.Path) -> tuple[str, dict | None]:
+def load_user_config_template(template_path: pathlib.Path) -> str:
     # Reminder: this method _reads from the filesystem_, so will need appropriate
     # privileges.  Per sc-28360, separate out from the rendering so that we can
     # load the file data into a string before dropping privileges.
-    from globus_compute_endpoint.endpoint.endpoint import Endpoint
-
-    user_config_path = Endpoint.user_config_template_path(endpoint_dir)
-    if not user_config_path.exists():
-        log.info("user_config_template.yaml.j2 does not exist; trying .yaml")
-        user_config_path = pathlib.Path(re.sub(r"\.j2$", "", str(user_config_path)))
-    template_str = _read_config_file(user_config_path)
-
-    user_config_schema = load_user_config_schema(endpoint_dir)
-
-    return template_str, user_config_schema
+    if not template_path.exists():
+        file_name = template_path.name
+        log.info(f"{file_name}.yaml.j2 does not exist; trying .yaml")
+        template_path = pathlib.Path(re.sub(r"\.j2$", "", str(template_path)))
+    return _read_config_file(template_path)
 
 
 def render_config_user_template(

@@ -52,6 +52,8 @@ known_manager_config_opts = {
     "heartbeat_period": int,
     "debug": True,
     "public": True,
+    "user_config_template_path": os.PathLike,
+    "user_config_schema_path": os.PathLike,
     "identity_mapping_config_path": os.PathLike,
     "pam": PamConfiguration,
     "force_mu_allow_same_user": True,
@@ -73,7 +75,7 @@ def get_random_of_datatype_impl(cls):
     elif issubclass(cls, os.PathLike):
         # use an invalid path to guarantee test is run under fs fixture
         p = pathlib.Path("/asadf/asdf/fake/filesystem/dir")
-        p.mkdir(parents=True)
+        p.mkdir(parents=True, exist_ok=True)
         p = p / "Some Test File"
         p.touch()
         return str(p)
