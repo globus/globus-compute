@@ -523,6 +523,37 @@ def test_handles_provided_endpoint_id_with_json(
     assert k["endpoint_id"] == ep_uuid
 
 
+@pytest.mark.parametrize("custom_template_path", (True, False))
+@pytest.mark.parametrize("custom_schema_path", (True, False))
+def test_sets_user_config_template_and_schema_path(
+    mock_client: t.Tuple[uuid.UUID, mock.Mock],
+    conf_dir: pathlib.Path,
+    mock_conf: ManagerEndpointConfig,
+    custom_template_path: bool,
+    custom_schema_path: bool,
+):
+    ep_uuid, _ = mock_client
+
+    template_path = Endpoint.user_config_template_path(conf_dir)
+    if custom_template_path:
+        template_path = conf_dir / "my_template.yaml.j2"
+
+    schema_path = Endpoint.user_config_schema_path(conf_dir)
+    if custom_schema_path:
+        schema_path = conf_dir / "my_schema.json"
+
+    template_path.write_text("multi_user: true")
+    schema_path.write_text("{}")
+
+    mock_conf.user_config_template_path = template_path
+    mock_conf.user_config_schema_path = schema_path
+
+    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
+
+    assert em.user_config_template_path == template_path
+    assert em.user_config_schema_path == schema_path
+
+
 @pytest.mark.parametrize("public", (True, False))
 def test_sends_data_during_registration(
     conf_dir, mock_conf: ManagerEndpointConfig, mock_client, public: bool

@@ -353,6 +353,12 @@ class ManagerEndpointConfig(BaseConfig):
            Do not use this flag as a means of security.  It controls *visibility* in
            the web user interface.  It does **not control access** to the endpoint.
 
+    :param user_config_template_path: Path to the user configuration template file for
+        this endpoint. If not specified, the default template path will be used.
+
+    :param user_config_schema_path: Path to the user configuration schema file for this
+        endpoint. If not specified, the default schema path will be used.
+
     :param identity_mapping_config_path: Path to the identity mapping configuration for
         this endpoint.  If the process is not privileged, a warning will be emitted to
         the logs and this item will be ignored; conversely, if privileged, this
@@ -393,6 +399,8 @@ class ManagerEndpointConfig(BaseConfig):
         self,
         *,
         public: bool = False,
+        user_config_template_path: os.PathLike | str | None = None,
+        user_config_schema_path: os.PathLike | str | None = None,
         identity_mapping_config_path: os.PathLike | str | None = None,
         pam: PamConfiguration | None = None,
         force_mu_allow_same_user: bool = False,
@@ -407,10 +415,32 @@ class ManagerEndpointConfig(BaseConfig):
         self.force_mu_allow_same_user = force_mu_allow_same_user is True
         self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
 
+        _tmp = user_config_template_path  # work with both mypy and flake8
+        self.user_config_template_path = _tmp  # type: ignore[assignment]
+
+        _tmp = user_config_schema_path  # work with both mypy and flake8
+        self.user_config_schema_path = _tmp  # type: ignore[assignment]
+
         _tmp = identity_mapping_config_path  # work with both mypy and flake8
         self.identity_mapping_config_path = _tmp  # type: ignore[assignment]
 
         self.pam = pam or PamConfiguration(enable=False)
+
+    @property
+    def user_config_template_path(self) -> pathlib.Path | None:
+        return self._user_config_template_path
+
+    @user_config_template_path.setter
+    def user_config_template_path(self, val: os.PathLike | str | None):
+        self._user_config_template_path = pathlib.Path(val) if val else None
+
+    @property
+    def user_config_schema_path(self) -> pathlib.Path | None:
+        return self._user_config_schema_path
+
+    @user_config_schema_path.setter
+    def user_config_schema_path(self, val: os.PathLike | str | None):
+        self._user_config_schema_path = pathlib.Path(val) if val else None
 
     @property
     def identity_mapping_config_path(self) -> pathlib.Path | None:

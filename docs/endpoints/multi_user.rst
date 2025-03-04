@@ -491,6 +491,8 @@ and an error is thrown if a user tries to send it as a user option:
    #   Unable to start user endpoint process for <user> [exit code: 77; (ValueError)
    #   'parent_config' is a reserved word and cannot be passed in via user config]")
 
+.. _user-config-schema-json:
+
 ``user_config_schema.json``
 ---------------------------
 

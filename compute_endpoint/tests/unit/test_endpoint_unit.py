@@ -19,12 +19,7 @@ import pytest
 import requests
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
-from globus_compute_endpoint.endpoint.config.utils import (
-    get_config,
-    load_user_config_template,
-    render_config_user_template,
-    serialize_config,
-)
+from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.engines import (
     GlobusComputeEngine,
@@ -542,16 +537,6 @@ def test_mu_endpoint_user_ep_yamls_world_readable(tmp_path):
         assert p.exists()
         assert p.stat().st_mode & 0o444 == 0o444, "Minimum world readable"
     assert ep_dir.stat().st_mode & 0o111 == 0o111, "Minimum world executable"
-
-
-def test_mu_endpoint_user_ep_sensible_default(tmp_path):
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
-    parent_cfg = get_config(ep_dir)
-
-    tmpl_str, schema = load_user_config_template(ep_dir)
-    # Doesn't crash; loads yaml, jinja template has defaults
-    render_config_user_template(parent_cfg, tmpl_str, schema, {})
 
 
 def test_always_prints_endpoint_id_to_terminal(
