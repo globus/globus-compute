@@ -306,8 +306,8 @@ def file_log(s: str, reset: bool = False) -> None:
                 s,
             )
             user = getuser()
-            if len(s) > 130:
-                s = s[:130] + "..."
+            if len(s) > 200:
+                s = s[:200] + "..."
             tid = get_ident()
             ts = datetime.now().isoformat()[:-3]
 
