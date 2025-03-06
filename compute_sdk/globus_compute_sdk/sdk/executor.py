@@ -5,7 +5,6 @@ import copy
 import json
 import logging
 import os
-import platform
 import queue
 import random
 import sys
@@ -20,7 +19,6 @@ from concurrent.futures import InvalidStateError
 import pika
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
-from globus_compute_sdk import __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.asynchronous.compute_future import ComputeFuture
 from globus_compute_sdk.sdk.client import Client
@@ -471,14 +469,7 @@ class Executor(concurrent.futures.Executor):
 
         log.debug("Function not registered. Registering: %s", fn)
         func_register_kwargs.pop("function", None)  # just to be sure
-        reg_kwargs = {
-            "function_name": fn.__name__,
-            "container_uuid": self.container_id,
-            "metadata": {
-                "python_version": platform.python_version(),
-                "sdk_version": __version__,
-            },
-        }
+        reg_kwargs = {"container_uuid": self.container_id}
         reg_kwargs.update(func_register_kwargs)
 
         try:
