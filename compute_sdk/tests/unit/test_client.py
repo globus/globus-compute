@@ -13,8 +13,8 @@ from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
+    FunctionRegistrationMetadata,
     WebClient,
-    _get_packed_code,
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
@@ -24,6 +24,13 @@ from globus_sdk.authorizers import GlobusAuthorizer
 from pytest_mock import MockerFixture
 
 _MOCK_BASE = "globus_compute_sdk.sdk.client."
+
+
+fnmetadata = FunctionRegistrationMetadata(
+    python_version="{}.{}.{}".format(*sys.version_info),
+    sdk_version=__version__,
+    serde_identifier="01",  # serializer default, which is currently DillCode
+)
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +53,13 @@ def gcc():
     yield _gcc
 
 
+@pytest.fixture(scope="module")
+def serde():
+    yield ComputeSerializer()
+
+
 def funk():
+    """Funky description"""
     return "Funky"
 
 
@@ -320,17 +333,26 @@ def test_container_build_status_failure(gcc):
     assert type(excinfo.value) is SystemError
 
 
-def test_register_function(gcc):
+def test_register_function(gcc, serde):
     gcc._compute_web_client = mock.MagicMock()
+    gcc.register_function(funk)
 
-    metadata = {"python_version": "3.11.3", "sdk_version": "2.3.3"}
-    gcc.register_function(funk, metadata=metadata)
+    (data,), _ = gcc._compute_web_client.v3.register_function.call_args
 
-    a, _ = gcc._compute_web_client.v2.register_function.call_args
-    func_data = a[0]
-    assert func_data["function_code"] is not None
-    assert func_data["metadata"]["python_version"] == metadata["python_version"]
-    assert func_data["metadata"]["sdk_version"] == metadata["sdk_version"]
+    metadata = {
+        "python_version": "{}.{}.{}".format(*sys.version_info),
+        "sdk_version": __version__,
+        "serde_identifier": serde.code_serializer.identifier.strip(),
+    }
+
+    assert data["function_name"] == funk.__name__
+    assert data["function_code"] is not None
+    assert data["description"] == inspect.getdoc(funk)
+    assert (
+        data["meta"]["python_version"] == metadata["python_version"]
+    ), "Expect to match the *running* Python version"
+    assert data["meta"]["sdk_version"] == metadata["sdk_version"]
+    assert data["meta"]["serde_identifier"] == metadata["serde_identifier"]
 
 
 @pytest.mark.parametrize("dep_arg", ["searchable", "function_name"])
@@ -411,76 +433,95 @@ def test_register_function_docstring(gcc, func):
     gcc.register_function(func)
     expected = inspect.getdoc(func)
 
-    a, _ = gcc._compute_web_client.v2.register_function.call_args
-    func_data = a[0]
-    assert func_data["description"] == expected
+    (data,), _ = gcc._compute_web_client.v3.register_function.call_args
+
+    if expected:
+        assert data["description"] == expected
+    else:
+        assert "description" not in data
 
 
-def test_register_function_no_metadata(gcc):
-    gcc._compute_web_client = mock.MagicMock()
-
-    gcc.register_function(funk)
-
-    a, _ = gcc._compute_web_client.v2.register_function.call_args
-    func_data = a[0]
-    assert func_data["metadata"] is None
-
-
-def test_register_function_no_function(gcc):
-    gcc._compute_web_client = mock.MagicMock()
-
-    with pytest.raises(ValueError) as pyt_exc:
-        gcc.register_function(None)
-
-    assert "either" in str(pyt_exc).lower()
-    assert "'function'" in str(pyt_exc).lower()
-    assert "'function_name'" in str(pyt_exc).lower()
-    assert "'function_code'" in str(pyt_exc).lower()
-
-
-def test_function_registration_data_function():
+def test_function_registration_data_data_function(serde):
     frd = FunctionRegistrationData(function=funk)
 
+    expected_code = serde.pack_buffers([serde.serialize(funk)])
     assert frd.function_name == "funk"
-    assert frd.function_code == _get_packed_code(funk)
+    assert frd.function_code == expected_code
+    assert frd.metadata.python_version == "{}.{}.{}".format(*sys.version_info)
+    assert frd.metadata.sdk_version == __version__
+    assert frd.metadata.serde_identifier == serde.code_serializer.identifier.strip()
 
 
-def test_function_registration_data_function_name_and_code():
+@pytest.mark.parametrize("missing", ("description", "public", "group"))
+def test_function_registration_data_optional_data(missing):
+    cond_data = {
+        "description": "some description",
+        "public": True,
+        "group": "some gorup",
+    }
+    cond_data.pop(missing)
+    frd = FunctionRegistrationData(function=funk, **cond_data)
+
+    for k, v in cond_data.items():
+        assert getattr(frd, k) == v, frd.to_dict()
+
+
+@pytest.mark.parametrize("desc", ("some desc", None))
+@pytest.mark.parametrize("public", (True, False))
+@pytest.mark.parametrize("group", ("some group", None))
+def test_function_registration_data_conditional_data(desc, public, group):
     frd = FunctionRegistrationData(
-        function=None, function_name="foo", function_code="bar"
+        function=_docstring_test_case_no_docstring,
+        description=desc,
+        public=public,
+        group=group,
     )
+    data = frd.to_dict()
+    assert ("description" in data) is bool(desc)
+    assert ("public" in data) is bool(public)
+    assert ("group" in data) is bool(group)
 
-    assert frd.function_name == "foo"
-    assert frd.function_code == "bar"
 
-
-@pytest.mark.parametrize(
-    "function_name, function_code", [("foo", None), (None, "bar"), (None, None)]
-)
-def test_function_registration_data_must_have_both_function_name_and_function_code(
-    function_name, function_code
+@pytest.mark.parametrize("fn", (funk, None))
+@pytest.mark.parametrize("fname", ("fname", None))
+@pytest.mark.parametrize("fcode", ("fcode", None))
+@pytest.mark.parametrize("mdata", (fnmetadata, None))
+def test_function_registration_data_exclusive_and_comorbid_args(
+    fn, fname, fcode, mdata
 ):
-    with pytest.raises(ValueError) as pyt_exc:
-        FunctionRegistrationData(
-            function=None, function_name=function_name, function_code=function_code
-        )
+    manual = (fname, fcode, mdata)
+    k = dict(function=fn, function_name=fname, function_code=fcode, metadata=mdata)
+    if fn and any(manual) or not (fn or all(manual)):
+        with pytest.raises(ValueError) as pyt_e:
+            FunctionRegistrationData(**k)
+        e_str = str(pyt_e.value)
+        assert "`function`" in e_str
+        assert "`function_name`" in e_str
+        assert "`function_code`" in e_str
 
-    assert "either" in str(pyt_exc).lower()
-    assert "'function'" in str(pyt_exc).lower()
-    assert "'function_name'" in str(pyt_exc).lower()
-    assert "'function_code'" in str(pyt_exc).lower()
+        if fn:
+            assert "cannot also specify" in e_str
+        else:
+            assert "or all three" in e_str
+
+    else:
+        frd = FunctionRegistrationData(**k)
+        assert frd.function_name == fname or funk.__name__
+        assert frd.description == fname and None or inspect.getdoc(funk)
+        assert frd.metadata.python_version == fnmetadata.python_version
+        assert frd.metadata.sdk_version == fnmetadata.sdk_version
+        assert frd.metadata.serde_identifier == fnmetadata.serde_identifier
 
 
-def test_function_registration_data_cant_have_both_function_and_name_code(randomstring):
-    with pytest.raises(ValueError) as pyt_exc:
-        FunctionRegistrationData(
-            function=funk, function_name=randomstring(), function_code=randomstring()
-        )
+def test_function_registration_data_repr_recreates():
+    frd = FunctionRegistrationData(function=funk)
+    frd2 = eval(repr(frd))
+    assert frd2.to_dict() == frd.to_dict()
 
-    assert "cannot specify" in str(pyt_exc).lower()
-    assert "'function'" in str(pyt_exc).lower()
-    assert "'function_name'" in str(pyt_exc).lower()
-    assert "'function_code'" in str(pyt_exc).lower()
+
+def test_function_registration_data_warns_container():
+    with pytest.warns(UserWarning, match="container_uuid"):
+        FunctionRegistrationData(function=funk, container_uuid="abc")
 
 
 def test_get_function(gcc):
