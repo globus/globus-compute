@@ -315,6 +315,31 @@ def test_hard_idle_honored(
     ), "expect process title updated; reflects status"
 
 
+def test_shutdown_lost_task_race_condition_sc36175(
+    ep_ix_factory,
+    mock_conf,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
+):
+
+    d_tag, p_headers, body = ("sometag", {"some": "headers"}, b"some bytes")
+
+    def _get(*a, **k):
+        ei.stop()
+        return d_tag, p_headers, body
+
+    ei = ep_ix_factory(config=mock_conf)
+    ei._quiesce_event = mock_quiesce
+    ei.pending_task_queue = mock.Mock(spec=queue.SimpleQueue, get=_get)
+    ei._main_loop()
+
+    assert not mock_tqs.ack.called, "Expect task received at shutdown not acked"
+    assert mock_tqs.nack.called, "Expect to return task to AMQP"
+    a, k = mock_tqs.nack.call_args
+    assert a[0] == d_tag, "Expect task reject to AQMP"
+
+
 def test_unidle_updates_proc_title(
     mocker,
     mock_log,
