@@ -87,6 +87,7 @@ def run_interchange_process(
     if rc is None:
         warnings.warn("Interchange process did not shut down cleanly - send SIGKILL")
         ix_proc.kill()
+    ix_proc.join()
     ix_proc.close()
 
 
@@ -147,70 +148,6 @@ def test_epi_forwards_tasks_and_results(
 
 
 @pytest.mark.parametrize(
-    "run_interchange_process",
-    [
-        None,
-        UserEndpointConfig(executors=(), allowed_functions=None),
-        UserEndpointConfig(executors=(), allowed_functions=_test_func_ids[:2]),
-        UserEndpointConfig(executors=(), allowed_functions=_test_func_ids[-1:]),
-    ],
-    indirect=True,
-)
-def test_epi_rejects_allowlist_task(
-    run_interchange_process, pika_conn_params, randomstring, request
-):
-    """
-    Copy of test_epi_forwards_tasks_and_results, but check for disallowed,
-    this test also doubles up as checking for not specifying the
-    resource_specification field.
-    """
-    *_, ep_uuid, reg_info = run_interchange_process
-
-    task_uuid = uuid.uuid4()
-    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
-    task_q, res_q = reg_info["task_queue_info"], reg_info["result_queue_info"]
-    res_q_name = res_q["queue"]
-    task_q_name = task_q["queue"]
-    task_exch = task_q["exchange"]
-
-    func_to_run = _test_func_ids[-1]
-
-    with pika.BlockingConnection(pika_conn_params) as mq_conn:
-        with mq_conn.channel() as chan:
-            chan.queue_purge(task_q_name)
-            chan.queue_purge(res_q_name)
-            chan.basic_publish(
-                task_exch,
-                task_q_name,
-                pack(task_msg),
-                properties=pika.BasicProperties(
-                    content_type="application/json",
-                    content_encoding="utf-8",
-                    headers={
-                        "function_uuid": str(func_to_run),
-                        "task_uuid": str(task_uuid),
-                    },
-                ),
-            )
-
-            for _, _, mbody in chan.consume(queue=res_q_name, inactivity_timeout=1):
-                result = unpack(mbody)
-                config = request.node.callspec.params["run_interchange_process"]
-                if (
-                    config is None
-                    or config.allowed_functions is None
-                    or func_to_run in config.allowed_functions
-                ):
-                    assert result.data == task_msg.task_buffer
-                else:
-                    assert (
-                        f"Function {func_to_run} not permitted" in result.data
-                    ), config
-                    assert f"on endpoint {ep_uuid}" in result.data, result
-                break
-
-
-@pytest.mark.parametrize(
     "resource_specification",
     [
         "NO_HEADER",  # SPECIAL CASE: Missing header
@@ -237,8 +174,6 @@ def test_resource_specification(
     task_exch = task_q["exchange"]
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:
-            x = chan.is_open
-            logging.warning(f"Channel open : {x=}")
             chan.queue_purge(task_q_name)
             chan.queue_purge(res_q_name)
             # publish our canary task

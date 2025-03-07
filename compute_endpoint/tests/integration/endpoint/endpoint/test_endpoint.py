@@ -54,7 +54,7 @@ def test_non_configured_endpoint(mocker, tmp_path):
         "😎 Great display/.name",
     ],
 )
-def test_start_endpoint_display_name(mocker, fs, display_name):
+def test_start_endpoint_display_name(fs, display_name):
     responses.add(  # 404 == we are verifying the POST, not the response
         responses.POST, _SVC_ADDY + "/v3/endpoints", json={}, status=404
     )

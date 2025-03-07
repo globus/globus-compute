@@ -16,6 +16,7 @@ class MockExecutor(unittest.mock.Mock):
         super().__init__(**kwargs)
         self.results_passthrough: queue.Queue | None = None
         self.passthrough = True
+        self.executor_exception = False
 
     def start(
         self,
