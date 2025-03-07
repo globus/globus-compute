@@ -7,7 +7,7 @@ It also implements data helpers for building complex payloads. Most notably,
 """
 
 import inspect
-import json
+import sys
 import typing as t
 import warnings
 
@@ -21,23 +21,22 @@ from globus_compute_sdk.version import __version__
 from .auth.scopes import ComputeScopes
 
 
-def _get_packed_code(
-    func: t.Callable, serializer: t.Optional[ComputeSerializer] = None
-) -> str:
-    serializer = serializer if serializer else ComputeSerializer()
-    return serializer.pack_buffers([serializer.serialize(func)])
-
-
 class FunctionRegistrationMetadata:
-    def __init__(self, python_version: str, sdk_version: str):
+    def __init__(self, python_version: str, sdk_version: str, serde_identifier: str):
         self.python_version = python_version
         self.sdk_version = sdk_version
+        self.serde_identifier = serde_identifier
 
     def to_dict(self):
         return {
             "python_version": self.python_version,
             "sdk_version": self.sdk_version,
+            "serde_identifier": self.serde_identifier,
         }
+
+    def __repr__(self) -> str:
+        args = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items())
+        return f"FunctionRegistrationMetadata({args})"
 
 
 class FunctionRegistrationData:
@@ -55,45 +54,60 @@ class FunctionRegistrationData:
         serializer: t.Optional[ComputeSerializer] = None,
     ):
         if function is not None:
-            if function_name is not None or function_code is not None:
+            if any((function_name, function_code, metadata)):
                 raise ValueError(
-                    "Cannot specify 'function_name' or 'function_code'"
-                    " if 'function' is provided."
+                    "`function` specified; cannot also specify `function_code`,"
+                    " `function_name`, or `metadata`"
                 )
+
+            serializer = serializer if serializer else ComputeSerializer()
             function_name = function.__name__
-            function_code = _get_packed_code(function, serializer=serializer)
+            function_code = serializer.pack_buffers([serializer.serialize(function)])
             if description is None:
                 description = inspect.getdoc(function)
+            metadata = FunctionRegistrationMetadata(
+                python_version="{}.{}.{}".format(*sys.version_info),
+                sdk_version=__version__,
+                serde_identifier=serializer.code_serializer.identifier.strip(),
+            )
 
-        if function_name is None or function_code is None:
+        elif None in (function_name, function_code, metadata):
             raise ValueError(
-                "Either 'function' must be provided, or "
-                "both of 'function_name' and 'function_code'."
+                "Either `function` must be provided, or all three of `function_name`,"
+                " `function_code`, and `metadata`."
+            )
+
+        if container_uuid:
+            warnings.warn(
+                "`container_uuid` is deprecated and no longer specified per function;"
+                " instead, send tasks to an endpoint within a container",
+                stacklevel=2,
             )
 
         self.function_name = function_name
         self.function_code = function_code
-        self.container_uuid = (
-            str(container_uuid) if container_uuid is not None else container_uuid
-        )
         self.description = description
         self.metadata = metadata
         self.public = public
         self.group = group
 
     def to_dict(self):
-        return {
+        data = {
             "function_name": self.function_name,
             "function_code": self.function_code,
-            "container_uuid": self.container_uuid,
-            "description": self.description,
-            "metadata": self.metadata.to_dict() if self.metadata else None,
-            "public": self.public,
-            "group": self.group,
+            "meta": self.metadata.to_dict() if self.metadata else None,
         }
+        if self.description:
+            data["description"] = self.description
+        if self.public:
+            data["public"] = True
+        if self.group:
+            data["group"] = self.group
+        return data
 
-    def __str__(self):
-        return "FunctionRegistrationData(" + json.dumps(self.to_dict()) + ")"
+    def __repr__(self) -> str:
+        args = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items())
+        return f"FunctionRegistrationData({args})"
 
 
 class WebClient(globus_sdk.BaseClient):
@@ -262,7 +276,7 @@ class WebClient(globus_sdk.BaseClient):
             if isinstance(function_registration_data, FunctionRegistrationData)
             else function_registration_data
         )
-        return self.post("/v2/functions", data=data)
+        return self.post("/v3/functions", data=data)
 
     def get_function(self, function_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
         return self.get(f"/v2/functions/{function_id}")
