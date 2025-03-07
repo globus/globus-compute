@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 from globus_compute_common.messagepack import pack, unpack
-from globus_compute_common.messagepack.message_types import EPStatusReport, Result
+from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.endpoint.config.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
@@ -17,10 +17,11 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
     TaskQueueSubscriber,
 )
-from globus_compute_endpoint.engines import GlobusComputeEngine
+from tests.integration.endpoint.executors.mock_executors import MockExecutor
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
+_test_func_ids = [str(uuid.uuid4()) for i in range(3)]
 
 
 @pytest.fixture
@@ -42,12 +43,13 @@ def mock_log(mocker):
 
 @pytest.fixture
 def mock_engine(endpoint_uuid):
-    ex = mock.Mock(spec=GlobusComputeEngine, endpoint_id=endpoint_uuid)
-    ex.get_status_report.return_value = EPStatusReport(
+    m = MockExecutor()
+    m.endpoint_id = endpoint_uuid
+    m.get_status_report.return_value = EPStatusReport(
         endpoint_id=endpoint_uuid, global_state={}, task_statuses=[]
     )
-    ex.executor_exception = None
-    yield ex
+
+    yield m
 
 
 @pytest.fixture
@@ -109,8 +111,9 @@ def ep_ix(ep_ix_factory):
 
 
 @pytest.fixture(autouse=True)
-def mock_spt(mocker):
-    yield mocker.patch(f"{_MOCK_BASE}setproctitle.setproctitle")
+def mock_spt():
+    with mock.patch(f"{_MOCK_BASE}setproctitle.setproctitle") as m:
+        yield m
 
 
 def test_endpoint_id_conveyed_to_engine(gc_dir, mock_conf, ep_uuid):
@@ -137,27 +140,15 @@ def test_start_requires_pre_registered(mock_conf, gc_dir):
         )
 
 
-@pytest.mark.parametrize("num_iters", (1, 2, 5, 10))
 def test_detects_bad_executor_when_no_tasks(
-    mock_log, num_iters, ep_ix, mock_engine, randomstring, mock_rp, mock_tqs
+    mock_log, ep_ix, mock_engine, randomstring, mock_rp, mock_tqs
 ):
-    expected_iters = num_iters
     exc_text = randomstring()
+    mock_engine.executor_exception = Exception(exc_text)
 
-    def update_executor_exception(*_a, **_k):
-        nonlocal num_iters
-        num_iters -= 1
-        if not num_iters:
-            mock_engine.executor_exception = Exception(exc_text)
-        raise queue.Empty
+    ep_ix._main_loop()
 
-    with mock.patch.object(ep_ix, "pending_task_queue") as ptq:
-        ptq.get.side_effect = update_executor_exception
-
-        ep_ix._main_loop()
-
-        assert ep_ix.time_to_quit, "Sanity check"
-        assert ep_ix.pending_task_queue.get.call_count == expected_iters
+    assert ep_ix.time_to_quit, "Sanity check"
     loglines = "\n".join(str(a[0]) for a, _k in mock_log.exception.call_args_list)
     assert exc_text in loglines, "Expected faithful sharing of executor exception"
 
@@ -192,7 +183,6 @@ def test_die_with_parent_goes_away_if_parent_dies(mocker, ep_ix_factory, mock_rp
 
 
 def test_no_idle_if_not_configured(
-    mocker,
     ep_ix_factory,
     mock_conf,
     mock_log,
@@ -206,24 +196,19 @@ def test_no_idle_if_not_configured(
     mock_conf.idle_heartbeats_soft = 0
     mock_conf.heartbeat_period = 1
     ei = ep_ix_factory(config=mock_conf)
-    ei.results_passthrough = mocker.Mock(spec=queue.Queue)
-    ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
-    ei.pending_task_queue.get.side_effect = queue.Empty
     ei._quiesce_event = mock_quiesce
 
     t = threading.Thread(target=ei._main_loop, daemon=True)
     t.start()
 
     try_assert(lambda: mock_log.debug.call_count > 500)
-    ei.time_to_quit = True
+    ei.stop()
     t.join()
     assert not mock_spt.called
 
 
-@pytest.mark.parametrize("idle_limit", (random.randint(2, 100),))
+@pytest.mark.parametrize("idle_limit", range(1, 11))
 def test_soft_idle_honored(
-    mocker,
     mock_log,
     mock_conf,
     ep_ix_factory,
@@ -239,11 +224,7 @@ def test_soft_idle_honored(
 
     mock_conf.idle_heartbeats_soft = idle_limit
     ei = ep_ix_factory(config=mock_conf)
-
-    ei.results_passthrough = mocker.Mock(spec=queue.Queue)
-    ei.results_passthrough.get.side_effect = (msg, queue.Empty)
-    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
-    ei.pending_task_queue.get.side_effect = queue.Empty
+    ei.results_passthrough.put(msg)
 
     ei._quiesce_event = mock_quiesce
     ei._main_loop()
@@ -269,7 +250,7 @@ def test_soft_idle_honored(
     assert num_updates == idle_limit, "expect process title updated; reflects status"
 
 
-@pytest.mark.parametrize("idle_limit", (random.randint(4, 100),))
+@pytest.mark.parametrize("idle_limit", range(2, 12))
 def test_hard_idle_honored(
     mocker,
     mock_log,
@@ -282,7 +263,7 @@ def test_hard_idle_honored(
     mock_tqs,
     mock_pack,
 ):
-    idle_soft_limit = random.randrange(2, idle_limit)
+    idle_soft_limit = random.randrange(1, idle_limit)
 
     mocker.patch(f"{_MOCK_BASE}threading.Thread")
 
@@ -315,8 +296,29 @@ def test_hard_idle_honored(
     ), "expect process title updated; reflects status"
 
 
+def test_shutdown_lost_task_race_condition_sc36175(
+    ep_ix_factory,
+    mock_conf,
+    mock_quiesce,
+    mock_rp,
+    mock_tqs,
+):
+
+    task = ("sometag", {"some": "headers"}, b"some bytes")
+
+    def _get(*a, **k):
+        ei.stop()
+        return task
+
+    ei = ep_ix_factory(config=mock_conf)
+    ei._quiesce_event = mock_quiesce
+    ei.pending_task_queue = mock.Mock(spec=queue.SimpleQueue, get=_get)
+    ei._main_loop()
+
+    assert not mock_tqs.ack.called, "Expect task received at shutdown not acked"
+
+
 def test_unidle_updates_proc_title(
-    mocker,
     mock_log,
     mock_conf,
     ep_ix_factory,
@@ -326,28 +328,25 @@ def test_unidle_updates_proc_title(
     mock_tqs,
     mock_pack,
 ):
+    def _get(*a, **k):
+        item = rp_q.get()
+        main_thread_may_continue.set()
+        return item
+
+    def insert_msg(*a, **k):
+        result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
+        rp_q.put({"task_id": str(result.task_id), "message": pack(result)})
+        main_thread_may_continue.wait()
+
+    rp_q = queue.Queue()
     mock_conf.heartbeat_period = 1
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 3
     ei = ep_ix_factory(config=mock_conf)
     ei._quiesce_event = mock_quiesce
-    ei.results_passthrough = mocker.Mock(spec=queue.Queue)
-    ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
-    ei.pending_task_queue.get.side_effect = queue.Empty
+    ei.results_passthrough = mock.Mock(spec=queue.Queue, get=_get, put=rp_q.put)
 
     main_thread_may_continue = threading.Event()
-
-    def return_msg_set_empty():
-        result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
-        yield {"task_id": str(result.task_id), "message": pack(result)}
-        main_thread_may_continue.set()
-        ei.results_passthrough.get.side_effect = queue.Empty
-        raise queue.Empty
-
-    def insert_msg(*a, **k):
-        ei.results_passthrough.get.side_effect = return_msg_set_empty()
-        main_thread_may_continue.wait()
 
     mock_spt.side_effect = insert_msg
 
@@ -366,7 +365,6 @@ def test_unidle_updates_proc_title(
 
 
 def test_sends_final_status_message_on_shutdown(
-    mocker,
     mock_log,
     mock_conf,
     ep_ix_factory,
@@ -378,10 +376,6 @@ def test_sends_final_status_message_on_shutdown(
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
     ei = ep_ix_factory(config=mock_conf)
-    ei.results_passthrough = mocker.Mock(spec=queue.Queue)
-    ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
-    ei.pending_task_queue.get.side_effect = queue.Empty
     ei._quiesce_event = mock_quiesce
     ei._main_loop()
 
@@ -394,7 +388,6 @@ def test_sends_final_status_message_on_shutdown(
 
 
 def test_gracefully_handles_final_status_message_timeout(
-    mocker,
     mock_log,
     mock_conf,
     ep_ix_factory,
@@ -407,18 +400,14 @@ def test_gracefully_handles_final_status_message_timeout(
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
     ei = ep_ix_factory(config=mock_conf)
-    ei.results_passthrough = mocker.Mock(spec=queue.Queue)
-    ei.results_passthrough.get.side_effect = queue.Empty
-    ei.pending_task_queue = mocker.Mock(spec=queue.SimpleQueue)
-    ei.pending_task_queue.get.side_effect = queue.Empty
     ei._quiesce_event = mock_quiesce
 
-    mock_future = mocker.Mock(spec=Future)
+    mock_future = mock.Mock(spec=Future)
     mock_future.result.side_effect = TimeoutError("asdfasdf")
     mock_rp.publish.return_value = mock_future
     ei._main_loop()
 
-    assert mock_rp
+    assert mock_rp.publish.called
 
 
 def test_sends_status_reports(
@@ -462,7 +451,37 @@ def test_epi_stored_results_processed(ep_ix_factory, tmp_path, mock_rp, mock_tqs
 
     mock_rp.publish.side_effect = _pub
 
-    ep_ix.pending_task_queue = mock.Mock()
-    ep_ix.pending_task_queue.get.side_effect = queue.Empty
     ep_ix._main_loop()
     assert not res_f.exists()
+
+
+@pytest.mark.parametrize("allowed_fns", (None, _test_func_ids[:2], _test_func_ids[-1:]))
+def test_epi_rejects_allowlist_task(
+    endpoint_uuid, ep_ix, allowed_fns, randomstring, mock_rp, mock_tqs
+):
+    ep_ix.config.allowed_functions = allowed_fns
+    ep_ix.start_engine()
+
+    task_uuid = uuid.uuid4()
+    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
+
+    func_to_run = _test_func_ids[-1]
+
+    headers = {"function_uuid": str(func_to_run), "task_uuid": str(task_uuid)}
+    t = threading.Thread(target=ep_ix._main_loop, daemon=True)
+    t.start()
+
+    ep_ix.results_passthrough.put(None)  # stop result thread
+    try_assert(lambda: ep_ix.results_passthrough.qsize() == 0, "Required test setup")
+
+    ep_ix.pending_task_queue.put((1, headers, pack(task_msg)))
+    res = ep_ix.results_passthrough.get()
+    res_msg = unpack(res["message"])
+
+    ep_ix.stop()
+    t.join()  # important to make sure we don't have a lockup
+    if allowed_fns is None or func_to_run in allowed_fns:
+        assert res_msg.data == task_msg.task_buffer
+    else:
+        assert f"Function {func_to_run} not permitted" in res_msg.data, ep_ix.config
+        assert f"on endpoint {endpoint_uuid}" in res_msg.data, res

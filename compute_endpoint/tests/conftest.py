@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import random
 import signal
 import string
@@ -87,9 +88,11 @@ def mock_quiesce():
 
     def mock_is_set():
         nonlocal quiesce_mock_wait
+        os.sched_yield()
         return quiesce_mock_wait
 
     def mock_wait(*a, **k):
+        os.sched_yield()
         return quiesce_mock_wait
 
     m = mock.Mock(spec=threading.Event)
