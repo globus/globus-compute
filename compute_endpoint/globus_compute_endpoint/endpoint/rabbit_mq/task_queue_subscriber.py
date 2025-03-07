@@ -73,6 +73,7 @@ class TaskQueueSubscriber(threading.Thread):
         self.queue_info = queue_info
         self.pending_task_queue = pending_task_queue
         self._to_ack: queue.SimpleQueue[int] = queue.SimpleQueue()
+        self._to_nack: queue.SimpleQueue[int] = queue.SimpleQueue()
         self._stop_event = threading.Event()
         self._channel_closed = threading.Event()
 
@@ -158,6 +159,9 @@ class TaskQueueSubscriber(threading.Thread):
 
     def ack(self, msg_tag: int):
         self._to_ack.put(msg_tag)
+
+    def nack(self, msg_tag: int):
+        self._to_nack.put(msg_tag)
 
     def stop(self) -> None:
         logger.info("Stopping thread")
@@ -351,6 +355,33 @@ class TaskQueueSubscriber(threading.Thread):
 
     def _event_watcher(self):
         """Polls the stop_event periodically to trigger a shutdown"""
+        ack_tags = []
+        nack_tags = []
+        try:
+            while True:
+                ack_tags.append(self._to_ack.get(block=False))
+        except queue.Empty:
+            pass
+        try:
+            while True:
+                nack_tags.append(self._to_nack.get(block=False))
+        except queue.Empty:
+            pass
+
+        while nack_tags:
+            # NACKs retrieved after, so nominally will be latest/largest IDs available.
+            # Assume they are not numerous, and nack them one by one.
+            nack_id = nack_tags.pop()
+            self._channel.basic_nack(nack_id, requeue=True)
+
+        if ack_tags:
+            # ACKs retrieved *before* NACKs; since we've aleady nacked the NACKs, we
+            # can be sure that multiple=True is safe
+            ack_tags.sort()  # nominally a no-op
+            latest_msg_id = ack_tags[-1]
+            self._channel.basic_ack(latest_msg_id, multiple=True)
+            logger.debug("%r Acknowledged through message: %s", self, latest_msg_id)
+
         if self._stop_event.is_set():
             logger.debug("%r Shutting down per stop event", self)
             self._stop_ioloop()
@@ -364,17 +395,5 @@ class TaskQueueSubscriber(threading.Thread):
                 logger.debug(
                     "%r Connection deemed stable; resetting connection tally", self
                 )
-
-        delivery_tags = []
-        try:
-            while True:
-                delivery_tags.append(self._to_ack.get(block=False))
-        except queue.Empty:
-            pass
-        if delivery_tags:
-            delivery_tags.sort()  # nominally a no-op
-            latest_msg_id = delivery_tags[-1]
-            self._channel.basic_ack(latest_msg_id, multiple=True)
-            logger.debug("%r Acknowledged through message: %s", self, latest_msg_id)
 
         self._connection.ioloop.call_later(self._poll_period_s, self._event_watcher)
