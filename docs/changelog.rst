@@ -24,6 +24,7 @@ New Functionality
   ``user_config_schema_path`` configuration options.
 
   .. code-block:: yaml
+
      multi_user: true
      user_config_template_path: /path/to/my_template.yaml.j2
      user_config_schema_path: /path/to/my_schema.json
@@ -45,7 +46,7 @@ Bug Fixes
 - Address a shutdown time race condition where an endpoint could receive a task
   just as it was shutting down, effectively losing the task.  Implement a check
   after receiving tasks; if the endpoint is shutting down, do not
-  ``ACK``nowledge the task so that the AMQP service will retain it for a later
+  ``ACK`` nowledge the task so that the AMQP service will retain it for a later
   endpoint instance.
 
 .. _changelog-3.2.0:
