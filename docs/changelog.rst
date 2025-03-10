@@ -3,6 +3,51 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.3.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.3.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The ``globus-compute-sdk`` and ``globus-compute-endpoint`` packages now support
+  Python version 3.13.
+
+- Added two new serialization strategies,
+  :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` and
+  :class:`~globus_compute_sdk.serialize.PureSourceDill`, which serialize functions as
+  raw source code strings (avoiding ``dill`` bytecode serialization entirely).
+
+- Multi-user endpoint administrators can now specify custom user configuration
+  template and schema paths with the ``user_config_template_path`` and
+  ``user_config_schema_path`` configuration options.
+
+  .. code-block:: yaml
+     multi_user: true
+     user_config_template_path: /path/to/my_template.yaml.j2
+     user_config_schema_path: /path/to/my_schema.json
+
+-  Administrators can now combine multiple user configuration templates with the
+   ``extends``, ``include``, and ``import`` Jinja tags. However, since the templates
+   are rendered in user space, the administrator must:
+
+   1. Move the template files to a directory that every mapped local user account has
+      read access to.
+   2. Specify the main template file path with the ``user_config_template_path``
+      configuration option.
+
+- Added `Podman` as a valid container type for the |GlobusComputeEngine|.
+
+Bug Fixes
+^^^^^^^^^
+
+- Address a shutdown time race condition where an endpoint could receive a task
+  just as it was shutting down, effectively losing the task.  Implement a check
+  after receiving tasks; if the endpoint is shutting down, do not
+  ``ACK``nowledge the task so that the AMQP service will retain it for a later
+  endpoint instance.
+
 .. _changelog-3.2.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.2.0
