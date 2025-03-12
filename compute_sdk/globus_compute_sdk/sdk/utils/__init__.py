@@ -40,11 +40,15 @@ def _log_tmp_file(item, filename: Path | None = None) -> None:
         print(ts, item, file=f)
 
 
+def get_py_version_str() -> str:
+    return "{}.{}.{}".format(*sys.version_info)
+
+
 def get_env_details() -> t.Dict[str, t.Any]:
     return {
         "os": platform(),
         "dill_version": dill.__version__,
-        "python_version": ".".join(map(str, sys.version_info[:3])),
+        "python_version": get_py_version_str(),
         "globus_compute_sdk_version": sdk_version.__version__,
     }
 
