@@ -7,7 +7,6 @@ It also implements data helpers for building complex payloads. Most notably,
 """
 
 import inspect
-import sys
 import typing as t
 import warnings
 
@@ -19,6 +18,7 @@ from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
 
 from .auth.scopes import ComputeScopes
+from .utils import get_py_version_str
 
 
 class FunctionRegistrationMetadata:
@@ -66,7 +66,7 @@ class FunctionRegistrationData:
             if description is None:
                 description = inspect.getdoc(function)
             metadata = FunctionRegistrationMetadata(
-                python_version="{}.{}.{}".format(*sys.version_info),
+                python_version=get_py_version_str(),
                 sdk_version=__version__,
                 serde_identifier=serializer.code_serializer.identifier.strip(),
             )
