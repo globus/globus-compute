@@ -169,58 +169,73 @@ latter also works with the ``Executor`` class.
 Batching
 --------
 
-The SDK includes a batch interface to reduce the overheads of launching a function many times.
-To use this interface, you must first create a batch object and then pass that object
-to the ``batch_run`` function. ``batch_run`` is non-blocking and returns a list of task ids
-corresponding to the functions in the batch with the ordering preserved.
+The SDK includes a batch interface to reduce the overhead of launching a function many
+times.  To use this interface, first create a |Batch| object and then pass that
+object to the |batch_run()| method.  The |batch_run()| method only blocks for the
+duration of the API call; the tasks may not yet have been received by the endpoint when
+it returns.
 
 .. code-block:: python
 
+  def noisy_multiply(x, y, noise=1, offset=0) -> float:
+      import random
+      return x * y + random.uniform(offset - noise, offset + noise)
+
+  noisy_fn_id = gcc.register_function(noisy_multiply)
   batch = gcc.create_batch()
 
-  for x in range(0,5):
-    batch.add(x, endpoint_id=tutorial_endpoint, function_id=func_id)
+  for val in range(5):
+    batch.add(noisy_fn_id, val + 3, val)
 
-  # batch_run returns a list task ids
+  # See what data structure will be sent to the API with .prepare()
+  # print(batch.prepare())
+
   batch_res = gcc.batch_run(batch)
 
-
-The batch result interface is useful to to fetch the results of a collection of task_ids.
-``get_batch_result`` is called with a list of task_ids. It is non-blocking and returns
-a ``dict`` with task_ids as the keys and each value is a dict that contains status information
-and a result if it is available.
+The batch result interface is useful to fetch the results of a collection of task ids.
+The :py:meth:`~globus_compute_sdk.Client.get_batch_result` method takes a list of
+task identifiers and returns a dictionary of the task statuses.
 
 .. code-block:: python
 
-  >>> results = gcc.get_batch_result(batch_res)
-  >>> print(results)
+  # batch_run returns a dictionary structure, analogous to what
+  # Batch.prepare() returns; to see the status of the outstanding
+  # tasks, first collect the task identifiers into a list
 
-  {'10c9678c-b404-4e40-bfd4-81581f52f9db': {'pending': False,
-                                            'status': 'success',
-                                            'result': 0,
-                                            'completion_t': '1632876695.6450012'},
-   '587afd2e-59e0-4d2d-82ab-cee409784c4c': {'pending': False,
-                                            'status': 'success',
-                                            'result': 0,
-                                            'completion_t': '1632876695.7048604'},
-   '11f34d69-913a-4442-ae79-ede046585d8f': {'pending': True,
-                                            'status': 'waiting-for-ep'},
-   'a2d86014-28a8-486d-b86e-5f38c80d0333': {'pending': True,
-                                            'status': 'waiting-for-ep'},
-   'e453a993-73e6-4149-8078-86e7b8370c35': {'pending': True,
-                                            'status': 'waiting-for-ep'}
-  }
+  task_ids = []
+  for fn_task_list in batch_res["tasks"].values():
+    task_ids.extend(fn_task_list)
 
+  # then pass that list to `get_batch_result()`
+  batch_status = gcc.get_batch_result(task_ids)
+  pprint.pprint(batch_status)
+
+  # Example output
+  # {'10c9678c-b404-4e40-bfd4-81581f52f9db': {'pending': False,
+  #                                           'status': 'success',
+  #                                           'result': -0.9416359586913254
+  #                                           'completion_t': '1632876695.6450012'},
+  #  '587afd2e-59e0-4d2d-82ab-cee409784c4c': {'pending': False,
+  #                                           'status': 'success',
+  #                                           'result': 10.532639922122334,
+  #                                           'completion_t': '1632876695.7048604'},
+  #  '11f34d69-913a-4442-ae79-ede046585d8f': {'pending': True,
+  #                                           'status': 'waiting-for-ep'},
+  #  'a2d86014-28a8-486d-b86e-5f38c80d0333': {'pending': True,
+  #                                           'status': 'waiting-for-ep'},
+  #  'e453a993-73e6-4149-8078-86e7b8370c35': {'pending': True,
+  #                                           'status': 'waiting-for-ep'}
+  # }
 
 .. _globus apps:
 
 GlobusApps
 -----------
 
-The Compute |Client|_ uses |GlobusApp|_ objects to handle authentication and
-authorization.  By default, the |Client|_ will instantiate a |UserApp|_ to facilitate a
+The Compute |Client| uses |GlobusApp|_ objects to handle authentication and
+authorization.  By default, the |Client| will instantiate a |UserApp|_ to facilitate a
 native app login flow.  For headless setups that :ref:`export client credentials
-<client credentials with globus compute clients>`, the |Client|_ will instantiate a
+<client credentials with globus compute clients>`, the |Client| will instantiate a
 |ClientApp|_.
 
 You can also create a custom ``GlobusApp`` object then pass it to the ``Client`` constructor. For example, to specify
@@ -269,7 +284,7 @@ This also applies when starting a Globus Compute endpoint.
 Using an Existing Token
 -----------------------
 
-To create a |Client|_ from an existing access token and skip the interactive login flow, you can pass an |AccessTokenAuthorizer|_
+To create a |Client| from an existing access token and skip the interactive login flow, you can pass an |AccessTokenAuthorizer|_
 via the ``authorizer`` parameter:
 
 .. code-block:: python
@@ -370,23 +385,24 @@ are usually safe, though not universally.
 Errors may surface as serialization/deserialization ``Exception``s, Globus
 Compute task workers lost due to ``SEGFAULT``, or even incorrect results.
 
-Note that the |Client|_ class's :func:`~globus_compute_sdk.Client.register_function` method can be used
-to pre-serialize a function using the registering SDK's environment and
-return a UUID identifier.   The resulting bytecode will then be deserialized
-at run time by an Endpoint whenever a task that specifies this function UUID
-is submitted (possibly from a different SDK environment) using the Client's
-:func:`~globus_compute_sdk.Client.run` or the Executor's :func:`~globus_compute_sdk.Executor.submit_to_registered_function` methods.
-On the other hand, the |Executor|_ 's :func:`~globus_compute_sdk.Executor.submit` takes a function argument
-and serializes a fresh copy each time it is invoked.
+Note that the |Client| class's :func:`~globus_compute_sdk.Client.register_function`
+method can be used to pre-serialize a function using the registering SDK's environment
+and return a UUID identifier.  The resulting bytecode will then be deserialized at run
+time by an Endpoint whenever a task that specifies this function UUID is submitted
+(possibly from a different SDK environment) using the Client's
+:func:`~globus_compute_sdk.Client.run` or the |Executor|'s
+:py:meth:`~globus_compute_sdk.Executor.submit_to_registered_function` methods.
 
 .. |rarr| unicode:: 0x2192
 
+.. |Batch| replace:: :class:`Batch <globus_compute_sdk.sdk.batch.Batch>`
+.. |Client| replace:: :class:`Client <globus_compute_sdk.sdk.client.Client>`
+.. |Executor| replace:: :class:`Executor <globus_compute_sdk.sdk.executor.Executor>`
+
+.. |batch_run()| replace:: :py:meth:`~globus_compute_sdk.Client.batch_run`
+
 .. |AccessTokenAuthorizer| replace:: ``AccessTokenAuthorizer``
 .. _AccessTokenAuthorizer: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_authorizers.html#globus_sdk.AccessTokenAuthorizer
-.. |Client| replace:: ``Client``
-.. _Client: reference/client.html
-.. |Executor| replace:: ``Executor``
-.. _Executor: reference/executor.html
 .. |dill| replace:: ``dill``
 .. _dill: https://dill.readthedocs.io/en/latest/#basic-usage
 
