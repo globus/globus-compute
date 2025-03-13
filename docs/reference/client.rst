@@ -9,6 +9,10 @@ Globus Compute Client
     :members:
     :member-order: bysource
 
+.. autoclass:: globus_compute_sdk.sdk.batch.Batch
+    :members:
+    :member-order: bysource
+
 .. autoclass:: globus_compute_sdk.sdk.batch.UserRuntime
     :members:
     :member-order: bysource
