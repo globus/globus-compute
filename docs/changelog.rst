@@ -2894,3 +2894,6 @@ New Functionality
 .. _HighThroughputExecutor: https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.HighThroughputExecutor.html
 .. |LocalProvider| replace:: ``LocalProvider``
 .. _LocalProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.LocalProvider.html
+
+.. |/v3/functions| replace:: ``/v3/functions``
+.. _/v3/functions: https://compute.api.globus.org/redoc#tag/Functions/operation/register_function_v3_functions_post

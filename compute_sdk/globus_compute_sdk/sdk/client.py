@@ -774,8 +774,9 @@ class Client:
             group=group,
             serializer=self.fx_serializer,
         )
-        logger.info(f"Registering function : {data}")
-        r = self._compute_web_client.v2.register_function(data.to_dict())
+        logger.info("Registering function: %s", data.function_name)
+        logger.debug("Function data: %s", data)
+        r = self._compute_web_client.v3.register_function(data.to_dict())
         return r.data["function_uuid"]
 
     @requires_login
