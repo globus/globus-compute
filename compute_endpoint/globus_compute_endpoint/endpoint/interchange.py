@@ -8,7 +8,6 @@ import platform
 import queue
 import random
 import signal
-import sys
 import threading
 import time
 import typing as t
@@ -28,6 +27,7 @@ from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_endpoint.exception_handling import get_result_error_details
 from globus_compute_sdk import __version__ as funcx_sdk_version
+from globus_compute_sdk.sdk.utils import get_py_version_str
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from parsl.version import VERSION as PARSL_VERSION
 
@@ -119,9 +119,7 @@ class EndpointInterchange:
 
         self.current_platform = {
             "parsl_v": PARSL_VERSION,
-            "python_v": "{}.{}.{}".format(
-                sys.version_info.major, sys.version_info.minor, sys.version_info.micro
-            ),
+            "python_v": get_py_version_str(),
             "os": platform.system(),
             "hname": platform.node(),
             "funcx_sdk_version": funcx_sdk_version,

@@ -1,14 +1,14 @@
 import random
-import sys
 import uuid
 from unittest import mock
 
 import parsl
 import pytest
 from globus_compute_endpoint.engines import GlobusComputeEngine
+from globus_compute_sdk.sdk.utils import get_py_version_str
 
 _MOCK_BASE = "globus_compute_endpoint.engines.globus_compute."
-this_py_version = "{}.{}.{}".format(*sys.version_info)
+this_py_version = get_py_version_str()
 
 
 @pytest.fixture(autouse=True)
