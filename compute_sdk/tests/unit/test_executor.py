@@ -226,6 +226,18 @@ def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, res_spec, uep_confi
     assert before_changes == after_changes
 
 
+def test_serializer_passthrough(gce):
+    mock_serializer = mock.Mock(spec=ComputeSerializer)
+    gce.serializer = mock_serializer
+
+    gce.submit(noop)
+
+    assert gce.client.register_function.called
+    try_assert(lambda: gce.client.create_batch.called)
+    assert mock_serializer == gce.client.register_function.call_args[1]["serializer"]
+    assert mock_serializer == gce.client.create_batch.call_args[1]["serializer"]
+
+
 def test_invalid_args_raise(randomstring):
     invalid_arg = f"abc_{randomstring()}"
     with pytest.raises(TypeError) as wrapped_err:

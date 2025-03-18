@@ -29,6 +29,7 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_optional_uuid,
     as_uuid,
 )
+from globus_compute_sdk.serialize.facade import ComputeSerializer
 
 log = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ class Executor(concurrent.futures.Executor):
         task_group_id: UUID_LIKE_T | None = None,
         resource_specification: dict[str, t.Any] | None = None,
         user_endpoint_config: dict[str, t.Any] | None = None,
+        serializer: ComputeSerializer | None = None,
         label: str = "",
         batch_size: int = 128,
         amqp_port: int | None = None,
@@ -141,6 +143,7 @@ class Executor(concurrent.futures.Executor):
         :param user_endpoint_config: User endpoint configuration values as described
             and allowed by endpoint administrators. Must be a JSON-serializable dict
             or None.
+        :param serializer: TODO
         :param label: a label to name the executor; mainly utilized for
             logging and advanced needs with multiple executors.
         :param batch_size: the maximum number of tasks to coalesce before
@@ -183,6 +186,9 @@ class Executor(concurrent.futures.Executor):
 
         self._user_endpoint_config: dict | None
         self.user_endpoint_config = user_endpoint_config
+
+        self._serializer: ComputeSerializer | None
+        self.serializer = serializer
 
         self.label = label
         self.batch_size = max(1, batch_size)
@@ -365,6 +371,33 @@ class Executor(concurrent.futures.Executor):
         self._user_endpoint_config = val
 
     @property
+    def serializer(self) -> ComputeSerializer:
+        """
+        The serializer used to serialize function code, task arguments, and task
+        keyword arguments.
+
+        Must be a ComputeSerializer instance or None.  Set by simple assignment::
+
+            >>> from globus_compute_sdk import Executor
+            >>> from globus_compute_sdk.serialize.facade import ComputeSerializer
+            >>> ser = ComputeSerializer()
+            >>> gce = Executor(serializer=ser)
+
+            # May also alter after construction:
+            >>> gce.serializer = ser
+        """
+        return self._serializer or self.client.fx_serializer
+
+    @serializer.setter
+    def serializer(self, val: ComputeSerializer | None):
+        if val is not None and not isinstance(val, ComputeSerializer):
+            raise TypeError(
+                f"Serializer must be of type ComputeSerializer,"
+                f" not {type(val).__name__}"
+            )
+        self._serializer = val
+
+    @property
     def container_id(self) -> uuid.UUID | None:
         """
         The container id with which this Executor instance is currently associated.
@@ -469,7 +502,10 @@ class Executor(concurrent.futures.Executor):
 
         log.debug("Function not registered. Registering: %s", fn)
         func_register_kwargs.pop("function", None)  # just to be sure
-        reg_kwargs = {"container_uuid": self.container_id}
+        reg_kwargs = {
+            "container_uuid": self.container_id,
+            "serializer": self.serializer,
+        }
         reg_kwargs.update(func_register_kwargs)
 
         try:
@@ -694,7 +730,7 @@ class Executor(concurrent.futures.Executor):
         if task_ids:
             # Complete the futures that already have results.
             pending: list[ComputeFuture] = []
-            deserialize = self.client.fx_serializer.deserialize
+            deserialize = self.serializer.deserialize
             chunk_size = 1024
             num_chunks = len(task_ids) // chunk_size
             num_chunks += len(task_ids) % chunk_size > 0
@@ -1049,9 +1085,10 @@ class Executor(concurrent.futures.Executor):
             taskgroup_uuid = self.task_group_id
 
         batch = self.client.create_batch(
-            taskgroup_uuid,
-            resource_specification,
-            user_endpoint_config,
+            task_group_id=taskgroup_uuid,
+            resource_specification=resource_specification,
+            user_endpoint_config=user_endpoint_config,
+            serializer=self.serializer,
             create_websocket_queue=True,
         )
         submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
@@ -1415,7 +1452,7 @@ class _ResultWatcher(threading.Thread):
         This method will set the _open_futures_empty event if there are no open
         futures *at the time of processing*.
         """
-        deserialize = self.client.fx_serializer.deserialize
+        deserialize = self.serializer.deserialize
         with self._new_futures_lock:
             futures_to_complete = [
                 self._open_futures.pop(tid)

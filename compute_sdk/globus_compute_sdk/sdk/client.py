@@ -469,6 +469,7 @@ class Client:
         task_group_id: UUID_LIKE_T | None = None,
         resource_specification: dict[str, t.Any] | None = None,
         user_endpoint_config: dict[str, t.Any] | None = None,
+        serializer: ComputeSerializer | None = None,
         create_websocket_queue: bool = False,
     ) -> Batch:
         """
@@ -493,6 +494,9 @@ class Client:
             User endpoint configuration values as described and allowed by endpoint
             administrators
 
+        serializer : ComputeSerializer (optional)
+            Override the default serializer for this batch.
+
         create_websocket_queue : bool
             Whether to create a websocket queue for the task_group_id if
             it isn't already created
@@ -506,7 +510,7 @@ class Client:
             resource_specification,
             user_endpoint_config,
             create_websocket_queue,
-            serializer=self.fx_serializer,
+            serializer=serializer or self.fx_serializer,
             user_runtime=UserRuntime(
                 globus_compute_sdk_version=__version__,
                 globus_sdk_version=__version_globus__,
@@ -722,6 +726,7 @@ class Client:
         public=False,
         group=None,
         searchable=None,
+        serializer: ComputeSerializer | None = None,
     ) -> str:
         """Register a function code with the Globus Compute service.
 
@@ -750,6 +755,8 @@ class Client:
             appropriate permissions
 
             DEPRECATED - ingesting functions to Globus Search is not currently supported
+        serializer: ComputeSerializer
+            If set, overrides this client's default serializer for this function.
 
         Returns
         -------
@@ -772,7 +779,7 @@ class Client:
             metadata=FunctionRegistrationMetadata(**metadata) if metadata else None,
             public=public,
             group=group,
-            serializer=self.fx_serializer,
+            serializer=serializer or self.fx_serializer,
         )
         logger.info("Registering function: %s", data.function_name)
         logger.debug("Function data: %s", data)

@@ -4,6 +4,10 @@ import re
 import textwrap
 import time
 
+from globus_compute_sdk.sdk.executor import Executor
+from globus_compute_sdk.serialize.concretes import CombinedCode, JSONData
+from globus_compute_sdk.serialize.facade import ComputeSerializer
+
 
 class ComputeError(Exception):
     """Base class for all funcx exceptions"""
@@ -77,17 +81,24 @@ class MaxResultSizeExceeded(Exception):
         )
 
 
+with Executor("blah") as gcx:
+    gcx.serializer = ComputeSerializer(
+        strategy_code=CombinedCode(), strategy_data=JSONData()
+    )
+    # do something with gcx
+
+
 SERDE_TASK_EXECUTION_FAILED_HELP_MESSAGE = """
 
 This appears to be an error with serialization. If it is, using a different
 serialization strategy from globus_compute_sdk.serialize might resolve the issue. For
 example, to use globus_compute_sdk.serialize.CombinedCode:
 
-    from globus_compute_sdk import Client, Executor
-    from globus_compute_sdk.serialize import CombinedCode
+    from globus_compute_sdk import Executor
+    from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode
 
-    gcc = Client(code_serialization_strategy=CombinedCode())
-    with Executor('<your-endpoint-id>', client=gcc) as gcx:
+    with Executor('<your-endpoint-id>') as gcx:
+        gcx.serializer = ComputeSerializer(strategy_code=CombinedCode())
         # do something with gcx
 
 For more information, see:
