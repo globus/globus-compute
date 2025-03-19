@@ -175,3 +175,20 @@ def test_bad_walltime(run_in_tmp_dir):
     os.environ["GC_TASK_UUID"] = task_id
     with pytest.raises(AssertionError):
         ShellFunction("pwd", walltime=-1)
+
+
+@pytest.mark.parametrize(
+    "shell_func, name",
+    [
+        (ShellFunction(cmd="foo", name="Foo"), "Foo"),
+        (ShellFunction(cmd="bar"), "ShellFunction: bar"),
+        (ShellFunction(cmd="bar\nbar"), "ShellFunction: bar"),
+        (
+            ShellFunction(cmd="10longword_20longword_30longword_40longword_50longword"),
+            "ShellFunction: 10longword_20longword_30longword",
+        ),
+    ],
+)
+def test_shell_func_name(shell_func: ShellFunction, name: str):
+    """Check if ShellFunction names are populated"""
+    assert shell_func.__name__ == name

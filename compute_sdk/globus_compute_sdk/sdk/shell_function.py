@@ -53,6 +53,7 @@ class ShellFunction:
         stderr: t.Optional[str] = None,
         walltime: t.Optional[float] = None,
         snippet_lines=1000,
+        name: t.Optional[str] = None,
     ):
         """Initialize a ShellFunction
 
@@ -76,11 +77,14 @@ class ShellFunction:
             Number of lines of stdout/err to capture,
             default=1000
 
+        name: str | None
+            Name of the ShellFunction used at registration
         """
         self.cmd = cmd
         self.stdout = stdout
         self.stderr = stderr
         self.walltime = walltime
+        self.name = name
         if walltime:
             assert walltime >= 0, f"Negative walltime={walltime} is not allowed"
         self.snippet_lines = snippet_lines
@@ -88,7 +92,12 @@ class ShellFunction:
     @property
     def __name__(self):
         # This is required for function registration
-        return f"{self.__class__.__name__}: {self.cmd}"
+        name = self.name
+        if not name:
+            snippet = self.cmd[0:32].split()[0]
+            name = f"{self.__class__.__name__}: {snippet}"
+
+        return name
 
     def open_std_fd(self, fname, mode: str = "a+"):
         import os
