@@ -8,6 +8,18 @@ Changelog
 globus-compute-sdk & globus-compute-endpoint v3.3.1
 ---------------------------------------------------
 
+Bug Fixes
+^^^^^^^^^
+
+- The ``deb`` / ``rpm`` packages for the 3.3.0 release contained some code that was
+  not ready for prime time. This release (3.3.1) brings those in sync with the PyPI
+  packages.
+
+.. _changelog-3.3.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.3.0
+---------------------------------------------------
+
 New Functionality
 ^^^^^^^^^^^^^^^^^
 
