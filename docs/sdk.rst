@@ -306,21 +306,17 @@ function code and arguments).
 
 The default strategies are :class:`~globus_compute_sdk.serialize.DillCode` for function code and :class:`~globus_compute_sdk.serialize.DillDataBase64` for
 function ``*args`` and ``**kwargs``, which are both wrappers around |dill|_. To choose
-another serializer, use the ``code_serialization_strategy`` and
-``data_serialization_strategy`` members of the Compute :class:`~globus_compute_sdk.Client`:
+another serializer, use the ``serializer`` member of the Compute :class:`~globus_compute_sdk.Executor`:
 
 .. code:: python
 
-  from globus_compute_sdk import Client, Executor
-  from globus_compute_sdk.serialize import CombinedCode, JSONData
+  from globus_compute_sdk import Executor
+  from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode, JSONData
 
-  gcc = Client(
-    code_serialization_strategy=CombinedCode(),
-    data_serialization_strategy=JSONData()
-  )
-  gcx = Executor('4b116d3c-1703-4f8f-9f6f-39921e5864df', client=gcc)
-
-  # do something with gcx
+  with Executor('<your-endpoint-id>') as gcx:
+    gcx.serializer = ComputeSerializer(
+      strategy_code=CombinedCode(), strategy_data=JSONData()
+    )
 
 :doc:`See here for a up-to-date list of serialization strategies. </reference/serialization_strategies>`
 

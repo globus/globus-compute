@@ -29,6 +29,7 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_optional_uuid,
     as_uuid,
 )
+from globus_compute_sdk.serialize.facade import ComputeSerializer
 
 log = logging.getLogger(__name__)
 
@@ -127,6 +128,7 @@ class Executor(concurrent.futures.Executor):
         amqp_port: int | None = None,
         api_burst_limit: int = 4,
         api_burst_window_s: int = 16,
+        serializer: ComputeSerializer | None = None,
         **kwargs,
     ):
         """
@@ -151,6 +153,8 @@ class Executor(concurrent.futures.Executor):
             client-side (i.e., this executor) rate-limiting.  See ``api_burst_window_s``
         :param api_burst_window_s: Window of time (in seconds) in which to count API
             calls for rate-limiting.
+        :param serializer: Used to serialize task args and kwargs.  If passed, and a
+            Client is also passed, this takes precedence over the Client's serializer.
         """
         deprecated_kwargs = {""}
         for key in kwargs:
@@ -164,6 +168,9 @@ class Executor(concurrent.futures.Executor):
             raise TypeError(msg)
 
         self.client = client or Client()
+
+        if serializer:
+            self.serializer = serializer
 
         self.endpoint_id = endpoint_id
 
@@ -406,6 +413,31 @@ class Executor(concurrent.futures.Executor):
     @amqp_port.setter
     def amqp_port(self, p: int | None):
         self._amqp_port = p
+
+    @property
+    def serializer(self) -> ComputeSerializer:
+        """
+        Property access to the underlying Client instance's owned serializer.  This is
+        used to serialize function code during function registration, serialize args/
+        kwargs during task submission, and deserialize results from submitted tasks.
+
+        Must be a ComputeSerializer.  Set by simple assignment::
+
+            >>> from globus_compute_sdk import Executor
+            >>> from globus_compute_sdk.serialize import CombinedCode, ComputeSerializer
+            >>> serde = ComputeSerializer(strategy_code=CombinedCode())
+            >>> gce = Executor(serializer=serde)
+
+            # May also alter after construction:
+            >>> gce.serializer = serde
+        """
+        return self.client.fx_serializer
+
+    @serializer.setter
+    def serializer(self, s: ComputeSerializer):
+        if not isinstance(s, ComputeSerializer):
+            raise TypeError(f"Expected ComputeSerializer, got {type(s).__name__}")
+        self.client.fx_serializer = s
 
     def _fn_cache_key(self, fn: t.Callable):
         return fn, self.container_id
