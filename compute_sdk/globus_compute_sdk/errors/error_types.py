@@ -83,12 +83,11 @@ This appears to be an error with serialization. If it is, using a different
 serialization strategy from globus_compute_sdk.serialize might resolve the issue. For
 example, to use globus_compute_sdk.serialize.CombinedCode:
 
-    from globus_compute_sdk import Client, Executor
-    from globus_compute_sdk.serialize import CombinedCode
+  from globus_compute_sdk import Executor
+  from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode
 
-    gcc = Client(code_serialization_strategy=CombinedCode())
-    with Executor('<your-endpoint-id>', client=gcc) as gcx:
-        # do something with gcx
+  with Executor('<your-endpoint-id>') as gcx:
+    gcx.serializer = ComputeSerializer(strategy_code=CombinedCode())
 
 For more information, see:
     https://globus-compute.readthedocs.io/en/latest/sdk.html#specifying-a-serialization-strategy

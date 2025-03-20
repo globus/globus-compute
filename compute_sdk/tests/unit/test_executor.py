@@ -29,6 +29,7 @@ from pytest_mock import MockerFixture
 from tests.utils import try_assert, try_for_timeout
 
 _MOCK_BASE = "globus_compute_sdk.sdk.executor."
+_MOCK_BASE_CLIENT = "globus_compute_sdk.sdk.client."
 _chunk_size = 1024
 
 
@@ -224,6 +225,31 @@ def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, res_spec, uep_confi
 
     after_changes = str(info)
     assert before_changes == after_changes
+
+
+def test_serializer_passthrough(gce):
+    mock_serializer = mock.Mock(spec=ComputeSerializer)
+
+    gce.serializer = mock_serializer
+    assert gce.client.fx_serializer is mock_serializer
+
+    gce.submit(noop)
+    assert gce.client.register_function.called
+    try_assert(lambda: gce.client.create_batch.called)
+
+    assert gce.serializer is mock_serializer
+    assert gce.client.fx_serializer is mock_serializer
+
+
+@pytest.mark.parametrize("not_a_compute_serializer", [None, "abc", 1, 1.0, object()])
+def test_serializer_setter_validation(gce, not_a_compute_serializer):
+    with pytest.raises(TypeError) as pyt_e:
+        gce.serializer = not_a_compute_serializer
+
+    assert "Expected ComputeSerializer" in str(pyt_e.value)
+    assert isinstance(gce.client.fx_serializer, ComputeSerializer)
+    assert isinstance(gce.serializer, ComputeSerializer)
+    assert gce.serializer is gce.client.fx_serializer
 
 
 def test_invalid_args_raise(randomstring):
