@@ -3,6 +3,58 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.4.0a0:
+
+globus-compute-sdk & globus-compute-endpoint v3.4.0a0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The :class:`~globus_compute_sdk.Executor` can now access the underlying
+  :class:`~globus_compute_sdk.serialize.ComputeSerializer` directly through the
+  ``serializer`` constructor argument and property. Eg:
+
+  .. code-block:: python
+
+    from globus_compute_sdk import Client, Executor
+    from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode
+
+    # this code block:
+    gcc = Client(code_serialization_strategy=CombinedCode())
+    gce = Executor("<some uuid>", client=gcc)
+
+    # is equivalent to this:
+    serde = ComputeSerializer(strategy_code=CombinedCode())
+    gce = Executor("<some uuid>", serializer=serde)
+
+    # or this:
+    with Executor("<some uuid>") as gce:
+        gce.serializer = ComputeSerializer(strategy_code=CombinedCode())
+
+Changed
+^^^^^^^
+
+- Updated minimum Globus SDK requirement to v3.51.0
+
+- Implement use of the |/v3/functions|_ API route in the Client.  For most
+  users, this will be a transparent change.  However, for those who manually
+  construct the serialized function code, this will necessitate also now
+  specifying the function metadata, including the new serializer identifier.
+
+- Update ``parsl`` dependency from `2025.2.17
+  <https://pypi.org/project/parsl/2025.2.17/>`_ to `2025.3.17
+  //<https://pypi.org/project/parsl/2025.3.17/>`_
+
+- |ShellFunction| and |MPIFunction| erroneously used the full ``cmd`` string as a function name.
+  These classes now default the function name to the class name. User may customize the function
+  name using the ``name`` keyword argument:
+
+  .. code-block:: python
+
+    s_fn = ShellFunction("echo Hi", name="my_hi_function")
+    mpi_fn = MPIFunction("lammps ..", name="my_lammps")
+
 .. _changelog-3.3.1:
 
 globus-compute-sdk & globus-compute-endpoint v3.3.1
