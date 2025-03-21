@@ -1,3 +1,4 @@
+import keyword
 import typing as t
 
 
@@ -53,6 +54,7 @@ class ShellFunction:
         stderr: t.Optional[str] = None,
         walltime: t.Optional[float] = None,
         snippet_lines=1000,
+        name: t.Optional[str] = None,
     ):
         """Initialize a ShellFunction
 
@@ -76,6 +78,9 @@ class ShellFunction:
             Number of lines of stdout/err to capture,
             default=1000
 
+        name: str | None
+            Name used to register function. Defaults to class name ShellFunction
+            if not set.
         """
         self.cmd = cmd
         self.stdout = stdout
@@ -85,10 +90,14 @@ class ShellFunction:
             assert walltime >= 0, f"Negative walltime={walltime} is not allowed"
         self.snippet_lines = snippet_lines
 
-    @property
-    def __name__(self):
-        # This is required for function registration
-        return f"{self.__class__.__name__}: {self.cmd}"
+        name = name or type(self).__name__
+        assert isinstance(name, str)
+        self.__name__ = self.valid_function_name(name)
+
+    def valid_function_name(self, v: str) -> str:
+        if not (v.isidentifier() and not keyword.iskeyword(v)):
+            raise ValueError("Function name must be valid python name")
+        return v
 
     def open_std_fd(self, fname, mode: str = "a+"):
         import os

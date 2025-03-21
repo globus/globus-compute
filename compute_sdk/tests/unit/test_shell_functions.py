@@ -14,7 +14,7 @@ def test_shell_function_no_stdfile(run_in_tmp_dir):
 
     assert isinstance(bf_result, ShellResult)
 
-    assert bf.__name__ == "ShellFunction: echo 'Hello'"
+    assert bf.__name__ == type(bf).__name__
     assert "Hello" in bf_result.stdout
     assert not bf_result.stderr
     assert "returned with exit status: 0" in str(bf_result)
@@ -31,7 +31,6 @@ def test_shell_function_with_stdfile(run_in_tmp_dir):
 
     assert isinstance(bf_result, ShellResult)
 
-    assert bf.__name__ == "ShellFunction: echo 'Hello'"
     assert "Hello" in bf_result.stdout
     assert not bf_result.stderr
     assert "returned with exit status: 0" in str(bf_result)
@@ -175,3 +174,27 @@ def test_bad_walltime(run_in_tmp_dir):
     os.environ["GC_TASK_UUID"] = task_id
     with pytest.raises(AssertionError):
         ShellFunction("pwd", walltime=-1)
+
+
+@pytest.mark.parametrize("fn_name", ["for", "with", "break", " abc", "2be"])
+def test_bad_shell_function_name(fn_name):
+    """BashFunction should raise a ValueError on invalid function names"""
+    with pytest.raises(ValueError):
+        ShellFunction("pwd", name=fn_name)
+
+
+@pytest.mark.parametrize("fn_name", ["Hello", "World", "My_Shell_Function", "École"])
+def test_shell_function_name(fn_name):
+    """BashFunction should have name set at init"""
+    sf = ShellFunction("pwd", name=fn_name)
+    assert sf.__name__ == fn_name
+
+
+def test_shell_function_instance_naming():
+    """Setting ShellFunction instance names should not mutate the class name"""
+    sf_a = ShellFunction("pwd", name="A")
+    sf_b = ShellFunction("pwd", name="B")
+
+    assert sf_a.__name__ == "A"
+    assert sf_b.__name__ == "B"
+    assert ShellFunction.__name__ == "ShellFunction"
