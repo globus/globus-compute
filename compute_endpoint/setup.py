@@ -35,12 +35,12 @@ REQUIRES = [
     # 'parsl' is a core requirement of the globus-compute-endpoint, essential to a range
     # of different features and functions
     # pin exact versions because it does not use semver
-    "parsl==2025.2.17",
+    "parsl==2025.3.17",
     "pika>=1.2.0",
     "pyprctl<0.2.0",
     "setproctitle>=1.3.2,<1.4",
     "pyyaml>=6.0,<7.0",
-    "jinja2>=3.1.3,<3.2",
+    "jinja2>=3.1.6,<3.2",
     "jsonschema>=4.21,<5",
     "cachetools>=5.3.1",
     "types-cachetools>=5.3.0.6",
