@@ -209,107 +209,6 @@ class DillCode(SerializationStrategy):
         return function
 
 
-class CombinedCode(SerializationStrategy):
-    """
-    This strategy attempts to serialize the function via the :class:`DillCodeSource`,
-    :class:`DillCode`, and :class:`DillCodeTextInspect` strategies, combining the
-    results of each sub-strategy as the final serialized payload. When deserializing,
-    it tries each sub-strategy in order until one successfully deserializes its part of
-    the payload. Intended for maximum compatibility, but is slightly slower and
-    generates larger payloads than the other strategies.
-
-    .. list-table:: Supports
-        :header-rows: 1
-        :align: center
-
-        * - Functions defined in Python interpreter
-          - Code from notebooks
-          - Interop between mismatched Python versions
-          - Decorated functions
-        * - ✅
-          - ✅
-          - ⚠️
-          - ✅
-    """
-
-    identifier = "10\n"  #:
-    for_code = True  #:
-
-    # Functions are serialized using the following strategies and the resulting encoded
-    # versions are stored as chunks.  Allows redundancy if one of the strategies fails
-    # on deserialization (undetectable during previous serialization attempts).
-    # Note that, of the 3 categories of failures:
-    #   1) Failure on serialization
-    #   2) Failure on deserialization
-    #   3) Failure on running the strategy
-    # We have agreed that we can only assist with 1) and 2).
-    _chunk_strategies = OrderedDict(
-        [
-            (DillCodeSource.identifier, DillCodeSource),
-            (DillCode.identifier, DillCode),
-            (DillCodeTextInspect.identifier, DillCodeTextInspect),
-        ]
-    )
-
-    _separator = ":"
-
-    def get_multiple_payloads(self, payload: str) -> tuple[tuple[str, str], ...]:
-        parts: list[str] = self.chomp(payload).split(CombinedCode._separator)
-        assert len(parts) > 0
-        ai = iter(parts)
-
-        # ie. ((04\n', 'gACQ...'), ('01\n', 'sAAbk2...'), ...)
-        return tuple(zip(ai, ai))
-
-    def serialize(self, data) -> str:
-        ":meta private:"
-        chunks = []
-        for id, cls in CombinedCode._chunk_strategies.items():
-            strategy = cls()
-            try:
-                serialized = strategy.serialize(data)
-            except Exception:
-                # Ignore and move on to next
-                continue
-            id_length = len(id)
-            chunks.append(serialized[:id_length])
-            chunks.append(serialized[id_length:])
-
-        if len(chunks) == 0:
-            raise SerializationError("No serialization methods were successful")
-
-        return self.identifier + CombinedCode._separator.join(chunks)
-
-    def deserialize(self, payload: str, variation: int = 0) -> t.Any:
-        """
-        If a variation is specified, try that strategy/payload if
-        present.
-        If variation is not specified, loop and return the first
-        one that deserializes successfully.  If none works, raise
-
-        Note variation is 1-indexed (ie. 2 means 2nd strategy), not
-        the ``identifier`` of the strategy (like ``"04\\n"``, ``"01\\n"``).
-        """
-        count = 0
-        for serial_id, encoded_func in self.get_multiple_payloads(payload):
-            count += 1
-            if variation == 0 or count == variation:
-                if serial_id in CombinedCode._chunk_strategies:
-                    strategy = CombinedCode._chunk_strategies[serial_id]()
-                    try:
-                        return strategy.deserialize(serial_id + encoded_func)
-                    except Exception:
-                        if variation > 0:
-                            # Only raise if this variation was specified and fails
-                            #  otherwise, just try next available
-                            raise DeserializationError(
-                                f"Failed to deserialize using variation #{count}"
-                            )
-                else:
-                    raise DeserializationError(f"Invalid serialization id {serial_id}")
-        raise DeserializationError(f"Deserialization failed after {count} tries")
-
-
 class PureSourceTextInspect(SerializationStrategy):
     """
     Extracts a function's definition via :func:`inspect.getsource` and sends the
@@ -388,6 +287,110 @@ class PureSourceDill(SerializationStrategy):
         exec_ns: dict = {}
         exec(body, exec_ns)
         return exec_ns[name]
+
+
+class CombinedCode(SerializationStrategy):
+    """
+    This strategy attempts to serialize the function using the other code strategies
+    (namely :class:`DillCodeSource`, :class:`DillCode`, :class:`DillCodeTextInspect`,
+    :class:`PureSourceDill`, and :class:`PureSourceTextInspect`), combining the results
+    of each sub-strategy as the final serialized payload. When deserializing, it tries
+    each sub-strategy in order until one successfully deserializes its part of the
+    payload. Intended for maximum compatibility, but is slower than using a single
+    strategy and generates larger payloads.
+
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ✅
+          - ✅
+          - ⚠️
+          - ✅
+    """
+
+    identifier = "10\n"  #:
+    for_code = True  #:
+
+    # Functions are serialized using the following strategies and the resulting encoded
+    # versions are stored as chunks.  Allows redundancy if one of the strategies fails
+    # on deserialization (undetectable during previous serialization attempts).
+    # Note that, of the 3 categories of failures:
+    #   1) Failure on serialization
+    #   2) Failure on deserialization
+    #   3) Failure on running the strategy
+    # We have agreed that we can only assist with 1) and 2).
+    _chunk_strategies = OrderedDict(
+        [
+            (DillCodeSource.identifier, DillCodeSource),
+            (DillCode.identifier, DillCode),
+            (DillCodeTextInspect.identifier, DillCodeTextInspect),
+            (PureSourceDill.identifier, PureSourceDill),
+            (PureSourceTextInspect.identifier, PureSourceTextInspect),
+        ]
+    )
+
+    _separator = ":"
+
+    def get_multiple_payloads(self, payload: str) -> tuple[tuple[str, str], ...]:
+        parts: list[str] = self.chomp(payload).split(CombinedCode._separator)
+        assert len(parts) > 0
+        ai = iter(parts)
+
+        # ie. ((04\n', 'gACQ...'), ('01\n', 'sAAbk2...'), ...)
+        return tuple(zip(ai, ai))
+
+    def serialize(self, data) -> str:
+        ":meta private:"
+        chunks = []
+        for id, cls in CombinedCode._chunk_strategies.items():
+            strategy = cls()
+            try:
+                serialized = strategy.serialize(data)
+            except Exception:
+                # Ignore and move on to next
+                continue
+            id_length = len(id)
+            chunks.append(serialized[:id_length])
+            chunks.append(serialized[id_length:])
+
+        if len(chunks) == 0:
+            raise SerializationError("No serialization methods were successful")
+
+        return self.identifier + CombinedCode._separator.join(chunks)
+
+    def deserialize(self, payload: str, variation: int = 0) -> t.Any:
+        """
+        If a variation is specified, try that strategy/payload if
+        present.
+        If variation is not specified, loop and return the first
+        one that deserializes successfully.  If none works, raise
+
+        Note variation is 1-indexed (ie. 2 means 2nd strategy), not
+        the ``identifier`` of the strategy (like ``"04\\n"``, ``"01\\n"``).
+        """
+        count = 0
+        for serial_id, encoded_func in self.get_multiple_payloads(payload):
+            count += 1
+            if variation == 0 or count == variation:
+                if serial_id in CombinedCode._chunk_strategies:
+                    strategy = CombinedCode._chunk_strategies[serial_id]()
+                    try:
+                        return strategy.deserialize(serial_id + encoded_func)
+                    except Exception:
+                        if variation > 0:
+                            # Only raise if this variation was specified and fails
+                            #  otherwise, just try next available
+                            raise DeserializationError(
+                                f"Failed to deserialize using variation #{count}"
+                            )
+                else:
+                    raise DeserializationError(f"Invalid serialization id {serial_id}")
+        raise DeserializationError(f"Deserialization failed after {count} tries")
 
 
 SELECTABLE_STRATEGIES = [
