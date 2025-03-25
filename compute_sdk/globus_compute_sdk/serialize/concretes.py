@@ -228,8 +228,9 @@ class PureSourceTextInspect(SerializationStrategy):
           - ❌
     """
 
-    identifier = "st\n"  # "Source TextInspect"
-    for_code = True
+    # "Source TextInspect"
+    identifier = "st\n"  #:
+    for_code = True  #:
 
     _separator = ":"
 
@@ -268,8 +269,9 @@ class PureSourceDill(SerializationStrategy):
           - ❌
     """
 
-    identifier = "sd\n"  # "Source Dill"
-    for_code = True
+    # "Source Dill"
+    identifier = "sd\n"  #:
+    for_code = True  #:
 
     _separator = ":"
 
