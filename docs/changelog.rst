@@ -44,7 +44,7 @@ Changed
 
 - Update ``parsl`` dependency from `2025.2.17
   <https://pypi.org/project/parsl/2025.2.17/>`_ to `2025.3.17
-  //<https://pypi.org/project/parsl/2025.3.17/>`_
+  <https://pypi.org/project/parsl/2025.3.17/>`_
 
 - |ShellFunction| and |MPIFunction| erroneously used the full ``cmd`` string as a function name.
   These classes now default the function name to the class name. User may customize the function
