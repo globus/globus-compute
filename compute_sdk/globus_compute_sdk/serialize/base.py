@@ -42,8 +42,14 @@ class SerializationStrategy(ABC):
     for_code: t.ClassVar[bool]
 
     @classmethod
-    def get_cached(cls, identifier: str) -> t.Optional["SerializationStrategy"]:
+    def get_cached_by_id(cls, identifier: str) -> t.Optional["SerializationStrategy"]:
         return cls._CACHE.get(identifier)
+
+    T = t.TypeVar("T", bound="SerializationStrategy")
+
+    @classmethod
+    def get_cached_by_class(cls, type_: t.Type[T]) -> T:
+        return t.cast(SerializationStrategy.T, cls._CACHE[type_.identifier])
 
     @abstractmethod
     def serialize(self, data: t.Any) -> str:

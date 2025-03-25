@@ -13,7 +13,11 @@ from globus_compute_sdk.errors import (
     SerializationError,
 )
 from globus_compute_sdk.serialize.base import IDENTIFIER_LENGTH, SerializationStrategy
-from globus_compute_sdk.serialize.facade import ComputeSerializer
+from globus_compute_sdk.serialize.facade import (
+    ComputeSerializer,
+    ValidatedStrategylike,
+    validate_strategylike,
+)
 
 
 def foo(x, y=3):
@@ -37,6 +41,23 @@ def decorated_add(a, b, c):
     Third argument is ignored, only for decorator usage
     """
     return a + b
+
+
+@pytest.fixture
+def unknown_strategy():
+    class UnknownStrategy(SerializationStrategy):
+        identifier = "aa\n"
+        for_code = True
+
+        def serialize(self, data):
+            pass
+
+        def deserialize(self, payload):
+            pass
+
+    yield UnknownStrategy
+
+    SerializationStrategy._CACHE.pop(UnknownStrategy.identifier)
 
 
 def check_deserialized_foo(f: t.Callable):
@@ -341,10 +362,52 @@ def test_selectable_serialization(strategy):
     assert ser_data[:IDENTIFIER_LENGTH] == strategy.identifier
 
 
+def test_selectable_serialization_validates_strategies(mocker):
+    mock_validate_strategylike = mocker.patch(
+        "globus_compute_sdk.serialize.facade.validate_strategylike"
+    )
+
+    strategy_code = concretes.DillCode()
+    strategy_data = concretes.JSONData()
+    ComputeSerializer(strategy_code, strategy_data)
+
+    assert mock_validate_strategylike.call_count == 2
+    mock_validate_strategylike.assert_any_call(strategy_code, for_code=True)
+    mock_validate_strategylike.assert_any_call(strategy_data, for_code=False)
+
+
+_validated_dill_code = ValidatedStrategylike(
+    concretes.DillCode,
+    SerializationStrategy.get_cached_by_class(concretes.DillCode),
+    "globus_compute_sdk.serialize.concretes.DillCode",
+)
+
+_validated_json_data = ValidatedStrategylike(
+    concretes.JSONData,
+    SerializationStrategy.get_cached_by_class(concretes.JSONData),
+    "globus_compute_sdk.serialize.concretes.JSONData",
+)
+
+
+@pytest.mark.parametrize(
+    "strategylike, validated",
+    [
+        (concretes.DillCode, _validated_dill_code),
+        ("globus_compute_sdk.serialize.concretes.DillCode", _validated_dill_code),
+        (concretes.DillCode(), _validated_dill_code),
+        (concretes.JSONData, _validated_json_data),
+        ("globus_compute_sdk.serialize.concretes.JSONData", _validated_json_data),
+        (concretes.JSONData(), _validated_json_data),
+    ],
+)
+def test_validate_strategylike(strategylike, validated):
+    assert validate_strategylike(strategylike) == validated
+
+
 @pytest.mark.parametrize("strategy", concretes.SELECTABLE_STRATEGIES)
-def test_selectable_serialization_enforces_for_code(strategy):
+def test_validate_strategylike_enforces_for_code(strategy):
     with pytest.raises(SerdeError) as pyt_exc:
-        ComputeSerializer(strategy_code=strategy(), strategy_data=strategy())
+        validate_strategylike(strategy(), for_code=not strategy.for_code)
 
     if strategy.for_code:
         e = "is a code serialization strategy, expected a data strategy"
@@ -353,28 +416,36 @@ def test_selectable_serialization_enforces_for_code(strategy):
     assert e in str(pyt_exc)
 
 
-def test_serializer_errors_on_unknown_strategy():
-    class NewStrategy(SerializationStrategy):
-        identifier = "aa\n"
-        for_code = True
+def test_validate_strategylike_errors_on_unknown_strategy(unknown_strategy):
+    with pytest.raises(SerdeError) as pyt_exc:
+        validate_strategylike(unknown_strategy())
 
-        def serialize(self, data):
-            pass
+    assert "is not a known serialization strategy" in str(pyt_exc)
 
-        def deserialize(self, payload):
-            pass
 
-    strategy = NewStrategy()
+@pytest.mark.parametrize(
+    "bad_path",
+    [
+        "invalid_path_1",
+        "invalid path 2",
+        "",
+    ],
+)
+def test_validate_strategylike_errors_on_bad_import_path(bad_path):
+    with pytest.raises(SerdeError) as pyt_exc:
+        validate_strategylike(bad_path)
 
-    with pytest.raises(SerdeError):
-        ComputeSerializer(strategy_code=strategy)
+    assert "an import path" in str(pyt_exc)
 
-    NewStrategy.for_code = False
 
-    with pytest.raises(SerdeError):
-        ComputeSerializer(strategy_data=strategy)
+def test_validate_strategylike_enforces_subclass():
+    class NotAStrategy:
+        pass
 
-    SerializationStrategy._CACHE.pop(NewStrategy.identifier)
+    with pytest.raises(SerdeError) as pyt_exc:
+        validate_strategylike(NotAStrategy())
+
+    assert "a subclass of" in str(pyt_exc)
 
 
 @pytest.mark.parametrize(
@@ -461,7 +532,7 @@ def test_allowed_deserializers_imports_from_path(allowlist):
 def test_allowed_deserializers_errors_on_invalid_import_path(allowlist):
     with pytest.raises(SerdeError) as pyt_exc:
         ComputeSerializer(allowed_deserializer_types=allowlist)
-    assert "is not a valid path to a strategy" in str(pyt_exc)
+    assert "an import path" in str(pyt_exc)
 
 
 @pytest.mark.parametrize(
@@ -597,32 +668,20 @@ def test_allowed_deserializers_enforces_subclass(non_subclass):
     with pytest.raises(SerdeError) as pyt_exc:
         ComputeSerializer(allowed_deserializer_types=[non_subclass])
 
-    assert "deserializers must either be SerializationStrategies" in str(pyt_exc)
+    assert "Invalid strategy-like" in str(pyt_exc)
 
 
-def test_allowed_deserializers_errors_on_unknown_strategy():
-    class NewStrategy(SerializationStrategy):
-        identifier = "aa\n"
-        for_code = True
-
-        def serialize(self, data):
-            pass
-
-        def deserialize(self, payload):
-            pass
-
+def test_allowed_deserializers_errors_on_unknown_strategy(unknown_strategy):
     with pytest.raises(SerdeError) as pyt_exc1:
-        ComputeSerializer(allowed_deserializer_types=[NewStrategy])
+        ComputeSerializer(allowed_deserializer_types=[unknown_strategy])
 
-    NewStrategy.for_code = False
+    unknown_strategy.for_code = False
 
     with pytest.raises(SerdeError) as pyt_exc2:
-        ComputeSerializer(allowed_deserializer_types=[NewStrategy])
+        ComputeSerializer(allowed_deserializer_types=[unknown_strategy])
 
     for e in (pyt_exc1, pyt_exc2):
         assert "is not a known serialization strategy" in str(e)
-
-    SerializationStrategy._CACHE.pop(NewStrategy.identifier)
 
 
 @pytest.mark.parametrize("wrong_length_id", ["", "1", "12", "1234"])
