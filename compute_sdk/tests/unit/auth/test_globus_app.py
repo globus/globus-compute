@@ -20,6 +20,8 @@ def test_get_globus_app(
 
     app = get_globus_app()
 
+    assert app.config.request_refresh_tokens
+
     if client_id and client_secret:
         assert isinstance(app, ClientApp)
     else:
