@@ -5,6 +5,7 @@ import inspect
 import logging
 import textwrap
 import typing as t
+from dataclasses import dataclass
 from enum import Enum
 
 from globus_compute_sdk.errors import (
@@ -22,6 +23,9 @@ from globus_compute_sdk.serialize.concretes import (
 logger = logging.getLogger(__name__)
 
 
+Strategylike = t.Union[SerializationStrategy, type[SerializationStrategy], str]
+
+
 class AllowlistWildcard(str, Enum):
     """
     Special values that can be included in deserializer allowlists to allow
@@ -34,34 +38,53 @@ class AllowlistWildcard(str, Enum):
     DATA = "globus_compute_sdk.*Data"
 
 
-DeserializerAllowlist = t.Iterable[
-    t.Union[type[SerializationStrategy], str, AllowlistWildcard]
-]
+DeserializerAllowlist = t.Iterable[t.Union[Strategylike, AllowlistWildcard]]
 
 
-def assert_strategy_type_valid(
-    strategy_type: type[SerializationStrategy], for_code: bool
-) -> None:
-    if strategy_type not in SELECTABLE_STRATEGIES:
+@dataclass
+class ValidatedStrategylike:
+    type_: type[SerializationStrategy]
+    instance: SerializationStrategy
+    import_path: str
+
+
+def validate_strategylike(
+    value: Strategylike, *, for_code: bool | None = None
+) -> ValidatedStrategylike:
+    bad_type_error = SerdeError(
+        f"Invalid strategy-like '{value}'. Expected either a SerializationStrategy"
+        f" instance, a subclass of SerializationStrategy, or an import path to one."
+    )
+
+    if isinstance(value, str):
+        try:
+            mod_name, _sep, obj_name = value.rpartition(".")
+            mod = importlib.import_module(mod_name)
+            value = getattr(mod, obj_name)
+        except Exception as e:
+            raise bad_type_error from e
+
+    class_ = value if inspect.isclass(value) else type(value)
+    normalized_path = f"{class_.__module__}.{class_.__name__}"
+
+    if not issubclass(class_, SerializationStrategy):
+        raise bad_type_error
+
+    if for_code is not None and class_.for_code != for_code:
+        if for_code:
+            etype, gtype = "code", "data"
+        else:
+            etype, gtype = "data", "code"
         raise SerdeError(
-            f"{strategy_type.__name__} is not a known serialization strategy"
-            f" (must be one of {SELECTABLE_STRATEGIES})"
+            f"{class_.__name__} is a {gtype} serialization strategy,"
+            f" expected a {etype} strategy."
         )
 
-    if strategy_type.for_code != for_code:
-        etype = "code" if for_code else "data"
-        gtype = "code" if strategy_type.for_code else "data"
-        raise SerdeError(
-            f"{strategy_type.__name__} is a {gtype} serialization strategy,"
-            f" expected a {etype} strategy"
-        )
+    instance = SerializationStrategy.get_cached_by_id(class_.identifier)
+    if not instance or class_ not in SELECTABLE_STRATEGIES:
+        raise SerdeError(f"{class_.__name__} is not a known serialization strategy.")
 
-
-def validate_strategy(
-    strategy: SerializationStrategy, for_code: bool
-) -> SerializationStrategy:
-    assert_strategy_type_valid(type(strategy), for_code)
-    return strategy
+    return ValidatedStrategylike(class_, instance, normalized_path)
 
 
 def parse_allowlist(
@@ -74,38 +97,9 @@ def parse_allowlist(
     wildcards: set[AllowlistWildcard] = set()
     for value in unvalidated:
         try:
-            AllowlistWildcard(value)
+            wildcards.add(AllowlistWildcard(value))
         except ValueError:
-            pass
-        else:
-            # value is either an instance of AllowlistWildcard or the .value of
-            # such an instance. mypy is not smart enough to know that
-            wildcards.add(value)  # type: ignore
-            continue
-
-        resolved_strategy_class = None
-        if isinstance(value, str):
-            try:
-                mod_name, class_name = value.rsplit(".", 1)
-                mod = importlib.import_module(mod_name)
-                resolved_strategy_class = getattr(mod, class_name)
-            except Exception as e:
-                raise SerdeError(f"`{value}` is not a valid path to a strategy") from e
-        else:
-            resolved_strategy_class = value
-
-        if not inspect.isclass(resolved_strategy_class) or not issubclass(
-            resolved_strategy_class, SerializationStrategy
-        ):
-            raise SerdeError(
-                "Allowed deserializers must either be SerializationStrategies"
-                f" or valid paths to them (got {value})"
-            )
-
-        assert_strategy_type_valid(
-            resolved_strategy_class, resolved_strategy_class.for_code
-        )
-        validated.add(resolved_strategy_class)
+            validated.add(validate_strategylike(value).type_)
 
     for wildcard in wildcards:
         for_code = wildcard == AllowlistWildcard.CODE
@@ -128,33 +122,37 @@ def parse_allowlist(
 class ComputeSerializer:
     def __init__(
         self,
-        strategy_code: SerializationStrategy | None = None,
-        strategy_data: SerializationStrategy | None = None,
+        strategy_code: Strategylike | None = None,
+        strategy_data: Strategylike | None = None,
         *,
         allowed_deserializer_types: DeserializerAllowlist | None = None,
     ):
         """
         Provides a uniform interface to Compute's various serialization strategies.
 
-        :param strategy_code: The serialization strategy for code. If not supplied, uses
-            :const:`~globus_compute_sdk.serialize.DEFAULT_STRATEGY_CODE`.
-        :param strategy_data: The serialization strategy for data. If not supplied, uses
-            :const:`~globus_compute_sdk.serialize.DEFAULT_STRATEGY_DATA`.
-        :param allowed_deserializers: A list of strategies that are allowed to
-            deserialize data/code, in the form of
-            :class:`~globus_compute_sdk.serialize.base.SerializationStrategy` subclasses
-            (not instances of those classes!), import paths to those classes, or the
-            special :class:`AllowlistWildcard` values. Requires at least one code and
-            one data strategy to be specified. If falsy, all deserializers are allowed.
+        :param strategy_code: The serialization strategy for code. If passed as a
+            string, must be a valid import path to a known strategy; if not supplied,
+            uses :const:`~globus_compute_sdk.serialize.DEFAULT_STRATEGY_CODE`.
+        :param strategy_data: The serialization strategy for data. If passed as a
+            string, must be a valid import path to a known strategy; if not supplied,
+            uses :const:`~globus_compute_sdk.serialize.DEFAULT_STRATEGY_DATA`.
+        :param allowed_deserializers: A list of strategies (or import paths) that are
+            allowed to deserialize data/code. Requires at least one code and one data
+            strategy to be specified. If falsy, all deserializers are allowed.
         :raises: If any serializer is unknown to Compute, or if any of the arguments are
             not in the expected format.
         """
 
-        self.code_serializer = validate_strategy(
-            strategy_code or DEFAULT_STRATEGY_CODE, True
+        self.code_serializer: SerializationStrategy = (
+            DEFAULT_STRATEGY_CODE
+            if strategy_code is None
+            else validate_strategylike(strategy_code, for_code=True).instance
         )
-        self.data_serializer = validate_strategy(
-            strategy_data or DEFAULT_STRATEGY_DATA, False
+
+        self.data_serializer: SerializationStrategy = (
+            DEFAULT_STRATEGY_DATA
+            if strategy_data is None
+            else validate_strategylike(strategy_data, for_code=False).instance
         )
 
         self.allowed_deserializer_types = parse_allowlist(allowed_deserializer_types)
@@ -197,7 +195,7 @@ class ComputeSerializer:
             with an allowed strategy.
         """
         header = payload[:IDENTIFIER_LENGTH]
-        strategy = SerializationStrategy.get_cached(header)
+        strategy = SerializationStrategy.get_cached_by_id(header)
 
         if not strategy:
             raise DeserializationError(f"Invalid header: {header} in data payload")

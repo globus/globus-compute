@@ -403,7 +403,7 @@ SELECTABLE_STRATEGIES = [
 
 #: The *code* serialization strategy used by :class:`ComputeSerializer`
 #: when one is not specified.
-DEFAULT_STRATEGY_CODE: DillCode = DillCode()
+DEFAULT_STRATEGY_CODE = SerializationStrategy.get_cached_by_class(DillCode)
 #: The *data* serialization strategy used by :class:`ComputeSerializer`
 #: when one is not specified.
-DEFAULT_STRATEGY_DATA: DillDataBase64 = DillDataBase64()
+DEFAULT_STRATEGY_DATA = SerializationStrategy.get_cached_by_class(DillDataBase64)
