@@ -3,6 +3,16 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.4.0a1:
+
+globus-compute-sdk & globus-compute-endpoint v3.4.0a1
+-----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Refresh tokens were not being requested properly since 2.28.0 when going through login flow.  Now they are requested as expected.  This previously prevented auto refreshing of access tokens upon expiry.
+
 .. _changelog-3.4.0a0:
 
 globus-compute-sdk & globus-compute-endpoint v3.4.0a0
