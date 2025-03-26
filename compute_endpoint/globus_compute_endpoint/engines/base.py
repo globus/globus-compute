@@ -280,6 +280,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         task_f: GCFuture,
         packed_task: bytes,
         resource_specification: dict,
+        result_serializers: list[str] | None = None,
     ):
         """GC Endpoints should submit tasks via this method so that tasks are
         tracked properly.
@@ -287,6 +288,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         :param task_f: The future to be notified when task is complete
         :param packed_task: The payload task (function and args) to eventually invoke
         :param resource_specification: MPI resource specification
+        :param result_serializers: list of import paths to serialization strategies
         """
         self._ensure_ready()
 
@@ -300,6 +302,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
             run_dir=self.working_dir,
             run_in_sandbox=self.run_in_sandbox,
             serde=self.serde,
+            result_serializers=result_serializers,
         )
         self._invoke_submission(
             task_f, submission_partial, retry_count=self.max_retries_on_system_failure

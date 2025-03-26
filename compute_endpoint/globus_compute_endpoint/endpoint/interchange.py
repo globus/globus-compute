@@ -396,6 +396,8 @@ class EndpointInterchange:
                     )
                     res_spec: dict = json.loads(res_spec_s) or {}
 
+                    res_serde: list[str] = prop_headers.get("result_serializers") or []
+
                     task_f = GCFuture(gc_task_id=tid)
                     task_f.add_done_callback(forward_result)  # type: ignore[arg-type]
 
@@ -426,7 +428,10 @@ class EndpointInterchange:
 
                 try:
                     engine.submit(
-                        task_f=task_f, packed_task=body, resource_specification=res_spec
+                        task_f=task_f,
+                        packed_task=body,
+                        resource_specification=res_spec,
+                        result_serializers=res_serde,
                     )
                     task_q_subscriber.ack(d_tag)
                 except Exception as exc:
