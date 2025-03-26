@@ -23,7 +23,8 @@ from globus_compute_sdk.sdk.executor import (
 from globus_compute_sdk.sdk.utils import chunk_by
 from globus_compute_sdk.sdk.utils.uuid_like import as_optional_uuid, as_uuid
 from globus_compute_sdk.sdk.web_client import WebClient
-from globus_compute_sdk.serialize.facade import ComputeSerializer
+from globus_compute_sdk.serialize.concretes import JSONData
+from globus_compute_sdk.serialize.facade import ComputeSerializer, validate_strategylike
 from globus_sdk import ComputeClientV2, ComputeClientV3
 from pytest_mock import MockerFixture
 from tests.utils import try_assert, try_for_timeout
@@ -162,14 +163,21 @@ def mock_log(mocker):
 
 
 @pytest.mark.parametrize(
-    "tg_id, fn_id, ep_id, res_spec, uep_config",
+    "tg_id, fn_id, ep_id, res_spec, uep_config, res_serde",
     (
-        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"num_nodes": 2}, {"heartbeat": 10}),
-        (str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), None, None),
+        (
+            uuid.uuid4(),
+            uuid.uuid4(),
+            uuid.uuid4(),
+            {"num_nodes": 2},
+            {"heartbeat": 10},
+            ["globus_compute_sdk.serialize.JSONData"],
+        ),
+        (str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), None, None, None),
     ),
 )
 def test_task_submission_info_stringification(
-    tg_id, fn_id, ep_id, res_spec, uep_config
+    tg_id, fn_id, ep_id, res_spec, uep_config, res_serde
 ):
     fut_id = 10
 
@@ -180,6 +188,7 @@ def test_task_submission_info_stringification(
         endpoint_id=ep_id,
         resource_specification=res_spec,
         user_endpoint_config=uep_config,
+        result_serializers=res_serde,
         args=(),
         kwargs={},
     )
@@ -191,19 +200,30 @@ def test_task_submission_info_stringification(
     assert f"function_uuid='{fn_id}'" in as_str
     assert f"endpoint_uuid='{ep_id}'" in as_str
     res_spec_len = len(res_spec) if res_spec else 0
-    assert f"resource_specification={{{res_spec_len}}};"
+    assert f"resource_specification={{{res_spec_len}}};" in as_str
     uep_config_len = len(uep_config) if uep_config else 0
-    assert f"user_endpoint_config={{{uep_config_len}}};"
+    assert f"user_endpoint_config={{{uep_config_len}}};" in as_str
+    res_serde_len = len(res_serde) if res_serde else 0
+    assert f"result_serializers=[{res_serde_len}];" in as_str
 
 
 @pytest.mark.parametrize(
-    "tg_id, fn_id, ep_id, res_spec, uep_config",
+    "tg_id, fn_id, ep_id, res_spec, uep_config, res_serde",
     (
-        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {"num_nodes": 2}, {"heartbeat": 10}),
-        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {}, {}),
+        (
+            uuid.uuid4(),
+            uuid.uuid4(),
+            uuid.uuid4(),
+            {"num_nodes": 2},
+            {"heartbeat": 10},
+            ["globus_compute_sdk.serialize.JSONData"],
+        ),
+        (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), {}, {}, []),
     ),
 )
-def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, res_spec, uep_config):
+def test_task_submission_snapshots_data(
+    tg_id, fn_id, ep_id, res_spec, uep_config, res_serde
+):
     fut_id = 10
 
     info = _TaskSubmissionInfo(
@@ -213,6 +233,7 @@ def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, res_spec, uep_confi
         endpoint_id=ep_id,
         resource_specification=res_spec,
         user_endpoint_config=uep_config,
+        result_serializers=res_serde,
         args=(),
         kwargs={},
     )
@@ -222,6 +243,7 @@ def test_task_submission_snapshots_data(tg_id, fn_id, ep_id, res_spec, uep_confi
     res_spec["num_nodes"] = 100
     uep_config["something else"] = "abc"
     uep_config["heartbeat"] = 12345
+    res_serde.append("globus_compute_sdk.serialize.DillDataBase64")
 
     after_changes = str(info)
     assert before_changes == after_changes
@@ -587,8 +609,8 @@ def test_resource_specification_added_to_batch(gce):
     gce.submit(noop)
 
     try_assert(lambda: gcc.batch_run.called)
-    args, _ = gcc.create_batch.call_args
-    assert gce.resource_specification in args
+    _, kwargs = gcc.create_batch.call_args
+    assert kwargs["resource_specification"] == gce.resource_specification
 
 
 def test_user_endpoint_config_added_to_batch(gce):
@@ -601,8 +623,33 @@ def test_user_endpoint_config_added_to_batch(gce):
     gce.submit(noop)
 
     try_assert(lambda: gcc.batch_run.called)
-    args, _ = gcc.create_batch.call_args
-    assert gce.user_endpoint_config in args
+    _, kwargs = gcc.create_batch.call_args
+    assert kwargs["user_endpoint_config"] == gce.user_endpoint_config
+
+
+@pytest.mark.parametrize(
+    "res_serde",
+    (
+        [],
+        [JSONData],
+        [JSONData()],
+        ["globus_compute_sdk.serialize.JSONData"],
+    ),
+)
+def test_result_serializers_added_to_batch(gce, res_serde):
+    gcc = gce.client
+
+    gce.endpoint_id = uuid.uuid4()
+    gce.result_serializers = res_serde
+    gcc.register_function.return_value = uuid.uuid4()
+
+    gce.submit(noop)
+
+    try_assert(lambda: gcc.batch_run.called)
+    _, kwargs = gcc.create_batch.call_args
+    assert kwargs["result_serializers"] == [
+        validate_strategylike(s).import_path for s in res_serde
+    ]
 
 
 def test_submit_raises_if_thread_stopped(gce):
@@ -1026,6 +1073,7 @@ def test_task_submitter_stops_executor_on_upstream_error_response(
         function_id=uuid.uuid4(),
         resource_specification=None,
         user_endpoint_config=None,
+        result_serializers=None,
         args=(),
         kwargs={},
     )
@@ -1062,8 +1110,8 @@ def test_sc25897_task_submit_correctly_handles_multiple_tg_ids(gce: Executor):
     gce._task_submitter_impl()
     assert gcc.batch_run.call_count == 2, "Two different task groups"
 
-    for expected, (a, _k) in zip((tg_id_1, tg_id_2), gcc.create_batch.call_args_list):
-        found_tg_uuid = str(a[0])
+    for expected, (_a, k) in zip((tg_id_1, tg_id_2), gcc.create_batch.call_args_list):
+        found_tg_uuid = str(k["task_group_id"])
         assert found_tg_uuid == expected
 
 
@@ -1119,11 +1167,10 @@ def test_task_submit_handles_multiple_user_endpoint_configs(gce: Executor):
 
     gce._task_submitter_impl()
     assert gcc.batch_run.call_count == 2, "two different configs"
-    for expected, (a, _k) in zip(
+    for expected, (_a, k) in zip(
         (uep_config_1, uep_config_2), gcc.create_batch.call_args_list
     ):
-        found_uep_config = a[2]
-        assert found_uep_config == expected
+        assert k["user_endpoint_config"] == expected
 
 
 def test_task_submitter_handles_stale_result_watcher_gracefully(gce: Executor):
@@ -1164,7 +1211,7 @@ def test_task_submitter_sets_future_metadata(gce, num_tasks, ignore_tasks, too_f
         batch_ids.pop()
 
     gcc.batch_run.return_value["tasks"] = submitted_tasks
-    gce._submit_tasks(tg_id, ep_id, None, None, futs, tasks)
+    gce._submit_tasks(tg_id, ep_id, None, None, None, futs, tasks)
 
     for f_idx, f in enumerate(futs):
         assert f._metadata["request_uuid"] == req_id, (f_idx, f._metadata, req_id)
@@ -1188,7 +1235,7 @@ def test_submit_tasks_stops_futures_on_bad_response(gce, batch_response):
     ]
 
     with pytest.raises(KeyError) as pyt_exc:
-        gce._submit_tasks("tg_id", "ep_id", None, None, futs, tasks)
+        gce._submit_tasks("tg_id", "ep_id", None, None, None, futs, tasks)
 
     for fut in futs:
         assert fut.exception() is pyt_exc.value

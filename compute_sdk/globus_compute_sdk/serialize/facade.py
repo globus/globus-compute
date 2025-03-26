@@ -23,6 +23,12 @@ from globus_compute_sdk.serialize.concretes import (
 logger = logging.getLogger(__name__)
 
 
+#: This type encapsulates all the ways a serialization strategy can be specified to a
+#: :class:`ComputeSerializer`.
+#: :class:`~globus_compute_sdk.serialize.SerializationStrategy`
+#: classes and instances can be passed directly and are essentially equivalent;
+#: alternatively, an import path pointing to such an instance or class can be passed as
+#: a string.
 Strategylike = t.Union[SerializationStrategy, type[SerializationStrategy], str]
 
 
@@ -132,10 +138,10 @@ class ComputeSerializer:
 
         :param strategy_code: The serialization strategy for code. If passed as a
             string, must be a valid import path to a known strategy; if not supplied,
-            uses :const:`~globus_compute_sdk.serialize.DEFAULT_STRATEGY_CODE`.
+            uses :const:`~globus_compute_sdk.serialize.concretes.DEFAULT_STRATEGY_CODE`.
         :param strategy_data: The serialization strategy for data. If passed as a
             string, must be a valid import path to a known strategy; if not supplied,
-            uses :const:`~globus_compute_sdk.serialize.DEFAULT_STRATEGY_DATA`.
+            uses :const:`~globus_compute_sdk.serialize.concretes.DEFAULT_STRATEGY_DATA`.
         :param allowed_deserializers: A list of strategies (or import paths) that are
             allowed to deserialize data/code. Requires at least one code and one data
             strategy to be specified. If falsy, all deserializers are allowed.

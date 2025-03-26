@@ -29,7 +29,12 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_optional_uuid,
     as_uuid,
 )
-from globus_compute_sdk.serialize.facade import ComputeSerializer
+from globus_compute_sdk.serialize.facade import (
+    ComputeSerializer,
+    Strategylike,
+    ValidatedStrategylike,
+    validate_strategylike,
+)
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +71,7 @@ class _TaskSubmissionInfo:
         "function_uuid",
         "resource_specification",
         "user_endpoint_config",
+        "result_serializers",
         "args",
         "kwargs",
     )
@@ -79,6 +85,7 @@ class _TaskSubmissionInfo:
         function_id: UUID_LIKE_T,
         resource_specification: dict[str, t.Any] | None,
         user_endpoint_config: dict[str, t.Any] | None,
+        result_serializers: list[str] | None,
         args: tuple,
         kwargs: dict,
     ):
@@ -88,6 +95,7 @@ class _TaskSubmissionInfo:
         self.endpoint_uuid = as_uuid(endpoint_id)
         self.resource_specification = copy.deepcopy(resource_specification)
         self.user_endpoint_config = copy.deepcopy(user_endpoint_config)
+        self.result_serializers = copy.deepcopy(result_serializers)
         self.args = args
         self.kwargs = kwargs
 
@@ -98,6 +106,7 @@ class _TaskSubmissionInfo:
             f"endpoint_uuid='{self.endpoint_uuid}'",
             f"function_uuid='{self.function_uuid}'",
             f"resource_specification={{{len(self.resource_specification or {})}}}",
+            f"result_serializers=[{len(self.result_serializers or [])}]",
             f"user_endpoint_config={{{len(self.user_endpoint_config or {})}}}",
             f"args=[{len(self.args)}]",
             f"kwargs=[{len(self.kwargs)}]",
@@ -129,6 +138,7 @@ class Executor(concurrent.futures.Executor):
         api_burst_limit: int = 4,
         api_burst_window_s: int = 16,
         serializer: ComputeSerializer | None = None,
+        result_serializers: t.Iterable[Strategylike] | None = None,
         **kwargs,
     ):
         """
@@ -143,6 +153,11 @@ class Executor(concurrent.futures.Executor):
         :param user_endpoint_config: User endpoint configuration values as described
             and allowed by endpoint administrators. Must be a JSON-serializable dict
             or None.
+        :param result_serializers: A list of Strategylike objects that will be sent to
+            the endpoint for use in serializing task results. The endpoint will attempt
+            to serialize results with each strategy in the list until one succeeds,
+            returning the first successful serialization. N.B.:  If this is falsy, the
+            endpoint will use the default strategies.
         :param label: a label to name the executor; mainly utilized for
             logging and advanced needs with multiple executors.
         :param batch_size: the maximum number of tasks to coalesce before
@@ -190,6 +205,10 @@ class Executor(concurrent.futures.Executor):
 
         self._user_endpoint_config: dict | None
         self.user_endpoint_config = user_endpoint_config
+
+        self._validated_result_serializers: list[ValidatedStrategylike] = []
+        self._result_serializers: t.Iterable[Strategylike] | None
+        self.result_serializers = result_serializers
 
         self.label = label
         self.batch_size = max(1, batch_size)
@@ -439,6 +458,39 @@ class Executor(concurrent.futures.Executor):
             raise TypeError(f"Expected ComputeSerializer, got {type(s).__name__}")
         self.client.fx_serializer = s
 
+    @property
+    def result_serializers(self) -> t.Iterable[Strategylike] | None:
+        """
+        A list of strategies that will be sent to the endpoint for use in serializing
+        task results. The endpoint will attempt to serialize results with each strategy
+        in the list until one succeeds, returning the first successful serialization.
+
+        If falsy, the endpoint will try the default strategies, i.e.
+        :const:`~globus_compute_sdk.serialize.concretes.DEFAULT_STRATEGY_CODE` and
+        :const:`~globus_compute_sdk.serialize.concretes.DEFAULT_STRATEGY_DATA`.
+
+        Must be valid :const:`~globus_compute_sdk.serialize.facade.Strategylike` values.
+        Set by simple assignment::
+
+            >>> from globus_compute_sdk import Executor
+            >>> from globus_compute_sdk.serialize import CombinedCode
+            >>> result_serializers = [CombinedCode()]
+            >>> gce = Executor(result_serializers=result_serializers)
+
+            # May also alter after construction:
+            >>> gce.result_serializers = result_serializers
+        """
+        return self._result_serializers
+
+    @result_serializers.setter
+    def result_serializers(self, val: t.Iterable[Strategylike] | None):
+        if val is None:
+            self._result_serializers = None
+            self._validated_result_serializers = []
+        else:
+            self._validated_result_serializers = [validate_strategylike(v) for v in val]
+            self._result_serializers = val
+
     def _fn_cache_key(self, fn: t.Callable):
         return fn, self.container_id
 
@@ -627,6 +679,7 @@ class Executor(concurrent.futures.Executor):
             args = ()
         if kwargs is None:
             kwargs = {}
+        res_serde = [vsl.import_path for vsl in self._validated_result_serializers]
 
         self._task_counter += 1
 
@@ -636,6 +689,7 @@ class Executor(concurrent.futures.Executor):
             endpoint_id=self.endpoint_id,
             resource_specification=self.resource_specification,
             user_endpoint_config=self.user_endpoint_config,
+            result_serializers=res_serde,
             function_id=function_id,
             args=args,
             kwargs=kwargs,
@@ -881,6 +935,7 @@ class Executor(concurrent.futures.Executor):
             endpoint_uuid: uuid.UUID
             resource_specification: dict | None
             user_endpoint_config: dict | None
+            result_serializers: list[str] | None
 
             def __hash__(self):
                 key = (
@@ -888,6 +943,7 @@ class Executor(concurrent.futures.Executor):
                     self.endpoint_uuid,
                     json.dumps(self.resource_specification, sort_keys=True),
                     json.dumps(self.user_endpoint_config, sort_keys=True),
+                    json.dumps(self.result_serializers, sort_keys=True),
                 )
                 return hash(key)
 
@@ -920,6 +976,7 @@ class Executor(concurrent.futures.Executor):
                             task.endpoint_uuid,
                             task.resource_specification,
                             task.user_endpoint_config,
+                            task.result_serializers,
                         )
                         tasks[submit_group].append(task)
                         futs[submit_group].append(fut)
@@ -938,7 +995,7 @@ class Executor(concurrent.futures.Executor):
                     fut_list = futs[submit_group]
                     num_tasks = len(task_list)
 
-                    tg_uuid, ep_uuid, res_spec, uep_config = submit_group
+                    tg_uuid, ep_uuid, res_spec, uep_config, res_serde = submit_group
                     log.info(
                         f"Submitting tasks for Task Group {tg_uuid} to"
                         f" Endpoint {ep_uuid}: {num_tasks:,}"
@@ -974,7 +1031,13 @@ class Executor(concurrent.futures.Executor):
                             )
                             time.sleep(delay)
                     self._submit_tasks(
-                        tg_uuid, ep_uuid, res_spec, uep_config, fut_list, task_list
+                        tg_uuid,
+                        ep_uuid,
+                        res_spec,
+                        uep_config,
+                        res_serde,
+                        fut_list,
+                        task_list,
                     )
                     if num_tasks < self.api_burst_limit:
                         api_burst_ts.append(time.monotonic())
@@ -1057,6 +1120,7 @@ class Executor(concurrent.futures.Executor):
         endpoint_uuid: uuid.UUID,
         resource_specification: dict | None,
         user_endpoint_config: dict | None,
+        result_serializers: list[str] | None,
         futs: list[ComputeFuture],
         tasks: list[_TaskSubmissionInfo],
     ):
@@ -1081,9 +1145,10 @@ class Executor(concurrent.futures.Executor):
             taskgroup_uuid = self.task_group_id
 
         batch = self.client.create_batch(
-            taskgroup_uuid,
-            resource_specification,
-            user_endpoint_config,
+            task_group_id=taskgroup_uuid,
+            resource_specification=resource_specification,
+            user_endpoint_config=user_endpoint_config,
+            result_serializers=result_serializers,
             create_websocket_queue=True,
         )
         submitted_futs_by_fn: t.DefaultDict[str, list[ComputeFuture]] = defaultdict(
