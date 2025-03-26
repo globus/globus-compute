@@ -26,6 +26,7 @@ REQUIRES = [
     "colorama==0.4.6",
     "rich==13.7.1",
     "psutil<6",
+    "exceptiongroup>=1.2.2",  # until we drop support for python < 3.11
 ]
 DOCS_REQUIRES = [
     "sphinx>=7.3.2",

@@ -19,6 +19,9 @@ from globus_compute_sdk.serialize.facade import (
     validate_strategylike,
 )
 
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
+
 
 def foo(x, y=3):
     return x * y
@@ -734,3 +737,92 @@ def test_init_subclass_requires_unique_identifier(existing_id):
                 pass
 
     assert f"{existing_id!r} is already used by" in str(pyt_exc.value)
+
+
+@pytest.mark.parametrize(
+    "data, strategies",
+    [
+        (foo, [concretes.DillCode(), concretes.DillCodeSource()]),
+        (foo, ["gibberish", concretes.DillCode()]),
+        (foo, [concretes.DillDataBase64(), concretes.PureSourceDill()]),
+        (foo, [concretes.JSONData(), concretes.CombinedCode()]),
+        (foo, concretes.SELECTABLE_STRATEGIES),
+        ("foo", [concretes.JSONData()]),
+        ("foo", ["gibberish", concretes.JSONData()]),
+        ("foo", [concretes.PureSourceTextInspect(), concretes.DillDataBase64()]),
+        ("foo", [concretes.DillDataBase64(), concretes.JSONData()]),
+        ("foo", concretes.SELECTABLE_STRATEGIES),
+    ],
+)
+def test_serialize_from_list_happy_path(data, strategies):
+    ComputeSerializer.serialize_from_list(data, strategies)
+
+
+@pytest.mark.parametrize("data", [foo, "foo"])
+def test_serialize_from_list_uses_default_strategies_when_empty(data):
+    buffer = ComputeSerializer.serialize_from_list(data, [])
+    buf_id = buffer[:IDENTIFIER_LENGTH]
+    expected_id = (
+        concretes.DEFAULT_STRATEGY_CODE.identifier
+        if callable(data)
+        else concretes.DEFAULT_STRATEGY_DATA.identifier
+    )
+    assert buf_id == expected_id
+
+
+@pytest.mark.parametrize(
+    "strategies",
+    [
+        ["gibberish", "strings", "alkjfdhaf"],
+        ["not", "strategylike", "objects", None, 123, object()],
+        [
+            "bad",
+            "import",
+            "paths",
+            "globus_compute_sdk.*",
+            "globus_compute_sdk JSONData",
+        ],
+    ],
+)
+def test_serialize_from_list_rejects_invalid_strategylikes(strategies):
+    with pytest.raises(SerdeError) as pyt_exc:
+        ComputeSerializer.serialize_from_list(foo, strategies)
+
+    excgroup = pyt_exc.value.__cause__
+    assert isinstance(excgroup, ExceptionGroup)
+    assert len(excgroup.exceptions) == len(strategies)
+    assert all("Invalid strategy-like" in str(e) for e in excgroup.exceptions)
+
+
+def test_serialize_from_list_rejects_unknown_strategy(unknown_strategy):
+    with pytest.raises(SerdeError) as pyt_exc:
+        ComputeSerializer.serialize_from_list(foo, [unknown_strategy])
+
+    excgroup = pyt_exc.value.__cause__
+    assert isinstance(excgroup, ExceptionGroup)
+    assert len(excgroup.exceptions) == 1
+    assert unknown_strategy.__name__ in str(excgroup.exceptions[0])
+    assert "not a known serialization strategy" in str(excgroup.exceptions[0])
+
+
+@pytest.mark.parametrize(
+    "data, strategies",
+    [
+        (foo, [s for s in concretes.SELECTABLE_STRATEGIES if not s.for_code]),
+        ("foo", [s for s in concretes.SELECTABLE_STRATEGIES if s.for_code]),
+    ],
+)
+def test_serialize_from_list_enforces_for_code(data, strategies):
+    with pytest.raises(SerdeError) as pyt_exc:
+        ComputeSerializer.serialize_from_list(data, strategies)
+
+    excgroup = pyt_exc.value.__cause__
+    assert isinstance(excgroup, ExceptionGroup)
+    assert len(excgroup.exceptions) == len(strategies)
+
+    if callable(data):
+        exp_msg = "is a data serialization strategy, expected a code strategy"
+    else:
+        exp_msg = "is a code serialization strategy, expected a data strategy"
+
+    assert all(exp_msg in str(e) for e in excgroup.exceptions)

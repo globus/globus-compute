@@ -33,6 +33,7 @@ def execute_task(
     result_size_limit: int = _RESULT_SIZE_LIMIT,
     run_in_sandbox: bool = False,
     serde: ComputeSerializer = ComputeSerializer(),
+    result_serializers: list[str] | None = None,
 ) -> bytes:
     """Execute task is designed to enable any executor to execute a Task payload
     and return a Result payload, where the payload follows the globus-compute protocols
@@ -85,7 +86,7 @@ def execute_task(
     try:
         _task, task_buffer = _unpack_messagebody(task_body)
         log.debug("executing task task_id='%s'", task_id)
-        result = _call_user_function(task_buffer, serde)
+        result = _call_user_function(task_buffer, serde, result_serializers or [])
 
         res_len = len(result)
         if res_len > result_size_limit:
@@ -143,12 +144,15 @@ def _unpack_messagebody(message: bytes) -> tuple[Task, str]:
     return task, task.task_buffer
 
 
-def _call_user_function(task_buffer: str, serde: ComputeSerializer) -> str:
+def _call_user_function(
+    task_buffer: str, serde: ComputeSerializer, result_serializers: list[str]
+) -> str:
     """Deserialize the buffer and execute the task.
     Parameters
     ----------
     task_buffer: serialized buffer of (fn, args, kwargs)
     serde: serializer for the buffers
+    result_serializers: list of serializers to use for the result
     Returns
     -------
     Returns serialized result or throws exception.
@@ -159,4 +163,6 @@ def _call_user_function(task_buffer: str, serde: ComputeSerializer) -> str:
         log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
         f = timeout(f, GC_TASK_TIMEOUT)
 
-    return serde.serialize(f(*args, **kwargs))
+    result = f(*args, **kwargs)
+
+    return serde.serialize_from_list(result, result_serializers)
