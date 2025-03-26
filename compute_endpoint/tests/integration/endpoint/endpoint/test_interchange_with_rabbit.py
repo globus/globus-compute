@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import multiprocessing
 import time
 import uuid
@@ -228,8 +227,6 @@ def test_bad_resource_specification(
     resource_specification = json.dumps({"BAD_KEY": "BAD_VALUE"})
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:
-            x = chan.is_open
-            logging.warning(f"Channel open : {x=}")
             chan.queue_purge(task_q_name)
             chan.queue_purge(res_q_name)
             # publish our canary task

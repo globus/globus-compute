@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
-import queue
 import typing as t
 import uuid
 from concurrent.futures import Future
@@ -44,7 +43,6 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         *args,
         endpoint_id: t.Optional[uuid.UUID] = None,
         run_dir: t.Optional[str] = None,
-        results_passthrough: t.Optional[queue.Queue] = None,
         **kwargs,
     ) -> None:
         """
@@ -52,16 +50,11 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         ----------
         endpoint_id: Endpoint UUID
         run_dir: endpoint run directory
-        results_passthrough: Queue to which packed results will be posted
         Returns
         -------
         """
         assert endpoint_id, "ThreadPoolEngine requires kwarg:endpoint_id at start"
         self.endpoint_id = endpoint_id
-        if results_passthrough:
-            self.results_passthrough = results_passthrough
-        assert self.results_passthrough
-
         self.set_working_dir(run_dir=run_dir)
         # mypy think the thread can be none
         self._engine_ready = True

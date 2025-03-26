@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import functools
+import itertools
 import logging
 import os
-import queue
 import threading
 import time
 import typing as t
@@ -22,11 +23,30 @@ from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
+from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T, as_uuid
 from globus_compute_sdk.serialize.facade import ComputeSerializer, DeserializerAllowlist
 from parsl.utils import RepresentationMixin
 
 logger = logging.getLogger(__name__)
-_EXC_HISTORY_TMPL = "+" * 68 + "\nTraceback from attempt: {ndx}\n{exc}\n" + "-" * 68
+
+_EXC_HISTORY_TMPL = "+" * 68 + "\nTraceback from attempt: {ndx}\n{exc}" + "-" * 68
+_EXC_NO_HISTORY_TMPL = "+" * 68 + "\n{exc}" + "-" * 68
+
+
+class GCFuture(Future):
+    __slots__ = ("_gc_task_id",)
+
+    def __init__(self, *, gc_task_id: UUID_LIKE_T):
+        super().__init__()
+        self.gc_task_id = gc_task_id
+
+    @property
+    def gc_task_id(self):
+        return self._gc_task_id
+
+    @gc_task_id.setter
+    def gc_task_id(self, val: UUID_LIKE_T):
+        self._gc_task_id = as_uuid(val)
 
 
 class GlobusComputeEngineBase(ABC, RepresentationMixin):
@@ -76,7 +96,6 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self.endpoint_id = endpoint_id
         self.serde = ComputeSerializer(allowed_deserializer_types=allowed_serializers)
         self.max_retries_on_system_failure = max_retries_on_system_failure
-        self._retry_table: dict[str, dict] = {}
         # remove these unused vars that we are adding to just keep
         # endpoint interchange happy
         self.container_type: str | None = None
@@ -85,9 +104,6 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self.run_in_sandbox: bool = False
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
-        self.results_passthrough: queue.Queue[dict[str, bytes | str | None]] = (
-            queue.Queue()
-        )
         self._engine_ready: bool = False
 
     @abstractmethod
@@ -121,61 +137,58 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
 
     def _handle_task_exception(
         self,
-        task_id: str,
+        task_id: uuid.UUID,
         execution_begin: TaskTransition,
-        exception: BaseException,
-    ) -> bytes:
+        exception_history: list[BaseException],
+    ) -> Result:
         """Repackage task exception to messagepack'ed bytes
-        Parameters
-        ----------
-        task_id: str
-        execution_begin: TaskTransition
-        exception: Exception object from the task failure
 
-        Returns
-        -------
-        bytes
+        :param task_id: Upstream task identifier
+        :param execution_begin: When the task was begun
+        :param exception_history: List of task exceptions (from previous attempts)
+
+        :returns: Result object, encasulating all exceptions into a string
         """
-        code, user_message = get_result_error_details(exception)
-        error_details = {"code": code, "user_message": user_message}
         execution_end = TaskTransition(
             timestamp=time.time_ns(),
             actor=ActorName.INTERCHANGE,
             state=TaskState.EXEC_END,
         )
-        exception_string = ""
-        for index, prev_exc in enumerate(
-            self._retry_table[task_id]["exception_history"]
-        ):
-            templated_history = _EXC_HISTORY_TMPL.format(
-                ndx=index + 1, exc=get_error_string(exc=prev_exc)
+
+        *exc_history, last_exc = exception_history
+        code, user_message = get_result_error_details(last_exc)
+        error_details = {"code": code, "user_message": user_message}
+
+        if exc_history:
+            exception_string = "\n".join(
+                _EXC_HISTORY_TMPL.format(ndx=index, exc=get_error_string(exc=exc))
+                for index, exc in itertools.chain(
+                    enumerate(exc_history), (("final attempt", last_exc),)
+                )
             )
-            exception_string += templated_history
+        else:
+            exception_string = _EXC_NO_HISTORY_TMPL.format(
+                exc=get_error_string(exc=last_exc)
+            )
 
-        final = _EXC_HISTORY_TMPL.format(
-            ndx="final attempt", exc=get_error_string(exc=exception)
-        )
-        exception_string += final
-
-        result_message = dict(
+        res = Result(
             task_id=task_id,
             data=exception_string,
             exception=exception_string,
             error_details=error_details,
             task_statuses=[execution_begin, execution_end],  # only timings we have
         )
-        return messagepack.pack(Result(**result_message))
+        return res
 
-    def _setup_future_done_callback(self, task_id: str, future: Future) -> None:
-        """
-        Set up the done() callback for the provided future.
-
-        The done callback handles
-        Callback to post result to the passthrough queue
-        Parameters
-        ----------
-        future: Future for which the callback is triggered
-        """
+    def _invoke_submission(
+        self,
+        task_fut: GCFuture,
+        submission_partial: t.Callable[..., Future],
+        retry_count: int = 0,
+        exception_history: list | None = None,
+    ):
+        if exception_history is None:
+            exception_history = []
 
         exec_beg = TaskTransition(  # Reminder: used by *closure*, below
             timestamp=time.time_ns(),
@@ -185,19 +198,30 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
 
         def _done_cb(f: Future):
             try:
-                packed = f.result()
-            except Exception as exception:
-                packed = self._handle_task_exception(
-                    task_id=task_id, execution_begin=exec_beg, exception=exception
-                )
+                task_fut.set_result(f.result())
+            except Exception as e:
+                exception_history.append(e)
+                if retry_count > 0:
+                    self._invoke_submission(
+                        task_fut,
+                        submission_partial,
+                        retry_count - 1,
+                        exception_history,
+                    )
+                else:
+                    res = self._handle_task_exception(
+                        task_id=task_fut.gc_task_id,
+                        execution_begin=exec_beg,
+                        exception_history=exception_history,
+                    )
+                    task_fut.set_result(messagepack.pack(res))
 
-            if packed:
-                # _handle_task_exception can return empty bytestring
-                # when it retries task, indicating there's no task status update
-                self.results_passthrough.put({"task_id": task_id, "message": packed})
-                self._retry_table.pop(task_id, None)
-
-        future.add_done_callback(_done_cb)
+        try:
+            work_f = submission_partial()
+        except Exception as e:
+            work_f = Future()
+            work_f.set_exception(e)
+        work_f.add_done_callback(_done_cb)
 
     @abstractmethod
     def _submit(
@@ -220,42 +244,35 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         task_id: str,
         packed_task: bytes,
         resource_specification: dict,
-    ) -> Future:
+    ) -> GCFuture:
         """GC Endpoints should submit tasks via this method so that tasks are
         tracked properly.
-        Parameters
-        ----------
-        packed_task: messagepack bytes buffer
-        resource_specification: Dict that specifies resource requirements
-        Returns
-        -------
-        future
+
+        :param task_id: Globus Compute web-services task identifier; should be a UUID
+        :param packed_task: The payload task (function and args) to eventually invoke
+        :param resource_specification: MPI resource specification
+        :return: A GCFuture that wraps the internal retry (if specified)
         """
         self._ensure_ready()
 
-        if task_id not in self._retry_table:
-            self._retry_table[task_id] = {
-                "retry_count": 0,
-                "packed_task": packed_task,
-                "exception_history": [],
-                "resource_specification": resource_specification,
-            }
-        try:
-            future = self._submit(
-                execute_task,
-                resource_specification,
-                task_id,
-                packed_task,
-                self.endpoint_id,
-                run_dir=self.working_dir,
-                run_in_sandbox=self.run_in_sandbox,
-                serde=self.serde,
-            )
-        except Exception as e:
-            future = Future()
-            future.set_exception(e)
-        self._setup_future_done_callback(task_id, future)
-        return future
+        task_f = GCFuture(gc_task_id=task_id)
+
+        submission_partial = functools.partial(
+            self._submit,
+            execute_task,
+            resource_specification,
+            task_f.gc_task_id,
+            packed_task,
+            self.endpoint_id,
+            run_dir=self.working_dir,
+            run_in_sandbox=self.run_in_sandbox,
+            serde=self.serde,
+        )
+        self._invoke_submission(
+            task_f, submission_partial, retry_count=self.max_retries_on_system_failure
+        )
+
+        return task_f
 
     @abstractmethod
     def shutdown(self, /, **kwargs) -> None:

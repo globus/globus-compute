@@ -27,6 +27,7 @@ def create_traceback(start: int = 0) -> types.TracebackType:
             tb = types.TracebackType(tb, frame, frame.f_lasti, frame.f_lineno)
         except ValueError:
             break
+    assert tb is not None, "Developer: too many frames ignored!"
     return tb
 
 
@@ -135,13 +136,6 @@ def create_task_packer(
 
 
 def double(x: int) -> int:
-    return x * 2
-
-
-def slow_double(x: int, sleep_duration_s: int) -> int:
-    import time
-
-    time.sleep(sleep_duration_s)
     return x * 2
 
 

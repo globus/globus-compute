@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import queue
 import typing as t
 import unittest.mock
 import uuid
+from concurrent.futures import Future
 
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task
@@ -14,7 +14,6 @@ from parsl.executors.errors import InvalidResourceSpecification
 class MockExecutor(unittest.mock.Mock):
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
-        self.results_passthrough: queue.Queue | None = None
         self.passthrough = True
         self.executor_exception = False
 
@@ -22,10 +21,8 @@ class MockExecutor(unittest.mock.Mock):
         self,
         endpoint_id: uuid.UUID | None = None,
         run_dir: str | None = None,
-        results_passthrough: queue.Queue = None,
         funcx_client: Client = None,
     ):
-        self.results_passthrough = results_passthrough
         self.funcx_client = funcx_client
         self.endpoint_id = endpoint_id
         self.run_dir = run_dir
@@ -43,6 +40,7 @@ class MockExecutor(unittest.mock.Mock):
         if "BAD_KEY" in resource_specification:
             raise InvalidResourceSpecification({"BAD_KEY"})
 
-        packed_result = messagepack.pack(res)
-        msg = {"task_id": str(task_id), "message": packed_result}
-        self.results_passthrough.put(msg)
+        f = Future()
+        f.gc_task_id = task_id
+        f.set_result(messagepack.pack(res))
+        return f

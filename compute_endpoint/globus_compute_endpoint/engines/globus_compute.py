@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import queue
 import re
 import shlex
 import typing as t
@@ -257,7 +256,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         *args,
         endpoint_id: t.Optional[uuid.UUID] = None,
         run_dir: t.Optional[str] = None,
-        results_passthrough: t.Optional[queue.Queue] = None,
         **kwargs,
     ):
         assert endpoint_id, "GCExecutor requires kwarg:endpoint_id at start"
@@ -277,10 +275,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             )
 
         os.makedirs(self.executor.provider.script_dir, exist_ok=True)
-        if results_passthrough:
-            # Only update the default queue in GCExecutorBase if
-            # a queue is passed in
-            self.results_passthrough = results_passthrough
         self.executor.start()
 
         # Add executor to poller *after* executor has started
@@ -443,30 +437,6 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
     def scale_in(self, blocks: int):
         logger.info(f"Scaling in {blocks} blocks")
         return self.executor.scale_in_facade(n=blocks)
-
-    def _handle_task_exception(
-        self,
-        task_id: str,
-        execution_begin: TaskTransition,
-        exception: BaseException,
-    ) -> bytes:
-        result_bytes = b""
-        retry_info = self._retry_table[task_id]
-        if retry_info["retry_count"] < self.max_retries_on_system_failure:
-            retry_info["retry_count"] += 1
-            retry_info["exception_history"].append(exception)
-            self.submit(
-                task_id,
-                retry_info["packed_task"],
-                resource_specification=retry_info["resource_specification"],
-            )
-        else:
-            # This is a terminal state
-            result_bytes = super()._handle_task_exception(
-                task_id=task_id, execution_begin=execution_begin, exception=exception
-            )
-
-        return result_bytes
 
     @property
     def scaling_enabled(self) -> bool:
