@@ -8,6 +8,7 @@ import typing as t
 from dataclasses import dataclass
 from enum import Enum
 
+from exceptiongroup import ExceptionGroup
 from globus_compute_sdk.errors import (
     DeserializationError,
     SerdeError,
@@ -156,6 +157,33 @@ class ComputeSerializer:
         )
 
         self.allowed_deserializer_types = parse_allowlist(allowed_deserializer_types)
+
+    @staticmethod
+    def serialize_from_list(data: t.Any, strategies: t.Iterable[Strategylike]) -> str:
+        """
+        Iterates through the list of Strategylike objects, validating each one and
+        attempting serialization. Returns the first successful serialization, or, if
+        all Strategylike objects fail to validate or serialize, raises an error with
+        the details of each failure.
+
+        If strategies is falsy, uses the default strategies.
+        """
+        exceptions: list[Exception] = []
+        for strategy in strategies or [DEFAULT_STRATEGY_DATA, DEFAULT_STRATEGY_CODE]:
+            try:
+                validated = validate_strategylike(strategy, for_code=callable(data))
+                return validated.instance.serialize(data)
+            except Exception as e:
+                exceptions.append(e)
+
+        excgroup = ExceptionGroup("Strategy failures:", exceptions)
+        logger.error(
+            "Strategy list %s failed to serialize data:\n%s",
+            strategies,
+            data,
+            exc_info=excgroup,
+        )
+        raise SerializationError("All strategies failed.") from excgroup
 
     def serialize(self, data: t.Any) -> str:
         """

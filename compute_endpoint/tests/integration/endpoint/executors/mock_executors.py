@@ -8,6 +8,7 @@ from concurrent.futures import Future
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task
 from globus_compute_sdk import Client
+from globus_compute_sdk.serialize.facade import validate_strategylike
 from parsl.executors.errors import InvalidResourceSpecification
 
 
@@ -32,6 +33,7 @@ class MockExecutor(unittest.mock.Mock):
         task_id: uuid.UUID,
         packed_task: bytes,
         resource_specification: t.Dict,
+        result_serializers: t.Optional[t.List[str]] = None,
     ):
         task: Task = messagepack.unpack(packed_task)
         res = Result(task_id=task_id, data=task.task_buffer)
@@ -39,6 +41,10 @@ class MockExecutor(unittest.mock.Mock):
         # This is a hack to trigger an InvalidResourceSpecification
         if "BAD_KEY" in resource_specification:
             raise InvalidResourceSpecification({"BAD_KEY"})
+
+        if result_serializers:
+            for serializer in result_serializers:
+                validate_strategylike(serializer)
 
         f = Future()
         f.gc_task_id = task_id
