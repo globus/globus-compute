@@ -5,6 +5,8 @@ Globus Compute Serializer
     :members:
     :member-order: bysource
 
+.. autodata:: globus_compute_sdk.serialize.facade.Strategylike
+
 .. autoclass:: globus_compute_sdk.serialize.AllowlistWildcard
     :members:
     :member-order: bysource

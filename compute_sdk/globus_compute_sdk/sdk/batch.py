@@ -41,6 +41,7 @@ class Batch:
         request_queue=False,
         serializer: ComputeSerializer | None = None,
         user_runtime: UserRuntime | None = None,
+        result_serializers: list[str] | None = None,
     ):
         """
         :param task_group_id: UUID of task group to which to submit the batch
@@ -53,6 +54,8 @@ class Batch:
         :param serializer: Used to serialize task args and kwargs
         :param user_runtime: Information about the runtime used to create and prepare
             this batch, such as Python and Globus Compute SDK versions
+        :param result_serializers: A list of serialization strategy import paths to
+            pass to the endpoint for use in serializing execution results.
         """
         self.task_group_id = as_optional_uuid(task_group_id)
         self.resource_specification = resource_specification
@@ -61,6 +64,7 @@ class Batch:
         self._serde = serializer or _default_serde
         self.request_queue = request_queue
         self.user_runtime = user_runtime
+        self.result_serializers = result_serializers
 
     def __repr__(self):
         return str(self.prepare())
@@ -134,5 +138,7 @@ class Batch:
             data["user_endpoint_config"] = self.user_endpoint_config
         if self.user_runtime:
             data["user_runtime"] = asdict(self.user_runtime)
+        if self.result_serializers:
+            data["result_serializers"] = self.result_serializers
 
         return data
