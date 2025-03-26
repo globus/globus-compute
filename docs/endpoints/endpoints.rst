@@ -620,9 +620,9 @@ functionally equivalent to a config that omits ``allowed_serializers``:
          - globus_compute_sdk.*Code
          - globus_compute_sdk.*Data
 
-.. note:: These values are *not* interpreted as wildcards |nbsp| --- |nbsp| they are
+.. note:: These values are *not* interpreted as globs |nbsp| --- |nbsp| they are
    hard-coded values with special meaning in the Compute serialization system. No other
-   wildcard-style options are supported.
+   glob-style options are supported.
 
 
 .. _enable_on_boot:
