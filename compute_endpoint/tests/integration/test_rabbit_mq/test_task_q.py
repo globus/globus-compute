@@ -162,7 +162,7 @@ def test_connection_closed_shuts_down(start_task_q_subscriber):
     # The RabbitMQ queue is configured for exclusive use, so attempting
     # to reconnect will cause an error.
     tqs.connect_attempt_limit = 1
-    try_assert(lambda: tqs._connection, "Ensure we establish a connection")
+    try_assert(lambda: tqs._connection and tqs._connection.is_open, "Test prereq")
 
     assert not tqs._stop_event.is_set()
     tqs._connection.close()
