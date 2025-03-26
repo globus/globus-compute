@@ -8,7 +8,6 @@ import threading
 import time
 import typing as t
 import uuid
-from queue import Queue
 from unittest import mock
 
 import globus_compute_sdk as gc
@@ -154,12 +153,13 @@ def nodeslist(num=100):
 @pytest.fixture
 def engine_runner(
     tmp_path, engine_heartbeat, nodeslist, reporting_period=0.1
-) -> t.Callable:
+) -> t.Callable[..., GlobusComputeEngineBase]:
     engines_to_shutdown = []
 
-    def _runner(engine_type: t.Type[GlobusComputeEngineBase], **kwargs):
+    def _runner(
+        engine_type: t.Type[GlobusComputeEngineBase], **kwargs
+    ) -> GlobusComputeEngineBase:
         ep_id = uuid.uuid4()
-        queue = Queue()
         if engine_type is engines.ProcessPoolEngine:
             k = dict(max_workers=2)
         elif engine_type is engines.ThreadPoolEngine:
@@ -167,6 +167,7 @@ def engine_runner(
         elif engine_type is engines.GlobusComputeEngine:
             k = dict(
                 address="::1",
+                max_workers_per_node=2,
                 heartbeat_period=engine_heartbeat,
                 heartbeat_threshold=2,
                 job_status_kwargs=dict(max_idletime=0, strategy_period=0.1),
@@ -196,9 +197,7 @@ def engine_runner(
             raise NotImplementedError(f"Unimplemented: {engine_type.__name__}")
         k.update(**kwargs)
         engine = engine_type(**k)
-        engine.start(
-            endpoint_id=ep_id, run_dir=str(tmp_path), results_passthrough=queue
-        )
+        engine.start(endpoint_id=ep_id, run_dir=str(tmp_path))
         engines_to_shutdown.append(engine)
         return engine
 

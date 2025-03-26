@@ -3,12 +3,12 @@ import logging
 import pathlib
 import random
 import time
-from queue import Queue
+import typing as t
 from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_common.messagepack.message_types import TaskTransition
+from globus_compute_common.messagepack.message_types import Result, TaskTransition
 from globus_compute_common.tasks import ActorName, TaskState
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
@@ -21,7 +21,6 @@ from globus_compute_endpoint.engines import (
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 from parsl import HighThroughputExecutor
-from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import KubernetesProvider
 from tests.utils import double, get_cwd, kill_manager
 
@@ -51,13 +50,13 @@ def test_result_message_packing(serde, task_uuid):
         task_statuses=[exec_start, exec_end],
     )
 
-    mResult = messagepack.message_types.Result(**result_message)
-    assert isinstance(mResult, messagepack.message_types.Result)
+    mResult = Result(**result_message)
+    assert isinstance(mResult, Result)
     packed_result = messagepack.pack(mResult)
     assert isinstance(packed_result, bytes)
 
     unpacked = messagepack.unpack(packed_result)
-    assert isinstance(unpacked, messagepack.message_types.Result)
+    assert isinstance(unpacked, Result)
 
     assert unpacked.task_id == task_uuid
     assert serde.deserialize(unpacked.data) == result
@@ -67,15 +66,14 @@ def test_result_message_packing(serde, task_uuid):
     "engine_type", (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine)
 )
 def test_engine_start(
-    engine_type: GlobusComputeEngineBase, engine_runner, endpoint_uuid, tmp_path
+    engine_type: t.Type[GlobusComputeEngineBase], engine_runner, endpoint_uuid, tmp_path
 ):
     """Engine.submit should fail before engine is started"""
 
     engine = engine_type()
     assert not engine._engine_ready, "Engine should not be ready before start"
 
-    engine.executor = mock.Mock()
-    engine.executor.status_polling_interval = 0
+    engine.executor = mock.Mock(status_polling_interval=0)
 
     # task submit should raise Exception if it was not started
     with pytest.raises(RuntimeError):
@@ -95,7 +93,7 @@ def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
     engine = engine_runner(engine_type)
 
     param = random.randint(1, 100)
-    resource_spec = {}
+    resource_spec: dict = {}
     future = engine._submit(double, resource_spec, param)
     assert isinstance(future, concurrent.futures.Future)
 
@@ -120,7 +118,7 @@ def test_engine_working_dir(
     """
     engine = engine_runner(engine_type)
 
-    task_args = (str(task_uuid), ez_pack_task(get_cwd), {})
+    task_args: tuple = (str(task_uuid), ez_pack_task(get_cwd), {})
 
     future1 = engine.submit(*task_args)
     unpacked1 = messagepack.unpack(future1.result())  # blocks; avoid race condition
@@ -129,6 +127,8 @@ def test_engine_working_dir(
     unpacked2 = messagepack.unpack(future2.result())
 
     # data is enough for test, but in error case, be kind to dev
+    assert isinstance(unpacked1, Result)
+    assert isinstance(unpacked2, Result)
     cwd1 = serde.deserialize(unpacked1.data)
     cwd2 = serde.deserialize(unpacked2.data)
     assert cwd1 == cwd2, "working dir should be idempotent"
@@ -142,62 +142,43 @@ def test_engine_submit_internal(
 ):
     engine = engine_runner(engine_type)
 
-    q = engine.results_passthrough
     task_bytes = ez_pack_task(double, 3)
-    future = engine.submit(str(task_uuid), task_bytes, resource_specification={})
-    packed_result = future.result()
+    f = engine.submit(str(task_uuid), task_bytes, resource_specification={})
+    packed_result = f.result()
 
     # Confirm that the future got the right answer
     assert isinstance(packed_result, bytes)
     result = messagepack.unpack(packed_result)
-    assert isinstance(result, messagepack.message_types.Result)
+    assert isinstance(result, Result)
     assert result.task_id == task_uuid
-
-    # Confirm that the same result got back though the queue
-    for _i in range(3):
-        q_msg = q.get(timeout=0.1)
-        assert isinstance(q_msg, dict)
-
-        packed_result_q = q_msg["message"]
-        result = messagepack.unpack(packed_result_q)
-        # Handle a sneaky EPStatusReport that popped in ahead of the result
-        if isinstance(result, messagepack.message_types.EPStatusReport):
-            continue
-
-        passed_task_id = q_msg["task_id"]
-        # At this point the message should be the result
-        assert (
-            packed_result == packed_result_q
-        ), "Result from passthrough_q and future should match"
-
-        assert passed_task_id == str(task_uuid)
-        assert result.task_id == task_uuid
-        final_result = serde.deserialize(result.data)
-        assert final_result == 6
-        break
+    assert serde.deserialize(result.data) == 6
 
 
 @pytest.mark.parametrize(
     "engine_type",
     (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine),
 )
-def test_allowed_serializers_passthrough_to_serde(engine_type, engine_runner):
-    engine = engine_runner(engine_type, allowed_serializers=SELECTABLE_STRATEGIES)
+def test_allowed_serializers_passthrough_to_serde(engine_type, engine_runner) -> None:
+    engine: GlobusComputeEngineBase = engine_runner(
+        engine_type, allowed_serializers=SELECTABLE_STRATEGIES
+    )
 
     assert engine.serde is not None
     assert engine.serde.allowed_deserializer_types == set(SELECTABLE_STRATEGIES)
 
 
-def test_gc_engine_system_failure(ez_pack_task, task_uuid, engine_runner):
+def test_gc_engine_system_failure(serde, ez_pack_task, task_uuid, engine_runner):
     """Test behavior of engine failure killing task"""
     engine = engine_runner(GlobusComputeEngine, max_retries_on_system_failure=0)
 
     task_bytes = ez_pack_task(kill_manager)
     future = engine.submit(str(task_uuid), task_bytes, {})
-
-    assert isinstance(future, concurrent.futures.Future)
-    with pytest.raises(ManagerLost):
-        future.result()
+    r = messagepack.unpack(future.result())
+    assert isinstance(r, Result)
+    assert r.task_id == task_uuid
+    assert r.is_error
+    assert r.error_details.code == "RemoteExecutionError"
+    assert "ManagerLost" in r.data
 
 
 def test_serialized_engine_config_has_provider():
@@ -264,9 +245,7 @@ def test_gcengine_start_pass_through_to_executor(tmp_path: pathlib.Path, endpoin
     assert mock_ex.run_dir != tmp_path
     assert mock_ex.provider.script_dir != scripts_dir
 
-    engine.start(
-        endpoint_id=endpoint_uuid, run_dir=tmp_path, results_passthrough=Queue()
-    )
+    engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
     engine.shutdown()
 
     assert mock_ex.run_dir == tmp_path
@@ -283,9 +262,7 @@ def test_gcengine_start_provider_without_channel(tmp_path: pathlib.Path, endpoin
     assert not hasattr(mock_executor.provider, "channel"), "Verify test setup"
 
     engine = GlobusComputeEngine(executor=mock_executor)
-    engine.start(
-        endpoint_id=endpoint_uuid, run_dir=tmp_path, results_passthrough=Queue()
-    )
+    engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
     engine.shutdown()
 
 
@@ -326,28 +303,22 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid, 
     ]
 
     assert all(f.done() for f in futs), "Expect immediate completion for failed state"
-    assert all(exc_text in str(f.exception()) for f in futs)
+    assert all(exc_text in str(f.result()) for f in futs)
 
 
 def test_gcengine_exception_report_from_bad_state(task_uuid, gce):
     gce._engine_ready = True
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
-    gce.submit(
+    f = gce.submit(
         task_id=str(task_uuid), resource_specification={}, packed_task=b"MOCK_TASK"
     )
 
-    result = None
-    for _i in range(10):
-        q_msg = gce.results_passthrough.get(timeout=5)
-        packed_result_q = q_msg["message"]
-        result = messagepack.unpack(packed_result_q)
-        if isinstance(result, messagepack.message_types.Result):
-            break
-
-    assert result.task_id == task_uuid
-    assert result.error_details.code == "RemoteExecutionError"
-    assert "ZeroDivisionError" in result.data
+    r = messagepack.unpack(f.result())
+    assert isinstance(r, Result)
+    assert ZeroDivisionError.__name__ in r.data
+    assert r.task_id == task_uuid
+    assert r.error_details.code == "RemoteExecutionError"
 
 
 def test_gcengine_rejects_mpi_mode(randomstring):
@@ -364,14 +335,15 @@ def test_gcengine_rejects_mpi_mode(randomstring):
 
 def test_gcengine_rejects_resource_specification(task_uuid, gce):
     gce._engine_ready = True
-    with pytest.raises(ValueError) as pyt_exc:
-        gce.submit(
-            str(task_uuid),
-            packed_task=b"packed_task",
-            resource_specification={"foo": "bar"},
-        ).result()
-
-    assert "is not supported" in str(pyt_exc)
+    f = gce.submit(
+        str(task_uuid),
+        packed_task=b"packed_task",
+        resource_specification={"foo": "bar"},
+    )
+    r = messagepack.unpack(f.result())
+    assert isinstance(r, Result)
+    assert r.is_error
+    assert "is not supported" in r.data
 
 
 def test_gcmpiengine_default_executor(randomstring):

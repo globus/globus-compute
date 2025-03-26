@@ -155,11 +155,7 @@ def test_rundir_passed_to_gcengine(mocker, fs, ei):
 
     ei.start_engine()
 
-    ei.engine.start.assert_called_with(
-        results_passthrough=ei.results_passthrough,
-        endpoint_id=ei.endpoint_id,
-        run_dir=ei.logdir,
-    )
+    ei.engine.start.assert_called_with(endpoint_id=ei.endpoint_id, run_dir=ei.logdir)
 
 
 def test_heartbeat_includes_static_info(ei, mock_rp, mock_tqs, mock_pack, mock_ep_info):

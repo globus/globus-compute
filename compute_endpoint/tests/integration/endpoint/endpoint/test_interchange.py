@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 from globus_compute_common.messagepack import pack, unpack
-from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
+from globus_compute_common.messagepack.message_types import EPStatusReport, Task
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.endpoint.config.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
@@ -59,7 +59,10 @@ def mock_conf(mock_engine):
 
 @pytest.fixture
 def mock_rp():
+    pub_f = Future()
+    pub_f.set_result(None)
     m = mock.Mock(spec=ResultPublisher)
+    m.publish.return_value = pub_f
     with mock.patch(f"{_MOCK_BASE}ResultPublisher", return_value=m):
         yield m
 
@@ -188,7 +191,6 @@ def test_no_idle_if_not_configured(
     mock_log,
     endpoint_uuid,
     mock_spt,
-    mock_quiesce,
     mock_rp,
     mock_tqs,
     mock_pack,
@@ -196,7 +198,6 @@ def test_no_idle_if_not_configured(
     mock_conf.idle_heartbeats_soft = 0
     mock_conf.heartbeat_period = 1
     ei = ep_ix_factory(config=mock_conf)
-    ei._quiesce_event = mock_quiesce
 
     t = threading.Thread(target=ei._main_loop, daemon=True)
     t.start()
@@ -214,19 +215,17 @@ def test_soft_idle_honored(
     ep_ix_factory,
     mock_spt,
     idle_limit,
-    mock_quiesce,
     mock_rp,
     mock_tqs,
     mock_pack,
 ):
-    result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
-    msg = {"task_id": str(result.task_id), "message": pack(result)}
-
     mock_conf.idle_heartbeats_soft = idle_limit
     ei = ep_ix_factory(config=mock_conf)
-    ei.results_passthrough.put(msg)
 
-    ei._quiesce_event = mock_quiesce
+    task = Task(task_id=uuid.uuid4(), task_buffer=b"some test data")
+    pheaders = {"task_uuid": task.task_id, "function_uuid": "a"}
+    ei.pending_task_queue.put((1, pheaders, pack(task)))
+
     ei._main_loop()
 
     assert ei.time_to_quit is True
@@ -258,7 +257,6 @@ def test_hard_idle_honored(
     ep_ix_factory,
     mock_spt,
     idle_limit,
-    mock_quiesce,
     mock_rp,
     mock_tqs,
     mock_pack,
@@ -270,7 +268,6 @@ def test_hard_idle_honored(
     mock_conf.idle_heartbeats_soft = idle_soft_limit
     mock_conf.idle_heartbeats_hard = idle_limit
     ei = ep_ix_factory(config=mock_conf)
-    ei._quiesce_event = mock_quiesce
 
     ei._main_loop()
 
@@ -299,7 +296,6 @@ def test_hard_idle_honored(
 def test_shutdown_lost_task_race_condition_sc36175(
     ep_ix_factory,
     mock_conf,
-    mock_quiesce,
     mock_rp,
     mock_tqs,
 ):
@@ -311,7 +307,6 @@ def test_shutdown_lost_task_race_condition_sc36175(
         return task
 
     ei = ep_ix_factory(config=mock_conf)
-    ei._quiesce_event = mock_quiesce
     ei.pending_task_queue = mock.Mock(spec=queue.SimpleQueue, get=_get)
     ei._main_loop()
 
@@ -328,26 +323,31 @@ def test_unidle_updates_proc_title(
     mock_tqs,
     mock_pack,
 ):
-    def _get(*a, **k):
-        item = rp_q.get()
+    orig_wait = mock_quiesce.wait.side_effect
+
+    def block_until(*a, **k):
+        os.sched_yield()
+        main_thread_may_continue.wait()
+        mock_quiesce.wait.side_effect = orig_wait
+
+    def _submit(*a, **k):
         main_thread_may_continue.set()
-        return item
+        f = engines.base.GCFuture(gc_task_id=uuid.uuid4())
+        f.set_result(b"abcd")
+        return f
 
     def insert_msg(*a, **k):
-        result = Result(task_id=uuid.uuid1(), data=b"TASK RESULT")
-        rp_q.put({"task_id": str(result.task_id), "message": pack(result)})
-        main_thread_may_continue.wait()
+        task = Task(task_id=uuid.uuid4(), task_buffer=b"some test data")
+        pheaders = {"task_uuid": task.task_id, "function_uuid": "a"}
+        ei.pending_task_queue.put((1, pheaders, pack(task)))
+        mock_quiesce.wait.side_effect = block_until
+        mock_spt.side_effect = None
 
-    rp_q = queue.Queue()
-    mock_conf.heartbeat_period = 1
+    main_thread_may_continue = threading.Event()
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 3
     ei = ep_ix_factory(config=mock_conf)
-    ei._quiesce_event = mock_quiesce
-    ei.results_passthrough = mock.Mock(spec=queue.Queue, get=_get, put=rp_q.put)
-
-    main_thread_may_continue = threading.Event()
-
+    ei.engine.submit = mock.Mock(side_effect=_submit)
     mock_spt.side_effect = insert_msg
 
     ei._main_loop()
@@ -369,17 +369,14 @@ def test_sends_final_status_message_on_shutdown(
     mock_conf,
     ep_ix_factory,
     endpoint_uuid,
-    mock_quiesce,
     mock_rp,
     mock_tqs,
 ):
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
     ei = ep_ix_factory(config=mock_conf)
-    ei._quiesce_event = mock_quiesce
     ei._main_loop()
 
-    assert mock_rp.publish.called
     packed_bytes = mock_rp.publish.call_args[0][0]
     epsr = unpack(packed_bytes)
     assert isinstance(epsr, EPStatusReport)
@@ -392,7 +389,6 @@ def test_gracefully_handles_final_status_message_timeout(
     mock_conf,
     ep_ix_factory,
     endpoint_uuid,
-    mock_quiesce,
     mock_rp,
     mock_tqs,
     mock_pack,
@@ -400,7 +396,6 @@ def test_gracefully_handles_final_status_message_timeout(
     mock_conf.idle_heartbeats_soft = 1
     mock_conf.idle_heartbeats_hard = 2
     ei = ep_ix_factory(config=mock_conf)
-    ei._quiesce_event = mock_quiesce
 
     mock_future = mock.Mock(spec=Future)
     mock_future.result.side_effect = TimeoutError("asdfasdf")
@@ -411,7 +406,7 @@ def test_gracefully_handles_final_status_message_timeout(
 
 
 def test_sends_status_reports(
-    mocker, ep_ix, endpoint_uuid, randomstring, mock_quiesce, mock_rp, mock_tqs
+    mocker, ep_ix, endpoint_uuid, randomstring, mock_rp, mock_tqs
 ):
     status_reports = [
         EPStatusReport(endpoint_id=uuid.uuid4(), global_state={}, task_statuses=[])
@@ -420,7 +415,6 @@ def test_sends_status_reports(
     ep_ix.engine.get_status_report.side_effect = status_reports
     ep_ix.config.idle_heartbeats_soft = 1
     ep_ix.config.idle_heartbeats_hard = 0  # will be set to soft + 1
-    ep_ix._quiesce_event = mock_quiesce
     num_hbs = ep_ix.config.idle_heartbeats_soft + 4
     with mock.patch(f"{_MOCK_BASE}threading.Thread"):
         ep_ix._main_loop()
@@ -460,28 +454,53 @@ def test_epi_rejects_allowlist_task(
     endpoint_uuid, ep_ix, allowed_fns, randomstring, mock_rp, mock_tqs
 ):
     ep_ix.config.allowed_functions = allowed_fns
-    ep_ix.start_engine()
-
-    task_uuid = uuid.uuid4()
-    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
 
     func_to_run = _test_func_ids[-1]
-
+    task_uuid = uuid.uuid4()
+    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
     headers = {"function_uuid": str(func_to_run), "task_uuid": str(task_uuid)}
-    t = threading.Thread(target=ep_ix._main_loop, daemon=True)
-    t.start()
-
-    ep_ix.results_passthrough.put(None)  # stop result thread
-    try_assert(lambda: ep_ix.results_passthrough.qsize() == 0, "Required test setup")
 
     ep_ix.pending_task_queue.put((1, headers, pack(task_msg)))
-    res = ep_ix.results_passthrough.get()
-    res_msg = unpack(res["message"])
 
+    t = threading.Thread(target=ep_ix._main_loop, daemon=True)
+    t.start()
+    try_assert(lambda: mock_rp.publish.called)
     ep_ix.stop()
     t.join()  # important to make sure we don't have a lockup
+
+    msg_b = next(m for (m,), _ in mock_rp.publish.call_args_list if b'"result"' in m)
+    res = unpack(msg_b)
     if allowed_fns is None or func_to_run in allowed_fns:
-        assert res_msg.data == task_msg.task_buffer
+        assert res.data == task_msg.task_buffer, msg_b
     else:
-        assert f"Function {func_to_run} not permitted" in res_msg.data, ep_ix.config
-        assert f"on endpoint {endpoint_uuid}" in res_msg.data, res
+        assert f"Function {func_to_run} not permitted" in res.data, ep_ix.config
+        assert f"on endpoint {endpoint_uuid}" in res.data, msg_b
+
+
+def test_engine_submit_failure_reported(
+    ep_ix, randomstring, mock_log, mock_tqs, mock_rp
+):
+    exc_text = randomstring()
+
+    def infra_failure(*a, **k):
+        raise Exception(exc_text)
+
+    func_to_run = _test_func_ids[-1]
+    task_uuid = uuid.uuid4()
+    task_msg = Task(task_id=task_uuid, task_buffer=randomstring())
+    headers = {"function_uuid": str(func_to_run), "task_uuid": str(task_uuid)}
+
+    ep_ix.engine.submit = infra_failure
+    ep_ix.pending_task_queue.put((1, headers, pack(task_msg)))
+
+    t = threading.Thread(target=ep_ix._main_loop, daemon=True)
+    t.start()
+    try_assert(lambda: mock_rp.publish.called)
+    ep_ix.stop()
+    t.join()
+
+    msg_b = next(m for (m,), _ in mock_rp.publish.call_args_list if b'"result"' in m)
+    (lfmt,), _ = mock_log.exception.call_args
+
+    assert exc_text.encode() in msg_b, "Expect engine failure published"
+    assert f"Failed to process task {task_uuid}" == lfmt, "Expect logs see failure"

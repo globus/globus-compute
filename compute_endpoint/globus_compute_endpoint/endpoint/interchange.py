@@ -11,6 +11,7 @@ import signal
 import threading
 import time
 import typing as t
+import uuid
 from concurrent.futures import Future
 
 import pika.exceptions
@@ -24,7 +25,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     TaskQueueSubscriber,
 )
 from globus_compute_endpoint.endpoint.result_store import ResultStore
-from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
+from globus_compute_endpoint.engines.base import GCFuture, GlobusComputeEngineBase
 from globus_compute_endpoint.exception_handling import get_result_error_details
 from globus_compute_sdk import __version__ as funcx_sdk_version
 from globus_compute_sdk.sdk.utils import get_py_version_str
@@ -129,15 +130,11 @@ class EndpointInterchange:
         }
         log.info(f"Platform info: {self.current_platform}")
 
-        self.results_passthrough: queue.Queue[_ResultPassthroughType | None] = (
-            queue.Queue()  # None == poison pill for thread (ref _main_loop)
-        )
         self.engine: GlobusComputeEngineBase = self.config.engine
 
     def start_engine(self):
         log.info("Starting Engine")
         self.engine.start(
-            results_passthrough=self.results_passthrough,
             endpoint_id=self.endpoint_id,
             run_dir=self.logdir,
         )
@@ -309,15 +306,62 @@ class EndpointInterchange:
             while not self._quiesce_event.wait(timeout=1):
                 for task_id, packed_result in self.result_store:
                     log.debug("Retrieved stored result (%s)", task_id)
-                    msg = {"task_id": task_id, "message": packed_result}
+                    f = GCFuture(gc_task_id=task_id)
+                    f.add_done_callback(forward_result)
+                    f.set_result(packed_result)
                     self.result_store.discard(task_id)
-                    self.results_passthrough.put(msg)
 
                     if self._quiesce_event.is_set():
                         # important to check every iteration as well, so as not to
                         # potentially hang up the shutdown procedure
                         return
             log.debug("Thread exit")
+
+        def publish_done(task_id: uuid.UUID, task_res: bytes):
+            def _done_cb(pub_fut: Future):
+                _exc = pub_fut.exception()
+                if _exc:
+                    # Publishing didn't work -- quiesce and see if a simple restart
+                    # fixes the issue.
+                    log.error("Failed to publish results", exc_info=_exc)
+                    log.info(f"Storing result for later: {task_id}")
+                    self.result_store[str(task_id)] = task_res
+                    self._quiesce_event.set()
+                else:
+                    nonlocal num_results_forwarded
+                    num_results_forwarded += 1
+
+            return _done_cb
+
+        def forward_result(task_f: GCFuture) -> None:
+            try:
+                res = task_f.result()
+            except Exception as e:
+                msg = f"Unknown task exception: ({type(e).__name__}) {e}"
+                failed_result = Result(
+                    task_id=task_f.gc_task_id,
+                    data=msg,
+                    error_details=ResultErrorDetails(
+                        code="UNKNOWN_TASK_FAILURE", user_message=msg
+                    ),
+                    task_statuses=[],
+                )
+                res = pack(failed_result)
+
+            try:
+                f = results_publisher.publish(res)
+                f.add_done_callback(publish_done(task_f.gc_task_id, res))
+
+            except Exception:
+                # Publishing didn't work -- quiesce and see if a simple restart fixes
+                # the issue.
+                self._quiesce_event.set()
+
+                log.exception(
+                    "Something broke while forwarding results; setting quiesce event"
+                )
+                log.info("Storing result for later: %s", task_f.gc_task_id)
+                self.result_store[str(task_f.gc_task_id)] = res
 
         def process_pending_tasks() -> None:
             # Pull tasks from upstream (RMQ) and send them down the ZMQ pipe to the
@@ -368,11 +412,10 @@ class EndpointInterchange:
                                 code="FUNCTION_NOT_ALLOWED", user_message=reject_msg
                             ),
                         )
-                        res: _ResultPassthroughType = {
-                            "task_id": tid,
-                            "message": pack(failed_result),
-                        }
-                        self.results_passthrough.put(res)
+                        f = GCFuture(gc_task_id=tid)
+                        f.add_done_callback(forward_result)  # type: ignore[arg-type]
+                        f.set_result(pack(failed_result))
+                        del failed_result
                         continue
 
                 except Exception:
@@ -380,12 +423,11 @@ class EndpointInterchange:
                     continue
 
                 try:
-                    engine.submit(
+                    fut = engine.submit(
                         task_id=tid, packed_task=body, resource_specification=res_spec
                     )
-
+                    fut.add_done_callback(forward_result)
                     task_q_subscriber.ack(d_tag)
-
                 except Exception as exc:
                     log.exception(f"Failed to process task {tid}")
                     code, msg = get_result_error_details()
@@ -395,71 +437,9 @@ class EndpointInterchange:
                         error_details=ResultErrorDetails(code=code, user_message=msg),
                         task_statuses=[],
                     )
-                    res_err: _ResultPassthroughType = {
-                        "task_id": tid,
-                        "message": pack(failed_result),
-                    }
-                    self.results_passthrough.put(res_err)
-                    del res_err
-
-            log.debug("Thread exit")
-
-        def process_pending_results() -> None:
-            # Forward incoming results from the globus-compute-manager to the
-            # Globus Compute services. For graceful handling of shutdown
-            # (or "reboot"), wait up to a second for incoming results before
-            # iterating the loop regardless.
-            nonlocal num_results_forwarded
-
-            def _create_done_cb(mq_msg: bytes, tid: str):
-                def _done_cb(pub_fut: Future):
-                    _exc = pub_fut.exception()
-                    if _exc:
-                        # Publishing didn't work -- quiesce and see if a simple
-                        # restart fixes the issue.
-                        log.info(f"Storing result for later: {tid}")
-                        self.result_store[tid] = mq_msg
-
-                        self._quiesce_event.set()
-                        log.error("Failed to publish results", exc_info=_exc)
-
-                return _done_cb
-
-            while True:
-                try:
-                    msg = self.results_passthrough.get()
-                    if not msg:  # poison pill
-                        break
-
-                    packed_message: bytes = msg["message"]
-                    task_id: str = msg["task_id"]
-
-                except Exception as exc:
-                    log.warning(
-                        "Invalid message received.  Ignoring."
-                        f"  ([{type(exc).__name__}] {exc})\n  {msg}"
-                    )
-                    continue
-
-                num_results_forwarded += 1
-                log.debug("Forwarding result for task: %s", task_id)
-
-                try:
-                    f = results_publisher.publish(packed_message)
-                    f.add_done_callback(_create_done_cb(packed_message, task_id))
-
-                except Exception:
-                    # Publishing didn't work -- quiesce and see if a simple restart
-                    # fixes the issue.
-                    self._quiesce_event.set()
-
-                    log.exception(
-                        "Something broke while forwarding results; setting quiesce"
-                        " event"
-                    )
-                    log.info("Storing result for later: %s", task_id)
-                    self.result_store[task_id] = packed_message
-                    continue  # just be explicit
+                    f = GCFuture(gc_task_id=tid)
+                    f.add_done_callback(forward_result)  # type: ignore[arg-type]
+                    f.set_result(pack(failed_result))
 
             log.debug("Thread exit")
 
@@ -496,12 +476,8 @@ class EndpointInterchange:
         task_processor_thread = threading.Thread(
             target=process_pending_tasks, daemon=True, name="Pending Task Handler"
         )
-        result_processor_thread = threading.Thread(
-            target=process_pending_results, daemon=True, name="Pending Result Handler"
-        )
         stored_processor_thread.start()
         task_processor_thread.start()
-        result_processor_thread.start()
 
         if hasattr(engine, "executor_exception"):
 
@@ -611,9 +587,6 @@ class EndpointInterchange:
         self.pending_task_queue.put(None)
         task_processor_thread.join()
         stored_processor_thread.join()
-
-        self.results_passthrough.put(None)
-        result_processor_thread.join()
 
         # let higher-level error handling take over if the following excepts
         try:

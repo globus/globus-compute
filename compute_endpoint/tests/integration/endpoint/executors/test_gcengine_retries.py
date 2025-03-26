@@ -1,5 +1,4 @@
 import concurrent.futures
-import queue
 import random
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +9,7 @@ from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GlobusComputeEngine
 from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import LocalProvider
-from tests.utils import slow_double
+from tests.utils import double
 
 
 class MockHTEX:
@@ -50,47 +49,42 @@ def mock_gce(tmp_path):
             provider=LocalProvider(min_blocks=0, max_blocks=0, init_blocks=0),
         )
         engine._engine_ready = True
-        engine.results_passthrough = queue.Queue()
         yield engine
         engine.shutdown()
 
 
-def test_success_after_1_fail(mock_gce, serde, ez_pack_task):
+@pytest.mark.parametrize("fail_count", range(5))
+def test_success_after_fails(mock_gce, serde, ez_pack_task, fail_count):
     engine = mock_gce
-    engine.max_retries_on_system_failure = 2
-    q = engine.results_passthrough
+    engine.max_retries_on_system_failure = fail_count
     task_id = uuid.uuid1()
     num = random.randint(1, 10000)
-    task_bytes = ez_pack_task(slow_double, num, 0.2)
+    task_bytes = ez_pack_task(double, num)
 
-    # Set the failure count on the mock executor to force failure
-    engine.executor.fail_count = 1
-    engine.submit(task_id, task_bytes, resource_specification={})
+    engine.executor.fail_count = fail_count
+    f = engine.submit(task_id, task_bytes, resource_specification={})
 
-    packed_result = q.get()
-    assert isinstance(packed_result, dict)
-    result = messagepack.unpack(packed_result["message"])
+    packed_result: bytes = f.result()
+    result = messagepack.unpack(packed_result)
+    assert isinstance(result, messagepack.message_types.Result)
 
     assert result.task_id == task_id
     assert serde.deserialize(result.data) == 2 * num
 
 
-def test_repeated_fail(mock_gce, ez_pack_task):
-    fail_count = 2
+@pytest.mark.parametrize("fail_count", range(1, 5))
+def test_repeated_fail(mock_gce, ez_pack_task, fail_count):
     engine = mock_gce
     engine.max_retries_on_system_failure = fail_count
-    q = engine.results_passthrough
     task_id = uuid.uuid1()
+    task_bytes = ez_pack_task(double, 5)
 
     # Set executor to continue failures beyond retry limit
     engine.executor.fail_count = fail_count + 1
+    f = engine.submit(task_id, task_bytes, resource_specification={})
 
-    task_bytes = ez_pack_task(slow_double, 5)
-
-    engine.submit(task_id, task_bytes, resource_specification={})
-
-    packed_result_q = q.get()
-    result = messagepack.unpack(packed_result_q["message"])
+    packed_result = f.result()
+    result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
     assert result.task_id == task_id
     assert result.error_details
