@@ -3,6 +3,22 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.5.0a0:
+
+globus-compute-sdk & globus-compute-endpoint v3.5.0a0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- The :class:`~globus_compute_sdk.serialize.ComputeSerializer` constructor now accepts
+  a wider range of inputs for ``strategy_code``, ``strategy_data``, and
+  ``allowed_deserializers``. See the class documentation for details.
+
+- Added :class:`~globus_compute_sdk.serialize.PureSourceDill` and
+  :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` as sub-strategies to
+  :class:`~globus_compute_sdk.serialize.CombinedCode`.
+
 .. _changelog-3.4.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.4.0
