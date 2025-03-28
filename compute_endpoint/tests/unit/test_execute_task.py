@@ -7,6 +7,7 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines.helper import _RESULT_SIZE_LIMIT, execute_task
 from globus_compute_sdk.errors import MaxResultSizeExceeded
+from globus_compute_sdk.serialize import JSONData
 from tests.utils import divide
 
 logger = logging.getLogger(__name__)
@@ -161,3 +162,21 @@ def test_execute_task_timeout(execute_task_runner, task_uuid, ez_pack_task):
     assert result.task_id == task_uuid
     assert "AppTimeout" in result.data
     assert mock_log.exception.called
+
+
+def test_execute_task_result_serializers(ez_pack_task, execute_task_runner, task_uuid):
+    task_bytes = ez_pack_task(divide, 10, 2)
+
+    packed_result = execute_task_runner(
+        task_bytes, result_serializers=["globus_compute_sdk.serialize.JSONData"]
+    )
+
+    result = messagepack.unpack(packed_result)
+    assert isinstance(result, messagepack.message_types.Result)
+    assert result.task_id == task_uuid
+    assert result.error_details is None
+
+    ser_strat = JSONData()
+    res_data = ser_strat.deserialize(result.data)
+
+    assert res_data == 5.0

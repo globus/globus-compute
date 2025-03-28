@@ -470,6 +470,7 @@ class Client:
         resource_specification: dict[str, t.Any] | None = None,
         user_endpoint_config: dict[str, t.Any] | None = None,
         create_websocket_queue: bool = False,
+        result_serializers: list[str] | None = None,
     ) -> Batch:
         """
         Create a Batch instance to handle batch submission in Globus Compute
@@ -497,6 +498,10 @@ class Client:
             Whether to create a websocket queue for the task_group_id if
             it isn't already created
 
+        result_serializers: list[str] (optional)
+            A list of import paths to Compute serialization strategies, which the
+            endpoint will iterate through when serializing task results.
+
         Returns
         -------
         Batch instance
@@ -506,6 +511,7 @@ class Client:
             resource_specification,
             user_endpoint_config,
             create_websocket_queue,
+            result_serializers=result_serializers,
             serializer=self.fx_serializer,
             user_runtime=UserRuntime(
                 globus_compute_sdk_version=__version__,

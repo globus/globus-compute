@@ -396,6 +396,9 @@ class EndpointInterchange:
                     )
                     res_spec: dict = json.loads(res_spec_s) or {}
 
+                    res_serde_s: str = prop_headers.get("result_serializers") or "null"
+                    res_serde: list[str] = json.loads(res_serde_s) or []
+
                     if fid and not self.function_allowed(fid):
                         # Same as web-service message but packed in a
                         # result error
@@ -424,7 +427,10 @@ class EndpointInterchange:
 
                 try:
                     fut = engine.submit(
-                        task_id=tid, packed_task=body, resource_specification=res_spec
+                        task_id=tid,
+                        packed_task=body,
+                        resource_specification=res_spec,
+                        result_serializers=res_serde,
                     )
                     fut.add_done_callback(forward_result)
                     task_q_subscriber.ack(d_tag)
