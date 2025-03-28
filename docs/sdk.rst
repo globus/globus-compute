@@ -294,8 +294,8 @@ via the ``authorizer`` parameter:
 
 .. _specifying-serde-strategy:
 
-Specifying a Serialization Strategy
------------------------------------
+Specifying a Submit-Side Serialization Strategy
+-----------------------------------------------
 
 When sending functions and arguments for execution on a Compute endpoint, the SDK uses
 the :class:`~globus_compute_sdk.serialize.ComputeSerializer` class to convert data to and from a format that can be easily
@@ -374,6 +374,30 @@ time by an Endpoint whenever a task that specifies this function UUID is submitt
 (possibly from a different SDK environment) using the Client's
 :func:`~globus_compute_sdk.Client.run` or the |Executor|'s
 :func:`~globus_compute_sdk.Executor.submit_to_registered_function` methods.
+
+
+Specifying Result Serialization Strategies
+------------------------------------------
+
+In addition to specifying what strategy to use when submitting tasks, it is also
+possible to specify what strategy the endpoint should use when serializing the results
+of any given task to be sent back to the SDK. This is achieved through the |Executor|'s
+``result_serializers`` constructor argument and property:
+
+.. code-block:: python
+
+  from globus_compute_sdk import Executor
+  from globus_compute_sdk.serialize import JSONData
+
+  with Executor("your endpoint id", result_serializers=[JSONData()]) as gcx:
+    # or set it directly:
+    gcx.result_serializers = [JSONData()]
+
+When a task submission specifies a list of result serializers, the endpoint will
+attempt each serialization strategy in the list until one of them succeeds, returning
+that first success. If all strategies in the list fail, the endpoint returns an error
+with the details of each failure.
+
 
 .. |rarr| unicode:: 0x2192
 
