@@ -26,7 +26,10 @@ import responses
 import yaml
 from globus_compute_common.messagepack import unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport
-from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
 from globus_compute_endpoint.endpoint.config.config import MINIMUM_HEARTBEAT
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.rabbit_mq import (
@@ -125,7 +128,7 @@ def mock_conf_root(identity_map_path):
 
 
 @pytest.fixture(autouse=True)
-def user_conf_template(conf_dir):
+def user_conf_template(conf_dir) -> pathlib.Path:
     template = Endpoint.user_config_template_path(conf_dir)
     template.write_text(
         """
@@ -139,6 +142,7 @@ engine:
         max_blocks: 1
         """
     )
+    return template
 
 
 @pytest.fixture(autouse=True)
@@ -1929,6 +1933,50 @@ def test_start_endpoint_logs_to_std(mocker, successful_exec_from_mocked_root):
     handlers = log_config["handlers"]
     assert "console" in handlers, "Test setup: verify expected structure"
     assert "logfile" not in handlers, "Expect only use stdout or stderr"
+
+
+@pytest.mark.parametrize("uep_ha", (True, False, "asdf"))
+def test_ha_disallowed_in_uep_conf(
+    mock_log, successful_exec_from_mocked_root, user_conf_template, uep_ha
+):
+    tmpl_text = user_conf_template.read_text()
+    tmpl_text += f"\nhigh_assurance: {str(uep_ha).lower()}"
+    user_conf_template.write_text(tmpl_text)
+
+    *_, em = successful_exec_from_mocked_root
+
+    with pytest.raises(SystemExit) as pyt_e:
+        em._event_loop()
+
+    assert pyt_e.value.code != _GOOD_EC, "Q&D: verify we failed, based on '+= 1'"
+
+    (efmt,), _ = mock_log.error.call_args_list[0]
+    assert "`high_assurance` may not be" in efmt, "expect specific to MEP logs"
+    (efmt,), _ = mock_log.error.call_args
+    assert "contact MEP administrator" in efmt, "expect opaque to user"
+
+
+@pytest.mark.parametrize("mep_ha", (None, True, False))
+def test_ha_aligned(successful_exec_from_mocked_root, user_conf_template, mep_ha):
+    em: EndpointManager
+    mock_os, *_, em = successful_exec_from_mocked_root
+    if mep_ha is not None:
+        em._config.high_assurance = mep_ha
+
+    m = mock.Mock()
+    mock_os.fdopen.return_value.__enter__.return_value = m
+    with pytest.raises(SystemExit) as pyt_e:
+        em._event_loop()
+
+    assert pyt_e.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+
+    (stdin_str,), _ = m.write.call_args
+    stdin_data = json.loads(stdin_str)
+    uep_conf_str = stdin_data.get("config")
+    uep_conf_data = yaml.safe_load(uep_conf_str)
+    uep_conf = UserEndpointConfig(**uep_conf_data)
+
+    assert em._config.high_assurance is uep_conf.high_assurance
 
 
 def test_run_as_same_user_disabled_if_admin(

@@ -1131,6 +1131,20 @@ class EndpointManager:
                 user_runtime,
             )
             exit_code += 1
+            _conf = yaml.safe_load(user_config)
+
+            _ha_key = "high_assurance"
+            if _ha_key in _conf:
+                log.error(f"`{_ha_key}` may not be specified in template")
+                raise ValueError("Error generating template; contact MEP administrator")
+
+            if self._config.high_assurance:
+                user_config = f"{_ha_key}: true\n{user_config}"
+                _conf = yaml.safe_load(user_config)
+            if bool(_conf.get(_ha_key)) ^ self._config.high_assurance:
+                # final check that the configuration HAness aligns
+                log.error(f"Unknown error generating correct template: `{_ha_key}`")
+                raise ValueError("Error generating template; contact MEP administrator")
 
             ep_info: dict = {"posix_ppid": os.getppid()}
             if ident.matched_identity:
@@ -1193,7 +1207,6 @@ class EndpointManager:
             # went wrong where" to the parent process (the MEP).
             exit_code += 1
 
-            _conf = yaml.safe_load(user_config)
             if _conf.get("debug") is True:
                 now = datetime.now().strftime(LOG_TS_FMT)
                 num_lines = user_config.count("\n") + 1  # +1 ==> \n *splits* lines
@@ -1207,7 +1220,6 @@ class EndpointManager:
                     f"\n  | {_rendered_config}"
                     f"\nEnd Compute endpoint configuration"
                 )
-            del _conf
 
             with os.fdopen(write_handle, "w") as stdin_pipe:
                 # intentional side effect: close handle
