@@ -326,22 +326,24 @@ def test_unidle_updates_proc_title(
     orig_wait = mock_quiesce.wait.side_effect
 
     def block_until(*a, **k):
-        os.sched_yield()
         main_thread_may_continue.wait()
+        os.sched_yield()
         mock_quiesce.wait.side_effect = orig_wait
 
     def _submit(*a, **k):
-        main_thread_may_continue.set()
         f = engines.base.GCFuture(gc_task_id=uuid.uuid4())
-        f.set_result(b"abcd")
+        f.set_result(b"abcd")  # single result to match task; so soft idle is in play
+        main_thread_may_continue.set()
         return f
 
     def insert_msg(*a, **k):
+        # hard idle warning just happened; now go unidle by injecting a task;
+        # soft idle will now be the exit path.
         task = Task(task_id=uuid.uuid4(), task_buffer=b"some test data")
         pheaders = {"task_uuid": task.task_id, "function_uuid": "a"}
         ei.pending_task_queue.put((1, pheaders, pack(task)))
         mock_quiesce.wait.side_effect = block_until
-        mock_spt.side_effect = None
+        mock_spt.side_effect = None  # back to normal mock behavior
 
     main_thread_may_continue = threading.Event()
     mock_conf.idle_heartbeats_soft = 1
@@ -356,12 +358,10 @@ def test_unidle_updates_proc_title(
     assert msg.startswith("Moved to active state"), "expect why state changed"
     assert "due to " in msg
 
-    first, *middle, last = (ca[0][0] for ca in mock_spt.call_args_list)
-    assert first.startswith("[possibly idle; shut down in ")
-    assert not any(
-        "idle; " in m for m in middle
-    ), "expected proc title set back when not idle"
-    assert last.startswith("[idle; shut down in ")
+    first_idle, moved, *_, last_idle = (ca[0][0] for ca in mock_spt.call_args_list)
+    assert first_idle.startswith("[possibly idle; shut down in ")
+    assert "idle; " not in moved, "expected proc title reset when not idle"
+    assert last_idle.startswith("[idle; shut down in ")
 
 
 def test_sends_final_status_message_on_shutdown(
