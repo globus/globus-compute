@@ -337,6 +337,12 @@ def version_command():
     show_default=True,
 )
 @optgroup.option(
+    "--auth-policy-mfa-required",
+    is_flag=True,
+    default=False,
+    help="Whether to require Multi-Factor Authentication on the policy",
+)
+@optgroup.option(
     "--auth-policy-description",
     default=_AUTH_POLICY_DEFAULT_DESC,
     show_default=True,
@@ -372,6 +378,7 @@ def configure_endpoint(
     high_assurance: bool,
     display_name: str | None,
     auth_policy: str | None,
+    auth_policy_mfa_required: bool,
     auth_policy_project_id: str | None,
     auth_policy_display_name: str,
     auth_policy_description: str,
@@ -401,6 +408,7 @@ def configure_endpoint(
         or excluded_domains is not None
         or auth_timeout is not None
     )
+    print(f"create_policy is {create_policy} and pid is {auth_policy_project_id}")
 
     if create_policy and auth_policy:
         raise ClickException(
@@ -412,7 +420,11 @@ def configure_endpoint(
             "high-assurance(HA) endpoints require both a HA policy and "
             "a HA subscription id"
         )
+    elif auth_policy_mfa_required and not create_policy:
+        raise ClickException("MFA can only be specified when creating a policy")
     elif create_policy:
+        if auth_policy_mfa_required and not high_assurance:
+            raise ClickException("MFA can only be enabled for high-assurance policies")
         app = get_globus_app_with_scopes()
         ac = ComputeAuthClient(app=app)
 
@@ -435,6 +447,7 @@ def configure_endpoint(
             include_domains=include_domain_list,
             exclude_domains=exclude_domain_list,
             timeout=auth_timeout or MISSING,
+            require_mfa=auth_policy_mfa_required or MISSING,
         )
 
     compute_dir = get_config_dir()
@@ -866,6 +879,7 @@ def create_auth_policy(
     include_domains: list[str] | MissingType,
     exclude_domains: list[str] | MissingType,
     timeout: int | MissingType,
+    require_mfa: bool | MissingType,
 ) -> str:
     """
     Uses the Globus SDK to create an auth policy and returns
@@ -881,6 +895,7 @@ def create_auth_policy(
             domain_constraints_exclude=exclude_domains,
             high_assurance=bool(timeout),
             authentication_assurance_timeout=timeout,
+            required_mfa=require_mfa,
         )
         return resp["policy"]["id"]
     except GlobusAPIError as e:
