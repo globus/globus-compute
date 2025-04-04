@@ -1,5 +1,6 @@
 import concurrent.futures
 import random
+import traceback
 import typing as t
 from unittest import mock
 
@@ -83,7 +84,12 @@ def test_engine_working_dir(
     assert isinstance(unpacked1, Result)
     assert isinstance(unpacked2, Result)
     cwd1 = serde.deserialize(unpacked1.data)
-    cwd2 = serde.deserialize(unpacked2.data)
+    try:
+        cwd2 = serde.deserialize(unpacked2.data)
+    except Exception:
+        print(f"===\n{cwd2}\n===")
+        print(traceback.format_exc())
+        raise
     assert cwd1 == cwd2, "working dir should be idempotent"
 
 
