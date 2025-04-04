@@ -301,7 +301,6 @@ def version_command():
     "--high-assurance",
     is_flag=True,
     default=False,
-    hidden=True,  # Until HA features are complete
     help="Configure endpoint as high assurance capable",
 )
 @click.option(
