@@ -17,6 +17,7 @@ class MockHTEX:
     ManagerLost errors"""
 
     def __init__(self, fail_count=1):
+        self._task_counter = 0
         self.fail_count = fail_count
         self.ex = ThreadPoolExecutor()
 
@@ -28,6 +29,9 @@ class MockHTEX:
             future.set_exception(ManagerLost(b"DEAD", "Faking Manager death!"))
         else:
             future = self.ex.submit(func, *args, **kwargs)
+        self._task_counter += 1
+        future.parsl_executor_task_id = self._task_counter  # match what Parsl does
+
         return future
 
     def shutdown(self):

@@ -2,11 +2,16 @@ import logging
 import pathlib
 import random
 import time
+from concurrent.futures import Future
 from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_common.messagepack.message_types import Result, TaskTransition
+from globus_compute_common.messagepack.message_types import (
+    EPStatusReport,
+    Result,
+    TaskTransition,
+)
 from globus_compute_common.tasks import ActorName, TaskState
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
@@ -18,12 +23,45 @@ from globus_compute_endpoint.engines import (
     ThreadPoolEngine,
 )
 from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
+from globus_compute_sdk.sdk.utils.uuid_like import as_uuid
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 from parsl import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from tests.utils import kill_manager
 
 logger = logging.getLogger(__name__)
+
+
+class MockGCEngine(GlobusComputeEngineBase):
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self._task_counter = random.randint(0, 1_000)
+        self.test_fail_count = 0
+
+    def assert_ha_compliant(self):
+        pass
+
+    def start(self, *a, endpoint_id, **k):
+        self.endpoint_id = as_uuid(endpoint_id)
+        self._engine_ready = True
+
+    def get_status_report(self) -> EPStatusReport:
+        return EPStatusReport(
+            endpoint_id=self.endpoint_id, global_state={}, task_statuses={}
+        )
+
+    def _submit(self, *a, **k):
+        self._task_counter += 1
+        f = Future()
+        f.executor_task_id = self._task_counter
+        if self.test_fail_count < self.max_retries_on_system_failure:
+            f.set_exception(Exception("Some infra exception"))
+        else:
+            f.set_result(None)
+        return f
+
+    def shutdown(self, /, **kwargs) -> None:
+        self._engine_ready = False
 
 
 @pytest.fixture
@@ -77,6 +115,49 @@ def test_allowed_serializers_passthrough_to_serde(engine_type, engine_runner) ->
 
     assert engine.serde is not None
     assert engine.serde.allowed_deserializer_types == set(SELECTABLE_STRATEGIES)
+
+
+@pytest.mark.parametrize("max_fails", (0, 1, 2, 3, 4))
+def test_executor_id_bookkeeping(task_uuid, max_fails):
+    engine = MockGCEngine(max_retries_on_system_failure=max_fails)
+    engine.start(endpoint_id=task_uuid)
+    task_f = GCFuture(gc_task_id=task_uuid)
+    engine.submit(task_f, b"SomeBytes", {})
+    task_f.result()
+    assert task_f.executor_task_id == engine._task_counter
+
+
+@pytest.mark.parametrize(
+    "EngineClass",
+    (ThreadPoolEngine, ProcessPoolEngine, GlobusComputeEngine, GlobusMPIEngine),
+)
+def test_engines_executor_id(ez_pack_task, task_uuid, EngineClass):
+    if EngineClass in (GlobusComputeEngine, GlobusMPIEngine):
+        with mock.patch.object(EngineClass, "_ExecutorClass") as mock_ex:
+            mock_ex.__name__ = "ClassName"
+            mock_ex.return_value = mock.Mock(launch_cmd="")
+            engine = EngineClass(address="::1")
+            engine._engine_ready = True
+    else:
+        engine = EngineClass(max_workers=1)
+        engine.executor = mock.Mock(spec=EngineClass)
+        engine._engine_ready = True
+
+    ex_task_id = random.randint(1, 1_1000)
+
+    def mock_ex_submit(*a, **k):
+        f = Future()
+        f.set_result(None)
+        f.parsl_executor_task_id = ex_task_id
+        f.executor_task_id = ex_task_id
+        return f
+
+    engine.executor.submit = mock_ex_submit
+
+    f = GCFuture(gc_task_id=task_uuid)
+    engine.submit(f, b"task bytes", {})
+    f.result()
+    assert f.executor_task_id is not None
 
 
 def test_gc_engine_system_failure(serde, ez_pack_task, task_uuid, engine_runner):

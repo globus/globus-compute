@@ -4,7 +4,7 @@ from unittest import mock
 
 import parsl
 import pytest
-from globus_compute_endpoint.engines import GlobusComputeEngine
+from globus_compute_endpoint.engines import GCFuture, GlobusComputeEngine
 from globus_compute_sdk.sdk.utils import get_py_version_str
 
 _MOCK_BASE = "globus_compute_endpoint.engines.globus_compute."
@@ -160,3 +160,11 @@ def test_status_poller_started_late(fs, htex, mock_jsp, ep_uuid):
     assert gce.job_status_poller is not None
     a, _ = gce.job_status_poller.add_executors.call_args
     assert a[0] == [htex], "Expect executor to be polled"
+
+
+def test_sets_task_id(fs, mock_htex, endpoint_uuid, task_uuid):
+    eng = GlobusComputeEngine(executor=mock_htex)
+    eng.start(endpoint_id=endpoint_uuid, run_dir="/")
+    f = GCFuture(gc_task_id=task_uuid)
+    eng.submit(f, b"bytes", {})
+    assert f.executor_task_id is not None
