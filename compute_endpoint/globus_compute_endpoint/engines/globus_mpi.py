@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import typing as t
-from concurrent.futures import Future
 
 import parsl.executors
+from globus_compute_endpoint.engines.base import GCExecutorFuture
 from globus_compute_endpoint.engines.globus_compute import GlobusComputeEngine
 
 
@@ -34,6 +34,11 @@ class GlobusMPIEngine(GlobusComputeEngine):
         resource_specification: t.Dict,
         *args: t.Any,
         **kwargs: t.Any,
-    ) -> Future:
+    ) -> GCExecutorFuture:
         # override submit since super rejects resource_specification
-        return self.executor.submit(func, resource_specification, *args, **kwargs)
+        f = t.cast(
+            GCExecutorFuture,
+            self.executor.submit(func, resource_specification, *args, **kwargs),
+        )
+        f.executor_task_id = f.parsl_executor_task_id  # type: ignore[attr-defined]
+        return f

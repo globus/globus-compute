@@ -6,13 +6,15 @@ import re
 import shlex
 import typing as t
 import uuid
-from concurrent.futures import Future
 
 from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     TaskTransition,
 )
-from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
+from globus_compute_endpoint.engines.base import (
+    GCExecutorFuture,
+    GlobusComputeEngineBase,
+)
 from globus_compute_sdk.serialize.facade import DeserializerAllowlist
 from parsl.executors.high_throughput.executor import HighThroughputExecutor
 from parsl.jobs.job_status_poller import JobStatusPoller
@@ -288,13 +290,18 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         resource_specification: t.Dict,
         *args: t.Any,
         **kwargs: t.Any,
-    ) -> Future:
+    ) -> GCExecutorFuture:
         if resource_specification:
             raise ValueError(
                 "resource_specification is not supported on GlobusComputeEngine."
                 " For MPI apps, use GlobusMPIEngine."
             )
-        return self.executor.submit(func, resource_specification, *args, **kwargs)
+        f = t.cast(
+            GCExecutorFuture,
+            self.executor.submit(func, resource_specification, *args, **kwargs),
+        )
+        f.executor_task_id = f.parsl_executor_task_id  # type: ignore[attr-defined]
+        return f
 
     @property
     def provider(self):

@@ -4,7 +4,6 @@ import logging
 import multiprocessing
 import typing as t
 import uuid
-from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor as NativeExecutor
 
 import psutil
@@ -12,7 +11,10 @@ from globus_compute_common.messagepack.message_types import (
     EPStatusReport,
     TaskTransition,
 )
-from globus_compute_endpoint.engines.base import GlobusComputeEngineBase
+from globus_compute_endpoint.engines.base import (
+    GCExecutorFuture,
+    GlobusComputeEngineBase,
+)
 from globus_compute_sdk.serialize.facade import DeserializerAllowlist
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,7 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
     ):
         self.label = label
         self.executor = NativeExecutor(*args, **kwargs)
+        self._task_counter: int = 0
         super().__init__(
             *args,
             **kwargs,
@@ -88,9 +91,13 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
         resource_specification: t.Dict,
         *args: t.Any,
         **kwargs: t.Any,
-    ) -> Future:
+    ) -> GCExecutorFuture:
         """``resource_specification`` is not applicable to the ThreadPoolEngine"""
-        return self.executor.submit(func, *args, **kwargs)
+
+        self._task_counter += 1
+        f = t.cast(GCExecutorFuture, self.executor.submit(func, *args, **kwargs))
+        f.executor_task_id = self._task_counter
+        return f
 
     def scale_out(self, blocks: int) -> list[str]:
         return []

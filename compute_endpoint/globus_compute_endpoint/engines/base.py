@@ -34,11 +34,22 @@ _EXC_NO_HISTORY_TMPL = "+" * 68 + "\n{exc}" + "-" * 68
 
 
 class GCFuture(Future):
-    __slots__ = ("_gc_task_id",)
+    __slots__ = (
+        "_gc_task_id",
+        "_ex_task_id",
+    )
 
-    def __init__(self, *, gc_task_id: UUID_LIKE_T):
+    def __init__(self, *, gc_task_id: UUID_LIKE_T, executor_task_id=None):
         super().__init__()
+        self._ex_task_id = None
+        self.executor_task_id = executor_task_id
         self.gc_task_id = gc_task_id
+
+    def __repr__(self) -> str:
+        cn = type(self).__name__
+        gc_task_id = str(self.gc_task_id)
+        executor_task_id = self.executor_task_id
+        return f"{cn}({gc_task_id=!r}, {executor_task_id=!r})"
 
     @property
     def gc_task_id(self):
@@ -47,6 +58,30 @@ class GCFuture(Future):
     @gc_task_id.setter
     def gc_task_id(self, val: UUID_LIKE_T):
         self._gc_task_id = as_uuid(val)
+
+    @property
+    def executor_task_id(self):
+        return self._ex_task_id
+
+    @executor_task_id.setter
+    def executor_task_id(self, val):
+        self._ex_task_id = val
+
+
+class GCExecutorFuture(Future):
+    __slots__ = ("executor_task_id",)
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.executor_task_id: t.Any = None
+
+    def __repr__(self) -> str:
+        cn = type(self).__name__
+        parts = []
+        if hasattr(self, "executor_task_id"):
+            parts.append(f"executor_task_id={self.executor_task_id!r}")
+
+        return f"{cn}({', '.join(parts)})"
 
 
 class GlobusComputeEngineBase(ABC, RepresentationMixin):
@@ -183,7 +218,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
     def _invoke_submission(
         self,
         task_fut: GCFuture,
-        submission_partial: t.Callable[..., Future],
+        submission_partial: t.Callable[..., GCExecutorFuture],
         retry_count: int = 0,
         exception_history: list | None = None,
     ):
@@ -218,8 +253,9 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
 
         try:
             work_f = submission_partial()
+            task_fut.executor_task_id = work_f.executor_task_id
         except Exception as e:
-            work_f = Future()
+            work_f = GCExecutorFuture()
             work_f.set_exception(e)
         work_f.add_done_callback(_done_cb)
 
@@ -230,7 +266,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         resource_specification: dict,
         *args: t.Any,
         **kwargs: t.Any,
-    ) -> Future:
+    ) -> GCExecutorFuture:
         """Subclass should use the internal execution system to implement this"""
         raise NotImplementedError()
 
