@@ -7,6 +7,7 @@ import pytest
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result
 from globus_compute_endpoint.engines import (
+    GCFuture,
     GlobusComputeEngine,
     ProcessPoolEngine,
     ThreadPoolEngine,
@@ -30,7 +31,7 @@ def test_engine_start(
 
     # task submit should raise Exception if it was not started
     with pytest.raises(RuntimeError):
-        engine.submit(str(endpoint_uuid), b"", {})
+        engine.submit(GCFuture(gc_task_id=endpoint_uuid), b"", {})
 
     engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
     assert engine._engine_ready, "Engine should be ready after start"
@@ -71,13 +72,15 @@ def test_engine_working_dir(
     """
     engine = engine_runner(engine_type)
 
-    task_args: tuple = (str(task_uuid), ez_pack_task(get_cwd), {})
+    task_args: tuple = (ez_pack_task(get_cwd), {})
 
-    future1 = engine.submit(*task_args)
-    unpacked1 = messagepack.unpack(future1.result())  # blocks; avoid race condition
+    fut1 = GCFuture(gc_task_id=task_uuid)
+    engine.submit(fut1, *task_args)
+    unpacked1 = messagepack.unpack(fut1.result())  # blocks; avoid race condition
 
-    future2 = engine.submit(*task_args)  # exact same task
-    unpacked2 = messagepack.unpack(future2.result())
+    fut2 = GCFuture(gc_task_id=task_uuid)
+    engine.submit(fut2, *task_args)  # exact same task
+    unpacked2 = messagepack.unpack(fut2.result())
 
     # data is enough for test, but in error case, be kind to dev
     assert isinstance(unpacked1, Result)
@@ -96,7 +99,8 @@ def test_engine_submit_internal(
     engine = engine_runner(engine_type)
 
     task_bytes = ez_pack_task(double, 3)
-    f = engine.submit(str(task_uuid), task_bytes, resource_specification={})
+    f = GCFuture(gc_task_id=task_uuid)
+    engine.submit(f, task_bytes, resource_specification={})
     packed_result = f.result()
 
     # Confirm that the future got the right answer

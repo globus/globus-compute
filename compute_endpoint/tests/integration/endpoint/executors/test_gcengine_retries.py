@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_endpoint.engines import GlobusComputeEngine
+from globus_compute_endpoint.engines import GCFuture, GlobusComputeEngine
 from parsl.executors.high_throughput.interchange import ManagerLost
 from parsl.providers import LocalProvider
 from tests.utils import double
@@ -62,7 +62,8 @@ def test_success_after_fails(mock_gce, serde, ez_pack_task, fail_count):
     task_bytes = ez_pack_task(double, num)
 
     engine.executor.fail_count = fail_count
-    f = engine.submit(task_id, task_bytes, resource_specification={})
+    f = GCFuture(gc_task_id=task_id)
+    engine.submit(f, task_bytes, resource_specification={})
 
     packed_result: bytes = f.result()
     result = messagepack.unpack(packed_result)
@@ -81,7 +82,8 @@ def test_repeated_fail(mock_gce, ez_pack_task, fail_count):
 
     # Set executor to continue failures beyond retry limit
     engine.executor.fail_count = fail_count + 1
-    f = engine.submit(task_id, task_bytes, resource_specification={})
+    f = GCFuture(gc_task_id=task_id)
+    engine.submit(f, task_bytes, resource_specification={})
 
     packed_result = f.result()
     result = messagepack.unpack(packed_result)

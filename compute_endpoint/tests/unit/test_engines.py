@@ -11,6 +11,7 @@ from globus_compute_common.tasks import ActorName, TaskState
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.engines import (
+    GCFuture,
     GlobusComputeEngine,
     GlobusMPIEngine,
     ProcessPoolEngine,
@@ -83,8 +84,9 @@ def test_gc_engine_system_failure(serde, ez_pack_task, task_uuid, engine_runner)
     engine = engine_runner(GlobusComputeEngine, max_retries_on_system_failure=0)
 
     task_bytes = ez_pack_task(kill_manager)
-    future = engine.submit(str(task_uuid), task_bytes, {})
-    r = messagepack.unpack(future.result())
+    task_f = GCFuture(gc_task_id=task_uuid)
+    engine.submit(task_f, task_bytes, {})
+    r = messagepack.unpack(task_f.result())
     assert isinstance(r, Result)
     assert r.task_id == task_uuid
     assert r.is_error
@@ -208,10 +210,9 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid, 
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
 
     taskb = b"some packed task bytes"
-    futs = [
-        gce.submit(task_id=str(task_uuid), packed_task=taskb, resource_specification={})
-        for _ in range(5)
-    ]
+    futs = [GCFuture(gc_task_id=task_uuid) for _ in range(5)]
+    for task_f in futs:
+        gce.submit(task_f=task_f, packed_task=taskb, resource_specification={})
 
     assert all(f.done() for f in futs), "Expect immediate completion for failed state"
     assert all(exc_text in str(f.result()) for f in futs)
@@ -221,9 +222,8 @@ def test_gcengine_exception_report_from_bad_state(task_uuid, gce):
     gce._engine_ready = True
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
-    f = gce.submit(
-        task_id=str(task_uuid), resource_specification={}, packed_task=b"MOCK_TASK"
-    )
+    f = GCFuture(gc_task_id=task_uuid)
+    gce.submit(task_f=f, resource_specification={}, packed_task=b"MOCK_TASK")
 
     r = messagepack.unpack(f.result())
     assert isinstance(r, Result)
@@ -246,11 +246,8 @@ def test_gcengine_rejects_mpi_mode(randomstring):
 
 def test_gcengine_rejects_resource_specification(task_uuid, gce):
     gce._engine_ready = True
-    f = gce.submit(
-        str(task_uuid),
-        packed_task=b"packed_task",
-        resource_specification={"foo": "bar"},
-    )
+    f = GCFuture(gc_task_id=task_uuid)
+    gce.submit(f, packed_task=b"packed_task", resource_specification={"foo": "bar"})
     r = messagepack.unpack(f.result())
     assert isinstance(r, Result)
     assert r.is_error
@@ -282,7 +279,8 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
         mock_ex.return_value = mock.Mock(launch_cmd="")
         engine = GlobusMPIEngine(address="::1")
         engine._engine_ready = True
-        engine.submit(str(task_uuid), b"some task", resource_specification=spec)
+        f = GCFuture(gc_task_id=task_uuid)
+        engine.submit(f, b"some task", resource_specification=spec)
 
     assert engine.executor.submit.called, "Verify test: correct internal method invoked"
     engine.shutdown()

@@ -223,7 +223,7 @@ def test_soft_idle_honored(
     ei = ep_ix_factory(config=mock_conf)
 
     task = Task(task_id=uuid.uuid4(), task_buffer=b"some test data")
-    pheaders = {"task_uuid": task.task_id, "function_uuid": "a"}
+    pheaders = {"task_uuid": task.task_id, "function_uuid": uuid.uuid4()}
     ei.pending_task_queue.put((1, pheaders, pack(task)))
 
     ei._main_loop()
@@ -330,17 +330,15 @@ def test_unidle_updates_proc_title(
         os.sched_yield()
         mock_quiesce.wait.side_effect = orig_wait
 
-    def _submit(*a, **k):
-        f = engines.base.GCFuture(gc_task_id=uuid.uuid4())
-        f.set_result(b"abcd")  # single result to match task; so soft idle is in play
+    def _submit(task_f, *a, **k):
+        task_f.set_result(b"abcd")  # no_results > no_tasks, so soft idle is in play
         main_thread_may_continue.set()
-        return f
 
     def insert_msg(*a, **k):
         # hard idle warning just happened; now go unidle by injecting a task;
         # soft idle will now be the exit path.
         task = Task(task_id=uuid.uuid4(), task_buffer=b"some test data")
-        pheaders = {"task_uuid": task.task_id, "function_uuid": "a"}
+        pheaders = {"task_uuid": task.task_id, "function_uuid": uuid.uuid4()}
         ei.pending_task_queue.put((1, pheaders, pack(task)))
         mock_quiesce.wait.side_effect = block_until
         mock_spt.side_effect = None  # back to normal mock behavior
@@ -475,6 +473,8 @@ def test_epi_rejects_allowlist_task(
     else:
         assert f"Function {func_to_run} not permitted" in res.data, ep_ix.config
         assert f"on endpoint {endpoint_uuid}" in res.data, msg_b
+        assert res.details["fid"] == func_to_run
+        assert res.details["eid"] == endpoint_uuid
 
 
 def test_engine_submit_failure_reported(

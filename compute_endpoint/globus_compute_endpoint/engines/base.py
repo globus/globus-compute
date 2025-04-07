@@ -241,21 +241,18 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
 
     def submit(
         self,
-        task_id: str,
+        task_f: GCFuture,
         packed_task: bytes,
         resource_specification: dict,
-    ) -> GCFuture:
+    ):
         """GC Endpoints should submit tasks via this method so that tasks are
         tracked properly.
 
-        :param task_id: Globus Compute web-services task identifier; should be a UUID
+        :param task_f: The future to be notified when task is complete
         :param packed_task: The payload task (function and args) to eventually invoke
         :param resource_specification: MPI resource specification
-        :return: A GCFuture that wraps the internal retry (if specified)
         """
         self._ensure_ready()
-
-        task_f = GCFuture(gc_task_id=task_id)
 
         submission_partial = functools.partial(
             self._submit,
@@ -271,8 +268,6 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self._invoke_submission(
             task_f, submission_partial, retry_count=self.max_retries_on_system_failure
         )
-
-        return task_f
 
     @abstractmethod
     def shutdown(self, /, **kwargs) -> None:

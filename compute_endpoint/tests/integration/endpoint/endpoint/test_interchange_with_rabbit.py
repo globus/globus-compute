@@ -126,7 +126,7 @@ def test_epi_forwards_tasks_and_results(
                     content_type="application/json",
                     content_encoding="utf-8",
                     headers={
-                        "function_uuid": "some_func",
+                        "function_uuid": str(uuid.uuid4()),
                         "task_uuid": str(task_uuid),
                         "resource_specification": "null",
                     },
@@ -177,7 +177,7 @@ def test_resource_specification(
             chan.queue_purge(res_q_name)
             # publish our canary task
             header = {
-                "function_uuid": "some_func",
+                "function_uuid": str(uuid.uuid4()),
                 "task_uuid": str(task_uuid),
             }
 
@@ -238,7 +238,7 @@ def test_bad_resource_specification(
                     content_type="application/json",
                     content_encoding="utf-8",
                     headers={
-                        "function_uuid": "some_func",
+                        "function_uuid": str(uuid.uuid4()),
                         "task_uuid": str(task_uuid),
                         "resource_specification": resource_specification,
                     },
