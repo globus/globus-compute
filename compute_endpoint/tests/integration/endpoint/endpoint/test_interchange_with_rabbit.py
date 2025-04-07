@@ -12,7 +12,7 @@ from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport, Result, Task
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
-from tests.integration.endpoint.executors.mock_executors import MockExecutor
+from tests.integration.endpoint.executors.mock_executors import MockEngine
 from tests.utils import try_for_timeout
 
 _test_func_ids = [str(uuid.uuid4()) for i in range(3)]
@@ -34,7 +34,7 @@ def run_interchange_process(
     """
 
     def run_it(reg_info: dict, endpoint_uuid, endpoint_dir):
-        mock_exe = MockExecutor()
+        mock_exe = MockEngine()
         mock_exe.endpoint_id = endpoint_uuid
         mock_exe.executor_exception = None
         mock_exe.get_status_report.return_value = EPStatusReport(
@@ -212,7 +212,7 @@ def test_bad_resource_specification(
     """
     Verify that a result is returned for a task that carries
     a bad resource_spec, in this case we use {"BAD_KEY": ...}
-    to trigger an exception in the MockExecutor
+    to trigger an exception in the MockEngine
     """
     ix_proc, tmp_path, ep_uuid, reg_info = run_interchange_process
 
@@ -223,7 +223,7 @@ def test_bad_resource_specification(
     task_q_name = task_q["queue"]
     task_exch = task_q["exchange"]
 
-    # The MockExecutor raises an exception on receiving res_spec with BAD_KEY
+    # The MockEngine raises an exception on receiving res_spec with BAD_KEY
     resource_specification = json.dumps({"BAD_KEY": "BAD_VALUE"})
     with pika.BlockingConnection(pika_conn_params) as mq_conn:
         with mq_conn.channel() as chan:

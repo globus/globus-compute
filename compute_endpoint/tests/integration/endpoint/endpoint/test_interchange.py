@@ -17,7 +17,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
     TaskQueueSubscriber,
 )
-from tests.integration.endpoint.executors.mock_executors import MockExecutor
+from tests.integration.endpoint.executors.mock_executors import MockEngine
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
@@ -43,7 +43,7 @@ def mock_log(mocker):
 
 @pytest.fixture
 def mock_engine(endpoint_uuid):
-    m = MockExecutor()
+    m = MockEngine()
     m.endpoint_id = endpoint_uuid
     m.get_status_report.return_value = EPStatusReport(
         endpoint_id=endpoint_uuid, global_state={}, task_statuses=[]
