@@ -65,9 +65,14 @@ def test_result_message_packing(serde, task_uuid):
     (ProcessPoolEngine, ThreadPoolEngine, GlobusComputeEngine),
 )
 def test_allowed_serializers_passthrough_to_serde(engine_type, engine_runner) -> None:
-    engine: GlobusComputeEngineBase = engine_runner(
-        engine_type, allowed_serializers=SELECTABLE_STRATEGIES
-    )
+    engine: GlobusComputeEngineBase
+    if hasattr(engine_type, "_ExecutorClass"):
+        with mock.patch.object(engine_type, "_ExecutorClass") as mock_ex:
+            mock_ex.__name__ = "ClassName"
+            mock_ex.return_value = mock.Mock(launch_cmd="")
+            engine = engine_type(allowed_serializers=SELECTABLE_STRATEGIES)
+    else:
+        engine = engine_type(allowed_serializers=SELECTABLE_STRATEGIES)
 
     assert engine.serde is not None
     assert engine.serde.allowed_deserializer_types == set(SELECTABLE_STRATEGIES)
