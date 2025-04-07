@@ -3,10 +3,10 @@ from __future__ import annotations
 import typing as t
 import unittest.mock
 import uuid
-from concurrent.futures import Future
 
 from globus_compute_common import messagepack
 from globus_compute_common.messagepack.message_types import Result, Task
+from globus_compute_endpoint.engines import GCFuture
 from globus_compute_sdk import Client
 from parsl.executors.errors import InvalidResourceSpecification
 
@@ -29,18 +29,15 @@ class MockEngine(unittest.mock.Mock):
 
     def submit(
         self,
-        task_id: uuid.UUID,
+        task_f: GCFuture,
         packed_task: bytes,
         resource_specification: t.Dict,
     ):
         task: Task = messagepack.unpack(packed_task)
-        res = Result(task_id=task_id, data=task.task_buffer)
+        res = Result(task_id=task_f.gc_task_id, data=task.task_buffer)
 
         # This is a hack to trigger an InvalidResourceSpecification
         if "BAD_KEY" in resource_specification:
             raise InvalidResourceSpecification({"BAD_KEY"})
 
-        f = Future()
-        f.gc_task_id = task_id
-        f.set_result(messagepack.pack(res))
-        return f
+        task_f.set_result(messagepack.pack(res))

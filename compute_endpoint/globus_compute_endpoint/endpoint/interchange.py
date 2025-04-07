@@ -396,6 +396,9 @@ class EndpointInterchange:
                     )
                     res_spec: dict = json.loads(res_spec_s) or {}
 
+                    task_f = GCFuture(gc_task_id=tid)
+                    task_f.add_done_callback(forward_result)  # type: ignore[arg-type]
+
                     if fid and not self.function_allowed(fid):
                         # Same as web-service message but packed in a
                         # result error
@@ -408,13 +411,12 @@ class EndpointInterchange:
                         failed_result = Result(
                             task_id=tid,
                             data=reject_msg,
+                            details={"fid": fid, "eid": self.endpoint_id},
                             error_details=ResultErrorDetails(
                                 code="FUNCTION_NOT_ALLOWED", user_message=reject_msg
                             ),
                         )
-                        f = GCFuture(gc_task_id=tid)
-                        f.add_done_callback(forward_result)  # type: ignore[arg-type]
-                        f.set_result(pack(failed_result))
+                        task_f.set_result(pack(failed_result))
                         del failed_result
                         continue
 
@@ -423,10 +425,9 @@ class EndpointInterchange:
                     continue
 
                 try:
-                    fut = engine.submit(
-                        task_id=tid, packed_task=body, resource_specification=res_spec
+                    engine.submit(
+                        task_f=task_f, packed_task=body, resource_specification=res_spec
                     )
-                    fut.add_done_callback(forward_result)
                     task_q_subscriber.ack(d_tag)
                 except Exception as exc:
                     log.exception(f"Failed to process task {tid}")
@@ -437,9 +438,7 @@ class EndpointInterchange:
                         error_details=ResultErrorDetails(code=code, user_message=msg),
                         task_statuses=[],
                     )
-                    f = GCFuture(gc_task_id=tid)
-                    f.add_done_callback(forward_result)  # type: ignore[arg-type]
-                    f.set_result(pack(failed_result))
+                    task_f.set_result(pack(failed_result))
 
             log.debug("Thread exit")
 

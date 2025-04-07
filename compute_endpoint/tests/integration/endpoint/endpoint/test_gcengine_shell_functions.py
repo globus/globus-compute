@@ -1,6 +1,6 @@
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_endpoint.engines import GlobusComputeEngine
+from globus_compute_endpoint.engines import GCFuture, GlobusComputeEngine
 from globus_compute_sdk.sdk.shell_function import ShellFunction
 
 
@@ -9,7 +9,8 @@ def test_shell_function(engine_runner, tmp_path, task_uuid, serde, ez_pack_task)
     engine = engine_runner(GlobusComputeEngine)
     shell_func = ShellFunction("pwd")
     task_bytes = ez_pack_task(shell_func)
-    future = engine.submit(task_uuid, task_bytes, resource_specification={})
+    future = GCFuture(gc_task_id=task_uuid)
+    engine.submit(future, task_bytes, resource_specification={})
 
     packed_result = future.result()
     result = messagepack.unpack(packed_result)
@@ -40,7 +41,8 @@ def test_fail_shell_function(
     engine = engine_runner(GlobusComputeEngine, run_in_sandbox=True)
     shell_func = ShellFunction(cmd, walltime=0.1)
     task_bytes = ez_pack_task(shell_func)
-    future = engine.submit(task_uuid, task_bytes, resource_specification={})
+    future = GCFuture(gc_task_id=task_uuid)
+    engine.submit(future, task_bytes, resource_specification={})
 
     packed_result = future.result()
     result = messagepack.unpack(packed_result)
@@ -58,7 +60,8 @@ def test_no_sandbox(engine_runner, task_uuid, serde, ez_pack_task):
     engine = engine_runner(GlobusComputeEngine, run_in_sandbox=False)
     shell_func = ShellFunction("pwd")
     task_bytes = ez_pack_task(shell_func)
-    future = engine.submit(task_uuid, task_bytes, resource_specification={})
+    future = GCFuture(gc_task_id=task_uuid)
+    engine.submit(future, task_bytes, resource_specification={})
 
     packed_result = future.result()
     result = messagepack.unpack(packed_result)

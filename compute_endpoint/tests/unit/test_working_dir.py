@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import (
+    GCFuture,
     GlobusComputeEngine,
     ProcessPoolEngine,
     ThreadPoolEngine,
@@ -105,7 +106,7 @@ def test_submit_pass(tmp_path, task_uuid, mock_gcengine):
     mock_gcengine.start(endpoint_id=uuid.uuid4(), run_dir=tmp_path)
 
     mock_gcengine.submit(
-        task_id=task_uuid,
+        task_f=GCFuture(gc_task_id=task_uuid),
         packed_task=b"PACKED_TASK",
         resource_specification={},
     )

@@ -3,7 +3,7 @@ import random
 
 import pytest
 from globus_compute_common import messagepack
-from globus_compute_endpoint.engines import GlobusMPIEngine
+from globus_compute_endpoint.engines import GCFuture, GlobusMPIEngine
 from globus_compute_sdk.sdk.mpi_function import MPIFunction
 from globus_compute_sdk.sdk.shell_function import ShellResult
 from parsl.executors.errors import InvalidResourceSpecification
@@ -19,7 +19,8 @@ def test_mpi_function(engine_runner, nodeslist, serde, task_uuid, ez_pack_task):
 
     mpi_func = MPIFunction("pwd")
     task_bytes = ez_pack_task(mpi_func)
-    future = engine.submit(task_uuid, task_bytes, resource_specification=resource_spec)
+    future = GCFuture(gc_task_id=task_uuid)
+    engine.submit(future, task_bytes, resource_specification=resource_spec)
 
     packed_result = future.result(timeout=10)
     result = messagepack.unpack(packed_result)
@@ -36,8 +37,9 @@ def test_env_vars(engine_runner, nodeslist, serde, task_uuid, ez_pack_task):
     engine = engine_runner(GlobusMPIEngine)
     task_bytes = ez_pack_task(get_env_vars)
     num_nodes = random.randint(1, len(nodeslist))
-    future = engine.submit(
-        task_uuid,
+    future = GCFuture(gc_task_id=task_uuid)
+    engine.submit(
+        future,
         task_bytes,
         resource_specification={"num_nodes": num_nodes, "num_ranks": 2},
     )
