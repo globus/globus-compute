@@ -11,7 +11,7 @@ from globus_compute_sdk import Client
 from parsl.executors.errors import InvalidResourceSpecification
 
 
-class MockExecutor(unittest.mock.Mock):
+class MockEngine(unittest.mock.Mock):
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
         self.passthrough = True
