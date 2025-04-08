@@ -106,7 +106,6 @@ def test_start_endpoint_data_passthrough(fs):
     assert req_json["subscription_uuid"] == str(ep_conf.subscription_id)
 
 
-@responses.activate
 def test_stop_remote_endpoint(mocker):
     ep_uuid = "some-uuid"
     ep_dir = pathlib.Path("some_ep_dir") / "abc-endpoint"
