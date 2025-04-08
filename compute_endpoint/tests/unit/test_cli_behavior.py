@@ -952,6 +952,7 @@ def test_configure_ep_auth_policy_defaults(
         "include_domains": MISSING,
         "exclude_domains": MISSING,
         "timeout": MISSING,
+        "require_mfa": MISSING,
     }
 
 
@@ -967,6 +968,9 @@ def test_configure_ep_auth_param_parse(
     mock_create_auth_policy = mocker.patch(f"{_MOCK_BASE}create_auth_policy")
     params = " ".join(
         [
+            "--high-assurance",
+            "--subscription-id=sub123",
+            "--auth-policy-mfa-required",
             "--auth-policy-project-id=p123",
             "--auth-policy-display-name='my awesome policy'",
             "--auth-policy-description='policy desc'",
@@ -986,6 +990,7 @@ def test_configure_ep_auth_param_parse(
         "include_domains": ["xyz.com", "example.org"],
         "exclude_domains": ["nope.com"],
         "timeout": 30,
+        "require_mfa": True,
     }
 
 
@@ -1072,24 +1077,76 @@ def test_configure_ep_auth_policy_timeout_sets_ha(
 
 
 @pytest.mark.parametrize(
-    ("is_ha", "policy_id", "auth_desc", "allowed_domains", "sub_id", "exc_text"),
+    (
+        "is_ha",
+        "use_mfa",
+        "policy_id",
+        "auth_desc",
+        "allowed_domains",
+        "sub_id",
+        "exc_text",
+    ),
     (
         (
-            [True, "pid", None, None, "sub_id", None],
-            [True, "pid", "desc", "globus.org", "sub_id", "Cannot specify an existing"],
-            [True, "pid", "desc", None, "sub_id", "Cannot specify an existing"],
-            [True, None, None, None, "sub_id", "require both a HA policy and a HA sub"],
-            [True, "pid", None, None, None, "require both a HA policy and a HA sub"],
+            [True, False, "pid", None, None, "sub_id", None],
+            [True, True, None, "desc", "globus.org", "sub_id", None],
+            [
+                False,
+                True,
+                None,
+                "desc",
+                "globus.org",
+                "sub_id",
+                "MFA may only be enabled for High Assurance",
+            ],
             [
                 True,
+                True,
+                "pid",
+                None,
+                None,
+                "sub_id",
+                "MFA may only be specified when creating a policy",
+            ],
+            [
+                True,
+                False,
+                "pid",
+                "desc",
+                "globus.org",
+                "sub_id",
+                "Cannot specify an existing",
+            ],
+            [True, False, "pid", "desc", None, "sub_id", "Cannot specify an existing"],
+            [
+                True,
+                False,
+                None,
+                None,
+                None,
+                "sub_id",
+                "require both a HA policy and a HA sub",
+            ],
+            [
+                True,
+                False,
+                "pid",
+                None,
+                None,
+                None,
+                "require both a HA policy and a HA sub",
+            ],
+            [
+                True,
+                False,
                 None,
                 "auth_desc",
                 "globus.org",
                 None,
                 "require both a HA policy and a HA sub",
             ],
-            [False, None, "auth_desc", "globus.org", None, None],
-            [False, "pid", None, None, None, None],
+            [False, False, None, "auth_desc", "globus.org", None, None],
+            [False, False, "pid", None, None, None, None],
         )
     ),
 )
@@ -1102,6 +1159,7 @@ def test_configure_ha_ep_requirements(
     mock_app,
     mock_auth_client,
     is_ha,
+    use_mfa,
     policy_id,
     auth_desc,
     allowed_domains,
@@ -1125,6 +1183,8 @@ def test_configure_ha_ep_requirements(
         args.append(f"--allowed-domains {allowed_domains}")
     if sub_id:
         args.append(f"--subscription-id {sub_id}")
+    if use_mfa:
+        args.append("--auth-policy-mfa-required")
 
     args.append("ep_name")
 
