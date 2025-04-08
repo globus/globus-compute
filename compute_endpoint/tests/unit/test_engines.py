@@ -121,7 +121,7 @@ def test_allowed_serializers_passthrough_to_serde(engine_type, engine_runner) ->
 def test_executor_id_bookkeeping(task_uuid, max_fails):
     engine = MockGCEngine(max_retries_on_system_failure=max_fails)
     engine.start(endpoint_id=task_uuid)
-    task_f = GCFuture(gc_task_id=task_uuid)
+    task_f = GCFuture(task_uuid)
     engine.submit(task_f, b"SomeBytes", {})
     task_f.result()
     assert task_f.executor_task_id == engine._task_counter
@@ -154,7 +154,7 @@ def test_engines_executor_id(ez_pack_task, task_uuid, EngineClass):
 
     engine.executor.submit = mock_ex_submit
 
-    f = GCFuture(gc_task_id=task_uuid)
+    f = GCFuture(task_uuid)
     engine.submit(f, b"task bytes", {})
     f.result()
     assert f.executor_task_id is not None
@@ -165,7 +165,7 @@ def test_gc_engine_system_failure(serde, ez_pack_task, task_uuid, engine_runner)
     engine = engine_runner(GlobusComputeEngine, max_retries_on_system_failure=0)
 
     task_bytes = ez_pack_task(kill_manager)
-    task_f = GCFuture(gc_task_id=task_uuid)
+    task_f = GCFuture(task_uuid)
     engine.submit(task_f, task_bytes, {})
     r = messagepack.unpack(task_f.result())
     assert isinstance(r, Result)
@@ -291,7 +291,7 @@ def test_gcengine_bad_state_futures_failed_immediately(randomstring, task_uuid, 
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError(exc_text))
 
     taskb = b"some packed task bytes"
-    futs = [GCFuture(gc_task_id=task_uuid) for _ in range(5)]
+    futs = [GCFuture(task_uuid) for _ in range(5)]
     for task_f in futs:
         gce.submit(task_f=task_f, packed_task=taskb, resource_specification={})
 
@@ -303,7 +303,7 @@ def test_gcengine_exception_report_from_bad_state(task_uuid, gce):
     gce._engine_ready = True
     gce.executor.set_bad_state_and_fail_all(ZeroDivisionError())
 
-    f = GCFuture(gc_task_id=task_uuid)
+    f = GCFuture(task_uuid)
     gce.submit(task_f=f, resource_specification={}, packed_task=b"MOCK_TASK")
 
     r = messagepack.unpack(f.result())
@@ -327,7 +327,7 @@ def test_gcengine_rejects_mpi_mode(randomstring):
 
 def test_gcengine_rejects_resource_specification(task_uuid, gce):
     gce._engine_ready = True
-    f = GCFuture(gc_task_id=task_uuid)
+    f = GCFuture(task_uuid)
     gce.submit(f, packed_task=b"packed_task", resource_specification={"foo": "bar"})
     r = messagepack.unpack(f.result())
     assert isinstance(r, Result)
@@ -360,7 +360,7 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
         mock_ex.return_value = mock.Mock(launch_cmd="")
         engine = GlobusMPIEngine(address="::1")
         engine._engine_ready = True
-        f = GCFuture(gc_task_id=task_uuid)
+        f = GCFuture(task_uuid)
         engine.submit(f, b"some task", resource_specification=spec)
 
     assert engine.executor.submit.called, "Verify test: correct internal method invoked"

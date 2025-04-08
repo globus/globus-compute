@@ -151,20 +151,20 @@ def test_status_report_provider_specific_terms(
     assert sr.global_state["account"] == account_val
 
 
-def test_status_poller_started_late(fs, htex, mock_jsp, ep_uuid):
+def test_status_poller_started_late(tmp_path, htex, mock_jsp, ep_uuid):
     gce = GlobusComputeEngine(endpoint_id=ep_uuid, executor=htex)
     assert gce.job_status_poller is None, "JSP must be started *after* daemonization"
     assert not mock_jsp.called, "`.start()` not yet invoked."
-    gce.start(endpoint_id=ep_uuid, run_dir="/")
+    gce.start(endpoint_id=ep_uuid, run_dir=str(tmp_path))
     assert mock_jsp.called, "Expect JSP created in engine's process"
     assert gce.job_status_poller is not None
     a, _ = gce.job_status_poller.add_executors.call_args
     assert a[0] == [htex], "Expect executor to be polled"
 
 
-def test_sets_task_id(fs, mock_htex, endpoint_uuid, task_uuid):
+def test_sets_task_id(tmp_path, mock_htex, endpoint_uuid, task_uuid):
     eng = GlobusComputeEngine(executor=mock_htex)
-    eng.start(endpoint_id=endpoint_uuid, run_dir="/")
-    f = GCFuture(gc_task_id=task_uuid)
+    eng.start(endpoint_id=endpoint_uuid, run_dir=str(tmp_path))
+    f = GCFuture(task_uuid)
     eng.submit(f, b"bytes", {})
     assert f.executor_task_id is not None

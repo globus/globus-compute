@@ -306,7 +306,7 @@ class EndpointInterchange:
             while not self._quiesce_event.wait(timeout=1):
                 for task_id, packed_result in self.result_store:
                     log.debug("Retrieved stored result (%s)", task_id)
-                    f = GCFuture(gc_task_id=task_id)
+                    f = GCFuture(task_id)
                     f.add_done_callback(forward_result)
                     f.set_result(packed_result)
                     self.result_store.discard(task_id)
@@ -395,10 +395,9 @@ class EndpointInterchange:
                         prop_headers.get("resource_specification") or "null"
                     )
                     res_spec: dict = json.loads(res_spec_s) or {}
-
                     res_serde: list[str] = prop_headers.get("result_serializers") or []
 
-                    task_f = GCFuture(gc_task_id=tid)
+                    task_f = GCFuture(tid, function_id=fid)
                     task_f.add_done_callback(forward_result)  # type: ignore[arg-type]
 
                     if fid and not self.function_allowed(fid):
