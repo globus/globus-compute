@@ -34,6 +34,8 @@ def patch_compute_client(mocker):
     )
     gcc.web_service_address = _SVC_ADDY
     gcc._compute_web_client = _ComputeWebClient(base_url=_SVC_ADDY)
+    gcc._compute_web_client.v2.transport.max_retries = 0
+    gcc._compute_web_client.v3.transport.max_retries = 0
 
     yield mocker.patch(f"{_MOCK_BASE}Client", return_value=gcc)
 
