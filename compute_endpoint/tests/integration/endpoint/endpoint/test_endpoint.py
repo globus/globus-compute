@@ -40,7 +40,7 @@ def patch_compute_client(mocker):
     yield mocker.patch(f"{_MOCK_BASE}Client", return_value=gcc)
 
 
-def test_non_configured_endpoint(mocker, tmp_path):
+def test_non_configured_endpoint(tmp_path):
     env = {"GLOBUS_COMPUTE_USER_DIR": str(tmp_path)}
     with mock.patch.dict(os.environ, env):
         result = CliRunner().invoke(app, ["start", "newendpoint"])
@@ -106,20 +106,23 @@ def test_start_endpoint_data_passthrough(fs):
     assert req_json["subscription_uuid"] == str(ep_conf.subscription_id)
 
 
-@mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value="abc-uuid")
-@mock.patch("globus_compute_endpoint.cli.get_config")
-@mock.patch(f"{_MOCK_BASE}Client.stop_endpoint")
-def test_stop_remote_endpoint(mock_get_id, mock_get_gcc, mock_stop_endpoint):
+@responses.activate
+def test_stop_remote_endpoint(mocker):
+    ep_uuid = "some-uuid"
     ep_dir = pathlib.Path("some_ep_dir") / "abc-endpoint"
+    mocker.patch("globus_compute_endpoint.cli.get_config")
+    mocker.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value=ep_uuid)
 
-    _do_stop_endpoint(ep_dir=ep_dir, remote=False)
-    assert not mock_stop_endpoint.called
+    path = f"/v2/endpoints/{ep_uuid}/lock"
+    with responses.RequestsMock() as resp:
+        lock_resp = resp.post(_SVC_ADDY + path, json={}, status=200)
+        _do_stop_endpoint(ep_dir=ep_dir, remote=False)
 
-    path = f"/v2/endpoints/{mock_stop_endpoint.return_value}/lock"
-    responses.add(responses.POST, _SVC_ADDY + path, json={}, status=200)
+        assert lock_resp.call_count == 0
 
-    _do_stop_endpoint(ep_dir=ep_dir, remote=True)
-    assert mock_stop_endpoint.called
+        _do_stop_endpoint(ep_dir=ep_dir, remote=True)
+
+        assert lock_resp.call_count == 1
 
 
 def test_endpoint_setup_execution(mocker, tmp_path, randomstring):
