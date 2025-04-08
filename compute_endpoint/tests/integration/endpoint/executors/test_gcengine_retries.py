@@ -19,6 +19,7 @@ class MockHTEX:
     def __init__(self, fail_count=1):
         self._task_counter = 0
         self.fail_count = fail_count
+        self.monitoring_messages = mock.Mock()
         self.ex = ThreadPoolExecutor()
 
     def submit(self, func, _resource_spec, *args, **kwargs):
@@ -66,7 +67,7 @@ def test_success_after_fails(mock_gce, serde, ez_pack_task, fail_count):
     task_bytes = ez_pack_task(double, num)
 
     engine.executor.fail_count = fail_count
-    f = GCFuture(gc_task_id=task_id)
+    f = GCFuture(task_id)
     engine.submit(f, task_bytes, resource_specification={})
 
     packed_result: bytes = f.result()
@@ -86,7 +87,7 @@ def test_repeated_fail(mock_gce, ez_pack_task, fail_count):
 
     # Set executor to continue failures beyond retry limit
     engine.executor.fail_count = fail_count + 1
-    f = GCFuture(gc_task_id=task_id)
+    f = GCFuture(task_id)
     engine.submit(f, task_bytes, resource_specification={})
 
     packed_result = f.result()

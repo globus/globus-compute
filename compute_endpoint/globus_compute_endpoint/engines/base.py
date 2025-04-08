@@ -23,7 +23,11 @@ from globus_compute_endpoint.exception_handling import (
     get_error_string,
     get_result_error_details,
 )
-from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T, as_uuid
+from globus_compute_sdk.sdk.utils.uuid_like import (
+    UUID_LIKE_T,
+    as_optional_uuid,
+    as_uuid,
+)
 from globus_compute_sdk.serialize.facade import ComputeSerializer, DeserializerAllowlist
 from parsl.utils import RepresentationMixin
 
@@ -37,19 +41,57 @@ class GCFuture(Future):
     __slots__ = (
         "_gc_task_id",
         "_ex_task_id",
+        "_block_id",
+        "_job_id",
+        "_function_id",
+        "_observers",
     )
 
-    def __init__(self, *, gc_task_id: UUID_LIKE_T, executor_task_id=None):
+    def __init__(
+        self,
+        gc_task_id: UUID_LIKE_T,
+        *,
+        function_id: UUID_LIKE_T | None = None,
+        block_id: t.Any = None,
+        executor_task_id: t.Any = None,
+        job_id: t.Any = None,
+    ):
         super().__init__()
-        self._ex_task_id = None
-        self.executor_task_id = executor_task_id
+        self._observers: dict[str, list[t.Callable[[GCFuture, t.Any], None]]] = {
+            "block_id": [],
+            "executor_task_id": [],
+            "job_id": [],
+        }
+        self._block_id = block_id
+        self._ex_task_id = executor_task_id
+        self._job_id = job_id
+
+        _tmp = function_id  # work with both mypy and flake8
+        self.function_id = _tmp  # type: ignore[assignment]
+
         self.gc_task_id = gc_task_id
 
     def __repr__(self) -> str:
         cn = type(self).__name__
         gc_task_id = str(self.gc_task_id)
+        parts = [f"{gc_task_id!r}"]
+        fid = self.function_id
         executor_task_id = self.executor_task_id
-        return f"{cn}({gc_task_id=!r}, {executor_task_id=!r})"
+        block_id = self.block_id
+        job_id = self.job_id
+        if fid is not None:
+            function_id = str(fid)
+            parts.append(f"{function_id=!r}")
+        if executor_task_id is not None:
+            parts.append(f"{executor_task_id=!r}")
+        if block_id:
+            parts.append(f"{block_id=!r}")
+        if job_id:
+            parts.append(f"{job_id=!r}")
+        return f"{cn}({', '.join(parts)})"
+
+    def bind(self, var_name: str, cb: t.Callable) -> None:
+        self._observers[var_name].append(cb)
 
     @property
     def gc_task_id(self):
@@ -60,12 +102,45 @@ class GCFuture(Future):
         self._gc_task_id = as_uuid(val)
 
     @property
+    def function_id(self) -> uuid.UUID | None:
+        return self._function_id
+
+    @function_id.setter
+    def function_id(self, val: UUID_LIKE_T | None):
+        self._function_id = as_optional_uuid(val)
+
+    @property
+    def block_id(self):
+        return self._block_id
+
+    @block_id.setter
+    def block_id(self, val):
+        if val != self._block_id:
+            self._block_id = val
+            for cb in self._observers["block_id"]:
+                cb(self, val)
+
+    @property
     def executor_task_id(self):
         return self._ex_task_id
 
     @executor_task_id.setter
     def executor_task_id(self, val):
-        self._ex_task_id = val
+        if val != self._ex_task_id:
+            self._ex_task_id = val
+            for cb in self._observers["executor_task_id"]:
+                cb(self, val)
+
+    @property
+    def job_id(self):
+        return self._job_id
+
+    @job_id.setter
+    def job_id(self, val):
+        if val != self._job_id:
+            self._job_id = val
+            for cb in self._observers["job_id"]:
+                cb(self, val)
 
 
 class GCExecutorFuture(Future):
@@ -74,14 +149,6 @@ class GCExecutorFuture(Future):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.executor_task_id: t.Any = None
-
-    def __repr__(self) -> str:
-        cn = type(self).__name__
-        parts = []
-        if hasattr(self, "executor_task_id"):
-            parts.append(f"executor_task_id={self.executor_task_id!r}")
-
-        return f"{cn}({', '.join(parts)})"
 
 
 class GlobusComputeEngineBase(ABC, RepresentationMixin):
@@ -137,6 +204,9 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self.run_dir: str | None = None
         self.working_dir: str | os.PathLike = working_dir
         self.run_in_sandbox: bool = False
+
+        self._task_id_map: dict[t.Any, GCFuture] = {}
+
         # This attribute could be set by the subclasses in their
         # start method if another component insists on owning the queue.
         self._engine_ready: bool = False
@@ -251,6 +321,7 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
                     )
                     task_fut.set_result(messagepack.pack(res))
 
+        self._task_id_map.pop(task_fut.executor_task_id, None)
         try:
             work_f = submission_partial()
             task_fut.executor_task_id = work_f.executor_task_id
@@ -258,6 +329,35 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
             work_f = GCExecutorFuture()
             work_f.set_exception(e)
         work_f.add_done_callback(_done_cb)
+
+    def _clear_task(self, gcf: GCFuture):
+        self._task_id_map.pop(gcf.executor_task_id, None)
+
+    def _update_executor_task_id(self, gcf: GCFuture, new_val):
+        self._task_id_map[new_val] = gcf
+
+    def set_tasks_placement(
+        self,
+        executor_tasks: list,
+        block_id: t.Any | None = None,
+        job_id: t.Any | None = None,
+    ):
+        """
+        Child classes may use this method when they have information about where tasks
+        are placed.  Based off of the Parsl infrastructure choice to relay information
+        about nodes at a time rather than individual tasks, set one or more task
+        locations per call.
+
+        :param executor_tasks: a list of the executor's task identifiers; these will be
+            matched against the bookkeeping we have of executor task identifiers to the
+            associated GCFuture.
+        :param block_id: the block identifier where these tasks are running
+        :param job_id: the scheduler job identifier associated with these tasks
+        """
+        for ex_tid in executor_tasks:
+            if f := self._task_id_map.get(ex_tid):
+                f.job_id = job_id
+                f.block_id = block_id
 
     @abstractmethod
     def _submit(
@@ -291,6 +391,8 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         :param result_serializers: list of import paths to serialization strategies
         """
         self._ensure_ready()
+        task_f.bind("executor_task_id", self._update_executor_task_id)
+        task_f.add_done_callback(self._clear_task)  # type: ignore[arg-type]
 
         submission_partial = functools.partial(
             self._submit,

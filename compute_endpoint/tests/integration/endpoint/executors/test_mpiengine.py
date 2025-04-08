@@ -19,7 +19,7 @@ def test_mpi_function(engine_runner, nodeslist, serde, task_uuid, ez_pack_task):
 
     mpi_func = MPIFunction("pwd")
     task_bytes = ez_pack_task(mpi_func)
-    future = GCFuture(gc_task_id=task_uuid)
+    future = GCFuture(task_uuid)
     engine.submit(future, task_bytes, resource_specification=resource_spec)
 
     packed_result = future.result(timeout=10)
@@ -37,7 +37,7 @@ def test_env_vars(engine_runner, nodeslist, serde, task_uuid, ez_pack_task):
     engine = engine_runner(GlobusMPIEngine)
     task_bytes = ez_pack_task(get_env_vars)
     num_nodes = random.randint(1, len(nodeslist))
-    future = GCFuture(gc_task_id=task_uuid)
+    future = GCFuture(task_uuid)
     engine.submit(
         future,
         task_bytes,

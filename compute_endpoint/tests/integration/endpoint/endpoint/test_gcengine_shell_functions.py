@@ -9,7 +9,7 @@ def test_shell_function(engine_runner, tmp_path, task_uuid, serde, ez_pack_task)
     engine = engine_runner(GlobusComputeEngine)
     shell_func = ShellFunction("pwd")
     task_bytes = ez_pack_task(shell_func)
-    future = GCFuture(gc_task_id=task_uuid)
+    future = GCFuture(task_uuid)
     engine.submit(future, task_bytes, resource_specification={})
 
     packed_result = future.result()
@@ -41,7 +41,7 @@ def test_fail_shell_function(
     engine = engine_runner(GlobusComputeEngine, run_in_sandbox=True)
     shell_func = ShellFunction(cmd, walltime=0.1)
     task_bytes = ez_pack_task(shell_func)
-    future = GCFuture(gc_task_id=task_uuid)
+    future = GCFuture(task_uuid)
     engine.submit(future, task_bytes, resource_specification={})
 
     packed_result = future.result()
@@ -60,7 +60,7 @@ def test_no_sandbox(engine_runner, task_uuid, serde, ez_pack_task):
     engine = engine_runner(GlobusComputeEngine, run_in_sandbox=False)
     shell_func = ShellFunction("pwd")
     task_bytes = ez_pack_task(shell_func)
-    future = GCFuture(gc_task_id=task_uuid)
+    future = GCFuture(task_uuid)
     engine.submit(future, task_bytes, resource_specification={})
 
     packed_result = future.result()

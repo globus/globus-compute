@@ -31,7 +31,7 @@ def test_engine_start(
 
     # task submit should raise Exception if it was not started
     with pytest.raises(RuntimeError):
-        engine.submit(GCFuture(gc_task_id=endpoint_uuid), b"", {})
+        engine.submit(GCFuture(endpoint_uuid), b"", {})
 
     engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
     assert engine._engine_ready, "Engine should be ready after start"
@@ -74,11 +74,11 @@ def test_engine_working_dir(
 
     task_args: tuple = (ez_pack_task(get_cwd), {})
 
-    fut1 = GCFuture(gc_task_id=task_uuid)
+    fut1 = GCFuture(task_uuid)
     engine.submit(fut1, *task_args)
     unpacked1 = messagepack.unpack(fut1.result())  # blocks; avoid race condition
 
-    fut2 = GCFuture(gc_task_id=task_uuid)
+    fut2 = GCFuture(task_uuid)
     engine.submit(fut2, *task_args)  # exact same task
     unpacked2 = messagepack.unpack(fut2.result())
 
@@ -99,7 +99,7 @@ def test_engine_submit_internal(
     engine = engine_runner(engine_type)
 
     task_bytes = ez_pack_task(double, 3)
-    f = GCFuture(gc_task_id=task_uuid)
+    f = GCFuture(task_uuid)
     engine.submit(f, task_bytes, resource_specification={})
     packed_result = f.result()
 
@@ -109,3 +109,15 @@ def test_engine_submit_internal(
     assert isinstance(result, Result)
     assert result.task_id == task_uuid
     assert serde.deserialize(result.data) == 6
+
+
+def test_gcengine_monitors_tasks(engine_runner, ez_pack_task, task_uuid):
+    eng = engine_runner(GlobusComputeEngine)
+    task_bytes = ez_pack_task(double, 1)
+    f = GCFuture(task_uuid)
+    assert f.block_id is None, "Verify test setup"
+    assert f.job_id is None, "Verify test setup"
+    eng.submit(f, task_bytes, {})
+    _ = f.result()
+    assert f.block_id is not None
+    assert f.job_id is not None

@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import shlex
+import threading
 import typing as t
 import uuid
 
@@ -18,6 +19,8 @@ from globus_compute_endpoint.engines.base import (
 from globus_compute_sdk.serialize.facade import DeserializerAllowlist
 from parsl.executors.high_throughput.executor import HighThroughputExecutor
 from parsl.jobs.job_status_poller import JobStatusPoller
+from parsl.monitoring.types import MessageType, TaggedMonitoringMessage
+from parsl.multiprocessing import SpawnQueue
 
 logger = logging.getLogger(__name__)
 DOCKER_CMD_TEMPLATE = "docker run {options} -v {rundir}:{rundir} -t {image} {command}"
@@ -253,6 +256,51 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         launch_cmd = " ".join(shlex.split(launch_cmd))
         return launch_cmd
 
+    def monitor_watcher(self) -> None:
+        logger.debug("Thread start")
+
+        monitoring_q = self.executor.monitoring_messages
+        if not monitoring_q:
+            logger.debug("Monitoring not enabled; thread exit")
+            return
+
+        while True:
+            msg: TaggedMonitoringMessage | None = monitoring_q.get()
+            if msg is None:  # poison pill
+                break
+
+            try:
+                msg_type: MessageType
+                data: list[dict] | dict
+                msg_type, data = msg
+            except Exception as e:
+                logger.debug(
+                    "Unexpected monitoring data structure: [%s] %s -- (msg: %s)",
+                    type(e).__name__,
+                    e,
+                    msg,
+                )
+                continue
+
+            try:
+                if msg_type == MessageType.NODE_INFO:
+                    if bid := data.get("block_id"):
+                        jid = self.executor.blocks_to_job_id.get(bid)
+                        if tasks := data.get("tasks"):
+                            self.set_tasks_placement(
+                                executor_tasks=tasks, block_id=bid, job_id=jid
+                            )
+
+            except Exception as e:
+                logger.error(
+                    "Unexpected monitoring message structure: [%s] %s -- (data: %s)",
+                    type(e).__name__,
+                    e,
+                    data,
+                )
+
+        logger.debug("Thread exit")
+
     def start(
         self,
         *args,
@@ -277,6 +325,16 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
             )
 
         os.makedirs(self.executor.provider.script_dir, exist_ok=True)
+
+        # A minor amout of black magic because we're not using Parsl's DFK:
+        # attach the `monitoring_messages` queue to the executor before starting
+        # the executor but *after* the GC Endpoint will have detached.  The
+        # existence of `monitoring_messages` tells Parsl to enable the requisite
+        # machinery to give us such details as `block_id`.
+        self.executor.monitoring_messages = SpawnQueue()
+
+        threading.Thread(target=self.monitor_watcher, daemon=True).start()
+
         self.executor.start()
 
         # Add executor to poller *after* executor has started
@@ -514,7 +572,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         return self.executor.executor_exception
 
     def shutdown(self, /, **kwargs) -> None:
+        if self.executor.monitoring_messages:
+            self.executor.monitoring_messages.put(None)  # type: ignore[arg-type]
+
         if self.job_status_poller:
             self.job_status_poller.close()
             self.job_status_poller = None
+
         self.executor.shutdown()
