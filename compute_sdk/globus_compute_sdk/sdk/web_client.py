@@ -52,6 +52,7 @@ class FunctionRegistrationData:
         public: bool = False,
         group: t.Optional[str] = None,
         serializer: t.Optional[ComputeSerializer] = None,
+        ha_endpoint_id: t.Optional[UUID_LIKE_T] = None,
     ):
         if function is not None:
             if any((function_name, function_code, metadata)):
@@ -77,6 +78,11 @@ class FunctionRegistrationData:
                 " `function_code`, and `metadata`."
             )
 
+        if ha_endpoint_id and (public or group):
+            raise ValueError(
+                "`ha_endpoint_id` is mutually exclusive with `public` and `group`"
+            )
+
         if container_uuid:
             warnings.warn(
                 "`container_uuid` is deprecated and no longer specified per function;"
@@ -90,6 +96,7 @@ class FunctionRegistrationData:
         self.metadata = metadata
         self.public = public
         self.group = group
+        self.ha_endpoint_id = ha_endpoint_id
 
     def to_dict(self):
         data = {
@@ -103,6 +110,8 @@ class FunctionRegistrationData:
             data["public"] = True
         if self.group:
             data["group"] = self.group
+        if self.ha_endpoint_id:
+            data["ha_endpoint_id"] = self.ha_endpoint_id
         return data
 
     def __repr__(self) -> str:
