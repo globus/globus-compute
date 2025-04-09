@@ -722,6 +722,7 @@ class Client:
         public=False,
         group=None,
         searchable=None,
+        ha_endpoint_id: UUID_LIKE_T | None = None,
     ) -> str:
         """Register a function code with the Globus Compute service.
 
@@ -750,6 +751,10 @@ class Client:
             appropriate permissions
 
             DEPRECATED - ingesting functions to Globus Search is not currently supported
+        ha_endpoint_id : UUID | str | None
+            Users will only be able to run this function on the specified HA endpoint.
+            Since HA functions cannot be shared, this argument is mutually exclusive
+            with the ``group`` and ``public`` arguments.
 
         Returns
         -------
@@ -773,6 +778,7 @@ class Client:
             public=public,
             group=group,
             serializer=self.fx_serializer,
+            ha_endpoint_id=ha_endpoint_id,
         )
         logger.info("Registering function: %s", data.function_name)
         logger.debug("Function data: %s", data)

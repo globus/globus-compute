@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 import sys
 import uuid
@@ -333,7 +335,7 @@ def test_container_build_status_failure(gcc):
     assert type(excinfo.value) is SystemError
 
 
-def test_register_function(gcc, serde):
+def test_register_function(gcc: gc.Client, serde: ComputeSerializer):
     gcc._compute_web_client = mock.MagicMock()
     gcc.register_function(funk)
 
@@ -456,16 +458,19 @@ def test_function_registration_data_data_function(serde):
 @pytest.mark.parametrize("public", (True, False))
 @pytest.mark.parametrize("group", ("some group", None))
 def test_function_registration_data_conditional_data(desc, public, group):
+    ha_ep_id = None if public or group else uuid.uuid4()  # mutually exclusive args
     frd = FunctionRegistrationData(
         function=_docstring_test_case_no_docstring,
         description=desc,
         public=public,
         group=group,
+        ha_endpoint_id=ha_ep_id,
     )
     data = frd.to_dict()
     assert ("description" in data) is bool(desc)
     assert ("public" in data) is bool(public)
     assert ("group" in data) is bool(group)
+    assert ("ha_endpoint_id" in data) is bool(ha_ep_id)
 
 
 @pytest.mark.parametrize("fn", (funk, None))
@@ -497,6 +502,24 @@ def test_function_registration_data_exclusive_and_comorbid_args(
         assert frd.metadata.python_version == fnmetadata.python_version
         assert frd.metadata.sdk_version == fnmetadata.sdk_version
         assert frd.metadata.serde_identifier == fnmetadata.serde_identifier
+
+
+@pytest.mark.parametrize("public", (True, False))
+@pytest.mark.parametrize("group", (str(uuid.uuid4()), None))
+def test_function_registration_data_ha_endpoint_id_mutually_exclusive(
+    public: bool, group: str | None
+):
+    def run_init():
+        FunctionRegistrationData(
+            function=funk, public=public, group=group, ha_endpoint_id=uuid.uuid4()
+        )
+
+    if public or group:
+        with pytest.raises(ValueError) as pyt_e:
+            run_init()
+        assert "mutually exclusive" in str(pyt_e.value)
+    else:
+        run_init()
 
 
 def test_function_registration_data_repr_recreates():

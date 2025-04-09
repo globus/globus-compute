@@ -1,0 +1,11 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Enabled support for registering a function to a specific HA endpoint via the
+  ``ha_endpoint_id`` argument in the following methods:
+
+  - :meth:`~globus_compute_sdk.Client.register_function`
+  - :meth:`~globus_compute_sdk.Executor.register_function`
+
+  Since HA functions cannot be shared, this argument is mutually exclusive with the
+  ``group`` and ``public`` arguments.
