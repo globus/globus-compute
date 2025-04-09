@@ -452,20 +452,6 @@ def test_function_registration_data_data_function(serde):
     assert frd.metadata.serde_identifier == serde.code_serializer.identifier.strip()
 
 
-@pytest.mark.parametrize("missing", ("description", "public", "group"))
-def test_function_registration_data_optional_data(missing):
-    cond_data = {
-        "description": "some description",
-        "public": True,
-        "group": "some gorup",
-    }
-    cond_data.pop(missing)
-    frd = FunctionRegistrationData(function=funk, **cond_data)
-
-    for k, v in cond_data.items():
-        assert getattr(frd, k) == v, frd.to_dict()
-
-
 @pytest.mark.parametrize("desc", ("some desc", None))
 @pytest.mark.parametrize("public", (True, False))
 @pytest.mark.parametrize("group", ("some group", None))
