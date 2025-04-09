@@ -90,7 +90,7 @@ RPM Installation
 
 .. code-block::
 
-   # install Globus' public key
+   # get the Globus installer
    dnf install https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
 
    # install the Globus Compute Agent package
@@ -101,10 +101,9 @@ DEB Installation
 
 .. code-block::
 
-   # install Globus' public key
+   # get the Globus installer
    curl -LOs https://downloads.globus.org/globus-connect-server/stable/installers/repo/deb/globus-repo_latest_all.deb
    dpkg -i globus-repo_latest_all.deb
-   apt-key add /usr/share/globus-repo/RPM-GPG-KEY-Globus
 
    # install the Globus Compute Agent package
    apt update
