@@ -3,13 +3,14 @@ from unittest import mock
 
 import pytest
 from globus_compute_common.messagepack.message_types import EPStatusReport
+from globus_compute_common.tasks import TaskState
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
     TaskQueueSubscriber,
 )
-from globus_compute_endpoint.engines import GlobusComputeEngine
+from globus_compute_endpoint.engines import GCFuture, GlobusComputeEngine
 
 _mock_base = "globus_compute_endpoint.endpoint.interchange."
 
@@ -20,6 +21,12 @@ def empty_reg_info() -> dict:
         "result_queue_info": {},
         "heartbeat_queue_info": {},
     }
+
+
+@pytest.fixture
+def mock_log():
+    with mock.patch(f"{_mock_base}log") as m:
+        yield m
 
 
 @pytest.fixture
@@ -184,3 +191,19 @@ def test_heartbeat_includes_static_info(ei, mock_rp, mock_tqs, mock_pack, mock_e
     ), f"Should be {num_hbs_until_quit} heartbeats and a final sign off"
     for a, k in mock_pack.call_args_list:
         assert all(a[0].global_state[k] == v for k, v in mock_ep_info.items())
+
+
+@pytest.mark.parametrize("audit_fd", (-1, None))
+@pytest.mark.parametrize("is_ha", (True, False))
+def test_audit_func_cleared_if_not_ha(mock_gce, task_uuid, audit_fd, is_ha, mock_log):
+    conf = UserEndpointConfig(high_assurance=is_ha, engine=mock_gce)
+    f = GCFuture(task_uuid)
+    ei = EndpointInterchange(
+        conf, reg_info=empty_reg_info(), ep_info={}, audit_fd=audit_fd
+    )
+    assert not ei.time_to_quit
+
+    exp_cleared = not (is_ha and bool(audit_fd))
+
+    ei.audit(TaskState.RECEIVED, f)
+    assert ei.time_to_quit is not exp_cleared, "non-cleared invokes self.stop()"

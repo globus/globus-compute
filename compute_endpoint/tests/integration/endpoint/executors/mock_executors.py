@@ -36,6 +36,9 @@ class MockEngine(unittest.mock.Mock):
         result_serializers: t.Optional[t.List[str]] = None,
     ):
         task: Task = messagepack.unpack(packed_task)
+        task_f.executor_task_id = 1
+        task_f.job_id = 12
+        task_f.block_id = 123
         res = Result(task_id=task_f.gc_task_id, data=task.task_buffer)
 
         # This is a hack to trigger an InvalidResourceSpecification

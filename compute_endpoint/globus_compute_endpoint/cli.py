@@ -577,6 +577,7 @@ def _do_start_endpoint(
     ep_info = {}
     reg_info = {}
     config_str: str | None = None
+    audit_fd: int | None = None
     fn_allow_list: list[str] | None | int = _no_fn_list_canary
     if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
         try:
@@ -591,7 +592,8 @@ def _do_start_endpoint(
 
             ep_info = stdin_data.get("ep_info", {})
             reg_info = stdin_data.get("amqp_creds", {})
-            config_str = stdin_data.get("config", None)
+            config_str = stdin_data.get("config")
+            audit_fd = stdin_data.get("audit_fd")
             fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
 
             del stdin_data  # clarity for intended scope
@@ -656,6 +658,7 @@ def _do_start_endpoint(
                 reg_info,
                 ep_info,
                 die_with_parent,
+                audit_fd,
             )
 
     except (SystemExit, Exception) as e:

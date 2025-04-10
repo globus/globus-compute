@@ -255,7 +255,7 @@ def test_endpoint_uuid_name_not_supported(run_line, cli_cmd):
         (True, json.dumps({"config": "myconfig"})),
         (True, json.dumps({"amqp_creds": {}, "config": ""})),
         (True, json.dumps({"amqp_creds": {"a": 1}, "config": "myconfig"})),
-        (True, json.dumps({"amqp_creds": {}, "config": "myconfig"})),
+        (True, json.dumps({"amqp_creds": {}, "config": "myconfig", "audit_fd": 1})),
     ],
 )
 def test_start_ep_reads_stdin(
@@ -280,14 +280,18 @@ def test_start_ep_reads_stdin(
     run_line(f"start {ep_name}")
     mock_ep, _ = mock_cli_state
     assert mock_ep.start_endpoint.called
-    reg_info_found = mock_ep.start_endpoint.call_args[0][5]
+    s_ep_a, _ = mock_ep.start_endpoint.call_args
+    reg_info_found = s_ep_a[5]
+    audit_fd_found = s_ep_a[8]
 
     if data_is_valid:
         data_dict = json.loads(data)
         reg_info = data_dict.get("amqp_creds", {})
-        config_str = data_dict.get("config", None)
+        config_str = data_dict.get("config")
+        audit_fd = data_dict.get("audit_fd")
 
         assert reg_info_found == reg_info
+        assert audit_fd_found == audit_fd
         if config_str:
             config_str_found = mock_load_conf.call_args[0][0]
             assert config_str_found == config_str

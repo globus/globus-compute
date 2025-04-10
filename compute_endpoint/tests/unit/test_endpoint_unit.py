@@ -198,9 +198,9 @@ def test_start_endpoint_populates_ep_static_info(
         ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info=ep_info)
     assert mock_launch.called, "Should launch successfully"
 
-    (*_, found), _k = mock_launch.call_args
+    (*_, found, _audit_fd), _k = mock_launch.call_args
     assert found is ep_info
-    assert found["canary"] == canary_value, "Should *add* data, no overwrite"
+    assert found["canary"] == canary_value, "Should *add* data, not overwrite"
 
     found_start_iso = datetime.fromisoformat(found["start_iso"])
     found_start_unix = found["start_unix"]
