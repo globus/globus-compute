@@ -365,6 +365,18 @@ class ManagerEndpointConfig(BaseConfig):
         configuration item is required, and a ``ValueError`` will be raised if the path
         does not exist.
 
+    :param audit_log_path: Path to the audit log.  If specified, and the endpoint is
+        marked as High-Assurance (HA), then the MEP will write auditing records here.
+        An auditing record is a single-line of text, received from child endpoints at
+        "interesting" points in a task lifetime.  For example, when the UEP interchange
+        first receives a task, it will emit an auditing record of ``RECEIVED`` for that
+        task.  Similarly, the UEP will emit ``EXEC_START`` when the executor registers
+        the task, ``RUNNING`` if the executor shares that the task is running, and
+        ``EXEC_END`` when the task is complete.  If the path is created, it will be
+        created with user-secure permission (``umask=0o077``), but it not be checked
+        for permission conformance thereafter.  It is up to the administrator to ensure
+        this path is generally secured.
+
     :param pam: Whether to enable authorization of user-endpoints via PAM routines, and
         optionally specify the PAM service name.  See |PamConfiguration|.  If not
         specified, PAM authorization defaults to disabled.
@@ -402,6 +414,7 @@ class ManagerEndpointConfig(BaseConfig):
         user_config_template_path: os.PathLike | str | None = None,
         user_config_schema_path: os.PathLike | str | None = None,
         identity_mapping_config_path: os.PathLike | str | None = None,
+        audit_log_path: os.PathLike | str | None = None,
         pam: PamConfiguration | None = None,
         force_mu_allow_same_user: bool = False,
         mu_child_ep_grace_period_s: float = 30.0,
@@ -423,6 +436,9 @@ class ManagerEndpointConfig(BaseConfig):
 
         _tmp = identity_mapping_config_path  # work with both mypy and flake8
         self.identity_mapping_config_path = _tmp  # type: ignore[assignment]
+
+        _tmp = audit_log_path  # work with both mypy and flake8
+        self.audit_log_path = _tmp  # type: ignore[assignment]
 
         self.pam = pam or PamConfiguration(enable=False)
 
@@ -466,3 +482,11 @@ class ManagerEndpointConfig(BaseConfig):
                     "Identity mapping specified, but process is not privileged;"
                     " ignoring identity mapping configuration."
                 )
+
+    @property
+    def audit_log_path(self) -> pathlib.Path | None:
+        return self._audit_log_path
+
+    @audit_log_path.setter
+    def audit_log_path(self, val: os.PathLike | str | None):
+        self._audit_log_path = pathlib.Path(val) if val else None

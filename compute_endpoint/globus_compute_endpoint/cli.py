@@ -564,6 +564,7 @@ def _do_start_endpoint(
     endpoint_uuid: str | None,
     die_with_parent: bool = False,
 ):
+    os.umask(0o077)
     state = CommandState.ensure()
     if ep_dir.is_dir():
         setup_logging(

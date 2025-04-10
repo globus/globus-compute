@@ -55,6 +55,7 @@ known_manager_config_opts = {
     "user_config_template_path": os.PathLike,
     "user_config_schema_path": os.PathLike,
     "identity_mapping_config_path": os.PathLike,
+    "audit_log_path": os.PathLike,
     "pam": PamConfiguration,
     "force_mu_allow_same_user": True,
     "mu_child_ep_grace_period_s": float,
