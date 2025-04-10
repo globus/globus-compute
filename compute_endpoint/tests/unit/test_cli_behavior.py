@@ -29,7 +29,6 @@ from globus_compute_endpoint.cli import (
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.engines import ThreadPoolEngine
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
@@ -264,7 +263,7 @@ def test_start_ep_reads_stdin(
 ):
     data_is_valid, data = stdin_data
 
-    conf = UserEndpointConfig(executors=[ThreadPoolEngine])
+    conf = UserEndpointConfig()
     mock_load_conf = mocker.patch(f"{_MOCK_BASE}load_config_yaml")
     mock_load_conf.return_value = conf
     mock_get_config = mocker.patch(f"{_MOCK_BASE}get_config")
@@ -310,7 +309,7 @@ def test_start_ep_stdin_allowed_fns_overrides_conf(
     else:
         allowed_fns = tuple(str(uuid.uuid4()) for _ in range(fn_count))
 
-    conf = UserEndpointConfig(executors=[ThreadPoolEngine])
+    conf = UserEndpointConfig()
     conf.allowed_functions = [uuid.uuid4() for _ in range(5)]  # to be overridden
     mock_get_config = mocker.patch(f"{_MOCK_BASE}get_config")
     mock_get_config.return_value = conf
@@ -563,8 +562,7 @@ def test_start_ep_config_py_takes_precedence(
     mock_ep, *_ = mock_cli_state
     conf_py.write_text(
         "from globus_compute_endpoint.endpoint.config import UserEndpointConfig"
-        "\nfrom globus_compute_endpoint.engines import ThreadPoolEngine"
-        "\nconfig = UserEndpointConfig(executors=[ThreadPoolEngine()])"
+        "\nconfig = UserEndpointConfig()"
     )
 
     run_line(f"start {ep_name}")
@@ -653,7 +651,7 @@ def test_die_with_parent_detached(
     ep_name,
     make_endpoint_dir,
 ):
-    config = UserEndpointConfig(executors=[ThreadPoolEngine()])
+    config = UserEndpointConfig()
     mock_get_config.return_value = config
     make_endpoint_dir()
 
