@@ -346,6 +346,7 @@ class Endpoint:
         reg_info: dict,
         ep_info: dict,
         die_with_parent: bool = False,
+        audit_fd: int | None = None,
     ):
         # If we are running a full detached daemon then we will send the output to
         # log files, otherwise we can piggy back on our stdout
@@ -416,6 +417,9 @@ class Endpoint:
             raise
 
         try:
+            files_preserve = []
+            if audit_fd:
+                files_preserve.append(audit_fd)
             pid_file = endpoint_dir / "daemon.pid"
             context = daemon.DaemonContext(
                 working_directory=endpoint_dir,
@@ -424,6 +428,7 @@ class Endpoint:
                 stdout=stdout,
                 stderr=stderr,
                 detach_process=endpoint_config.detach_endpoint,
+                files_preserve=files_preserve,
             )
 
         except Exception:
@@ -599,6 +604,7 @@ class Endpoint:
                 result_store,
                 parent_pid,
                 ep_info,
+                audit_fd,
             )
 
     @staticmethod
@@ -610,6 +616,7 @@ class Endpoint:
         result_store: ResultStore,
         parent_pid: int,
         ep_info: dict,
+        audit_fd: int | None,
     ):
         log.info(f"\n\n========== Endpoint begins: {endpoint_uuid}")
 
@@ -622,6 +629,7 @@ class Endpoint:
             logdir=endpoint_dir,
             parent_pid=parent_pid,
             ep_info=ep_info,
+            audit_fd=audit_fd,
         )
 
         interchange.start()

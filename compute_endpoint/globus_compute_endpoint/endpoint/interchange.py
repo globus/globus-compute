@@ -18,6 +18,7 @@ import pika.exceptions
 import setproctitle
 from globus_compute_common.messagepack import InvalidMessageError, pack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
+from globus_compute_common.tasks import TaskState
 from globus_compute_endpoint import __version__ as funcx_endpoint_version
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.rabbit_mq import (
@@ -63,6 +64,7 @@ class EndpointInterchange:
         result_store: ResultStore | None = None,
         reconnect_attempt_limit: int = 5,
         parent_pid: int = 0,
+        audit_fd: int | None = None,
     ):
         """
         Parameters
@@ -95,6 +97,7 @@ class EndpointInterchange:
         if self.config.engine is None:
             raise ValueError("No Compute Engine specified")
 
+        self._audit_fd = audit_fd
         self.endpoint_dir = endpoint_dir
 
         self.task_q_info = reg_info["task_queue_info"]
@@ -157,6 +160,13 @@ class EndpointInterchange:
 
     def cleanup(self):
         self.engine.shutdown(block=True)
+        if self._audit_fd:
+            try:
+                os.close(self._audit_fd)
+            except Exception:
+                log.debug("Unknown problem closing audit log", exc_info=True)
+            finally:
+                self._audit_fd = None
 
     def handle_sigterm(self, sig_num, curr_stack_frame):
         log.warning("Received SIGTERM, setting termination flag.")
@@ -258,6 +268,39 @@ class EndpointInterchange:
         self.cleanup()
         log.info("EndpointInterchange shutdown complete.")
 
+    def audit(self, task_action: TaskState, task: GCFuture, msg: str = ""):
+        """
+        Write audit records (single line messages) to the audit file descriptor.
+
+        Note that auditing is only available for High Assurance endpoints.
+
+        :param task_action: The state of the task at the point of the audit call
+        :param task: The associated task relevant to this audit message
+        :param msg: Additional information to append to the audit log record;
+            newlines (``\\r``, ``\\n``) and null charactors (``\\0``), if present,
+            will be removed
+        """
+        if not (self.config.high_assurance and self._audit_fd):
+            return
+
+        tid = task.gc_task_id
+        fid = task.function_id or ""
+        bid = task.block_id or ""
+        jid = task.job_id and f"jid={task.job_id} " or ""
+        audit_msg = f"fid={fid} tid={tid} bid={bid} {jid}{task_action.name}"
+
+        if msg:
+            audit_msg += f" - {msg}"
+
+        audit_msg = audit_msg.replace("\n", " ").replace("\r", "").replace("\0", "")
+        try:
+            os.write(self._audit_fd, audit_msg.encode())
+        except Exception as e:
+            # if we can't audit, disallow further processing
+            self.stop()
+            e_str = f"({type(e).__name__}) {e}"
+            log.error(f"Unable to write audit log; endpoint may not continue: {e_str}")
+
     def _main_loop(self):
         """
         This is the "kernel" of the endpoint interchange process.  Conceptually, there
@@ -294,6 +337,12 @@ class EndpointInterchange:
         num_tasks_received = 0
         num_results_forwarded = 0
         hb_lock = threading.Lock()
+
+        def _mark_task_started(gcf: GCFuture, _new_val):
+            self.audit(TaskState.EXEC_START, gcf)
+
+        def _mark_task_running(gcf: GCFuture, _new_val):
+            self.audit(TaskState.RUNNING, gcf)
 
         def process_stored_results():
             # Handle any previously stored results, either from a previous run or
@@ -334,6 +383,7 @@ class EndpointInterchange:
             return _done_cb
 
         def forward_result(task_f: GCFuture) -> None:
+            self.audit(TaskState.EXEC_END, task_f)
             try:
                 res = task_f.result()
             except Exception as e:
@@ -398,7 +448,11 @@ class EndpointInterchange:
                     res_serde: list[str] = prop_headers.get("result_serializers") or []
 
                     task_f = GCFuture(tid, function_id=fid)
+                    task_f.bind("block_id", _mark_task_running)
+                    task_f.bind("executor_task_id", _mark_task_started)
+
                     task_f.add_done_callback(forward_result)  # type: ignore[arg-type]
+                    self.audit(TaskState.RECEIVED, task_f)
 
                     if fid and not self.function_allowed(fid):
                         # Same as web-service message but packed in a
@@ -408,6 +462,9 @@ class EndpointInterchange:
                             f"endpoint {self.endpoint_id}"
                         )
                         log.warning(reject_msg)
+
+                        audit_msg = "Function not permitted on endpoint"
+                        self.audit(TaskState.FAILED, task_f, audit_msg)
 
                         failed_result = Result(
                             task_id=tid,

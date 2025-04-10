@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 from globus_compute_common.messagepack import pack, unpack
 from globus_compute_common.messagepack.message_types import EPStatusReport, Task
+from globus_compute_common.tasks import TaskState
 from globus_compute_endpoint import engines
 from globus_compute_endpoint.endpoint.config.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange, log
@@ -18,7 +19,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     TaskQueueSubscriber,
 )
 from tests.integration.endpoint.executors.mock_executors import MockEngine
-from tests.utils import try_assert
+from tests.utils import double, try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.interchange."
 _test_func_ids = [str(uuid.uuid4()) for i in range(3)]
@@ -504,3 +505,74 @@ def test_engine_submit_failure_reported(
 
     assert exc_text.encode() in msg_b, "Expect engine failure published"
     assert f"Failed to process task {task_uuid}" == lfmt, "Expect logs see failure"
+
+
+def test_tasks_audited_happy_path(
+    ep_ix_factory, mock_conf, mock_log, mock_tqs, mock_rp, task_uuid, ez_pack_task
+):
+    r, w = os.pipe2(os.O_DIRECT)
+
+    mock_conf.high_assurance = True
+    ei = ep_ix_factory(config=mock_conf, audit_fd=w)
+    assert not ei.time_to_quit
+
+    f = engines.GCFuture(task_uuid)
+    ei.audit(TaskState.RECEIVED, f)
+    assert not ei.time_to_quit, "Canary test"
+    msg = os.read(r, 4096).decode()
+    assert TaskState.RECEIVED.name in msg, "Verify machinery hooked up"
+    assert f"tid={str(task_uuid)}" in msg, "Verify machinery hooked up"
+
+    task_bytes = ez_pack_task(double, 1)
+    headers = {"function_uuid": str(task_uuid), "task_uuid": str(task_uuid)}
+    ei.pending_task_queue.put((1, headers, task_bytes))
+
+    t = threading.Thread(target=ei._main_loop, daemon=True)
+    t.start()
+    try_assert(lambda: mock_rp.publish.called)
+    ei.stop()
+    t.join()
+
+    os.close(w)
+    audit_msgs = ""
+    while msg := os.read(r, 4096):
+        audit_msgs += msg.decode() + "\n"
+    os.close(r)
+    assert TaskState.RECEIVED.name in audit_msgs
+    assert TaskState.EXEC_START.name in audit_msgs
+    assert TaskState.RUNNING.name in audit_msgs
+    assert TaskState.EXEC_END.name in audit_msgs
+    assert audit_msgs.count(f"fid={task_uuid}") == 4, "Expect func id with each record"
+    assert audit_msgs.count(f"tid={task_uuid}") == 4, "Expect task id with each record"
+    assert audit_msgs.count("bid=") == 4, "Expect known block state always shared"
+    assert audit_msgs.count("bid=123") == 2, "Expect block shared when available"
+    assert audit_msgs.count("jid=") == 2, "Expect job only shared if specified"
+
+
+def test_tasks_audited_failed(
+    ep_ix_factory, mock_conf, mock_log, mock_tqs, mock_rp, task_uuid, ez_pack_task
+):
+    r, w = os.pipe2(os.O_DIRECT)
+
+    mock_conf.high_assurance = True
+    mock_conf.allowed_functions = []
+    ei = ep_ix_factory(config=mock_conf, audit_fd=w)
+
+    task_bytes = ez_pack_task(double, 1)
+    headers = {"function_uuid": str(task_uuid), "task_uuid": str(task_uuid)}
+    ei.pending_task_queue.put((1, headers, task_bytes))
+
+    t = threading.Thread(target=ei._main_loop, daemon=True)
+    t.start()
+    try_assert(lambda: mock_rp.publish.called)
+    ei.stop()
+    t.join()
+
+    os.close(w)
+    audit_msgs = ""
+    while msg := os.read(r, 4096):
+        audit_msgs += msg.decode() + "\n"
+    os.close(r)
+    assert TaskState.RECEIVED.name in audit_msgs
+    assert TaskState.FAILED.name in audit_msgs
+    assert TaskState.EXEC_START.name not in audit_msgs
