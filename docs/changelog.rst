@@ -3,9 +3,9 @@ Changelog
 
 .. scriv-insert-here
 
-.. _changelog-3.6.0a0:
+.. _changelog-3.6.0a1:
 
-globus-compute-sdk & globus-compute-endpoint v3.6.0a0
+globus-compute-sdk & globus-compute-endpoint v3.6.0a1
 -----------------------------------------------------
 
 New Functionality
