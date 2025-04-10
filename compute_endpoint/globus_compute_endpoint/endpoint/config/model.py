@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pathlib
 import typing as t
 import uuid
 from types import ModuleType
@@ -142,6 +143,7 @@ class ManagerEndpointConfigModel(BaseEndpointConfigModel):
     user_config_template_path: t.Optional[FilePath]
     user_config_schema_path: t.Optional[FilePath]
     identity_mapping_config_path: t.Optional[FilePath]
+    audit_log_path: t.Optional[pathlib.Path]
     force_mu_allow_same_user: t.Optional[bool]
     mu_child_ep_grace_period_s: t.Optional[float]
     pam: t.Optional[PamConfiguration]

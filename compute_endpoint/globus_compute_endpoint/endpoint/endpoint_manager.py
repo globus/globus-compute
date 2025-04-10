@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import io
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import pwd
 import queue
 import re
 import resource
+import selectors
 import signal
 import socket
 import sys
@@ -173,6 +175,15 @@ class EndpointManager:
         self._cached_cmd_start_args: TTLCache[int, T_CMD_START_ARGS] = TTLCache(
             maxsize=32768, ttl=config.mu_child_ep_grace_period_s
         )
+        self._audit_pipes: dict[int, t.Any] = {}
+        self._audit_log_handler_stop = not (
+            self._config.high_assurance and bool(self._config.audit_log_path)
+        )
+        self._audit_buf_size = resource.getpagesize()
+        self._audit_log_lock = threading.Lock()
+        self._audit_selector = selectors.DefaultSelector()
+        if self._audit_log_handler_stop:
+            self._audit_selector.close()  # for mypy: closed, but always defined
 
         endpoint_uuid = Endpoint.get_endpoint_id(conf_dir) or endpoint_uuid
 
@@ -432,6 +443,71 @@ class EndpointManager:
                 f"  kwargs: {kwargs}"
             )
 
+    def _audit_log_impl(self):
+        uid = os.getuid()
+        pid = os.getpid()
+        eid = self._endpoint_uuid_str
+        with open(self._config.audit_log_path, "ab", buffering=0) as audit_f:
+            nowtz = datetime.now().astimezone().isoformat()
+            msg = f"{nowtz} uid={uid} pid={pid} eid={eid} Begin MEP session =====\n"
+            audit_f.write(msg.encode())
+            del msg, nowtz
+            while not self._audit_log_handler_stop:
+                for key, _mask in self._audit_selector.select(timeout=3):
+                    cb = key.data  # N.B.: _audit_log_write(), but is general approach
+                    cb(key.fd, audit_f)
+            # thread stops after all UEPs have stopped, so perform one last round
+            # to ensure we collect any outstanding messages still in kernel's buffer
+            while self._audit_pipes:
+                for key, _mask in self._audit_selector.select(timeout=0.0001):
+                    cb = key.data
+                    cb(key.fd, audit_f)
+
+            nowtz = datetime.now().astimezone().isoformat()
+            msg = f"{nowtz} uid={uid} pid={pid} eid={eid} End MEP session -----\n"
+            audit_f.write(msg.encode())
+
+    def _audit_log_close_reader(self, fd: int) -> None:
+        try:
+            with self._audit_log_lock:
+                self._audit_pipes.pop(fd, None)
+                os.close(fd)
+                self._audit_selector.unregister(fd)
+        except Exception as e:
+            log.error(f"Failure unregistering audit pipe: ({type(e).__name__}) {e}")
+
+    def _audit_log_write(self, fd: int, fpath: io.BytesIO):
+        uep_audit_info = self._audit_pipes.get(fd)
+        if not uep_audit_info:
+            self._audit_log_close_reader(fd)
+            return
+
+        pid = uep_audit_info.get("pid")
+        uid = uep_audit_info.get("uid")
+        eid = uep_audit_info.get("endpoint_id")
+        try:
+            msg = (
+                os.read(fd, self._audit_buf_size)
+                .replace(b"\n", b" ")
+                .replace(b"\r", b"")
+                .replace(b"\0", b"")
+            )
+            if not msg:
+                self._audit_log_close_reader(fd)
+                return
+
+            nowtz = datetime.now().astimezone().isoformat()
+            header = f"{nowtz} uid={uid} pid={pid} uep={eid} "
+            msgb = header.encode() + msg + b"\n"
+
+            fpath.write(msgb)
+        except Exception as e:
+            # If unable to write audit log, then shutdown; don't run out of space,
+            # Administrator.
+            self._time_to_stop = True
+            e_str = f"({type(e).__name__}) {e}"
+            log.error(f"Failed to write audit log message: [{uid=}, {eid=}] - {e_str}")
+
     def _install_signal_handlers(self):
         signal.signal(signal.SIGTERM, self.request_shutdown)
         signal.signal(signal.SIGINT, self.request_shutdown)
@@ -481,6 +557,11 @@ class EndpointManager:
             print(f"{hc}        >>> Multi-User Endpoint ID: {pld} <<<", file=msg_out)
 
         self._install_signal_handlers()
+
+        audit_thr = None
+        if not self._audit_log_handler_stop:
+            audit_thr = threading.Thread(target=self._audit_log_impl, daemon=True)
+            audit_thr.start()
 
         self._command.start()
         self._heartbeat_publisher.start()
@@ -533,8 +614,12 @@ class EndpointManager:
                 time.sleep(0.5)
                 self.wait_for_children()
 
+        self._audit_log_handler_stop = True
         self._command.join(5)
         self._heartbeat_publisher.join(5)
+        if audit_thr:
+            audit_thr.join(5)
+
         log.info(
             "Shutdown complete."
             f"\n---------- Endpoint Manager ends: {self._endpoint_uuid_str}\n\n"
@@ -960,9 +1045,26 @@ class EndpointManager:
             *args,
         ]
 
+        uep_amqp_creds: dict = kwargs["amqp_creds"]
+
+        audit_r, audit_w = 0, 0
+        if not self._audit_log_handler_stop:
+            with self._audit_log_lock:
+                audit_r, audit_w = os.pipe2(os.O_DIRECT)
+                self._audit_pipes[audit_r] = {
+                    "uid": uid,
+                    "endpoint_id": uep_amqp_creds["endpoint_id"],
+                }
+                self._audit_selector.register(
+                    audit_r, selectors.EVENT_READ, self._audit_log_write
+                )
+
         try:
             pid = os.fork()
         except Exception as e:
+            if audit_r:
+                self._audit_log_close_reader(audit_r)
+                os.close(audit_w)
             log.error(f"Unable to fork child process: ({e.__class__.__name__}) {e}")
             raise
 
@@ -971,11 +1073,17 @@ class EndpointManager:
             self._children[pid] = UserEndpointRecord(
                 ep_name=ep_name, local_user_info=user_record, arguments=proc_args_s
             )
+            if audit_r:
+                os.close(audit_w)
+                self._audit_pipes[audit_r]["pid"] = pid
             log.info(f"Creating new user endpoint (pid: {pid}) [{proc_args_s}]")
             return
 
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
+        if audit_w:
+            os.close(audit_r)
+        del audit_r
 
         exit_code = 70
         try:
@@ -1160,6 +1268,8 @@ class EndpointManager:
             }
             if self._config.allowed_functions is not None:
                 stdin_data_dict["allowed_functions"] = self._config.allowed_functions
+            if audit_w:
+                stdin_data_dict["audit_fd"] = audit_w
 
             stdin_data = json.dumps(stdin_data_dict, separators=(",", ":"))
             exit_code += 1
@@ -1227,13 +1337,19 @@ class EndpointManager:
 
             exit_code += 1
             _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)
+            fd_low = 3
 
             # Save closerange until last so that we can still get logs written
             # to the endpoint.log.  Meanwhile, use the exit_code as a
             # last-ditch attempt at sharing "what went wrong where" to the
             # parent process.
             exit_code += 1
-            os.closerange(3, hard_no)
+            if fd_low < audit_w:
+                os.closerange(fd_low, audit_w)
+                fd_low = audit_w + 1
+            elif fd_low == audit_w:
+                fd_low += 1
+            os.closerange(fd_low, hard_no)
 
             exit_code += 1
             os.execvpe(proc_args[0], args=proc_args, env=env)

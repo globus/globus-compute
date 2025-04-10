@@ -316,7 +316,11 @@ def command_payload(ident):
         "globus_effective_identity": 1,
         "globus_identity_set": [ident],
         "command": "cmd_start_endpoint",
-        "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
+        "kwargs": {
+            "name": "some_ep_name",
+            "user_opts": {"heartbeat": 10},
+            "amqp_creds": {},
+        },
     }
 
 
@@ -721,9 +725,10 @@ def test_caches_start_cmd_args_if_ep_already_running(
     cached_args = em._cached_cmd_start_args.pop(child_pid)
     assert cached_args is not None
     mpi, args, kwargs = cached_args
+    exp_kw = {"name": "some_ep_name", "user_opts": {"heartbeat": 10}, "amqp_creds": {}}
     assert mpi.local_user_record == _mock_localuser_rec
     assert args == []
-    assert kwargs == {"name": "some_ep_name", "user_opts": {"heartbeat": 10}}
+    assert kwargs == exp_kw
 
 
 def test_writes_endpoint_uuid(epmanager_as_root):
@@ -2168,7 +2173,11 @@ def test_ep_info_not_root_gets_no_matched_identity(
         "globus_identity_set": ident_rv["identity_set"],
         "globus_username": "a@b.com",
         "command": "cmd_start_endpoint",
-        "kwargs": {"name": "some_ep_name", "user_opts": {"heartbeat": 10}},
+        "kwargs": {
+            "name": "some_ep_name",
+            "user_opts": {"heartbeat": 10},
+            "amqp_creds": {},
+        },
     }
     queue_item = (1, mock_props, json.dumps(cmd_payload).encode())
     em._command_queue.get.side_effect = (queue_item, queue.Empty())
@@ -2245,7 +2254,7 @@ def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked
 def test_pipe_size_limit(mocker, mock_log, successful_exec_from_mocked_root, is_valid):
     *_, em = successful_exec_from_mocked_root
 
-    stdin_data_size = 226  # Empirically/designed size of `stdin_data` string
+    stdin_data_size = 224  # Empirically/designed size of `stdin_data` string
     pipe_buffer_size = 255 + stdin_data_size + is_valid  # manufacture error/success
 
     conf_str = "k: v"  # some key, some value; valid YAML string

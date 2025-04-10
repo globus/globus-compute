@@ -39,6 +39,14 @@ from pytest_mock import MockFixture
 _MOCK_BASE = "globus_compute_endpoint.cli."
 
 
+@pytest.fixture(autouse=True, scope="module")
+def reset_umask():
+    original_umask = os.umask(0)
+    os.umask(original_umask)
+    yield
+    os.umask(original_umask)
+
+
 @pytest.fixture
 def gc_dir(tmp_path):
     yield tmp_path / ".globus_compute"
@@ -572,6 +580,15 @@ def test_start_ep_config_py_takes_precedence(
     run_line(f"start {ep_name}")
     assert mock_ep.start_endpoint.called
     assert not load_config_yaml.called, "Key outcome: config.py takes precedence"
+
+
+def test_start_ep_umask_set_restrictive(
+    run_line, mock_cli_state, make_endpoint_dir, ep_name
+):
+    orig_umask = os.umask(0)
+    make_endpoint_dir()
+    run_line(f"start {ep_name}")
+    assert os.umask(orig_umask) == 0o077
 
 
 def test_single_user_requires_engine_configured(mock_command_ensure, ep_name, run_line):
