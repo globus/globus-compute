@@ -359,10 +359,7 @@ def version_command():
 )
 @optgroup.option(
     "--auth-timeout",
-    help=(
-        "How old (in seconds) a login session can be and still be compliant. "
-        "If set, the auth policy will be High Assurance(HA)"
-    ),
+    help="How old (in seconds) a login session can be and still be compliant",
     type=click.IntRange(min=0),
     default=None,
 )
