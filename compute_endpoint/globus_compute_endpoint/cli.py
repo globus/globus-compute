@@ -444,6 +444,7 @@ def configure_endpoint(
             description=auth_policy_description,
             include_domains=include_domain_list,
             exclude_domains=exclude_domain_list,
+            high_assurance=high_assurance or MISSING,
             timeout=auth_timeout or MISSING,
             require_mfa=auth_policy_mfa_required or MISSING,
         )
@@ -880,6 +881,7 @@ def create_auth_policy(
     description: str,
     include_domains: list[str] | MissingType,
     exclude_domains: list[str] | MissingType,
+    high_assurance: bool | MissingType,
     timeout: int | MissingType,
     require_mfa: bool | MissingType,
 ) -> str:
@@ -887,7 +889,6 @@ def create_auth_policy(
     Uses the Globus SDK to create an auth policy and returns
     the policy_id after creation
     """
-
     try:
         resp = ac.create_policy(
             project_id=project_id,
@@ -895,7 +896,7 @@ def create_auth_policy(
             description=description,
             domain_constraints_include=include_domains,
             domain_constraints_exclude=exclude_domains,
-            high_assurance=bool(timeout),
+            high_assurance=high_assurance,
             authentication_assurance_timeout=timeout,
             required_mfa=require_mfa,
         )

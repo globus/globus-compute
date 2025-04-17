@@ -447,25 +447,28 @@ class EndpointManager:
         uid = os.getuid()
         pid = os.getpid()
         eid = self._endpoint_uuid_str
-        with open(self._config.audit_log_path, "ab", buffering=0) as audit_f:
-            nowtz = datetime.now().astimezone().isoformat()
-            msg = f"{nowtz} uid={uid} pid={pid} eid={eid} Begin MEP session =====\n"
-            audit_f.write(msg.encode())
-            del msg, nowtz
-            while not self._audit_log_handler_stop:
-                for key, _mask in self._audit_selector.select(timeout=3):
-                    cb = key.data  # N.B.: _audit_log_write(), but is general approach
-                    cb(key.fd, audit_f)
-            # thread stops after all UEPs have stopped, so perform one last round
-            # to ensure we collect any outstanding messages still in kernel's buffer
-            while self._audit_pipes:
-                for key, _mask in self._audit_selector.select(timeout=0.0001):
-                    cb = key.data
-                    cb(key.fd, audit_f)
+        try:
+            with open(self._config.audit_log_path, "ab", buffering=0) as audit_f:
+                nowtz = datetime.now().astimezone().isoformat()
+                msg = f"{nowtz} uid={uid} pid={pid} eid={eid} Begin MEP session =====\n"
+                audit_f.write(msg.encode())
+                del msg, nowtz
+                while not self._audit_log_handler_stop:
+                    for key, _mask in self._audit_selector.select(timeout=3):
+                        cb = key.data  # N.B.: _audit_log_write(), but general
+                        cb(key.fd, audit_f)
+                # thread stops after all UEPs have stopped, so perform one last round
+                # to ensure we collect any outstanding messages still in kernel's buffer
+                while self._audit_pipes:
+                    for key, _mask in self._audit_selector.select(timeout=0.0001):
+                        cb = key.data
+                        cb(key.fd, audit_f)
 
-            nowtz = datetime.now().astimezone().isoformat()
-            msg = f"{nowtz} uid={uid} pid={pid} eid={eid} End MEP session -----\n"
-            audit_f.write(msg.encode())
+                nowtz = datetime.now().astimezone().isoformat()
+                msg = f"{nowtz} uid={uid} pid={pid} eid={eid} End MEP session -----\n"
+                audit_f.write(msg.encode())
+        finally:
+            self._time_to_stop = True
 
     def _audit_log_close_reader(self, fd: int) -> None:
         try:

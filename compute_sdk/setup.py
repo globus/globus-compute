@@ -7,7 +7,7 @@ from setuptools import find_namespace_packages, setup
 REQUIRES = [
     # request sending and authorization tools
     "requests>=2.31.0,<3",
-    "globus-sdk>=3.51.0,<4",
+    "globus-sdk>=3.54.0,<4",
     "globus-compute-common==0.5.0",
     # dill is an extension of `pickle` to a wider array of native python types
     # pin to the latest version, as 'dill' is not at 1.0 and does not have a clear

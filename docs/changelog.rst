@@ -3,6 +3,44 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.6.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.6.0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- When using the :class:`~globus_compute_sdk.Executor`, users can now specify what
+  serialization strategies they would like their results to be serialized with.
+  For example:
+
+  .. code-block:: python
+
+    from globus_compute_sdk import Executor
+    from globus_compute_sdk.serialize import JSONData
+
+    with Executor("<your-endpoint-uuid>") as gcx:
+      # tell the endpoint to serialize the result of the function using JSONData:
+      gcx.result_serializers = [JSONData()]
+      result = gcx.submit(...)
+
+- Enabled support for registering a function to a specific HA endpoint via the
+  ``ha_endpoint_id`` argument in the following methods:
+
+  - :meth:`~globus_compute_sdk.Client.register_function`
+  - :meth:`~globus_compute_sdk.Executor.register_function`
+
+  Since HA functions cannot be shared, this argument is mutually exclusive with the
+  ``group`` and ``public`` arguments.
+
+Changed
+^^^^^^^
+
+- Update ``parsl`` dependency from `2025.3.17
+  <https://pypi.org/project/parsl/2025.3.17/>`_ to `2025.3.31
+  <https://pypi.org/project/parsl/2025.3.31/>`_
+
 .. _changelog-3.5.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.5.0

@@ -970,6 +970,7 @@ def test_configure_ep_auth_policy_defaults(
         "description": _AUTH_POLICY_DEFAULT_DESC,
         "include_domains": MISSING,
         "exclude_domains": MISSING,
+        "high_assurance": MISSING,
         "timeout": MISSING,
         "require_mfa": MISSING,
     }
@@ -1008,6 +1009,7 @@ def test_configure_ep_auth_param_parse(
         "description": "policy desc",
         "include_domains": ["xyz.com", "example.org"],
         "exclude_domains": ["nope.com"],
+        "high_assurance": True,
         "timeout": 30,
         "require_mfa": True,
     }
@@ -1065,34 +1067,6 @@ def test_configure_ep_auth_policy_creates_or_chooses_project(
     )
 
     assert isinstance(res.exception, StopTest)
-
-
-@pytest.mark.parametrize("timeout", [None] + list(range(5)))
-def test_configure_ep_auth_policy_timeout_sets_ha(
-    mocker,
-    run_line,
-    mock_cli_state,
-    make_endpoint_dir,
-    ep_name,
-    mock_app: UserApp,
-    mock_auth_client: ComputeAuthClient,
-    timeout,
-):
-    mock_auth_client.create_policy.return_value = {"policy": {"id": "foo"}}
-
-    if timeout is None:
-        line = f"configure --auth-policy-project-id=bar {ep_name}"
-    else:
-        line = (
-            f"configure --auth-policy-project-id=bar --auth-timeout={timeout} {ep_name}"
-        )
-
-    run_line(line)
-
-    assert mock_auth_client.create_policy.called
-    assert mock_auth_client.create_policy.call_args.kwargs["high_assurance"] == bool(
-        timeout
-    )
 
 
 @pytest.mark.parametrize(

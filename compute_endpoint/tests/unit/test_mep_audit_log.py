@@ -181,6 +181,19 @@ def test_audit_log_shutsdown_on_write_error(
     assert em._time_to_stop, "Key outcome"
 
 
+def test_audit_log_shutsdown_on_general_error(
+    tmp_path, ep_uuid, conf, reg_info, mock_os, randomstring
+):
+    em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
+
+    exc_text = randomstring()
+    with mock.patch(f"{_MOCK_BASE}open", side_effect=MemoryError(exc_text)):
+        with pytest.raises(MemoryError) as pyt_e:
+            em._audit_log_impl()
+    assert exc_text in str(pyt_e.value), "Verify that test induced failure"
+    assert em._time_to_stop is True, "Expect shutdown, no matter the error"
+
+
 def test_audit_log_pipe_hookup(mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os):
     em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
 
