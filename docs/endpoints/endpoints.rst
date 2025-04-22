@@ -443,6 +443,7 @@ following options:
     * ``docker``
     * ``singularity``
     * ``podman``
+    * ``podman-hpc``
     * ``custom``
     * ``None``
 
