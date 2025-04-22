@@ -24,10 +24,20 @@ from parsl.multiprocessing import SpawnQueue
 
 logger = logging.getLogger(__name__)
 # Docker, podman, and podman-hpc all use the same syntax
-DOCKER_CMD_TEMPLATE = "{cmd_name} run {options} -v {rundir}:{rundir} -t {image} {command}"
+DOCKER_CMD_TEMPLATE = (
+    "{cmd_name} run {options} -v {rundir}:{rundir} -t {image} {command}"
+)
 # Apptainer and Singularity use the same syntax
 APPTAINER_CMD_TEMPLATE = "{cmd_name} run {options} {image} {command}"
-VALID_CONTAINER_TYPES = ("docker", "singularity", "apptainer", "podman", "podman-hpc", "custom", None)
+VALID_CONTAINER_TYPES = (
+    "docker",
+    "singularity",
+    "apptainer",
+    "podman",
+    "podman-hpc",
+    "custom",
+    None,
+)
 
 
 class JobStatusPollerKwargs(t.TypedDict, total=False):
