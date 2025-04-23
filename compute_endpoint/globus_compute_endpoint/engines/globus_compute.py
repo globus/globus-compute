@@ -23,11 +23,13 @@ from parsl.monitoring.types import MessageType, TaggedMonitoringMessage
 from parsl.multiprocessing import SpawnQueue
 
 logger = logging.getLogger(__name__)
-DOCKER_CMD_TEMPLATE = "docker run {options} -v {rundir}:{rundir} -t {image} {command}"
-APPTAINER_CMD_TEMPLATE = "apptainer run {options} {image} {command}"
-SINGULARITY_CMD_TEMPLATE = "singularity run {options} {image} {command}"
-PODMAN_CMD_TEMPLATE = "podman run {options} -v {rundir}:{rundir} -t {image} {command}"
-VALID_CONTAINER_TYPES = ("docker", "singularity", "apptainer", "podman", "custom", None)
+# Docker, podman, and podman-hpc all use the same syntax
+DOCKER_CMD_TEMPLATE = "{cmd} run {options} -v {rundir}:{rundir} -t {image} {command}"
+# Apptainer and Singularity use the same syntax
+APPTAINER_CMD_TEMPLATE = "{cmd} run {options} {image} {command}"
+_DOCKER_TYPES = ("docker", "podman", "podman-hpc")
+_APPTAINER_TYPES = ("apptainer", "singularity")
+VALID_CONTAINER_TYPES = _DOCKER_TYPES + _APPTAINER_TYPES + ("custom", None)
 
 
 class JobStatusPollerKwargs(t.TypedDict, total=False):
@@ -217,29 +219,18 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         launch_cmd = self.executor.launch_cmd
         # Adding assert here since mypy can't figure out launch_cmd's type
         assert launch_cmd
-        if self.container_type == "docker":
+        if self.container_type in _DOCKER_TYPES:
             launch_cmd = DOCKER_CMD_TEMPLATE.format(
+                cmd=self.container_type,
                 image=self.container_uri,
                 rundir=self.run_dir,
                 command=launch_cmd,
                 options=self.container_cmd_options or "",
             )
-        elif self.container_type == "apptainer":
+        elif self.container_type in _APPTAINER_TYPES:
             launch_cmd = APPTAINER_CMD_TEMPLATE.format(
+                cmd=self.container_type,
                 image=self.container_uri,
-                command=launch_cmd,
-                options=self.container_cmd_options or "",
-            )
-        elif self.container_type == "singularity":
-            launch_cmd = SINGULARITY_CMD_TEMPLATE.format(
-                image=self.container_uri,
-                command=launch_cmd,
-                options=self.container_cmd_options or "",
-            )
-        elif self.container_type == "podman":
-            launch_cmd = PODMAN_CMD_TEMPLATE.format(
-                image=self.container_uri,
-                rundir=self.run_dir,
                 command=launch_cmd,
                 options=self.container_cmd_options or "",
             )

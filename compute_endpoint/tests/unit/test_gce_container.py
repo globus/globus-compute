@@ -4,7 +4,11 @@ import uuid
 from unittest import mock
 
 import pytest
-from globus_compute_endpoint.engines.globus_compute import GlobusComputeEngine
+from globus_compute_endpoint.engines.globus_compute import (
+    _APPTAINER_TYPES,
+    _DOCKER_TYPES,
+    GlobusComputeEngine,
+)
 
 _MOCK_BASE = "globus_compute_endpoint.engines.globus_compute."
 _LAUNCH_CMD_PREFIX = (
@@ -44,35 +48,20 @@ def gce_factory(tmp_path, randomstring) -> t.Callable:
         e.shutdown()
 
 
-def test_docker(tmp_path, gce_factory):
-    gce, exp_uri, exp_opts = gce_factory(container_type="docker")
+@pytest.mark.parametrize("contype", _APPTAINER_TYPES)
+def test_apptainer_type(gce_factory, contype):
+    gce, exp_uri, exp_opts = gce_factory(container_type=contype)
+    container_launch_cmd = gce.executor.launch_cmd
+    expected = f"{contype} run {exp_opts} {exp_uri} {_LAUNCH_CMD_PREFIX}"
+    assert container_launch_cmd.startswith(expected)
+
+
+@pytest.mark.parametrize("contype", _DOCKER_TYPES)
+def test_docker_type(tmp_path, gce_factory, contype):
+    gce, exp_uri, exp_opts = gce_factory(container_type=contype)
     container_launch_cmd = gce.executor.launch_cmd
     expected = (
-        f"docker run {exp_opts} -v {tmp_path}:{tmp_path} -t"
-        f" {exp_uri} {_LAUNCH_CMD_PREFIX}"
-    )
-    assert container_launch_cmd.startswith(expected)
-
-
-def test_apptainer(gce_factory):
-    gce, exp_uri, exp_opts = gce_factory(container_type="apptainer")
-    container_launch_cmd = gce.executor.launch_cmd
-    expected = f"apptainer run {exp_opts} {exp_uri} {_LAUNCH_CMD_PREFIX}"
-    assert container_launch_cmd.startswith(expected)
-
-
-def test_singularity(gce_factory, randomstring):
-    gce, exp_uri, exp_opts = gce_factory(container_type="singularity")
-    container_launch_cmd = gce.executor.launch_cmd
-    expected = f"singularity run {exp_opts} {exp_uri} {_LAUNCH_CMD_PREFIX}"
-    assert container_launch_cmd.startswith(expected)
-
-
-def test_podman(tmp_path, gce_factory):
-    gce, exp_uri, exp_opts = gce_factory(container_type="podman")
-    container_launch_cmd = gce.executor.launch_cmd
-    expected = (
-        f"podman run {exp_opts} -v {tmp_path}:{tmp_path} -t"
+        f"{contype} run {exp_opts} -v {tmp_path}:{tmp_path} -t"
         f" {exp_uri} {_LAUNCH_CMD_PREFIX}"
     )
     assert container_launch_cmd.startswith(expected)
