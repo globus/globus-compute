@@ -24,20 +24,12 @@ from parsl.multiprocessing import SpawnQueue
 
 logger = logging.getLogger(__name__)
 # Docker, podman, and podman-hpc all use the same syntax
-DOCKER_CMD_TEMPLATE = (
-    "{cmd_name} run {options} -v {rundir}:{rundir} -t {image} {command}"
-)
+DOCKER_CMD_TEMPLATE = "{cmd} run {options} -v {rundir}:{rundir} -t {image} {command}"
 # Apptainer and Singularity use the same syntax
-APPTAINER_CMD_TEMPLATE = "{cmd_name} run {options} {image} {command}"
-VALID_CONTAINER_TYPES = (
-    "docker",
-    "singularity",
-    "apptainer",
-    "podman",
-    "podman-hpc",
-    "custom",
-    None,
-)
+APPTAINER_CMD_TEMPLATE = "{cmd} run {options} {image} {command}"
+_DOCKER_TYPES = ("docker", "podman", "podman-hpc")
+_APPTAINER_TYPES = ("apptainer", "singularity")
+VALID_CONTAINER_TYPES = _DOCKER_TYPES + _APPTAINER_TYPES + ("custom", None)
 
 
 class JobStatusPollerKwargs(t.TypedDict, total=False):
@@ -227,17 +219,17 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         launch_cmd = self.executor.launch_cmd
         # Adding assert here since mypy can't figure out launch_cmd's type
         assert launch_cmd
-        if self.container_type in ["docker", "podman", "podman-hpc"]:
+        if self.container_type in _DOCKER_TYPES:
             launch_cmd = DOCKER_CMD_TEMPLATE.format(
-                cmd_name=self.container_type,
+                cmd=self.container_type,
                 image=self.container_uri,
                 rundir=self.run_dir,
                 command=launch_cmd,
                 options=self.container_cmd_options or "",
             )
-        elif self.container_type in ["apptainer", "singularity"]:
+        elif self.container_type in _APPTAINER_TYPES:
             launch_cmd = APPTAINER_CMD_TEMPLATE.format(
-                cmd_name=self.container_type,
+                cmd=self.container_type,
                 image=self.container_uri,
                 command=launch_cmd,
                 options=self.container_cmd_options or "",
