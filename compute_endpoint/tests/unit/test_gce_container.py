@@ -5,9 +5,9 @@ from unittest import mock
 
 import pytest
 from globus_compute_endpoint.engines.globus_compute import (
-    GlobusComputeEngine,
     _APPTAINER_TYPES,
     _DOCKER_TYPES,
+    GlobusComputeEngine,
 )
 
 _MOCK_BASE = "globus_compute_endpoint.engines.globus_compute."
