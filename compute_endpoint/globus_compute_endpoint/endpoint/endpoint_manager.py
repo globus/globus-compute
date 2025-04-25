@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import pathlib
+import pickle
 import platform
 import pwd
 import queue
@@ -157,8 +158,8 @@ class EndpointManager:
         else:
             _import_pyprctl()
 
-        self._reload_requested = False
         self._time_to_stop = False
+        self._restart = False
 
         self._heartbeat_period: float = max(MINIMUM_HEARTBEAT, config.heartbeat_period)
 
@@ -174,7 +175,7 @@ class EndpointManager:
         self._cached_cmd_start_args: TTLCache[int, T_CMD_START_ARGS] = TTLCache(
             maxsize=32768, ttl=config.mu_child_ep_grace_period_s
         )
-        self._audit_pipes: dict[int, t.Any] = {}
+        self._audit_pipes: dict[int, dict[str, int | str]] = {}
         self._audit_log_handler_stop = not (
             self._config.high_assurance and bool(self._config.audit_log_path)
         )
@@ -372,6 +373,9 @@ class EndpointManager:
             "user_config_schema": user_config_schema,
         }
 
+    def request_restart(self, sig_num, curr_stack_frame):
+        self._restart = True
+
     def request_shutdown(self, sig_num, curr_stack_frame):
         self._time_to_stop = True
 
@@ -488,12 +492,13 @@ class EndpointManager:
         uid = uep_audit_info.get("uid")
         eid = uep_audit_info.get("endpoint_id")
         try:
-            msg = (
-                os.read(fd, self._audit_buf_size)
-                .replace(b"\n", b" ")
-                .replace(b"\r", b"")
-                .replace(b"\0", b"")
-            )
+            with self._audit_log_lock:
+                msg = (
+                    os.read(fd, self._audit_buf_size)
+                    .replace(b"\n", b" ")
+                    .replace(b"\r", b"")
+                    .replace(b"\0", b"")
+                )
             if not msg:
                 self._audit_log_close_reader(fd)
                 return
@@ -511,6 +516,7 @@ class EndpointManager:
             log.error(f"Failed to write audit log message: [{uid=}, {eid=}] - {e_str}")
 
     def _install_signal_handlers(self):
+        signal.signal(signal.SIGHUP, self.request_restart)
         signal.signal(signal.SIGTERM, self.request_shutdown)
         signal.signal(signal.SIGINT, self.request_shutdown)
         signal.signal(signal.SIGQUIT, self.request_shutdown)
@@ -629,6 +635,74 @@ class EndpointManager:
             # re-enable cursor visibility
             print("\033[?25h", end="", file=msg_out)
 
+    def hot_restart(self):
+        log.info("Manager hot hot_restart requested")
+        r_fd = os.memfd_create("hot_restart", flags=0)  # 0 == *not* CLOEXEC
+
+        stdin_data = {
+            "amqp_creds": {
+                "endpoint_id": self._endpoint_uuid_str,
+                "command_queue_info": self._command.queue_info,
+                "heartbeat_queue_info": self._heartbeat_publisher.queue_info,
+            },
+            "restart_fd": r_fd,
+        }
+        self._command_stop_event.set()
+        self._heartbeat_publisher.stop()
+        self._command.join()
+
+        r, w = os.pipe()
+        os.dup2(r, 0)
+        os.write(w, json.dumps(stdin_data).encode())
+        os.close(w)
+        os.close(r)
+
+        with self._audit_log_lock:
+            if not self._audit_log_handler_stop:
+                nowtz = datetime.now().astimezone().isoformat()
+                uid = os.getuid()
+                pid = os.getpid()
+                eid = self._endpoint_uuid_str
+                msg = (
+                    f"{nowtz} uid={uid} pid={pid} eid={eid} End MEP session"
+                    f" [hot restart] .....\n"
+                )
+                with open(self._config.audit_log_path, "ab", buffering=0) as audit_f:
+                    audit_f.write(msg.encode())
+
+            # only thread of consequence that we block; will be restarted in new exec();
+            # AMQP will resend any interim received tasks because we won't ACK them.
+            state = {
+                "_audit_pipes": self._audit_pipes,
+                "_children": self._children,
+                "_cached_cmd_start_args": self._cached_cmd_start_args,
+            }
+            os.write(r_fd, pickle.dumps(state))
+            os.fsync(r_fd)
+            os.lseek(r_fd, 0, os.SEEK_SET)
+            args = [sys.executable, *sys.argv]
+
+            num_children = len(self._children)
+            log.info(
+                f"\n.......... Manager hot restarting {self._endpoint_uuid_str}"
+                f" (task processors: {num_children})\n"
+            )
+            os.execvpe(args[0], args=args, env=os.environ)
+
+    def _finish_hot_restart(self, fd: int):
+        with os.fdopen(fd, "rb") as f:
+            restart_data: dict = pickle.loads(f.read())
+
+        self._audit_pipes.update(restart_data.get("_audit_pipes", {}))
+        self._children.update(restart_data.get("_children", {}))
+        self._cached_cmd_start_args.update(
+            restart_data.get("_cached_cmd_start_args", {})
+        )
+        for audit_r in self._audit_pipes:
+            self._audit_selector.register(
+                audit_r, selectors.EVENT_READ, self._audit_log_write
+            )
+
     def _event_loop(self):
         parent_identities: set[str] = set()
         if not is_privileged():
@@ -667,6 +741,11 @@ class EndpointManager:
         while not self._time_to_stop:
             if self._wait_for_child:
                 self.wait_for_children()
+
+            if self._restart:
+                # not protected; if exec() fails, then this raises and we shutdown
+                # ... "Failure is not an option!"
+                self.hot_restart()
 
             if time.monotonic() - last_heartbeat >= self._heartbeat_period:
                 self.send_heartbeat()
