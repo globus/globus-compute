@@ -100,12 +100,14 @@ def test_load_manager_endpoint_config(get_random_of_datatype, fs):
 def test_render_user_config_escape_strings(conf_no_exec):
     template = """
 endpoint_setup: {{ setup }}
+display_name: {{ user_runtime.python_version }}
 engine:
     type: {{ engine.type }}
     accelerators:
         {%- for a in engine.accelerators %}
         - {{ a }}
-        {% endfor %}"""
+        {% endfor %}
+    """
 
     user_opts = {
         "setup": f"my-setup\nallowed_functions:\n    - {uuid.uuid4()}",
@@ -114,14 +116,17 @@ engine:
             "accelerators": [f"{uuid.uuid4()}\n    mem_per_worker: 100"],
         },
     }
+    user_runtime = {"python_version": "3.13\n    bar: baz"}
     rendered_str = render_config_user_template(
-        conf_no_exec, template, pathlib.Path("/"), {}, user_opts
+        conf_no_exec, template, pathlib.Path("/"), {}, user_opts, user_runtime
     )
+    print(rendered_str)
     loaded = yaml.safe_load(rendered_str)
 
-    assert len(loaded) == 2
+    assert len(loaded) == 3
     assert len(loaded["engine"]) == 2
     assert loaded["endpoint_setup"] == user_opts["setup"]
+    assert loaded["display_name"] == user_runtime["python_version"]
     assert loaded["engine"]["type"] == user_opts["engine"]["type"]
     assert loaded["engine"]["accelerators"] == user_opts["engine"]["accelerators"]
 
