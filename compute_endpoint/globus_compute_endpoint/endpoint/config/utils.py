@@ -264,6 +264,9 @@ def render_config_user_template(
     _validate_user_opts(_user_opts, user_config_schema)
     _user_opts = _sanitize_user_opts(_user_opts)
 
+    _user_runtime = user_runtime or {}
+    _user_runtime = _sanitize_user_opts(_user_runtime)
+
     user_config_template_dir = user_config_template_path.parent
     try:
         list(user_config_template_dir.iterdir())
@@ -283,7 +286,7 @@ def render_config_user_template(
 
     try:
         return template.render(
-            **_user_opts, parent_config=parent_config, user_runtime=user_runtime
+            **_user_opts, parent_config=parent_config, user_runtime=_user_runtime
         )
     except jinja2.exceptions.UndefinedError as e:
         log.debug("Missing required user option: %s", e)
