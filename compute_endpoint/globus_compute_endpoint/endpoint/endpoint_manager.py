@@ -159,7 +159,6 @@ class EndpointManager:
 
         self._reload_requested = False
         self._time_to_stop = False
-        self._kill_event = threading.Event()
 
         self._heartbeat_period: float = max(MINIMUM_HEARTBEAT, config.heartbeat_period)
 
@@ -577,7 +576,6 @@ class EndpointManager:
         ptitle = f"[shutdown in progress] {setproctitle.getproctitle()}"
         setproctitle.setproctitle(ptitle)
         self._command_stop_event.set()
-        self._kill_event.set()
 
         if self.identity_mapper:
             self.identity_mapper.stop_watching()
