@@ -168,12 +168,13 @@ def test_die_with_parent_refuses_to_start_if_not_parent(mocker, ep_ix_factory):
     assert "refusing to start" in warn_msg
 
 
-def test_die_with_parent_goes_away_if_parent_dies(mocker, ep_ix_factory, mock_rp):
-    ppid = os.getppid()
+def test_die_with_parent_goes_away_if_parent_dies(
+    mocker, ep_ix_factory, mock_rp, mock_tqs
+):
+    ppid = random.randint(2, 1_000_000)
 
-    mocker.patch(f"{_MOCK_BASE}time.sleep")
     mock_ppid = mocker.patch(f"{_MOCK_BASE}os.getppid")
-    mock_ppid.side_effect = (ppid, 1)
+    mock_ppid.side_effect = [ppid] * 100 + [1]  # sometime in future, parent dies
     ei = ep_ix_factory(parent_pid=ppid)
     mock_warn = mocker.patch.object(log, "warning")
     assert not ei.time_to_quit, "Verify test setup"

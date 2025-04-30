@@ -203,7 +203,7 @@ class EndpointInterchange:
 
             def _parent_watcher(ppid: int):
                 while ppid == os.getppid():
-                    if not self._quiesce_event.wait(timeout=1):
+                    if self._quiesce_event.wait(timeout=1):
                         return
                 log.warning(f"Parent ({ppid}) has gone away; initiating shut down")
                 self.stop()
