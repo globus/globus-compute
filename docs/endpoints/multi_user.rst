@@ -39,11 +39,11 @@ UEPs are initiated by tasks sent to the MEP id.  In REST-speak, that means that 
 more tasks were |POSTed to the /v3/endpoints/<mep_uuid>/submit|_ Globus Compute
 route.  When the web service determines that the ``endpoint_uuid`` is for a MEP, it
 generates a UEP identifier specific to the tuple of the ``endpoint_uuid``, the Globus
-Auth identity of the user making the request, and the endpoint configuration in the
-request (e.g., ``generate_identifier_from(site_id, user_id, conf)``) |nbsp| --- |nbsp|
-this identifier is simultaneously stable and unique.  After verifying that the generated
-ID is either new, or already belongs to the user, the web service then sends a start-UEP
-message to the MEP (via `AMQP
+Auth identity of the user making the request, the endpoint configuration in the request,
+and various user runtime information (e.g., ``generate_identifier_from(site_id, user_id,
+conf, user_runtime)``) |nbsp| --- |nbsp| this identifier is simultaneously stable and
+unique.  After verifying that the generated ID is either new, or already belongs to the
+user, the web service then sends a start-UEP message to the MEP (via `AMQP
 <https://en.wikipedia.org/wiki/Advanced_Message_Queuing_Protocol>`_), asking it to start
 an endpoint on behalf of the Globus Auth identity making the REST request identified by
 the generated UEP id.
