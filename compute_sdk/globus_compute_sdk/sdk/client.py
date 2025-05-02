@@ -558,6 +558,7 @@ class Client:
         subscription_id: UUID_LIKE_T | None = None,
         public: bool | None = None,
         high_assurance: bool | None = None,
+        admins: list[UUID_LIKE_T] | None = None,
     ):
         """Register an endpoint with the Globus Compute service.
 
@@ -583,6 +584,10 @@ class Client:
             Subscription ID to associate endpoint with
         public : bool | None
             Indicates if all users can discover the multi-user endpoint.
+        admins: list[UUID_LIKE_T] | None
+            A list of Globus Auth identity IDs that, in addition to the owner, have
+            administrative access to the endpoint. This field requires an active
+            Globus subscription.
 
         Returns
         -------
@@ -610,6 +615,8 @@ class Client:
             data["public"] = public
         if high_assurance is not None:
             data["high_assurance"] = high_assurance
+        if admins:
+            data["admins"] = admins
 
         if endpoint_id:
             r = self._compute_web_client.v3.update_endpoint(endpoint_id, data)

@@ -57,6 +57,10 @@ class BaseConfig:
         implementation of the CLI's ``--debug`` flag.  Note that if this value is
         explicitly False, then the CLI flag, if utilized, will still put the EP into
         "debug mode."  The CLI wins.
+
+    :param admins: A set of Globus Auth identity IDs that, in addition to the owner,
+        have administrative access to the endpoint. This field requires an active
+        Globus subscription.
     """
 
     def __init__(
@@ -73,6 +77,7 @@ class BaseConfig:
         environment: str | None = None,
         local_compute_services: bool = False,
         debug: bool = False,
+        admins: t.Iterable[UUID_LIKE_T] | None = None,
     ):
         # Misc
         self.display_name = display_name
@@ -90,6 +95,7 @@ class BaseConfig:
         self.allowed_functions = allowed_functions
         self.authentication_policy = authentication_policy
         self.subscription_id = subscription_id
+        self.admins = admins
 
         # Used to store the raw content of the YAML or Python config file
         self.source_content: str | None = None
@@ -150,6 +156,17 @@ class BaseConfig:
     @subscription_id.setter
     def subscription_id(self, val: UUID_LIKE_T | None):
         self._subscription_id = as_optional_uuid(val)
+
+    @property
+    def admins(self):
+        return self._admins
+
+    @admins.setter
+    def admins(self, val: t.Iterable[UUID_LIKE_T] | None):
+        if val is None:
+            self._admins = None
+        else:
+            self._admins = list(as_uuid(identity_id) for identity_id in val)
 
 
 class UserEndpointConfig(BaseConfig):
