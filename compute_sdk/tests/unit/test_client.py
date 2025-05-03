@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import inspect
+import io
+import json
 import sys
+import types
 import uuid
 from unittest import mock
 
 import globus_compute_sdk as gc
 import pytest
+import requests
 from globus_compute_sdk import ContainerSpec, __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
-from globus_compute_sdk.sdk.client import _ComputeWebClient
+from globus_compute_sdk.sdk.client import _client_gares_handler, _ComputeWebClient
 from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.utils import get_env_details, get_py_version_str
 from globus_compute_sdk.sdk.web_client import (
@@ -20,7 +24,7 @@ from globus_compute_sdk.sdk.web_client import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
-from globus_sdk import ComputeClientV2, ComputeClientV3, UserApp
+from globus_sdk import ComputeClientV2, ComputeClientV3, GlobusAPIError, UserApp
 from globus_sdk import __version__ as __version_globus__
 from globus_sdk.authorizers import GlobusAuthorizer
 from pytest_mock import MockerFixture
@@ -33,6 +37,29 @@ fnmetadata = FunctionRegistrationMetadata(
     sdk_version=__version__,
     serde_identifier="01",  # serializer default, which is currently DillCode
 )
+
+known_gare_wrapped = {
+    gc.Client.get_task,
+    gc.Client.get_batch_result,
+    gc.Client.batch_run,
+    gc.Client.register_endpoint,
+    gc.Client.get_result_amqp_url,
+    gc.Client.get_containers,
+    gc.Client.get_container,
+    gc.Client.get_endpoint_status,
+    gc.Client.get_endpoint_metadata,
+    gc.Client.get_endpoints,
+    gc.Client.register_function,
+    gc.Client.get_function,
+    gc.Client.register_container,
+    gc.Client.build_container,
+    gc.Client.get_container_build_status,
+    gc.Client.get_allowed_functions,
+    gc.Client.stop_endpoint,
+    gc.Client.delete_endpoint,
+    gc.Client.delete_function,
+    gc.Client.get_worker_hardware_details,
+}
 
 
 @pytest.fixture(autouse=True)
@@ -58,6 +85,18 @@ def gcc():
 @pytest.fixture(scope="module")
 def serde():
     yield ComputeSerializer()
+
+
+@pytest.fixture
+def gare() -> GlobusAPIError:
+    ws_response = {"code": "test_fail", "authorization_parameters": {}}
+    req = requests.Request("GET", "https://some.url/some/path").prepare()
+    res = requests.Response()
+    res.request = req
+    res.status_code = 401
+    res.headers = {"Content-Type": "application/json"}
+    res.raw = io.BytesIO(json.dumps(ws_response).encode())
+    return GlobusAPIError(res)
 
 
 def funk():
@@ -866,12 +905,54 @@ def test_auth_client_deprecated():
     assert any(msg in str(r.message) for r in record)
 
 
-def test_login_manager_deprecated():
-    mock_lm = mock.Mock(spec=LoginManager)
-    gcc = gc.Client(do_version_check=False, login_manager=mock_lm)
+def test_login_manager_deprecated(gcc):
     with pytest.warns(UserWarning) as record:
         assert (
             gcc.login_manager
         ), "Client.login_manager needed for backward compatibility"
     msg = "'Client.login_manager' attribute is deprecated"
     assert any(msg in str(r.message) for r in record)
+
+
+def test_known_gare_handled_methods(gare):
+    # +1 ==> starts *inside* the decorator function
+    wrapped_lineno = _client_gares_handler.__code__.co_firstlineno + 1
+
+    found_gare_wrapped = {
+        fn
+        for attr_name in dir(gc.Client)
+        if isinstance(fn := getattr(gc.Client, attr_name), types.FunctionType)
+        if fn.__code__.co_filename == _client_gares_handler.__code__.co_filename
+        if fn.__code__.co_firstlineno == wrapped_lineno
+    }
+
+    assert known_gare_wrapped == found_gare_wrapped, "Typo?  Or time to update tests?"
+
+
+def test_gare_wrapper(gcc, gare):
+    meth_name = "get_task"  # an arbitrary, known-gare-wrapped method
+    get_task_method = getattr(gc.Client, meth_name)
+    assert get_task_method in known_gare_wrapped, "Verify below test is valid"
+
+    assert not gcc.login_manager.run_login_flow.called, "Verify test setup"
+    with mock.patch.object(gcc._compute_web_client.v2, meth_name) as mock_get:
+        mock_get.side_effect = gare
+        with pytest.raises(GlobusAPIError) as pyt_e:
+            get_task_method(gcc, "some task id")
+    assert gare.errors[0].code in str(pyt_e.value), "Verify test setup"
+    assert gcc.login_manager.run_login_flow.called, "Expect auth error induces login"
+    assert mock_get.call_count == 2, "Expect two reqs, one after induced login"
+
+
+def test_gare_no_login_available(gare, gcc):
+    meth_name = "get_task"  # an arbitrary, known-gare-wrapped method
+    get_task_method = getattr(gc.Client, meth_name)
+    assert get_task_method in known_gare_wrapped, "Verify below test is valid"
+
+    gcc._login_manager = None
+    with mock.patch.object(gcc._compute_web_client.v2, meth_name) as mock_get:
+        mock_get.side_effect = gare
+        with pytest.raises(GlobusAPIError) as pyt_e:
+            get_task_method(gcc, "some task id")
+    assert gare.errors[0].code in str(pyt_e.value), "Verify test setup"
+    assert mock_get.call_count == 1, "Expect to try it, despite not login available"

@@ -7,7 +7,7 @@ import globus_sdk
 import pytest
 import requests
 from globus_compute_sdk.sdk._environments import _get_envname
-from globus_compute_sdk.sdk.login_manager import LoginManager, requires_login
+from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.client_login import (
     get_client_login,
     is_client_login,
@@ -206,38 +206,3 @@ def test_ensure_logged_in(mocker, logman, missing_keys, missing_scopes):
     logman.ensure_logged_in()
 
     assert needs_login == mock_run_login_flow.called
-
-
-def test_requires_login_decorator(mocker, logman):
-    mocked_run_login_flow = mocker.patch(
-        f"{MOCK_BASE}.manager.LoginManager.run_login_flow"
-    )
-    mocked_get_web_client = mocker.patch(
-        f"{MOCK_BASE}.manager.LoginManager.get_web_client"
-    )
-
-    expected = "expected result"
-    mock_method = mock.Mock()
-    mock_method.side_effect = [
-        expected,
-        globus_sdk.AuthAPIError(_fake_http_response(status=400, method="POST")),
-        expected,
-    ]
-    mock_method.__name__ = "mock_method"
-
-    class MockClient:
-        login_manager = logman
-        web_service_address = "::1"
-        upstream_call = requires_login(mock_method)
-
-    mock_client = MockClient()
-
-    res = mock_client.upstream_call(None)  # case: no need to reauth
-    assert res == expected
-    assert not mocked_run_login_flow.called
-    assert not mocked_get_web_client.called
-
-    res = mock_client.upstream_call(None)  # case: now must reauth
-    assert res == expected
-    assert mocked_run_login_flow.called
-    assert mocked_get_web_client.called

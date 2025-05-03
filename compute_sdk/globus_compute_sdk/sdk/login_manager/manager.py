@@ -7,7 +7,8 @@ import typing as t
 import warnings
 
 import globus_sdk
-from globus_sdk.scopes import AuthScopes
+from globus_sdk.gare import GlobusAuthorizationParameters
+from globus_sdk.scopes import AuthScopes, Scope
 
 from ..auth.scopes import ComputeScopeBuilder
 from ..web_client import WebClient
@@ -65,7 +66,8 @@ class LoginManager:
         self,
         *,
         scopes: list[str] | None = None,
-    ):
+        auth_params: GlobusAuthorizationParameters | None = None,
+    ) -> None:
         if is_client_login():
             # We don't need a login flow for a client login
             return
@@ -82,12 +84,17 @@ class LoginManager:
                 "Unable to run native app login flow: stdin is closed or is not a TTY."
             )
 
-        if scopes is None:  # flatten scopes to list of strings if none provided
-            scopes = [
-                s for _rs_name, rs_scopes in self.login_requirements for s in rs_scopes
-            ]
+        min_scopes = [Scope(s) for s in (scopes or [])]
+        for _, rs_scopes in self.login_requirements:
+            min_scopes.extend(Scope(s) for s in rs_scopes)
 
-        token = do_link_auth_flow(scopes)
+        _auth_params = auth_params or GlobusAuthorizationParameters()
+        combined_scopes = Scope.merge_scopes(
+            min_scopes, [Scope(s) for s in _auth_params.required_scopes or []]
+        )
+        _auth_params.required_scopes = list(map(str, combined_scopes))
+
+        token = do_link_auth_flow(_auth_params)
         with self._access_lock:
             self._token_storage.store(token)
 
