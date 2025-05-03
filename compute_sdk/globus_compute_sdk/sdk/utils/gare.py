@@ -1,10 +1,14 @@
 import typing as t
 
-from globus_sdk import GlobusAPIError, GlobusApp
-from globus_sdk.gare import to_gares
+from globus_sdk import GlobusAPIError
+from globus_sdk.gare import GlobusAuthorizationParameters, to_gares
 
 
-def gare_handler(app: GlobusApp, f: t.Callable, *args, **kwargs):
+class GareLogin(t.Protocol):
+    def __call__(self, *, auth_params: GlobusAuthorizationParameters) -> None: ...
+
+
+def gare_handler(login: GareLogin, f: t.Callable, *args, **kwargs):
     try:
         return f(*args, **kwargs)
     except GlobusAPIError as e:
@@ -17,6 +21,6 @@ def gare_handler(app: GlobusApp, f: t.Callable, *args, **kwargs):
             if auth_params.session_message is None:
                 auth_params.session_message = gare.extra.get("reason")
 
-            app.login(auth_params=auth_params)
+            login(auth_params=auth_params)
 
         return f(*args, **kwargs)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import sys
@@ -16,6 +17,7 @@ from globus_compute_sdk.errors import (
 from globus_compute_sdk.sdk._environments import get_web_service_url
 from globus_compute_sdk.sdk.hardware_report import run_hardware_report
 from globus_compute_sdk.sdk.utils import check_version
+from globus_compute_sdk.sdk.utils.gare import GareLogin, gare_handler
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
@@ -23,16 +25,41 @@ from globus_compute_sdk.sdk.web_client import (
 )
 from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
 from globus_compute_sdk.version import __version__, compare_versions
+from globus_sdk.gare import GlobusAuthorizationParameters
 from globus_sdk.version import __version__ as __version_globus__
 
 from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app
 from .batch import Batch, UserRuntime
-from .login_manager import LoginManagerProtocol, requires_login
+from .login_manager import LoginManagerProtocol
 from .utils import get_env_var_with_deprecation
 from .web_client import WebClient
 
 logger = logging.getLogger(__name__)
+
+
+def _client_gares_handler(f: t.Callable):
+    @functools.wraps(f)
+    def _wrapper(self: Client, *args, **kwargs):
+        _login: GareLogin | None = None
+        if self.app:
+            _login = self.app.login
+        elif self._login_manager:
+
+            def _login(auth_params: GlobusAuthorizationParameters):
+                self.login_manager.run_login_flow(auth_params=auth_params)
+                self.web_client = self.login_manager.get_web_client(
+                    base_url=self.web_service_address
+                )
+
+        if _login:
+            return gare_handler(_login, f, self, *args, **kwargs)
+
+        # Perhaps an authorizer is in use; there is no way to relogin so if an error
+        # happens, then just let the naked exception raise
+        return f(self, *args, **kwargs)
+
+    return _wrapper
 
 
 class _ComputeWebClient:
@@ -323,7 +350,7 @@ class Client:
         self._task_status_table[task_id] = status
         return status
 
-    @requires_login
+    @_client_gares_handler
     def get_task(self, task_id):
         """Get a Globus Compute task.
 
@@ -346,7 +373,6 @@ class Client:
         logger.debug(f"Response string : {r}")
         return self._update_task_table(r.text, tid)
 
-    @requires_login
     def get_result(self, task_id: UUID_LIKE_T):
         """Get the result of a Globus Compute task
 
@@ -371,7 +397,7 @@ class Client:
                 logger.warning("We have an exception : {}".format(task["exception"]))
                 task["exception"].reraise()
 
-    @requires_login
+    @_client_gares_handler
     def get_batch_result(self, task_id_list: list[UUID_LIKE_T]) -> dict[str, dict]:
         """Request status of list of tasks
 
@@ -438,7 +464,6 @@ class Client:
 
         return results
 
-    @requires_login
     def run(
         self, *args, endpoint_id: UUID_LIKE_T, function_id: UUID_LIKE_T, **kwargs
     ) -> str:
@@ -520,7 +545,7 @@ class Client:
             ),
         )
 
-    @requires_login
+    @_client_gares_handler
     def batch_run(
         self, endpoint_id: UUID_LIKE_T, batch: Batch
     ) -> dict[str, str | dict[str, list[str]]]:
@@ -545,7 +570,7 @@ class Client:
         # Send the data to Globus Compute
         return self._compute_web_client.v3.submit(endpoint_id, batch.prepare()).data
 
-    @requires_login
+    @_client_gares_handler
     def register_endpoint(
         self,
         name,
@@ -618,12 +643,12 @@ class Client:
 
         return r.data
 
-    @requires_login
+    @_client_gares_handler
     def get_result_amqp_url(self) -> dict[str, str]:
         r = self._compute_web_client.v2.get_result_amqp_url()
         return r.data
 
-    @requires_login
+    @_client_gares_handler
     def get_containers(self, name, description=None):
         """
         Register a DLHub endpoint with the Globus Compute service and get
@@ -645,7 +670,7 @@ class Client:
         r = self._compute_web_client.v2.post("/v2/get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
-    @requires_login
+    @_client_gares_handler
     def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
 
@@ -669,7 +694,7 @@ class Client:
         )
         return r.data["container"]
 
-    @requires_login
+    @_client_gares_handler
     def get_endpoint_status(self, endpoint_uuid):
         """Get the status reports for an endpoint.
 
@@ -686,7 +711,7 @@ class Client:
         r = self._compute_web_client.v2.get_endpoint_status(endpoint_uuid)
         return r.data
 
-    @requires_login
+    @_client_gares_handler
     def get_endpoint_metadata(self, endpoint_uuid):
         """Get the metadata for an endpoint.
 
@@ -705,7 +730,7 @@ class Client:
         r = self._compute_web_client.v2.get_endpoint(endpoint_uuid)
         return r.data
 
-    @requires_login
+    @_client_gares_handler
     def get_endpoints(self):
         """Get a list of all endpoints owned by the current user across all systems.
 
@@ -717,7 +742,7 @@ class Client:
         r = self._compute_web_client.v2.get_endpoints()
         return r.data
 
-    @requires_login
+    @_client_gares_handler
     def register_function(
         self,
         function,
@@ -791,7 +816,7 @@ class Client:
         r = self._compute_web_client.v3.register_function(data.to_dict())
         return r.data["function_uuid"]
 
-    @requires_login
+    @_client_gares_handler
     def get_function(self, function_id: UUID_LIKE_T):
         """Submit a request for details about a registered function.
 
@@ -809,7 +834,7 @@ class Client:
         r = self._compute_web_client.v2.get_function(function_id)
         return r.data
 
-    @requires_login
+    @_client_gares_handler
     def register_container(self, location, container_type, name="", description=""):
         """Register a container with the Globus Compute service.
 
@@ -840,7 +865,7 @@ class Client:
         r = self._compute_web_client.v2.post("/v2/containers", data=payload)
         return r.data["container_id"]
 
-    @requires_login
+    @_client_gares_handler
     def build_container(self, container_spec):
         """
         Submit a request to build a docker image based on a container spec. This
@@ -871,6 +896,7 @@ class Client:
         )
         return r.data["container_id"]
 
+    @_client_gares_handler
     def get_container_build_status(self, container_id):
         r = self._compute_web_client.v2.get(f"/v2/containers/build/{container_id}")
         if r.http_status == 200:
@@ -885,7 +911,7 @@ class Client:
             logger.error(message)
             raise SystemError(message)
 
-    @requires_login
+    @_client_gares_handler
     def get_allowed_functions(self, endpoint_id: UUID_LIKE_T):
         """List the functions that are allowed to execute on this endpoint
         Parameters
@@ -899,7 +925,7 @@ class Client:
         """
         return self._compute_web_client.v3.get_endpoint_allowlist(endpoint_id).data
 
-    @requires_login
+    @_client_gares_handler
     def stop_endpoint(self, endpoint_id: str):
         """Stop an endpoint by dropping it's active connections.
 
@@ -915,7 +941,7 @@ class Client:
         """
         return self._compute_web_client.v2.lock_endpoint(endpoint_id)
 
-    @requires_login
+    @_client_gares_handler
     def delete_endpoint(self, endpoint_id: str):
         """Delete an endpoint
 
@@ -931,7 +957,7 @@ class Client:
         """
         return self._compute_web_client.v2.delete_endpoint(endpoint_id)
 
-    @requires_login
+    @_client_gares_handler
     def delete_function(self, function_id: str):
         """Delete a function
 
@@ -947,7 +973,7 @@ class Client:
         """
         return self._compute_web_client.v2.delete_function(function_id)
 
-    @requires_login
+    @_client_gares_handler
     def get_worker_hardware_details(self, endpoint_id: UUID_LIKE_T) -> str:
         """
         Run a function to get hardware details. Returns a task ID; when that task is
