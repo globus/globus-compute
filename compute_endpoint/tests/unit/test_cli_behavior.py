@@ -33,7 +33,7 @@ from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.web_client import WebClient
-from globus_sdk import MISSING, AuthClient
+from globus_sdk import MISSING
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.cli."
@@ -65,8 +65,9 @@ def mock_app(mocker: MockFixture):
 
 
 @pytest.fixture
-def mock_auth_client(mocker: MockFixture):
+def mock_auth_client(mocker: MockFixture, mock_app):
     mock_auth_client = mock.Mock(spec=ComputeAuthClient)
+    mock_auth_client._app = mock_app
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient", return_value=mock_auth_client)
     return mock_auth_client
 
@@ -1018,6 +1019,7 @@ def test_configure_ep_auth_param_parse(
 def test_choose_auth_project(
     mocker,
     randomstring,
+    mock_auth_client: ComputeAuthClient,
 ):
     mock_user_input_select = mocker.patch(f"{_MOCK_BASE}user_input_select")
     mock_user_input_select.side_effect = lambda _p, o: random.choice(o)
@@ -1025,10 +1027,9 @@ def test_choose_auth_project(
     get_projects_response = [
         {"id": str(uuid.uuid4()), "display_name": randomstring()} for _ in range(5)
     ]
-    mock_ac = mocker.Mock(spec=AuthClient)
-    mock_ac.get_projects.return_value = get_projects_response
+    mock_auth_client.get_projects.return_value = get_projects_response
 
-    proj_id = create_or_choose_auth_project(mock_ac)
+    proj_id = create_or_choose_auth_project(mock_auth_client)
 
     assert uuid.UUID(proj_id)
     assert proj_id in [p["id"] for p in get_projects_response]
