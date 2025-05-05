@@ -29,6 +29,7 @@ from globus_compute_sdk.sdk.auth.globus_app import get_globus_app
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
+from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, GlobusApp, MissingType
 
@@ -816,7 +817,8 @@ def create_or_choose_auth_project(ac: AuthClient) -> str:
     Lets the user choose from one of their existing projects, or
     prompt for a description and creates one for them
     """
-    projects = ac.get_projects()
+    assert ac._app is not None  # mypy
+    projects = gare_handler(ac._app.login, ac.get_projects)
     if any(projects):
         proj_selected = user_input_select(
             (
@@ -862,7 +864,10 @@ def create_or_choose_auth_project(ac: AuthClient) -> str:
 
     try:
         print("Creating project...")
-        resp = ac.create_project(
+        assert ac._app is not None  # mypy
+        resp = gare_handler(
+            ac._app.login,
+            ac.create_project,
             display_name=display_name,
             contact_email=contact_email,
             admin_ids=admin_ids,
@@ -890,7 +895,10 @@ def create_auth_policy(
     the policy_id after creation
     """
     try:
-        resp = ac.create_policy(
+        assert ac._app is not None  # mypy
+        resp = gare_handler(
+            ac._app.login,
+            ac.create_policy,
             project_id=project_id,
             display_name=display_name,
             description=description,
