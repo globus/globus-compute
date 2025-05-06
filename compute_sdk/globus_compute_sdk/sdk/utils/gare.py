@@ -8,7 +8,7 @@ def gare_handler(app: GlobusApp, f: t.Callable, *args, **kwargs):
     try:
         return f(*args, **kwargs)
     except GlobusAPIError as e:
-        gares = to_gares([e.raw_json or {}])
+        gares = to_gares([e])
         if not gares:
             raise
 
