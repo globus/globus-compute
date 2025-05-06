@@ -27,8 +27,8 @@ software, users typically install it from `PyPI
 <https://pypi.org/project/globus-compute-endpoint/>`_.  We **strongly** recommend
 installing the Globus Compute endpoint into an isolated virtual environment (e.g.,
 `venv <https://docs.python.org/3/library/venv.html>`_, `virtualenv
-<https://pypi.org/project/virtualenv/>`_.  We
-recommend use of |pipx for library isolation|_:
+<https://pypi.org/project/virtualenv/>`_).  We recommend use of |pipx for library
+isolation|_:
 
 .. code-block:: console
 
