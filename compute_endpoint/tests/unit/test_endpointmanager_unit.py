@@ -4,11 +4,13 @@ import json
 import logging
 import os
 import pathlib
+import pickle
 import pwd
 import queue
 import random
 import re
 import resource
+import selectors
 import signal
 import sys
 import time
@@ -49,6 +51,7 @@ else:
         EndpointManager,
         InvalidUserError,
         MappedPosixIdentity,
+        UserEndpointRecord,
     )
 
 
@@ -267,6 +270,7 @@ def epmanager_as_root(
     mock_os.pipe.return_value = 40, 41
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
+    mock_os.memfd_create.return_value = random.randint(50, 10000)
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = (
@@ -295,8 +299,8 @@ def epmanager_as_root(
     mock_auth_client.userinfo.return_value = {"identity_set": [{"sub": ident}]}
 
     em = EndpointManager(conf_dir, ep_uuid, mock_conf_root)
-    em._command = mock.Mock(spec=CommandQueueSubscriber)
-    em._heartbeat_publisher = mock.Mock(spec=ResultPublisher)
+    em._command = mock.Mock(spec=CommandQueueSubscriber, queue_info={})
+    em._heartbeat_publisher = mock.Mock(spec=ResultPublisher, queue_info={})
 
     yield conf_dir, mock_conf_root, mock_client, mock_os, mock_pwd, em
     if em.identity_mapper:
@@ -2543,3 +2547,143 @@ def test_do_auth_change_uid_then_close(
 
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
     assert pamh.pam_close_session.called
+
+
+def test_restart_signal(successful_exec_from_mocked_root, reset_signals):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    em.hot_restart = mock.Mock(side_effect=MemoryError)
+    em._install_signal_handlers()
+    assert not em._restart, "Verify test setup"
+    os.kill(os.getpid(), signal.SIGHUP)
+
+    with pytest.raises(MemoryError):
+        em._event_loop()
+
+    assert em._restart, "Ensure class state, but main thing is .hot_restart() invoked"
+
+
+def test_restart_restarts(successful_exec_from_mocked_root, randomstring):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    canary = randomstring()
+    mock_os.environ = {"canary": canary}
+
+    em.hot_restart()
+
+    assert mock_os.execvpe.called, "Basic correctness"
+    a, k = mock_os.execvpe.call_args
+    exp_args = [sys.executable, *sys.argv]
+    assert (exp_args[0],) == a, "Expect repeat of initial args"
+    assert k["args"] == exp_args, "Expect repeat of initial args"
+    assert k["env"]["canary"] == canary, "Expect to relay environment variables"
+
+
+def test_restart_conveys_state(successful_exec_from_mocked_root, randomstring):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    em._audit_pipes[123] = {"pid": random.randint(1, 1000000)}
+    em._children[123] = UserEndpointRecord(ep_name="abc", arguments="some_args")
+    em._cached_cmd_start_args[123] = randomstring()
+    em._command.queue_info = {"canary": randomstring()}
+    em._heartbeat_publisher.queue_info = {"canary": randomstring()}
+    em.hot_restart()
+
+    assert mock_os.execvpe.called, "Basic correctness"
+    assert mock_os.write.call_count == 2, "Verify test setup, expected writes"
+
+    pipe_r, pipe_w = mock_os.pipe.return_value
+    (stdin_fd, stdin_bytes), _ = mock_os.write.call_args_list[0]
+    (mem_fd, conveyed), _ = mock_os.write.call_args_list[1]
+
+    assert stdin_fd == pipe_w, "Expect write to new proc stdin"
+    mock_os.dup2.assert_called_with(pipe_r, 0), "Expect write to new proc stdin"
+    stdin = json.loads(stdin_bytes)
+    creds = stdin.get("amqp_creds")
+    assert creds, "Expect reconnection credentials; no need to relogin"
+    assert creds["endpoint_id"] == em._endpoint_uuid_str
+    assert creds["command_queue_info"] == em._command.queue_info
+    assert creds["heartbeat_queue_info"] == em._heartbeat_publisher.queue_info
+    assert stdin.get("restart_fd") == mem_fd, "Hot restarted requires a state file"
+
+    assert mem_fd == mock_os.memfd_create.return_value, "Should write *anonymous* file"
+
+    state = pickle.loads(conveyed)
+    assert state["_audit_pipes"] == em._audit_pipes
+    assert state["_children"] == em._children
+    assert state["_cached_cmd_start_args"] == em._cached_cmd_start_args
+
+
+def test_restart_repopulates_state(successful_exec_from_mocked_root, randomstring):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    canary = randomstring()
+    audit_pipes = {123: {"pid": random.randint(1, 1000000)}}
+    children = {123: UserEndpointRecord(ep_name="abc", arguments="some_args")}
+    cached_args = {123: randomstring()}
+    em._audit_selector = mock.Mock(spec=selectors.DefaultSelector)
+    em._audit_pipes = audit_pipes
+    em._children = children
+    em._cached_cmd_start_args = cached_args
+
+    em.hot_restart()
+    em._audit_pipes = {10000: canary}
+    em._children = {10000: canary}
+    em._cached_cmd_start_args = {10000: canary}
+
+    (mem_fd, conveyed), _ = mock_os.write.call_args_list[1]
+    mem_f = io.BytesIO(conveyed)
+    mem_f.seek(0)
+    mock_os.fdopen.return_value = mem_f
+
+    em._finish_hot_restart(mem_fd)
+    mock_os.fdopen.assert_called_with(mem_fd, "rb"), "Expect passed fd opened"
+    assert em._audit_pipes[10000] == canary, "Expect updated, not overwritten"
+    assert em._children[10000] == canary, "Expect updated, not overwritten"
+    assert em._cached_cmd_start_args[10000] == canary, "Expect updated, not overwritten"
+    del em._audit_pipes[10000], em._children[10000], em._cached_cmd_start_args[10000]
+
+    assert em._audit_pipes == audit_pipes
+    assert em._children == children
+    assert em._cached_cmd_start_args == cached_args
+
+    all_args = {
+        fd: (evt, cb) for (fd, evt, cb), _ in em._audit_selector.register.call_args_list
+    }
+
+    exp_args = (selectors.EVENT_READ, em._audit_log_write)
+    for audit_fd in em._audit_pipes:
+        assert all_args[audit_fd] == exp_args, "Expect reregistration of audit pipes"
+
+
+def test_restart_audit_pipes_protected(successful_exec_from_mocked_root):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    em._audit_pipes[123] = {"pid": 1235}
+    em._audit_log_lock = mock.MagicMock()
+
+    def lock_test(*a, **k):
+        assert em._audit_log_lock.__enter__.called
+        assert not em._audit_log_lock.__exit__.called, "Expect locked at during call"
+        return b"some audit bytes"
+
+    mock_os.execvpe.side_effect = lock_test
+    em.hot_restart()
+    assert em._audit_log_lock.__enter__.called, "Verify test setup"
+
+    mock_os.read.side_effect = lock_test
+    em._audit_log_lock.reset_mock()
+    em._audit_log_write(123, mock.Mock())
+    assert em._audit_log_lock.__enter__.called, "Verify test setup"
+
+
+def test_restart_logs(successful_exec_from_mocked_root, mock_log):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    em.hot_restart()
+
+    i_logs = "\n".join(f"{a}" for (a,), k in mock_log.info.call_args_list)
+
+    assert "hot hot_restart requested" in i_logs, "Expect initial signal acknowledged"
+    assert ".......... Manager hot restarting" in i_logs, "Expect last message"
+    assert " (task processors: 0)" in i_logs, "Expect friendly count for admin"

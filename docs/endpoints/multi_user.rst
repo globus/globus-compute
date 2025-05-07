@@ -613,8 +613,8 @@ Running the MEP
 
 The MEP starts in the exact same way as a regular endpoint |nbsp| --- |nbsp| with the
 ``start`` subcommand.  However, the MEP has no notion of the ``detach_endpoint``
-configuration item.  Once started, the MEP stays attached to the console, with a timer
-that updates every second:
+configuration item.  Once started, the MEP stays in the foreground, with a timer that
+updates every second:
 
 .. code-block:: text
 
@@ -622,15 +622,95 @@ that updates every second:
         >>> Multi-User Endpoint ID: [endpoint_uuid] <<<
     ----> Fri Apr 19 11:56:27 2024
 
-The timer is only displayed if the process is connected to the terminal, and is intended
+The timer is only displayed if the process is connected to a terminal, and is intended
 as a hint to the administrator that the MEP process is running, even if no start UEP
 requests are yet incoming.
 
 And |hellip| that's it.  The Multi-user endpoint is running, waiting for start UEP
 requests to come in.  (But see :ref:`mep-as-a-service` for automatic starting.)
 
-To stop the MEP, type ``Ctrl+\`` (SIGQUIT) or ``Ctrl+C`` (SIGINT).  Alternatively, the
-process also responds to SIGTERM.
+To stop the MEP, type ``Ctrl+\`` (``SIGQUIT``) or ``Ctrl+C`` (``SIGINT``).
+Alternatively, the process also responds to ``SIGTERM``.
+
+.. _process-tree-invariant:
+
+Process Tree Invariant
+----------------------
+
+When a user submits a task to a MEP, the web-service will (after all requisite
+verification and validation) send the MEP a "start UEP" message.  After similar
+verification on-site (e.g., mapping to a local POSIX user), the MEP will fork a new
+process to become the UEP.  This sets up a parent-child relationship that the UEP treats
+as invariant; if the MEP process shuts down (intentionally or otherwise), then the UEP
+will do the same.  It is strictly disallowed for a UEP to exist without its MEP parent
+process.  This fact ensures that there will not be any rogue ("orphaned") UEPs allowed
+to persist if the parent MEP goes away, and enables a single "point of entry" when
+looking for UEP processes.  In addition to the `web console`_, administrators can also
+instrospect what UEPs are active with the usual Unix tools:
+
+.. _web console: https://app.globus.org/console/compute
+
+.. code-block:: console
+   :caption: Example avenues to show MEP process hierarchy and active user processes
+
+   $ htop -t  # threaded view; use arrow keys or pgdn/up to navigate
+      [... interaction omitted ...]
+
+   $ pstree -sp 1894794  # from psmisc package
+      [... output omitted ...]
+
+   $ ps -eF --forest | perl -ne'if (/(\| +\| +)\\_ Globus Compute Endpoint \*/) { $pre = $1; $pre =~ s/\|/\\|/g; print; while (<>) { last if !/$pre/; print}}'
+   UID        PID   PPID  [...]      TIME  CMD  [----- # PS HEADER ADDED FOR EXAMPLE CLARITY -----]
+
+   root      1247    367  [...]  00:00:00  |   |               \_ Globus Compute Endpoint *(d9ff80b0-..., mu [...]
+   tory     34788   1247  [...]  00:00:01  |   |                   \_ Globus Compute Endpoint (d41ad71c-ff09-0969-81ac-dc841fe4234c, uep.d9ff80b0-...d41ad71c-...) [...]
+   tory     34792  34788  [...]  00:00:00  |   |                       \_ .../python3.11 -c from multiprocessing.resource_tracker import main;main(6)
+   tory     34796  34788  [...]  00:00:00  |   |                       \_ parsl: monitoring zmq router
+   tory     34799  34788  [...]  00:00:01  |   |                       \_ parsl: HTEX interchange
+   rmjuli   46111  11177  [...]  00:00:21  |   |   \_ Globus Compute Endpoint *(e3e05ce9-..., personal_mu) [...]
+   rmjuli   46992  46111  [...]  00:00:01  |   |       \_ Globus Compute Endpoint (3c1aa57a-907c-9c41-56e5-5a5ba65c1d21, uep.e3e05ce9-...3c1aa57a-...) [...]
+   rmjuli   47038  46992  [...]  00:00:00  |   |           \_ .../python3.11 -c from multiprocessing.resource_tracker import main;main(6)
+   rmjuli   47046  46992  [...]  00:00:00  |   |           \_ parsl: monitoring zmq router
+   rmjuli   47064  46992  [...]  00:00:01  |   |           \_ parsl: HTEX interchange
+
+In this example, the ``root`` user is running a MEP (``d9ff80b0``, pid ``1247``) that has spawned a
+UEP for the local POSIX user ``tory`` (``d41ad71c``, pid ``34788``).  Meanwhile, user ``rmjuli`` is
+running a personal MEP (``e3e05ce9``, pid ``46111``) and has also started a single UEP instance.
+
+
+.. _hot-restart:
+
+Hot Restarting
+--------------
+
+If a MEP requires a configuration change but the administrator does not want to
+interrupt any active UEPs, the MEP can be hot-restarted.  Due to the :ref:`process tree
+invariant <process-tree-invariant>` this scenario requires hot-restarting, as the more
+naive ``restart`` operation will completely stop the MEP (and any related UEPs) before
+starting it up again.  By contrast, a hot-restart differs from a naive restart by
+``exec()``-ing the MEP process in-place.  The new MEP instance will restart with the
+same PID and open file descriptors, and, after setting up afresh (including rereading
+the configuration), resume watching the child processes and waiting for UEP start
+requests.  Crucially, from the perspective of the child UEPs, it will appear as if
+nothing has happened.
+
+To initiate a hot-restart, send the MEP process the Unix signal ``SIGHUP``:
+
+.. code-block:: console
+   :caption: Hot restarting a MEP with ``SIGHUP``
+
+   # kill -SIGHUP <the_mep_pid>
+
+At this time, ``SIGHUP`` is the only avenue to hot-restart a MEP.
+
+.. tip::
+
+   A hot-restart is not required for changes to the identity-mapping configuration or
+   to the user configuration template.  The identity-mapping configuration automatically
+   and atomically (no change is loaded if the new configuration is invalid) updates when
+   changes are detected.  Similarly, the user configuration template is reloaded afresh
+   by every UEP at startup.
+
 
 Checking the Logs
 -----------------
