@@ -4,6 +4,8 @@ import inspect
 import io
 import json
 import sys
+import threading
+import time
 import types
 import uuid
 from unittest import mock
@@ -38,28 +40,29 @@ fnmetadata = FunctionRegistrationMetadata(
     serde_identifier="01",  # serializer default, which is currently DillCode
 )
 
-known_gare_wrapped = {
-    gc.Client.get_task,
-    gc.Client.get_batch_result,
-    gc.Client.batch_run,
-    gc.Client.register_endpoint,
-    gc.Client.get_result_amqp_url,
-    gc.Client.get_containers,
-    gc.Client.get_container,
-    gc.Client.get_endpoint_status,
-    gc.Client.get_endpoint_metadata,
-    gc.Client.get_endpoints,
-    gc.Client.register_function,
-    gc.Client.get_function,
-    gc.Client.register_container,
-    gc.Client.build_container,
-    gc.Client.get_container_build_status,
-    gc.Client.get_allowed_functions,
-    gc.Client.stop_endpoint,
-    gc.Client.delete_endpoint,
-    gc.Client.delete_function,
-    gc.Client.get_worker_hardware_details,
+client_api_reqs = {
+    gc.Client.get_allowed_functions: ("some ep id",),
+    gc.Client.get_batch_result: (["some", "task", "id", "list"],),
+    gc.Client.get_container: ("some container id", "some container type"),
+    gc.Client.get_container_build_status: ("some container id",),
+    gc.Client.get_endpoint_metadata: ("some ep id",),
+    gc.Client.get_endpoint_status: ("some ep id",),
+    gc.Client.get_endpoints: (),
+    gc.Client.get_function: ("some fn id",),
+    gc.Client.get_result_amqp_url: (),
+    gc.Client.get_task: ("some task id",),
+    # non-GETs: ---
+    gc.Client.batch_run: ("some ep id", mock.Mock(name="some batch")),
+    gc.Client.build_container: (ContainerSpec(),),
+    gc.Client.delete_endpoint: ("some ep id",),
+    gc.Client.delete_function: ("some func id",),
+    gc.Client.get_containers: ("some name",),
+    gc.Client.register_endpoint: ("ep name", None),
+    gc.Client.register_function: (lambda: "some function",),
+    gc.Client.register_container: ("some loc", "some container type"),
+    gc.Client.stop_endpoint: ("some ep id",),
 }
+known_gare_wrapped = set(client_api_reqs)
 
 
 @pytest.fixture(autouse=True)
@@ -956,3 +959,47 @@ def test_gare_no_login_available(gare, gcc):
             get_task_method(gcc, "some task id")
     assert gare.errors[0].code in str(pyt_e.value), "Verify test setup"
     assert mock_get.call_count == 1, "Expect to try it, despite not login available"
+
+
+@pytest.mark.parametrize("func1,args1", client_api_reqs.items())
+@pytest.mark.parametrize("func2,args2", client_api_reqs.items())
+def test_client_requests_serialized(mocker, gare, func1, args1, func2, args2):
+    test_lock = threading.Lock()
+    may_proceed = threading.Event()
+    concurrent_calls = 0
+
+    def _long_request(*a, **k):
+        # this function is nominally "the server responding", so should be inside
+        # the client's request lock
+        nonlocal concurrent_calls
+        may_proceed.wait()
+        with test_lock:
+            concurrent_calls += 1
+        assert concurrent_calls == 1, "If 2, then an API request not guarded"
+        time.sleep(0.0001)  # take some time, give other thread chance to run
+        assert concurrent_calls == 1, "If 2, then an API request not guarded"
+        with test_lock:
+            concurrent_calls -= 1
+
+        raise gare  # for test simplicity; point is threading, not response
+
+    c = gc.Client(do_version_check=False)
+    c.app.login = mock.Mock(spec=c.app.login)
+    mocker.patch.object(c._compute_web_client.v2, "get", side_effect=_long_request)
+    mocker.patch.object(c._compute_web_client.v2, "post", side_effect=_long_request)
+    mocker.patch.object(c._compute_web_client.v2, "delete", side_effect=_long_request)
+    mocker.patch.object(c._compute_web_client.v3, "get", side_effect=_long_request)
+    mocker.patch.object(c._compute_web_client.v3, "post", side_effect=_long_request)
+    mocker.patch.object(c._compute_web_client.v3, "delete", side_effect=_long_request)
+
+    def _other_thread(f, *a, **k):
+        may_proceed.set()  # basal attempt to have concurrent threads
+        with pytest.raises(GlobusAPIError):
+            f(*a, **k)
+
+    t = threading.Thread(target=_other_thread, args=(func2, c, *args2))
+    t.start()
+
+    with pytest.raises(GlobusAPIError):
+        func1(c, *args1)
+    t.join()
