@@ -4,6 +4,7 @@ import functools
 import json
 import logging
 import sys
+import threading
 import typing as t
 import warnings
 
@@ -161,6 +162,7 @@ class Client:
         self._login_manager: LoginManagerProtocol | None = None
         self._web_client: WebClient | None = None
         self._auth_client: globus_sdk.AuthClient | None = None
+        self._request_lock = threading.Lock()
 
         if sum(bool(x) for x in (app, authorizer, login_manager)) > 1:
             raise ValueError(
@@ -254,7 +256,8 @@ class Client:
 
         Raises a VersionMismatch error on failure.
         """
-        data = self._compute_web_client.v2.get_version(service="all")
+        with self._request_lock:
+            data = self._compute_web_client.v2.get_version(service="all")
 
         min_ep_version = data["min_ep_version"]
         min_sdk_version = data["min_sdk_version"]
@@ -369,8 +372,9 @@ class Client:
         if task.get("pending", True) is False:
             return task
 
-        r = self._compute_web_client.v2.get_task(task_id)
-        logger.debug(f"Response string : {r}")
+        with self._request_lock:
+            r = self._compute_web_client.v2.get_task(task_id)
+        logger.debug("Response string: %s", r)
         return self._update_task_table(r.text, tid)
 
     def get_result(self, task_id: UUID_LIKE_T):
@@ -446,8 +450,9 @@ class Client:
         results = {tid: tst[tid] for tid in result_ids}
 
         if pending_task_ids:
-            r = self._compute_web_client.v2.get_task_batch(pending_task_ids)
-            logger.debug(f"Response string : {r}")
+            with self._request_lock:
+                r = self._compute_web_client.v2.get_task_batch(pending_task_ids)
+            logger.debug("Response string: %s", r)
 
             statuses = r["results"]
             for task_id in pending_task_ids:
@@ -568,7 +573,8 @@ class Client:
             raise ValueError("No tasks specified for batch run")
 
         # Send the data to Globus Compute
-        return self._compute_web_client.v3.submit(endpoint_id, batch.prepare()).data
+        with self._request_lock:
+            return self._compute_web_client.v3.submit(endpoint_id, batch.prepare()).data
 
     @_client_gares_handler
     def register_endpoint(
@@ -636,17 +642,18 @@ class Client:
         if high_assurance is not None:
             data["high_assurance"] = high_assurance
 
-        if endpoint_id:
-            r = self._compute_web_client.v3.update_endpoint(endpoint_id, data)
-        else:
-            r = self._compute_web_client.v3.register_endpoint(data)
+        with self._request_lock:
+            if endpoint_id:
+                r = self._compute_web_client.v3.update_endpoint(endpoint_id, data)
+            else:
+                r = self._compute_web_client.v3.register_endpoint(data)
 
         return r.data
 
     @_client_gares_handler
     def get_result_amqp_url(self) -> dict[str, str]:
-        r = self._compute_web_client.v2.get_result_amqp_url()
-        return r.data
+        with self._request_lock:
+            return self._compute_web_client.v2.get_result_amqp_url().data
 
     @_client_gares_handler
     def get_containers(self, name, description=None):
@@ -667,7 +674,8 @@ class Client:
             The port to connect to and a list of containers
         """
         data = {"endpoint_name": name, "description": description}
-        r = self._compute_web_client.v2.post("/v2/get_containers", data=data)
+        with self._request_lock:
+            r = self._compute_web_client.v2.post("/v2/get_containers", data=data)
         return r.data["endpoint_uuid"], r.data["endpoint_containers"]
 
     @_client_gares_handler
@@ -689,9 +697,10 @@ class Client:
         """
         self.version_check()
 
-        r = self._compute_web_client.v2.get(
-            f"/v2/containers/{container_uuid}/{container_type}"
-        )
+        with self._request_lock:
+            r = self._compute_web_client.v2.get(
+                f"/v2/containers/{container_uuid}/{container_type}"
+            )
         return r.data["container"]
 
     @_client_gares_handler
@@ -708,8 +717,8 @@ class Client:
         dict
             The details of the endpoint's stats
         """
-        r = self._compute_web_client.v2.get_endpoint_status(endpoint_uuid)
-        return r.data
+        with self._request_lock:
+            return self._compute_web_client.v2.get_endpoint_status(endpoint_uuid).data
 
     @_client_gares_handler
     def get_endpoint_metadata(self, endpoint_uuid):
@@ -727,8 +736,8 @@ class Client:
             configuration values. If there were any issues deserializing this data, may
             also include an "errors" key.
         """
-        r = self._compute_web_client.v2.get_endpoint(endpoint_uuid)
-        return r.data
+        with self._request_lock:
+            return self._compute_web_client.v2.get_endpoint(endpoint_uuid).data
 
     @_client_gares_handler
     def get_endpoints(self):
@@ -739,8 +748,8 @@ class Client:
         list
             A list of dictionaries which contain endpoint info
         """
-        r = self._compute_web_client.v2.get_endpoints()
-        return r.data
+        with self._request_lock:
+            return self._compute_web_client.v2.get_endpoints().data
 
     @_client_gares_handler
     def register_function(
@@ -813,7 +822,9 @@ class Client:
         )
         logger.info("Registering function: %s", data.function_name)
         logger.debug("Function data: %s", data)
-        r = self._compute_web_client.v3.register_function(data.to_dict())
+
+        with self._request_lock:
+            r = self._compute_web_client.v3.register_function(data.to_dict())
         return r.data["function_uuid"]
 
     @_client_gares_handler
@@ -831,8 +842,8 @@ class Client:
             Information about the registered function, such as name, description,
             serialized source code, python version, etc.
         """
-        r = self._compute_web_client.v2.get_function(function_id)
-        return r.data
+        with self._request_lock:
+            return self._compute_web_client.v2.get_function(function_id).data
 
     @_client_gares_handler
     def register_container(self, location, container_type, name="", description=""):
@@ -862,7 +873,8 @@ class Client:
             "type": container_type,
         }
 
-        r = self._compute_web_client.v2.post("/v2/containers", data=payload)
+        with self._request_lock:
+            r = self._compute_web_client.v2.post("/v2/containers", data=payload)
         return r.data["container_id"]
 
     @_client_gares_handler
@@ -891,14 +903,16 @@ class Client:
         ContainerBuildForbidden
             User is not in the globus group that protects the build
         """
-        r = self._compute_web_client.v2.post(
-            "/v2/containers/build", data=container_spec.to_json()
-        )
+        with self._request_lock:
+            r = self._compute_web_client.v2.post(
+                "/v2/containers/build", data=container_spec.to_json()
+            )
         return r.data["container_id"]
 
     @_client_gares_handler
     def get_container_build_status(self, container_id):
-        r = self._compute_web_client.v2.get(f"/v2/containers/build/{container_id}")
+        with self._request_lock:
+            r = self._compute_web_client.v2.get(f"/v2/containers/build/{container_id}")
         if r.http_status == 200:
             return r["status"]
         elif r.http_status == 404:
@@ -923,7 +937,8 @@ class Client:
         json
             The response of the request
         """
-        return self._compute_web_client.v3.get_endpoint_allowlist(endpoint_id).data
+        with self._request_lock:
+            return self._compute_web_client.v3.get_endpoint_allowlist(endpoint_id).data
 
     @_client_gares_handler
     def stop_endpoint(self, endpoint_id: str):
@@ -939,7 +954,8 @@ class Client:
         json
             The response of the request
         """
-        return self._compute_web_client.v2.lock_endpoint(endpoint_id)
+        with self._request_lock:
+            return self._compute_web_client.v2.lock_endpoint(endpoint_id)
 
     @_client_gares_handler
     def delete_endpoint(self, endpoint_id: str):
@@ -955,7 +971,8 @@ class Client:
         json
             The response of the request
         """
-        return self._compute_web_client.v2.delete_endpoint(endpoint_id)
+        with self._request_lock:
+            return self._compute_web_client.v2.delete_endpoint(endpoint_id)
 
     @_client_gares_handler
     def delete_function(self, function_id: str):
@@ -971,9 +988,9 @@ class Client:
         json
             The response of the request
         """
-        return self._compute_web_client.v2.delete_function(function_id)
+        with self._request_lock:
+            return self._compute_web_client.v2.delete_function(function_id)
 
-    @_client_gares_handler
     def get_worker_hardware_details(self, endpoint_id: UUID_LIKE_T) -> str:
         """
         Run a function to get hardware details. Returns a task ID; when that task is
