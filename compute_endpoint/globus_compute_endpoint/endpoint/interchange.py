@@ -644,20 +644,29 @@ class EndpointInterchange:
                         idle_proc_title.format(shutdown_s, live_proc_title)
                     )
 
+        log.debug("loop exit 1")
         self.pending_task_queue.put(None)
+        log.debug("loop exit 2")
         task_processor_thread.join()
+        log.debug("loop exit 3")
         stored_processor_thread.join()
+        log.debug("loop exit 4")
 
         # let higher-level error handling take over if the following excepts
         try:
+            log.debug("loop exit 5")
             heartbeat(active=False).result(timeout=5)
+            log.debug("loop exit 6")
         except concurrent.futures.TimeoutError:
             log.warning(
                 "Unable to send final heartbeat (timeout sending); ignoring for quiesce"
             )
 
+        log.debug("loop exit 7")
         task_q_subscriber.stop()
+        log.debug("loop exit 8")
         results_publisher.stop(block=False)
+        log.debug("loop exit 9")
         heartbeat_publisher.stop(block=False)
 
         log.debug("_main_loop exits")
