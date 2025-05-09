@@ -1,4 +1,0 @@
-New Functionality
-^^^^^^^^^^^^^^^^^
-
-- Added support for podman-hpc in :class:`~globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine` as a supported container type
