@@ -22,7 +22,7 @@ REQUIRES = [
     # provides easy daemonization of the endpoint
     "python-daemon>=2,<3",
     # CLI parsing
-    "click>=8,<9",
+    "click>=8,<8.2.0",
     "click-option-group>=0.5.6,<1",
     # disallow use of 22.3.0; the whl package on some platforms causes ZMQ issues
     #
