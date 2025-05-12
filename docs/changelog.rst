@@ -3,6 +3,24 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.7.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.7.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for podman-hpc in :class:`~globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine` as a supported container type
+
+Security
+^^^^^^^^
+
+- Apply JSON escaping to the values of the ``user_runtime`` Jinja variable
+  passed to the user endpoint configuration template. This matches our handling
+  of user-provided template variables and helps endpoint administrators prevent
+  YAML injection attacks.
+
 .. _changelog-3.6.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.6.0
