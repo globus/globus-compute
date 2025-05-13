@@ -63,6 +63,7 @@ class LauncherModel(BaseConfigModel):
 class ProviderModel(BaseConfigModel):
     type: str
     launcher: t.Optional[LauncherModel]
+    persistent_volumes: t.Optional[t.List[t.Tuple[str, str]]]  # KubernetesProvider
 
     _validate_type = _validate_import("type", parsl_providers)
     _validate_launcher = _validate_params("launcher")

@@ -1,0 +1,6 @@
+Bug Fixes
+^^^^^^^^^
+
+- Defining ``persistent_volumes`` when using the ``KubernetesProvider`` in an
+  endpoint configuration will no longer raise an error.
+
