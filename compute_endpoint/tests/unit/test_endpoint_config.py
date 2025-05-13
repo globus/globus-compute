@@ -12,7 +12,7 @@ from globus_compute_endpoint.endpoint.config import (
     UserEndpointConfig,
     UserEndpointConfigModel,
 )
-from globus_compute_endpoint.endpoint.config.model import EngineModel
+from globus_compute_endpoint.endpoint.config.model import EngineModel, ProviderModel
 from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config."
@@ -42,16 +42,16 @@ def mock_log():
 
 
 @pytest.mark.parametrize(
-    "data",
+    "field, expected_val",
     [
         ("worker_ports", (50000, 55000)),
         ("worker_port_range", (50000, 55000)),
         ("interchange_port_range", (50000, 55000)),
     ],
 )
-def test_config_model_tuple_conversions(config_dict: dict, data: t.Tuple[str, t.Tuple]):
-    field, expected_val = data
-
+def test_config_engine_model_tuple_conversions(
+    config_dict: dict, field: str, expected_val: t.Tuple
+):
     e_conf = config_dict["engine"]
     e_conf[field] = expected_val
     model = EngineModel(**e_conf)
@@ -68,6 +68,27 @@ def test_config_model_tuple_conversions(config_dict: dict, data: t.Tuple[str, t.
     e_str = str(pyt_e)
     assert field in e_str, "Verify test; are we testing what we think?"
     assert "not a valid tuple" in e_str, "Verify test; are we testing what we think?"
+
+
+def test_config_provider_persistent_volumes_conversion():
+    field = "persistent_volumes"
+    expected_val = [("pvc1", "/path/to/dir"), ("pvc2", "/path/to/dir2")]
+    p_conf = {"type": "KubernetesProvider", field: expected_val}
+
+    model = ProviderModel(**p_conf)
+    assert model.persistent_volumes == expected_val
+
+    p_conf[field] = [list(t) for t in expected_val]
+    model = ProviderModel(**p_conf)
+    assert model.persistent_volumes == expected_val
+
+    p_conf[field] = [t[0] for t in expected_val]
+    with pytest.raises(ValueError) as pyt_e:
+        ProviderModel(**p_conf)
+
+    p_str = str(pyt_e)
+    assert field in p_str, "Verify test; are we testing what we think?"
+    assert "not a valid tuple" in p_str, "Verify test; are we testing what we think?"
 
 
 def test_config_model_enforces_engine(config_dict):
