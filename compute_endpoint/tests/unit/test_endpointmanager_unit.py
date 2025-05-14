@@ -582,6 +582,7 @@ def test_sends_data_during_registration(
         "allowed_functions",
         "auth_policy",
         "subscription_id",
+        "admins",
         "public",
     }
     assert expected_keys == k.keys(), "Missing or unexpected keys; update this test?"

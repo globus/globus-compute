@@ -91,6 +91,7 @@ def test_start_endpoint_data_passthrough(fs):
     ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
     ep_conf.authentication_policy = str(uuid.uuid4())
     ep_conf.subscription_id = str(uuid.uuid4())
+    ep_conf.admins = [str(uuid.uuid4()), str(uuid.uuid4())]
     ep_conf.public = True
 
     with pytest.raises(SystemExit) as pyt_exc:
@@ -104,6 +105,8 @@ def test_start_endpoint_data_passthrough(fs):
     assert req_json["allowed_functions"][1] == str(ep_conf.allowed_functions[1])
     assert req_json["authentication_policy"] == str(ep_conf.authentication_policy)
     assert req_json["subscription_uuid"] == str(ep_conf.subscription_id)
+    assert len(req_json["admins"]) == 2
+    assert req_json["admins"][1] == str(ep_conf.admins[1])
 
 
 def test_stop_remote_endpoint(mocker):
