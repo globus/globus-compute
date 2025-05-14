@@ -1395,7 +1395,7 @@ def test_resultwatcher_blocks_until_tasks_done():
     mrw.start()
 
     res = Result(task_id=fut.task_id, data="abc123")
-    mrw._received_results[fut.task_id] = (None, res)
+    mrw._received_results[fut.task_id] = (mock.Mock(headers=None), res)
 
     mrw.shutdown(wait=False)
     try_assert(lambda: not mrw._time_to_stop, timeout_ms=1000)
@@ -1420,7 +1420,7 @@ def test_resultwatcher_checks_match_if_results():
     res = Result(task_id=fut.task_id, data="abc123")
 
     mrw = MockedResultWatcher()
-    mrw._received_results[fut.task_id] = (None, res)
+    mrw._received_results[fut.task_id] = (mock.Mock(headers=None), res)
 
     mrw.watch_for_task_results(MockedExecutor(), [fut])
     mrw.start()
@@ -1468,7 +1468,7 @@ def test_resultwatcher_match_sets_exception(randomstring):
 
     mrw = MockedResultWatcher()
     mrw.client.fx_serializer.deserialize = fxs.deserialize
-    mrw._received_results[fut.task_id] = (mock.Mock(timestamp=5), res)
+    mrw._received_results[fut.task_id] = (mock.Mock(timestamp=5, headers=None), res)
     mrw.watch_for_task_results(MockedExecutor(), [fut])
     mrw.start()
     mrw._event_watcher()
@@ -1486,7 +1486,7 @@ def test_resultwatcher_match_sets_result(randomstring):
 
     mrw = MockedResultWatcher()
     mrw.client.fx_serializer.deserialize = fxs.deserialize
-    mrw._received_results[fut.task_id] = (None, res)
+    mrw._received_results[fut.task_id] = (mock.Mock(headers=None), res)
     mrw.watch_for_task_results(MockedExecutor(), [fut])
     mrw.start()
     mrw._event_watcher()
@@ -1503,7 +1503,7 @@ def test_resultwatcher_match_handles_deserialization_error():
 
     mrw = MockedResultWatcher()
     mrw.client.fx_serializer.deserialize = fxs.deserialize
-    mrw._received_results[fut.task_id] = (None, res)
+    mrw._received_results[fut.task_id] = (mock.Mock(headers=None), res)
     mrw.watch_for_task_results(MockedExecutor(), [fut])
     mrw.start()
     mrw._event_watcher()
@@ -1522,7 +1522,7 @@ def test_resultwatcher_match_calls_log_version_mismatch(randomstring):
 
     mrw = MockedResultWatcher()
     mrw.client.fx_serializer.deserialize = fxs.deserialize
-    mrw._received_results[fut.task_id] = (None, res)
+    mrw._received_results[fut.task_id] = (mock.Mock(headers=None), res)
     mrw.watch_for_task_results(MockedExecutor(), [fut])
     mrw.start()
     mrw._event_watcher()
@@ -1656,3 +1656,63 @@ def test_result_queue_watcher_custom_port(mocker, gce: Executor):
     rw._connect()
 
     assert connect.call_args[0][0].port == custom_port_no
+
+
+def test_resultwatcher_loads_ha_results(randomstring):
+    payload = randomstring()
+    serde = ComputeSerializer()
+    fut = ComputeFuture(task_id=str(uuid.uuid4()))
+    err_details = ResultErrorDetails(code="1234", user_message="some_user_message")
+    res = Result(task_id=fut.task_id, error_details=err_details, data=payload)
+
+    task_result = {
+        "completion_t": 1234567890,
+        "status": "success",
+        "result": serde.serialize("yay!"),
+    }
+    tasks_status = {fut.task_id: task_result}
+    mock_response = mock.Mock(data={"results": tasks_status})
+
+    pheaders = {"high_assurance": True}
+    mrw = MockedResultWatcher()
+    mrw.client.fx_serializer.deserialize = serde.deserialize
+    mrw.client._compute_web_client.v2.get_task_batch.return_value = mock_response
+    mrw._received_results[fut.task_id] = (mock.Mock(headers=pheaders), res)
+    mrw.watch_for_task_results(MockedExecutor(), [fut])
+    mrw.start()
+    mrw._event_watcher()
+    mrw.shutdown()
+
+    assert mrw.client._compute_web_client.v2.get_task_batch.called, "Verify setup"
+    assert fut.done()
+    assert fut.result() == "yay!"
+
+
+def test_resultwatcher_warns_of_incomplete_ha_result(mock_log, randomstring):
+    payload = randomstring()
+    serde = ComputeSerializer()
+    fut = ComputeFuture(task_id=str(uuid.uuid4()))
+    err_details = ResultErrorDetails(code="1234", user_message="some_user_message")
+    res = Result(task_id=fut.task_id, error_details=err_details, data=payload)
+
+    task_result = {"pending": True}
+    tasks_status = {fut.task_id: task_result}
+    mock_response = mock.Mock(data={"results": tasks_status})
+
+    pheaders = {"high_assurance": True}
+    mrw = MockedResultWatcher()
+    mrw.client.fx_serializer.deserialize = serde.deserialize
+    mrw.client._compute_web_client.v2.get_task_batch.return_value = mock_response
+    mrw._received_results[fut.task_id] = (mock.Mock(headers=pheaders), res)
+    mrw.watch_for_task_results(MockedExecutor(), [fut])
+    mrw.start()
+    mrw._event_watcher()
+    mrw.shutdown()
+
+    assert mrw.client._compute_web_client.v2.get_task_batch.called, "Verify setup"
+    assert not fut.done()
+
+    assert mock_log.warning.called
+    (a,), _ = mock_log.warning.call_args
+    assert "but did not return results for" in a
+    assert fut.task_id in a
