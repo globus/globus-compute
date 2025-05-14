@@ -1,0 +1,18 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added support for specifying multiple Globus Auth identity IDs with administrative access
+  to an endpoint, in addition to the owner. This requires an active Globus subscription
+  (i.e., ``subscription_id``).
+
+  Example:
+
+  .. code-block:: yaml
+
+     multi_user: true
+     subscription_id: 600ba9ac-ef16-4387-30ad-60c6cc3a6853
+     admins:
+       # Peter Gibbons (software engineer)
+       - 10afcf74-b041-4439-8e0d-eab371767440
+       # Samir Nagheenanajar (sysadmin, HPC services)
+       - a6a7b9ee-be04-4e45-9832-d3737c2fafa2
