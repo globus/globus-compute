@@ -88,9 +88,10 @@ def test_start_endpoint_data_passthrough(fs):
     ep_conf = UserEndpointConfig(engine=mock.Mock())
     ep_dir = pathlib.Path("/some/path/some_endpoint_name")
     ep_dir.mkdir(parents=True, exist_ok=True)
-    ep_conf.allowed_functions = [str(uuid.uuid4()), str(uuid.uuid4())]
+    ep_conf.allowed_functions = [uuid.uuid4() for _ in range(random.randint(1, 10))]
     ep_conf.authentication_policy = str(uuid.uuid4())
     ep_conf.subscription_id = str(uuid.uuid4())
+    ep_conf.admins = [uuid.uuid4() for _ in range(random.randint(1, 10))]
     ep_conf.public = True
 
     with pytest.raises(SystemExit) as pyt_exc:
@@ -100,10 +101,12 @@ def test_start_endpoint_data_passthrough(fs):
     req = pyt_exc.value.__cause__._underlying_response.request
     req_json = json.loads(req.body)
 
-    assert len(req_json["allowed_functions"]) == 2
-    assert req_json["allowed_functions"][1] == str(ep_conf.allowed_functions[1])
+    assert len(req_json["allowed_functions"]) == len(ep_conf.allowed_functions)
+    assert req_json["allowed_functions"] == [str(f) for f in ep_conf.allowed_functions]
     assert req_json["authentication_policy"] == str(ep_conf.authentication_policy)
     assert req_json["subscription_uuid"] == str(ep_conf.subscription_id)
+    assert len(req_json["admins"]) == len(ep_conf.admins)
+    assert req_json["admins"] == [str(a) for a in ep_conf.admins]
 
 
 def test_stop_remote_endpoint(mocker):

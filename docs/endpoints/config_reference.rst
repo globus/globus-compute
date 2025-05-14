@@ -307,6 +307,26 @@ note are:
      multi_user: true
      public: true
 
+- ``admins``
+
+  A list of Globus Auth identity IDs that have administrative access to the endpoint,
+  in addition to the owner.
+
+  .. important::
+
+     This field requires an active Globus subscription (i.e., ``subscription_id``).
+
+  .. code-block:: yaml
+     :caption: ``config.yaml`` -- specifying endpoint administrators
+
+     multi_user: true
+     subscription_id: 600ba9ac-ef16-4387-30ad-60c6cc3a6853
+     admins:
+       # Peter Gibbons (software engineer)
+       - 10afcf74-b041-4439-8e0d-eab371767440
+       # Samir Nagheenanajar (sysadmin, HPC services)
+       - a6a7b9ee-be04-4e45-9832-d3737c2fafa2
+
 - ``display_name``
 
   If not specified, the endpoint will show up in the `Web UI`_ as the given local name.

@@ -221,6 +221,7 @@ class EndpointManager:
                     subscription_id=config.subscription_id,
                     public=config.public,
                     high_assurance=config.high_assurance,
+                    admins=config.admins,
                 )
 
                 # Mostly to appease mypy, but also a useful text if it ever

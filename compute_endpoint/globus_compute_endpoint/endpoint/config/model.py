@@ -111,6 +111,7 @@ class BaseEndpointConfigModel(BaseModel):
     multi_user: t.Optional[bool]
     display_name: t.Optional[str]
     allowed_functions: t.Optional[t.List[uuid.UUID]]
+    admins: t.Optional[t.List[uuid.UUID]]
     authentication_policy: t.Optional[uuid.UUID]
     subscription_id: t.Optional[uuid.UUID]
     amqp_port: t.Optional[int]
