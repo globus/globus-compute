@@ -120,7 +120,7 @@ def mock_result_watcher(mocker: MockerFixture):
 
 @pytest.fixture
 def gce(mock_result_watcher):
-    gc_executor = MockedExecutor()
+    gc_executor = MockedExecutor(batch_size=_chunk_size)
     gc_executor.endpoint_id = gc_executor.client.batch_run.return_value["endpoint_id"]
 
     yield gc_executor
@@ -700,6 +700,44 @@ def test_map_raises(gce):
         gce.map(noop)
 
 
+@pytest.mark.parametrize("num_tasks", (0, 1, 10))
+@pytest.mark.parametrize("complete", (True, False))
+@pytest.mark.parametrize("succeed", (True, False))
+@pytest.mark.parametrize("result", (None, 123))
+@pytest.mark.parametrize("exc", (None, "some test exc"))
+def test_load_tasks(mock_log, gce, num_tasks, complete, succeed, result, exc):
+    gcc = gce.client
+    gcc.fx_serializer = ComputeSerializer()
+
+    tasks = {str(uuid.uuid4()): {} for _ in range(num_tasks)}
+    task_futs = {tid: ComputeFuture() for tid in tasks}
+    for ts in tasks.values():
+        if complete:
+            ts["completion_t"] = 1700000000  # arbitrary date in past
+        if succeed:
+            ts["status"] = "success"
+        if result:
+            ts["result"] = gcc.fx_serializer.serialize(123)
+        if exc:
+            ts["exception"] = "Fool!  No success for you!"
+    mock_batch_result = mock.Mock(data={"results": tasks})
+    gcc._compute_web_client.v2.get_task_batch.return_value = mock_batch_result
+
+    pending = list(gce._load_tasks_status(task_futs, client=gcc))
+    if num_tasks:
+        if not complete:
+            assert not all(f.done() for f in task_futs.values())
+            assert len(pending) == len(task_futs)
+        else:
+            assert any(f.done() for f in task_futs.values())
+            assert not pending
+
+            if succeed and result:
+                assert all(f.result() == result for f in task_futs.values())
+            else:
+                assert all(f.exception() for f in task_futs.values())
+
+
 def test_reload_tasks_requires_task_group_id(gce):
     assert gce.task_group_id is None, "verify test setup"
     with pytest.raises(Exception) as e:
@@ -879,7 +917,7 @@ def test_reload_chunks_tasks_requested(mock_log, gce, num_tasks):
         dbgs = [
             a
             for a, _ in mock_log.debug.call_args_list
-            if a[0].startswith("Large task group")
+            if a[0].startswith("Loading large number of tasks")
         ]
         assert len(dbgs) == exp_num_chunks
         assert all(a[1] == num_tasks for a in dbgs)
