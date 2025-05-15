@@ -1545,14 +1545,20 @@ class _ResultWatcher(threading.Thread):
             if not self._open_futures:
                 self._open_futures_empty.set()
 
+        res_to_retrieve: dict[str, ComputeFuture] = {}
         for fut in futures_to_complete:
             props, res = self._received_results.pop(fut.task_id)
 
             self.client._log_version_mismatch(res.details)
-            if res.is_error:
+            if props.headers and props.headers.get("high_assurance"):
+                log.debug("Enqueuing result retrieval for HA task: %s", fut.task_id)
+                res_to_retrieve[fut.task_id] = fut
+
+            elif res.is_error:
                 fut.set_exception(
                     TaskExecutionFailed(res.data, str(props.timestamp or 0))
                 )
+
             else:
                 try:
                     fut.set_result(deserialize(res.data))
@@ -1566,6 +1572,22 @@ class _ResultWatcher(threading.Thread):
                     )
                     task_exc.__cause__ = exc
                     fut.set_exception(task_exc)
+
+        if res_to_retrieve:
+            # in HA setups, be kinder to web-service; increase min coalescing time
+            self.poll_period_s = max(4, self.poll_period_s)
+
+            pending = Executor._load_tasks_status(res_to_retrieve, client=self.client)
+            if pending:
+                # We don't expect this path ~ever, as should only get
+                # *completed* tasks per the web-service guarantee.  Nevertheless,
+                # account for the possibility of a mistake somewhere and at least log
+                # the situation
+                task_ids = "\n  ".join(str(f.task_id) for f in pending)
+                log.warning(
+                    "Service reported tasks completed but did not return results for"
+                    f" the following tasks:\n  {task_ids}"
+                )
 
     def _event_watcher(self):
         """
