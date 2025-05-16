@@ -656,29 +656,6 @@ class Client:
             return self._compute_web_client.v2.get_result_amqp_url().data
 
     @_client_gares_handler
-    def get_containers(self, name, description=None):
-        """
-        Register a DLHub endpoint with the Globus Compute service and get
-        the containers to launch.
-
-        Parameters
-        ----------
-        name : str
-            Name of the endpoint
-        description : str
-            Description of the endpoint
-
-        Returns
-        -------
-        int
-            The port to connect to and a list of containers
-        """
-        data = {"endpoint_name": name, "description": description}
-        with self._request_lock:
-            r = self._compute_web_client.v2.post("/v2/get_containers", data=data)
-        return r.data["endpoint_uuid"], r.data["endpoint_containers"]
-
-    @_client_gares_handler
     def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
 
