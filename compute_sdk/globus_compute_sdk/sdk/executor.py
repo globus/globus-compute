@@ -144,6 +144,7 @@ class Executor(concurrent.futures.Executor):
         """
         :param endpoint_id: id of the endpoint to which to submit tasks
         :param container_id: id of the container in which to execute tasks
+            DEPRECATED - Container functionality has moved to endpoint configuration.
         :param client: instance of Client to be used by the executor.  If not provided,
             the executor will instantiate one with default arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
@@ -171,7 +172,7 @@ class Executor(concurrent.futures.Executor):
         :param serializer: Used to serialize task args and kwargs.  If passed, and a
             Client is also passed, this takes precedence over the Client's serializer.
         """
-        deprecated_kwargs = {""}
+        deprecated_kwargs = {"container_id"}
         for key in kwargs:
             if key in deprecated_kwargs:
                 warnings.warn(
@@ -239,10 +240,9 @@ class Executor(concurrent.futures.Executor):
         name = self.__class__.__name__
         label = self.label and f"{self.label}; " or ""
         ep_id = self.endpoint_id and f"ep_id:{self.endpoint_id}; " or ""
-        c_id = self.container_id and f"c_id:{self.container_id}; " or ""
         tg_id = f"tg_id:{self.task_group_id}; "
         bs = f"bs:{self.batch_size}"
-        return f"{name}<{label}{ep_id}{c_id}{tg_id}{bs}>"
+        return f"{name}<{label}{ep_id}{tg_id}{bs}>"
 
     @property
     def endpoint_id(self):
@@ -414,6 +414,12 @@ class Executor(concurrent.futures.Executor):
 
         [default: ``None``]
         """
+        warnings.warn(
+            "The 'container_id' attribute is deprecated."
+            " Container functionality has moved to the endpoint configuration.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
         return self._container_id
 
     @container_id.setter
