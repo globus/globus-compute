@@ -56,7 +56,6 @@ client_api_reqs = {
     gc.Client.build_container: (ContainerSpec(),),
     gc.Client.delete_endpoint: ("some ep id",),
     gc.Client.delete_function: ("some func id",),
-    gc.Client.get_containers: ("some name",),
     gc.Client.register_endpoint: ("ep name", None),
     gc.Client.register_function: (lambda: "some function",),
     gc.Client.register_container: ("some loc", "some container type"),
