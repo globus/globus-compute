@@ -44,7 +44,6 @@ known_gare_wrapped = {
     gc.Client.batch_run,
     gc.Client.register_endpoint,
     gc.Client.get_result_amqp_url,
-    gc.Client.get_containers,
     gc.Client.get_container,
     gc.Client.get_endpoint_status,
     gc.Client.get_endpoint_metadata,
