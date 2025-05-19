@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 
 
 class ContainerSpec:
@@ -39,6 +40,13 @@ class ContainerSpec:
         payload_url : str
             GitHub repo or publicly readable zip file to copy into container
         """
+        warnings.warn(
+            "The 'ContainerSpec' class is deprecated."
+            " Container functionality has moved to the endpoint configuration.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+
         if not self.semver_regex.match(python_version):
             raise ValueError("Python version must be a valid semantic version")
 

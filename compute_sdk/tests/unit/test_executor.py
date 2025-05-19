@@ -523,6 +523,13 @@ def test_failed_registration_shuts_down_executor(gce, randomstring):
     assert "refusing to register function" in e_str
 
 
+def test_container_id_deprecated(gce: Executor):
+    gce.container_id = None
+    with pytest.warns(DeprecationWarning) as pyt_wrn:
+        gce.container_id = uuid.uuid4()
+    assert "'container_id' attribute is deprecated" in str(pyt_wrn[0].message)
+
+
 @pytest.mark.parametrize("container_id", (None, uuid.uuid4(), str(uuid.uuid4())))
 def test_container_id_as_id(gce, container_id):
     assert gce.container_id is None, "Default value is None"

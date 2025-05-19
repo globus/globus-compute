@@ -655,6 +655,14 @@ class Client:
         with self._request_lock:
             return self._compute_web_client.v2.get_result_amqp_url().data
 
+    def _raise_container_deprecation_warning(self, method_name: str):
+        warnings.warn(
+            f"The '{method_name}' method is deprecated."
+            " Container functionality has moved to the endpoint configuration.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+
     @_client_gares_handler
     def get_container(self, container_uuid, container_type):
         """Get the details of a container for staging it locally.
@@ -672,8 +680,7 @@ class Client:
         dict
             The details of the containers to deploy
         """
-        self.version_check()
-
+        self._raise_container_deprecation_warning("get_container")
         with self._request_lock:
             r = self._compute_web_client.v2.get(
                 f"/v2/containers/{container_uuid}/{container_type}"
@@ -752,6 +759,7 @@ class Client:
             DEPRECATED - functions' names are derived from their ``__name__`` attribute
         container_uuid : str
             Container UUID from registration with Globus Compute
+            DEPRECATED - Container functionality has moved to the endpoint configuration
         description : str
             Description of the function. If this is None, and the function has a
             docstring, that docstring is uploaded as the function's description instead;
@@ -843,6 +851,8 @@ class Client:
         str
             The id of the container
         """
+        self._raise_container_deprecation_warning("register_container")
+
         payload = {
             "name": name,
             "location": location,
@@ -880,6 +890,7 @@ class Client:
         ContainerBuildForbidden
             User is not in the globus group that protects the build
         """
+        self._raise_container_deprecation_warning("build_container")
         with self._request_lock:
             r = self._compute_web_client.v2.post(
                 "/v2/containers/build", data=container_spec.to_json()
@@ -888,6 +899,7 @@ class Client:
 
     @_client_gares_handler
     def get_container_build_status(self, container_id):
+        self._raise_container_deprecation_warning("get_container_build_status")
         with self._request_lock:
             r = self._compute_web_client.v2.get(f"/v2/containers/build/{container_id}")
         if r.http_status == 200:

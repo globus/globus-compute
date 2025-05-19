@@ -144,6 +144,7 @@ class Executor(concurrent.futures.Executor):
         """
         :param endpoint_id: id of the endpoint to which to submit tasks
         :param container_id: id of the container in which to execute tasks
+            DEPRECATED - Container functionality has moved to endpoint configuration.
         :param client: instance of Client to be used by the executor.  If not provided,
             the executor will instantiate one with default arguments.
         :param task_group_id: The Task Group to which to associate tasks.  If not set,
@@ -418,6 +419,13 @@ class Executor(concurrent.futures.Executor):
 
     @container_id.setter
     def container_id(self, c_id: UUID_LIKE_T | None):
+        if c_id:
+            warnings.warn(
+                "The 'container_id' attribute is deprecated."
+                " Container functionality has moved to the endpoint configuration.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
         self._container_id = as_optional_uuid(c_id)
 
     @property
