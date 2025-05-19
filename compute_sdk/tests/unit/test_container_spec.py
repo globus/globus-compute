@@ -2,6 +2,12 @@ import pytest as pytest
 from globus_compute_sdk.sdk.container_spec import ContainerSpec
 
 
+def test_container_spec_deprecated():
+    with pytest.warns(DeprecationWarning) as pyt_wrn:
+        ContainerSpec()
+    assert "'ContainerSpec' class is deprecated" in str(pyt_wrn[0].message)
+
+
 def test_constructor():
     container = ContainerSpec(python_version="3.8.10")
     assert not container.pip

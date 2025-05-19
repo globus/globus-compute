@@ -312,6 +312,28 @@ def test_batch_includes_user_runtime_info(gcc):
     }
 
 
+def test_get_container(gcc: gc.Client):
+    container_info = {"foo": "bar"}
+    gcc._compute_web_client.v2.get.return_value = mock.Mock(
+        data={"container": container_info}
+    )
+    with pytest.warns(DeprecationWarning) as pyt_wrn:
+        res = gcc.get_container("some-endpoint", "docker")
+    assert "'get_container' method is deprecated" in str(pyt_wrn[0].message)
+    assert res == container_info
+
+
+def test_register_container(gcc: gc.Client):
+    container_id = str(uuid.uuid4())
+    gcc._compute_web_client.v2.post.return_value = mock.Mock(
+        data={"container_id": container_id}
+    )
+    with pytest.warns(DeprecationWarning) as pyt_wrn:
+        res = gcc.register_container("some-endpoint", "docker")
+    assert "'register_container' method is deprecated" in str(pyt_wrn[0].message)
+    assert res == container_id
+
+
 def test_build_container(mocker, gcc, randomstring):
     expected_container_id = randomstring()
     mock_data = mocker.Mock(data={"container_id": expected_container_id})
@@ -323,7 +345,9 @@ def test_build_container(mocker, gcc, randomstring):
         payload_url="https://github.com/funcx-faas/funcx-container-service.git",
     )
 
-    container_id = gcc.build_container(spec)
+    with pytest.warns(DeprecationWarning) as pyt_wrn:
+        container_id = gcc.build_container(spec)
+    assert "'build_container' method is deprecated" in str(pyt_wrn[0].message)
 
     assert container_id == expected_container_id
     assert gcc._compute_web_client.v2.post.called
@@ -342,7 +366,13 @@ def test_container_build_status(gcc, randomstring):
             self.http_status = 200
 
     gcc._compute_web_client.v2.get.return_value = MockData()
-    status = gcc.get_container_build_status("123-434")
+
+    with pytest.warns(DeprecationWarning) as pyt_wrn:
+        status = gcc.get_container_build_status("123-434")
+    assert "'get_container_build_status' method is deprecated" in str(
+        pyt_wrn[0].message
+    )
+
     assert status == expected_status
 
 
