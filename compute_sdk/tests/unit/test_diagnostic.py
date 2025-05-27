@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import getpass
 import gzip
@@ -58,6 +60,7 @@ def mock_connection_tests(mocker):
 
 @pytest.fixture
 def mock_general_reports(mocker, mock_gc_home, mock_endpoint_config_dir_data):
+    mock_endpoint_config_dir_data(mock_gc_home)
     home_dir = str(mock_gc_home).strip()
     general_report = [
         [
@@ -110,32 +113,32 @@ def mock_connection_tests_only(mocker):
 
 
 @pytest.fixture
-def mock_endpoint_config_dir_data(randomstring, mock_gc_home, change_test_dir):
-    ep_names = ["diagnostic_ep1", "diagnostic_other_ep"]
+def mock_endpoint_config_dir_data(randomstring, mock_gc_home_other):
+    def _config_data_by_ep(base_dir: pathlib.Path, ep_names: list[str] | None = None):
+        config_random_data_by_file = {}
+        if ep_names is None:
+            ep_names = ["diagnostic_ep1", "diagnostic_other_ep"]
+        for ep_name in ep_names:
+            ep_dir_path = base_dir / ep_name
+            ep_dir_path.mkdir(exist_ok=True, parents=True)
+            conf_path = ep_dir_path / "config.yaml"
+            log_path = ep_dir_path / "endpoint.log"
+            conf_data = randomstring()
+            log_data_random_part = randomstring()
+            log_data_lines = [f"Fake logline #{i} for {ep_name}" for i in range(200)]
+            log_data_lines.append(log_data_random_part)
 
-    config_random_data_by_file = {}
+            with open(conf_path, "w") as f:
+                f.write(conf_data)
 
-    for ep_name in ep_names:
-        ep_dir_path = mock_gc_home / ep_name
-        ep_dir_path.mkdir(exist_ok=False)
+            with open(log_path, "w") as f:
+                f.write("\n".join(log_data_lines))
 
-        conf_path = ep_dir_path / "config.yaml"
-        log_path = ep_dir_path / "endpoint.log"
-        conf_data = randomstring()
-        log_data_random_part = randomstring()
-        log_data_lines = [f"Fake logline #{i} for {ep_name}" for i in range(200)]
-        log_data_lines.append(log_data_random_part)
+            config_random_data_by_file[conf_path] = conf_data
+            config_random_data_by_file[log_path] = log_data_random_part
+        return config_random_data_by_file
 
-        with open(conf_path, "w") as f:
-            f.write(conf_data)
-
-        with open(log_path, "w") as f:
-            f.write("\n".join(log_data_lines))
-
-        config_random_data_by_file[conf_path] = conf_data
-        config_random_data_by_file[log_path] = log_data_random_part
-
-    yield config_random_data_by_file
+    yield _config_data_by_ep
 
 
 @pytest.fixture
@@ -251,6 +254,7 @@ def test_diagnostic_simple(
     change_test_dir,
     capsys,
 ):
+    test_config = mock_endpoint_config_dir_data(mock_gc_home)
     do_diagnostic_base(DIAG_PRINT_ARGS + ["-k", "1"])
     captured = capsys.readouterr()
 
@@ -262,7 +266,7 @@ def test_diagnostic_simple(
         for title in title_parts:
             assert title in captured.out
 
-    for random_data in mock_endpoint_config_dir_data.values():
+    for random_data in test_config.values():
         assert random_data in captured.out
 
 
@@ -306,6 +310,7 @@ def test_diagnostic_gzip(
     mock_endpoint_config_dir_data,
     capsys,
 ):
+    test_config = mock_endpoint_config_dir_data(mock_gc_home)
     args = DIAG_ZIP_ARGS + ["-v"] if verbose else DIAG_ZIP_ARGS
     do_diagnostic_base(args)
     captured = capsys.readouterr()
@@ -335,7 +340,7 @@ def test_diagnostic_gzip(
     # Ends with line break
     assert not captured_stdout[-1]
 
-    for random_file_data in mock_endpoint_config_dir_data.values():
+    for random_file_data in test_config.values():
         assert random_file_data in contents
 
     assert contents.count("== Diagnostic:") == len(mock_all_reports)
@@ -346,7 +351,10 @@ def test_diagnostic_log_size_limit(
     mock_all_reports,
     mock_endpoint_config_dir_data,
     mock_gc_home,
+    mocker,
 ):
+    mocker.patch(f"{MOCK_DIAG_BASE}.Client")
+    test_config = mock_endpoint_config_dir_data(mock_gc_home)
     # Limit log file size to 2 KB, so the last 2KB changes but size is the same
     constant_diag_args = DIAG_ZIP_ARGS + ["--log-kb", "2"]
     do_diagnostic_base(constant_diag_args)
@@ -359,7 +367,7 @@ def test_diagnostic_log_size_limit(
 
     appended_to_log = False
     log_extra = "Some more log data blah blah 1 2 3"
-    for log_file in mock_endpoint_config_dir_data.keys():
+    for log_file in test_config.keys():
         if str(log_file).endswith(".log"):
             with open(log_file, "a") as f:
                 # Write more than a few words just to make sure
@@ -383,3 +391,65 @@ def test_diagnostic_log_size_limit(
     # Need a little fudge factor as appending '| ' to logs and line breaks
     # sometimes produce a few more/less chars
     assert abs(len(first_iteration_output) - len(second_iteration_output)) < 10
+
+
+@pytest.mark.parametrize(
+    ("compute_dir", "config_param", "expected_base", "valid_dir"),
+    (
+        (None, None, None, True),
+        (None, "config_dir_1", None, False),
+        (None, "config_dir_1", "config_dir_1", True),
+        ("config_dir_2", "level_1/config_dir_3", "level_1/config_dir_3", True),
+        ("config_dir_4", None, "config_dir_4", True),
+    ),
+)
+def test_diagnostic_base_dir_GC_HOME_or_config_param(
+    mock_gc_home,
+    mock_gc_home_other,
+    mock_all_reports,
+    mock_endpoint_config_dir_data,
+    mocker,
+    tmp_path,
+    randomstring,
+    compute_dir,
+    config_param,
+    expected_base,
+    valid_dir,
+    capsys,
+):
+    mocker.patch(f"{MOCK_DIAG_BASE}.Client")
+    mocker.patch(f"{MOCK_DIAG_BASE}.run_single_command")
+
+    ep_names = [randomstring(), randomstring()]
+
+    if compute_dir is None:
+        compute_dir = "home/gc_home"
+    base_dir_absolute = (tmp_path / compute_dir).absolute()
+    env = os.environ.copy()
+    env["GLOBUS_COMPUTE_USER_DIR"] = str(base_dir_absolute)
+    with mock.patch.dict(os.environ, env):
+        test_config = mock_endpoint_config_dir_data(base_dir_absolute, ep_names)
+        print(f"test_config base={test_config.values()}")
+        diag_args = ["-p"]
+        if config_param:
+            config_absolute = (tmp_path / config_param).absolute()
+            diag_args.extend(["--config-dir", str(config_absolute)])
+            if valid_dir:
+                test_config = mock_endpoint_config_dir_data(config_absolute, ep_names)
+                print(f"test_config from config_param={test_config.values()}")
+
+        if valid_dir:
+            do_diagnostic_base(diag_args)
+            output = capsys.readouterr().out
+            if valid_dir:
+                for random_value in test_config.values():
+                    if random_value not in output:
+                        print(f"{random_value} not in : \n{output}")
+                        pytest.fail()
+            else:
+                assert "is not a valid directory" in output
+        else:
+            with pytest.raises(SystemExit) as se:
+                do_diagnostic_base(diag_args)
+            assert se.type == SystemExit
+            assert se.value.code == 1
