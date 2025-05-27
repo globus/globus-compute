@@ -5,6 +5,7 @@ import glob
 import gzip
 import io
 import os
+from pathlib import Path
 import platform
 import shlex
 import shutil
@@ -269,13 +270,28 @@ def general_commands_list():
     ]
 
 
-def get_diagnostic_commands(log_bytes: int):
+def get_diagnostic_commands(log_bytes: int, home_dir: str | None = None):
 
     commands = filter_by_os(hardware_commands_list())
     commands.extend(general_commands_list())
     commands.extend(connection_tests())
 
     gc_home_dir = ensure_compute_dir()
+    if home_dir:
+        home_path = Path(home_dir)
+        if home_path.exists():
+            if home_path.is_dir():
+                gc_home_dir = home_path
+            else:
+                print_warning(
+                    f"Specified path '{home_path}' is not a directory, using "
+                    f"default {home_dir} instead"
+                )
+        else:
+            print_warning(
+                f"Specified path '{home_path}' does not exist, using default "
+                f"{home_dir} instead"
+            )
 
     # Run endpoint related diagnostics when it is installed
     ep_install_dir = print_endpoint_install_dir()
@@ -353,7 +369,11 @@ def run_single_command(cmd: str):
 
 
 def run_all_diags_wrapper(
-    print_only: bool, log_bytes: int, verbose: bool, ep_uuid: str | None = None
+    print_only: bool,
+    log_bytes: int,
+    verbose: bool,
+    ep_uuid: str | None = None,
+    home_dir: str | None = None,
 ):
     """
     This is the diagnostic wrapper that obtains the list of commands to be run
@@ -381,6 +401,7 @@ def run_all_diags_wrapper(
     :param ep_uuid:           # If specified, register a sample function and
                                 send a task that uses the function UUID to the
                                 endpoint to test end to end connectivity
+    :param home_dir:         The base directory to use when gathering config/logs
     """
 
     current_time = dt.now().astimezone(timezone.utc).strftime("%Y-%m-%d-%H-%M-%SZ")
@@ -388,7 +409,7 @@ def run_all_diags_wrapper(
 
     diagnostic_output = []
 
-    diag_cmds, ep_install_dir = get_diagnostic_commands(log_bytes)
+    diag_cmds, ep_install_dir = get_diagnostic_commands(log_bytes, home_dir)
 
     if ep_install_dir or ep_uuid:
         # If the Endpoint is installed we will be running ``whoami`` and ``list``
@@ -548,10 +569,25 @@ def do_diagnostic_base(diagnostic_args):
             "UUID is required."
         ),
     )
+    parser.add_argument(
+        "-d",
+        "--base_user_dir",
+        default=None,
+        type=str,
+        help=(
+            "Gather endpoint configuration and log info from the specified "
+            "parent directory instead of the default ~/.globus_compute or "
+            "what is set in GLOBUS_COMPUTE_USER_DIR"
+        ),
+    )
 
     args = parser.parse_args(diagnostic_args)
     run_all_diags_wrapper(
-        args.print_only, args.log_kb * 1024, args.verbose, args.endpoint_uuid
+        args.print_only,
+        args.log_kb * 1024,
+        args.verbose,
+        args.endpoint_uuid,
+        base_dir,
     )
 
 
