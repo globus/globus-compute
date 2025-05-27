@@ -383,3 +383,62 @@ def test_diagnostic_log_size_limit(
     # Need a little fudge factor as appending '| ' to logs and line breaks
     # sometimes produce a few more/less chars
     assert abs(len(first_iteration_output) - len(second_iteration_output)) < 10
+
+
+@pytest.mark.parametrize(
+    ("compute_dir", "config_param", "expected_base", "valid_dir"),
+    (
+        (None, None, None, True),
+        (None, "config_dir_1", None, False),
+        (None, "config_dir_1", "config_dir_1", True),
+        ("config_dir_2", "level_1/config_dir_3", "level_1/config_dir_3", True),
+        ("config_dir_4", None, "config_dir_4", True),
+    ),
+)
+def test_diagnostic_base_dir_GC_HOME_or_config_param(
+    mock_gc_home,
+    mock_all_reports,
+    mock_endpoint_config_dir_data,
+    mocker,
+    compute_dir,
+    config_param,
+    expected_base,
+    valid_dir,
+    capsys,
+):
+    mocker.patch(f"{MOCK_DIAG_BASE}.Client")
+    mocker.patch(f"{MOCK_DIAG_BASE}.run_single_command")
+
+    # the cat commands will be in the diagnostic headers if print is enabled
+    diag_args = ["-p"]
+
+    base_path = mock_gc_home
+    if expected_base:
+        if valid_dir:
+            # Make sure directory is present so there's files there to collate
+            (base_path / expected_base).mkdir(parents=True, exist_ok=True)
+    else:
+        expected_base = str(mock_gc_home.absolute())
+
+    if compute_dir:
+        if valid_dir:
+            # make GLOBUS_COMPUTE_USER_DIR absolute path based on GC_HOME
+            (mock_gc_home / compute_dir).mkdir(parents=True, exist_ok=True)
+
+    if config_param:
+        diag_args.extend(["--config-dir", config_param])
+
+    try:
+        if compute_dir:
+            env = os.environ.copy()
+            env["GLOBUS_COMPUTE_USER_DIR"] = compute_dir
+            with mock.patch.dict(os.environ, env):
+                do_diagnostic_base(diag_args)
+        else:
+            do_diagnostic_base(diag_args)
+
+        output = capsys.readouterr().out
+        assert expected_base in output, f"<{expected_base}> NOT in\n{output}"
+    except ValueError as e:
+        assert valid_dir is False
+        assert "not a valid directory" in str(e)
