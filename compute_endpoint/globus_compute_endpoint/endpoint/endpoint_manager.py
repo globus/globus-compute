@@ -34,7 +34,6 @@ from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_common.pydantic_v1 import BaseModel
 from globus_compute_endpoint import __version__
-from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
 from globus_compute_endpoint.endpoint.config.config import MINIMUM_HEARTBEAT
 from globus_compute_endpoint.endpoint.config.utils import (
@@ -56,6 +55,7 @@ from globus_compute_endpoint.endpoint.utils import (
     update_url_port,
 )
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
+from globus_compute_sdk.sdk.auth.globus_app import get_globus_app
 from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:
@@ -210,7 +210,7 @@ class EndpointManager:
                 gcc = GC.Client(
                     local_compute_services=config.local_compute_services,
                     environment=config.environment,
-                    app=get_globus_app_with_scopes(),
+                    app=get_globus_app(),
                 )
                 reg_info = gcc.register_endpoint(
                     name=conf_dir.name,
@@ -638,7 +638,7 @@ class EndpointManager:
             client_options = {
                 "local_compute_services": self._config.local_compute_services,
                 "environment": self._config.environment,
-                "app": get_globus_app_with_scopes(),
+                "app": get_globus_app(),
             }
             log.debug("Ascertaining user identity set (%s)", client_options)
 

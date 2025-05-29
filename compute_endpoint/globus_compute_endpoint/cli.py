@@ -11,7 +11,6 @@ import uuid
 import click
 from click import ClickException
 from click_option_group import optgroup
-from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
@@ -26,6 +25,7 @@ from globus_compute_endpoint.endpoint.utils import (
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
+from globus_compute_sdk.sdk.auth.globus_app import get_globus_app
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
@@ -409,7 +409,7 @@ def configure_endpoint(
             raise ClickException(
                 "MFA may only be enabled for High Assurance(HA) policies"
             )
-        app = get_globus_app_with_scopes()
+        app = get_globus_app()
         ac = ComputeAuthClient(app=app)
 
         if not auth_policy_project_id:
@@ -509,7 +509,7 @@ def logout_endpoints(force: bool):
     help="Also show identities linked to the currently logged-in primary identity.",
 )
 def whoami(linked_identities: bool) -> None:
-    app = get_globus_app_with_scopes()
+    app = get_globus_app()
     try:
         print_whoami_info(app, linked_identities)
     except ValueError as ve:
@@ -517,7 +517,7 @@ def whoami(linked_identities: bool) -> None:
 
 
 def _do_login(force: bool) -> None:
-    app = get_globus_app_with_scopes()
+    app = get_globus_app()
     if force or app.login_required():
         app.login(force=force)
     else:
@@ -537,7 +537,7 @@ def _do_logout_endpoints(force: bool) -> None:
             + "\nPlease use logout --force to proceed"
         )
     else:
-        app = get_globus_app_with_scopes()
+        app = get_globus_app()
         app.logout()
         log.info("Logout succeeded and all cached credentials were revoked")
 
@@ -904,7 +904,7 @@ def create_auth_policy(
 )
 @name_or_uuid_arg
 def enable_on_boot_cmd(ep_dir: pathlib.Path):
-    app = get_globus_app_with_scopes()
+    app = get_globus_app()
     enable_on_boot(ep_dir, app=app)
 
 

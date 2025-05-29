@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pytest
+from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import DEFAULT_CLIENT_ID, get_globus_app
-from globus_sdk import ClientApp, UserApp
+from globus_sdk import ClientApp, ComputeClient, UserApp
 from pytest_mock import MockerFixture
 
 _MOCK_BASE = "globus_compute_sdk.sdk.auth.globus_app."
@@ -32,14 +33,37 @@ def test_get_globus_app(
     else:
         assert app.client_id == DEFAULT_CLIENT_ID
 
+    compute_scopes = [
+        str(s) for s in app.scope_requirements[ComputeClient.scopes.resource_server]
+    ]
+    auth_scopes = [
+        str(s) for s in app.scope_requirements[ComputeAuthClient.scopes.resource_server]
+    ]
+    assert all(
+        str(s) in compute_scopes for s in ComputeClient.default_scope_requirements
+    )
+    assert all(
+        str(s) in auth_scopes for s in ComputeAuthClient.default_scope_requirements
+    )
 
-def test_get_globus_app_with_environment(mocker: MockerFixture, randomstring):
+
+@pytest.mark.parametrize("env_arg", ["some-arg", None])
+@pytest.mark.parametrize("env_var", ["some-var", None])
+def test_get_globus_app_with_environment(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    env_arg: str | None,
+    env_var: str | None,
+):
     mock_get_token_storage = mocker.patch(f"{_MOCK_BASE}get_token_storage")
     mocker.patch(f"{_MOCK_BASE}UserApp", autospec=True)
 
-    env = randomstring()
-    get_globus_app(environment=env)
+    if env_var:
+        monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", env_var)
 
+    get_globus_app(environment=env_arg)
+
+    env = env_arg or env_var
     mock_get_token_storage.assert_called_once_with(environment=env)
 
 

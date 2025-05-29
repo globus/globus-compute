@@ -23,13 +23,13 @@ import setproctitle
 import texttable
 import yaml
 from globus_compute_endpoint import __version__
-from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import BaseConfig, UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds, update_url_port
 from globus_compute_endpoint.logging_config import setup_logging
+from globus_compute_sdk.sdk.auth.globus_app import get_globus_app
 from globus_compute_sdk.sdk.client import Client
 from globus_sdk import AuthAPIError, GlobusAPIError, NetworkError
 
@@ -329,7 +329,7 @@ class Endpoint:
 
     @staticmethod
     def get_funcx_client(config: BaseConfig | None) -> Client:
-        app = get_globus_app_with_scopes()
+        app = get_globus_app()
         if config:
             return Client(
                 local_compute_services=config.local_compute_services,

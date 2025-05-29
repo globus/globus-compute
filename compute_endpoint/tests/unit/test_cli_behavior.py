@@ -23,7 +23,6 @@ from globus_compute_endpoint.cli import (
     _do_logout_endpoints,
     app,
     create_or_choose_auth_project,
-    get_globus_app_with_scopes,
     init_config_dir,
 )
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
@@ -32,7 +31,6 @@ from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
-from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import MISSING
 from pytest_mock import MockFixture
 
@@ -60,7 +58,7 @@ def ep_name(randomstring):
 @pytest.fixture
 def mock_app(mocker: MockFixture):
     mock_app = mock.Mock(spec=UserApp)
-    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=mock_app)
+    mocker.patch(f"{_MOCK_BASE}get_globus_app", return_value=mock_app)
     return mock_app
 
 
@@ -185,35 +183,6 @@ def test_init_config_dir_permission_error(fs):
             init_config_dir()
 
     assert "Permission denied" in str(exc)
-
-
-def test_get_globus_app_with_scopes(mocker: MockFixture):
-    mock_stdin = mocker.patch.object(sys, "stdin")
-    mock_stdin.isatty.return_value = True
-    mock_stdin.closed = False
-
-    app = get_globus_app_with_scopes()
-
-    scopes = []
-    for scope_list in app.scope_requirements.values():
-        for scope in scope_list:
-            scopes.append(str(scope))
-
-    assert len(scopes) > 0
-    assert all(str(s) in scopes for s in WebClient.default_scope_requirements)
-    assert all(str(s) in scopes for s in ComputeAuthClient.default_scope_requirements)
-
-
-@pytest.mark.parametrize("exception_type", [ValueError, RuntimeError])
-def test_get_globus_app_with_scopes_handles_exception(
-    exception_type: Exception, mocker: MockFixture
-):
-    mocker.patch(
-        f"{_MOCK_BASE}get_globus_app", side_effect=exception_type("Test exception")
-    )
-    with pytest.raises(ClickException) as exc:
-        get_globus_app_with_scopes()
-    assert "Test exception" in str(exc)
 
 
 def test_start_ep_corrupt(run_line, mock_cli_state, make_endpoint_dir, ep_name):
@@ -859,7 +828,7 @@ def test_login(
 ):
     mock_app = mock.Mock(spec=UserApp)
     mock_app.login_required.return_value = login_required
-    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=mock_app)
+    mocker.patch(f"{_MOCK_BASE}get_globus_app", return_value=mock_app)
     caplog.set_level(logging.INFO)
 
     _do_login(force=force)
@@ -889,7 +858,7 @@ def test_logout(
     mock_cli_state,
 ):
     mock_app = mock.Mock(spec=UserApp)
-    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=mock_app)
+    mocker.patch(f"{_MOCK_BASE}get_globus_app", return_value=mock_app)
     mocker.patch(
         f"{_MOCK_BASE}Endpoint.get_running_endpoints", return_value=running_endpoints
     )
