@@ -11,6 +11,7 @@ import uuid
 import click
 from click import ClickException
 from click_option_group import optgroup
+from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
@@ -25,13 +26,11 @@ from globus_compute_endpoint.endpoint.utils import (
 from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
-from globus_compute_sdk.sdk.auth.globus_app import get_globus_app
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
 from globus_compute_sdk.sdk.utils.gare import gare_handler
-from globus_compute_sdk.sdk.web_client import WebClient
-from globus_sdk import MISSING, AuthClient, GlobusAPIError, GlobusApp, MissingType
+from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
 
 try:
     from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
@@ -75,20 +74,6 @@ def init_config_dir() -> pathlib.Path:
 def get_config_dir() -> pathlib.Path:
     state = CommandState.ensure()
     return state.endpoint_config_dir
-
-
-def get_globus_app_with_scopes() -> GlobusApp:
-    try:
-        app = get_globus_app()
-    except (RuntimeError, ValueError) as e:
-        raise ClickException(str(e))
-    app.add_scope_requirements(
-        {
-            WebClient.scopes.resource_server: WebClient.default_scope_requirements,
-            ComputeAuthClient.scopes.resource_server: ComputeAuthClient.default_scope_requirements,  # noqa E501
-        }
-    )
-    return app
 
 
 def get_cli_endpoint(conf: UserEndpointConfig) -> Endpoint:
