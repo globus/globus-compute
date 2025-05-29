@@ -3,6 +3,72 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.8.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.8.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- ``globus-compute-endpoint`` CLI commands involved in the creation of Auth Policies
+  now prompt for re-login if a `Globus Auth Requirements Error <https://globus-sdk-python.readthedocs.io/en/stable/authorization/gare.html>`_
+  is returned from the Auth API.
+
+- Updated version bound for the Globus SDK to at least `3.56.0 <https://github.com/globus/globus-sdk-python/releases/tag/3.56.0>`_
+  to take advantage of improved GARE handling
+
+- Added support for specifying multiple Globus Auth identity IDs with administrative access
+  to an endpoint, in addition to the owner. This requires an active Globus subscription
+  (i.e., ``subscription_id``).
+
+  Example:
+
+  .. code-block:: yaml
+
+     multi_user: true
+     subscription_id: 600ba9ac-ef16-4387-30ad-60c6cc3a6853
+     admins:
+       # Peter Gibbons (software engineer)
+       - 10afcf74-b041-4439-8e0d-eab371767440
+       # Samir Nagheenanajar (sysadmin, HPC services)
+       - a6a7b9ee-be04-4e45-9832-d3737c2fafa2
+
+- Enable use of the Executor with High Assurance (HA) endpoints.  The
+  fundamental change is that rather than receiving the result directly via
+  AMQP, it instead is only notified that a result is ready.  The Executor will
+  then reach out to the web-services to collect the known-complete tasks,
+  thereby initiating an HA check.
+
+Bug Fixes
+^^^^^^^^^
+
+- Defining ``persistent_volumes`` when using the ``KubernetesProvider`` in an
+  endpoint configuration will no longer raise an error.
+
+Removed
+^^^^^^^
+
+- Removed legacy ``Client.get_containers`` method, which is no longer supported by the
+  Globus Compute web service.
+
+Deprecated
+^^^^^^^^^^
+
+- Deprecated the following legacy container features:
+
+  - :attr:`Executor.container_id <globus_compute_sdk.Executor.container_id>` attribute
+  - :class:`ContainerSpec <globus_compute_sdk.sdk.container_spec.ContainerSpec>` class
+  - ``container_uuid`` argument to :meth:`Client.register_function <globus_compute_sdk.Client.register_function>` method
+  - :meth:`Client.get_container <globus_compute_sdk.Client.get_container>` method
+  - :meth:`Client.register_container <globus_compute_sdk.Client.register_container>` method
+  - :meth:`Client.build_container <globus_compute_sdk.Client.build_container>` method
+  - :meth:`Client.get_container_build_status <globus_compute_sdk.Client.get_container_build_status>` method
+
+  Container functionality has moved to the endpoint configuration. For more information,
+  see the Compute endpoint `containerized environments documentation
+  <https://globus-compute.readthedocs.io/en/latest/endpoints/endpoints.html#containerized-environments>`_.
+
 .. _changelog-3.7.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.7.0
