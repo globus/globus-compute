@@ -154,8 +154,9 @@ For production builds, check the  ``BUILD_FOR_STABLE`` box.
 2. (Access on VPN) Click the [build button here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec)
 3. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
 4. For production release cycles where there is also a GCS release, if we push our packages before they do, skip the following (also not necessary for alpha releases)
-    * If there isn't a concurrent GCS release, or if we build our packages after they finish their deploy, we need to manually run the downloads sync (leave SYNC_V4_REPO ubnchecked):
+    * If there isn't a concurrent GCS release, or if GCS finishes their deploy before we finish building our packages, we need to manually run the downloads sync Jenkins script:
     * https://builds.globus.org/jenkins/view/all/job/Synchronize%20GCSv5%20Stable/build?delay=0sec
+        * Leave `SYNC_WHEELS_ONLY` unchecked
 
 #### Old Build Instructions
 
