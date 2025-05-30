@@ -401,12 +401,15 @@ def test_load_user_config_template_valid_extensions(
     assert load_user_config_template(template_path) == template_str
 
 
-def test_load_user_config_template_tries_yaml_if_j2_not_found():
+def test_load_user_config_template_tries_yaml_if_j2_not_found(mock_log):
     conf_dir = pathlib.Path("/")
     template_path_yaml = conf_dir / "user_config_template.yaml"
     template_path_yaml.write_text("yaml")
     template_path_j2 = conf_dir / "user_config_template.yaml.j2"
+
     assert load_user_config_template(template_path_j2) == "yaml"
+    a, *_ = mock_log.info.call_args
+    assert "user_config_template.yaml.j2 does not exist" in a[0]
 
 
 @pytest.mark.parametrize(
