@@ -171,6 +171,8 @@ user must manage |nbsp| --- |nbsp| many users will barely even need to open thei
 terminal, much less an SSH terminal on a login node.
 
 
+.. _multi-user-configuration:
+
 Configuration
 =============
 

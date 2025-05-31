@@ -34,7 +34,7 @@ New Functionality
        # Samir Nagheenanajar (sysadmin, HPC services)
        - a6a7b9ee-be04-4e45-9832-d3737c2fafa2
 
-- Enable use of the Executor with High Assurance (HA) endpoints.  The
+- Enable use of the Executor with `High Assurance`_ (HA) endpoints.  The
   fundamental change is that rather than receiving the result directly via
   AMQP, it instead is only notified that a result is ready.  The Executor will
   then reach out to the web-services to collect the known-complete tasks,
@@ -3092,6 +3092,7 @@ New Functionality
 .. |ShellFunction| replace:: :class:`ShellFunction <globus_compute_sdk.sdk.shell_function.ShellFunction>`
 .. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
 
+.. |audit_log_path| replace:: :class:`audit_log_path <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
 .. |detach_endpoint| replace:: :class:`detach_endpoint <globus_compute_endpoint.endpoint.config.config.UserEndpointConfig>`
 .. |GlobusComputeEngine| replace:: :class:`GlobusComputeEngine <globus_compute_endpoint.engines.globus_compute.GlobusComputeEngine>`
 .. |GlobusMPIEngine| replace:: :class:`GlobusMPIEngine <globus_compute_endpoint.engines.globus_mpi.GlobusMPIEngine>`
@@ -3105,3 +3106,5 @@ New Functionality
 
 .. |/v3/functions| replace:: ``/v3/functions``
 .. _/v3/functions: https://compute.api.globus.org/redoc#tag/Functions/operation/register_function_v3_functions_post
+
+.. _High Assurance: https://docs.globus.org/guides/overviews/high-assurance/
