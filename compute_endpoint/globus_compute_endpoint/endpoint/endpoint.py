@@ -74,6 +74,10 @@ class Endpoint:
         return endpoint_dir / "example_identity_mapping_config.json"
 
     @staticmethod
+    def _audit_log_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+        return endpoint_dir / "audit.log"
+
+    @staticmethod
     def update_config_file(
         original_path: pathlib.Path,
         target_path: pathlib.Path,
@@ -89,12 +93,6 @@ class Endpoint:
         if display_name:
             config_dict["display_name"] = display_name
 
-        if auth_policy:
-            config_dict["authentication_policy"] = auth_policy
-
-        if high_assurance:
-            config_dict["high_assurance"] = high_assurance
-
         if multi_user:
             config_dict["multi_user"] = multi_user
             config_dict.pop("engine", None)
@@ -103,6 +101,15 @@ class Endpoint:
                     target_path.parent
                 )
             )
+
+        if auth_policy:
+            config_dict["authentication_policy"] = auth_policy
+
+        if high_assurance:
+            config_dict["high_assurance"] = high_assurance
+            if multi_user:
+                audit_path = Endpoint._audit_log_path(target_path.parent)
+                config_dict["audit_log_path"] = str(audit_path)
 
         if subscription_id:
             config_dict["subscription_id"] = subscription_id
@@ -114,12 +121,12 @@ class Endpoint:
     def init_endpoint_dir(
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
-        multi_user=False,
-        high_assurance=False,
+        multi_user: bool = False,
+        high_assurance: bool = False,
         display_name: str | None = None,
         auth_policy: str | None = None,
         subscription_id: str | None = None,
-    ):
+    ) -> None:
         """Initialize a clean endpoint dir
 
         :param endpoint_dir: Path to the endpoint configuration dir

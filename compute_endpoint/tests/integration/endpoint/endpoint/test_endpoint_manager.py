@@ -109,6 +109,28 @@ class TestStart:
         else:
             assert "multi_user" not in config_dict
 
+    @pytest.mark.parametrize("ha", (False, True))
+    @pytest.mark.parametrize("mu", (False, True))
+    def test_configure_ha_audit_default(self, ha, mu):
+        manager = Endpoint()
+        config_dir = pathlib.Path("/some/path/mock_endpoint")
+        config_file = Endpoint._config_file_path(config_dir)
+        audit_path = Endpoint._audit_log_path(config_dir)
+
+        with patch(f"{_MOCK_BASE}print"):  # quiet, please
+            manager.configure_endpoint(
+                config_dir, None, multi_user=mu, high_assurance=ha
+            )
+
+        assert config_file.exists(), "Verify setup"
+        conf = yaml.safe_load(config_file.read_text())
+        if not (mu and ha):
+            assert "audit_log_path" not in conf
+        else:
+            assert conf.get("multi_user"), conf
+            assert conf.get("high_assurance"), conf
+            assert conf.get("audit_log_path") == str(audit_path), conf
+
     @pytest.mark.skip(
         "This test needs to be re-written after endpoint_register is updated"
     )
