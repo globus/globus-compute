@@ -12,3 +12,4 @@ def test_sets_task_id(endpoint_uuid, task_uuid):
         f = GCFuture(task_uuid)
         eng.submit(f, b"bytes", {})
         assert f.executor_task_id is not None
+        eng.shutdown()
