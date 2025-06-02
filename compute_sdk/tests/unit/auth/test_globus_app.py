@@ -33,13 +33,23 @@ def test_get_globus_app(
         assert app.client_id == DEFAULT_CLIENT_ID
 
 
-def test_get_globus_app_with_environment(mocker: MockerFixture, randomstring):
+@pytest.mark.parametrize("env_arg", ["some-arg", None])
+@pytest.mark.parametrize("env_var", ["some-var", None])
+def test_get_globus_app_with_environment(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    env_arg: str | None,
+    env_var: str | None,
+):
     mock_get_token_storage = mocker.patch(f"{_MOCK_BASE}get_token_storage")
     mocker.patch(f"{_MOCK_BASE}UserApp", autospec=True)
 
-    env = randomstring()
-    get_globus_app(environment=env)
+    if env_var:
+        monkeypatch.setenv("GLOBUS_SDK_ENVIRONMENT", env_var)
 
+    get_globus_app(environment=env_arg)
+
+    env = env_arg or env_var
     mock_get_token_storage.assert_called_once_with(environment=env)
 
 

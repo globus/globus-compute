@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import platform
 
 from globus_sdk import ClientApp, GlobusApp, GlobusAppConfig, UserApp
@@ -11,6 +12,7 @@ DEFAULT_CLIENT_ID = "4cf29807-cf21-49ec-9443-ff9a3fb9f81c"
 
 
 def get_globus_app(environment: str | None = None) -> GlobusApp:
+    environment = environment or os.getenv("GLOBUS_SDK_ENVIRONMENT")
     app_name = platform.node()
     client_id, client_secret = get_client_creds()
     config = GlobusAppConfig(
