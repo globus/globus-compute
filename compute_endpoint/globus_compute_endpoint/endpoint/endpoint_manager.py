@@ -34,6 +34,7 @@ from globus_compute_common.messagepack import pack
 from globus_compute_common.messagepack.message_types import EPStatusReport
 from globus_compute_common.pydantic_v1 import BaseModel
 from globus_compute_endpoint import __version__
+from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import ManagerEndpointConfig
 from globus_compute_endpoint.endpoint.config.config import MINIMUM_HEARTBEAT
 from globus_compute_endpoint.endpoint.config.utils import (
@@ -209,6 +210,7 @@ class EndpointManager:
                 gcc = GC.Client(
                     local_compute_services=config.local_compute_services,
                     environment=config.environment,
+                    app=get_globus_app_with_scopes(),
                 )
                 reg_info = gcc.register_endpoint(
                     name=conf_dir.name,
@@ -636,6 +638,7 @@ class EndpointManager:
             client_options = {
                 "local_compute_services": self._config.local_compute_services,
                 "environment": self._config.environment,
+                "app": get_globus_app_with_scopes(),
             }
             log.debug("Ascertaining user identity set (%s)", client_options)
 

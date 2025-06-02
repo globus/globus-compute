@@ -23,6 +23,7 @@ import setproctitle
 import texttable
 import yaml
 from globus_compute_endpoint import __version__
+from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.endpoint.config import BaseConfig, UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
@@ -335,13 +336,15 @@ class Endpoint:
 
     @staticmethod
     def get_funcx_client(config: BaseConfig | None) -> Client:
+        app = get_globus_app_with_scopes()
         if config:
             return Client(
                 local_compute_services=config.local_compute_services,
                 environment=config.environment,
+                app=app,
             )
         else:
-            return Client()
+            return Client(app=app)
 
     def start_endpoint(
         self,

@@ -14,13 +14,22 @@ from globus_compute_endpoint.cli import _do_stop_endpoint, app
 from globus_compute_endpoint.endpoint import endpoint
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_sdk.sdk.client import _ComputeWebClient
+from globus_sdk import UserApp
+from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
 _SVC_ADDY = "http://api.funcx.fqdn"  # something clearly not correct
 
 
 @pytest.fixture(autouse=True)
-def patch_compute_client(mocker):
+def mock_app(mocker: MockFixture) -> UserApp:
+    _app = mock.Mock(spec=UserApp)
+    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=_app)
+    return _app
+
+
+@pytest.fixture(autouse=True)
+def patch_compute_client(mocker: MockFixture):
     responses.add(
         responses.GET,
         _SVC_ADDY + "/v2/version",
