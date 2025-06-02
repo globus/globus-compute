@@ -37,7 +37,8 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
 )
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds
-from globus_sdk import GlobusAPIError, NetworkError
+from globus_sdk import GlobusAPIError, NetworkError, UserApp
+from pytest_mock import MockFixture
 
 try:
     import pyprctl
@@ -169,6 +170,13 @@ def mock_reg_info(ep_uuid) -> str:
             "queue_publish_kwargs": {},
         },
     }
+
+
+@pytest.fixture(autouse=True)
+def mock_app(mocker: MockFixture) -> UserApp:
+    _app = mock.Mock(spec=UserApp)
+    mocker.patch(f"{_MOCK_BASE}get_globus_app_with_scopes", return_value=_app)
+    return _app
 
 
 @pytest.fixture

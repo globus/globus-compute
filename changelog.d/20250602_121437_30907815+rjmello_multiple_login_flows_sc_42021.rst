@@ -1,0 +1,4 @@
+Bug Fixes
+^^^^^^^^^
+
+- Starting a multi-user endpoint no longer prompts the user to complete multiple login flows.
