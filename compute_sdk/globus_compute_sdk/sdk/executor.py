@@ -394,6 +394,11 @@ class Executor(concurrent.futures.Executor):
     @property
     def container_id(self) -> uuid.UUID | None:
         """
+        .. warning::
+
+            Deprecated since version 3.8.0. Container functionality has moved to
+            the endpoint configuration.
+
         The container id with which this Executor instance is currently associated.
         Tasks submitted after this is set will use this container.
 
