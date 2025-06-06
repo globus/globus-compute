@@ -90,6 +90,7 @@ how to download and configure an endpoint for local (multi-process) execution:
    sdk
    endpoints/index
    tutorial
+   tutorials/index
    actionprovider
    reference/index
    limits
