@@ -430,7 +430,9 @@ def test_register_function(gcc: gc.Client, serde: ComputeSerializer):
 
 @pytest.mark.parametrize("dep_arg", ["searchable", "function_name"])
 def test_register_function_deprecated_args(gcc, dep_arg):
-    gcc._compute_web_client = mock.MagicMock()
+    gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
+        data={"function_uuid": str(uuid.uuid4())}
+    )
 
     with pytest.deprecated_call() as pyt_wrn:
         gcc.register_function(funk, **{dep_arg: "foo"})
@@ -1032,3 +1034,59 @@ def test_client_requests_serialized(mocker, gare, func1, args1, func2, args2):
     with pytest.raises(GlobusAPIError):
         func1(c, *args1)
     t.join()
+
+
+def test_register_function_raises_ha_warning(gcc):
+    gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
+        data={
+            "function_uuid": str(uuid.uuid4()),
+            "ha_warning": "some arbitrary warning text",
+        }
+    )
+
+    with pytest.warns(UserWarning) as record:
+        gcc.register_function(funk)
+
+    assert len(record) == 1
+    assert "some arbitrary warning text" in str(record[0].message)
+
+
+def test_batch_run_raises_ha_warning(gcc, mocker):
+    gcc._compute_web_client.v3.submit.return_value = types.SimpleNamespace(
+        data={
+            "task_group_id": str(uuid.uuid4()),
+            "ha_warning": "some arbitrary warning text",
+        }
+    )
+
+    with pytest.warns(UserWarning) as record:
+        gcc.batch_run("endpoint_id", batch=mocker.Mock())
+
+    assert len(record) == 1
+    assert "some arbitrary warning text" in str(record[0].message)
+
+
+def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
+    gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
+        data={
+            "function_uuid": str(uuid.uuid4()),
+            "ha_warning": "some arbitrary warning text",
+        }
+    )
+    gcc._compute_web_client.v3.submit.return_value = types.SimpleNamespace(
+        data={
+            "task_group_id": str(uuid.uuid4()),
+            "ha_warning": "some arbitrary warning text",
+        }
+    )
+
+    with pytest.warns(UserWarning) as record:
+        gcc.register_function(funk)
+        gcc.batch_run("endpoint_id", batch=mocker.Mock())
+
+    assert len(record) != 1
+    # as long as the following are the same, repeated warnings should be suppressed. see https://docs.python.org/3/library/warnings.html#repeated-warning-suppression-criteria # noqa: E501
+    assert len({str(r.message) for r in record}) == 1
+    assert len({r.category for r in record}) == 1
+    assert len({r.filename for r in record}) == 1
+    assert len({r.lineno for r in record}) == 1
