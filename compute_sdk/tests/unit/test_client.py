@@ -8,6 +8,7 @@ import threading
 import time
 import types
 import uuid
+import warnings
 from unittest import mock
 
 import globus_compute_sdk as gc
@@ -430,7 +431,9 @@ def test_register_function(gcc: gc.Client, serde: ComputeSerializer):
 
 @pytest.mark.parametrize("dep_arg", ["searchable", "function_name"])
 def test_register_function_deprecated_args(gcc, dep_arg):
-    gcc._compute_web_client = mock.MagicMock()
+    gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
+        data={"function_uuid": str(uuid.uuid4())}
+    )
 
     with pytest.deprecated_call() as pyt_wrn:
         gcc.register_function(funk, **{dep_arg: "foo"})
@@ -1032,3 +1035,61 @@ def test_client_requests_serialized(mocker, gare, func1, args1, func2, args2):
     with pytest.raises(GlobusAPIError):
         func1(c, *args1)
     t.join()
+
+
+def test_register_function_raises_ha_warning(gcc):
+    gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
+        data={
+            "function_uuid": str(uuid.uuid4()),
+            "ha_warning": "some arbitrary warning text",
+        }
+    )
+
+    with pytest.warns(UserWarning) as record:
+        gcc.register_function(funk)
+
+    assert len(record) == 1
+    assert "some arbitrary warning text" in str(record[0].message)
+
+
+def test_batch_run_raises_ha_warning(gcc, mocker):
+    gcc._compute_web_client.v3.submit.return_value = types.SimpleNamespace(
+        data={
+            "task_group_id": str(uuid.uuid4()),
+            "ha_warning": "some arbitrary warning text",
+        }
+    )
+
+    with pytest.warns(UserWarning) as record:
+        gcc.batch_run("endpoint_id", batch=mocker.Mock())
+
+    assert len(record) == 1
+    assert "some arbitrary warning text" in str(record[0].message)
+
+
+def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
+    arbitrary_hatext = "some arbitrary warning text"
+    gcc._compute_web_client.v3.register_function.return_value = types.SimpleNamespace(
+        data={"function_uuid": str(uuid.uuid4()), "ha_warning": arbitrary_hatext}
+    )
+    gcc._compute_web_client.v3.submit.return_value = types.SimpleNamespace(
+        data={"task_group_id": str(uuid.uuid4()), "ha_warning": arbitrary_hatext}
+    )
+
+    with pytest.warns(UserWarning) as record:
+        gcc.register_function(funk)
+        for _ in range(10):
+            gcc.batch_run("endpoint_id", batch=mocker.Mock())
+
+    assert len(record) == 11, "Verify always checked for an HA warning"
+
+    with warnings.catch_warnings(record=True) as records:
+        for _ in range(10):
+            gcc.batch_run("endpoint_id", batch=mocker.Mock())
+
+        gcc._compute_web_client.v3.submit.return_value.data["ha_warning"] = "abcd"
+        gcc.batch_run("endpoint_id", batch=mocker.Mock())
+
+    assert len(records) == 2, "Only two distinct messages; warnings suppresses dups"
+    assert arbitrary_hatext == str(records[0].message)
+    assert "abcd" == str(records[1].message)
