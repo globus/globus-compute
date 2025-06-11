@@ -7,7 +7,6 @@ REQUIRES = [
     "requests>=2.31.0,<3",
     "globus-sdk",  # version will be bounded by `globus-compute-sdk`
     "globus-compute-sdk==3.8.0",
-    "globus-compute-common==0.5.0",
     "globus-identity-mapping==0.4.0",
     # table printing used in list-endpoints
     "texttable>=1.6.4,<2",
