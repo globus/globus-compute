@@ -1,5 +1,5 @@
-Globus Compute Tutorial
-=======================
+Using the SDK
+=============
 
 Globus Compute is a Function-as-a-Service (FaaS) platform that enables
 fire-and-forget execution of Python functions on one or more remote
