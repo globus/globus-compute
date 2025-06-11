@@ -430,8 +430,15 @@ Similarly, artifacts created by ``endpoint_setup`` may be cleaned up with
      conda remove -n my-conda-env --all
 
 
+.. _containerized-environments:
+
+
 2. Containerized Environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. hint::
+   See the :doc:`../tutorials/dynamic_containers` tutorial for instructions on how
+   to specify container configuration when submitting tasks.
 
 Container support is limited to the |GlobusComputeEngine|_, and accessible via the
 following options:
