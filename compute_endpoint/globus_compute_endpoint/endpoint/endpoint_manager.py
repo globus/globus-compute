@@ -22,7 +22,6 @@ import typing as t
 import uuid
 from concurrent.futures import Future
 from contextlib import contextmanager
-from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
 
@@ -44,7 +43,10 @@ from globus_compute_endpoint.endpoint.config.utils import (
     serialize_config,
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
-from globus_compute_endpoint.endpoint.identity_mapper import PosixIdentityMapper
+from globus_compute_endpoint.endpoint.identity_mapper import (
+    MappedPosixIdentity,
+    PosixIdentityMapper,
+)
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     CommandQueueSubscriber,
     ResultPublisher,
@@ -106,22 +108,6 @@ class UserEndpointRecord(BaseModel):
     @property
     def uname(self) -> str:
         return self.local_user_info.pw_name if self.local_user_info else ""
-
-
-@dataclass
-class MappedPosixIdentity:
-    local_user_record: pwd.struct_passwd
-
-    # Example structure:
-    # In this example data,
-    #  - the first mapper found no identities or failed
-    #  - the second mapper mapped uuid1 to both alice and bob and additionally mapped
-    #    uuid2 to charlie.
-    #  - the third mapper mapped uuid1 to darla
-    # [[], [{"uuid1": ["alice", "bob"], "uuid2": ["charlie"]}], [{"uuid1": ["darla"]}]]
-    globus_identity_candidates: list[list[dict[str, list[str]]]]
-
-    matched_identity: uuid.UUID | str | None
 
 
 T_CMD_START_ARGS = t.Tuple[
@@ -1239,6 +1225,7 @@ class EndpointManager:
                 self._config,
                 template_str,
                 self.user_config_template_path,
+                ident,
                 user_config_schema,
                 user_opts,
                 user_runtime,

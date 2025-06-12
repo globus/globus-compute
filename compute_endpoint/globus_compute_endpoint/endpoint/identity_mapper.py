@@ -4,8 +4,11 @@ import json
 import logging
 import os
 import pathlib
+import pwd
 import threading
 import typing as t
+import uuid
+from dataclasses import dataclass
 
 from globus_identity_mapping.loader import load_mappers
 from globus_identity_mapping.protocol import IdentityMappingProtocol
@@ -240,3 +243,19 @@ class PosixIdentityMapper:
                 )
 
         return results
+
+
+@dataclass
+class MappedPosixIdentity:
+    local_user_record: pwd.struct_passwd
+
+    # Example structure:
+    # In this example data,
+    #  - the first mapper found no identities or failed
+    #  - the second mapper mapped uuid1 to both alice and bob and additionally mapped
+    #    uuid2 to charlie.
+    #  - the third mapper mapped uuid1 to darla
+    # [[], [{"uuid1": ["alice", "bob"], "uuid2": ["charlie"]}], [{"uuid1": ["darla"]}]]
+    globus_identity_candidates: list[list[dict[str, list[str]]]]
+
+    matched_identity: uuid.UUID | str | None

@@ -4,6 +4,7 @@ import importlib.util
 import inspect
 import json
 import logging
+import os
 import pathlib
 import re
 import shlex
@@ -12,6 +13,7 @@ import uuid
 import yaml
 from click import ClickException
 from globus_compute_common.pydantic_v1 import ValidationError
+from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 
 from .config import ManagerEndpointConfig, UserEndpointConfig
 
@@ -235,6 +237,24 @@ def _shell_escape_filter(val):
     return json.dumps(shlex.quote(loaded))
 
 
+def _parse_mapped_identity(mapped_identity: MappedPosixIdentity) -> dict:
+    uname = mapped_identity.local_user_record.pw_name
+    gid = mapped_identity.local_user_record.pw_gid
+    groups = os.getgrouplist(uname, gid)
+    return {
+        "local": {
+            "uname": uname,
+            "uid": mapped_identity.local_user_record.pw_uid,
+            "gid": gid,
+            "gecos": mapped_identity.local_user_record.pw_gecos,
+            "shell": mapped_identity.local_user_record.pw_shell,
+            "dir": mapped_identity.local_user_record.pw_dir,
+            "groups": groups,
+        },
+        "globus": {"id": mapped_identity.matched_identity},
+    }
+
+
 def load_user_config_template(template_path: pathlib.Path) -> str:
     # Reminder: this method _reads from the filesystem_, so will need appropriate
     # privileges.  Per sc-28360, separate out from the rendering so that we can
@@ -250,6 +270,7 @@ def render_config_user_template(
     parent_config: ManagerEndpointConfig,
     user_config_template: str,
     user_config_template_path: pathlib.Path,
+    mapped_identity: MappedPosixIdentity,
     user_config_schema: dict | None = None,
     user_opts: dict | None = None,
     user_runtime: dict | None = None,
@@ -266,6 +287,8 @@ def render_config_user_template(
 
     _user_runtime = user_runtime or {}
     _user_runtime = _sanitize_user_opts(_user_runtime)
+
+    _mapped_identity = _parse_mapped_identity(mapped_identity)
 
     user_config_template_dir = user_config_template_path.parent
     try:
@@ -286,7 +309,10 @@ def render_config_user_template(
 
     try:
         return template.render(
-            **_user_opts, parent_config=parent_config, user_runtime=_user_runtime
+            **_user_opts,
+            parent_config=parent_config,
+            user_runtime=_user_runtime,
+            mapped_identity=_mapped_identity,
         )
     except jinja2.exceptions.UndefinedError as e:
         log.debug("Missing required user option: %s", e)
