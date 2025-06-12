@@ -2252,11 +2252,31 @@ def test_respects_config_template_and_schema(mocker, successful_exec_from_mocked
     a, _ = mock_render.call_args
     assert a[1] == template
     assert a[2] == template_path
-    assert a[3] == schema
+    assert a[4] == schema
 
     (received_stdin,), _k = m.write.call_args
     parsed_stdin = json.loads(received_stdin)
     assert parsed_stdin["config"] == config
+
+
+def test_includes_mapped_identity_in_user_config(
+    mocker, successful_exec_from_mocked_root, ident
+):
+    mock_os, *_, em = successful_exec_from_mocked_root
+
+    mock_render = mocker.patch(
+        f"{_MOCK_BASE}render_config_user_template", return_value="foo: bar"
+    )
+
+    m = mock.Mock()
+    mock_os.fdopen.return_value.__enter__.return_value = m
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+    a, _ = mock_render.call_args
+    assert isinstance(a[3], MappedPosixIdentity)
+    assert a[3].matched_identity == ident
 
 
 @pytest.mark.parametrize("is_valid", (True, False))

@@ -486,6 +486,31 @@ Every template also has access to the following variables:
   submitting the task request, such as Python version. See |UserRuntime| for a complete
   list of available information.
 
+- ``mapped_identity``: Contains information about the user's mapped identity. The following
+  fields are available:
+
+  - ``mapped_identity.local.uname``: Local user's username
+  - ``mapped_identity.local.uid``: Local user's ID
+  - ``mapped_identity.local.gid``: Local user's primary group ID
+  - ``mapped_identity.local.groups``: List of group IDs the local user is a member of
+  - ``mapped_identity.local.gecos``: Local user's GECOS field
+  - ``mapped_identity.local.shell``: Local user's login shell
+  - ``mapped_identity.local.dir``: Local user's home directory
+  - ``mapped_identity.globus.id``: Matched Globus identity ID
+
+  .. code-block:: yaml+jinja
+     :caption: Example usage of ``mapped_identity`` in config template
+
+      engine:
+         type: GlobusComputeEngine
+         provider:
+            type: SlurmProvider
+      {% if 1001 in mapped_identity.local.groups %}
+            partition: {{ partition }}
+      {% else %}
+            partition: default
+      {% endif %}
+
 These are reserved words and their values cannot be overridden by the user or admin,
 and an error is thrown if a user tries to send it as a user option:
 
