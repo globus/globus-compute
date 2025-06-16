@@ -1219,3 +1219,25 @@ def test_delete_endpoint_no_local_config(
     result = run_line(line, assert_exit_code=1)
     assert not mock_ep_cls.delete_endpoint.called
     assert err_msg in result.stderr
+
+
+def test_configure_endpoint_exists_msg(mocker, run_line, mock_command_ensure):
+    compute_dir = mock_command_ensure.endpoint_config_dir
+    compute_dir.mkdir(parents=True, exist_ok=True)
+    ep_name = "some_name"
+    ep_dir = compute_dir / ep_name
+    ep_dir.mkdir(parents=True, exist_ok=True)
+
+    mock_ep_base = "globus_compute_endpoint.endpoint.endpoint.Endpoint."
+    mock_init = mocker.patch(f"{mock_ep_base}init_endpoint_dir")
+    result = run_line(f"configure {ep_name}")
+    assert f"configuration file for <{ep_name}> already exists" in result.stdout
+    # Should not proceed to next action init_endpoint_dir()
+    assert not mock_init.called
+
+    mocker.patch(
+        f"{mock_ep_base}check_pidfile", return_value={"exists": True, "active": True}
+    )
+    result = run_line(f"configure {ep_name}")
+    assert f"The endpoint <{ep_name}> is already running" in result.stdout
+    assert not mock_init.called

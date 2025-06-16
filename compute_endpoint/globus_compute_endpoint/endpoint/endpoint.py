@@ -209,10 +209,25 @@ class Endpoint:
         subscription_id: str | None = None,
     ):
         ep_name = conf_dir.name
+        config_path = Endpoint._config_file_path(conf_dir)
         if conf_dir.exists():
-            print(conf_dir)
-            print(f"config dir <{ep_name}> already exists")
-            raise Exception("ConfigExists")
+            pid_info = Endpoint.check_pidfile(conf_dir)
+            if pid_info.get("exists") and pid_info.get("active"):
+                print(
+                    f"The endpoint <{ep_name}> is already running with the "
+                    f"configuration file at\n\t{config_path.absolute()}."
+                    "\nAfter making changes to the config, the `restart` "
+                    "subcommand can be used to restart the endpoint:\n"
+                    f"\n\t$ globus-compute-endpoint restart {ep_name}"
+                )
+            else:
+                print(
+                    f"A configuration file for <{ep_name}> already exists "
+                    f"at\n\t{config_path.absolute()}"
+                    "\nUse the `start` subcommand to run this endpoint:\n"
+                    f"\n\t$ globus-compute-endpoint start {ep_name}"
+                )
+            return
 
         templ_conf_path = pathlib.Path(endpoint_config) if endpoint_config else None
         Endpoint.init_endpoint_dir(
@@ -224,7 +239,6 @@ class Endpoint:
             auth_policy,
             subscription_id,
         )
-        config_path = Endpoint._config_file_path(conf_dir)
         if multi_user:
             user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
             user_conf_schema_path = Endpoint.user_config_schema_path(conf_dir)
