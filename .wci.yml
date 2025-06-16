@@ -1,0 +1,39 @@
+name: Globus Compute
+
+icon: https://www.globus.org/compute
+
+headline: High Performance Function Serving for Science
+
+description: | 
+  Globus offers a distributed Function as a Service (FaaS) platform 
+  that enables reliable, scalable, and high performance remote 
+  function execution. Unlike centralized FaaS platforms, the 
+  Globus compute platform enables you to execute functions on 
+  diverse remote systems, from laptops to campus clusters, 
+  clouds, and supercomputers.
+
+language: Python
+            
+documentation: 
+  general: https://globus-compute.readthedocs.io
+  installation: https://globus-compute.readthedocs.io/en/latest/quickstart.html
+  tutorial: https://globus-compute.readthedocs.io/en/latest/tutorials/index.html
+            
+social:
+  twitter: globus
+  youtube: @GlobusOnline
+            
+execution_environment:
+  interfaces:
+    - Python API
+  resource_managers:
+    - Slurm
+    - LSF
+    - PBS
+    - Flux
+    - GridEngine
+    - HTCondor
+    - AWS
+    - Google Cloud
+    - Kubernetes
+            
