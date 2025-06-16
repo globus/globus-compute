@@ -210,7 +210,7 @@ class Endpoint:
     ):
         ep_name = conf_dir.name
         if "some_name" in ep_name:
-            raise NotImplementedError(
+            raise ZeroDivisionError(
                 f"Checking for {conf_dir.absolute()} is "
                 f"<{conf_dir.exists()}> exists"
             )
