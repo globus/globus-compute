@@ -56,7 +56,7 @@ class TestStart:
 
         manager.configure_endpoint(config_dir, None)
         assert config_dir.exists() and config_dir.is_dir()
-        with pytest.raises(Exception, match="ConfigExists"):
+        with pytest.raises(Exception, match="already exists at"):
             manager.configure_endpoint(config_dir, None)
 
     @pytest.mark.parametrize("ha", [None, True, False])
