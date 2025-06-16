@@ -209,6 +209,11 @@ class Endpoint:
         subscription_id: str | None = None,
     ):
         ep_name = conf_dir.name
+        if "some_name" in ep_name:
+            raise NotImplementedError(
+                f"Checking for {conf_dir.absolute()} is "
+                f"<{conf_dir.exists()}> exists"
+            )
         config_path = Endpoint._config_file_path(conf_dir)
         if conf_dir.exists():
             pid_info = Endpoint.check_pidfile(conf_dir)
