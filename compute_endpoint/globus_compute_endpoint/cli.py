@@ -437,15 +437,19 @@ def configure_endpoint(
 
     compute_dir = get_config_dir()
     ep_dir = compute_dir / name
-    Endpoint.configure_endpoint(
-        ep_dir,
-        endpoint_config,
-        multi_user,
-        high_assurance,
-        display_name,
-        auth_policy,
-        subscription_id,
-    )
+    try:
+        Endpoint.configure_endpoint(
+            ep_dir,
+            endpoint_config,
+            multi_user,
+            high_assurance,
+            display_name,
+            auth_policy,
+            subscription_id,
+        )
+    except ValueError as e:
+        # If EP is already configured, show only the message not the whole stacktrace
+        raise ClickException(str(e))
 
 
 @app.command(name="start", help="Start an endpoint")
