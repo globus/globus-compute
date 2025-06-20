@@ -8,7 +8,6 @@ import pwd
 import queue
 import random
 import re
-import resource
 import signal
 import sys
 import time
@@ -54,7 +53,7 @@ else:
 
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_GOOD_EC = 89  # SPoA for "good/happy-path" exit code
+_GOOD_EC = 88  # SPoA for "good/happy-path" exit code
 
 _mock_rootuser_rec = pwd.struct_passwd(
     ("root", "", 0, 0, "Mock Root User", "/mock_root", "/bin/false")
@@ -180,10 +179,16 @@ def mock_app(mocker: MockFixture) -> UserApp:
 
 
 @pytest.fixture
+def mock_close_fds():
+    with mock.patch(f"{_MOCK_BASE}close_all_fds") as m:
+        yield m
+
+
+@pytest.fixture
 def mock_client(mocker, ep_uuid, mock_reg_info):
     mock_gcc = mock.Mock()
     mock_gcc.register_endpoint.return_value = mock_reg_info
-    mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
+    mocker.patch(f"{_MOCK_BASE}Client", return_value=mock_gcc)
     yield ep_uuid, mock_gcc
 
 
@@ -216,7 +221,9 @@ def mock_props():
 
 
 @pytest.fixture
-def epmanager_as_user(mocker, conf_dir, mock_client, mock_auth_client, mock_conf):
+def epmanager_as_user(
+    mocker, conf_dir, mock_close_fds, mock_client, mock_auth_client, mock_conf
+):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getuid.return_value = _mock_localuser_rec.pw_uid
     mock_os.getgid.return_value = _mock_localuser_rec.pw_gid
@@ -262,7 +269,13 @@ def epmanager_as_user(mocker, conf_dir, mock_client, mock_auth_client, mock_conf
 
 @pytest.fixture
 def epmanager_as_root(
-    mocker, conf_dir, mock_conf_root, mock_client, mock_auth_client, mock_pim
+    mocker,
+    conf_dir,
+    mock_close_fds,
+    mock_conf_root,
+    mock_client,
+    mock_auth_client,
+    mock_pim,
 ):
     mock_os = mocker.patch(f"{_MOCK_BASE}os")
     mock_os.getppid.return_value = 1111
@@ -275,6 +288,7 @@ def epmanager_as_root(
     mock_os.pipe.return_value = 40, 41
     mock_os.dup2.side_effect = (0, 1, 2, AssertionError("dup2: unexpected?"))
     mock_os.open.side_effect = (4, 5, AssertionError("open: unexpected?"))
+    mock_os.environ = {"Some": "test", "environ": "with", "debug": "1"}
 
     mock_pwd = mocker.patch(f"{_MOCK_BASE}pwd")
     mock_pwd.getpwnam.side_effect = (
@@ -289,10 +303,7 @@ def epmanager_as_root(
     )
 
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
-    mocker.patch(
-        f"{_MOCK_BASE}GC.sdk.compute_dir.ensure_compute_dir",
-        side_effect=mock_ensure_compute_dir,
-    )
+    mocker.patch(f"{_MOCK_BASE}ensure_compute_dir", side_effect=mock_ensure_compute_dir)
 
     ep_uuid, _ = mock_client
 
@@ -334,7 +345,6 @@ def command_payload(ident):
 
 @pytest.fixture
 def successful_exec_from_mocked_root(
-    mocker,
     epmanager_as_root,
     mock_auth_client,
     user_conf_template,
@@ -484,7 +494,7 @@ def test_gracefully_exits_if_registration_blocked(
     status_code,
 ):
     mock_gcc = get_standard_compute_client()
-    mocker.patch("globus_compute_sdk.Client", return_value=mock_gcc)
+    mocker.patch(f"{_MOCK_BASE}Client", return_value=mock_gcc)
 
     some_err = randomstring()
     register_endpoint_failure_response(endpoint_uuid, status_code, some_err)
@@ -633,10 +643,7 @@ def test_handles_network_error_scriptably(
     randomstring,
 ):
     some_err = randomstring()
-    mocker.patch(
-        "globus_compute_sdk.Client",
-        side_effect=NetworkError(some_err, Exception()),
-    )
+    mocker.patch(f"{_MOCK_BASE}Client", side_effect=NetworkError(some_err, Exception()))
 
     with pytest.raises(SystemExit) as pyexc:
         EndpointManager(conf_dir, endpoint_uuid, mock_conf)
@@ -1712,6 +1719,29 @@ def test_handles_shutdown_signal(successful_exec_from_mocked_root, sig, reset_si
     assert not em._command_queue.get.called, " ... that we've now confirmed works"
 
 
+def test_clears_environment_immediately_after_fork(
+    successful_exec_from_mocked_root, mock_close_fds, randomstring
+):
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    sentinel_key = "ARBITRARY_ENV_VAR_NAME"
+
+    mock_os.environ = {}
+    mock_os.environ.update(os.environ)
+    mock_os.environ[sentinel_key] = randomstring()
+    mock_close_fds.side_effect = SystemExit  # exit early; test is done
+    with pytest.raises(SystemExit):
+        em._event_loop()
+
+    assert not mock_os.environ, "Expect environment immediately wiped post-fork()"
+    assert mock_close_fds.called, "Expect descriptors closed immediately post-fork()"
+    _, k = mock_close_fds.call_args
+
+    for fd in (0, 1, 2):
+        assert fd in k["preserve_fds"], "Expect std streams preserved, for now"
+    assert len(k["preserve_fds"]) == 4, "Expect audit path kept"
+
+
 def test_environment_default_path(successful_exec_from_mocked_root):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
@@ -2123,7 +2153,7 @@ def test_run_as_same_user_does_not_change_uid(successful_exec_from_mocked_root):
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
 
-    assert pyexc.value.code == 85, "Q&D: verify we exec'ed, but no privilege drop"
+    assert pyexc.value.code == 84, "Q&D: verify we exec'ed, but no privilege drop"
 
     assert not mock_os.initgroups.called
     assert not mock_os.setresuid.called
@@ -2213,16 +2243,16 @@ def test_ep_info_not_root_gets_no_matched_identity(
 def test_all_files_closed(successful_exec_from_mocked_root):
     mock_os, *_, em = successful_exec_from_mocked_root
     with pytest.raises(SystemExit) as pyexc:
-        em._event_loop()
+        with mock.patch(f"{_MOCK_BASE}close_all_fds") as mock_close:
+            em._event_loop()
 
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
 
-    _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)
-    assert mock_os.closerange.called
-    (low, hi), _ = mock_os.closerange.call_args
-    assert low == 3, "Starts from first FD number after std* files"
-    assert low < hi
-    assert hi >= hard_no, "Expect ALL open files closed"
+    assert mock_close.call_count > 1, "Expect second, final close attempt"
+    _, k = mock_close.call_args
+    for fd in (0, 1, 2):
+        assert fd in k["preserve_fds"], "Expect std streams preserved"
+    assert len(k["preserve_fds"]) == 4, "Expect audit path kept"
 
     assert mock_os.dup2.call_count == 3, "Expect to close 3 std* files"
     closed = [std_to_close for (_fd, std_to_close), _ in mock_os.dup2.call_args_list]

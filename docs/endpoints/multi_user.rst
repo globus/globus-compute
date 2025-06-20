@@ -444,6 +444,8 @@ schema.
 Please refer to the :ref:`template-variable-validation` section of :doc:`templates`
 for more information.
 
+.. _user-environment-yaml:
+
 ``user_environment.yaml``
 -------------------------
 
