@@ -16,7 +16,7 @@ from globus_compute_endpoint.endpoint.endpoint_manager import (
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_GOOD_UNPRIVILEGED_EC = 85
+_GOOD_UNPRIVILEGED_EC = 84
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -41,6 +41,12 @@ def tell_fakefs_to_goaway():
 def mock_log():
     with mock.patch(f"{_MOCK_BASE}log", spec=logging.Logger) as m:
         m.getEffectiveLevel.return_value = logging.DEBUG
+        yield m
+
+
+@pytest.fixture
+def mock_close_fds():
+    with mock.patch(f"{_MOCK_BASE}close_all_fds") as m:
         yield m
 
 
@@ -194,7 +200,9 @@ def test_audit_log_shutsdown_on_general_error(
     assert em._time_to_stop is True, "Expect shutdown, no matter the error"
 
 
-def test_audit_log_pipe_hookup(mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os):
+def test_audit_log_pipe_hookup(
+    mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os, mock_close_fds
+):
     em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
 
     m = mock.Mock()
