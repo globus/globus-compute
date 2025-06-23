@@ -27,13 +27,14 @@ if ! grep '^globus\-compute\-sdk \& globus\-compute\-endpoint v'"$VERSION"'$' do
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     [[ $0 = $BASH_SOURCE ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
   else
-    echo "\n  Releasing globus-compute-sdk and globus-compute-endpoint without changelog updates for v$VERSION"
+    echo -e "\n  Releasing globus-compute-sdk and globus-compute-endpoint without changelog updates for v$VERSION"
   fi
 fi
 
 echo "releasing v$VERSION"
-TAG_STDERR="$(git tag -s -m v$VERSION $VERSION 2>&1 > /dev/null)"
-if [[ $? == 0 ]]; then
+TAG_ERR=
+TAG_STDERR="$(git tag -s -m v$VERSION $VERSION 2>&1 > /dev/null)" || TAG_ERR=$?
+if [[ -z $TAG_ERR ]]; then
   echo "Git tagged $VERSION"
   git push origin "$VERSION"
 elif [[ "$TAG_STDERR" =~ "already exists" ]]; then
