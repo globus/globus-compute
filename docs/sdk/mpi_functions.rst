@@ -132,10 +132,10 @@ our `documentation section on shell results <#shell-results>`_ for more informat
 
 
 .. |MPIFunction| replace:: ``MPIFunction``
-.. _MPIFunction: reference/mpi_function.html
+.. _MPIFunction: ../reference/mpi_function.html
 
 .. |ShellFunction| replace:: ``ShellFunction``
-.. _ShellFunction: reference/shell_function.html
+.. _ShellFunction: ../reference/shell_function.html
 
 .. |ShellResult| replace:: ``ShellResult``
-.. _ShellResult: reference/shell_function.html#globus_compute_sdk.sdk.shell_function.ShellResult
+.. _ShellResult: ../reference/shell_function.html#globus_compute_sdk.sdk.shell_function.ShellResult

@@ -1,16 +1,7 @@
-Globus Compute SDK User Guide
-=============================
+Client User Guide
+=================
 
-The **Globus Compute SDK** provides a programmatic interface to Globus Compute from Python.
-The SDK provides a convenient Pythonic interface to:
-
-1. Register functions
-2. Register containers and execution environments
-3. Launch registered functions on accessible endpoints
-4. Check the status of launched functions
-5. Retrieve outputs from functions
-
-The SDK provides a client class for interacting with Globus Compute. The client
+The SDK provides a |Client| class for interacting with Globus Compute. The |Client|
 abstracts authentication and provides an interface to make Globus Compute
 API calls without needing to know the Globus Compute REST endpoints for those operations.
 You can instantiate a Globus Compute client as follows:
@@ -20,7 +11,7 @@ You can instantiate a Globus Compute client as follows:
   from globus_compute_sdk import Client
   gcc = Client()
 
-Instantiating a client will start an authentication process where you will be asked to authenticate via Globus Auth.
+Instantiating a |Client| will start an authentication process where you will be asked to authenticate via Globus Auth.
 We require every interaction with Globus Compute to be authenticated, as this enables enforced
 access control on both functions and endpoints.
 Globus Auth is an identity and access management platform that provides authentication brokering
@@ -74,7 +65,7 @@ monitor status and retrieve results.
 
 .. note::
    Globus Compute places limits on the size of the functions and the rate at which functions can be submitted.
-   Please refer to the :doc:`limits` section for details.
+   Please refer to the :doc:`../limits` section for details.
 
 
 Retrieving Results
@@ -292,114 +283,21 @@ via the ``authorizer`` parameter:
       'https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all'
 
 
-.. _specifying-serde-strategy:
+Endpoint Operations
+-------------------
 
-Specifying a Submit-Side Serialization Strategy
------------------------------------------------
-
-When sending functions and arguments for execution on a Compute endpoint, the SDK uses
-the :class:`~globus_compute_sdk.serialize.ComputeSerializer` class to convert data to and from a format that can be easily
-sent over the wire. Internally, :class:`~globus_compute_sdk.serialize.ComputeSerializer` uses instances of
-:class:`~globus_compute_sdk.serialize.SerializationStrategy` to do the actual work of serializing (converting function code
-and arguments to strings) and deserializing (converting well-formatted strings back into
-function code and arguments).
-
-The default strategies are :class:`~globus_compute_sdk.serialize.DillCode` for function code and :class:`~globus_compute_sdk.serialize.DillDataBase64` for
-function ``*args`` and ``**kwargs``, which are both wrappers around |dill|_. To choose
-another serializer, use the ``serializer`` member of the Compute :class:`~globus_compute_sdk.Executor`:
+You can retrieve information about endpoints including status and
+information about how the endpoint is configured.
 
 .. code:: python
 
-  from globus_compute_sdk import Executor
-  from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode, JSONData
-
-  with Executor('<your-endpoint-id>') as gcx:
-    gcx.serializer = ComputeSerializer(
-      strategy_code=CombinedCode(), strategy_data=JSONData()
-    )
-
-:doc:`See here for a up-to-date list of serialization strategies. </reference/serialization_strategies>`
-
-To check whether a strategy works for a given use-case, use the :func:`~globus_compute_sdk.serialize.ComputeSerializer.check_strategies`
-method:
-
-.. code:: python
-
-  from globus_compute_sdk.serialize import ComputeSerializer, DillCodeSource, JSONData
-
-  def greet(name, greeting = "greetings"):
-    """Greet someone."""
-
-    return f"{greeting} {name}"
-
-  serializer = ComputeSerializer(
-    strategy_code=DillCodeSource(),
-    strategy_data=JSONData()
-  )
-
-  serializer.check_strategies(greet, "world", greeting="hello")
-  # serializes like the following:
-  gcx.submit(greet, "world", greeting="hello")
-
-  # use the return value of check_strategies:
-  fn, args, kwargs = serializer.check_strategies(greet, "world", greeting="hello")
-  assert fn(*args, **kwargs) == greet("world", greeting="hello")
-
-.. _avoiding-serde-errors:
-
-Avoiding Serialization Errors
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-We strongly recommend that you use the same Python version as the target
-Endpoint when using the SDK to submit new functions.
-
-The serialization/deserialization mechanics in Python and the pickle/dill
-libraries are implemented at the bytecode level and have evolved extensively
-over time.  There is no backward/forward compatibility guarantee between
-versions.  Thus a function serialized in an older version of Python or dill
-may not deserialize correctly in later versions, and the opposite is even more
-problematic.
-
-Even a single number difference in Python minor versions (e.g., from 3.12 |rarr| 3.13)
-can generate issues.  Micro version differences (e.g., from 3.11.8 |rarr| 3.11.9)
-are usually safe, though not universally.
-
-Errors may surface as serialization/deserialization ``Exception``s, Globus
-Compute task workers lost due to ``SEGFAULT``, or even incorrect results.
-
-Note that the |Client| class's :func:`~globus_compute_sdk.Client.register_function`
-method can be used to pre-serialize a function using the registering SDK's environment
-and return a UUID identifier.  The resulting bytecode will then be deserialized at run
-time by an Endpoint whenever a task that specifies this function UUID is submitted
-(possibly from a different SDK environment) using the Client's
-:func:`~globus_compute_sdk.Client.run` or the |Executor|'s
-:func:`~globus_compute_sdk.Executor.submit_to_registered_function` methods.
-
-
-Specifying Result Serialization Strategies
-------------------------------------------
-
-In addition to specifying what strategy to use when submitting tasks, it is also
-possible to specify what strategy the endpoint should use when serializing the results
-of any given task to be sent back to the SDK. This is achieved through the |Executor|'s
-``result_serializers`` constructor argument and property:
-
-.. code-block:: python
-
-  from globus_compute_sdk import Executor
-  from globus_compute_sdk.serialize import JSONData
-
-  with Executor("your endpoint id", result_serializers=[JSONData()]) as gcx:
-    # or set it directly:
-    gcx.result_serializers = [JSONData()]
-
-When a task submission specifies a list of result serializers, the endpoint will
-attempt each serialization strategy in the list until one of them succeeds, returning
-that first success. If all strategies in the list fail, the endpoint returns an error
-with the details of each failure.
-
-
-.. |rarr| unicode:: 0x2192
+  >>> from globus_compute_sdk import Client
+  >>> gcc = Client()
+  >>> ep_id = '4b116d3c-1703-4f8f-9f6f-39921e5864df'
+  >>> gcc.get_endpoint_status(ep_id)
+  {'status': 'online'}
+  >>> gcc.get_endpoint_metadata(ep_id)
+  {'uuid': '4b116d3c-1703-4f8f-9f6f-39921e5864df', 'name': 'tutorial', ...}
 
 .. |Batch| replace:: :class:`Batch <globus_compute_sdk.sdk.batch.Batch>`
 .. |Client| replace:: :class:`Client <globus_compute_sdk.sdk.client.Client>`
@@ -409,8 +307,6 @@ with the details of each failure.
 
 .. |AccessTokenAuthorizer| replace:: ``AccessTokenAuthorizer``
 .. _AccessTokenAuthorizer: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_authorizers.html#globus_sdk.AccessTokenAuthorizer
-.. |dill| replace:: ``dill``
-.. _dill: https://dill.readthedocs.io/en/latest/#basic-usage
 
 .. |GlobusApp| replace:: ``GlobusApp``
 .. _GlobusApp: https://globus-sdk-python.readthedocs.io/en/stable/authorization/globus_app/apps.html

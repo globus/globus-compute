@@ -1,5 +1,5 @@
-Globus Compute Executor
-=======================
+Executor User Guide
+===================
 
 The |Executor|_ class, a subclass of Python's |ConcurrentFuturesExecutor|_, is the
 preferred approach to collecting results from the Globus Compute web services.  Over
@@ -332,6 +332,113 @@ processing:
 .. include:: shell_functions.rst
 
 
+.. _specifying-serde-strategy:
+
+Specifying a Submit-Side Serialization Strategy
+-----------------------------------------------
+
+When sending functions and arguments for execution on a Compute endpoint, the SDK uses
+the :class:`~globus_compute_sdk.serialize.ComputeSerializer` class to convert data to and from a format that can be easily
+sent over the wire. Internally, :class:`~globus_compute_sdk.serialize.ComputeSerializer` uses instances of
+:class:`~globus_compute_sdk.serialize.SerializationStrategy` to do the actual work of serializing (converting function code
+and arguments to strings) and deserializing (converting well-formatted strings back into
+function code and arguments).
+
+The default strategies are :class:`~globus_compute_sdk.serialize.DillCode` for function code and :class:`~globus_compute_sdk.serialize.DillDataBase64` for
+function ``*args`` and ``**kwargs``, which are both wrappers around |dill|_. To choose
+another serializer, use the ``serializer`` member of the Compute :class:`~globus_compute_sdk.Executor`:
+
+.. code:: python
+
+  from globus_compute_sdk import Executor
+  from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode, JSONData
+
+  with Executor('<your-endpoint-id>') as gcx:
+    gcx.serializer = ComputeSerializer(
+      strategy_code=CombinedCode(), strategy_data=JSONData()
+    )
+
+:doc:`See here for a up-to-date list of serialization strategies. <../reference/serialization_strategies>`
+
+To check whether a strategy works for a given use-case, use the :func:`~globus_compute_sdk.serialize.ComputeSerializer.check_strategies`
+method:
+
+.. code:: python
+
+  from globus_compute_sdk.serialize import ComputeSerializer, DillCodeSource, JSONData
+
+  def greet(name, greeting = "greetings"):
+    """Greet someone."""
+
+    return f"{greeting} {name}"
+
+  serializer = ComputeSerializer(
+    strategy_code=DillCodeSource(),
+    strategy_data=JSONData()
+  )
+
+  serializer.check_strategies(greet, "world", greeting="hello")
+  # serializes like the following:
+  gcx.submit(greet, "world", greeting="hello")
+
+  # use the return value of check_strategies:
+  fn, args, kwargs = serializer.check_strategies(greet, "world", greeting="hello")
+  assert fn(*args, **kwargs) == greet("world", greeting="hello")
+
+.. _avoiding-serde-errors:
+
+Avoiding Serialization Errors
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We strongly recommend that you use the same Python version as the target
+Endpoint when using the SDK to submit new functions.
+
+The serialization/deserialization mechanics in Python and the pickle/dill
+libraries are implemented at the bytecode level and have evolved extensively
+over time.  There is no backward/forward compatibility guarantee between
+versions.  Thus a function serialized in an older version of Python or dill
+may not deserialize correctly in later versions, and the opposite is even more
+problematic.
+
+Even a single number difference in Python minor versions (e.g., from 3.12 |rarr| 3.13)
+can generate issues.  Micro version differences (e.g., from 3.11.8 |rarr| 3.11.9)
+are usually safe, though not universally.
+
+Errors may surface as serialization/deserialization ``Exception``s, Globus
+Compute task workers lost due to ``SEGFAULT``, or even incorrect results.
+
+Note that the |Client| class's :func:`~globus_compute_sdk.Client.register_function`
+method can be used to pre-serialize a function using the registering SDK's environment
+and return a UUID identifier.  The resulting bytecode will then be deserialized at run
+time by an Endpoint whenever a task that specifies this function UUID is submitted
+(possibly from a different SDK environment) using the Client's
+:func:`~globus_compute_sdk.Client.run` or the |Executor|'s
+:func:`~globus_compute_sdk.Executor.submit_to_registered_function` methods.
+
+
+Specifying Result Serialization Strategies
+------------------------------------------
+
+In addition to specifying what strategy to use when submitting tasks, it is also
+possible to specify what strategy the endpoint should use when serializing the results
+of any given task to be sent back to the SDK. This is achieved through the |Executor|'s
+``result_serializers`` constructor argument and property:
+
+.. code-block:: python
+
+  from globus_compute_sdk import Executor
+  from globus_compute_sdk.serialize import JSONData
+
+  with Executor("your endpoint id", result_serializers=[JSONData()]) as gcx:
+    # or set it directly:
+    gcx.result_serializers = [JSONData()]
+
+When a task submission specifies a list of result serializers, the endpoint will
+attempt each serialization strategy in the list until one of them succeeds, returning
+that first success. If all strategies in the list fail, the endpoint returns an error
+with the details of each failure.
+
+
 AMQP Port
 ---------
 
@@ -350,18 +457,20 @@ like BinderHub:
   >>> gce = Executor(amqp_port=443)
 
 
+.. |rarr| unicode:: 0x2192
+
 .. |Client| replace:: ``Client``
-.. _Client: reference/client.html
+.. _Client: ../reference/client.html
 .. |Executor| replace:: ``Executor``
-.. _Executor: reference/executor.html
+.. _Executor: ../reference/executor.html
 .. |Future| replace:: ``Future``
 .. _Future: https://docs.python.org/3/library/concurrent.futures.html#future-objects
 .. |ConcurrentFuturesExecutor| replace:: ``concurrent.futures.Executor``
 .. _ConcurrentFuturesExecutor: https://docs.python.org/3/library/concurrent.futures.html#executor-objects
 .. |.shutdown()| replace:: ``.shutdown()``
-.. _.shutdown(): reference/executor.html#globus_compute_sdk.Executor.shutdown
+.. _.shutdown(): ../reference/executor.html#globus_compute_sdk.Executor.shutdown
 .. |.submit()| replace:: ``.submit()``
-.. _.submit(): reference/executor.html#globus_compute_sdk.Executor.submit
+.. _.submit(): ../reference/executor.html#globus_compute_sdk.Executor.submit
 .. |.result()| replace:: ``.result()``
 .. _.result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.result
 .. |.done()| replace:: ``.done()``
@@ -369,8 +478,10 @@ like BinderHub:
 .. |.set_result()| replace:: ``.set_result()``
 .. _.set_result(): https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future.set_result
 .. |.reload_tasks()| replace:: ``.reload_tasks()``
-.. _.reload_tasks(): reference/executor.html#globus_compute_sdk.Executor.reload_tasks
+.. _.reload_tasks(): ../reference/executor.html#globus_compute_sdk.Executor.reload_tasks
 .. |.task_group_id| replace:: ``.task_group_id``
-.. _.task_group_id: reference/executor.html#globus_compute_sdk.Executor.task_group_id
+.. _.task_group_id: ../reference/executor.html#globus_compute_sdk.Executor.task_group_id
 .. _Collatz conjecture: https://en.wikipedia.org/wiki/Collatz_conjecture
 .. _concurrent.futures.as_completed: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.as_completed
+.. |dill| replace:: ``dill``
+.. _dill: https://dill.readthedocs.io/en/latest/#basic-usage

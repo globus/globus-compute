@@ -86,8 +86,7 @@ how to download and configure an endpoint for local (multi-process) execution:
    :caption: Contents:
 
    quickstart
-   executor
-   sdk
+   sdk/index
    endpoints/index
    tutorials/index
    actionprovider
