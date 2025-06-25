@@ -1212,7 +1212,7 @@ to the Executor constructor or for later submissions:
        print("Result:", results)
 
 N.B. this is example code highlighting the ``user_endpoint_config`` attribute of the
-``Executor`` class; please generally consult the :doc:`../executor` documentation.
+``Executor`` class; please generally consult the :doc:`../sdk/executor_user_guide` documentation.
 
 
 Administrator Quickstart

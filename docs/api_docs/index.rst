@@ -1,5 +1,5 @@
-API Documentation
-=================
+REST API Documentation
+======================
 
 .. toctree::
 

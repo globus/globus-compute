@@ -15,7 +15,7 @@ running Linux.
 .. note::
 
    Though the Compute Endpoint is only supported on Linux, the
-   :doc:`Globus Compute SDK <../sdk>` *is* supported on other operating systems.
+   :doc:`Globus Compute SDK <../sdk/index>` *is* supported on other operating systems.
 
 .. _pypi-based-installation:
 

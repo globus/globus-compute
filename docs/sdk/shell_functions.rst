@@ -54,7 +54,7 @@ available through the |ShellResult|_:
 .. note::
     Bear in mind that the snippet lines count toward the 10 MiB payload size limit.  The
     number of lines captured from ``stdout`` and ``stderr`` can be modified by setting
-    the :doc:`snippet_lines <reference/shell_function>` keyword argument.
+    the :doc:`snippet_lines <../reference/shell_function>` keyword argument.
 
 Working Directory
 ^^^^^^^^^^^^^^^^^
