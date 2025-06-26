@@ -3,6 +3,43 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.9.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.9.0
+---------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Endpoint administrators now have access to information about the user's mapped
+  identity in the user configuration template (``user_config_template.yaml.j2``)
+  via the ``mapped_identity`` variable. The following fields are available:
+
+  - ``mapped_identity.local.uname``: Local user's username
+  - ``mapped_identity.local.uid``: Local user's ID
+  - ``mapped_identity.local.gid``: Local user's primary group ID
+  - ``mapped_identity.local.groups``: List of group IDs the local user is a member of
+  - ``mapped_identity.local.gecos``: Local user's GECOS field
+  - ``mapped_identity.local.shell``: Local user's login shell
+  - ``mapped_identity.local.dir``: Local user's home directory
+  - ``mapped_identity.globus.id``: Matched Globus identity ID
+
+Bug Fixes
+^^^^^^^^^
+
+- Starting a multi-user endpoint no longer prompts the user to complete multiple login flows.
+
+Changed
+^^^^^^^
+
+- Under the assumption that newly configured `High Assurance`_ (HA) endpoints
+  will typically require audit logging, the new endpoint configuration (i.e.,
+  the :ref:`configure <multi-user-configuration>` subcommand) routine now sets
+  the |audit_log_path| configuration item to a default value.  (In effect,
+  audit log functionality is now opt-out, not opt-in.)
+
+- Bump ``globus-compute-common`` requirement to version ``0.7.1``.
+
 .. _changelog-3.8.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.8.0
