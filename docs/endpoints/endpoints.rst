@@ -561,6 +561,8 @@ We explain how to acquire the environment variable values in detail in
 :ref:`client credentials with globus compute clients`.
 
 
+.. _restrict-submission-serialization-methods:
+
 Restricting Submission Serialization Methods
 --------------------------------------------
 

@@ -574,67 +574,6 @@ behave as expected.  Example:
 That will be injected into the UEP process as an environment variable.
 
 
-Security Posture
-================
-
-The current security model of the MEP relies heavily upon Identity Mapping and POSIX
-user support.  The only job of the MEP is to start UEPs for users on request from the
-Globus Compute web service.  The actual processing of tasks is left to the individual
-UEPs.  This is accomplished through the well-known ``fork()`` |rarr| *drop privileges*
-|rarr| ``exec()`` Unix workflow, mimicking the approach of many other services
-(including Secure Shell [ssh], Globus GridFTP, and the Apache Web server).  In this
-manner, all of the standard Unix administrative user controls can be enforced.
-
-Additionally, administrators may further limit access to MEP installations via Globus
-authentication policies (which can verify that users have site-appropriate identities
-linked to their Globus account with recent authentications), and limiting tasks to an
-approved list of functions.
-
-
-.. _identity-mapping:
-
-Identity Mapping
-----------------
-
-"Mapping an identity" is the site-specific process of verifying that one identity is
-equivalent to another for the purposes of a given action.  In the Globus Compute case,
-this means translating a Globus Auth identity set to a local POSIX user account on the
-MEP host for each start-UEP message.  For an administrator-run MEP (i.e., running as the
-``root`` user), an identity mapping configuration is required, and is the main
-difference from a :ref:`non-root MEP <endpoints_templating_configuration>` |nbsp| ---
-|nbsp| a ``root``-owned MEP first maps the Globus Auth identity set from each start-UEP
-message to a local POSIX user (i.e., a local username), before ``fork()``-ing a new
-process, dropping privileges to that user, and starting the requested UEP.
-
-Please reference the discussion with :ref:`example-idmap-config` (above) for specifics
-and examples.
-
-
-Authentication Policies
------------------------
-
-In addition to the identity mapping access control, administrators may also use Globus
-authentication policies to narrow which identities can even send tasks to a MEP.  An
-authentication policy can enforce details such as that a user has an identity from a
-specific domain or has authenticated with the Globus Auth recently.  Refer to the
-`Authentication Policies documentation`_ for more background and specifics on what
-Globus authentication policies can do and how they fit in to a site's security posture.
-
-Please reference the larger :ref:`auth-policies` section (below) for more information.
-
-
-Function Allow Listing
-----------------------
-
-Administrators can further narrow MEP usage by limiting what functions may be invoked
-by tasks.  At task submission time, the web-service will reject any submissions that
-request functions not in the MEP's configured ``allowed_functions`` list.  Then, child
-UEPs will again verify each task against the same list |nbsp| --- |nbsp| a check at the
-web-service and a check on-site.
-
-Please reference :ref:`function-allowlist` (below) for more detailed information.
-
-
 Running the MEP
 ===============
 
@@ -971,7 +910,7 @@ custom module!  But sadly, that is also out of scope of this documentation; plea
 Authentication Policies
 =======================
 
-Administrators can limit access to a MEP via a Globus authentication policy, which
+Administrators can limit access to a MEP via a `Globus authentication policy`_, which
 verifies that the user has appropriate identities linked to their Globus account and
 that the required identities have recent authentications. Authentication policies are
 stored within the Globus Auth service and can be shared among multiple MEPs.
@@ -1042,6 +981,235 @@ make the necessary changes to ``config.yaml``:
    $ globus-compute-endpoint configure my-mep --multi-user --auth-policy 2340174a-1a0e-46d8-a958-7c3ddf2c834a
 
 
+.. _high-assurance-mep:
+
+High-Assurance
+--------------
+
+Globus Compute endpoints may be designated as High-Assurance (HA) to meet stricter
+security, compliance, and operational requirements.  HA endpoints differ from non-HA
+endpoints in a few key ways:
+
+- in addition to running regular functions, HA endpoints may also run HA functions
+  (described below).
+
+- HA endpoints enable audit-logging, whereby the states of all tasks (whether HA or
+  not) are logged to a file.
+
+Consider deploying a High-Assurance endpoint where there is need for stronger identity
+verification and authentication controls, and for workloads that require elevated
+assurance levels, such as sensitive research or regulated data processing.
+
+.. note::
+
+   Once an endpoint has registered, the High-Assurance setting may not be toggled.
+   An endpoint may not become HA at a later date if it is not initially registered as
+   such.  The reverse ("downgrading" from HA) is similarly disallowed.
+
+
+Configuration
+^^^^^^^^^^^^^
+
+High-Assurance functionality requires a HA-enabled `Globus subscription`_, to be
+explicitly marked as HA, and to be associated with a HA `Auth policy`_.  In
+configuration form, that translates to ``subscription_id``, ``high_assurance``, and
+``authentication_policy``:
+
+.. code-block:: yaml
+   :caption: Example ``config.yaml`` of a HA endpoint
+
+   ...
+   subscription_id: 2c94f030-d346-11e9-939f-02ff96a5aa76
+   high_assurance: true
+   authentication_policy: 8e6529c8-a7ce-4310-b895-244e1b33702a
+   ...
+
+In this example, the ``subscription_id`` is associated with a HA-enabled subscription,
+and the ``authentication_policy`` has similarly been setup as HA.  Both of these values
+may be found in the Globus App `Web UI`_.  Find Subscriptions available to you via
+**Settings** |rarr| **Subscriptions**.
+
+Policies are associated with projects, so first navigate to **Settings**
+|rarr| **Developers** and select or create a project.  Within a project, navigate to
+the **Policies** tab.  If creating a policy, be sure to check the "High Assurance"
+checkbox.
+
+Alternatively, a new HA policy may be created at configuration time with an
+overly-specified command line:
+
+.. code-block:: console
+   :linenos:
+
+   # globus-compute-endpoint configure \
+       --multi-user \
+       --display-name "Example High-Assurance Compute Endpoint" \
+       --high-assurance \
+       --subscription-id 00000000-1111-...ffff \
+       --auth-policy-project-id 11111111-2222-...5555 \
+       --allowed-domains "example.edu,*.example.edu" \
+       --auth-timeout 1800 \
+      example_ha_compute_endpoint
+
+This example command line will
+
+- (Line 4) *create* a new HA (``--high-assurance``) policy ...
+- (Line 5) associated with the ``0000...`` subscription ...
+- (Line 6) under the ``1111...`` project ...
+- (Line 7) that will require users be from the ``example.edu`` domain or any subdomain ...
+- (Line 8) and that they authenticate every ``1800`` seconds.
+
+This example does not show all options; use ``configure --help`` to see what is
+available:
+
+.. code-block:: console
+
+   # globus-compute-endpoint configure --help
+   Usage: globus-compute-endpoint configure [OPT...
+
+
+High-Assurance Functions
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+A High-Assurance function is one that has been registered with the Globus Compute API
+as associated with a HA endpoint.  In other words, a HA function requires (exactly one)
+HA endpoint.  A HA function may not be run on any other endpoint and will be removed
+from all Globus-operated storage after 3 months of inactivity.
+
+To register a High-Assurance function, specify the ``ha_endpoint_id`` argument to
+``register_function()``:
+
+.. code-block:: python
+
+   from globus_compute_sdk import Client, Executor
+
+   def ha_func(pii: str):
+      from datetime import datetime
+      return f"ha_func: {datetime.now()} - processed pii: {pii}"
+
+   gc = Client()
+   ex = Executor()  # for illustrative purposes; strongly consider `with Executor() as ex:` style
+
+   # Registration works the same, whether via the Client or the Executor
+   ha_func_id_via_client = gc.register_function(ha_func, ha_endpoint_id='...')
+   ha_func_id_via_ex = ex.register_function(ha_func, ha_endpoint_id='...')
+
+   # Now save one of the registered ids (from this example, they point to the same
+   # function logic) for later use with `.submit_to_registered_function()`
+   print(ha_func_id_via_ex)
+
+Further, SDK usage of a HA function will require the SDK interaction to follow the HA
+requirements of the associated policy.  For example, a long running HA task (a task
+that uses an HA function) might require the SDK to login again before downloading the
+associated result:
+
+.. code-block:: python
+   :emphasize-lines: 6,15
+   :linenos:
+
+   >>> from globus_compute_sdk import Executor
+   >>> ha_endpoint_id = '...'
+   >>> ha_function_id = '...'
+   >>> with Executor(endpoint_id=ha_endpoint_id) as ex:
+   ...     fut = ex.submit_to_registered_function(ha_function_id, "ha-worthy-argument-to-function")
+   ...     print("\nResult:", fut.result())
+
+   Please authenticate with Globus here:
+   -------------------------------------
+   https://auth.globus.org/v2/oauth2/authorize?...
+   -------------------------------------
+
+   Enter the resulting Authorization Code here: ...
+
+   It is your responsibility to ensure disclosure of regulated data, such as Protected Health Information, resulting from the submission of this function and its arguments is legally authorized.
+
+   ha_func: 2025-04-29 13:39:57.888666 - processed pii: ha-worthy-argument-to-function
+
+On line 6, the script will wait until it receives notification from the AMQP server
+that the task result is ready.  Crucially, as the function is designated HA, the
+service does **not** send the result directly to the Executor instance, but instead
+simply sends notification that the task has completed.  To retrieve the result, the
+Executor will make a request to the Globus Compute API which will verify, at the time
+of retrieval, that all HA requirements are met.  If they are not, then the Executor
+will initiate the required login flow.
+
+Line 15 shows the standard disclaimer when working with an HA function.
+
+
+Audit Logging
+^^^^^^^^^^^^^
+
+Audit logging is available only to High-Assurance endpoints, and is enabled by the
+``audit_log_path`` |ManagerEndpointConfig| item:
+
+.. code-block:: yaml
+   :caption: Example ``config.yaml`` showing the ``audit_log_path`` configuration key
+   :emphasize-lines: 3,4
+
+   multi_user: true
+   ...
+   high_assurance: true
+   audit_log_path: /.../audit.log
+
+If this file does not exist, then it will be created with user-secure permissions
+(``umask=0o077``) when the endpoint starts.  It will not be checked thereafter, so it
+is incumbent on the administrator to ensure the file remains appropriately secured.
+
+When enabled, task events, if available, will be emitted one record per line:
+
+.. code-block:: text
+   :caption: Example ``audit.log`` content; the ``...`` fields are omitted for
+      documentation clarity
+
+   2025-04-10T14:44:58.742079-05:00 uid=0 pid=... eid=... Begin MEP session =====
+   ...
+   2025-04-10T14:45:30.906170-05:00 uid=... pid=... uep=... fid=... tid=... bid= RECEIVED
+   2025-04-10T14:45:30.906661-05:00 uid=... pid=... uep=... fid=... tid=... bid= EXEC_START
+   2025-04-10T14:45:37.401833-05:00 uid=... pid=... uep=... fid=... tid=... bid=4 jid=2477 RUNNING
+   2025-04-10T14:45:37.969570-05:00 uid=... pid=... uep=... fid=... tid=... bid=4 jid=2477 EXEC_END
+   ...
+   2025-04-10T14:46:39.689716-05:00 uid=0 pid=... eid=... End MEP session -----
+
+Each session begins when the MEP starts, and ends when the MEP stops (denoted with the
+sentinel lines ``Begin MEP session =====`` and ``End MEP session -----``).  Each record
+contains for the emitting process:
+
+- a local-timezone timestamp in ISO 8601 format
+- ``uid`` -- the POSIX user id
+- ``pid`` -- the POSIX process id
+- ``uep`` -- the internal UEP identifier, a UUID
+- ``fid`` -- the function identifier registered with the Compute service, a UUID
+- ``tid`` -- the task identifier registered with the Compute service, a UUID
+- ``bid`` -- the block identifier, if available, where the task was scheduled
+- ``jid`` -- the scheduler job identifier, if available
+- the task state (one of ``RECEIVED``, ``EXEC_START``, ``RUNNING``, ``EXEC_END``)
+
+The four task states describe where the task was in the execution process when the
+audit record was emitted:
+
+- ``RECEIVED`` -- denotes that the endpoint has received the task from the AMQP service
+
+- ``EXEC_START`` -- emitted when the engine has handed the task to the internal executor
+
+- ``RUNNING`` -- emitted if the engine shares this event; notably, the
+  GlobusComputeEngine does while the :ref:`ProcessPoolEngine and ThreadPoolEngines
+  <uep-conf>` do not.
+
+- ``EXEC_END`` -- emitted when the task has completed, just prior to sending the result
+  to the Compute AMQP service
+
+
+Additional High-Assurance Resources
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Globus Subscriptions:
+
+  https://www.globus.org/subscriptions
+
+- High Assurance Security Overview:
+
+  https://docs.globus.org/guides/overviews/security/high-assurance-overview/
+
+
 .. _function-allowlist:
 
 Function Allow Listing
@@ -1051,6 +1219,7 @@ To require that UEPs only allow certain functions, specify the ``allowed_functio
 top-level configuration item:
 
 .. code-block:: yaml
+   :caption: ``config.yaml``
 
    multi_user: true
    allowed_functions:
@@ -1082,6 +1251,7 @@ as this check will be done locally by the UEP.  An example UEP configuration tem
 snippet might be:
 
 .. code-block:: yaml+jinja
+   :caption: ``user_config_template.yaml.j2``
 
    engine:
       ...
@@ -1340,16 +1510,20 @@ Administrator Quickstart
 .. _Web UI: https://app.globus.org/compute
 .. _Identity Mapping documentation: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/
 .. _Authentication Policies documentation: https://docs.globus.org/api/auth/developer-guide/#authentication_policy_fields
+.. _Auth policy: https://docs.globus.org/api/auth/developer-guide/#authentication-policies
 .. |globus-identity-mapping| replace:: ``globus-identity-mapping``
 .. _globus-identity-mapping: https://pypi.org/project/globus-identity-mapping/
 .. |getpwnam(3)| replace:: ``getpwnam(3)``
 .. _getpwnam(3): https://www.man7.org/linux/man-pages/man3/getpwnam.3.html
 .. _Jinja template: https://jinja.palletsprojects.com/en/3.1.x/
+.. _Globus authentication policy: https://docs.globus.org/api/auth/developer-guide/#authentication-policies
 .. _Globus Connect Server Identity Mapping Guide: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#mapping_recipes
+.. _Globus subscription: https://www.globus.org/subscriptions
 .. _#help on the Globus Compute Slack: https://funcx.slack.com/archives/C017637NZFA
 .. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
 .. _JSON schema: https://json-schema.org/
 
+.. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
 .. |PamConfiguration| replace:: :class:`PamConfiguration <globus_compute_endpoint.endpoint.config.pam.PamConfiguration>`
 
 .. _virtualenv: https://pypi.org/project/virtualenv/
