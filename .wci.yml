@@ -16,8 +16,8 @@ language: Python
             
 documentation: 
   general: https://globus-compute.readthedocs.io
-  installation: https://globus-compute.readthedocs.io/en/latest/quickstart.html
-  tutorial: https://globus-compute.readthedocs.io/en/latest/tutorials/index.html
+  installation: https://globus-compute.readthedocs.io/en/stable/quickstart.html
+  tutorial: https://globus-compute.readthedocs.io/en/stable/tutorials/index.html
             
 social:
   twitter: globus
