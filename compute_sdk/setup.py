@@ -23,8 +23,8 @@ REQUIRES = [
     "tblib==1.7.0",
     "texttable>=1.6.7",
     # 3 below for color highlighting related console print
-    "colorama==0.4.6",
-    "rich==13.7.1",
+    "colorama>=0.4.6,<1",
+    "rich>=13.7.1,<15",
     "psutil<6",
     "exceptiongroup>=1.2.2",  # until we drop support for python < 3.11
 ]
