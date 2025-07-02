@@ -407,6 +407,15 @@ def test_container_build_status_failure(gcc):
     assert type(excinfo.value) is SystemError
 
 
+def test_stop_endpoint(gcc: gc.Client):
+    ep_uuid_str = uuid.uuid4()
+    gcc._compute_web_client = mock.MagicMock()
+
+    gcc.stop_endpoint(ep_uuid_str)
+
+    gcc._compute_web_client.v3.lock_endpoint.assert_called_with(ep_uuid_str)
+
+
 def test_register_function(gcc: gc.Client, serde: ComputeSerializer):
     gcc._compute_web_client = mock.MagicMock()
     gcc.register_function(funk)

@@ -1004,7 +1004,7 @@ class Client:
             The response of the request
         """
         with self._request_lock:
-            return self._compute_web_client.v2.lock_endpoint(endpoint_id)
+            return self._compute_web_client.v3.lock_endpoint(endpoint_id)
 
     @_client_gares_handler
     def delete_endpoint(self, endpoint_id: str):

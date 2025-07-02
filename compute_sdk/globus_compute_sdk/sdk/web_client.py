@@ -296,7 +296,7 @@ class WebClient(globus_sdk.BaseClient):
         return self.get(f"/v3/endpoints/{endpoint_id}/allowed_functions")
 
     def stop_endpoint(self, endpoint_id: UUID_LIKE_T) -> globus_sdk.GlobusHTTPResponse:
-        return self.post(f"/v2/endpoints/{endpoint_id}/lock", data={})
+        return self.post(f"/v3/endpoints/{endpoint_id}/lock", data={})
 
     def delete_endpoint(
         self, endpoint_id: UUID_LIKE_T
