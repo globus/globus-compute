@@ -124,7 +124,7 @@ def test_stop_remote_endpoint(mocker):
     mocker.patch("globus_compute_endpoint.cli.get_config")
     mocker.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id", return_value=ep_uuid)
 
-    path = f"/v2/endpoints/{ep_uuid}/lock"
+    path = f"/v3/endpoints/{ep_uuid}/lock"
     with responses.RequestsMock() as resp:
         lock_resp = resp.post(_SVC_ADDY + path, json={}, status=200)
         _do_stop_endpoint(ep_dir=ep_dir, remote=False)
