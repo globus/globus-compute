@@ -752,16 +752,23 @@ class Client:
             return self._compute_web_client.v2.get_endpoint(endpoint_uuid).data
 
     @_client_gares_handler
-    def get_endpoints(self):
-        """Get a list of all endpoints owned by the current user across all systems.
+    def get_endpoints(self, role: str | None = None):
+        """Get a list of endpoints available to the current user.
+
+        Parameters
+        ----------
+        role: str
+            Filter returned list by user's association to endpoints (e.g., ``owner``,
+            ``any``).  The default value is unset, in which case the API (currently)
+            assumes ``owner``.
 
         Returns
         -------
         list
-            A list of dictionaries which contain endpoint info
+            A list of dictionaries which contain endpoint information
         """
         with self._request_lock:
-            return self._compute_web_client.v2.get_endpoints().data
+            return self._compute_web_client.v2.get_endpoints(role=role).data
 
     @_client_gares_handler
     def register_function(

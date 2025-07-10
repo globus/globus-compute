@@ -10,12 +10,13 @@ from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_sdk import GlobusHTTPResponse
 
 
+def randomstring_impl(length=5, alphabet=string.ascii_letters):
+    return "".join(random.choice(alphabet) for _ in range(length))
+
+
 @pytest.fixture
 def randomstring():
-    def func(length=5, alphabet=string.ascii_letters):
-        return "".join(random.choice(alphabet) for _ in range(length))
-
-    return func
+    return randomstring_impl
 
 
 @pytest.fixture

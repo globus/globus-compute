@@ -14,6 +14,7 @@ from unittest import mock
 import globus_compute_sdk as gc
 import pytest
 import requests
+from conftest import randomstring_impl
 from globus_compute_sdk import ContainerSpec, __version__
 from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
@@ -1102,3 +1103,12 @@ def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
     assert len(records) == 2, "Only two distinct messages; warnings suppresses dups"
     assert arbitrary_hatext == str(records[0].message)
     assert "abcd" == str(records[1].message)
+
+
+@pytest.mark.parametrize("role", (None, randomstring_impl(), "any"))
+def test_get_endpoints_with_role(gcc, role):
+    gcc.get_endpoints()  # always check the "send nothing" case
+    gcc._compute_web_client.v2.get_endpoints.assert_called_with(role=None)
+
+    gcc.get_endpoints(role=role)
+    gcc._compute_web_client.v2.get_endpoints.assert_called_with(role=role)
