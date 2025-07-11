@@ -92,7 +92,7 @@ def check_version(task_details: dict | None, check_py_micro: bool = True) -> str
                 f"\t    SDK: Python {sdk_py}/Dill {sdk_dill}\n"
                 f"\tWorkers: Python {worker_py}/Dill {worker_dill}\n"
                 f"This may cause serialization issues.  See "
-                "https://globus-compute.readthedocs.io/en/latest/sdk.html#avoiding-serialization-errors "  # noqa"
+                "https://globus-compute.readthedocs.io/en/latest/sdk/executor_user_guide.html#avoiding-serialization-errors "  # noqa"
                 "for more information."
             )
     return None
