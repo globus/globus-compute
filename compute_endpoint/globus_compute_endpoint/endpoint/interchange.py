@@ -140,6 +140,7 @@ class EndpointInterchange:
         self.engine.start(
             endpoint_id=self.endpoint_id,
             run_dir=self.logdir,
+            monitored=(self.config.high_assurance and self._audit_fd),
         )
 
     def quiesce(self):

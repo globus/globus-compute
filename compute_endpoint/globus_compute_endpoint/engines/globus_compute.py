@@ -317,14 +317,15 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
 
         os.makedirs(self.executor.provider.script_dir, exist_ok=True)
 
-        # A minor amout of black magic because we're not using Parsl's DFK:
-        # attach the `monitoring_messages` queue to the executor before starting
-        # the executor but *after* the GC Endpoint will have detached.  The
-        # existence of `monitoring_messages` tells Parsl to enable the requisite
-        # machinery to give us such details as `block_id`.
-        self.executor.monitoring_messages = SpawnQueue()
+        if kwargs.pop("monitored", None) is True:
+            # A minor amout of black magic because we're not using Parsl's DFK:
+            # attach the `monitoring_messages` queue to the executor before starting
+            # the executor but *after* the GC Endpoint will have detached.  The
+            # existence of `monitoring_messages` tells Parsl to enable the requisite
+            # machinery to give us such details as `block_id`.
+            self.executor.monitoring_messages = SpawnQueue()
 
-        threading.Thread(target=self.monitor_watcher, daemon=True).start()
+            threading.Thread(target=self.monitor_watcher, daemon=True).start()
 
         self.executor.start()
 

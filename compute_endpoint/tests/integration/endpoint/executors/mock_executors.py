@@ -23,6 +23,7 @@ class MockEngine(unittest.mock.Mock):
         endpoint_id: uuid.UUID | None = None,
         run_dir: str | None = None,
         funcx_client: Client = None,
+        monitored: bool = False,
     ):
         self.funcx_client = funcx_client
         self.endpoint_id = endpoint_id
