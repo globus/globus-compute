@@ -497,14 +497,22 @@ def test_engine_submit_failure_reported(
 
     t = threading.Thread(target=ep_ix._main_loop, daemon=True)
     t.start()
-    try_assert(lambda: mock_rp.publish.called)
+
+    msgs_b = b""
+
+    def has_result():
+        nonlocal msgs_b
+        msgs_b = b"\n".join(m for (m,), _ in mock_rp.publish.call_args_list)
+        return b'"result"' in msgs_b
+
+    try_assert(has_result, "Expect result published")
+
     ep_ix.stop()
     t.join()
 
-    msg_b = next(m for (m,), _ in mock_rp.publish.call_args_list if b'"result"' in m)
     (lfmt,), _ = mock_log.exception.call_args
 
-    assert exc_text.encode() in msg_b, "Expect engine failure published"
+    assert exc_text.encode() in msgs_b, "Expect engine failure published"
     assert f"Failed to process task {task_uuid}" == lfmt, "Expect logs see failure"
 
 
