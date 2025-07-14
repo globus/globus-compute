@@ -246,16 +246,14 @@ def test_gcengine_start_pass_through_to_executor(tmp_path: pathlib.Path, endpoin
     assert mock_ex.provider.script_dir == scripts_dir
 
 
-def test_gcengine_start_provider_without_channel(tmp_path: pathlib.Path, endpoint_uuid):
-    mock_executor = mock.Mock(spec=HighThroughputExecutor)
-    mock_executor.status_polling_interval = 5
-    mock_executor.provider = mock.Mock(spec=KubernetesProvider)
-    mock_executor.launch_cmd = "foo-bar"
-    mock_executor.interchange_launch_cmd = "foo-bar"
+def test_gcengine_start_provider_without_channel(
+    mock_htex: HighThroughputExecutor, tmp_path: pathlib.Path, endpoint_uuid
+):
+    mock_htex.provider = mock.Mock(spec=KubernetesProvider)
 
-    assert not hasattr(mock_executor.provider, "channel"), "Verify test setup"
+    assert not hasattr(mock_htex.provider, "channel"), "Verify test setup"
 
-    engine = GlobusComputeEngine(executor=mock_executor)
+    engine = GlobusComputeEngine(executor=mock_htex)
     engine.start(endpoint_id=endpoint_uuid, run_dir=tmp_path)
     engine.shutdown()
 

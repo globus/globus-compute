@@ -111,8 +111,14 @@ def test_engine_submit_internal(
     assert serde.deserialize(result.data) == 6
 
 
-def test_gcengine_monitors_tasks(engine_runner, ez_pack_task, task_uuid):
-    eng = engine_runner(GlobusComputeEngine)
+def test_gcengine_monitors_tasks(tmp_path, ez_pack_task, task_uuid):
+    eng = GlobusComputeEngine(
+        address="::1",
+        max_workers_per_node=1,
+        heartbeat_period=1,
+        job_status_kwargs={"max_idletime": 0, "strategy_period": 0.2},
+    )
+    eng.start(endpoint_id=task_uuid, run_dir=str(tmp_path), monitored=True)
     task_bytes = ez_pack_task(double, 1)
     f = GCFuture(task_uuid)
     assert f.block_id is None, "Verify test setup"
@@ -121,3 +127,4 @@ def test_gcengine_monitors_tasks(engine_runner, ez_pack_task, task_uuid):
     _ = f.result()
     assert f.block_id is not None
     assert f.job_id is not None
+    eng.shutdown()

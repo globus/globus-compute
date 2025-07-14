@@ -5,10 +5,13 @@ import pathlib
 import random
 import typing as t
 import uuid
+from unittest import mock
 
 import pytest
 from globus_compute_endpoint.endpoint.config import PamConfiguration
 from globus_compute_endpoint.engines.helper import execute_task
+from parsl import HighThroughputExecutor
+from parsl.executors import MPIExecutor
 from tests.conftest import randomstring_impl
 
 
@@ -104,3 +107,21 @@ def get_random_of_datatype():
 @pytest.fixture
 def execute_task_runner(task_uuid, tmp_path):
     return functools.partial(execute_task, task_uuid, run_dir=tmp_path)
+
+
+@pytest.fixture
+def mock_htex():
+    m = mock.Mock(spec=HighThroughputExecutor, monitoring_messages=None)
+    m.status_polling_interval = 5
+    m.launch_cmd = "launchy"
+    m.interchange_launch_cmd = "ix-launchy"
+    return m
+
+
+@pytest.fixture
+def mock_mpiex():
+    m = mock.Mock(spec=MPIExecutor, monitoring_messages=None)
+    m.status_polling_interval = 5
+    m.launch_cmd = "launchy"
+    m.interchange_launch_cmd = "ix-launchy"
+    return m
