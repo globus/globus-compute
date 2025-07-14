@@ -3,6 +3,22 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.10.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.10.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed the ``Client.stop_endpoint`` method to work with multi-user endpoints
+  in addition to single-user endpoints.
+
+Changed
+^^^^^^^
+
+- Expanded upper bound for ``rich`` and ``colorama`` dependencies.
+
 .. _changelog-3.9.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.9.0

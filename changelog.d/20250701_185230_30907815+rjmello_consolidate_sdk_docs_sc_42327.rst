@@ -1,4 +1,0 @@
-Changed
-^^^^^^^
-
-- Expanded upper bound for ``rich`` and ``colorama`` dependencies.

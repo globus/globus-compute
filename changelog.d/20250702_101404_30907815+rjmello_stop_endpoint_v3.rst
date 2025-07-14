@@ -1,5 +1,0 @@
-Bug Fixes
-^^^^^^^^^
-
-- Fixed the ``Client.stop_endpoint`` method to work with multi-user endpoints
-  in addition to single-user endpoints.
