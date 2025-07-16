@@ -267,7 +267,7 @@ note are:
 - ``user_config_template_path``
 
   The path to the user endpoint configuration Jinja2 template YAML file.  If not specified,
-  the default template path will be used: ``~/.globus_compute/user_config_template.yaml.j2``.
+  the default template path will be used: ``~/.globus_compute/my-mep/user_config_template.yaml.j2``.
 
   See :ref:`user-config-template-yaml-j2` for more information.
 
@@ -280,7 +280,7 @@ note are:
 - ``user_config_schema_path``
 
   The path to the user endpoint configuration JSON schema file.  If not specified, the
-  default schema path will be used: ``~/.globus_compute/user_config_schema.json``.
+  default schema path will be used: ``~/.globus_compute/my-mep/user_config_schema.json``.
 
   See :ref:`user-config-schema-json` for more information.
 
