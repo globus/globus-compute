@@ -7,5 +7,6 @@ Globus Compute Endpoints
    Compute Endpoints <endpoints>
    multi_user
    installation
+   templates
    endpoint_examples
    config_reference

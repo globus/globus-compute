@@ -230,6 +230,7 @@ the |HighThroughputExecutor|_ and the `available providers`_.
 .. _Parsl implements a number of providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
 .. _available providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
 
+.. _endpoint-manager-config:
 
 Endpoint Manager Configuration
 ------------------------------
