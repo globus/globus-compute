@@ -152,8 +152,9 @@ def test_reset_reconnect_attempt_limit_when_stable(mocker, fs, ei, mock_tqs, moc
     assert ei._quiesce_event.wait.call_count == 3, "Verify loop iterations"
 
 
-def test_rundir_passed_to_gcengine(mocker, fs, ei):
-    "Test EndpointInterchange passing run_dir to GCE on start"
+def test_start_engine_args_to_gcengine(mocker, fs, ei):
+    """Test EndpointInterchange passes args (endpoint_id, run_dir, monitored) to
+    engine on start"""
 
     mocker.patch(f"{_mock_base}ResultPublisher")
     mocker.patch(f"{_mock_base}threading.Thread")
@@ -162,8 +163,9 @@ def test_rundir_passed_to_gcengine(mocker, fs, ei):
 
     ei.start_engine()
 
-    a, k = ei.engine.start.call_args
-    assert k["run_dir"] == ei.logdir
+    ei.engine.start.assert_called_with(
+        endpoint_id=ei.endpoint_id, run_dir=ei.logdir, monitored=False
+    )
 
 
 def test_heartbeat_includes_static_info(ei, mock_rp, mock_tqs, mock_pack, mock_ep_info):
