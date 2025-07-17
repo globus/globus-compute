@@ -8,5 +8,6 @@ Globus Compute Endpoints
    multi_user
    security_posture
    installation
+   templates
    endpoint_examples
    config_reference

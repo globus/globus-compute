@@ -804,6 +804,10 @@ Both ``.submit()`` calls will send tasks to the *same* endpoint, the one specifi
 ``mep_id``, but the MEP will spawn two different UEPs, one for each unique
 ``user_endpoint_config`` sent to the web services.
 
+.. tip::
+
+   Refer to :doc:`templates` for more information.
+
 .. _pardon-the-mess:
 
 .. note::
@@ -813,33 +817,6 @@ Both ``.submit()`` calls will send tasks to the *same* endpoint, the one specifi
    flag has stuck, but we will very likely evolve the implementation and thinking here
    to be a more general concept.
 
-Validating Template Variables
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If the file ``user_config_schema.json`` exists, then the MEP will validate the
-``user_endpoint_config`` input against the JSON schema.  The default schema is quite
-permissive, allowing the two defined variables to be strings, and then also allowing any
-other user‑specified properties directly:
-
-.. code-block:: json
-
-   {
-     "$schema": "https://json-schema.org/draft/2020-12/schema",
-     "type": "object",
-     "properties": {
-       "endpoint_setup": { "type": "string" },
-       "worker_init": { "type": "string" }
-     },
-     "additionalProperties": true
-   }
-
-Configuring a JSON schema is out of scope for this documentation, but this tool is
-available to restrict what the MEP will accept for interpolation.  If the only person
-using this endpoint is you, then this schema might be considered overkill.  On the other
-hand, using it properly can help ferret out typos and thinkos, so one item to call out
-specifically is ``additionalProperties: true``, which is what allows
-non‑specified (i.e., "arbitrary") properties.  Please consult the `JSON Schema
-documentation <https://json-schema.org/>`_ for more information.
 
 .. |nbsp| unicode:: 0xA0
    :trim:

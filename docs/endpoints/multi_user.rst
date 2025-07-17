@@ -431,105 +431,7 @@ successful start-UEP requests.  More than simple interpolation, the MEP treats t
 as a `Jinja template`_, so there is a good bit of flexibility available to the motivated
 administrator.
 
-.. tip::
-
-   Administrators can combine multiple templates with the ``extends``, ``include``, and
-   ``import`` Jinja tags.  However, since these templates are rendered in user space,
-   the administrator must:
-
-   1. Move the template files to a directory that every mapped local user account has
-      read access to.
-   2. Specify the main template file path with the ``user_config_template_path``
-      configuration option.
-
-The initial user config template implements two user-specifiable
-variables, ``endpoint_setup`` and ``worker_init``.  Both of these default to the empty
-string if not specified by the user (i.e., ``...|default()``).
-
-.. code-block:: yaml+jinja
-
-   endpoint_setup: {{ endpoint_setup|default() }}
-   engine:
-     ...
-     provider:
-       ...
-       worker_init: {{ worker_init|default() }}
-
-   idle_heartbeats_soft: 10
-   idle_heartbeats_hard: 5760
-
-Given the above template, users submitting to this MEP would be able to specify the
-``endpoint_setup`` and ``worker_init`` values.  All other values will remain unchanged
-when the UEP starts up.
-
-As linked on the left, :doc:`there are a number of example configurations
-<endpoint_examples>` to showcase the available options, but ``idle_heartbeats_soft`` and
-``idle_heartbeats_hard`` bear describing.
-
-- ``idle_heartbeats_soft``: if there are no outstanding tasks still processing, and the
-  endpoint has been idle for this many heartbeats, shutdown the endpoint
-
-- ``idle_heartbeats_hard``: if endpoint is *apparently* idle (e.g., there are
-  outstanding tasks, but they have not moved) for this many heartbeats, then shutdown
-  anyway.
-
-A heartbeat occurs every 30s; if ``idle_heartbeats_hard`` is set to 7, and no tasks
-or results move (i.e., tasks received from the web service or results received from
-workers), then the endpoint will shutdown after 3m30s (7 × 30s).
-
-Every template also has access to the following variables:
-
-- ``parent_config``: Contains the configuration values of the parent MEP. Can be helpful
-  in situations involving Python-based configuration files.
-
-- ``user_runtime``: Contains information about the runtime that the user used when
-  submitting the task request, such as Python version. See |UserRuntime| for a complete
-  list of available information.
-
-- ``mapped_identity``: Contains information about the user's mapped identity. The following
-  fields are available:
-
-  - ``mapped_identity.local.uname``: Local user's username
-  - ``mapped_identity.local.uid``: Local user's ID
-  - ``mapped_identity.local.gid``: Local user's primary group ID
-  - ``mapped_identity.local.groups``: List of group IDs the local user is a member of
-  - ``mapped_identity.local.gecos``: Local user's GECOS field
-  - ``mapped_identity.local.shell``: Local user's login shell
-  - ``mapped_identity.local.dir``: Local user's home directory
-  - ``mapped_identity.globus.id``: Matched Globus identity ID
-
-  .. code-block:: yaml+jinja
-     :caption: Example usage of ``mapped_identity`` in config template
-
-      engine:
-         type: GlobusComputeEngine
-         provider:
-            type: SlurmProvider
-      {% if 1001 in mapped_identity.local.groups %}
-            partition: {{ partition }}
-      {% else %}
-            partition: default
-      {% endif %}
-
-These are reserved words and their values cannot be overridden by the user or admin,
-and an error is thrown if a user tries to send it as a user option:
-
-.. code-block:: python
-
-   mep_id = "..."
-   with Executor(
-       endpoint_id=mep_id,
-       user_endpoint_config={
-           "parent_config": "not allowed"
-       },
-   ) as ex:
-       ex.submit(some_task).result()
-
-   # the following exception is thrown:
-   # GlobusAPIError: ('POST', 'http://compute.api.globus.org/v3/endpoints/<mep_id>/submit',
-   #   'Bearer', 422, 'SEMANTICALLY_INVALID', "Request payload failed validation:
-   #   Unable to start user endpoint process for <user> [exit code: 77; (ValueError)
-   #   'parent_config' is a reserved word and cannot be passed in via user config]")
+Please refer to :doc:`templates` for more information.
 
 .. _user-config-schema-json:
 
@@ -537,27 +439,10 @@ and an error is thrown if a user tries to send it as a user option:
 ---------------------------
 
 If this file exists, then the MEP will validate the user's input against the JSON
-schema.  The default schema is quite permissive, allowing strings for the two defined
-variables to be strings, and then any other properties.  Example:
+schema.
 
-.. code-block:: json
-
-   {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-         "endpoint_setup": { "type": "string" },
-         "worker_init": { "type": "string" }
-      },
-      "additionalProperties": true
-   }
-
-While configuring a JSON schema is out of scope for this documentation, one item to call
-out specifically is ``additionalProperties: true``.  If set to true, then the schema
-will allow any key not already-specified in ``properties`` |nbsp| --- |nbsp| in other
-words, any arbitrary keys and values specified by the user at task submission time,
-whether or not they are utilized in ``user_config_template.yaml.j2``.  Please consult
-the `JSON Schema documentation <https://json-schema.org/>`_ for more information.
+Please refer to the :ref:`template-variable-validation` section of :doc:`templates`
+for more information.
 
 ``user_environment.yaml``
 -------------------------
