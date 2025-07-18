@@ -436,6 +436,15 @@ Similarly, artifacts created by ``endpoint_setup`` may be cleaned up with
 2. Containerized Environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. important::
+   Container images must include the ``globus-compute-endpoint`` package.
+
+   .. code-block:: dockerfile
+
+      # Example Dockerfile
+      FROM python:3.13
+      RUN pip install globus-compute-endpoint
+
 .. hint::
    See the :doc:`../tutorials/dynamic_containers` tutorial for instructions on how
    to specify container configuration when submitting tasks.
