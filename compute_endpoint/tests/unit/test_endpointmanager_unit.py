@@ -609,15 +609,16 @@ def test_sends_data_during_registration(
 
     for key in (
         "type",
-        "multi_user",
         "environment",
     ):
         assert key in k["metadata"]["config"]
 
     assert k["public"] is mock_conf.public
     assert k["multi_user"] is True
-    assert k["metadata"]["config"]["multi_user"] is True
+
     assert k["metadata"]["endpoint_config"] == mock_conf.source_content
+    assert "multi_user" not in k["metadata"]["config"]
+    assert "engine" not in k["metadata"]["config"]
 
 
 def test_handles_network_error_scriptably(

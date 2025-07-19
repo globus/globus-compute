@@ -28,6 +28,7 @@ from globus_compute_endpoint.cli import (
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.utils import is_privileged
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
@@ -169,6 +170,9 @@ def test_init_config_dir_file_conflict(fs):
     assert "Error creating directory" in str(exc)
 
 
+@pytest.mark.skipif(
+    is_privileged(), reason="Can't observe permission errors if run as root"
+)
 def test_init_config_dir_permission_error(fs):
     parent_dirname = pathlib.Path("/parent/dir/")
     config_dirname = parent_dirname / "config"
@@ -491,11 +495,9 @@ def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
     run_line(config_cmd)
 
     conf_dict = dict(yaml.safe_load(conf.read_text()))
-    conf_dict["engine"]["address"] = "::1"  # avoid unnecessary DNS lookup
     conf = load_config_yaml(yaml.safe_dump(conf_dict))
 
     assert conf.display_name is None, conf.display_name
-    conf.engine.shutdown()
 
 
 def test_start_ep_incorrect_config_yaml(
@@ -561,37 +563,6 @@ def test_start_ep_umask_set_restrictive(
     assert os.umask(orig_umask) == 0o077
 
 
-def test_single_user_requires_engine_configured(mock_command_ensure, ep_name, run_line):
-    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
-    ep_dir.mkdir(parents=True)
-    data = {"config": ""}
-
-    config = {}
-    data["config"] = yaml.safe_dump(config)
-    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
-    assert "validation error" in rc.stderr
-    assert "engine\n  field required" in rc.stderr
-
-    config = {"multi_user": False}
-    data["config"] = yaml.safe_dump(config)
-    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
-    assert "validation error" in rc.stderr
-    assert "engine\n  field required" in rc.stderr
-
-
-def test_multi_user_config_enforces_no_engine(mock_command_ensure, ep_name, run_line):
-    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
-    ep_dir.mkdir(parents=True)
-    data = {"config": ""}
-
-    config = {"engine": {"type": "ThreadPoolEngine"}, "multi_user": True}
-    data["config"] = yaml.safe_dump(config)
-    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
-
-    assert "validation error" in rc.stderr, (rc.stdout, rc.stderr)
-    assert "engine\n" in rc.stderr, (rc.stdout, rc.stderr)
-
-
 @pytest.mark.parametrize("use_uuid", (True, False))
 @mock.patch(f"{_MOCK_BASE}get_config")
 @mock.patch(f"{_MOCK_BASE}Endpoint.get_endpoint_id")
@@ -630,27 +601,6 @@ def test_delete_endpoint_with_malformed_config_sc28515(
     assert conf_dir.exists() and conf_dir.is_dir()
     run_line(f"delete {ep_name} --yes --force")
     assert not conf_dir.exists()
-
-
-@pytest.mark.parametrize("die_with_parent", [True, False])
-@mock.patch(f"{_MOCK_BASE}get_config")
-def test_die_with_parent_detached(
-    mock_get_config,
-    run_line,
-    mock_cli_state,
-    die_with_parent,
-    ep_name,
-    make_endpoint_dir,
-):
-    config = UserEndpointConfig()
-    mock_get_config.return_value = config
-    make_endpoint_dir()
-
-    if die_with_parent:
-        run_line(f"start {ep_name} --die-with-parent")
-    else:
-        run_line(f"start {ep_name}")
-    assert config.detach_endpoint is (not die_with_parent)
 
 
 def test_python_exec(mocker: MockFixture, run_line: t.Callable):

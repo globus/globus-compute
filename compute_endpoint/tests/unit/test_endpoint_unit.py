@@ -508,26 +508,9 @@ def test_endpoint_respects_port(mock_ep_data, port, mock_reg_info, ep_uuid):
         assert a == (exp_url, port)
 
 
-def test_endpoint_sets_owner_only_access(tmp_path, umask):
-    umask(0)
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
-
-    assert ep_dir.stat().st_mode & 0o777 == 0o700, "Expected user-only access"
-
-
-def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
-    umask(0o777)  # No access whatsoever
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
-
-    assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
-    ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
-
-
 def test_mu_endpoint_user_ep_yamls_world_readable(tmp_path):
     ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
+    Endpoint.init_endpoint_dir(ep_dir, id_mapping=True)
 
     user_tmpl_path = Endpoint.user_config_template_path(ep_dir)
     user_env_path = Endpoint._user_environment_path(ep_dir)

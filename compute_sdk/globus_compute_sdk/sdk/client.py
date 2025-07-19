@@ -633,11 +633,9 @@ class Client:
         """
         self.version_check()
 
-        data: t.Dict[str, t.Any] = {"endpoint_name": name}
+        data: t.Dict[str, t.Any] = {"endpoint_name": name, "multi_user": True}
         if display_name is not None:
             data["display_name"] = display_name
-        if multi_user:
-            data["multi_user"] = multi_user
         if metadata:
             data["metadata"] = metadata
         if allowed_functions:
