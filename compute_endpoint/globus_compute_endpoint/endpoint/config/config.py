@@ -194,7 +194,7 @@ class UserEndpointConfig(BaseConfig):
 
     :param engine: The GlobusComputeEngine for this endpoint to execute functions.
         The currently known engines are ``GlobusComputeEngine``, ``ProcessPoolEngine``,
-        and ``ThreadPoolEngine``.  See :ref:`uep_conf` for more information.
+        and ``ThreadPoolEngine``.  See :ref:`uep-conf` for more information.
 
     :param executors: A tuple of executors which serve as the backend for function
         execution.  If ``None``, then use a default-instantiation of

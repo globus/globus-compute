@@ -6,6 +6,7 @@ Globus Compute Endpoints
 
    Compute Endpoints <endpoints>
    multi_user
+   security_posture
    installation
    endpoint_examples
    config_reference
