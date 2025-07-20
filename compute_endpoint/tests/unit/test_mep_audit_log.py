@@ -60,7 +60,7 @@ def conf_tmpl():
 @pytest.fixture
 def conf(tmp_path):
     (tmp_path / "user_config_template.yaml.j2").write_text(conf_tmpl())
-    mec = ManagerEndpointConfig(multi_user=True, high_assurance=True)
+    mec = ManagerEndpointConfig(high_assurance=True)
     mec.audit_log_path = tmp_path / "audit.log"
     test_environ = {
         "HOME": str(tmp_path),
