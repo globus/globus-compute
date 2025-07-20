@@ -50,7 +50,7 @@ def enable_on_boot(ep_dir: pathlib.Path, app: GlobusApp):
     ep_name = ep_dir.name
 
     config = get_config(ep_dir)
-    if isinstance(config, UserEndpointConfig):  # aka: not multi_user
+    if isinstance(config, UserEndpointConfig):  # aka: not a manager endpoint
         if config.detach_endpoint:
             # config.py takes priority if it exists
             if (ep_dir / "config.py").is_file():
