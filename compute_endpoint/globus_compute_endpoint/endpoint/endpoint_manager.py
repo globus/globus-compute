@@ -236,7 +236,7 @@ class EndpointManager:
                     sys.exit(os.EX_DATAERR)
                 raise
             except NetworkError as e:
-                log.exception("Network error while registering multi-user endpoint")
+                log.exception("Network error while registering manager endpoint")
                 log.critical(f"Network failure; unable to register endpoint: {e}")
                 sys.exit(os.EX_TEMPFAIL)
 
@@ -335,7 +335,7 @@ class EndpointManager:
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
 
-        # * == "multi-user"; not important until it is, so let it be subtle
+        # * == "manager endpoint"; not important until it is, so let it be subtle
         ptitle = f"Globus Compute Endpoint *({endpoint_uuid}, {conf_dir.name})"
         if config.environment:
             ptitle += f" - {config.environment}"
@@ -1033,11 +1033,10 @@ class EndpointManager:
             p_uname = self._mu_user.pw_name
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
-                    "Requested UID is same as multi-user UID, but configuration"
-                    " has not been marked to allow the multi-user UID to process"
-                    " tasks.  To allow the multi-user UID to also run single-user"
-                    " endpoints, consider using a non-root user or removing privileges"
-                    " from the UID."
+                    "Requested UID is same as Manager Endpoint UID, but configuration"
+                    " has not been marked to allow the Manager Endpoint UID to process"
+                    " tasks.  To allow the same UID to also run tasks, consider using"
+                    " a non-root user or removing privileges from the UID."
                     f"\n  MU Process UID: {self._mu_user.pw_uid} ({p_uname})"
                     f"\n  Requested UID:  {uid} ({uname})"
                     f"\n  Via identity:   {ident.matched_identity}",
@@ -1165,10 +1164,9 @@ class EndpointManager:
 
             orig_uid, orig_gid = os.getuid(), os.getgid()
             if (orig_uid, orig_gid) != (uid, gid):
-                # For multi-user systems, this is the expected path.  But for those
-                # who run the multi-user setup as a non-privileged user, there is
-                # no need to change the user: they're already executing _as that
-                # uid_!
+                # For template-only uses, there is no need to change the user.  But
+                # for administrative installs, this is the expected path -- become the
+                # identity-mapped user before doing anything else.
 
                 with self.do_host_auth(uname):
                     log.debug("Setting process group for %s to %s", pid, gid)
