@@ -63,7 +63,7 @@ def conf_no_exec():
     yield UserEndpointConfig(executors=())
 
 
-def _get_cls_kwds(cls):
+def _get_cls_kwds(cls) -> set[str]:
     fas = (inspect.getfullargspec(c.__init__) for c in cls.__mro__)
 
     return {k for f in fas for k in f.kwonlyargs}
@@ -71,8 +71,10 @@ def _get_cls_kwds(cls):
 
 def test_config_opts_accounted_for_in_tests():
     kwds = _get_cls_kwds(UserEndpointConfig)
+    kwds.remove("multi_user")  # special case deprecated argument
     assert set(known_user_config_opts) == kwds
     kwds = _get_cls_kwds(ManagerEndpointConfig)
+    kwds.remove("multi_user")  # special case deprecated argument
     assert set(known_manager_config_opts) == kwds
 
 
@@ -90,7 +92,14 @@ def test_extra_opts_disallowed():
     assert "does_not_exist" in str(pyt_e.value)
 
 
-def test_load_user_endpoint_config(get_random_of_datatype):
+def test_load_user_endpoint_config_minimal():
+    conf = {"engine": {"type": "ThreadPoolEngine"}}
+    serde_yaml = yaml.safe_dump(conf)
+    conf = load_config_yaml(serde_yaml)
+    assert isinstance(conf, UserEndpointConfig)
+
+
+def test_load_user_endpoint_config_full(get_random_of_datatype):
     conf = {
         kw: get_random_of_datatype(tval) for kw, tval in known_user_config_opts.items()
     }
@@ -101,7 +110,14 @@ def test_load_user_endpoint_config(get_random_of_datatype):
     assert isinstance(conf, UserEndpointConfig)
 
 
-def test_load_manager_endpoint_config(get_random_of_datatype, fs):
+def test_load_manager_endpoint_config_minimal():
+    conf = {}
+    serde_yaml = yaml.safe_dump(conf)
+    conf = load_config_yaml(serde_yaml)
+    assert isinstance(conf, ManagerEndpointConfig)
+
+
+def test_load_manager_endpoint_config_full(get_random_of_datatype):
     conf = {
         kw: get_random_of_datatype(tval)
         for kw, tval in known_manager_config_opts.items()
