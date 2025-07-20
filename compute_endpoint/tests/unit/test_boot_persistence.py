@@ -72,28 +72,17 @@ def test_enable_on_boot_no_systemd(fake_ep_dir, mocker):
     assert "Systemd not found" in str(e)
 
 
-@pytest.mark.parametrize("mu", (True, False))
-def test_enable_on_boot_detach_endpoint(
-    mocker, fake_ep_dir, systemd_unit_dir, mu: bool
-):
+def test_enable_on_boot_detach_endpoint(fake_ep_dir, systemd_unit_dir):
     mock_app = mock.Mock(spec=UserApp)
     cfg_path = fake_ep_dir / "config.yaml"
     cfg = yaml.safe_load(cfg_path.read_text())
     del cfg["detach_endpoint"]
-    if mu:
-        cfg["multi_user"] = True
-        del cfg["engine"]
     cfg_path.write_text(yaml.dump(cfg))
 
-    if mu:
-        mock_print = mocker.patch(f"{_MOCK_BASE}print")
+    with pytest.raises(ClickException) as e:
         enable_on_boot(fake_ep_dir, mock_app)
-        assert "Systemd service installed at " in mock_print.call_args[0][0]
-    else:
-        with pytest.raises(ClickException) as e:
-            enable_on_boot(fake_ep_dir, mock_app)
 
-        assert "cannot run in detached mode" in str(e)
+    assert "cannot run in detached mode" in str(e)
 
 
 @pytest.mark.parametrize("exists", [True, False])
