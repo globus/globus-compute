@@ -88,7 +88,7 @@ def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointCon
     except Exception as err:
         raise ClickException(f"Invalid config syntax: {str(err)}") from err
 
-    is_templatable = config_dict.get("multi_user", False) is True
+    is_templatable = config_dict.get("engine") is None
     try:
         ConfigClass: type[UserEndpointConfig | ManagerEndpointConfig]
         if is_templatable:
