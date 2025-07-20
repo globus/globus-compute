@@ -115,7 +115,7 @@ def identity_map_path(conf_dir):
 
 @pytest.fixture
 def mock_conf(identity_map_path):
-    yield ManagerEndpointConfig(multi_user=True)
+    yield ManagerEndpointConfig()
 
 
 @pytest.fixture
@@ -123,9 +123,7 @@ def mock_conf_root(identity_map_path):
     to_mock = "globus_compute_endpoint.endpoint.config.config.is_privileged"
     with mock.patch(to_mock) as m:
         m.return_value = True
-        yield ManagerEndpointConfig(
-            multi_user=True, identity_mapping_config_path=identity_map_path
-        )
+        yield ManagerEndpointConfig(identity_mapping_config_path=identity_map_path)
 
 
 @pytest.fixture(autouse=True)
@@ -449,7 +447,7 @@ def test_sets_process_title(
     assert a[0].startswith(
         "Globus Compute Endpoint"
     ), "Expect easily identifiable process name"
-    assert "*(" in a[0], "Expected asterisk as subtle clue of 'multi-user'"
+    assert "*(" in a[0], "Expected asterisk as subtle clue of 'manager process'"
     assert f"{ep_uuid}, {conf_dir.name}" in a[0], "Can find process by conf"
 
     if env:
@@ -557,7 +555,7 @@ def test_sets_user_config_template_and_schema_path(
     if custom_schema_path:
         schema_path = conf_dir / "my_schema.json"
 
-    template_path.write_text("multi_user: true")
+    template_path.touch()
     schema_path.write_text("{}")
 
     mock_conf.user_config_template_path = template_path
@@ -609,15 +607,15 @@ def test_sends_data_during_registration(
 
     for key in (
         "type",
-        "multi_user",
         "environment",
     ):
         assert key in k["metadata"]["config"]
 
     assert k["public"] is mock_conf.public
     assert k["multi_user"] is True
-    assert k["metadata"]["config"]["multi_user"] is True
+
     assert k["metadata"]["endpoint_config"] == mock_conf.source_content
+    assert "engine" not in k["metadata"]["config"]
 
 
 def test_handles_network_error_scriptably(

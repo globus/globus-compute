@@ -82,7 +82,7 @@ class Endpoint:
     def update_config_file(
         original_path: pathlib.Path,
         target_path: pathlib.Path,
-        multi_user: bool,
+        id_mapping: bool,
         high_assurance: bool,
         display_name: str | None,
         auth_policy: str | None,
@@ -90,13 +90,12 @@ class Endpoint:
     ):
         config_text = original_path.read_text()
         config_dict = yaml.safe_load(config_text)
+        config_dict.pop("engine", None)
 
         if display_name:
             config_dict["display_name"] = display_name
 
-        if multi_user:
-            config_dict["multi_user"] = multi_user
-            config_dict.pop("engine", None)
+        if id_mapping:
             config_dict["identity_mapping_config_path"] = str(
                 Endpoint._example_identity_mapping_configuration_path(
                     target_path.parent
@@ -108,9 +107,8 @@ class Endpoint:
 
         if high_assurance:
             config_dict["high_assurance"] = high_assurance
-            if multi_user:
-                audit_path = Endpoint._audit_log_path(target_path.parent)
-                config_dict["audit_log_path"] = str(audit_path)
+            audit_path = Endpoint._audit_log_path(target_path.parent)
+            config_dict["audit_log_path"] = str(audit_path)
 
         if subscription_id:
             config_dict["subscription_id"] = subscription_id
@@ -122,7 +120,7 @@ class Endpoint:
     def init_endpoint_dir(
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
-        multi_user: bool = False,
+        id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
         auth_policy: str | None = None,
@@ -133,14 +131,13 @@ class Endpoint:
         :param endpoint_dir: Path to the endpoint configuration dir
         :param endpoint_config: Path to a config file to be used instead of
             the Globus Compute default config file
-        :param multi_user: Whether the endpoint is a multi-user endpoint
+        :param id_mapping: Whether the endpoint will map users
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
         :param subscription_id: Subscription ID to associate endpoint with
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
         user_umask = os.umask(0o0077)
-        os.umask(0o0077 | (user_umask & 0o0400))  # honor only the UR bit for dirs
         try:
             # pathlib.Path does not handle unusual umasks (e.g., 0o0111) so well
             # in the parents=True case, so temporarily change it.  This is nominally
@@ -157,43 +154,36 @@ class Endpoint:
             Endpoint.update_config_file(
                 endpoint_config,
                 config_target_path,
-                multi_user,
+                id_mapping,
                 high_assurance,
                 display_name,
                 auth_policy,
                 subscription_id,
             )
 
-            if multi_user:
-                # template must be readable by user-endpoint processes (see
-                # endpoint_manager.py)
-                owner_only = 0o0600
-                world_readable = 0o0644 & ((0o0777 - user_umask) | 0o0444)
-                world_executable = 0o0711 & ((0o0777 - user_umask) | 0o0111)
-                endpoint_dir.chmod(world_executable)
+            owner_only = 0o0600
+            world_readable = 0o0644
 
-                src_user_tmpl_path = package_dir / "config/user_config_template.yaml.j2"
-                src_user_schem_path = package_dir / "config/user_config_schema.json"
-                src_user_env_path = package_dir / "config/user_environment.yaml"
-                src_example_idmap_path = (
-                    package_dir / "config/example_identity_mapping_config.json"
-                )
-                dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
-                dst_user_schem_path = Endpoint.user_config_schema_path(endpoint_dir)
-                dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
-                dst_idmap_conf_path = (
-                    Endpoint._example_identity_mapping_configuration_path(endpoint_dir)
-                )
+            dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
+            dst_user_schem_path = Endpoint.user_config_schema_path(endpoint_dir)
+            dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
+            dst_idmap_conf_path = Endpoint._example_identity_mapping_configuration_path(
+                endpoint_dir
+            )
 
-                shutil.copy(src_user_tmpl_path, dst_user_tmpl_path)
-                shutil.copy(src_user_schem_path, dst_user_schem_path)
-                shutil.copy(src_user_env_path, dst_user_env_path)
-                shutil.copy(src_example_idmap_path, dst_idmap_conf_path)
+            _src_conf_dir = package_dir / "config"
+            src_user_tmpl_path = _src_conf_dir / dst_user_tmpl_path.name
+            src_user_schem_path = _src_conf_dir / dst_user_schem_path.name
+            src_user_env_path = _src_conf_dir / dst_user_env_path.name
+            src_example_idmap_path = _src_conf_dir / dst_idmap_conf_path.name
 
-                dst_user_tmpl_path.chmod(world_readable)
-                dst_user_schem_path.chmod(world_readable)
-                dst_user_env_path.chmod(world_readable)
+            shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
+            shutil.copyfile(src_user_schem_path, dst_user_schem_path)
+            shutil.copyfile(src_user_env_path, dst_user_env_path)
+            if id_mapping:
+                shutil.copyfile(src_example_idmap_path, dst_idmap_conf_path)
                 dst_idmap_conf_path.chmod(owner_only)
+                dst_user_tmpl_path.chmod(world_readable)
 
         finally:
             os.umask(user_umask)
@@ -202,7 +192,7 @@ class Endpoint:
     def configure_endpoint(
         conf_dir: pathlib.Path,
         endpoint_config: str | None,
-        multi_user: bool = False,
+        id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
         auth_policy: str | None = None,
@@ -218,39 +208,36 @@ class Endpoint:
         Endpoint.init_endpoint_dir(
             conf_dir,
             templ_conf_path,
-            multi_user,
+            id_mapping,
             high_assurance,
             display_name,
             auth_policy,
             subscription_id,
         )
+
         config_path = Endpoint._config_file_path(conf_dir)
-        if multi_user:
-            user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
-            user_conf_schema_path = Endpoint.user_config_schema_path(conf_dir)
-            user_env_path = Endpoint._user_environment_path(conf_dir)
+        user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
+        user_conf_schema_path = Endpoint.user_config_schema_path(conf_dir)
+        user_env_path = Endpoint._user_environment_path(conf_dir)
+
+        print(
+            f"Created profile for endpoint named <{ep_name}>\n"
+            f"\n\tConfiguration file: {config_path}"
+        )
+
+        if id_mapping:
             idmap_ex_conf_path = Endpoint._example_identity_mapping_configuration_path(
                 conf_dir
             )
+            print(f"\n\tExample identity mapping configuration: {idmap_ex_conf_path}")
 
-            print(f"Created multi-user profile for endpoint named <{ep_name}>")
-            print(
-                f"\n\tConfiguration file: {config_path}\n"
-                f"\n\tExample identity mapping configuration: {idmap_ex_conf_path}\n"
-                f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
-                f"\n\tUser endpoint configuration schema: {user_conf_schema_path}"
-                f"\n\tUser endpoint environment variables: {user_env_path}"
-                "\n\nUse the `start` subcommand to run it:\n"
-                f"\n\t$ globus-compute-endpoint start {ep_name}"
-            )
-
-        else:
-            print(f"Created profile for endpoint named <{ep_name}>")
-            print(
-                f"\n\tConfiguration file: {config_path}\n"
-                "\nUse the `start` subcommand to run it:\n"
-                f"\n\t$ globus-compute-endpoint start {ep_name}"
-            )
+        print(
+            f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
+            f"\n\tUser endpoint configuration schema: {user_conf_schema_path}"
+            f"\n\tUser endpoint environment variables: {user_env_path}\n"
+            "\nUse the `start` subcommand to run it:\n"
+            f"\n\t$ globus-compute-endpoint start {ep_name}"
+        )
 
     @staticmethod
     def validate_endpoint_name(path_name: str) -> None:

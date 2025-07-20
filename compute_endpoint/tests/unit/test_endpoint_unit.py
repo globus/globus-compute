@@ -508,35 +508,19 @@ def test_endpoint_respects_port(mock_ep_data, port, mock_reg_info, ep_uuid):
         assert a == (exp_url, port)
 
 
-def test_endpoint_sets_owner_only_access(tmp_path, umask):
-    umask(0)
+@pytest.mark.parametrize("mask", [0, 511] + random.sample(range(1, 511), 5))
+@pytest.mark.parametrize("idmap", (False, True))
+def test_endpoint_sets_owner_only_access(tmp_path, umask, mask, idmap):
+    umask(mask)  # no umask; default to 777 permissions
     ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
+    Endpoint.init_endpoint_dir(ep_dir, id_mapping=idmap)
 
-    assert ep_dir.stat().st_mode & 0o777 == 0o700, "Expected user-only access"
-
-
-def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
-    umask(0o777)  # No access whatsoever
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
-
-    assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
-    ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
-
-
-def test_mu_endpoint_user_ep_yamls_world_readable(tmp_path):
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
-
-    user_tmpl_path = Endpoint.user_config_template_path(ep_dir)
-    user_env_path = Endpoint._user_environment_path(ep_dir)
-
-    assert user_env_path != user_tmpl_path, "Dev typo while developing"
-    for p in (user_tmpl_path, user_env_path):
-        assert p.exists()
-        assert p.stat().st_mode & 0o444 == 0o444, "Minimum world readable"
-    assert ep_dir.stat().st_mode & 0o111 == 0o111, "Minimum world executable"
+    assert ep_dir.stat().st_mode & 0o777 == 0o700, f"Expect POSIX restricted: {ep_dir}/"
+    for p in ep_dir.iterdir():
+        if idmap and p.name.endswith(".j2"):
+            assert p.stat().st_mode & 0o777 == 0o644, f"Expect sharable: {p}"
+            continue
+        assert p.stat().st_mode & 0o777 == 0o600, f"Expect owner-only access: {p}"
 
 
 def test_always_prints_endpoint_id_to_terminal(
@@ -839,7 +823,7 @@ def test_update_config_file_retains_order(fs):
     Endpoint.update_config_file(
         original_path,
         target_path,
-        multi_user=False,
+        id_mapping=False,
         high_assurance=False,
         display_name=None,
         auth_policy=None,

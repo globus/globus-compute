@@ -60,74 +60,41 @@ class TestStart:
             manager.configure_endpoint(config_dir, None)
 
     @pytest.mark.parametrize("ha", [None, True, False])
-    @pytest.mark.parametrize("mu", [None, True, False])
-    def test_configure_multi_user_ha_existing_config(self, ha, mu):
+    def test_configure_ha_existing_config(self, ha):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = Endpoint._config_file_path(config_dir)
         config_copy = str(config_dir.parent / "config2.yaml")
 
-        # First, make an entry with multi_user/ha
-        manager.configure_endpoint(
-            config_dir, None, multi_user=True, high_assurance=False
-        )
+        # First, make an entry with no ha
+        manager.configure_endpoint(config_dir, None, high_assurance=False)
         shutil.move(config_file, config_copy)
         shutil.rmtree(config_dir)
 
         # Then, modify it with new settings
-        manager.configure_endpoint(
-            config_dir, config_copy, multi_user=mu, high_assurance=ha
-        )
+        manager.configure_endpoint(config_dir, config_copy, high_assurance=ha)
 
         with open(config_file) as f:
             config_dict = yaml.safe_load(f)
-        assert "multi_user" in config_dict
         assert ("high_assurance" in config_dict) is (ha is True)
 
         os.remove(config_copy)
 
-    @pytest.mark.parametrize("mu", [None, True, False])
-    def test_configure_multi_user(self, mu):
-        manager = Endpoint()
-        config_dir = pathlib.Path("/some/path/mock_endpoint")
-        config_file = config_dir / "config.yaml"
-
-        if mu is not None:
-            manager.configure_endpoint(config_dir, None, multi_user=mu)
-        else:
-            manager.configure_endpoint(config_dir, None)
-
-        assert config_file.exists()
-
-        with open(config_file) as f:
-            config_dict = yaml.safe_load(f)
-        if mu:
-            assert config_dict["multi_user"] == mu is True
-            assert "engine" not in config_dict
-            assert "identity_mapping_config_path" in config_dict
-            assert pathlib.Path(config_dict["identity_mapping_config_path"]).exists()
-        else:
-            assert "multi_user" not in config_dict
-
     @pytest.mark.parametrize("ha", (False, True))
-    @pytest.mark.parametrize("mu", (False, True))
-    def test_configure_ha_audit_default(self, ha, mu):
+    def test_configure_ha_audit_default(self, ha):
         manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = Endpoint._config_file_path(config_dir)
         audit_path = Endpoint._audit_log_path(config_dir)
 
         with patch(f"{_MOCK_BASE}print"):  # quiet, please
-            manager.configure_endpoint(
-                config_dir, None, multi_user=mu, high_assurance=ha
-            )
+            manager.configure_endpoint(config_dir, None, high_assurance=ha)
 
         assert config_file.exists(), "Verify setup"
         conf = yaml.safe_load(config_file.read_text())
-        if not (mu and ha):
+        if not ha:
             assert "audit_log_path" not in conf
         else:
-            assert conf.get("multi_user"), conf
             assert conf.get("high_assurance"), conf
             assert conf.get("audit_log_path") == str(audit_path), conf
 
