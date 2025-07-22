@@ -828,3 +828,23 @@ def test_delete_endpoint_with_uuid_errors(
 
     assert pyt_exc.value.code == exit_code
     assert log_msg in mock_log.warning.call_args[0][0]
+
+
+def test_update_config_file_retains_order(fs):
+    target_path = pathlib.Path("target_config.yaml")
+    original_path = pathlib.Path("original_config.yaml")
+
+    original_config = "z: first\na: second\n"
+    original_path.write_text(original_config)
+    Endpoint.update_config_file(
+        original_path,
+        target_path,
+        multi_user=False,
+        high_assurance=False,
+        display_name=None,
+        auth_policy=None,
+        subscription_id=None,
+    )
+
+    target_config = target_path.read_text()
+    assert original_config == target_config

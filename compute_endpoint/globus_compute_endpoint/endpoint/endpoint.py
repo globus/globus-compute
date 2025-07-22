@@ -115,7 +115,7 @@ class Endpoint:
         if subscription_id:
             config_dict["subscription_id"] = subscription_id
 
-        config_text = yaml.safe_dump(config_dict)
+        config_text = yaml.safe_dump(config_dict, sort_keys=False)
         target_path.write_text(config_text)
 
     @staticmethod
