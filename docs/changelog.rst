@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.11.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.11.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Add a new ``role`` keyword argument to the ``Client.get_endpoints`` method
+  that enables querying for endpoints that are accessble to, but not owned by,
+  the user (e.g., MEPs). Valid options for ``role`` are ``owner`` and ``any``.
+
 .. _changelog-3.10.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.10.0
