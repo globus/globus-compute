@@ -36,13 +36,35 @@ class ShellResult:
         self.returncode = returncode
         self.exception_name = exception_name
 
-    def __str__(self):
-        return f"Command {self.cmd} returned with exit status: {self.returncode}"
+    def __str__(self) -> str:
+        rc = self.returncode
+        _sout = self.stdout.lstrip("\n").rstrip()
+        sout = "\n".join(_sout[-1024:].splitlines()[-10:])
+        if sout != _sout:
+            sout = f"[... truncated; see .stdout for full output ...]\n{sout}"
+        msg = f"exit code: {rc}\n   stdout:\n{sout}"
+        if rc != 0:
+            # not successful
+            _serr = self.stderr.lstrip("\n").rstrip()
+            serr = "\n".join(_serr[-1024:].splitlines()[-10:])
+            if serr != _serr:
+                serr = f"[... truncated; see .stderr for full output ...]\n{serr}"
+            msg += f"\n\n   stderr:\n{serr}"
+            if self.exception_name:
+                msg += f"\n\nexception: {self.exception_name}"
+        return msg
 
-    def __repr__(self):
-        return (
-            f"{self.__class__.__name__}(returncode={self.returncode}, cmd={self.cmd})"
-        )
+    def __repr__(self) -> str:
+        parts = [
+            f"returncode={self.returncode!r}",
+            f"cmd={self.cmd!r}",
+        ]
+        if self.exception_name is not None:
+            parts.append(f"exception_name={self.exception_name!r}")
+
+        parts.extend((f"stdout={self.stdout!r}", f"stderr={self.stderr!r}"))
+        k = ", ".join(parts)
+        return f"{type(self).__name__}({k})"
 
 
 class ShellFunction:
@@ -93,6 +115,45 @@ class ShellFunction:
         name = name or type(self).__name__
         assert isinstance(name, str)
         self.__name__ = self.valid_function_name(name)
+
+    def __str__(self) -> str:
+        parts = []
+        if self.walltime is not None:
+            parts.append(f" wall time: {self.walltime}")
+        if self.stdout is not None:
+            parts.append(f"    stdout: {self.stdout!r}")
+        if self.stderr is not None:
+            parts.append(f"    stderr: {self.stderr!r}")
+        parts.append(f"     lines: {self.snippet_lines!r}")
+
+        command_header = "   command: "
+        _cmd = self.cmd.strip()
+        cmd = "\n".join(_cmd[:1024].splitlines()[:10])
+        if cmd != _cmd:
+            cmd += "\n[... truncated; see .cmd for full script ...]"
+        if "\n" in cmd:
+            indent = "\n" + len(command_header) * " "
+            cmd = cmd.strip().replace("\n", indent)
+            cmd = f"-----{indent}{cmd}{indent}-----"
+
+        parts.append(f"{command_header}{cmd}")
+        parts_str = "\n".join(parts)
+        return f"{self.__name__}\n{parts_str}"
+
+    def __repr__(self) -> str:
+        parts = []
+        if self.__name__ != type(self).__name__:
+            parts.append(f"name={self.__name__!r}")
+        if self.walltime is not None:
+            parts.append(f"walltime={self.walltime!r}")
+        if self.stdout is not None:
+            parts.append(f"stdout={self.stdout!r}")
+        if self.stderr is not None:
+            parts.append(f"stderr={self.stderr!r}")
+        parts.append(f"snippet_lines={self.snippet_lines}")
+        parts.append(f"cmd={self.cmd!r}")
+        k = ", ".join(parts)
+        return f"{type(self).__name__}({k})"
 
     def valid_function_name(self, v: str) -> str:
         if not (v.isidentifier() and not keyword.iskeyword(v)):
