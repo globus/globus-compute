@@ -24,9 +24,6 @@ log = logging.getLogger(__name__)
 
 class BaseConfig:
     """
-    :param multi_user: If true, the endpoint will spawn child endpoint processes based
-        upon a configuration template.
-
     :param display_name: The display name for the endpoint.  If ``None``, defaults to
         the endpoint name (i.e., the directory name in ``~/.globus_compute/``)
 
@@ -61,12 +58,15 @@ class BaseConfig:
     :param admins: A list of Globus Auth identity IDs that have administrative access
         to the endpoint, in addition to the owner. This field requires an active
         Globus subscription (i.e., ``subscription_id``).
+
+    :param multi_user: DEPRECATED - previously, this controlled whether an endpoint
+        would instantiate child endpoint processes.  The ``engine`` field is now used
+        for this purpose.
     """
 
     def __init__(
         self,
         *,
-        multi_user: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
         allowed_functions: t.Iterable[UUID_LIKE_T] | None = None,
@@ -78,11 +78,11 @@ class BaseConfig:
         local_compute_services: bool = False,
         debug: bool = False,
         admins: t.Iterable[UUID_LIKE_T] | None = None,
+        multi_user: bool | None = None,
     ):
         # Misc
         self.display_name = display_name
         self.debug = debug is True
-        self.multi_user = multi_user is True
         self.high_assurance = high_assurance is True
 
         # Connection info and tuning
@@ -100,6 +100,15 @@ class BaseConfig:
         # Used to store the raw content of the YAML or Python config file
         self.source_content: str | None = None
 
+        if multi_user is not None:
+            warnings.warn(
+                "`multi_user` is deprecated and will be removed in a future release."
+                " If you want this endpoint to spawn child processes, ensure there is"
+                " no `engine` field in its config.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
     def __repr__(self) -> str:
         kwds: dict[str, t.Any] = {}
         for cls in type(self).__mro__:
@@ -109,6 +118,10 @@ class BaseConfig:
                 if kw == "executors":
                     # special case; remove when deprecation complete and removed
                     # circa Aug, 2025 (but no rush)
+                    continue
+                if kw == "multi_user":
+                    # special case; remove when deprecation complete and removed
+                    # circa Jan, 2026 (but no rush)
                     continue
                 curval = getattr(self, kw)
                 if kwdefs and curval != kwdefs.get(kw):
@@ -260,7 +273,6 @@ class UserEndpointConfig(BaseConfig):
         stderr: str = "./endpoint.log",
         **kwargs,
     ) -> None:
-        kwargs["multi_user"] = False
         super().__init__(**kwargs)
 
         if executors and engine:
@@ -340,16 +352,26 @@ class ManagerEndpointConfig(BaseConfig):
     """Holds the configuration items for an endpoint manager.
 
     Typically, one does not instantiate this configuration directly, but specifies
-    the relevant options in the endpoint's ``config.yaml`` file.  For example, to
-    specify an endpoint as multi-user (this class) the YAML config might be just 1
-    line:
+    the relevant options in the endpoint's ``config.yaml`` file.  In fact, the way that
+    Compute internally determines which ``*EndpointConfig`` class is instantiated is
+    whether there is an ``engine`` block in its ``config.yaml`` file:
 
     .. code-block:: yaml
-       :caption: ``config.yaml``
+       :caption: ``config.yaml`` for Managers
 
-       multi_user: true
+       # this file left empty; with no engine block, Compute interprets this
+       # as a manager endpoint
 
-    Note that for multi-user endpoints that will not be run with privileges, identity
+    .. code-block:: yaml
+       :caption: ``config.yaml`` for task-processing endpoints (i.e., non-Managers)
+
+       engine:
+         ...
+
+       # with an engine block, Compute will instantiate a task-processing endpoint
+       # (i.e., a user-endpoint process, or UEP)
+
+    Note that for manager endpoints that will not be run with privileges, identity
     mapping is disabled (hence not specified above).  Conversely, if the process will
     have elevated privileges (e.g., run by ``root`` user or has |setuid(2)|_
     privileges) then identity mapping is required:
@@ -358,14 +380,13 @@ class ManagerEndpointConfig(BaseConfig):
        :caption: ``config.yaml`` (for a ``root``-owned process)
 
        display_name: Debug queue, 1-block max
-       multi_user: true
        identity_mapping_config_path: /path/to/this/idmap_conf.json
 
     Please see the |BaseConfig| class for a list of options that both
     |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
 
-    :param public: Whether all users can discover the multi-user endpoint via the
-        `Globus Compute web user interface <https://app.globus.org/compute>`_ and API.
+    :param public: Whether all users can discover this endpoint via the `Globus
+        Compute web user interface <https://app.globus.org/compute>`_ and API.
 
         .. warning::
 
@@ -408,14 +429,13 @@ class ManagerEndpointConfig(BaseConfig):
         start request for the user-endpoint for this grace period.
 
     :param force_mu_allow_same_user:  If set, override the heuristic that determines
-        whether the UID running the multi-user endpoint may also run single-user
-        endpoints.
+        whether the UID running the manager endpoint may also run single-user endpoints
 
-        Normally, the multi-user endpoint disallows starting single-user endpoints with
-        the same UID as the parent process unless the UID has no privileges.  In other
-        words, ``root`` may not process tasks.  This flag is for those niche setups that
-        require the ``root`` user to process tasks.  Be very careful if setting this
-        flag.
+        Normally, the manager endpoint disallows starting user-endpoint processes
+        (UEPs) with the same UID as the parent process unless the UID has no
+        privileges.  In other words, ``root`` may not process tasks.  This flag is for
+        those niche setups that require the ``root`` user to process tasks.  Be very
+        careful if setting this flag.
 
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
     .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
@@ -439,7 +459,6 @@ class ManagerEndpointConfig(BaseConfig):
         mu_child_ep_grace_period_s: float = 30.0,
         **kwargs,
     ):
-        kwargs["multi_user"] = True
         super().__init__(**kwargs)
         self.public = public is True
 
