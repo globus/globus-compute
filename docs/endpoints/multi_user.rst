@@ -1,5 +1,5 @@
-Multi-User Compute Endpoints
-****************************
+Multi-User Endpoints
+********************
 
 .. attention::
 

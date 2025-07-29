@@ -232,12 +232,12 @@ the |HighThroughputExecutor|_ and the `available providers`_.
 
 .. _endpoint-manager-config:
 
-Endpoint Manager Configuration
+Manager Endpoint Configuration
 ------------------------------
 
-In contrast to user endpoints (UEPs), manager endpoints (MEPs) have fewer options, and
-are similarly simpler to configure.  The main flag to differentiate between an MEP
-configuration and a UEP configuration is ``multi_user``:
+In contrast to user endpoint processes (UEPs), manager endpoint processes (MEPs) have
+fewer options, and are similarly simpler to configure.  The main flag to differentiate
+between an MEP configuration and a UEP configuration is ``multi_user``:
 
 .. code-block:: yaml
    :caption: The simplest possible ``config.yaml`` for an MEP

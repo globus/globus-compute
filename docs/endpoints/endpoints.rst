@@ -1,26 +1,9 @@
-Globus Compute Endpoints
-************************
+Endpoint User Guide
+*******************
 
-A Globus Compute Endpoint is a process launched by the user to serve as a conduit for
-executing functions on a computing resource.  The Compute Endpoint process manages the
-site‑specific interactions for executing functions, leaving users with only a single API
-necessary for running code on their laptop, campus cluster, or even leadership‑class HPC
-machines.
+This guide will walk you through many of the core features of Globus Compute endpoints.
 
-In the mental model of Globus Compute, Endpoints are the remote instance:
-
-- Globus Compute SDK |nbsp| --- |nbsp| i.e., the script a researcher writes to submit
-  functions to ...
-
-- Globus Compute Web Services |nbsp| --- |nbsp| the Globus‑provided cloud‑services that
-  authenticate and ferry functions and tasks
-
-- **Globus Compute Endpoint** |nbsp| --- |nbsp| a site-specific process, typically on a
-  cluster head node, that manages user‑accessible compute resources to run tasks
-  submitted by the SDK
-
-The Compute Endpoint may be installed via PyPI in the usual manner, as well as via
-system packages.  See :doc:`installation` for more information.
+Each section builds on the previous ones while separating topics for easy reference.
 
 
 Quickstart
@@ -39,11 +22,8 @@ For those just looking for the quickstart commands:
    $ globus-compute-endpoint stop my_first_endpoint
 
 
-Getting Started
-===============
-
-Creating New Compute Endpoints
-------------------------------
+Creating an Endpoint
+====================
 
 Create a new endpoint directory and default files in ``$HOME/.globus_compute/`` via the
 ``configure`` subcommand:
@@ -137,7 +117,7 @@ as these are known working configurations.
 
 
 Starting the Endpoint
----------------------
+=====================
 
 After configuration, start the endpoint instance with the ``start`` subcommand:
 
@@ -227,8 +207,8 @@ If all is well, then using the endpoint is just as described in :ref:`Quickstart
    $ python does_it_work.py
      (1, 2, 3)⸳(4, 5, 6) ==> 32
 
-Stopping the Compute Endpoint
------------------------------
+Stopping the Endpoint
+=====================
 
 There are a couple of ways to stop the Compute endpoint.  The CLI offers the ``stop``
 subcommand:
@@ -249,7 +229,7 @@ parent process is handy, then either will work:
 
 
 Listing Endpoints
------------------
+=================
 
 To list available endpoints on the current system, run:
 
@@ -288,9 +268,6 @@ Endpoints will be in one of the following states:
 
 Fine-Tuning Endpoint Setups
 ===========================
-
-GlobusComputeEngine
--------------------
 
 |GlobusComputeEngine|_ is the execution backend that Globus Compute uses
 to execute functions.  To execute functions at scale, Globus Compute can be
@@ -361,7 +338,7 @@ Here's an example configuration:
 
 
 Ensuring Execution Environment
-------------------------------
+==============================
 
 When executing a function, endpoint *worker processes* expect to have all dependencies
 installed.  For example, if a function requires ``numpy`` and a worker environment does
@@ -522,7 +499,7 @@ The Docker YAML example from above could be approached via ``custom`` and the
 
 
 Client Identities
------------------
+=================
 
 The usual workflow involves a human manually starting an endpoint.  After the first‑run
 and the ensuing "long‑url" login‑process, the credentials are cached in
@@ -564,7 +541,7 @@ We explain how to acquire the environment variable values in detail in
 .. _restrict-submission-serialization-methods:
 
 Restricting Submission Serialization Methods
---------------------------------------------
+============================================
 
 When submitting to an endpoint, users may :ref:`select alternate strategies to
 serialize their code and data. <specifying-serde-strategy>` When that happens, the
@@ -647,7 +624,7 @@ functionally equivalent to a config that omits ``allowed_serializers``:
 .. _enable_on_boot:
 
 Starting the Compute Endpoint on Host Boot
-------------------------------------------
+==========================================
 
 Run ``globus-compute-endpoint enable-on-boot`` to install a systemd unit file:
 
@@ -671,7 +648,7 @@ the service:
 
 
 AMQP Port
----------
+=========
 
 Endpoints receive tasks and communicate task results via the AMQP messaging protocol.
 As of v2.11.0, newly configured endpoints use AMQP over port 443 by default, since
@@ -693,7 +670,7 @@ typically means port 5671.
 .. _endpoints_templating_configuration:
 
 Templating Endpoint Configuration
----------------------------------
+=================================
 
 A common experience for Compute users is a proliferation of their Compute Endpoints.
 After starting with a basic configuration, changing or conflicting requirements
