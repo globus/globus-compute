@@ -18,45 +18,36 @@ In the mental model of Globus Compute, Endpoints are the remote instance:
   cluster head node, that manages user‑accessible compute resources to run tasks
   submitted by the SDK
 
-Core Concepts
-=============
+Process Hierarchy
+=================
 
 When a user submits tasks to a Globus Compute endpoint, the manager endpoint process uses
 :doc:`configuration templates <templates>` to launch a user endpoint process for the user,
-which then launches workers to execute the submitted tasks.
+which ultimately launches workers to execute the tasks.
 
 If an administrator starts a Compute endpoint as a non-privileged local user, the manager
-endpoint process and user endpoint processes all run under same local user:
+endpoint process and user endpoint processes all run as same local user:
 
 .. code-block:: text
-   :caption: Non-privileged user process hierarchy
+   :caption: Starting endpoint as alice
 
    Endpoint
    └── Manager Endpoint Process (alice, UID: 1001)
       └── User Endpoint Process (alice, UID: 1001)
-          ├── Worker 1
-          ├── Worker 2
-          └── Worker N
 
 If an administrator starts a Compute endpoint as a privileged local user (e.g., root), the
-manager endpoint process will run as the privileged local user and employs an identity mapping
-script to determine which local user account should be used to launch each user endpoint process:
+manager endpoint process will run as the privileged local user and employ an `identity mapping
+script <example-idmap-config>`_ to determine which local user account to use when launching each
+user endpoint process:
 
 .. code-block:: text
-   :caption: Privileged user process hierarchy
+   :caption: Starting endpoint as root
 
    Endpoint
    └── Manager Endpoint Process (root)
        ├── User Endpoint Process (alice, UID: 1001)
-       │   ├── Worker 1
-       │   ├── Worker 2
-       │   └── Worker N
        ├── User Endpoint Process (bob, UID: 1002)
-       │   ├── Worker 1
-       │   └── Worker N
        └── User Endpoint Process (eve, UID: 1003)
-           ├── Worker 1
-           └── Worker N
 
 
 .. toctree::
