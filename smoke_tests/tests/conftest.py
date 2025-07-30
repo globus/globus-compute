@@ -73,7 +73,6 @@ _CONFIGS = {
         "endpoint_uuid": "4b116d3c-1703-4f8f-9f6f-39921e5864df",
     },
     "local": {
-        # localhost; typical defaults for a helm deploy
         "client_args": {"environment": "local"},
         "public_hello_fn_uuid": _LOCAL_FUNCTION_ID,
         "endpoint_uuid": _LOCAL_ENDPOINT_ID,
