@@ -441,6 +441,11 @@ def test_diagnostic_base_dir_GC_HOME_or_config_param(
     output = capsys.readouterr().out
     if valid_dir:
         for random_value in test_config.values():
-            assert random_value in output
+            if random_value not in output:
+                print(output)
+                assert False
+            else:
+                assert True
+                # assert random_value in output
     else:
         assert "is not valid" in output
