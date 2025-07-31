@@ -429,12 +429,14 @@ def test_diagnostic_base_dir_GC_HOME_or_config_param(
     env["GLOBUS_COMPUTE_USER_DIR"] = str(base_dir_absolute)
     with mock.patch.dict(os.environ, env):
         test_config = mock_endpoint_config_dir_data(base_dir_absolute, ep_names)
+        print(f"test_config1=({test_config.values()}")
         diag_args = ["-p"]
         if config_param:
             config_absolute = (tmp_path / config_param).absolute()
             diag_args.extend(["--config-dir", str(config_absolute)])
             if valid_dir:
                 test_config = mock_endpoint_config_dir_data(config_absolute, ep_names)
+                print(f"test_config2=({test_config.values()}")
 
         do_diagnostic_base(diag_args)
 
@@ -443,7 +445,7 @@ def test_diagnostic_base_dir_GC_HOME_or_config_param(
         for random_value in test_config.values():
             if random_value not in output:
                 print(output)
-                assert False
+                assert random_value in output
             else:
                 assert True
                 # assert random_value in output
