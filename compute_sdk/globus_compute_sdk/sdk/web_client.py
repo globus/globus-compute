@@ -1,6 +1,6 @@
 """
 This module implements a Globus SDK client class suitable for use with the
-Globus Compute web service.
+Globus Compute web service....
 
 It also implements data helpers for building complex payloads. Most notably,
 `FunctionRegistrationData` which can be constructed from an arbitrary callable.
