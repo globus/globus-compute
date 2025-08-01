@@ -26,7 +26,7 @@ When a user submits tasks to a Globus Compute endpoint, the manager endpoint pro
 which ultimately launches workers to execute the tasks.
 
 If an administrator starts a Compute endpoint as a non-privileged local user, the manager
-endpoint process and user endpoint processes all run as same local user:
+endpoint process and user endpoint processes all run as the same local user:
 
 .. code-block:: text
    :caption: Starting endpoint as alice

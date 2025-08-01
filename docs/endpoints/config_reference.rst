@@ -30,7 +30,7 @@ wrappers of Python's |ThreadPoolExecutor|_ and |ProcessPoolExecutor|_.  These en
 are appropriate for single‑host installations (e.g., a personal workstation).  For
 scheduler‑based clusters, |GlobusComputeEngine|_, as a wrapper over Parsl's
 |HighThroughputExecutor|_, enables access to multiple computation nodes.  The
-:ref:`default configuration <cea_configuration>` specifies |GlobusComputeEngine|_.
+:ref:`default configuration <uep-conf>` specifies |GlobusComputeEngine|_.
 
 The simplest configuration would use the ``ThreadPoolEngine``:
 
@@ -219,6 +219,22 @@ the |HighThroughputExecutor|_ and the `available providers`_.
    with the cluster's internal nodes.
 
    At which point, try it "and see."
+
+Additional Fields
+^^^^^^^^^^^^^^^^^
+
+- ``idle_heartbeats_soft``: if there are no outstanding tasks still processing, and the
+  endpoint has been idle for this many heartbeats, shutdown the endpoint
+
+- ``idle_heartbeats_hard``: if endpoint is *apparently* idle (e.g., there are
+  outstanding tasks, but they have not moved) for this many heartbeats, then shutdown
+  anyway.
+
+.. note::
+
+   By default, a heartbeat occurs every 30s. If ``idle_heartbeats_hard`` is set to 7, and
+   no tasks or results move (i.e., tasks received from the web service or results received
+   from workers), then the endpoint will shutdown after 3m30s (7 × 30s).
 
 .. |LocalProvider| replace:: ``LocalProvider``
 .. _LocalProvider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.LocalProvider.html

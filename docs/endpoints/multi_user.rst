@@ -214,8 +214,7 @@ The default MEP ``config.yaml`` file is:
 The ``multi_user`` flag is required, but the ``identity_mapping_config_path`` is only
 required if the MEP process will have privileges to change users (e.g., if ``$USER =
 root``).  ``display_name`` is optional, but if set, determines how the MEP will appear
-in the `Web UI`_.  (And as the MEP does *not execute tasks*, :ref:`there is no engine
-block <cea_configuration>`.)
+in the `Web UI`_.
 
 .. _example-idmap-config:
 
@@ -421,42 +420,42 @@ the Globus Connect Server's `Identity Mapping documentation`_.
 .. |idmap_output| replace:: ``identity_mapping_output#1.0.0``
 .. _idmap_output: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/#output_document
 
-.. _user-config-template-yaml-j2:
+.. .. _user-config-template-yaml-j2:
 
-``user_config_template.yaml.j2``
---------------------------------
+.. ``user_config_template.yaml.j2``
+.. --------------------------------
 
-This file is the template that will be interpolated with user-specific variables for
-successful start-UEP requests.  More than simple interpolation, the MEP treats this file
-as a `Jinja template`_, so there is a good bit of flexibility available to the motivated
-administrator.
+.. This file is the template that will be interpolated with user-specific variables for
+.. successful start-UEP requests.  More than simple interpolation, the MEP treats this file
+.. as a `Jinja template`_, so there is a good bit of flexibility available to the motivated
+.. administrator.
 
-Please refer to :doc:`templates` for more information.
+.. Please refer to :doc:`templates` for more information.
 
-.. _user-config-schema-json:
+.. .. _user-config-schema-json:
 
-``user_config_schema.json``
----------------------------
+.. ``user_config_schema.json``
+.. ---------------------------
 
-If this file exists, then the MEP will validate the user's input against the JSON
-schema.
+.. If this file exists, then the MEP will validate the user's input against the JSON
+.. schema.
 
-Please refer to the :ref:`template-variable-validation` section of :doc:`templates`
-for more information.
+.. Please refer to the :ref:`template-variable-validation` section of :doc:`templates`
+.. for more information.
 
-``user_environment.yaml``
--------------------------
+.. ``user_environment.yaml``
+.. -------------------------
 
-Use this file to specify site-specific environment variables to export to the UEP
-process.  Though this is a YAML file, it is interpreted internally as a simple
-top-level-only set of key-value pairs.  Nesting of data structures will probably not
-behave as expected.  Example:
+.. Use this file to specify site-specific environment variables to export to the UEP
+.. process.  Though this is a YAML file, it is interpreted internally as a simple
+.. top-level-only set of key-value pairs.  Nesting of data structures will probably not
+.. behave as expected.  Example:
 
-.. code-block:: yaml
+.. .. code-block:: yaml
 
-   SITE_SPECIFIC_VAR: --additional_flag_for_frobnicator
+..    SITE_SPECIFIC_VAR: --additional_flag_for_frobnicator
 
-That will be injected into the UEP process as an environment variable.
+.. That will be injected into the UEP process as an environment variable.
 
 
 Running the MEP

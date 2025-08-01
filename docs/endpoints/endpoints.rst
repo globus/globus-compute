@@ -30,101 +30,159 @@ Create a new endpoint directory and default files in ``$HOME/.globus_compute/`` 
 
 .. code-block:: console
 
-   $ globus-compute-endpoint configure my_first_endpoint
-   Created profile for endpoint named <my_first_endpoint>
+   $ globus-compute-endpoint configure my_endpoint
+   Created multi-user profile for endpoint named <my_endpoint>
 
-       Configuration file: /.../.globus_compute/my_first_endpoint/config.yaml
+       Configuration file: /user/home/.globus_compute/my_endpoint/config.yaml
 
-This new Compute Endpoint will also be in the output of the ``list`` subcommand:
+       User endpoint configuration template: /user/home/.globus_compute/my_endpoint/user_config_template.yaml.j2
+       User endpoint configuration schema: /user/home/.globus_compute/my_endpoint/user_config_schema.json
+       User endpoint environment variables: /user/home/.globus_compute/my_endpoint/user_environment.yaml
 
-.. code-block:: console
+   Use the `start` subcommand to run it:
 
-   $ globus-compute-endpoint list
-   +--------------------------------------+--------------+--------------------+
-   |             Endpoint ID              |    Status    |   Endpoint Name    |
-   +======================================+==============+====================+
-   | None                                 | Initialized  | my_first_endpoint  |
-   +--------------------------------------+--------------+--------------------+
+   globus-compute-endpoint start my_endpoint
 
-The Compute endpoint will receive an endpoint identifier from the Globus Compute web
-service upon first connect.  Until then, it exists solely as a subdirectory of
-``$HOME/.globus_compute/``.
+.. tip::
 
-.. _cea_configuration:
+   Adding the ``--multi-user`` flag will enable multiple users to submit tasks to the endpoint.
+   Visit :doc:`multi_user` to learn more.
 
-As Globus Compute endpoints may be run on a diverse set of computational resources
-(i.e., the gamut from laptops to supercomputers), it is important to configure each
-instance to match the underlying capabilities and restrictions of the resource.  The
-default configuration is functional |nbsp| --- |nbsp| it will process tasks |nbsp| ---
-|nbsp| but it is intentionally limited to only use processes on the Endpoint host; in
-particular, on an HPC host, it will not use any additional computational nodes.  In
-its entirety, the default configuration is:
+``config.yaml``
+---------------
+
+The ``config.yaml`` file controls the manager endpoint process. Please refer to
+:ref:`endpoint-manager-config` for details on each field.
 
 .. code-block:: yaml
-   :caption: ``$HOME/.globus_compute/my_first_endpoint/config.yaml``
+   :caption: Default ``config.yaml`` configuration
 
+   amqp_port: 443
    display_name: null
+
+.. Note::
+   ``display_name`` is an optional field that determines how the endpoint will
+   appear in the `Web UI`_.
+
+.. _user-config-template-yaml-j2:
+
+``user_config_template.yaml.j2``
+--------------------------------
+
+This file is the template that the manager endpoint process will render with user
+defined variables to ultimately launch a user endpoint process. More than simple
+interpolation, the endpoint treats this file as a `Jinja template`_, enabling a
+good bit of flexibility.
+
+The default template file lives in the main endpoint directory, but admins can modify
+the full file path via the ``user_config_template_path`` variable in the :ref:`endpoint
+manager configuration <endpoint-manager-config>`.
+
+The default template implements two user-defined variables: ``endpoint_setup`` and
+``worker_init``.  Both of these default to the empty string if not specified by the
+user (i.e., ``...|default()``).
+
+.. code-block:: yaml+jinja
+   :caption: Default ``user_config_template.yaml.j2``
+
+   endpoint_setup: {{ endpoint_setup|default() }}
+
    engine:
-     max_workers_per_node: 1
-     type: GlobusComputeEngine
-     provider:
-       type: LocalProvider
-       init_blocks: 1
-       max_blocks: 1
-       min_blocks: 0
+      type: GlobusComputeEngine
+      max_workers_per_node: 1
 
-For now, the key items to observe are the structure (e.g., ``provider`` as a child of
-``engine``), the engine type, ``GlobusComputeEngine``, and the provider type,
-``LocalProvider``.
+      provider:
+         type: LocalProvider
+         min_blocks: 0
+         max_blocks: 1
+         init_blocks: 1
+         worker_init: {{ worker_init|default() }}
 
-The *engine* pulls tasks from the incoming queue and conveys them to the *provider* for
-execution.  Globus Compute implements three engines: ``ThreadPoolEngine``,
-``ProcessPoolEngine``, and ``GlobusComputeEngine``.  The first two are Compute endpoint
-wrappers of Python's |ThreadPoolExecutor|_ and |ProcessPoolExecutor|_.  These engines
-are most appropriate for single‑host installations (e.g., a personal workstation).  For
-scheduler‑based clusters, |GlobusComputeEngine|_, as a wrapper over Parsl's
-|HighThroughputExecutor|_, enables access to multiple computation nodes.
+   idle_heartbeats_soft: 10
+   idle_heartbeats_hard: 5760
 
-In contrast to the engine, the *provider* speaks to the site's available resources.  For
-example, if an endpoint is on the local workstation, the configuration might use the
-|LocalProvider|_, but for running jobs on a Slurm cluster, the endpoint would need the
-|SlurmProvider|_.  (|LocalProvider|_ and |SlurmProvider|_ are an arbitrary selection for
-this discussion; Parsl implements `a number of other providers`_.)
+The default configuration is functional |nbsp| --- |nbsp| it will process tasks |nbsp|
+--- |nbsp| but it is intentionally limited to only use processes on the endpoint host.
+Thus, on an HPC host, the endpoint will not use any additional computational nodes.
 
-Using the full power of the underlying resources requires site‑specific setup, and can
-be tricky to get right.  For instance, configuring the endpoint to submit tasks to a
-batch scheduler might require a scheduler account id, awareness of which queues are
-accessible for the account id and the job size at hand (that can change!), knowledge of
-which network interface cards to use, administrator‑chosen setup steps, and so forth ...
-the :doc:`list of example configurations <endpoint_examples>` is a good first resource
-as these are known working configurations.
+Our docs showcase many :doc:`example configurations <endpoint_examples>`, but refer
+to :ref:`uep-conf` for an in-depth explanation of configuration features.
 
-.. |ThreadPoolExecutor| replace:: ``concurrent.futures.ThreadPoolExecutor``
-.. _ThreadPoolExecutor: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor
-.. |ProcessPoolExecutor| replace:: ``concurrent.futures.ProcessPoolExecutor``
-.. _ProcessPoolExecutor: https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ProcessPoolExecutor
-.. |pipx for library isolation| replace:: ``pipx`` for library isolation
-.. _pipx for library isolation: https://pipx.pypa.io/stable/
-.. |GlobusComputeEngine| replace:: ``GlobusComputeEngine``
-.. _GlobusComputeEngine: ../reference/engine.html#globus_compute_endpoint.engines.GlobusComputeEngine
-.. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
-.. _HighThroughputExecutor: https://parsl.readthedocs.io/en/latest/stubs/parsl.executors.HighThroughputExecutor.html
-.. |LocalProvider| replace:: ``LocalProvider``
-.. _LocalProvider: https://parsl.readthedocs.io/en/latest/stubs/parsl.providers.LocalProvider.html
-.. |SlurmProvider| replace:: ``SlurmProvider``
-.. _SlurmProvider: https://parsl.readthedocs.io/en/latest/stubs/parsl.providers.SlurmProvider.html
-.. _a number of other providers: https://parsl.readthedocs.io/en/latest/reference.html#providers
+For more information on working with the template, please refer to :doc:`templates`.
+
+.. _user-config-schema-json:
+
+``user_config_schema.json``
+---------------------------
+
+Admins can define a `JSON schema <https://json-schema.org/>`_ to validate user-defined
+variables. The default schema file lives in the main endpoint directory, but admins can
+modify the file path via the ``user_config_schema_path`` variable in the :ref:`endpoint
+manager configuration <endpoint-manager-config>`.
+
+The default schema is quite permissive, enforcing that the two default template variables
+are strings, then allowing any other user-defined properties:
+
+.. code-block:: json
+   :caption: Default ``user_config_schema.json``
+
+   {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+       "endpoint_setup": { "type": "string" },
+       "worker_init": { "type": "string" }
+     },
+     "additionalProperties": true
+   }
+
+.. important::
+
+   The default schema sets ``additionalProperties`` to ``true``, allowing properties
+   not explicitly defined in the schema. This enables the default template to work
+   without customization.
+
+   Endpoint administrators who require stricter input validation should consider
+   setting ``additionalProperties`` to ``false`` to reject unexpected properties.
+
+
+``user_environment.yaml``
+-------------------------
+
+Use this file to specify site-specific environment variables to export to the user
+endpoint process. Though this is a YAML file, it is interpreted internally as a simple
+top-level-only set of key-value pairs.  Nesting of data structures will probably not
+behave as expected. Example:
+
+.. code-block:: yaml
+
+   SITE_SPECIFIC_VAR: --additional_flag_for_frobnicator
+
+That will be injected into the user endpoint process as an environment variable.
 
 
 Starting the Endpoint
 =====================
 
-After configuration, start the endpoint instance with the ``start`` subcommand:
+After configuration, start the endpoint instance with the ``start`` subcommand.
+Once started, the MEP stays attached to the console, with a timer that updates
+every second:
 
-.. code-block:: console
+.. code-block:: text
 
-   $ globus-compute-endpoint start my_first_endpoint
-   Starting endpoint; registered ID: <...registered UUID...>
+    globus-compute-endpoint start my_endpoint
+        >>> Endpoint ID: [endpoint_uuid] <<<
+    ----> Fri Apr 19 11:56:27 2024
+
+The timer is only displayed if the process is connected to the terminal, and is intended
+as a hint to the administrator that the MEP process is running, even if no start UEP
+requests are yet incoming.
+
+And |hellip| that's it.  The endpoint is running, waiting for requests to start user endpoint
+processes. (But see :ref:`mep-as-a-service` for automatic starting.)
+
+To stop the endpoint, type ``Ctrl+\`` (SIGQUIT) or ``Ctrl+C`` (SIGINT).  Alternatively,
+the process also responds to SIGTERM.
 
 .. _endpoint-process-tree:
 
@@ -798,7 +856,20 @@ Both ``.submit()`` calls will send tasks to the *same* endpoint, the one specifi
 .. |nbsp| unicode:: 0xA0
    :trim:
 
+.. |rarr| unicode:: 0x2192
+   :trim:
+
+.. |hellip| unicode:: 0x2026
+
+.. _Web UI: https://app.globus.org/compute
+.. _Jinja template: https://jinja.palletsprojects.com/en/stable/
+
 .. |Providers| replace:: ``Providers``
 .. _Providers: https://parsl.readthedocs.io/en/stable/reference.html#providers
+.. |GlobusComputeEngine| replace:: ``GlobusComputeEngine``
+.. _GlobusComputeEngine: ../reference/engine.html#globus_compute_endpoint.engines.GlobusComputeEngine
+.. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
+.. _HighThroughputExecutor: https://parsl.readthedocs.io/en/latest/stubs/parsl.executors.HighThroughputExecutor.html
+
 
 .. _deserializing untrusted data via pickle,: https://github.com/swisskyrepo/PayloadsAllTheThings/blob/4.1/Insecure%20Deserialization/Python.md
