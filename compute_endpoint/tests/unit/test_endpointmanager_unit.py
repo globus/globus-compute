@@ -569,14 +569,18 @@ def test_sets_user_config_template_and_schema_path(
     assert em.user_config_schema_path == schema_path
 
 
-@pytest.mark.parametrize("public", (True, False))
+@pytest.mark.parametrize("public", (False, True))
+@pytest.mark.parametrize("privs", (False, True))
 def test_sends_data_during_registration(
-    conf_dir, mock_conf: ManagerEndpointConfig, mock_client, public: bool
+    conf_dir, mock_conf: ManagerEndpointConfig, mock_client, public: bool, privs: bool
 ):
     ep_uuid, mock_gcc = mock_client
     mock_conf.public = public
     mock_conf.source_content = "foo: bar"
-    EndpointManager(conf_dir, ep_uuid, mock_conf)
+    with mock.patch(f"{_MOCK_BASE}is_privileged", return_value=privs):
+        if privs:
+            mock_conf._identity_mapping_config_path = "/some / path / "
+        EndpointManager(conf_dir, ep_uuid, mock_conf)
 
     assert mock_gcc.register_endpoint.called
     _a, k = mock_gcc.register_endpoint.call_args
@@ -615,7 +619,7 @@ def test_sends_data_during_registration(
         assert key in k["metadata"]["config"]
 
     assert k["public"] is mock_conf.public
-    assert k["multi_user"] is True
+    assert k["multi_user"] is privs
     assert k["metadata"]["config"]["multi_user"] is True
     assert k["metadata"]["endpoint_config"] == mock_conf.source_content
 
