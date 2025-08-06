@@ -130,5 +130,8 @@ venv.bak/
 # Intellij
 .idea/
 
+# Visual Studio Code
+.vscode/
+
 # MacOS Finder Cache
 .DS_Store
