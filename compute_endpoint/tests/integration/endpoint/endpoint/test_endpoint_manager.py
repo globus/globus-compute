@@ -44,37 +44,34 @@ class TestStart:
         yield
 
     def test_configure(self):
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
-        manager.configure_endpoint(config_dir, None)
+        Endpoint.configure_endpoint(config_dir, None)
         assert config_dir.exists() and config_dir.is_dir()
 
     def test_double_configure(self):
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
 
-        manager.configure_endpoint(config_dir, None)
+        Endpoint.configure_endpoint(config_dir, None)
         assert config_dir.exists() and config_dir.is_dir()
         with pytest.raises(Exception, match="ConfigExists"):
-            manager.configure_endpoint(config_dir, None)
+            Endpoint.configure_endpoint(config_dir, None)
 
     @pytest.mark.parametrize("ha", [None, True, False])
     @pytest.mark.parametrize("mu", [None, True, False])
     def test_configure_multi_user_ha_existing_config(self, ha, mu):
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = Endpoint._config_file_path(config_dir)
         config_copy = str(config_dir.parent / "config2.yaml")
 
         # First, make an entry with multi_user/ha
-        manager.configure_endpoint(
+        Endpoint.configure_endpoint(
             config_dir, None, multi_user=True, high_assurance=False
         )
         shutil.move(config_file, config_copy)
         shutil.rmtree(config_dir)
 
         # Then, modify it with new settings
-        manager.configure_endpoint(
+        Endpoint.configure_endpoint(
             config_dir, config_copy, multi_user=mu, high_assurance=ha
         )
 
@@ -87,14 +84,13 @@ class TestStart:
 
     @pytest.mark.parametrize("mu", [None, True, False])
     def test_configure_multi_user(self, mu):
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = config_dir / "config.yaml"
 
         if mu is not None:
-            manager.configure_endpoint(config_dir, None, multi_user=mu)
+            Endpoint.configure_endpoint(config_dir, None, multi_user=mu)
         else:
-            manager.configure_endpoint(config_dir, None)
+            Endpoint.configure_endpoint(config_dir, None)
 
         assert config_file.exists()
 
@@ -111,13 +107,12 @@ class TestStart:
     @pytest.mark.parametrize("ha", (False, True))
     @pytest.mark.parametrize("mu", (False, True))
     def test_configure_ha_audit_default(self, ha, mu):
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
         config_file = Endpoint._config_file_path(config_dir)
         audit_path = Endpoint._audit_log_path(config_dir)
 
         with patch(f"{_MOCK_BASE}print"):  # quiet, please
-            manager.configure_endpoint(
+            Endpoint.configure_endpoint(
                 config_dir, None, multi_user=mu, high_assurance=ha
             )
 
@@ -147,14 +142,13 @@ class TestStart:
 
         config = UserEndpointConfig(detach_endpoint=False)
 
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
 
-        manager.configure_endpoint(config_dir, None)
+        Endpoint.configure_endpoint(config_dir, None)
         with pytest.raises(ValueError, match="has no engines defined"):
             log_to_console = False
             no_color = True
-            manager.start_endpoint(
+            Endpoint().start_endpoint(
                 config_dir,
                 None,
                 config,
@@ -186,16 +180,15 @@ class TestStart:
             detach_endpoint=False, high_assurance=True, engine=mock_engine
         )
 
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
 
-        manager.configure_endpoint(config_dir, None)
+        Endpoint.configure_endpoint(config_dir, None)
         with pytest.raises(
             ValueError, match="Engine configuration is not High Assurance compliant"
         ):
             log_to_console = False
             no_color = True
-            manager.start_endpoint(
+            Endpoint().start_endpoint(
                 config_dir,
                 None,
                 config,
@@ -208,13 +201,12 @@ class TestStart:
     @pytest.mark.parametrize("web_svc_ok", (True, False))
     @pytest.mark.parametrize("force", (True, False))
     def test_delete_endpoint(self, mocker, web_svc_ok, force, ep_uuid):
-        manager = Endpoint()
         config_dir = pathlib.Path("/some/path/mock_endpoint")
 
         mock_stop_endpoint = mocker.patch.object(Endpoint, "stop_endpoint")
         mock_rmtree = mocker.patch.object(shutil, "rmtree")
 
-        manager.configure_endpoint(config_dir, None)
+        Endpoint.configure_endpoint(config_dir, None)
 
         mock_gcc = mocker.Mock()
         mocker.patch(f"{_MOCK_BASE}Endpoint.get_funcx_client").return_value = mock_gcc
@@ -227,7 +219,7 @@ class TestStart:
 
             if not force:
                 with pytest.raises(SystemExit), patch(f"{_MOCK_BASE}log") as mock_log:
-                    manager.delete_endpoint(config_dir, force=force, ep_uuid=ep_uuid)
+                    Endpoint.delete_endpoint(config_dir, force=force, ep_uuid=ep_uuid)
                 a, _k = mock_log.critical.call_args
                 assert "without deleting the local endpoint" in a[0], "expected notice"
 
@@ -241,7 +233,7 @@ class TestStart:
             }
 
         try:
-            manager.delete_endpoint(
+            Endpoint.delete_endpoint(
                 config_dir, ep_config=None, force=force, ep_uuid=ep_uuid
             )
 
