@@ -202,7 +202,7 @@ class EndpointManager:
                     name=conf_dir.name,
                     endpoint_id=endpoint_uuid,
                     metadata=self.get_metadata(config),
-                    multi_user=True,
+                    multi_user=privileged,
                     display_name=config.display_name,
                     allowed_functions=config.allowed_functions,
                     auth_policy=config.authentication_policy,
