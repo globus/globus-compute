@@ -499,8 +499,8 @@ def test_gracefully_exits_if_registration_blocked(
     a, *_ = mock_log.warning.call_args
     assert some_err in str(a), "Expected upstream response still shared"
 
-    assert some_err in stdout_msg, f"Expecting error message in stdout ({stdout_msg})"
-    assert pyexc.value.code == exit_code, "Expecting meaningful exit code"
+    assert some_err in stdout_msg, "Expect error message in stdout"
+    assert pyexc.value.code == exit_code, "Expect meaningful exit code"
 
     if exit_code == "Error":
         # The other route tests SystemExit; nominally this route is an unhandled
