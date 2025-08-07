@@ -33,7 +33,6 @@ from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app
 from .batch import Batch, UserRuntime
 from .login_manager import LoginManagerProtocol
-from .utils import get_env_var_with_deprecation
 from .web_client import WebClient
 
 logger = logging.getLogger(__name__)
@@ -79,17 +78,6 @@ class Client:
 
     Holds helper operations for performing common tasks with the Globus Compute service.
     """
-
-    FUNCX_SDK_CLIENT_ID = get_env_var_with_deprecation(
-        "GLOBUS_COMPUTE_CLIENT_ID",
-        "FUNCX_SDK_CLIENT_ID",
-        "4cf29807-cf21-49ec-9443-ff9a3fb9f81c",
-    )
-    FUNCX_SCOPE = get_env_var_with_deprecation(
-        "GLOBUS_COMPUTE_SCOPE",
-        "FUNCX_SCOPE",
-        "https://auth.globus.org/scopes/facd7ccc-c5f4-42aa-916b-a0e270e2c2a9/all",
-    )
 
     def __init__(
         self,

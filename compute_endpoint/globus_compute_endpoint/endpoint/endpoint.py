@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 import typing as t
+import warnings
 from datetime import datetime
 from http import HTTPStatus
 
@@ -339,7 +340,7 @@ class Endpoint:
         return None
 
     @staticmethod
-    def get_funcx_client(config: BaseConfig | None) -> Client:
+    def get_compute_client(config: BaseConfig | None) -> Client:
         app = get_globus_app_with_scopes()
         if config:
             return Client(
@@ -349,6 +350,14 @@ class Endpoint:
             )
         else:
             return Client(app=app)
+
+    @staticmethod
+    def get_funcx_client(config: BaseConfig | None) -> Client:
+        warnings.warn(
+            "Endpoint.get_funcx_client() is deprecated and will be removed "
+            "in a future release. Use .get_compute_client() instead."
+        )
+        return Endpoint.get_compute_client(config)
 
     def start_endpoint(
         self,
@@ -435,7 +444,7 @@ class Endpoint:
             endpoint_uuid = Endpoint.get_endpoint_id(endpoint_dir) or endpoint_uuid
             log.debug("Attempting registration; trying with eid: %s", endpoint_uuid)
             try:
-                fx_client = Endpoint.get_funcx_client(endpoint_config)
+                fx_client = Endpoint.get_compute_client(endpoint_config)
                 reg_info = fx_client.register_endpoint(
                     name=endpoint_dir.name,
                     endpoint_id=endpoint_uuid,
@@ -643,7 +652,7 @@ class Endpoint:
             if not endpoint_id:
                 raise ValueError(f"Endpoint <{ep_name}> could not be located")
 
-            fx_client = Endpoint.get_funcx_client(endpoint_config)
+            fx_client = Endpoint.get_compute_client(endpoint_config)
             fx_client.stop_endpoint(endpoint_id)
 
         ep_status = Endpoint.check_pidfile(endpoint_dir)
@@ -723,7 +732,7 @@ class Endpoint:
         # If we have the UUID, do the online status check/deletion first
         if ep_uuid:
             try:
-                gc_client = Endpoint.get_funcx_client(ep_config)
+                gc_client = Endpoint.get_compute_client(ep_config)
                 status = gc_client.get_endpoint_status(ep_uuid)
                 if status.get("status") == "online":
                     if not force:

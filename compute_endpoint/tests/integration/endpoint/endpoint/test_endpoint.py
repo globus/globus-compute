@@ -18,7 +18,7 @@ from globus_sdk import UserApp
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint."
-_SVC_ADDY = "http://api.funcx.fqdn"  # something clearly not correct
+_SVC_ADDY = "http://api.compute.fqdn"  # something clearly not correct
 
 
 @pytest.fixture(autouse=True)

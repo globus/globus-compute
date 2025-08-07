@@ -25,8 +25,8 @@ jobs:
         .venv/bin/python -m pip install tox
     - name: run smoke tests (ECS staging)
       env:
-        FUNCX_SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
-        FUNCX_SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET_STAGING }}
+        SMOKE_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+        SMOKE_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET_STAGING }}
         GLOBUS_SDK_ENVIRONMENT: "staging"
       run: |
         source .venv/bin/activate

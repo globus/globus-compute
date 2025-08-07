@@ -20,7 +20,7 @@ MOCK_BASE = "globus_compute_sdk.sdk.login_manager"
 
 
 def _fake_http_response(*, status: int = 200, method: str = "GET") -> requests.Response:
-    req = requests.Request(method, "https://funcx.example.org/")
+    req = requests.Request(method, "https://compute.example.org/")
     p_req = req.prepare()
     res = requests.Response()
     res.request = p_req

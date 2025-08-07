@@ -19,7 +19,7 @@ import setproctitle
 from globus_compute_common.messagepack import InvalidMessageError, pack
 from globus_compute_common.messagepack.message_types import Result, ResultErrorDetails
 from globus_compute_common.tasks import TaskState
-from globus_compute_endpoint import __version__ as funcx_endpoint_version
+from globus_compute_endpoint import __version__ as compute_endpoint_version
 from globus_compute_endpoint.endpoint.config import UserEndpointConfig
 from globus_compute_endpoint.endpoint.rabbit_mq import (
     ResultPublisher,
@@ -28,7 +28,7 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.engines.base import GCFuture, GlobusComputeEngineBase
 from globus_compute_endpoint.exception_handling import get_result_error_details
-from globus_compute_sdk import __version__ as funcx_sdk_version
+from globus_compute_sdk import __version__ as compute_sdk_version
 from globus_compute_sdk.sdk.utils import get_py_version_str
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from parsl.version import VERSION as PARSL_VERSION
@@ -126,8 +126,8 @@ class EndpointInterchange:
             "python_v": get_py_version_str(),
             "os": platform.system(),
             "hname": platform.node(),
-            "funcx_sdk_version": funcx_sdk_version,
-            "funcx_endpoint_version": funcx_endpoint_version,
+            "compute_sdk_version": compute_sdk_version,
+            "compute_endpoint_version": compute_endpoint_version,
             "registration": self.endpoint_id,
             "dir": os.getcwd(),
         }

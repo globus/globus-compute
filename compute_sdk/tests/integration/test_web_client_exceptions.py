@@ -21,7 +21,9 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return WebClient(base_url="https://api.funcx", transport_params={"max_retries": 0})
+    return WebClient(
+        base_url="https://api.compute", transport_params={"max_retries": 0}
+    )
 
 
 @pytest.mark.parametrize("http_status", [400, 500])
@@ -29,7 +31,7 @@ def test_message_parsed_as_part_of_error(client, http_status):
     message = "you are bad and you should feel bad"
     responses.add(
         responses.GET,
-        "https://api.funcx/foo",
+        "https://api.compute/foo",
         json={"code": 100, "message": message},
         match_querystring=None,
         status=http_status,

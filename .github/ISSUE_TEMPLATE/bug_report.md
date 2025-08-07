@@ -29,7 +29,7 @@ A clear and concise description of what you expected to happen.
  - globus-compute-endpoint version @ endpoint
 
 **Distributed Environment**
-- Where are you running the funcX script from? [e.g. Laptop/Workstation, Login node, Compute node]
+- Where are you running the Compute script from? [e.g. Laptop/Workstation, Login node, Compute node]
 - Where does the endpoint run? [e.g. Laptop/Workstation, Login node]
 - What is your endpoint-uuid?
 - If this is an endpoint issue, run `globus-compute-endpoint self-diagnostic -z` and attach the resulting zip file.

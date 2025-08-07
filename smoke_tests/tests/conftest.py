@@ -180,8 +180,8 @@ def compute_test_config(pytestconfig, compute_test_config_name):
     local_compute_services = pytestconfig.getoption("--local-compute-services")
 
     # env vars to allow use of client creds in GitHub Actions
-    api_client_id = os.getenv("FUNCX_SMOKE_CLIENT_ID")
-    api_client_secret = os.getenv("FUNCX_SMOKE_CLIENT_SECRET")
+    api_client_id = os.getenv("SMOKE_CLIENT_ID")
+    api_client_secret = os.getenv("SMOKE_CLIENT_SECRET")
     if local_compute_services:
         client_args["local_compute_services"] = local_compute_services
 
