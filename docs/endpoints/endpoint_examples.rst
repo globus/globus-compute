@@ -5,9 +5,9 @@ Example Configurations
 
 While Globus Compute is in use on various systems around the world, getting to a working
 configuration that matches the underlying system constraints and the requirements of the
-site-administrator often takes trial and error.  Below are example configurations for some
-well-known systems that are known to work.  These serve as a reference for getting
-started.
+site-administrator often takes trial and error.  Below are example user endpoint configuration
+templates for some well-known systems that are known to work.  These serve as a reference
+for getting started.
 
 If you would like to add your system to this list please contact the Globus Compute Team
 via `Slack <https://funcx.slack.com/>`_.  (The `#help channel`_ is a good place to
@@ -29,6 +29,7 @@ interface with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 
 .. literalinclude:: configs/anvil.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Delta (NCSA)
@@ -43,6 +44,7 @@ with the scheduler, and uses the ``SrunLauncher`` to launch workers.
 
 .. literalinclude:: configs/delta.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Expanse (SDSC)
@@ -57,6 +59,7 @@ scheduler, and uses the ``SrunLauncher`` to launch workers.
 
 .. literalinclude:: configs/expanse.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 The |GlobusMPIEngine|_ adds support for running MPI applications. The following snippet
 shows an example configuration for Expanse that uses the ``SlurmProvider`` to provision
@@ -65,6 +68,7 @@ MPI functions with ``srun``.
 
 .. literalinclude:: configs/expanse_mpi.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 UChicago AI Cluster
@@ -80,6 +84,7 @@ Link to `docs <https://howto.cs.uchicago.edu/slurm:ai>`_.
 
 .. literalinclude:: configs/uchicago_ai_cluster.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 Here is some Python that demonstrates how to compute the variables in the YAML example
 above:
@@ -100,12 +105,14 @@ uses the ``SlurmProvider`` to interface with the scheduler, and uses the
 
 .. literalinclude:: configs/midway.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 The following configuration example uses an Apptainer (formerly Singularity) container
 on Midway.
 
 .. literalinclude:: configs/midway_apptainer.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Kubernetes Clusters
@@ -121,6 +128,7 @@ the Python Kubernetes API, which assumes that you have kube config in
 
 .. literalinclude:: configs/kube.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Polaris (ALCF)
@@ -135,6 +143,7 @@ configuration assumes that the script is being executed on the login node of Pol
 
 .. literalinclude:: configs/polaris.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Perlmutter (NERSC)
@@ -151,6 +160,7 @@ the worker nodes using Anaconda.
 
 .. literalinclude:: configs/perlmutter.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Frontera (TACC)
@@ -165,6 +175,7 @@ launch workers.
 
 .. literalinclude:: configs/frontera.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Bebop (LCRC, ANL)
@@ -179,6 +190,7 @@ node, uses the ``SlurmProvider`` to interface with the scheduler, and uses the
 
 .. literalinclude:: configs/bebop.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Bridges-2 (PSC)
@@ -193,6 +205,7 @@ launch workers.
 
 .. literalinclude:: configs/bridges-2.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 FASTER (TAMU)
@@ -205,6 +218,7 @@ scheduler, and uses the ``SrunLauncher`` to launch workers.
 
 .. literalinclude:: configs/faster.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Open Science Pool
@@ -225,6 +239,7 @@ to the workers.
 
 .. literalinclude:: configs/ospool.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 
 Stampede3 (TACC)
@@ -240,6 +255,7 @@ to launch workers across nodes.
 
 .. literalinclude:: configs/stampede3.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 Pinning Workers to devices
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -257,6 +273,7 @@ specific identity assigned: ``CUDA_VISIBLE_DEVICES``, ``ROCR_VISIBLE_DEVICES``,
 
 .. literalinclude:: configs/worker_pinning.yaml
    :language: yaml
+   :caption: ``user_config_template.yaml.j2``
 
 .. |nbsp| unicode:: 0xA0
    :trim:
