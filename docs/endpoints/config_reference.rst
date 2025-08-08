@@ -322,15 +322,15 @@ are used to create an instance of the |ManagerEndpointConfig| class.
 
 - ``multi_user``
 
-   If ``true``, the Globus Compute web services will allow task submissions from multiple
-   users.
+  If ``true``, the Globus Compute web services will allow task submissions from multiple
+  users.
 
-   This field is required for multi-user endpoints.
+  This field is required for multi-user endpoints.
 
-   .. code-block:: yaml
-      :caption: The simplest possible ``config.yaml`` for a multi-user endpoint
+  .. code-block:: yaml
+     :caption: The simplest possible ``config.yaml`` for a multi-user endpoint
 
-      multi_user: true
+     multi_user: true
 
 - ``identity_mapping_config_path``
 
@@ -338,8 +338,6 @@ are used to create an instance of the |ManagerEndpointConfig| class.
   Mapping Guide`_.  The configuration file must be a JSON-list of identity mapping
   configurations.  The multi-user endpoint  documentation :ref:`discusses the
   content<example-idmap-config>` of this file in detail.
-
-  This field is required for multi-user endpoints.
 
   .. code-block:: yaml
      :caption: Example ``config.yaml`` with an identity mapping path

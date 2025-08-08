@@ -22,8 +22,8 @@ features described in the :doc:`endpoints` page, plus the ability to map Globus 
 identities of function-submitting users to local POSIX user accounts, then launch
 user endpoint processes as those mapped users.
 
-For a detailed look at how a task makes its way to a user endpoint process, please
-refer to :ref:`tracing-a-task`.
+For a detailed look at how a task makes its way to a user endpoint process, see
+:ref:`tracing-a-task`.
 
 
 Key Benefits
@@ -133,10 +133,9 @@ to open their own terminal, much less an SSH terminal on a login node.
 Configuring a Multi-User Endpoint
 =================================
 
-The ``configure`` subcommand must be run either as a privileged user (e.g., root)
-or with the ``--multi-user`` flag to properly generate the required multi-user
-``config.yaml`` and :ref:`example-idmap-config` files, along with other default
-files in ``$HOME/.globus_compute/``:
+The ``configure`` subcommand must be run as a privileged user (e.g., root) to properly
+generate the :ref:`multi-user-config-yaml` and :ref:`example-idmap-config` files, along
+with other default files in ``$HOME/.globus_compute/``:
 
 .. code-block:: console
 
@@ -156,11 +155,13 @@ files in ``$HOME/.globus_compute/``:
    globus-compute-endpoint start my_mu_ep
 
 
+.. _multi-user-config-yaml:
+
 ``config.yaml``
 ---------------
 
-The default multi-user endpoint ``config.yaml`` file contains two additional, required
-fields: ``multi_user`` and ``identity_mapping_config_path``:
+The default multi-user endpoint ``config.yaml`` file contains two additional fields:
+``multi_user`` and ``identity_mapping_config_path``:
 
 .. code-block:: yaml
    :caption: The default multi-user ``config.yaml`` configuration
@@ -174,7 +175,7 @@ The ``multi_user`` flag tells the web services to allow task submissions from
 multiple users, and the ``identity_mapping_config_path`` points to the identity
 mapping file.
 
-Please refer to :ref:`endpoint-manager-config` for details on other fields.
+Please refer to :ref:`endpoint-manager-config` for details on each field.
 
 
 .. _example-idmap-config:
@@ -385,10 +386,11 @@ the Globus Connect Server's `Identity Mapping documentation`_.
 Starting the Multi-User Endpoint
 ================================
 
-A multi-user endpoint must be started by a privileged local user account
-(e.g., root) to enable the manager endpoint process to perform identity
-mapping and drop privileges. Otherwise, multi-user endpoints start and
-stop in the same fashion as regular endpoints:
+A multi-user endpoint requires a privileged local user account (e.g., root)
+to start, enabling the manager endpoint process to perform identity mapping
+and drop privileges to mapped user accounts. Apart from this initial setup
+requirement, multi-user endpoints operate identically to regular endpoints
+for starting and stopping:
 
 .. code-block:: console
 

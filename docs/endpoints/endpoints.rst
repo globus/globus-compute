@@ -33,22 +33,20 @@ laptop, campus cluster, or even leadership‑class HPC machines.
 
 A Globus Compute endpoint consists of three main process types:
 
-- **Manager endpoint process** - Combines user-defined variables with a :ref:`configuration
-  template <user-config-template-yaml-j2>` to launch user endpoint processes. If running
-  as a :doc:`multi-user endpoint <multi_user>`, this process is also responsible for mapping
-  Globus identities to local user accounts, then launching the user endpoint processes as
-  those mapped local users.
+- **Manager endpoint process** - Primarily responsible for launching and managing user endpoint
+  processes. When running as a :doc:`multi-user endpoint <multi_user>`, this process handles
+  mapping Globus identities to local user accounts, then launching the user endpoint processes
+  as those mapped local users.
 
-- **User endpoint process** - Directly communicates with the Globus Compute web services
-  to securely receive tasks, launch worker processes, and publish results. Each user
-  endpoint process can **only** receive tasks from a single Globus Auth identity, and
-  shuts itself down after a configurable idle time.
+- **User endpoint process** - Establishes secure communication with Globus Compute web services
+  to receive tasks, manage worker processes, and publish results. Each user endpoint process is
+  bound to a single Globus Auth identity and automatically shuts down after a configurable idle
+  period to optimize resource usage.
 
-- **Worker process** - Executes tasks on HPC cluster nodes, local CPUs, etc., depending on
-  the user endpoint configuration.
+- **Worker process** - Executes the actual computational tasks on various computing resources,
+  including HPC cluster nodes and local CPUs, according to the user endpoint configuration.
 
-For a detailed look at how a task makes its way to a user endpoint process, please refer
-to :ref:`tracing-a-task`.
+For a detailed look at how a task makes its way to a user endpoint process, see :ref:`tracing-a-task`.
 
 
 Configuring an Endpoint
@@ -64,16 +62,16 @@ Create a new endpoint directory and default files in ``$HOME/.globus_compute/`` 
 
        Configuration file: /user/home/.globus_compute/my_endpoint/config.yaml
 
-       User endpoint configuration template: /user/home/.globus_compute/my_endpoint/user_config_template.yaml.j2
-       User endpoint configuration schema: /user/home/.globus_compute/my_endpoint/user_config_schema.json
-       User endpoint environment variables: /user/home/.globus_compute/my_endpoint/user_environment.yaml
+       User endpoint configuration template: /home/user/.globus_compute/my_endpoint/user_config_template.yaml.j2
+       User endpoint configuration schema: /home/user/.globus_compute/my_endpoint/user_config_schema.json
+       User endpoint environment variables: /home/user/.globus_compute/my_endpoint/user_environment.yaml
 
    Use the `start` subcommand to run it:
 
    globus-compute-endpoint start my_endpoint
 
 The ``configure`` subcommand will generate an additional :ref:`example-idmap-config` file
-if run as a privileged user, such as root. See :doc:`multi_user` for more information.
+if run as a privileged user (e.g., root). See :doc:`multi_user` for more information.
 
 
 ``config.yaml``
@@ -98,10 +96,9 @@ The ``config.yaml`` file controls the manager endpoint process. Please refer to
 ``user_config_template.yaml.j2``
 --------------------------------
 
-This file is the template that the manager endpoint process will render with user
-defined variables to ultimately launch a user endpoint process. More than simple
-interpolation, the endpoint treats this file as a `Jinja template`_, enabling a
-good bit of flexibility.
+The manager endpoint process will render this template with user defined variables
+to launch a user endpoint process. More than simple interpolation, the endpoint treats
+this file as a `Jinja template`_, enabling a good bit of flexibility.
 
 The default template file lives in the main endpoint directory, but admins can modify
 the full file path via the ``user_config_template_path`` variable in the :ref:`endpoint
@@ -504,6 +501,9 @@ For more information on what the template knows about the user's runtime environ
 
 Advanced Environment Customization
 ==================================
+
+.. note::
+   This section is only relevant for :ref:`repository-based installations <repo-based-installation>`.
 
 There are some instances where static configuration is not enough.  For example, setting
 a user-specific environment variable or running arbitrary scripts prior to handing
