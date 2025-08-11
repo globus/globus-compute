@@ -19,7 +19,7 @@ integration:
 	tox -e localdeps -- --compute-config integration
 local_with_dev_sdk:
 	@if [ -z "${COMPUTE_LOCAL_ENDPOINT_ID}" ]; then echo "Missing exported COMPUTE_LOCAL_ENDPOINT_ID"; exit 1; fi
-	tox -e localdeps -- --compute-config local
+	tox -e localdeps -- --compute-config local --local-compute-services
 local_with_published_sdk:
 	@if [ -z "${COMPUTE_LOCAL_ENDPOINT_ID}" ]; then echo "Missing exported COMPUTE_LOCAL_ENDPOINT_ID"; exit 1; fi
-	tox -- --compute-config local
+	tox -- --compute-config local --local-compute-services
