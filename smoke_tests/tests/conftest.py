@@ -74,7 +74,7 @@ _CONFIGS = {
     },
     "local": {
         # localhost; typical defaults for a helm deploy
-        "client_args": {"environment": "local"},
+        "client_args": {"environment": "sandbox"},
         "public_hello_fn_uuid": _LOCAL_FUNCTION_ID,
         "endpoint_uuid": _LOCAL_ENDPOINT_ID,
     },
