@@ -1,4 +1,3 @@
-display_name: Permutter@NERSC
 engine:
     type: GlobusComputeEngine
     worker_debug: False

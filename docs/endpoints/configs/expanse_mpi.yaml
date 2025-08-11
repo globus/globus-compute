@@ -1,5 +1,3 @@
-display_name: ExpanseMPI@SDSC
-
 engine:
     type: GlobusMPIEngine
     mpi_launcher: srun
