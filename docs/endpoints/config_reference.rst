@@ -1,41 +1,64 @@
 Configuration Reference
 ***********************
 
-Compute endpoints are configured by a text YAML file named ``config.yaml`` in the
-endpoint directory.  (A reminder that the "endpoint directory" is a subdirectory within
-``~/.globus_compute/``, with the same name as the endpoint.)  This YAML file is a
-convenience interface to the Python configuration classes used internally by Compute
-endpoints.  Anything specified in YAML is conveyed during the endpoint startup to those
-backing classes; consequently, for a complete list of options, please see the
-:ref:`internal class documentation <config-class-doc>` at the bottom of this page.
-Meanwhile, the YAML interface is generally much easier to understand, easier to
-``diff``, and, with less required boilerplate code, easier to maintain.
+Globus Compute endpoints require two configuration files:
 
-YAML Configuration
-==================
+- ``config.yaml`` for the manager endpoint process
+- ``user_config_template.yaml.j2`` for user endpoint processes
 
-Compute endpoints currently come in two flavors: one for processing tasks and one for
-*managing* multiple task-processing endpoints.  We discuss the former first, backed by
-|UserEndpointConfig|, as it is typically the first entry into Compute for most people.
+These two YAML files serve as convenience interfaces to the Python configuration
+classes used internally by Compute endpoints.  Anything specified here is conveyed
+during the endpoint startup to those backing classes; consequently, for a complete
+list of options, please see the :ref:`internal class documentation <config-class-doc>`
+at the bottom of this page. Meanwhile, the YAML interface is generally much easier to
+understand, easier to ``diff``, and, with less required boilerplate code, easier to
+maintain.
 
 .. _uep-conf:
 
 User Endpoint Configuration
----------------------------
+===========================
 
-The basic configuration has a number of options, but the only required item is
-``engine``.  Globus Compute implements three engines: ``ThreadPoolEngine``,
-``ProcessPoolEngine``, and ``GlobusComputeEngine``.  The first two are Compute endpoint
-wrappers of Python's |ThreadPoolExecutor|_ and |ProcessPoolExecutor|_.  These engines
-are appropriate for single‑host installations (e.g., a personal workstation).  For
-scheduler‑based clusters, |GlobusComputeEngine|_, as a wrapper over Parsl's
-|HighThroughputExecutor|_, enables access to multiple computation nodes.  The
-:ref:`default configuration <cea_configuration>` specifies |GlobusComputeEngine|_.
+The ``user_config_template.yaml.j2`` file is a Jinja template used to generate YAML
+configurations for user endpoint processes that execute tasks. Under the hood, all
+configuration options are used to create an instance of the |UserEndpointConfig|
+class.
+
+For information on template capabilities and peculiarities, see :doc:`templates`.
+
+Idle Timeout
+------------
+
+User endpoint processes automatically shut down after a configurable idle timeout
+to conserve resources:
+
+- ``idle_heartbeats_soft``: if there are no outstanding tasks still processing, and the
+  user endpoint process has been idle for this many heartbeats, shut it down
+
+- ``idle_heartbeats_hard``: if the user endpoint process is *apparently* idle (e.g., there
+  are outstanding tasks, but they have not moved) for this many heartbeats, then shut down
+  anyway.
+
+By default, a heartbeat occurs every 30s. If ``idle_heartbeats_hard`` is set to 7, and
+no tasks or results move (i.e., tasks received from the web service or results received
+from workers), then the user endpoint process will shut down after 3m30s (7 × 30s).
+
+Engine
+------
+
+The only required configuration item is ``engine``, with three available types:
+``ThreadPoolEngine``, ``ProcessPoolEngine``, and ``GlobusComputeEngine``.  The
+first two are Compute endpoint wrappers of Python's |ThreadPoolExecutor|_ and
+|ProcessPoolExecutor|_, respectively. These engines are appropriate for single‑host
+installations (e.g., a personal workstation).  For scheduler‑based clusters,
+|GlobusComputeEngine|_, as a wrapper over Parsl's |HighThroughputExecutor|_, enables
+access to multiple computation nodes.  The :ref:`default configuration <uep-conf>`
+specifies |GlobusComputeEngine|_.
 
 The simplest configuration would use the ``ThreadPoolEngine``:
 
 .. code-block:: yaml
-   :caption: ``~/.globus_compute/simple_threadpool/config.yaml``
+   :caption: ``~/.globus_compute/simple_threadpool/user_config_template.yaml.j2``
 
    engine:
      type: ThreadPoolEngine
@@ -46,7 +69,7 @@ to fine-tune the underlying executor's behavior must be placed inside the ``engi
 stanza.  For example, to limit the worker to 3 threads:
 
 .. code-block:: yaml
-   :caption: ``~/.globus_compute/three_threads/config.yaml``
+   :caption: ``~/.globus_compute/three_threads/user_config_template.yaml.j2``
 
    engine:
      type: ThreadPoolEngine
@@ -56,7 +79,7 @@ Similarly, if using the ``ProcessPoolEngine``, one might implement a policy of w
 only running 100 tasks before workers are respawned:
 
 .. code-block:: yaml
-   :caption: ``~/.globus_compute/four_workers_100_tasks/config.yaml``
+   :caption: ``~/.globus_compute/four_workers_100_tasks/user_config_template.yaml.j2``
 
    engine:
      type: ProcessPoolEngine
@@ -97,13 +120,67 @@ has more options and is similarly more complicated to configure.  A rough equiva
 the ``ProcessPoolEngine`` example would be:
 
 .. code-block:: yaml
-   :caption: ``~/.globus_compute/my_first_cluster_setup/config.yaml``
+   :caption: ``~/.globus_compute/my_first_cluster_setup/user_config_template.yaml.j2``
 
    engine:
      type: GlobusComputeEngine
      provider:
        type: LocalProvider
        max_blocks: 4
+
+Retries
+^^^^^^^
+
+Functions submitted to the |GlobusComputeEngine|_ can fail due to infrastructure
+failures. For example, the worker executing the task might terminate due to it
+running out of memory, or all workers under a batch job could fail due to the batch
+job exiting as it reaches the walltime limit. |GlobusComputeEngine|_ can be configured
+to automatically retry these tasks by setting ``max_retries_on_system_failure=N``,
+where N is the number of retries allowed. The default config sets retries to 0 since
+functions can be computationally expensive, not idempotent, or leave side effects that
+affect subsequent retries.
+
+Example config snippet:
+
+.. code-block:: yaml
+   :caption: ``user_config_template.yaml.j2``
+
+   engine:
+       type: GlobusComputeEngine
+       max_retries_on_system_failure: 2  # Default=0
+
+
+Auto-Scaling
+^^^^^^^^^^^^
+
+|GlobusComputeEngine|_ by default automatically scales workers in response to workload.
+
+``Strategy`` configuration is limited to two options:
+
+#. ``max_idletime``: Maximum duration in seconds that workers are allowed to idle before
+   they are marked for termination
+
+#. ``strategy_period``: Set the # of seconds between strategy attempting auto-scaling
+   events
+
+The bounds for scaling are determined by the options to the ``Provider``
+(``init_blocks``, ``min_blocks``, ``max_blocks``). Please refer to the `Parsl docs
+<https://parsl.readthedocs.io/en/stable/userguide/execution.html#elasticity>`_ for more
+info.
+
+Here's an example configuration:
+
+.. code-block:: yaml
+   :caption: ``user_config_template.yaml.j2``
+
+   engine:
+       type: GlobusComputeEngine
+       job_status_kwargs:
+           max_idletime: 60.0      # Default = 120s
+           strategy_period: 120.0  # Default = 5s
+
+Provider
+^^^^^^^^
 
 Whereas the ``ThreadPoolEngine`` and ``ProcessPoolEngine`` wrappers have an implicit
 approach to managing the compute resources (the `process model`_), the
@@ -134,15 +211,15 @@ than 5 minutes (``walltime``).
 For communication between the endpoint and the worker nodes, tell the endpoint to open
 up communication ports on the *internal* interface, named ``bond0``.
 
-.. code-block:: yaml
+.. code-block:: yaml+jinja
+   :caption: Example ``user_config_template.yaml.j2`` of an endpoint on UChicago RCC's Midway
 
-   display_name: Example Configuration of an Endpoint on UChicago RCC's Midway
    engine:
        type: GlobusComputeEngine
        max_workers_per_node: 2
        provider:
            type: SlurmProvider
-           account: YOUR_ACCOUNT_IDENTIFIER
+           account: {{ account }}
            partition: caslake
            worker_init: "module load Anaconda; source activate compute-env"
            nodes_per_block: 1
@@ -232,50 +309,35 @@ the |HighThroughputExecutor|_ and the `available providers`_.
 
 .. _endpoint-manager-config:
 
-Endpoint Manager Configuration
-------------------------------
+Manager Endpoint Configuration
+==============================
 
-In contrast to user endpoints (UEPs), manager endpoints (MEPs) have fewer options, and
-are similarly simpler to configure.  The main flag to differentiate between an MEP
-configuration and a UEP configuration is ``multi_user``:
-
-.. code-block:: yaml
-   :caption: The simplest possible ``config.yaml`` for an MEP
-
-   multi_user: true
-
-This flag tells the Compute endpoint logic to instantiate a |ManagerEndpointConfig|
-instance and thereby to start an MEP and not a UEP.  The other configuration items of
-note are:
+The ``config.yaml`` file contains the YAML configuration for the manager endpoint process,
+which manages user endpoint processes. Under the hood, all configuration options in this file
+are used to create an instance of the |ManagerEndpointConfig| class.
 
 - ``identity_mapping_config_path``
 
   A path to an identity mapping configuration, per the Globus Connect Server `Identity
   Mapping Guide`_.  The configuration file must be a JSON-list of identity mapping
-  configurations.  The MEP documentation :ref:`discusses the
+  configurations.  The multi-user endpoint  documentation :ref:`discusses the
   content<example-idmap-config>` of this file in detail.
 
-  This field is required for MEPs run by the ``root`` user.  For MEPs run by
-  non-``root`` users (or those without ``setuid`` capabilities), this field is
-  ignored.
-
   .. code-block:: yaml
-     :caption: Example MEP ``config.yaml`` with an identity mapping path
+     :caption: Example ``config.yaml`` with an identity mapping path
 
-     multi_user: true
      identity_mapping_config_path: /path/to/idmap_config.json
 
 - ``user_config_template_path``
 
   The path to the user endpoint configuration Jinja2 template YAML file.  If not specified,
-  the default template path will be used: ``~/.globus_compute/my-mep/user_config_template.yaml.j2``.
+  the default template path will be used: ``~/.globus_compute/my-ep/user_config_template.yaml.j2``.
 
   See :ref:`user-config-template-yaml-j2` for more information.
 
   .. code-block:: yaml
-     :caption: Example MEP ``config.yaml`` with a custom user config template path
+     :caption: Example ``config.yaml`` with a custom user config template path
 
-     multi_user: true
      user_config_template_path: /path/to/my_template.yaml.j2
 
 - ``user_config_schema_path``
@@ -286,26 +348,24 @@ note are:
   See :ref:`user-config-schema-json` for more information.
 
   .. code-block:: yaml
-     :caption: Example MEP ``config.yaml`` with a custom user config schema path
+     :caption: Example ``config.yaml`` with a custom user config schema path
 
-     multi_user: true
      user_config_schema_path: /path/to/my_schema.json
 
 - ``public``
 
-  A boolean value, dictating whether other users can discover this MEP in the Globus
+  A boolean value, dictating whether other users can discover this endpoint in the Globus
   Compute web API and Globus `Web UI`_.  It defaults to ``false``.
 
   .. warning::
 
-     This field does **not** prevent access to the endpoint.  It determines only
-     whether this MEP is easily discoverable |nbsp| --- |nbsp| do not use this field as
-     a security control.
+     This field does **not** prevent access to the endpoint.  It determines only whether
+     this endpoint is easily discoverable |nbsp| --- |nbsp| do not use this field as a
+     security control.
 
   .. code-block:: yaml
-     :caption: ``config.yaml`` -- example public MEP
+     :caption: ``config.yaml`` -- example public multi-user endpoint
 
-     multi_user: true
      public: true
 
 - ``admins``
@@ -320,7 +380,6 @@ note are:
   .. code-block:: yaml
      :caption: ``config.yaml`` -- specifying endpoint administrators
 
-     multi_user: true
      subscription_id: 600ba9ac-ef16-4387-30ad-60c6cc3a6853
      admins:
        # Peter Gibbons (software engineer)
@@ -336,38 +395,35 @@ note are:
   This field is free-form (accepting space characters, for example).
 
   .. code-block:: yaml
-     :caption: ``config.yaml`` -- naming a public MEP
+     :caption: ``config.yaml`` -- naming a public endpoint
 
      display_name: Debug queue, 10m max job time (RCC, Midway, UChicago)
-     multi_user: true
      public: true
 
 - ``allowed_functions``
 
-  This field specifies an allow-list of functions that may be run by child UEPs.  As
-  this list is available at MEP registration time, not only do the UEPs verify that
-  each task requests a valid function, but the web-service enforces the allowed
-  functions list at task submission as well.  For more information, see :ref:`MEP §
-  Function Allow Listing <function-allowlist>`.
+  This field specifies an allow-list of functions that may be run by a user endpoint
+  process. As this list is available at endpoint registration time, not only do the
+  user endpoint processes verify that each task requests a valid function, but the
+  web-service enforces the allowed functions list at task submission as well.  For
+  more information, see :ref:`Function Allow Listing <function-allowlist>`.
 
   .. code-block:: yaml
-     :caption: ``config.yaml`` -- allowing UEPs to only run certain functions
+     :caption: ``config.yaml`` -- only allow certain functions
 
-     multi_user: true
      allowed_functions:
        - 00911703-e76b-4d0b-7b98-6f2e25ab9943
        - e552e7f2-c007-4671-6ca4-3a4fd84f3805
 
 - ``authentication_policy``
 
-  Use a Globus `Authentication Policy`_ to restrict who can use the MEP at the web
-  service.  (Note that authentication policies require a subscription.)  See
-  :ref:`MEP § Authentication Policies <auth-policies>` for more information.
+  Use a Globus `Authentication Policy`_ to restrict who can use a multi-user endpoint
+  at the web service. See :ref:`Authentication Policies <auth-policies>` for more
+  information.
 
   .. code-block:: yaml
-     :caption: ``config.yaml`` -- allowing only valid identities to use the MEP
+     :caption: ``config.yaml`` -- allowing only valid identities
 
-     multi_user: true
      authentication_policy: 498c7327-9c6a-4847-c954-1eafa923da8e
      subscription_id: 600ba9ac-ef16-4387-30ad-60c6cc3a6853
 
@@ -375,17 +431,14 @@ note are:
 
   Use `Pluggable Authentication Modules`_ (PAM) for site-specific authorization
   requirements.  A structure with ``enable`` and ``service_name`` options.  Defaults to
-  disabled and ``globus-compute-endpoint``.  See :ref:`MEP § PAM <pam>` for more
+  disabled and ``globus-compute-endpoint``.  See :ref:`Multi-User § PAM <pam>` for more
   information.
 
   .. code-block:: yaml
      :caption: ``config.yaml`` -- enabling PAM
 
-     multi_user: true
      pam:
        enable: true
-
-These options are all described in detail in :doc:`multi_user`
 
 
 .. _Identity Mapping Guide: https://docs.globus.org/globus-connect-server/v5.4/identity-mapping-guide/
@@ -401,9 +454,8 @@ Python Class Documentation
 ==========================
 
 The YAML configurations discussed above are facades over the following Python classes.
-Though the vast majority of users will only use the YAML configuration file
-(``config.yaml``), we present the following class documentation to show all of the
-available options.
+Though the vast majority of users will only use the YAML configurations, we present the
+following class documentation to show all of the available options.
 
 .. autoclass:: globus_compute_endpoint.endpoint.config.config.UserEndpointConfig
    :members:
