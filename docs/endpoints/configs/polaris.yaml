@@ -20,7 +20,7 @@ engine:
       bind_cmd: --cpu-bind
       overrides: --depth=64 --ppn 1
 
-    account: {{ YOUR_POLARIS_ACCOUNT }}
+    account: {{ POLARIS_ACCOUNT }}
     queue: debug-scaling
     cpus_per_node: 32
     select_options: ngpus=4

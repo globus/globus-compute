@@ -13,7 +13,7 @@ engine:
         type: SlurmProvider
 
         # e.g., EAR22001
-        account: {{ YOUR_FRONTERA_ACCOUNT }}
+        account: {{ FRONTERA_ACCOUNT }}
 
         # e.g., development
         partition: {{ PARTITION }}
