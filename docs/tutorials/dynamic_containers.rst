@@ -1,30 +1,23 @@
 Dynamic Container Configuration
 *******************************
 
-This tutorial demonstrates how to leverage a multi-user endpoint to enable dynamic
-container configuration at the point of task submission.
+This tutorial demonstrates how to enable dynamic container configuration at the
+point of task submission.
 
 For general information on how to specify container environments in an endpoint
 configuration, see :ref:`Containerized Environments <containerized-environments>`.
 
-.. note::
 
-   A multi-user endpoint functionally becomes a single-user "template-able" endpoint
-   when deployed as a non-privileged user. See :ref:`endpoints_templating_configuration`
-   for more information.
+Configure an Endpoint
+=====================
 
-
-Configure a Multi-User Endpoint
-===============================
-
-If you are starting from scratch, you will need to initialize a multi-user endpoint with
-the ``--multi-user`` flag. See :ref:`Multi-User Configuration <multi-user-configuration>`
-for more information.
+If you are starting from scratch, you will need to initialize an endpoint with
+the ``configure`` subcommand:
 
 
 .. code-block:: console
 
-   $ globus-compute-endpoint configure --multi-user my-mep
+   $ globus-compute-endpoint configure my-ep
 
 
 Modify the Configuration Template
@@ -94,7 +87,7 @@ Once the endpoint is configured, we can start it up.
 
 .. code-block:: console
 
-   $ globus-compute-endpoint start my-mep
+   $ globus-compute-endpoint start my-ep
 
 Take note of the endpoint ID emitted to the console; we will use it later in the tutorial.
 

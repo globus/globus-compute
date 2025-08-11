@@ -1,5 +1,5 @@
-Installing the Compute Endpoint
-*******************************
+Installing the Endpoint
+***********************
 
 The Globus Compute Endpoint is available as a PyPI package or as a native system
 package (DEB and RPM).
