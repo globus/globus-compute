@@ -1,12 +1,12 @@
 Security Posture
 ================
 
-There are multiple avenues to secure a Multi-User Compute Endpoint (MEP) installation.
-Administrators familiar with `Globus Connect Server`_ will recognize the concepts of
-identity mapping and authentication policies to limit access to resources.  (Notably,
-Globus Compute also implements the :ref:`High-Assurance <posture-ha>` aspect of Globus
-Auth policies.)  But more specifically for Compute, there is also the possibility to
-limit exactly which functions may be invoked, and how arguments may be serialized.
+There are multiple avenues to secure a Compute Endpoint installation. Administrators
+familiar with `Globus Connect Server`_ will recognize the concepts of identity mapping
+and authentication policies to limit access to resources.  (Notably, Globus Compute also
+implements the :ref:`High-Assurance <posture-ha>` aspect of Globus Auth policies.)  But
+more specifically for Compute, there is also the possibility to limit exactly which
+functions may be invoked, and how arguments may be serialized.
 
 Each of these concepts is outlined below.
 
@@ -16,51 +16,52 @@ Each of these concepts is outlined below.
 Identity Mapping
 ----------------
 
-The current security model of the Multi-User Compute Endpoint (MEP) relies heavily upon
-Identity Mapping and POSIX user support.  The only job of a MEP is to start user
-endpoint processes (UEP) for users on request from the Globus Compute web service.  The
-actual processing of tasks is left to the individual UEPs.  This is accomplished
-through the well-known ``fork()`` |rarr| *drop privileges* |rarr| ``exec()`` Unix
-workflow, mimicking the approach of many other services (including Secure Shell [ssh],
-Globus GridFTP, and the Apache Web server).  In this manner, all of the standard Unix
-administrative user controls can be enforced.
+The current security model of the Multi-User Compute Endpoint (i.e., running as the ``root``
+user) relies heavily upon Identity Mapping and POSIX user support.  The only job of an endpoint
+is to start user endpoint processes for users on request from the Globus Compute web service.
+The actual processing of tasks is left to the individual user endpoint processes.  This is
+accomplished through the well-known ``fork()`` |rarr| *drop privileges* |rarr| ``exec()`` Unix
+workflow, mimicking the approach of many other services (including Secure Shell [ssh], Globus
+GridFTP, and the Apache Web server).  In this manner, all of the standard Unix administrative
+user controls can be enforced.
 
 "Mapping an identity" is the site-specific process of verifying that one identity is
 equivalent to another for the purposes of a given action.  In the Globus Compute case,
 this means translating a Globus Auth identity set to a local POSIX user account on the
-MEP host for each start-UEP message.  For an administrator-run MEP (i.e., running as the
-``root`` user), an identity mapping configuration is required, and is the main
-difference from a :ref:`non-root MEP <endpoints_templating_configuration>` |nbsp| ---
-|nbsp| a ``root``-owned MEP first maps the Globus Auth identity set from each start-UEP
-message to a local POSIX user (i.e., a local username), before ``fork()``-ing a new
-process, dropping privileges to that user, and starting the requested UEP.
+endpoint host for each request to start a user endpoint process.  For a multi-user endpoint,
+an identity mapping configuration is required, and is the main difference from a
+:doc:`non-root endpoint <endpoints>` |nbsp| --- |nbsp| a ``root``-owned multi-user endpoint
+first maps the Globus Auth identity set from each start message to a local POSIX user
+(i.e., a local username), before ``fork()``-ing a new process, dropping privileges to that
+user, and starting the requested user endpoint process.
 
-See :ref:`MEP § Configuration <example-idmap-config>` for specifics and examples.
+See :ref:`Multi-User § Configuration <example-idmap-config>` for specifics and examples.
 
 
 Authentication Policies
 -----------------------
 
 In addition to the identity mapping access control, administrators may also use Globus
-authentication policies to narrow which identities can even send tasks to a MEP.  An
-authentication policy can enforce details such as that a user has an identity from a
-specific domain or has authenticated with the Globus Auth recently.  Refer to the
-`Authentication Policies documentation`_ for more background and specifics on what
-Globus authentication policies can do and how they fit in to a site's security posture.
+authentication policies to narrow which identities can even send tasks to a multi-user
+endpoint.  An authentication policy can enforce details such as that a user has an
+identity from a specific domain or has authenticated with the Globus Auth recently.
+Refer to the `Authentication Policies documentation`_ for more background and specifics
+on what Globus authentication policies can do and how they fit in to a site's security
+posture.
 
-Reference :ref:`MEP § Authentication Policies <auth-policies>` for more information.
+Reference :ref:`Authentication Policies <auth-policies>` for more information.
 
 
 Function Allow Listing
 ----------------------
 
-Administrators can narrow MEP usage by limiting what functions may be requested by
+Administrators can narrow endpoint usage by limiting what functions may be requested by
 tasks.  The web-service will reject any submissions that request functions not in the
-MEP's configured ``allowed_functions`` list, and user endpoint processes will again
+endpoint's configured ``allowed_functions`` list, and user endpoint processes will again
 verify each task against the same list |nbsp| --- |nbsp| a check at the web-service and
 a check on-site.
 
-Please reference :ref:`MEP § Function Allow Listing <function-allowlist>` for more
+Please reference :ref:`Function Allow Listing <function-allowlist>` for more
 detailed information.
 
 
@@ -75,7 +76,7 @@ may receive |nbsp| --- |nbsp| for example, a callable like another function coul
 be passed |nbsp| --- |nbsp| but is safe from arbitrary code execution during
 deserialization.
 
-See :ref:`Endpoint § Restricting Submission Serialization Methods
+See :ref:`Restricting Submission Serialization Methods
 <restrict-submission-serialization-methods>` for more information.
 
 
@@ -95,19 +96,18 @@ differences:
 - HA functions are cleared from all Globus-related storage (e.g., function name,
   definition, description) after 3 months of inactivity.
 
-Reference :ref:`MEP § High-Assurance <high-assurance-mep>` for details.
+Reference :ref:`High-Assurance <high-assurance>` for details.
 
 
-Multiple Administrators of a MEP
+Multiple Endpoint Administrators
 --------------------------------
 
-MEPs associated with a subscription may be administered by multiple Globus Auth
+Endpoints associated with a subscription may be administered by multiple Globus Auth
 identities.  The identities are stated in the ``admins`` key of the ``config.yaml``:
 
 .. code-block:: yaml
    :caption: ``config.yaml``
 
-   multi_user: true
    subscription_id: 600ba9ac-ef16-4387-30ad-60c6cc3a6853
    admins:
      # Peter Gibbons (software engineer)
@@ -122,7 +122,7 @@ manage and view the endpoint's status page in the `Globus Web app`_.
 
 .. important::
 
-   Note that changes to this list will not go into effect until the MEP is restarted
+   Note that changes to this list will not go into effect until the endpoint is restarted
    and registers afresh with the Globus Compute web services.
 
 
