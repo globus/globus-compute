@@ -1,4 +1,3 @@
-display_name: AI Cluster CS@UChicago
 engine:
     type: GlobusComputeEngine
     label: fe.cs.uchicago
