@@ -42,6 +42,18 @@ def run_in_tmp_dir(tmp_path):
 @pytest.fixture
 def mock_gc_home(tmp_path):
     env = os.environ.copy()
-    env["GLOBUS_COMPUTE_USER_DIR"] = str(tmp_path / "home")
+    env["GLOBUS_COMPUTE_USER_DIR"] = str(tmp_path / "home/mock_gc")
     with mock.patch.dict(os.environ, env):
         yield ensure_compute_dir().absolute()
+
+
+@pytest.fixture
+def mock_gc_home_other(tmp_path):
+    def _mock_base_dir(base_dir: str):
+        env = os.environ.copy()
+        base_absolute_dir = str((tmp_path / base_dir).absolute())
+        env["GLOBUS_COMPUTE_USER_DIR"] = base_absolute_dir
+        with mock.patch.dict(os.environ, env):
+            return ensure_compute_dir().absolute()
+
+    yield _mock_base_dir
