@@ -1,5 +1,4 @@
 amqp_port: 443
-display_name: Anvil CPU
 engine:
   type: GlobusComputeEngine
   max_workers_per_node: 2
