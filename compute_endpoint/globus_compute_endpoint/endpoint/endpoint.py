@@ -8,10 +8,10 @@ import platform
 import pwd
 import re
 import shutil
-import signal
 import socket
 import subprocess
 import sys
+import time
 import typing as t
 from datetime import datetime
 from http import HTTPStatus
@@ -55,6 +55,10 @@ class Endpoint:
     @staticmethod
     def _config_file_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
         return endpoint_dir / "config.yaml"
+
+    @staticmethod
+    def pid_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
+        return endpoint_dir / "daemon.pid"
 
     @staticmethod
     def user_config_template_path(endpoint_dir: pathlib.Path) -> pathlib.Path:
@@ -395,27 +399,6 @@ class Endpoint:
                     "  Endpoint will not start."
                 ) from e
 
-        pid_check = Endpoint.check_pidfile(endpoint_dir)
-        # if the pidfile exists, we should return early because we don't
-        # want to attempt to create a new daemon when one is already
-        # potentially running with the existing pidfile
-        if pid_check["exists"]:
-            if pid_check["active"]:
-                endpoint_name = endpoint_dir.name
-                if endpoint_config.display_name:
-                    endpoint_name = endpoint_config.display_name
-                active_msg = f"Endpoint '{endpoint_name}' is already active"
-                log.info(active_msg)
-                if ostream:
-                    print(active_msg, file=ostream)
-                sys.exit(-1)
-            else:
-                log.info(
-                    "A prior Endpoint instance appears to have been terminated without "
-                    "proper cleanup. Cleaning up now."
-                )
-                Endpoint.pidfile_cleanup(endpoint_dir)
-
         if endpoint_config.endpoint_setup:
             Endpoint._run_command("endpoint_setup", endpoint_config.endpoint_setup)
 
@@ -430,11 +413,10 @@ class Endpoint:
             files_preserve = []
             if audit_fd:
                 files_preserve.append(audit_fd)
-            pid_file = endpoint_dir / "daemon.pid"
             context = daemon.DaemonContext(
                 working_directory=endpoint_dir,
                 umask=0o002,
-                pidfile=daemon.pidfile.PIDLockFile(pid_file),
+                pidfile=daemon.pidfile.PIDLockFile(Endpoint.pid_path(endpoint_dir)),
                 stdout=stdout,
                 stderr=stderr,
                 detach_process=endpoint_config.detach_endpoint,
@@ -653,7 +635,7 @@ class Endpoint:
         endpoint_config: BaseConfig | None,
         remote: bool = False,
     ):
-        pid_path = endpoint_dir / "daemon.pid"
+        pid_path = Endpoint.pid_path(endpoint_dir)
         ep_name = endpoint_dir.name
 
         if remote is True:
@@ -665,14 +647,15 @@ class Endpoint:
             fx_client.stop_endpoint(endpoint_id)
 
         ep_status = Endpoint.check_pidfile(endpoint_dir)
-        if ep_status["exists"] and not ep_status["active"]:
-            Endpoint.pidfile_cleanup(endpoint_dir)
-            return
-        elif not ep_status["exists"]:
-            log.info(f"Endpoint <{ep_name}> is not active.")
+        if not ep_status["exists"]:
+            log.info("Endpoint not active.")
             return
 
-        log.debug(f"{ep_name} has a daemon.pid file")
+        if not ep_status["active"]:
+            Endpoint.pidfile_cleanup(endpoint_dir)
+            return
+
+        log.debug("%s has a PID file (%s)", ep_name, pid_path)
 
         if isinstance(endpoint_config, UserEndpointConfig):
             teardown = endpoint_config.endpoint_teardown
@@ -681,19 +664,30 @@ class Endpoint:
 
         pid = int(pid_path.read_text().strip())
         try:
-            log.debug(f"Signaling process: {pid}")
-            # For all the processes, including the daemon and its descendants,
-            # send SIGTERM, wait for 10s, and then SIGKILL any still alive.
+            log.debug("Signaling process: %s", pid)
+
             grace_period_s = 10
             parent = psutil.Process(pid)
+
             processes = parent.children(recursive=True)
             processes.append(parent)
-            for p in processes:
-                p.send_signal(signal.SIGTERM)
+
+            # Give parent process chance to clean itself up
+            parent.terminate()
+            parent.wait(timeout=grace_period_s)
+
+            # After grace period, give children 1 second, before pulling the plug
             terminated, alive = psutil.wait_procs(processes, timeout=grace_period_s)
             for p in alive:
                 try:
-                    p.send_signal(signal.SIGKILL)
+                    p.terminate()
+                except psutil.NoSuchProcess:
+                    pass
+
+            terminated, alive = psutil.wait_procs(alive, timeout=1)
+            for p in alive:
+                try:
+                    p.kill()
                 except psutil.NoSuchProcess:
                     pass
 
@@ -707,7 +701,7 @@ class Endpoint:
             log.warning(f"Endpoint <{ep_name}> could not be terminated")
             log.warning(f"Attempting Endpoint <{ep_name}> cleanup")
             pid_path.unlink(missing_ok=True)
-            exit(-1)
+            sys.exit(-1)
 
     @staticmethod
     def delete_endpoint(
@@ -792,28 +786,19 @@ class Endpoint:
         endpoint_dir : pathlib.Path
             Configuration directory of the endpoint
         """
-        status = {"exists": False, "active": False}
-        pid_path = endpoint_dir / "daemon.pid"
-        if not pid_path.exists():
+        pid_path = Endpoint.pid_path(endpoint_dir)
+        status = {"exists": pid_path.exists(), "active": False}
+        if not status["exists"]:
             return status
 
-        status["exists"] = True
-
-        try:
-            pid = int(pid_path.read_text().strip())
-            psutil.Process(pid)
-            status["active"] = True
-        except ValueError:
-            # Invalid literal for int() parsing
-            pass
-        except psutil.NoSuchProcess:
-            pass
+        now = time.time()
+        status["active"] = abs(pid_path.stat().st_mtime - now) < 30
 
         return status
 
     @staticmethod
     def pidfile_cleanup(endpoint_dir: pathlib.Path):
-        (endpoint_dir / "daemon.pid").unlink(missing_ok=True)
+        Endpoint.pid_path(endpoint_dir).unlink(missing_ok=True)
         log.info(f"Endpoint <{endpoint_dir.name}> has been cleaned up.")
 
     @staticmethod

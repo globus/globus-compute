@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 import pathlib
+import signal
 import sys
 import textwrap
+import threading
+import time
 import uuid
 
 import click
+import lockfile
 from click import ClickException
 from click_option_group import optgroup
+from daemon.pidfile import PIDLockFile
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_endpoint.boot_persistence import disable_on_boot, enable_on_boot
 from globus_compute_endpoint.endpoint.config import (
@@ -542,6 +548,80 @@ def _do_logout_endpoints(force: bool) -> None:
         log.info("Logout succeeded and all cached credentials were revoked")
 
 
+@contextlib.contextmanager
+def _pidfile(pid_path: pathlib.Path, stale_watermark):
+    if pid_path.exists():
+        _now = time.time()
+        pid_mtime = pid_path.stat().st_mtime
+
+        now_human = time.ctime(_now)
+        mtime_human = time.ctime(pid_mtime)
+        log.info(
+            f"\n       PID path: {pid_path} (PID: {pid_path.read_text().strip()})"
+            f"\n  Last modified: {pid_mtime:.3f} ({mtime_human})"
+            f"\n   Current time: {_now:.3f} ({now_human})"
+        )
+        if pid_mtime >= stale_watermark:
+            msg = (
+                "Another instance of this endpoint is running.  (Perhaps on"
+                " another login node?)  Refusing to start.  If this is not"
+                " correct, then remove the PID file before starting again."
+            )
+            log.error(msg)
+            sys.exit(os.EX_CANTCREAT)
+
+        else:
+            log.warning(
+                "Previous endpoint instance failed to shutdown cleanly."
+                "  Removing PID file."
+            )
+            pid_path.unlink(missing_ok=True)
+
+        del _now, stale_watermark, pid_mtime, now_human, mtime_human
+
+    shutting_down = threading.Event()
+
+    def _touch_pid():
+        while not shutting_down.wait(15) and pid_path.exists():
+            pid_path.touch(mode=0o644)
+        pid_path.unlink(missing_ok=True)  # in case race condition
+
+        if not shutting_down.is_set():
+            # An external event has removed the PID file: we need to shut
+            # down.
+            mthread = threading.main_thread()
+            log.warning("PID file removed by another process; initiating shutdown")
+            os.kill(os.getpid(), signal.SIGTERM)
+            mthread.join(timeout=15)
+            if not mthread.is_alive():
+                return
+
+            # We're a daemon thread; if we're still here, then the SIGTERM
+            # was not enough
+            os.killpg(os.getpgrp(), signal.SIGTERM)
+            threading.main_thread().join(timeout=5)
+
+            if not mthread.is_alive():
+                return
+
+            # Damn.  Nuke it from orbit.
+            os.killpg(os.getpgrp(), signal.SIGKILL)
+
+    pidfile = PIDLockFile(pid_path)
+    pidfile.acquire()
+    threading.Thread(target=_touch_pid, daemon=True).start()
+    try:
+        yield
+    finally:
+        shutting_down.set()
+        try:
+            pidfile.release()
+        except (lockfile.NotLocked, lockfile.NotMyLock):
+            # Likely from a self-daemonization; regardless, we're shutting down
+            # so no longer ours to worry about
+            pass
+
+
 def _do_start_endpoint(
     *,
     ep_dir: pathlib.Path,
@@ -587,7 +667,27 @@ def _do_start_endpoint(
             exc_type = e.__class__.__name__
             log.debug("Invalid info on stdin -- (%s) %s", exc_type, e)
 
-    try:
+    @contextlib.contextmanager
+    def _send_message_on_error_exit():
+        try:
+            yield
+        except (SystemExit, Exception) as e:
+            if isinstance(e, SystemExit):
+                if e.code in (0, None):
+                    # normal, system exit
+                    raise
+
+            if reg_info:
+                # We're quitting anyway, so just let any exceptions bubble
+                msg = (
+                    f"Failed to start or unexpected error:\n  ({type(e).__name__}) {e}"
+                )
+                send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
+
+            raise
+
+    with contextlib.ExitStack() as stk:
+        stk.enter_context(_send_message_on_error_exit())
         try:
             if config_str is not None:
                 ep_config = load_config_yaml(config_str)
@@ -620,6 +720,9 @@ def _do_start_endpoint(
             log.critical(msg)
             raise
 
+        pid_path = Endpoint.pid_path(ep_dir)
+        stk.enter_context(_pidfile(pid_path, ep_config.heartbeat_period * 3))
+
         if isinstance(ep_config, ManagerEndpointConfig):
             if not _has_multi_user:
                 raise ClickException(
@@ -634,6 +737,9 @@ def _do_start_endpoint(
                 ep_config.detach_endpoint = False
                 log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
+            if ep_config.detach_endpoint:
+                # special case until self-daemonization removed:
+                Endpoint.pid_path(ep_dir).unlink()
             get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
                 endpoint_uuid,
@@ -645,19 +751,6 @@ def _do_start_endpoint(
                 die_with_parent,
                 audit_fd,
             )
-
-    except (SystemExit, Exception) as e:
-        if isinstance(e, SystemExit):
-            if e.code in (0, None):
-                # normal, system exit
-                raise
-
-        if reg_info:
-            # We're quitting anyway, so just let any exceptions bubble
-            msg = f"Failed to start or unexpected error:\n  ({type(e).__name__}) {e}"
-            send_endpoint_startup_failure_to_amqp(reg_info, msg=msg)
-
-        raise
 
 
 @app.command("stop")

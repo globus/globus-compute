@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -9,6 +10,7 @@ import shlex
 import sys
 import typing as t
 import uuid
+from contextlib import redirect_stderr
 from unittest import mock
 
 import globus_sdk
@@ -16,6 +18,7 @@ import pytest
 import yaml
 from click import ClickException
 from click.testing import CliRunner
+from globus_compute_endpoint import cli
 from globus_compute_endpoint.cli import (
     _AUTH_POLICY_DEFAULT_DESC,
     _AUTH_POLICY_DEFAULT_NAME,
@@ -83,10 +86,10 @@ def mock_command_ensure(gc_dir):
 @pytest.fixture
 def mock_cli_state(gc_dir, mock_command_ensure, ep_name):
     with mock.patch(f"{_MOCK_BASE}Endpoint") as mock_ep:
+        ep_dir = gc_dir / ep_name
+        mock_ep.get_endpoint_by_name_or_uuid.return_value = ep_dir
+        mock_ep.pid_path.return_value = ep_dir / "daemon.pid"
         mock_ep.return_value = mock_ep
-        mock_ep.get_endpoint_by_name_or_uuid.return_value = (
-            mock_command_ensure.endpoint_config_dir / ep_name
-        )
         yield mock_ep, mock_command_ensure
 
 
@@ -133,7 +136,11 @@ def run_line(cli_runner):
             stdin = "{}"  # silence some logs; incurred by invoke's sys.stdin choice
         result = cli_runner.invoke(app, args, input=stdin)
         if assert_exit_code is not None:
-            assert result.exit_code == assert_exit_code, (result.stdout, result.stderr)
+            assert result.exit_code == assert_exit_code, (
+                result.stdout,
+                result.stderr,
+                result.exception,
+            )
         return result
 
     return func
@@ -209,6 +216,24 @@ def test_start_endpoint_existing_ep(
     run_line(f"start {ep_name}")
     mock_ep, _ = mock_cli_state
     mock_ep.start_endpoint.assert_called_once()
+
+
+def test_start_endpoint_already_running(mock_cli_state, make_endpoint_dir, ep_name):
+    """Check to ensure endpoint already active message prints to console"""
+    ep_dir = make_endpoint_dir()
+    pid_path = Endpoint.pid_path(ep_dir)
+    pid_path.write_text("12345")
+    f = io.StringIO()
+    with redirect_stderr(f):
+        with pytest.raises(SystemExit) as pyt_e:
+            cli._do_start_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
+    pid_path.unlink()
+
+    serr = f.getvalue()
+    assert pyt_e.value.code == os.EX_CANTCREAT
+    assert "Another instance " in serr, "Expect cause explained"
+    assert "Refusing to start." in serr, "Expect action taken conveyed"
+    assert "remove the PID file" in serr, "Expect suggested action conveyed"
 
 
 @pytest.mark.parametrize("cli_cmd", ["configure"])
