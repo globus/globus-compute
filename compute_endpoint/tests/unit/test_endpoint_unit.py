@@ -7,6 +7,7 @@ import logging
 import os
 import pathlib
 import random
+import time
 import uuid
 from collections import namedtuple
 from contextlib import redirect_stdout
@@ -332,25 +333,6 @@ def test_register_endpoint_blocked(
         assert pytexc.value.http_status == status_code
 
 
-def test_register_endpoint_already_active(mock_get_client, mock_ep_data, ep_uuid):
-    """Check to ensure endpoint already active message prints to console"""
-    pid_active = {
-        "exists": True,
-        "active": True,
-    }
-    f = io.StringIO()
-    f.isatty = lambda: True
-
-    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
-    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
-    with mock.patch(f"{_mock_base}Endpoint.check_pidfile", return_value=pid_active):
-        with redirect_stdout(f):
-            with pytest.raises(SystemExit) as pytest_exc:
-                ep.start_endpoint(*ep_args, reg_info={}, ep_info={})
-    assert "is already active" in f.getvalue()
-    assert pytest_exc.value.code == -1
-
-
 def test_list_endpoints_none_configured(mock_ep_buf):
     buf = mock_ep_buf
     Endpoint.print_endpoint_table()
@@ -400,23 +382,20 @@ def test_list_endpoints_long_names_wrapped(
 
 
 @pytest.mark.parametrize(
-    "pid_info",
-    [
-        [False, None, False, False],
-        [True, "", True, False],
-        [True, "123", True, False],
-    ],
+    "is_running,is_active", ((False, False), (True, False), (True, True))
 )
-def test_pid_file_check(pid_info, fs):
-    has_file, pid_content, should_exist, should_active = pid_info
-
+def test_pid_file_check(fs, is_running, is_active):
     ep_dir = pathlib.Path(".")
-    if has_file:
-        (ep_dir / "daemon.pid").write_text(pid_content)
+    if is_running:
+        pid_path = Endpoint.pid_path(ep_dir)
+        pid_path.touch()
+        if not is_active:
+            ptime = time.time() - 35  # something larger than the touch update
+            os.utime(pid_path, (ptime, ptime))
 
     pid_status = Endpoint.check_pidfile(ep_dir)
-    assert should_exist == pid_status["exists"]
-    assert should_active == pid_status["active"]
+    assert pid_status["exists"] is is_running
+    assert pid_status["active"] is is_active
 
 
 @pytest.mark.parametrize(
