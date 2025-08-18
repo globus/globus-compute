@@ -12,7 +12,7 @@ engine:
     type: SlurmProvider
 
     # e.g., EAR22001
-    account: {{ YOUR_TACC_ALLOCATION }}
+    account: {{ TACC_ALLOCATION }}
 
     # e.g., skx-dev
     partition: {{ PARTITION }}
