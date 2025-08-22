@@ -549,10 +549,10 @@ def _do_logout_endpoints(force: bool) -> None:
 
 
 @contextlib.contextmanager
-def _pidfile(pid_path: pathlib.Path, stale_watermark):
+def _pidfile(pid_path: pathlib.Path, stale_after_s: int | float):
     if pid_path.exists():
-        _now = time.time()
         pid_mtime = pid_path.stat().st_mtime
+        _now = time.time()
 
         now_human = time.ctime(_now)
         mtime_human = time.ctime(pid_mtime)
@@ -561,7 +561,7 @@ def _pidfile(pid_path: pathlib.Path, stale_watermark):
             f"\n  Last modified: {pid_mtime:.3f} ({mtime_human})"
             f"\n   Current time: {_now:.3f} ({now_human})"
         )
-        if pid_mtime >= stale_watermark:
+        if _now - pid_mtime <= stale_after_s:
             msg = (
                 "Another instance of this endpoint is running.  (Perhaps on"
                 " another login node?)  Refusing to start.  If this is not"
@@ -577,7 +577,7 @@ def _pidfile(pid_path: pathlib.Path, stale_watermark):
             )
             pid_path.unlink(missing_ok=True)
 
-        del _now, stale_watermark, pid_mtime, now_human, mtime_human
+        del _now, stale_after_s, pid_mtime, now_human, mtime_human
 
     shutting_down = threading.Event()
 
@@ -737,9 +737,8 @@ def _do_start_endpoint(
                 ep_config.detach_endpoint = False
                 log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
-            if ep_config.detach_endpoint:
-                # special case until self-daemonization removed:
-                Endpoint.pid_path(ep_dir).unlink()
+            # special case until daemon.DaemonContext logic removed:
+            Endpoint.pid_path(ep_dir).unlink()
             get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
                 endpoint_uuid,

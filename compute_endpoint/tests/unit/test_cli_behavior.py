@@ -8,6 +8,7 @@ import pathlib
 import random
 import shlex
 import sys
+import time
 import typing as t
 import uuid
 from contextlib import redirect_stderr
@@ -234,6 +235,22 @@ def test_start_endpoint_already_running(mock_cli_state, make_endpoint_dir, ep_na
     assert "Another instance " in serr, "Expect cause explained"
     assert "Refusing to start." in serr, "Expect action taken conveyed"
     assert "remove the PID file" in serr, "Expect suggested action conveyed"
+
+
+def test_start_endpoint_stale(mock_cli_state, make_endpoint_dir, ep_name):
+    ep_dir = make_endpoint_dir()
+    pid_path = Endpoint.pid_path(ep_dir)
+    pid_path.write_text("12345")
+    stale_time = time.time() - 95  # something larger than HB * 3
+    os.utime(pid_path, (stale_time, stale_time))
+    f = io.StringIO()
+    with redirect_stderr(f):
+        cli._do_start_endpoint(ep_dir=ep_dir, endpoint_uuid=None)
+
+    serr = f.getvalue()
+    assert "Previous endpoint instance" in serr, "Expect 'who' in warning"
+    assert "failed to shutdown cleanly" in serr, "Expect 'what' in warning"
+    assert "Removing PID file" in serr, "Expect action taken in warning"
 
 
 @pytest.mark.parametrize("cli_cmd", ["configure"])
