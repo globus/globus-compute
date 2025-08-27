@@ -282,8 +282,10 @@ def get_diagnostic_commands(log_bytes: int, config_dir: str | None = None):
         if specified_path.exists() and specified_path.is_dir():
             gc_base_dir = specified_path
         else:
-            print(f"{specified_path.absolute()} is not a valid directory")
-            sys.exit(1)
+            print(
+                f"{specified_path.absolute()} is not a valid directory", file=sys.stderr
+            )
+            sys.exit(os.EX_NOINPUT)
 
     # Run endpoint related diagnostics when it is installed
     ep_install_dir = print_endpoint_install_dir()
@@ -507,10 +509,10 @@ def do_diagnostic_base(diagnostic_args):
     colorama.just_fix_windows_console()
 
     DIAGNOSTIC_HELP_TEXT = (
-        "This utility gathers local hardware specifications,  tests "
-        "connectivity to the Globus Compute web services, and collates "
-        "portions of local Compute Endpoint log files, if present, to a "
-        "local compressed file."
+        "This utility gathers local hardware specifications, tests"
+        " connectivity to the Globus Compute web services, and collates"
+        " portions of local Compute Endpoint log files, if present, to a"
+        " local compressed file."
     )
 
     parser = argparse.ArgumentParser(
@@ -523,8 +525,8 @@ def do_diagnostic_base(diagnostic_args):
         action="store_true",
         default=False,
         help=(
-            "Do not generate a Gzip-compressed file. Print diagnostic results "
-            "to the console instead."
+            "Do not generate a Gzip-compressed file. Print diagnostic results"
+            " to the console instead."
         ),
     )
     parser.add_argument(
@@ -545,9 +547,9 @@ def do_diagnostic_base(diagnostic_args):
         default=False,
         action="store_true",
         help=(
-            "When writing diagnostic output to local compressed file, also "
-            "print the name of each test to stdout as they are being run, "
-            "to help monitor diagnostic progress."
+            "When writing diagnostic output to local compressed file, also"
+            " print the name of each test to stdout as they are being run,"
+            " to help monitor diagnostic progress."
         ),
     )
     parser.add_argument(
@@ -556,9 +558,9 @@ def do_diagnostic_base(diagnostic_args):
         default=None,
         type=str,
         help=(
-            "Test an endpoint by registering a sample function and sending "
-            "a task to it using the newly registered function.  An endpoint "
-            "UUID is required."
+            "Test an endpoint by registering a sample function and sending"
+            " a task to it using the newly registered function.  An endpoint"
+            " UUID is required."
         ),
     )
     parser.add_argument(
@@ -567,9 +569,9 @@ def do_diagnostic_base(diagnostic_args):
         default=None,
         type=str,
         help=(
-            "Gather endpoint configuration and log info from the specified "
-            "parent directory instead of the default ~/.globus_compute or "
-            "what is set in $GLOBUS_COMPUTE_USER_DIR"
+            "Gather endpoint configuration and log info from the specified"
+            " parent directory instead of the default ~/.globus_compute or"
+            " what is set in $GLOBUS_COMPUTE_USER_DIR"
         ),
     )
 
