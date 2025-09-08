@@ -526,7 +526,7 @@ This requires that there are conda environments named ``py314``, ``py313``,
 ``py312``, and ``py311`` with the appropriate Python versions installed.
 
 For more information on what the template knows about the user's runtime
-environment, see |UserRuntime|.
+environment, see :ref:`reserved-template-variables`.
 
 
 Advanced Environment Customization
@@ -1299,7 +1299,6 @@ The workflow for a task sent to an endpoint roughly follows these steps:
 .. |HighThroughputExecutor| replace:: ``HighThroughputExecutor``
 .. _HighThroughputExecutor: https://parsl.readthedocs.io/en/latest/stubs/parsl.executors.HighThroughputExecutor.html
 .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
-.. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
 .. _Web UI: https://app.globus.org/compute
 .. _Jinja template: https://jinja.palletsprojects.com/en/stable/
 .. _Globus Auth: https://www.globus.org/platform/services/auth

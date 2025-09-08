@@ -46,6 +46,8 @@ The template would fail to render if we used ``'test'`` or ``"test"`` instead of
 ``'"test"'``.
 
 
+.. _reserved-template-variables:
+
 Reserved Variables
 ==================
 
@@ -56,9 +58,14 @@ user or admin:
   endpoint.  This can be helpful in situations involving Python-based
   configuration files.
 
-- ``user_runtime``: Contains information about the runtime that the user used
-  when submitting the task request, such as Python version.  See |UserRuntime|
-  for a complete list of available information.
+- ``user_runtime``: Contains information about the runtime environment of the
+  user submitting tasks, such as their Python version.  The following fields are
+  available:
+
+  - ``globus_compute_sdk_version``: Version string of the Globus Compute SDK
+  - ``globus_sdk_version``: Version string of the base Globus SDK dependency
+  - ``python_version``: Complete Python version string from ``sys.version``,
+    including implementation details
 
 - ``mapped_identity``: Contains information about the user's mapped identity.
   The following fields are available:
@@ -116,4 +123,3 @@ rendered in user space, the administrator must:
 
 
 .. _Jinja template: https://jinja.palletsprojects.com/en/3.1.x/
-.. |UserRuntime| replace:: :class:`UserRuntime <globus_compute_sdk.sdk.batch.UserRuntime>`
