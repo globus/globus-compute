@@ -121,25 +121,21 @@ git push
 Before building the packages:
 
 * ensure that the release itself, either the alpha or prod versions, is published on PyPI.
-* VPN is enabled to access the build page.
+* ⚠️ The Jenkins build pages need to be accessed via VPN.
 
 #### Build Process
 
-To build the alpha DEB/RPM packages after the alpha PyPI is released, simply put
-the tag name ie. ``v2.29.0a0`` or ``v2.29.0`` into the input textbox of the
-[build page here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec).
-then clicking the green **Build** button.
+To build the DEB/RPM packages after the alpha/prod PyPI is released, specify the alpha or prod
+tag names as detailed below and then click the green **Build** button.
 
-For production builds, check the  ``BUILD_FOR_STABLE`` box.
-
-1. Notes
+##### Notes
     Our alpha builds will go to the ``unstable`` repo, and production packages goes
      to both the ``testing`` and ``stable`` repos.
 
     After this build process for production, the testing and stable packages will
     reside in an internal globus 'holding' repo.  GCS manages the infrastructure
-    so we need to run another Jenkins build to push it to live if GCS is not having
-    a release the same week.  TBD details
+    so we need to run another Jenkins build to push it to live if GCS is not doing
+    a release the same week which also pushes our packages.  See last pipeline step below.
 
     * Example of unstable repo:
         * https://downloads.globus.org/globus-connect-server/unstable/rpm/el/9/x86_64/
@@ -151,9 +147,10 @@ For production builds, check the  ``BUILD_FOR_STABLE`` box.
         * After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
             * https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
       [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
-2. (Access on VPN) Click the [build button here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec)
-3. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
-4. For production release cycles where there is also a GCS release, if we push our packages before they do, skip the following (also not necessary for alpha releases)
+1. (Access on VPN) For each release, update the Pipeline -> SCM -> Branch Specifier to the current release branch name e.g. v3.14.0 in [Build Configuration](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/configure)
+1. Enter the alpha or prod release name e.g. v3.14.0a0 or v3.14.0 in the input textbox of the [build page here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec).  Check the ``BUILD_FOR_STABLE`` box if building for production
+1. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
+1. For production release cycles where there is also a GCS release, if we push our packages before they do, skip the following (also not necessary for alpha releases)
     * If there isn't a concurrent GCS release, or if GCS finishes their deploy before we finish building our packages, we need to manually run the downloads sync Jenkins script:
     * https://builds.globus.org/jenkins/view/all/job/Synchronize%20GCSv5%20Stable/build?delay=0sec
         * Leave `SYNC_WHEELS_ONLY` unchecked
@@ -174,8 +171,8 @@ env variables in our [JenkinsFile](https://github.com/globus/globus-compute/blob
         * After GCS push during deploy day (or if we ping them to do so), the public images will be located at:
             * https://downloads.globus.org/globus-connect-server/stable/rpm/el/9/x86_64/
       [publishResults.groovy line 85](https://github.com/globusonline/gcs-build-scripts/blob/168617a0ccbb0aee7b3bee04ee67940bbe2a80f6/vars/publishResults.groovy#L85)
-2. (Access on VPN) Click the [build button here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec)
-3. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
-4. For production release, we will have finished the build before the GCS
+1. (Access on VPN) Click the [build button here](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/build?delay=0sec)
+1. Wait 20-30 minutes and confirm that the [build is green](https://builds.globus.org/jenkins/job/BuildGlobusComputeAgentPackages/)
+1. For production release, we will have finished the build before the GCS
    team, and can notify them that our build is complete.  They then will
    publish all packages when they finish their builds, which includes ours.
