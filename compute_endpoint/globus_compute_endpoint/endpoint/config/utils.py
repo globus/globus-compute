@@ -214,6 +214,8 @@ def _sanitize_user_opts(data):
         return json.dumps(data)
     elif isinstance(data, (int, float)):
         return data
+    elif data is None:
+        return "null"
     else:
         # We do not expect to hit this because user options are passed
         # from the web service as JSON
