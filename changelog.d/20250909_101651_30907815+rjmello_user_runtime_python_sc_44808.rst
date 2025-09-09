@@ -1,0 +1,14 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- We've deprecated the ``user_runtime.python_version`` template variable in favor of
+  more granular variables to facilitate leveraging Python installation information in
+  the configuration template:
+
+  - ``user_runtime.python.version``: The Python version as a string 'major.minor.micro'
+  - ``user_runtime.python.version_tuple``: The Python version as a tuple (major, minor, micro)
+  - ``user_runtime.python.compiler``: String identifying the compiler used for compiling Python
+  - ``user_runtime.python.implementation``: String identifying the Python implementation
+
+  The ``user_runtime.python_version`` variable provides the complete ``sys.version`` string,
+  which contains useful information but is hard to utilize in the template.
