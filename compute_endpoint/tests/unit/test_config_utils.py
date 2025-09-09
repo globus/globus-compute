@@ -118,7 +118,7 @@ def test_render_user_config_escape_strings(
 ):
     template = """
 endpoint_setup: {{ setup }}
-display_name: {{ user_runtime.python_version }}
+display_name: {{ user_runtime.python.version}}
 engine:
     type: {{ engine.type }}
     accelerators:
@@ -134,7 +134,7 @@ engine:
             "accelerators": [f"{uuid.uuid4()}\n    mem_per_worker: 100"],
         },
     }
-    user_runtime = {"python_version": "3.13\n    bar: baz"}
+    user_runtime = {"python": {"version": "3.13.7\n    bar: baz"}}
     rendered_str = render_config_user_template(
         conf_no_exec,
         template,
@@ -149,7 +149,7 @@ engine:
     assert len(loaded) == 3
     assert len(loaded["engine"]) == 2
     assert loaded["endpoint_setup"] == user_opts["setup"]
-    assert loaded["display_name"] == user_runtime["python_version"]
+    assert loaded["display_name"] == user_runtime["python"]["version"]
     assert loaded["engine"]["type"] == user_opts["engine"]["type"]
     assert loaded["engine"]["accelerators"] == user_opts["engine"]["accelerators"]
 
@@ -362,8 +362,8 @@ def test_render_config_passes_parent_config(
 def test_render_config_passes_user_runtime(
     conf_no_exec, mapped_ident: MappedPosixIdentity
 ):
-    template = "user_python: {{ user_runtime.python_version }}"
-    user_runtime = {"python_version": "X.Y.Z"}
+    template = "user_python: {{ user_runtime.python.version }}"
+    user_runtime = {"python": {"version": "X.Y.Z"}}
 
     rendered = render_config_user_template(
         conf_no_exec,
@@ -374,7 +374,7 @@ def test_render_config_passes_user_runtime(
     )
 
     rendered_dict = yaml.safe_load(rendered)
-    assert rendered_dict["user_python"] == user_runtime["python_version"]
+    assert rendered_dict["user_python"] == user_runtime["python"]["version"]
 
 
 def test_render_config_passes_mapped_identity(mocker, conf_no_exec):

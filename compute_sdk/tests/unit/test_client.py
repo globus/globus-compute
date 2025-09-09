@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import io
 import json
+import platform
 import sys
 import threading
 import time
@@ -311,6 +312,13 @@ def test_batch_includes_user_runtime_info(gcc):
         "globus_compute_sdk_version": __version__,
         "globus_sdk_version": __version_globus__,
         "python_version": sys.version,
+        "python": {
+            "version": platform.python_version(),
+            "version_tuple": sys.version_info[:3],
+            "version_info": tuple(sys.version_info),
+            "implementation": platform.python_implementation(),
+            "compiler": platform.python_compiler(),
+        },
     }
 
 
