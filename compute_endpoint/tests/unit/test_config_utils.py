@@ -154,6 +154,32 @@ engine:
     assert loaded["engine"]["accelerators"] == user_opts["engine"]["accelerators"]
 
 
+def test_render_user_config_handles_null_user_values(
+    conf_no_exec, mapped_ident: MappedPosixIdentity
+):
+    template = """
+endpoint_setup: {{ some_var }}
+display_name: {{ user_runtime.some_var }}
+    """
+
+    user_opts = {"some_var": None}
+    user_runtime = {"some_var": None}
+    rendered_str = render_config_user_template(
+        conf_no_exec,
+        template,
+        pathlib.Path("/"),
+        mapped_ident,
+        {},
+        user_opts,
+        user_runtime,
+    )
+    loaded = yaml.safe_load(rendered_str)
+
+    assert len(loaded) == 2
+    assert loaded["endpoint_setup"] is None
+    assert loaded["display_name"] is None
+
+
 @pytest.mark.parametrize(
     "data",
     [
