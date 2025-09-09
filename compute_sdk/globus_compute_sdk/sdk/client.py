@@ -555,6 +555,14 @@ class Client:
                     compiler=platform.python_compiler(),
                     implementation=platform.python_implementation(),
                 ),
+                platform=UserRuntime.PlatformInfo(
+                    architecture=platform.architecture(),
+                    machine=platform.machine(),
+                    node=platform.node(),
+                    platform=platform.platform(),
+                    processor=platform.processor(),
+                    release=platform.release(),
+                ),
             ),
         )
 

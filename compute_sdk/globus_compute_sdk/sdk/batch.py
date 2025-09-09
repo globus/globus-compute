@@ -30,7 +30,9 @@ class UserRuntime:
         Complete Python version string from ``sys.version``
         (Deprecated; use ``python`` instead)
     python
-        Information about the Python installation
+        Information about the Python runtime
+    platform
+        General platform information from the host
     """
 
     globus_compute_sdk_version: str
@@ -64,6 +66,35 @@ class UserRuntime:
         compiler: str
 
     python: PythonInfo
+
+    @dataclass
+    class PlatformInfo:
+        """General platform information from the host
+
+        Parameters
+        ----------
+        architecture
+            Host architecture tuple (e.g., ``("64bit", "ELF")``)
+        machine
+            Host machine type (e.g., ``"x86_64"``)
+        node
+            Host node name (e.g., ``"login03"``)
+        platform
+            Host platform (e.g., ``"Linux-6.14.0-29-generic-x86_64-with-glibc2.39"``)
+        processor
+            Host processor name (e.g., ``"x86_64"``)
+        release
+            Host OS release (e.g., ``"6.16.5-2-generic"``)
+        """
+
+        architecture: tuple[str, str]
+        machine: str
+        node: str
+        platform: str
+        processor: str
+        release: str
+
+    platform: PlatformInfo
 
 
 class Batch:
