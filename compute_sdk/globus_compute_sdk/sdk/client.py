@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import json
 import logging
+import platform
 import sys
 import threading
 import typing as t
@@ -547,6 +548,13 @@ class Client:
                 globus_compute_sdk_version=__version__,
                 globus_sdk_version=__version_globus__,
                 python_version=sys.version,
+                python=UserRuntime.PythonInfo(
+                    version=platform.python_version(),
+                    version_tuple=sys.version_info[:3],
+                    version_info=tuple(sys.version_info),  # type: ignore[arg-type]
+                    compiler=platform.python_compiler(),
+                    implementation=platform.python_implementation(),
+                ),
             ),
         )
 

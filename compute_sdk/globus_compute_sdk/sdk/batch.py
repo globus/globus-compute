@@ -20,14 +20,50 @@ class UserRuntime:
     """Information about a user's runtime environment, which is sent along with task
     submissions to the MEP user config renderer.
 
-    :param str globus_compute_sdk_version: Version of the Compute SDK
-    :param str globus_sdk_version: Version of the Globus SDK
-    :param str python_version: Python version running the Compute SDK
+    Parameters
+    ----------
+    globus_compute_sdk_version
+        Version string of the Globus Compute SDK (e.g., ``"3.14.0"``)
+    globus_sdk_version
+        Version string of the Globus SDK dependency (e.g., ``"3.63.0"``)
+    python_version
+        Complete Python version string from ``sys.version``
+        (Deprecated; use ``python`` instead)
+    python
+        Information about the Python installation
     """
 
     globus_compute_sdk_version: str
     globus_sdk_version: str
     python_version: str
+
+    @dataclass
+    class PythonInfo:
+        """Information about the Python runtime
+
+        Parameters
+        ----------
+        version
+            Python version string (e.g., ``"3.13.7"``)
+        version_tuple
+            Python version as a tuple (e.g., ``(3, 13, 7)``)
+        version_info
+            Python version info from ``tuple(sys.version_info)``
+            (e.g., ``(3, 13, 7, "final", 0)``)
+        implementation
+            Python implementation (e.g., ``"CPython"``)
+        compiler
+            String identifying the compiler used for compiling Python
+            (e.g., ``"Clang 14.0.6"``)
+        """
+
+        version: str
+        version_tuple: tuple[int, int, int]
+        version_info: tuple[int, int, int, str, int]
+        implementation: str
+        compiler: str
+
+    python: PythonInfo
 
 
 class Batch:
