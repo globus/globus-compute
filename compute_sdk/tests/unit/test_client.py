@@ -319,6 +319,14 @@ def test_batch_includes_user_runtime_info(gcc):
             "implementation": platform.python_implementation(),
             "compiler": platform.python_compiler(),
         },
+        "platform": {
+            "architecture": platform.architecture(),
+            "machine": platform.machine(),
+            "node": platform.node(),
+            "platform": platform.platform(),
+            "processor": platform.processor(),
+            "release": platform.release(),
+        },
     }
 
 
