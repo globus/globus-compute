@@ -3,6 +3,17 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.13.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.13.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Template-capable endpoints are no longer ignored by the ``list`` and ``stop``
+  commands.
+
 .. _changelog-3.12.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.12.0
