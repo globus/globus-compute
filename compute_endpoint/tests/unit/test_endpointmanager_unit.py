@@ -942,23 +942,13 @@ def test_emits_endpoint_id_if_isatty(mocker, mock_log, epmanager_as_root):
     assert not mock_sys.stderr.write.called
 
 
-def test_as_root_and_no_identity_mapper_configuration_fails(
-    mocker, mock_log, mock_client, conf_dir, mock_conf
+def test_as_root_and_no_identity_mapper_configuration_allowed(
+    mocker, mock_client, conf_dir, mock_conf
 ):
-    mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
-
     ep_uuid, _ = mock_client
     mock_conf.identity_mapping_config_path = None
-    with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, mock_conf)
-
-    assert pyt_exc.value.code == os.EX_OSFILE
-    assert mock_log.error.called
-    assert mock_print.called
-    for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
-        assert "No identity mapping file specified" in a
-        assert "identity_mapping_config_path" in a, "Expected required config item"
+    EndpointManager(conf_dir, ep_uuid, mock_conf)
 
 
 def test_no_identity_mapper_if_unprivileged(
@@ -997,6 +987,7 @@ def test_quits_if_not_privileged_and_no_identity_set(
     mocker, mock_log, mock_client, mock_auth_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
+    em.identity_mapper = None
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
     mock_auth_client.userinfo.return_value = {"identity_set": []}
     assert em._time_to_stop is False, "Verify test setup"
@@ -1012,6 +1003,7 @@ def test_clean_exit_on_identity_collection_error(
     mocker, mock_log, mock_client, mock_auth_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
+    em.identity_mapper = None
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
     mock_auth_client.userinfo.return_value = {"not_identity_set": None}
     assert em._time_to_stop is False, "Verify test setup"
