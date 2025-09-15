@@ -124,9 +124,7 @@ def test_load_manager_endpoint_config_full(get_random_of_datatype):
         for kw, tval in known_manager_config_opts.items()
     }
     serde_yaml = yaml.safe_dump(conf)
-    to_mock = "globus_compute_endpoint.endpoint.config.config.is_privileged"
-    with mock.patch(to_mock, return_value=True):
-        conf = load_config_yaml(serde_yaml)
+    conf = load_config_yaml(serde_yaml)
     assert isinstance(conf, ManagerEndpointConfig)
 
 

@@ -251,16 +251,7 @@ class EndpointManager:
                     f"\n    (ignored) '{config.identity_mapping_config_path}'"
                 )
                 log.warning(msg)
-        else:
-            if not config.identity_mapping_config_path:
-                msg = (
-                    "No identity mapping file specified; please specify"
-                    " identity_mapping_config_path"
-                )
-                log.error(msg)
-                print(msg, file=sys.stderr)
-                sys.exit(os.EX_OSFILE)
-
+        elif config.identity_mapping_config_path:
             # Only map identities if possibility of *changing* uid; otherwise
             # we enforce that the identity of UEPs must match the
             # parent-process' authorization -- we do not want to allow an open
@@ -607,7 +598,7 @@ class EndpointManager:
 
     def _event_loop(self):
         parent_identities: set[str] = set()
-        if not is_privileged():
+        if not (is_privileged() and self.identity_mapper):
             client_options = {
                 "local_compute_services": self._config.local_compute_services,
                 "environment": self._config.environment,
@@ -1001,14 +992,17 @@ class EndpointManager:
         udir, uid, gid = user_record.pw_dir, user_record.pw_uid, user_record.pw_gid
         uname = user_record.pw_name
 
-        if not self._allow_same_user:
+        if self.identity_mapper and not self._allow_same_user:
             p_uname = self._mu_user.pw_name
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
-                    "Requested UID is same as Manager Endpoint UID, but configuration"
-                    " has not been marked to allow the Manager Endpoint UID to process"
-                    " tasks.  To allow the same UID to also run tasks, consider using"
-                    " a non-root user or removing privileges from the UID."
+                    "Requested UID is same as Manager Endpoint UID on a user-mapped"
+                    " Manager Endpoint. To allow the same UID to run tasks, consider: "
+                    "\n * using a non-root user,"
+                    "\n * removing privileges from the UID, or"
+                    "\n * removing the identity mapping configuration file"
+                    f" ({self.identity_mapper.config_path})."
+                    "\n\nDetails:"
                     f"\n  MU Process UID: {self._mu_user.pw_uid} ({p_uname})"
                     f"\n  Requested UID:  {uid} ({uname})"
                     f"\n  Via identity:   {ident.matched_identity}",

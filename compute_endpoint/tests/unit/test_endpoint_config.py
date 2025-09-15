@@ -131,37 +131,16 @@ def test_mep_config_verifies_path_like_fields(config_dict_mep, field: str):
     )  # doesn't raise; conditional validation
 
 
-def test_mep_config_warns_idmapping_ignored(mock_log, config_dict_mep):
-    config_dict_mep["identity_mapping_config_path"] = "not exists file"
-    ManagerEndpointConfig(**config_dict_mep)
-
-    a, _k = mock_log.warning.call_args
-    assert "Identity mapping specified" in a[0]
-    assert "is not privileged" in a[0]
-
-
-def test_mep_config_privileged_requires_idmapping(config_dict_mep):
-    del config_dict_mep["identity_mapping_config_path"]
-    with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
-        with pytest.raises(ValueError) as pyt_e:
-            ManagerEndpointConfig(**config_dict_mep)
-
-    assert "identity mapping" in str(pyt_e).lower()
-    assert "required" in str(pyt_e).lower()
-    assert "Hint: identity_mapping_config_path" in str(pyt_e), "Expect config item hint"
-
-
 def test_mep_config_privileged_verifies_idmapping(config_dict_mep):
     p = config_dict_mep["identity_mapping_config_path"]
-    with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
-        ManagerEndpointConfig(**config_dict_mep)  # Verify for test: doesn't raise!
+    ManagerEndpointConfig(**config_dict_mep)  # Verify for test: doesn't raise!
 
-        p.unlink(missing_ok=True)
-        with pytest.raises(ValueError) as pyt_e:
-            ManagerEndpointConfig(**config_dict_mep)
+    p.unlink(missing_ok=True)
+    with pytest.raises(ValueError) as pyt_e:
+        ManagerEndpointConfig(**config_dict_mep)
 
-        assert "not found" in str(pyt_e)
-        assert str(p) in str(pyt_e), "Expect invalid path shared"
+    assert "not found" in str(pyt_e)
+    assert str(p) in str(pyt_e), "Expect invalid path shared"
 
 
 @pytest.mark.parametrize("public", (None, True, False, "a", 1))
@@ -229,11 +208,7 @@ def test_managerconfig_repr_nondefault_kwargs(
     if cls == os.PathLike:
         val = pathlib.Path(val)
 
-    if kw == "identity_mapping_config_path":
-        with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
-            repr_c = repr(ManagerEndpointConfig(**{kw: val}))
-    else:
-        repr_c = repr(ManagerEndpointConfig(**{kw: val}))
+    repr_c = repr(ManagerEndpointConfig(**{kw: val}))
 
     assert f"{kw}={repr(val)}" in repr_c
 
