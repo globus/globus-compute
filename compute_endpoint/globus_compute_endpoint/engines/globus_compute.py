@@ -151,6 +151,11 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         self.executor.interchange_launch_cmd = self._get_compute_ix_launch_cmd()
         self.executor.launch_cmd = self._get_compute_launch_cmd()
 
+        # This flag serves as a temporary workaround to support different
+        # Python versions at the endpoint and worker layers. We can drop
+        # the flag once Parsl supports modular internal message protocols.
+        self.executor._check_python_mismatch = False
+
         self.run_in_sandbox = run_in_sandbox
         if strategy is None:
             strategy = "simple"

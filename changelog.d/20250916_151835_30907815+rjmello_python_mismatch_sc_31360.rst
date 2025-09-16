@@ -1,0 +1,4 @@
+Bug Fixes
+^^^^^^^^^
+
+- The endpoint and worker Python versions no longer have to be in sync.
