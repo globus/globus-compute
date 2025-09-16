@@ -415,7 +415,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         """
         if managers is None:
             managers = self.get_connected_managers()
-        total_task_count = self.executor.outstanding
+        total_task_count = self.executor.outstanding()
         breakdown = [(m["manager"], m["tasks"], m["active"]) for m in managers]
         total_count_managers = sum([m["tasks"] for m in managers])
         task_count_interchange = total_task_count - total_count_managers
@@ -428,7 +428,7 @@ class GlobusComputeEngine(GlobusComputeEngineBase):
         -------
         Dict of type {str_task_type: count_tasks}
         """
-        return {"RAW": self.executor.outstanding}
+        return {"RAW": self.executor.outstanding()}
 
     def get_total_tasks_pending(self, managers: t.List[t.Dict[str, t.Any]]) -> int:
         """
