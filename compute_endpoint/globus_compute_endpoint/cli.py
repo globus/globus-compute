@@ -737,8 +737,6 @@ def _do_start_endpoint(
                 ep_config.detach_endpoint = False
                 log.debug("The --die-with-parent flag has set detach_endpoint to False")
 
-            # special case until daemon.DaemonContext logic removed:
-            Endpoint.pid_path(ep_dir).unlink()
             get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
                 endpoint_uuid,

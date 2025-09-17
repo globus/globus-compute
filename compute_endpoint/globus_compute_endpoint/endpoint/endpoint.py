@@ -17,7 +17,6 @@ from datetime import datetime
 from http import HTTPStatus
 
 import daemon
-import daemon.pidfile
 import psutil
 import setproctitle
 import texttable
@@ -416,7 +415,6 @@ class Endpoint:
             context = daemon.DaemonContext(
                 working_directory=endpoint_dir,
                 umask=0o002,
-                pidfile=daemon.pidfile.PIDLockFile(Endpoint.pid_path(endpoint_dir)),
                 stdout=stdout,
                 stderr=stderr,
                 detach_process=endpoint_config.detach_endpoint,
