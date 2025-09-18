@@ -504,7 +504,7 @@ class Executor(concurrent.futures.Executor):
             self._validated_result_serializers = [validate_strategylike(v) for v in val]
             self._result_serializers = val
 
-    def _fn_cache_key(self, fn: t.Callable):
+    def _fn_cache_key(self, fn: t.Callable | int):
         return fn, self.container_id
 
     def register_function(
@@ -578,6 +578,61 @@ class Executor(concurrent.futures.Executor):
         self._function_registry[fn_cache_key] = func_reg_id
         log.debug("Function registered with id: %s", func_reg_id)
         return func_reg_id
+
+    def register_source_code(
+        self,
+        source: str,
+        function_name: str,
+        **registration_kwargs,
+    ) -> str:
+        """Register arbitrary Python source code with entrypoint function
+
+        The standard ``.register_function()`` method expects a callable function object,
+        which it then serializes using the specified code serialization strategy. In
+        contrast, this method enables the user to directly provide an arbitrary source
+        code string and entrypoint function name.
+
+        As with ``.register_function()``, this method will store the registered function
+        source code and ``function_id`` in the ``Executor``'s cache. If a function is
+        already in the cache, this method raise a ``ValueError`` to help track down the
+        errant double registration attempt.
+
+        .. important::
+
+            This method will ignore the current code serialization strategy and use
+            ``PureSourceTextInspect`` instead.
+
+        :param source: The source code string
+        :param function_name: The name of the entrypoint function within the source code
+        :param registration_kwargs: Additional keyword arguments passed to
+            :meth:`Client.register_source_code
+            <globus_compute_sdk.Client.register_source_code>`
+        :returns: UUID string of the registered function
+        """
+        if self._stopped:
+            raise RuntimeError(f"{self!r} is shutdown; refusing to register function")
+
+        fn_cache_key = self._fn_cache_key(hash(source))
+        if fn_cache_key in self._function_registry:
+            cached_fn_id = self._function_registry[fn_cache_key]
+            msg = f"Function already registered as function id: {cached_fn_id}"
+            log.error(msg)
+            raise ValueError(msg)
+
+        log.debug(f"Function not registered. Registering: {function_name}")
+
+        try:
+            fn_id = self.client.register_source_code(
+                source, function_name, **registration_kwargs
+            )
+        except Exception:
+            log.error(f"Unable to register function: {function_name}")
+            self.shutdown(wait=False, cancel_futures=True)
+            raise
+
+        self._function_registry[fn_cache_key] = fn_id
+        log.debug(f"Function registered with id: {fn_id}")
+        return fn_id
 
     def submit(self, fn, *args, **kwargs):
         """

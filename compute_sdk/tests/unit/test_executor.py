@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import inspect
 import random
 import threading
 import typing as t
@@ -60,6 +61,7 @@ class MockedExecutor(Executor):
         # Unless test overrides, set default response:
         fn_id = str(uuid.uuid4())
         mock_client.register_function.return_value = fn_id
+        mock_client.register_source_code.return_value = fn_id
         mock_client.batch_run.return_value = {
             "tasks": {fn_id: [str(uuid.uuid4())]},
             "task_group_id": str(uuid.uuid4()),
@@ -521,6 +523,77 @@ def test_failed_registration_shuts_down_executor(gce, randomstring):
     e_str = str(pyt_e.value)
     assert "is shutdown" in e_str
     assert "refusing to register function" in e_str
+
+
+def test_register_source_code(gce: Executor, mock_log, randomstring):
+    source = inspect.getsource(noop)
+    function_name = noop.__name__
+    reg_kwargs = {randomstring(): randomstring() for _ in range(random.randint(2, 5))}
+
+    fn_id = gce.register_source_code(source, function_name, **reg_kwargs)
+
+    a, _ = mock_log.debug.call_args
+    assert "Function registered" in a[0]
+    assert fn_id in a[0]
+
+    a, k = gce.client.register_source_code.call_args
+    assert source in a
+    assert function_name in a
+    for key, val in reg_kwargs.items():
+        assert k[key] == val
+
+
+def test_multiple_register_source_code_fails(gce: Executor, mock_log):
+    source = inspect.getsource(noop)
+    function_name = noop.__name__
+    fn_id = gce.register_source_code(source, function_name)
+
+    with pytest.raises(ValueError) as pyt_e:
+        gce.register_source_code(source, function_name)
+
+    a, _ = mock_log.error.call_args
+    assert "Function already registered" in a[0]
+    assert fn_id in a[0]
+
+    e_str = str(pyt_e.value)
+    assert "Function already registered" in e_str
+    assert fn_id in e_str
+    assert "attempted" not in e_str
+    assert not gce._stopped
+
+
+def test_failed_source_code_registration_shuts_down_executor(
+    gce: Executor, randomstring
+):
+    exc = RuntimeError(randomstring())
+    gcc = gce.client
+    gcc.register_source_code.side_effect = exc
+
+    source = inspect.getsource(noop)
+    function_name = noop.__name__
+    with pytest.raises(Exception) as pyt_exc:
+        gce.register_source_code(source, function_name)
+
+    assert pyt_exc.value is exc, "Expected raw exception raised"
+    try_assert(lambda: gce._stopped)
+
+    with pytest.raises(RuntimeError) as pyt_e:
+        gce.register_source_code(source, function_name)
+
+    e_str = str(pyt_e.value)
+    assert "is shutdown" in e_str
+    assert "refusing to register function" in e_str
+
+
+def test_register_source_code_executor_stopped(gce: Executor, fs):
+    source = inspect.getsource(noop)
+    function_name = noop.__name__
+
+    gce.shutdown()
+    with pytest.raises(RuntimeError) as pyt_e:
+        gce.register_source_code(source, function_name)
+
+    assert "refusing to register function" in str(pyt_e)
 
 
 def test_container_id_deprecated(gce: Executor):
