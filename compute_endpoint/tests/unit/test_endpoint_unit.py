@@ -398,6 +398,26 @@ def test_pid_file_check(fs, is_running, is_active):
     assert pid_status["active"] is is_active
 
 
+def test_daemon_creates_pid(randomstring, mock_ep_data, mock_reg_info, ep_uuid):
+    ep, ep_dir, log_to_console, no_color, ep_conf = mock_ep_data
+
+    mock_stk = mock.MagicMock()
+    mock_stk.__enter__.return_value = mock_stk
+    mock_stk.enter_context.side_effect = (None, MemoryError)
+    ep_args = (ep_dir, ep_uuid, ep_conf, log_to_console, no_color)
+
+    assert ep_conf.detach_endpoint, "Verify test setup and raison d'etre"
+    with mock.patch(f"{_mock_base}contextlib.ExitStack", return_value=mock_stk):
+        with pytest.raises(MemoryError):
+            ep.start_endpoint(*ep_args, reg_info=mock_reg_info, ep_info={})
+
+    a, k = mock_stk.enter_context.call_args
+    contextmanager_generator = a[0]
+
+    # awful test, but a temporary measure until v4, when we remove daemon context
+    assert contextmanager_generator.func.__name__ == "_pidfile"
+
+
 @pytest.mark.parametrize(
     "engine_cls", (GlobusComputeEngine, ThreadPoolEngine, ProcessPoolEngine)
 )
