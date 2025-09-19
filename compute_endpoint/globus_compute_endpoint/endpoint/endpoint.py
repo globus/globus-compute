@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -554,7 +555,18 @@ class Endpoint:
                 msg = f"\n    {msg}\n"
             print(msg, file=ostream)
 
-        with context:
+        with contextlib.ExitStack() as stk:
+            stk.enter_context(context)
+            if endpoint_config.detach_endpoint:
+                # special case until daemon.DaemonContext logic removed
+                pid_path = Endpoint.pid_path(endpoint_dir)
+                pid_path.unlink(missing_ok=True)
+
+                from globus_compute_endpoint.cli import _pidfile
+
+                pid_ctxt = _pidfile(pid_path, endpoint_config.heartbeat_period * 3)
+                stk.enter_context(pid_ctxt)
+
             # Per DaemonContext implementation, and that we _don't_ pass stdin,
             # fd 0 is already connected to devnull.  Unfortunately, there is an
             # as-yet unknown interaction on Polaris (ALCF) that needs this
