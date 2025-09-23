@@ -750,6 +750,12 @@ def _do_start_endpoint(
             epm.start()
         else:
             assert isinstance(ep_config, UserEndpointConfig)
+
+            print(
+                "This endpoint is not template capable. To add that capability, run:"
+                f"\n\n\t$ globus-compute-endpoint migrate-to-template-capable {ep_dir.name}\n"  # noqa: E501
+            )
+
             if die_with_parent:
                 # The endpoint cannot die with its parent if it doesn't have one :)
                 ep_config.detach_endpoint = False
@@ -1023,6 +1029,34 @@ def enable_on_boot_cmd(ep_dir: pathlib.Path):
 @name_or_uuid_arg
 def disable_on_boot_cmd(ep_dir: pathlib.Path):
     disable_on_boot(ep_dir)
+
+
+@app.command(
+    "migrate-to-template-capable",
+    help="Add configuration templating to an existing endpoint",
+)
+@click.option(
+    "--yes",
+    is_flag=True,
+    default=False,
+    help="Do not ask for confirmation to migrate the endpoint.",
+)
+@name_or_uuid_arg
+def migrate_to_template_capable(ep_dir: pathlib.Path, yes: bool):
+    """Migrate an endpoint to be template capable"""
+    if not yes:
+        click.confirm(
+            f"> Are you sure you want to migrate endpoint '{ep_dir.name}' to be"
+            " template capable? This is a one-way operation.",
+            abort=True,
+        )
+
+    try:
+        Endpoint.migrate_to_template_capable(ep_dir)
+    except Exception as e:
+        raise ClickException(f"Failed to migrate endpoint: {e}")
+    else:
+        log.info(f"Endpoint {ep_dir.name} successfully migrated to template capable.")
 
 
 def cli_run():
