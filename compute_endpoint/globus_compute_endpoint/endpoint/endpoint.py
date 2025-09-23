@@ -24,8 +24,12 @@ import texttable
 import yaml
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
-from globus_compute_endpoint.endpoint.config import BaseConfig, UserEndpointConfig
-from globus_compute_endpoint.endpoint.config.utils import serialize_config
+from globus_compute_endpoint.endpoint.config import (
+    BaseConfig,
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
+from globus_compute_endpoint.endpoint.config.utils import get_config, serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds, update_url_port
@@ -242,6 +246,56 @@ class Endpoint:
             "\nUse the `start` subcommand to run it:\n"
             f"\n\t$ globus-compute-endpoint start {ep_name}"
         )
+
+    @staticmethod
+    def migrate_to_template_capable(conf_dir: pathlib.Path):
+        og_config_obj = get_config(conf_dir)
+        if isinstance(og_config_obj, ManagerEndpointConfig):
+            raise ValueError(f"Endpoint '{conf_dir.name}' is already template capable.")
+
+        if Endpoint.check_pidfile(conf_dir)["active"]:
+            raise ValueError(f"Endpoint '{conf_dir.name}' is currently running.")
+
+        assert og_config_obj.source_content is not None
+        og_config_dict = yaml.safe_load(og_config_obj.source_content)
+
+        mep_config_path = Endpoint._config_file_path(conf_dir)
+        mep_config_keys = {
+            "admins",
+            "display_name",
+            "allowed_functions",
+            "authentication_policy",
+            "subscription_id",
+        }
+        uep_template_path = Endpoint.user_config_template_path(conf_dir)
+        uep_template_keys: set[str] = set(og_config_dict) - mep_config_keys
+        shared_keys = {
+            "debug",
+            "amqp_port",
+            "heartbeat_period",
+            # internal usage:
+            "local_compute_services",
+            "environment",
+        }
+
+        mep_config_backup_path = mep_config_path.with_name(
+            f"{mep_config_path.name}.backup"
+        )
+        if mep_config_backup_path.exists():
+            raise FileExistsError(
+                f"Tried to back up '{mep_config_path}' to '{mep_config_backup_path}',"
+                " but the latter already exists."
+            )
+        mep_config_path.rename(mep_config_backup_path)
+
+        for keys, dest in [
+            (mep_config_keys, mep_config_path),
+            (uep_template_keys, uep_template_path),
+        ]:
+            config_dict = {
+                k: og_config_dict[k] for k in keys | shared_keys if k in og_config_dict
+            }
+            dest.write_text(yaml.safe_dump(config_dict, sort_keys=False))
 
     @staticmethod
     def validate_endpoint_name(path_name: str) -> None:

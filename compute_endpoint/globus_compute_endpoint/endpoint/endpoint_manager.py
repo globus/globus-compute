@@ -1012,7 +1012,7 @@ class EndpointManager:
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
                     "Requested UID is same as Manager Endpoint UID on a user-mapped"
-                    " Manager Endpoint. To allow the same UID to run tasks, consider: "
+                    " Manager Endpoint. To allow the same UID to run tasks, consider:"
                     "\n * using a non-root user,"
                     "\n * removing privileges from the UID, or"
                     "\n * removing the identity mapping configuration file"
