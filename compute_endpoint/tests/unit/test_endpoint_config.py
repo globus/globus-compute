@@ -140,17 +140,6 @@ def test_mep_config_warns_idmapping_ignored(mock_log, config_dict_mep):
     assert "is not privileged" in a[0]
 
 
-def test_mep_config_privileged_requires_idmapping(config_dict_mep):
-    del config_dict_mep["identity_mapping_config_path"]
-    with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
-        with pytest.raises(ValueError) as pyt_e:
-            ManagerEndpointConfig(**config_dict_mep)
-
-    assert "identity mapping" in str(pyt_e).lower()
-    assert "required" in str(pyt_e).lower()
-    assert "Hint: identity_mapping_config_path" in str(pyt_e), "Expect config item hint"
-
-
 def test_mep_config_privileged_verifies_idmapping(config_dict_mep):
     p = config_dict_mep["identity_mapping_config_path"]
     with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):

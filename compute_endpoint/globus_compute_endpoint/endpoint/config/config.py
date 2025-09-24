@@ -502,24 +502,19 @@ class ManagerEndpointConfig(BaseConfig):
 
     @identity_mapping_config_path.setter
     def identity_mapping_config_path(self, val: os.PathLike | str | None):
-        self._identity_mapping_config_path: pathlib.Path | None
-        if is_privileged():
-            if not val:
-                raise ValueError(
-                    "Identity mapping required.  (Hint: identity_mapping_config_path)"
-                )
-
-            _p = pathlib.Path(val)
-            if not _p.exists():
-                raise ValueError(f"Identity mapping config path not found ({_p})")
-            self._identity_mapping_config_path = _p
-        else:
-            self._identity_mapping_config_path = None
-            if val:
-                log.warning(
-                    "Identity mapping specified, but process is not privileged;"
-                    " ignoring identity mapping configuration."
-                )
+        self._identity_mapping_config_path: pathlib.Path | None = None
+        if not val:
+            return
+        if not is_privileged():
+            log.warning(
+                "Identity mapping specified, but process is not privileged;"
+                " ignoring identity mapping configuration."
+            )
+            return
+        _p = pathlib.Path(val)
+        if not _p.exists():
+            raise ValueError(f"Identity mapping config path not found ({_p})")
+        self._identity_mapping_config_path = _p
 
     @property
     def audit_log_path(self) -> pathlib.Path | None:
