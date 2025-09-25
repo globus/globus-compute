@@ -134,3 +134,12 @@ def display_name(name: str):
         return func
 
     return decorator
+
+
+def simple_humanize(num: int | float) -> tuple[str, str]:
+    unit = ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei")
+    i = 0
+    while num >= 1024:
+        i += 1
+        num /= 1024.0
+    return f"{round(num, 1)}", unit[i]
