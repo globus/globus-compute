@@ -3,6 +3,27 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.15.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.15.0
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- The endpoint and worker Python versions no longer have to be in sync.
+
+- 3.14.0 fixed an authorization-timeout bug for endpoint startups, but
+  erroneously then allowed multiple endpoint instances to attempt to start from
+  the same host.  The pre-3.14.0 behavior is returned, whereby the second
+  instance will see the PID file (``daemon.pid``) and refuse to start.
+
+Changed
+^^^^^^^
+
+- Bumped ``parsl`` dependency  from `2025.3.31 <https://pypi.org/project/parsl/2025.3.31/>`_
+  to `2025.9.15 <https://pypi.org/project/parsl/2025.9.15/>`_
+
 .. _changelog-3.14.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.14.0
