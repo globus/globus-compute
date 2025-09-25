@@ -7,10 +7,16 @@ import io
 import os
 import pathlib
 import platform
+import sys
 from unittest import mock
 
 import pytest
 from globus_compute_sdk.sdk.diagnostic import cat, do_diagnostic_base
+from globus_compute_sdk.sdk.hardware_report import (
+    mem_info,
+    python_runtime_host_info,
+    swap_info,
+)
 from globus_compute_sdk.sdk.web_client import WebClient
 from pytest_mock import MockFixture
 
@@ -453,3 +459,35 @@ def test_diagnostic_base_dir_GC_HOME_or_config_param(
                 do_diagnostic_base(diag_args)
             assert se.type == SystemExit
             assert se.value.code == os.EX_NOINPUT
+
+
+def test_python_host_info():
+    info = python_runtime_host_info()
+
+    assert f"Version: {sys.version}" in info
+    assert f"Version info: {sys.version_info}" in info
+    assert f"Interpreter path: {sys.executable}" in info
+
+    assert f"CPU architecture: {platform.processor()}" in info
+    assert f"CPU core count: {os.cpu_count()}" in info
+
+    assert f"Node name: {platform.node()}" in info
+    assert f"Platform: {platform.platform()}" in info
+
+    assert f"HOME: {os.getenv('HOME')}" in info
+    assert f"USER: {os.getenv('USER')}" in info
+    assert f"USERNAME: {os.getenv('USERNAME')}" in info
+    assert f"LANG: {os.getenv('LANG')}" in info
+    assert f"XDG_RUNTIME_DIR: {os.getenv('XDG_RUNTIME_DIR')}" in info
+    assert f"PATH: {os.getenv('PATH')}" in info
+    assert f"VIRTUAL_ENV: {os.getenv('VIRTUAL_ENV')}" in info
+
+    assert f"uid: {os.getuid()}" in info
+
+
+def test_mem_swap_info():
+    minfo = mem_info()
+    sinfo = swap_info()
+
+    assert "iB " in minfo, "Expect humanization of output"
+    assert "iB " in sinfo, "Expect humanization of output"

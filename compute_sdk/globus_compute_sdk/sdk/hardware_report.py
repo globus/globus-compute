@@ -8,25 +8,63 @@ import shutil
 import subprocess
 import sys
 
-from globus_compute_sdk.sdk.utils import display_name
+from globus_compute_sdk.sdk.utils import display_name, simple_humanize
+
+
+def _format_psmem(psdata) -> str:
+    data = psdata._asdict()
+    max_name_len = max(map(len, data.keys()))
+    max_val_len = max(map(len, map(str, data.values())))
+    lines = []
+    for fname, fval in data.items():
+        fname = fname.capitalize()
+        if fname == "Percent":
+            val = f"{fval:>6} % (used)"
+        else:
+            v, u = simple_humanize(fval)
+            val = f"{v:>6} {u + 'B':<3} ({fval:>{max_val_len}})"
+        lines.append(f"{fname:>{max_name_len}}: {val}")
+
+    return "\n".join(lines)
 
 
 @display_name("psutil.virtual_memory()")
 def mem_info() -> str:
     import psutil  # import here bc psutil is installed with endpoint but not sdk
 
-    svmem = psutil.virtual_memory()
-    return "\n".join(f"{k}: {v}" for k, v in svmem._asdict().items())
+    return _format_psmem(psutil.virtual_memory())
 
 
-@display_name("Python version")
-def python_version() -> str:
-    return str(sys.version)
+@display_name("psutil.swap_memory()")
+def swap_info() -> str:
+    import psutil  # import here bc psutil is installed with endpoint but not sdk
+
+    return _format_psmem(psutil.swap_memory())
 
 
-@display_name("Python interpreter location")
-def python_location() -> str:
-    return str(sys.executable)
+@display_name("python_runtime_host_info")
+def python_runtime_host_info() -> str:
+    return (
+        f"          Version: {sys.version}"
+        f"\n     Version info: {sys.version_info}"
+        f"\n Interpreter path: {sys.executable}"
+        "\n"
+        f"\n CPU architecture: {platform.processor()}"
+        f"\n   CPU core count: {os.cpu_count()}"
+        "\n"
+        f"\n        Node name: {platform.node()}"
+        f"\n         Platform: {platform.platform()}"
+        "\n"
+        f"\n             HOME: {os.getenv('HOME')}"
+        f"\n             USER: {os.getenv('USER')}"
+        f"\n         USERNAME: {os.getenv('USERNAME')}"
+        f"\n             LANG: {os.getenv('LANG')}"
+        f"\n  XDG_RUNTIME_DIR: {os.getenv('XDG_RUNTIME_DIR')}"
+        f"\n             PATH: {os.getenv('PATH')}"
+        f"\n      VIRTUAL_ENV: {os.getenv('VIRTUAL_ENV')}"
+        "\n"
+        f"\n              uid: {os.getuid()}"
+    )
 
 
 def cpu_info() -> str | None:
@@ -76,14 +114,12 @@ def hardware_commands_list() -> list:
     Commands that can also be useful in globus-compute-diagnostic
     """
     return [
-        platform.processor,
-        os.cpu_count,
+        python_runtime_host_info,
+        mem_info,
+        swap_info,
         cpu_info(),
         "nvidia-smi",
-        mem_info,
-        "df",
-        platform.node,
-        platform.platform,
+        "df -h",
     ]
 
 
@@ -102,8 +138,6 @@ def run_hardware_report(env: str | None = None) -> str:
     # SDK diagnostics or that we only want to run here
     commands.extend(
         [
-            python_version,
-            python_location,
             "lshw -C display",
             "globus-compute-endpoint version",
         ]
