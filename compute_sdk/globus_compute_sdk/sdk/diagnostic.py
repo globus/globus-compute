@@ -5,7 +5,6 @@ import glob
 import gzip
 import io
 import os
-import platform
 import shlex
 import shutil
 import socket
@@ -262,7 +261,6 @@ def general_commands_list():
         "whoami",
         "pip freeze",
         print_openssl_version,
-        platform.processor,
         ifconfig_wrapper(),
         if_supported_on_os("ip addr"),
         if_supported_on_os("ip route"),
