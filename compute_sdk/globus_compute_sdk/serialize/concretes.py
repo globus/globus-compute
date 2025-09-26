@@ -236,14 +236,20 @@ class PureSourceTextInspect(SerializationStrategy):
 
     def serialize(self, data) -> str:
         ":meta private:"
-        name = data.__name__
+        name: str = data.__name__
         body = inspect.getsource(data)
         x = name + self._separator + body
+        x = codecs.encode(x.encode(), "base64").decode()
         return self.identifier + x
 
     def deserialize(self, payload: str):
         ":meta private:"
         chomped = self.chomp(payload)
+        try:
+            chomped = codecs.decode(chomped.encode(), "base64").decode()
+        except Exception:
+            # Older versions do not use bas64 encoding
+            pass
         name, body = chomped.split(self._separator, 1)
         exec_ns: dict = {}
         exec(body, exec_ns)
@@ -277,14 +283,20 @@ class PureSourceDill(SerializationStrategy):
 
     def serialize(self, data) -> str:
         ":meta private:"
-        name = data.__name__
+        name: str = data.__name__
         body = dill.source.getsource(data, lstrip=True)
         x = name + self._separator + body
+        x = codecs.encode(x.encode(), "base64").decode()
         return self.identifier + x
 
     def deserialize(self, payload: str):
         ":meta private:"
         chomped = self.chomp(payload)
+        try:
+            chomped = codecs.decode(chomped.encode(), "base64").decode()
+        except Exception:
+            # Older versions do not use bas64 encoding
+            pass
         name, body = chomped.split(self._separator, 1)
         exec_ns: dict = {}
         exec(body, exec_ns)
