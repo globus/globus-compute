@@ -88,7 +88,7 @@ def handle_auth_errors(f: t.Callable) -> t.Callable:
                 """)
 
             # Check for auth error that should go through login flow
-            if e.http_status == 400 and e.code == "Error" and sys.stdin.isatty():
+            if e.http_status == 400 and '"error"' in e.text and sys.stdin.isatty():
                 try:
                     error_info = json.loads(e.text)
                     if "invalid_grant" == error_info.get("error"):

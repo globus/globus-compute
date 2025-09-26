@@ -39,7 +39,7 @@ def print_whoami_info(app: GlobusApp, linked_identities: bool = False) -> None:
     # if we get back an error the user likely needs to log in again
     try:
         user_info = {}
-        res = auth_client.oauth2_userinfo()
+        res = auth_client.userinfo()
         main_id = res["sub"]
         user_info[main_id] = get_user_info(auth_client, main_id)
 

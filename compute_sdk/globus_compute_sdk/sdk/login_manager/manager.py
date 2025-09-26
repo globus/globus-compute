@@ -8,9 +8,10 @@ import warnings
 
 import globus_sdk
 from globus_sdk.gare import GlobusAuthorizationParameters
-from globus_sdk.scopes import AuthScopes, Scope
+from globus_sdk.scopes import AuthScopes, ComputeScopes, Scope
+from globus_sdk.scopes.parser import ScopeParser
+from globus_sdk.token_storage.token_data import TokenStorageData
 
-from ..auth.scopes import ComputeScopeBuilder
 from ..web_client import WebClient
 from .client_login import get_client_login, is_client_login
 from .globus_auth import internal_auth_client
@@ -18,8 +19,6 @@ from .login_flow import do_link_auth_flow
 from .tokenstore import get_token_storage_adapter
 
 log = logging.getLogger(__name__)
-
-ComputeScopes = ComputeScopeBuilder()
 
 
 class LoginManager:
@@ -37,8 +36,11 @@ class LoginManager:
     """
 
     SCOPES: dict[str, list[str]] = {
-        ComputeScopes.resource_server: [ComputeScopes.all],
-        AuthScopes.resource_server: [AuthScopes.openid, AuthScopes.manage_projects],
+        ComputeScopes.resource_server: [ComputeScopes.all.scope_string],
+        AuthScopes.resource_server: [
+            AuthScopes.openid.scope_string,
+            AuthScopes.manage_projects.scope_string,
+        ],
     }
 
     def __init__(self, *, environment: str | None = None) -> None:
@@ -89,14 +91,14 @@ class LoginManager:
             min_scopes.extend(Scope(s) for s in rs_scopes)
 
         _auth_params = auth_params or GlobusAuthorizationParameters()
-        combined_scopes = Scope.merge_scopes(
+        combined_scopes = ScopeParser.merge_scopes(
             min_scopes, [Scope(s) for s in _auth_params.required_scopes or []]
         )
         _auth_params.required_scopes = list(map(str, combined_scopes))
 
         token = do_link_auth_flow(_auth_params)
         with self._access_lock:
-            self._token_storage.store(token)
+            self._token_storage.store_token_response(token)
 
     def logout(self) -> bool:
         """
@@ -105,11 +107,13 @@ class LoginManager:
         with self._access_lock:
             auth_client = internal_auth_client()
             tokens_revoked = False
-            for rs, token_data in self._token_storage.get_by_resource_server().items():
-                for tok_key in ("access_token", "refresh_token"):
-                    token = token_data[tok_key]
-                    auth_client.oauth2_revoke_token(token)
-                self._token_storage.remove_tokens_for_resource_server(rs)
+            tokens: dict[str, TokenStorageData] = (
+                self._token_storage.get_token_data_by_resource_server()
+            )
+            for rs, token_data in tokens.items():
+                auth_client.oauth2_revoke_token(token_data.access_token)
+                auth_client.oauth2_revoke_token(token_data.refresh_token)
+                self._token_storage.remove_token_data(rs)
                 tokens_revoked = True
 
         return tokens_revoked
@@ -119,11 +123,11 @@ class LoginManager:
         is found to be invalid, a new login flow is initiated.
         """
         with self._access_lock:
-            data = self._token_storage.get_by_resource_server()
+            data = self._token_storage.get_token_data_by_resource_server()
 
         for server, scopes in self.login_requirements:
             tok = data.get(server)
-            if not tok or any(scope not in tok["scope"] for scope in scopes):
+            if not tok or any(scope not in tok.scope for scope in scopes):
                 self.run_login_flow()
                 break
 
@@ -148,8 +152,8 @@ class LoginManager:
             access_token = None
             expires_at = None
             if tokens:
-                access_token = tokens["access_token"]
-                expires_at = tokens["expires_at_seconds"]
+                access_token = tokens.access_token
+                expires_at = tokens.expires_at_seconds
 
             with self._access_lock:
                 return globus_sdk.ClientCredentialsAuthorizer(
@@ -157,7 +161,7 @@ class LoginManager:
                     scopes=scopes,
                     access_token=access_token,
                     expires_at=expires_at,
-                    on_refresh=self._token_storage.on_refresh,
+                    on_refresh=self._token_storage.store_token_response,
                 )
         else:
             if tokens is None:
@@ -166,11 +170,10 @@ class LoginManager:
                 )
             with self._access_lock:
                 return globus_sdk.RefreshTokenAuthorizer(
-                    tokens["refresh_token"],
+                    str(tokens.refresh_token),
                     internal_auth_client(),
-                    access_token=tokens["access_token"],
-                    expires_at=tokens["expires_at_seconds"],
-                    on_refresh=self._token_storage.on_refresh,
+                    access_token=tokens.access_token,
+                    expires_at=tokens.expires_at_seconds,
                 )
 
     def get_auth_client(self) -> globus_sdk.AuthClient:

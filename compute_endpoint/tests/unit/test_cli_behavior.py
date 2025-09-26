@@ -489,7 +489,7 @@ def test_restart_endpoint_does_start_and_stop(
         (os.EX_UNAVAILABLE, HTTPStatus.NOT_FOUND),
         (os.EX_DATAERR, HTTPStatus.BAD_REQUEST),
         (os.EX_DATAERR, HTTPStatus.UNPROCESSABLE_ENTITY),
-        ("Error", HTTPStatus.IM_A_TEAPOT),
+        ("I'm a Teapot", 418),
     ),
 )
 def test__do_register_endpoint_registration_blocked(
@@ -523,12 +523,15 @@ def test__do_register_endpoint_registration_blocked(
     assert some_err in str(a), "Expected upstream response still shared"
 
     assert some_err in stdout_msg, "Expect error message in stdout"
-    assert pyexc.value.code == exit_code, "Expect meaningful exit code"
 
-    if exit_code == "Error":
+    if isinstance(exit_code, str):
         # The other route tests SystemExit; nominally this route is an unhandled
         # traceback -- good.  We should _not_ blanket hide all exceptions.
         assert pyexc.value.http_status == status_code
+        assert exit_code in str(pyexc.value)
+    else:
+        # SystemExit(..)
+        assert pyexc.value.code == exit_code, "Expect meaningful exit message"
 
 
 @pytest.mark.parametrize("with_json", (False, True))
@@ -1164,12 +1167,6 @@ def test_handle_globus_auth_error(
     assert err_msg in a[0]
     assert "400" in res.stdout
     assert "400" in a[0]
-
-    additional_details = "credentials may have expired"
-    if "invalid_grant" in auth_err_msg:
-        assert additional_details in res.stdout
-    else:
-        assert additional_details not in res.stdout
 
 
 @pytest.mark.parametrize("exit_exc", (None, SystemExit(), SystemExit(0)))

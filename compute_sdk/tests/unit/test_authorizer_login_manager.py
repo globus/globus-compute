@@ -4,11 +4,10 @@ from itertools import chain, combinations
 from unittest import mock
 
 import pytest
-from globus_compute_sdk.sdk.auth.scopes import ComputeScopes
 from globus_compute_sdk.sdk.login_manager import AuthorizerLoginManager, LoginManager
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_sdk import AuthClient, RefreshTokenAuthorizer
-from globus_sdk.scopes import AuthScopes
+from globus_sdk.scopes import AuthScopes, ComputeScopes
 
 CID_KEY = "GLOBUS_COMPUTE_CLIENT_ID"
 CSC_KEY = "GLOBUS_COMPUTE_CLIENT_SECRET"
