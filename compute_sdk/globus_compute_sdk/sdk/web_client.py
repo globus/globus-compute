@@ -17,7 +17,6 @@ from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
 
-from .auth.scopes import ComputeScopes
 from .utils import get_py_version_str
 
 
@@ -128,8 +127,8 @@ class WebClient(globus_sdk.BaseClient):
     # use the Globus Compute-specific error class
     error_class = globus_sdk.GlobusAPIError
 
-    scopes = ComputeScopes
-    default_scope_requirements = [globus_sdk.Scope(ComputeScopes.all)]
+    scopes = globus_sdk.scopes.ComputeScopes
+    default_scope_requirements = [globus_sdk.scopes.ComputeScopes]
 
     def __init__(
         self,
@@ -142,7 +141,7 @@ class WebClient(globus_sdk.BaseClient):
     ):
         warnings.warn(
             "The 'WebClient' class is deprecated."
-            " Please use globus_sdk.ComputeClient instead.",
+            " Please use globus_sdk.ComputeClientV3 instead.",
             category=DeprecationWarning,
             stacklevel=2,
         )
