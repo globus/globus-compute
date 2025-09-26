@@ -173,7 +173,7 @@ def test_heartbeat_includes_static_info(ei, mock_rp, mock_tqs, mock_pack, mock_e
     num_hbs_until_quit = 2
 
     def two_hbs_then_quit(*a, **k):
-        nonlocal call_count, num_hbs_until_quit
+        nonlocal call_count
         call_count += 1
         if call_count >= num_hbs_until_quit:
             ei.stop()

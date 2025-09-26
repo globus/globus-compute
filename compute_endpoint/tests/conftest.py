@@ -86,7 +86,6 @@ def mock_quiesce():
         quiesce_mock_wait = True
 
     def mock_is_set():
-        nonlocal quiesce_mock_wait
         os.sched_yield()
         return quiesce_mock_wait
 

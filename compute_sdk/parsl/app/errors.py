@@ -36,7 +36,7 @@ R = TypeVar("R")
 
 
 def wrap_error(
-    func: Callable[..., R]
+    func: Callable[..., R],
 ) -> Callable[..., Union[R, RemoteExceptionWrapper]]:
     @wraps(func)  # type: ignore
     def wrapper(*args: object, **kwargs: object) -> Any:

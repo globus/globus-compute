@@ -1171,7 +1171,7 @@ def test_heartbeat_sent_periodically(
     mock_monotonic = mocker.patch(f"{_MOCK_BASE}time.monotonic")
 
     def mock_q_get(*a, **k):
-        nonlocal iteration_count, num_iterations
+        nonlocal iteration_count
         iteration_count += 1
         if iteration_count >= num_iterations:
             em._time_to_stop = True
