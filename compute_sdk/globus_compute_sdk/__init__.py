@@ -1,6 +1,4 @@
-""" Globus Compute : Fast function serving for clouds, clusters and supercomputers.
-
-"""
+"""Globus Compute : Fast function serving for clouds, clusters and supercomputers."""
 
 from globus_compute_sdk.version import __version__ as _version
 
