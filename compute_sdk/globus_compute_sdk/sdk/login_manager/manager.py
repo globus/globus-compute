@@ -8,9 +8,8 @@ import warnings
 
 import globus_sdk
 from globus_sdk.gare import GlobusAuthorizationParameters
-from globus_sdk.scopes import AuthScopes, Scope
+from globus_sdk.scopes import AuthScopes, ComputeScopes, Scope
 
-from ..auth.scopes import ComputeScopeBuilder
 from ..web_client import WebClient
 from .client_login import get_client_login, is_client_login
 from .globus_auth import internal_auth_client
@@ -18,8 +17,6 @@ from .login_flow import do_link_auth_flow
 from .tokenstore import get_token_storage_adapter
 
 log = logging.getLogger(__name__)
-
-ComputeScopes = ComputeScopeBuilder()
 
 
 class LoginManager:
