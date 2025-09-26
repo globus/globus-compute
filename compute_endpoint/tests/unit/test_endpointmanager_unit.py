@@ -496,7 +496,7 @@ def test_sets_process_title(
         (os.EX_UNAVAILABLE, HTTPStatus.NOT_FOUND),
         (os.EX_DATAERR, HTTPStatus.BAD_REQUEST),
         (os.EX_DATAERR, HTTPStatus.UNPROCESSABLE_ENTITY),
-        ("Error", 418),  # IM_A_TEAPOT
+        ("I'm a Teapot", 418),
     ),
 )
 def test_gracefully_exits_if_registration_blocked(
@@ -528,12 +528,15 @@ def test_gracefully_exits_if_registration_blocked(
     assert some_err in str(a), "Expected upstream response still shared"
 
     assert some_err in stdout_msg, "Expect error message in stdout"
-    assert pyexc.value.code == exit_code, "Expect meaningful exit code"
 
-    if exit_code == "Error":
+    if isinstance(exit_code, str):
         # The other route tests SystemExit; nominally this route is an unhandled
         # traceback -- good.  We should _not_ blanket hide all exceptions.
         assert pyexc.value.http_status == status_code
+        assert exit_code in str(pyexc.value)
+    else:
+        # SystemExit(..)
+        assert pyexc.value.code == exit_code, "Expect meaningful exit message"
 
 
 def test_handles_provided_endpoint_id_no_json(

@@ -7,9 +7,7 @@ import globus_sdk
 from globus_compute_sdk.sdk.login_manager.manager import LoginManager
 from globus_compute_sdk.sdk.login_manager.protocol import LoginManagerProtocol
 from globus_compute_sdk.sdk.web_client import WebClient
-from globus_sdk.scopes import AuthScopes
-
-from ..auth.scopes import ComputeScopes
+from globus_sdk.scopes import AuthScopes, ComputeScopes
 
 log = logging.getLogger(__name__)
 
