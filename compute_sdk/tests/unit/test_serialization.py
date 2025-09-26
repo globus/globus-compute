@@ -2,6 +2,7 @@ import inspect
 import random
 import sys
 import typing as t
+from collections import OrderedDict
 from unittest.mock import patch
 
 import globus_compute_sdk.serialize.concretes as concretes
@@ -277,6 +278,24 @@ def test_code_dill_source():
 def test_overall():
     check_serialize_deserialize_foo(ComputeSerializer())
     check_serialize_deserialize_bar(ComputeSerializer())
+
+
+@pytest.mark.parametrize(
+    "strategy", list(concretes.CombinedCode._chunk_strategies.values())
+)
+def test_combined_strategies(strategy: SerializationStrategy):
+    # Ensure we test each individual sub-strategy
+    concretes.CombinedCode._chunk_strategies = OrderedDict(
+        [(strategy.identifier, strategy)]
+    )
+
+    combined = concretes.CombinedCode()
+    serialized = combined.serialize(foo)
+    func = combined.deserialize(serialized)
+
+    assert callable(func)
+    n1, n2 = random.randint(1, 100), random.randint(1, 100)
+    assert func(n1, n2) == foo(n1, n2)
 
 
 def test_combined_serialize_fail():
