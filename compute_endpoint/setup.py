@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 
 REQUIRES = [
     "requests>=2.31.0,<3",
-    "globus-sdk",  # version will be bounded by `globus-compute-sdk`
+    "globus-sdk==4.1.0",  # version will be bounded by `globus-compute-sdk`
     "globus-compute-sdk==4.3.0",
     "globus-identity-mapping==0.5.0",
     # table printing used in list-endpoints

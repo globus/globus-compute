@@ -100,7 +100,7 @@ def test_whoami(response_output, mocker: MockerFixture):
 
     print_mock = mocker.patch(f"{MOCK_BASE}.print_table")
     mock_auth_client = mocker.Mock(spec=ComputeAuthClient)
-    mock_auth_client.oauth2_userinfo.return_value = resp
+    mock_auth_client.userinfo.return_value = resp
     mock_auth_client.get_identities.return_value = profile
     mocker.patch(f"{MOCK_BASE}.ComputeAuthClient", return_value=mock_auth_client)
     mock_app = mocker.Mock(spec=UserApp)

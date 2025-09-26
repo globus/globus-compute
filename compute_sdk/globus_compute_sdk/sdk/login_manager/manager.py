@@ -8,9 +8,8 @@ import warnings
 
 import globus_sdk
 from globus_sdk.gare import GlobusAuthorizationParameters
-from globus_sdk.scopes import AuthScopes, Scope
+from globus_sdk.scopes import AuthScopes, ComputeScopes, Scope
 
-from ..auth.scopes import ComputeScopeBuilder
 from ..web_client import WebClient
 from .client_login import get_client_login, is_client_login
 from .globus_auth import internal_auth_client
@@ -18,8 +17,6 @@ from .login_flow import do_link_auth_flow
 from .tokenstore import get_token_storage_adapter
 
 log = logging.getLogger(__name__)
-
-ComputeScopes = ComputeScopeBuilder()
 
 
 class LoginManager:
@@ -37,8 +34,11 @@ class LoginManager:
     """
 
     SCOPES: dict[str, list[str]] = {
-        ComputeScopes.resource_server: [ComputeScopes.all],
-        AuthScopes.resource_server: [AuthScopes.openid, AuthScopes.manage_projects],
+        ComputeScopes.resource_server: [ComputeScopes.all.scope_string],
+        AuthScopes.resource_server: [
+            AuthScopes.openid.scope_string,
+            AuthScopes.manage_projects.scope_string,
+        ],
     }
 
     def __init__(self, *, environment: str | None = None) -> None:
@@ -157,7 +157,7 @@ class LoginManager:
                     scopes=scopes,
                     access_token=access_token,
                     expires_at=expires_at,
-                    on_refresh=self._token_storage.on_refresh,
+                    on_refresh=self._token_storage.store,
                 )
         else:
             if tokens is None:
