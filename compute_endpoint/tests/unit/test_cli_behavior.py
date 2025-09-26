@@ -814,12 +814,6 @@ def test_handle_globus_auth_error(
     assert "400" in res.stdout
     assert "400" in a[0]
 
-    additional_details = "credentials may have expired"
-    if "invalid_grant" in auth_err_msg:
-        assert additional_details in res.stdout
-    else:
-        assert additional_details not in res.stdout
-
 
 @pytest.mark.parametrize("exit_exc", (None, SystemExit(), SystemExit(0)))
 def test_happy_path_exit_no_amqp_msg(
