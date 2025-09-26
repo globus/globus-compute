@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from globus_sdk.tokenstorage import SQLiteAdapter
+from globus_sdk.token_storage import SQLiteTokenStorage
 
 from .._environments import _get_envname
 from ..compute_dir import ensure_compute_dir
@@ -35,8 +35,9 @@ def _resolve_namespace(environment: str | None) -> str:
     return f"user/{env}"
 
 
-def get_token_storage_adapter(*, environment: str | None = None) -> SQLiteAdapter:
-    return SQLiteAdapter(
+def get_token_storage_adapter(*, environment: str | None = None) -> SQLiteTokenStorage:
+
+    return SQLiteTokenStorage(
         _get_storage_filename(),
         namespace=_resolve_namespace(environment),  # current env == "namespace"
         connect_params={"check_same_thread": False},

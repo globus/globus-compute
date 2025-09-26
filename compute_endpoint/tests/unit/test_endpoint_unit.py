@@ -561,7 +561,13 @@ def test_register_endpoint_blocked(
     assert some_err in str(a), "Expected upstream response still shared"
 
     assert some_err in stdout_msg, f"Expecting error message in stdout ({stdout_msg})"
-    assert pytexc.value.code == exit_code, "Expecting meaningful exit code"
+
+    if hasattr(pytexc.value, "text"):
+        # Globus AuthAPIError has the .text field filled in from the response
+        assert some_err in str(pytexc.value.text), "Expecting custom error text"
+    else:
+        # Otherwise it's just SystemExit(exit_code)
+        assert pytexc.value.code == exit_code, "Expecting meaningful exit code"
 
     if exit_code == "Error":
         # The other route tests SystemExit; nominally this route is an unhandled

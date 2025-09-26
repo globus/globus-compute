@@ -25,7 +25,6 @@ from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
     FunctionRegistrationMetadata,
-    WebClient,
 )
 from globus_compute_sdk.serialize import (
     ComputeSerializer,
@@ -123,7 +122,6 @@ def funk():
 )
 def test_client_warns_on_unknown_kwargs(kwargs, mocker: MockerFixture):
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
-    mocker.patch(f"{_MOCK_BASE}WebClient")
     mocker.patch(f"{_MOCK_BASE}_ComputeWebClient")
 
     known_kwargs = [
@@ -152,7 +150,6 @@ def test_client_init_sets_addresses_by_env(
     monkeypatch, env, usage_method, randomstring, mocker: MockerFixture
 ):
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
-    mocker.patch(f"{_MOCK_BASE}WebClient")
     mocker.patch(f"{_MOCK_BASE}_ComputeWebClient")
 
     if env in (None, "production"):
@@ -806,9 +803,6 @@ def test_client_handles_globus_app(
     mock_auth_client = mocker.patch(
         f"{_MOCK_BASE}ComputeAuthClient", return_value=mock.Mock(spec=ComputeAuthClient)
     )
-    mock_web_client = mocker.patch(
-        f"{_MOCK_BASE}WebClient", return_value=mock.Mock(spec=WebClient)
-    )
     mock_compute_web_client = mocker.patch(
         f"{_MOCK_BASE}_ComputeWebClient", return_value=mock.Mock(spec=_ComputeWebClient)
     )
@@ -831,11 +825,7 @@ def test_client_handles_globus_app(
         mock_get_globus_app.assert_called_once_with(environment=env)
 
     assert client.app is mock_app
-    assert client.web_client is mock_web_client.return_value
     assert client._compute_web_client is mock_compute_web_client.return_value
-    mock_web_client.assert_called_once_with(
-        base_url=client.web_service_address, app=mock_app
-    )
     mock_compute_web_client.assert_called_once_with(
         base_url=client.web_service_address, app=mock_app
     )
@@ -861,12 +851,11 @@ def test_client_handles_login_manager():
     client = gc.Client(do_version_check=False, login_manager=mock_lm)
     assert client.login_manager is mock_lm
     assert mock_lm.get_web_client.call_count == 1
-    assert mock_lm.get_web_client.call_args[1]["base_url"] == client.web_service_address
+    assert mock_lm.get_web_client.call_args[1] == {}
 
 
 def test_client_logout_with_app(mocker):
     mocker.patch(f"{_MOCK_BASE}ComputeAuthClient")
-    mocker.patch(f"{_MOCK_BASE}WebClient")
     mocker.patch(f"{_MOCK_BASE}_ComputeWebClient")
     mock_app = mock.Mock(spec=UserApp)
     client = gc.Client(do_version_check=False, app=mock_app)
@@ -889,14 +878,6 @@ def test_client_logout_with_authorizer_warning(mocker):
     a, _ = mock_log.warning.call_args
     assert "Logout is not supported" in a[0]
     assert type(mock_authorizer).__name__ in a[0], "Authorizer type helps clarify error"
-
-
-def test_web_client_deprecated():
-    gcc = gc.Client(do_version_check=False)
-    with pytest.warns(DeprecationWarning) as record:
-        assert gcc.web_client, "Client.web_client needed for backward compatibility"
-    msg = "'Client.web_client' attribute is deprecated"
-    assert any(msg in str(r.message) for r in record)
 
 
 def test_auth_client_deprecated():
@@ -1042,6 +1023,7 @@ def test_ha_register_and_submit_warning_deduplication(gcc, mocker):
     gcc._compute_web_client.v3.submit.return_value = types.SimpleNamespace(
         data={"task_group_id": str(uuid.uuid4()), "ha_warning": arbitrary_hatext}
     )
+    gcc._login_manager = None
 
     with pytest.warns(UserWarning) as record:
         gcc.register_function(funk)

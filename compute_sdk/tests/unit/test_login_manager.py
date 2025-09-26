@@ -194,10 +194,10 @@ def test_ensure_logged_in(mocker, logman, missing_keys, missing_scopes):
             if key in missing_keys:
                 continue
             scope_str = " ".join(s for s in scope_list if s not in missing_scopes)
-            token_data[key] = {"scope": scope_str}
+            token_data[key] = mock.Mock(scope=scope_str)
         return token_data
 
-    logman._token_storage.get_by_resource_server = _get_data
+    logman._token_storage.get_token_data_by_resource_server = _get_data
 
     mock_run_login_flow = mocker.patch(
         f"{MOCK_BASE}.manager.LoginManager.run_login_flow"

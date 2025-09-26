@@ -8,4 +8,4 @@ def test_default_scope_requirements():
     scopes = [str(s) for s in client.default_scope_requirements]
     assert len(expected_scopes) == len(scopes)
     for scope in expected_scopes:
-        assert scope in scopes
+        assert scope.scope_string in scopes
