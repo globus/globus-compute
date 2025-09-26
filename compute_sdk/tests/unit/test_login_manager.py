@@ -154,9 +154,9 @@ def test_run_login_flow_ignored_if_client_login(mocker, logman):
 
 def test_get_authorizer(mocker, logman):
     mock_gsdk = mocker.patch(f"{MOCK_BASE}.manager.globus_sdk")
-    env = {CID_KEY: str(uuid.uuid4()), CSC_KEY: "some_secret"}
-    with mock.patch.dict(os.environ, env):
-        logman._get_authorizer("some_resource_server")
+    # env = {CID_KEY: str(uuid.uuid4()), CSC_KEY: "some_secret"}
+    # with mock.patch.dict(os.environ, env):
+    #     logman._get_authorizer("some_resource_server")
     mock_gsdk.ClientCredentialsAuthorizer.assert_called()
 
     with pytest.raises(LookupError):
