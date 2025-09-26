@@ -9,6 +9,7 @@ import responses
 from globus_compute_sdk.sdk.client import Client
 from globus_compute_sdk.sdk.web_client import WebClient
 from globus_compute_sdk.version import __version__
+from globus_sdk.transport import RequestsTransport
 
 _BASE_URL = "https://api.gc"
 
@@ -30,7 +31,8 @@ def mocked_responses():
 @pytest.fixture
 def client():
     # for the default test client, set a fake URL and disable retries
-    return WebClient(base_url=_BASE_URL, transport_params={"max_retries": 0})
+    RequestsTransport.MAX_RETRIES = 0
+    return WebClient(base_url=_BASE_URL)
 
 
 def test_web_client_deprecated():
@@ -41,10 +43,10 @@ def test_web_client_deprecated():
 
 
 def test_web_client_can_set_explicit_base_url():
-    c1 = WebClient(base_url="https://foo.example.com/")
-    c2 = WebClient(base_url="https://bar.example.com/")
-    assert c1.base_url == "https://foo.example.com/"
-    assert c2.base_url == "https://bar.example.com/"
+    c1 = WebClient(base_url="https://foo.example.com")
+    c2 = WebClient(base_url="https://bar.example.com")
+    assert c1.base_url == "https://foo.example.com"
+    assert c2.base_url == "https://bar.example.com"
 
 
 @pytest.mark.parametrize("service_param", [None, "foo"])
