@@ -17,8 +17,10 @@ from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
 from globus_compute_sdk.serialize import ComputeSerializer
 from globus_compute_sdk.version import __version__
+from globus_sdk import Scope
 
 from .auth.scopes import ComputeScopes
+from .utils import get_py_version_str
 
 
 class FunctionRegistrationMetadata:
@@ -119,17 +121,11 @@ class FunctionRegistrationData:
         return f"FunctionRegistrationData({args})"
 
 
-class WebClient(globus_sdk.BaseClient):
+class WebClient(globus_sdk.ComputeClientV3):
     # the `service_name` is used in the Globus SDK to lookup the service URL from
     # config. However, Globus Compute has its own logic for determining the base URL.
     # set `service_name` to allow the check which ensures this is set to pass
     # it does not have any other effects
-    service_name: str = "funcx"
-    # use the Globus Compute-specific error class
-    error_class = globus_sdk.GlobusAPIError
-
-    scopes = ComputeScopes
-    default_scope_requirements = [globus_sdk.Scope(ComputeScopes.all)]
 
     def __init__(
         self,
@@ -142,7 +138,7 @@ class WebClient(globus_sdk.BaseClient):
     ):
         warnings.warn(
             "The 'WebClient' class is deprecated."
-            " Please use globus_sdk.ComputeClient instead.",
+            " Please use globus_sdk.ComputeClientV3 instead.",
             category=DeprecationWarning,
             stacklevel=2,
         )
@@ -204,11 +200,6 @@ class WebClient(globus_sdk.BaseClient):
         if additional_fields is not None:
             data.update(additional_fields)
         return self.post("/v2/batch_status", data=data)
-
-    def submit(
-        self, endpoint_id: UUID_LIKE_T, batch: t.Dict[str, t.Any]
-    ) -> globus_sdk.GlobusHTTPResponse:
-        return self.post(f"/v3/endpoints/{endpoint_id}/submit", data=batch)
 
     def register_endpoint(
         self,

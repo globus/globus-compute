@@ -31,8 +31,8 @@ from globus_compute_sdk.serialize import (
     SerializationStrategy,
 )
 from globus_compute_sdk.version import __version__, compare_versions
+from globus_sdk import __version__ as __version_globus__
 from globus_sdk.gare import GlobusAuthorizationParameters
-from globus_sdk.version import __version__ as __version_globus__
 
 from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app

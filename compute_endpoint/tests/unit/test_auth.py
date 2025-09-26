@@ -4,7 +4,7 @@ import pytest
 from click import ClickException
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
-from globus_sdk import ComputeClient
+from globus_sdk import ComputeClientV3
 from pytest_mock import MockFixture
 
 _MOCK_BASE = "globus_compute_endpoint.auth."
@@ -23,7 +23,7 @@ def test_get_globus_app_with_scopes(mocker: MockFixture):
             scopes.append(str(scope))
 
     assert len(scopes) > 0
-    assert all(str(s) in scopes for s in ComputeClient.default_scope_requirements)
+    assert all(str(s) in scopes for s in ComputeClientV3.default_scope_requirements)
     assert all(str(s) in scopes for s in ComputeAuthClient.default_scope_requirements)
 
 
