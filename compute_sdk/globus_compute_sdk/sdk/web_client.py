@@ -50,7 +50,7 @@ class FunctionRegistrationData:
         description: t.Optional[str] = None,
         metadata: t.Optional[FunctionRegistrationMetadata] = None,
         public: bool = False,
-        group: t.Optional[str] = None,
+        group: t.Optional[UUID_LIKE_T] = None,
         serializer: t.Optional[ComputeSerializer] = None,
         ha_endpoint_id: t.Optional[UUID_LIKE_T] = None,
     ):

@@ -27,7 +27,11 @@ from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationMetadata,
     WebClient,
 )
-from globus_compute_sdk.serialize import ComputeSerializer
+from globus_compute_sdk.serialize import (
+    ComputeSerializer,
+    DillCode,
+    PureSourceTextInspect,
+)
 from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
 from globus_sdk import ComputeClientV2, ComputeClientV3, GlobusAPIError, UserApp
 from globus_sdk import __version__ as __version_globus__
@@ -61,6 +65,7 @@ client_api_reqs = {
     gc.Client.delete_function: ("some func id",),
     gc.Client.register_endpoint: ("ep name", None),
     gc.Client.register_function: (lambda: "some function",),
+    gc.Client.register_source_code: ("some source", "some func name"),
     gc.Client.register_container: ("some loc", "some container type"),
     gc.Client.stop_endpoint: ("some ep id",),
 }
@@ -552,6 +557,56 @@ def test_function_registration_data_data_function(serde):
     assert frd.metadata.python_version == get_py_version_str()
     assert frd.metadata.sdk_version == __version__
     assert frd.metadata.serde_identifier == serde.code_serializer.identifier.strip()
+
+
+def test_register_source_code(gcc: gc.Client):
+    gcc._compute_web_client.v3.register_function.return_value = mock.MagicMock()
+    gcc.fx_serializer.code_serializer = DillCode()  # Set the stage
+
+    def hello(name: str):
+        return f"Hello, {name}!"
+
+    source = inspect.getsource(hello)
+    entrypoint = hello.__name__
+    description = "A warm greeting."
+    metadata = {
+        "python_version": platform.python_version(),
+        "sdk_version": __version__,
+        "serde_identifier": "st",  # PureSourceTextInspect
+    }
+
+    gcc.register_source_code(
+        source=source,
+        function_name=entrypoint,
+        description=description,
+    )
+
+    serialized = PureSourceTextInspect().serialize(hello)
+    function_code = ComputeSerializer.pack_buffers([serialized])
+
+    (data,), _ = gcc._compute_web_client.v3.register_function.call_args
+    assert data["function_code"] == function_code
+    assert data["function_name"] == entrypoint
+    assert data["description"] == description
+    assert data["meta"] == metadata
+
+
+def test_register_source_code_metadata_override(gcc: gc.Client):
+    gcc._compute_web_client.v3.register_function.return_value = mock.MagicMock()
+    metadata = {
+        "python_version": "3.11.5",
+        "sdk_version": "3.11.0",
+        "serde_identifier": "foo",
+    }
+
+    gcc.register_source_code(
+        source="def noop():\n    return\n", function_name="noop", metadata=metadata
+    )
+
+    (data,), _ = gcc._compute_web_client.v3.register_function.call_args
+    assert data["meta"]["python_version"] == metadata["python_version"]
+    assert data["meta"]["sdk_version"] == metadata["sdk_version"]
+    assert data["meta"]["serde_identifier"] == "st", "serde iden should always be 'st'"
 
 
 @pytest.mark.parametrize("desc", ("some desc", None))

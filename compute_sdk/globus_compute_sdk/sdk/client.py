@@ -25,7 +25,11 @@ from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
     FunctionRegistrationMetadata,
 )
-from globus_compute_sdk.serialize import ComputeSerializer, SerializationStrategy
+from globus_compute_sdk.serialize import (
+    ComputeSerializer,
+    PureSourceTextInspect,
+    SerializationStrategy,
+)
 from globus_compute_sdk.version import __version__, compare_versions
 from globus_sdk.gare import GlobusAuthorizationParameters
 from globus_sdk.version import __version__ as __version_globus__
@@ -34,7 +38,7 @@ from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app
 from .batch import Batch, UserRuntime
 from .login_manager import LoginManagerProtocol
-from .utils import get_env_var_with_deprecation
+from .utils import get_env_var_with_deprecation, get_py_version_str
 from .web_client import WebClient
 
 logger = logging.getLogger(__name__)
@@ -862,6 +866,86 @@ class Client:
         with self._request_lock:
             r = self._compute_web_client.v3.register_function(data.to_dict())
 
+        self._raise_ha_warning(r.data)
+
+        return r.data["function_uuid"]
+
+    @_client_gares_handler
+    def register_source_code(
+        self,
+        source: str,
+        function_name: str,
+        description: str | None = None,
+        metadata: dict | None = None,
+        public: bool = False,
+        group: UUID_LIKE_T | None = None,
+        ha_endpoint_id: UUID_LIKE_T | None = None,
+    ) -> str:
+        """Register arbitrary Python source code with entrypoint function
+
+        The standard ``.register_function()`` method expects a callable function object,
+        which it then serializes using the specified code serialization strategy. In
+        contrast, this method enables the user to directly provide an arbitrary source
+        code string and entrypoint function name.
+
+        .. important::
+
+            This method will ignore the current code serialization strategy and use
+            ``PureSourceTextInspect`` instead.
+
+        Parameters
+        ----------
+        source
+            The source code string
+        function_name
+            The name of the entrypoint function within the source code
+        description
+            Description of the function source code
+        metadata
+            Function source code metadata (e.g., Python version)
+        public
+            Whether the function source code is publicly accessible
+        group
+            A globus group UUID to share this function source code with
+        ha_endpoint_id
+            Users will only be able to run this function source code on the specified
+            HA endpoint. Since HA functions cannot be shared, this argument is mutually
+            exclusive with the ``group`` and ``public`` arguments.
+
+        Returns
+        -------
+        str
+            UUID string of the registered function
+        """
+        # Simulate PureSourceTextInspect strategy
+        serde_iden = PureSourceTextInspect.identifier
+        serde_sep = PureSourceTextInspect._separator
+        serialized = f"{serde_iden}{function_name}{serde_sep}{source}"
+        packed = ComputeSerializer.pack_buffers([serialized])
+
+        if metadata:
+            metadata["serde_identifier"] = serde_iden.strip()
+            reg_meta = FunctionRegistrationMetadata(**metadata)
+        else:
+            reg_meta = FunctionRegistrationMetadata(
+                python_version=get_py_version_str(),
+                sdk_version=__version__,
+                serde_identifier=serde_iden.strip(),
+            )
+        data = FunctionRegistrationData(
+            function_code=packed,
+            function_name=function_name,
+            description=description,
+            metadata=reg_meta,
+            public=public,
+            group=group,
+            ha_endpoint_id=ha_endpoint_id,
+        )
+        logger.info("Registering function: %s", data.function_name)
+        logger.debug("Function data: %s", data)
+
+        with self._request_lock:
+            r = self._compute_web_client.v3.register_function(data.to_dict())
         self._raise_ha_warning(r.data)
 
         return r.data["function_uuid"]
