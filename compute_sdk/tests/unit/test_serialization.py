@@ -2,8 +2,10 @@ import inspect
 import random
 import sys
 import typing as t
+from collections import OrderedDict
 from unittest.mock import patch
 
+import dill
 import globus_compute_sdk.serialize.concretes as concretes
 import globus_compute_sdk.serialize.facade as facade
 import pytest
@@ -274,9 +276,65 @@ def test_code_dill_source():
     check_serialize_deserialize_bar(concretes.DillCodeSource())
 
 
+def test_pure_source_text_inspect():
+    check_serialize_deserialize_foo(concretes.PureSourceTextInspect())
+
+
+def test_pure_source_dill():
+    check_serialize_deserialize_foo(concretes.PureSourceDill())
+    check_serialize_deserialize_bar(concretes.PureSourceDill())
+
+
+def test_pure_source_text_inspect_handles_legacy_serialization():
+    # Before SDK version 3.16.0, the PureSourceTextInspect strategy did not
+    # encode the function source code with base64
+    def legacy_serialize(f: t.Callable):
+        name: str = f.__name__
+        body = inspect.getsource(f)
+        return "st\n" + name + ":" + body
+
+    check_serialize_deserialize_foo(
+        concretes.PureSourceTextInspect(), pre_serialized=legacy_serialize(foo)
+    )
+
+
+def test_pure_source_dill_handles_legacy_serialization():
+    # Before SDK version 3.16.0, the PureSourceDill strategy did not encode
+    # the function source code with base64
+    def legacy_serialize(f: t.Callable):
+        name: str = f.__name__
+        body = dill.source.getsource(f, lstrip=True)
+        return "sd\n" + name + ":" + body
+
+    check_serialize_deserialize_foo(
+        concretes.PureSourceDill(), pre_serialized=legacy_serialize(foo)
+    )
+
+
 def test_overall():
     check_serialize_deserialize_foo(ComputeSerializer())
     check_serialize_deserialize_bar(ComputeSerializer())
+
+
+@pytest.mark.parametrize(
+    "strategy", list(concretes.CombinedCode._chunk_strategies.values())
+)
+def test_combined_strategies(strategy: SerializationStrategy, mocker):
+    # Ensure we isolate each sub-strategy
+    # Otherwise, the test will pass if any sub-strategy works
+    mocker.patch.object(
+        concretes.CombinedCode,
+        "_chunk_strategies",
+        OrderedDict([(strategy.identifier, strategy)]),
+    )
+
+    combined = concretes.CombinedCode()
+    serialized = combined.serialize(foo)
+    func = combined.deserialize(serialized)
+
+    assert callable(func)
+    n1, n2 = random.randint(1, 100), random.randint(1, 100)
+    assert func(n1, n2) == foo(n1, n2)
 
 
 def test_combined_serialize_fail():
