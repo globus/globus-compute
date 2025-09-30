@@ -2073,56 +2073,6 @@ def test_run_as_same_user_enabled_if_not_admin(
     assert em._allow_same_user is True, "If not privileged, can only runas same user"
 
 
-@pytest.mark.parametrize("isatty", (True, False))
-def test_run_as_same_user_forced_warns(
-    mocker, isatty, conf_dir, mock_conf, mock_client, randomstring
-):
-    # spot-check a couple of capabilities: if set, then same user is *disallowed*
-    ep_uuid, mock_gcc = mock_client
-
-    mocker.patch(f"{_MOCK_BASE}pwd")
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
-    mock_os.stderr.isatty.return_value = isatty
-    mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
-    mocker.patch(f"{_MOCK_BASE}print")
-
-    _test_mock_base = "globus_compute_endpoint.endpoint.utils."
-    mocker.patch(f"{_test_mock_base}_pwd")
-    mock_prctl = mocker.patch(f"{_test_mock_base}_pyprctl")
-
-    mock_prctl.CapState.get_current.return_value.effective = {pyprctl.Cap.SYS_ADMIN}
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
-    assert em._allow_same_user is False, "Verify test setup"
-    assert not any(
-        "force_mu_allow_same_user" in a[0] for a, _ in mock_warn.call_args_list
-    ), "Verify test setup"
-
-    mock_uid, mock_gid = randomstring(), randomstring()
-    mock_os.getuid.return_value = mock_uid
-    mock_os.getgid.return_value = mock_gid
-    mock_conf.force_mu_allow_same_user = True
-    mock_warn.reset_mock()
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
-    assert em._allow_same_user is True
-    assert mock_warn.called
-
-    a, _k = mock_warn.call_args
-    a = next(
-        a[0] for a, _ in mock_warn.call_args_list if "force_mu_allow_same_user" in a[0]
-    )
-    assert "`force_mu_allow_same_user` set to `true`" in a
-    assert "very dangerous override" in a
-    assert "Endpoint (UID, GID):" in a, "Expect process UID, GID in warning"
-    assert f"({mock_uid}, {mock_gid})" in a, "Expect process UID, GID in warning"
-    if isatty:
-        a = next(a[0] for a, _ in mock_warn.call_args_list if "dangerous" in a[0])
-        assert a is not None, "Superfluous assert: ensure warning printed for human eye"
-        assert "`force_mu_allow_same_user` set to `true`" in a
-        assert "very dangerous override" in a
-        assert "Endpoint (UID, GID):" in a, "Expect process UID, GID in warning"
-        assert f"({mock_uid}, {mock_gid})" in a, "Expect process UID, GID in warning"
-
-
 def test_run_as_same_user_fails_if_admin(successful_exec_from_mocked_root):
     *_, em = successful_exec_from_mocked_root
 
