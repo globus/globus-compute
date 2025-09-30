@@ -120,10 +120,7 @@ def mock_conf(identity_map_path):
 
 @pytest.fixture
 def mock_conf_root(identity_map_path):
-    to_mock = "globus_compute_endpoint.endpoint.config.config.is_privileged"
-    with mock.patch(to_mock) as m:
-        m.return_value = True
-        yield ManagerEndpointConfig(identity_mapping_config_path=identity_map_path)
+    yield ManagerEndpointConfig(identity_mapping_config_path=identity_map_path)
 
 
 @pytest.fixture(autouse=True)
@@ -2098,6 +2095,7 @@ def test_run_as_same_user_fails_if_admin(successful_exec_from_mocked_root):
     assert "UID is same as" in e_str
     assert "using a non-root user" in e_str, "Expected suggested fix"
     assert "removing privileges" in e_str, "Expected suggested fix"
+    assert "removing the identity mapping" in e_str, "Expected suggested fix"
     assert "\n  MU Process UID: 0 (root)" in e_str
     assert "\n  Requested UID:  0" in e_str
     assert f"\n  Via identity:   {mpi.matched_identity}" in e_str

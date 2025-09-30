@@ -15,7 +15,6 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_uuid,
 )
 
-from ..utils import is_privileged
 from .pam import PamConfiguration
 
 MINIMUM_HEARTBEAT: float = 5.0
@@ -504,12 +503,6 @@ class ManagerEndpointConfig(BaseConfig):
     def identity_mapping_config_path(self, val: os.PathLike | str | None):
         self._identity_mapping_config_path: pathlib.Path | None = None
         if not val:
-            return
-        if not is_privileged():
-            log.warning(
-                "Identity mapping specified, but process is not privileged;"
-                " ignoring identity mapping configuration."
-            )
             return
         _p = pathlib.Path(val)
         if not _p.exists():

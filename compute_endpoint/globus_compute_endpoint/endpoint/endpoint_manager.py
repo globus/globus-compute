@@ -611,7 +611,7 @@ class EndpointManager:
 
     def _event_loop(self):
         parent_identities: set[str] = set()
-        if not self.identity_mapper:
+        if not (is_privileged() and self.identity_mapper):
             client_options = {
                 "local_compute_services": self._config.local_compute_services,
                 "environment": self._config.environment,
