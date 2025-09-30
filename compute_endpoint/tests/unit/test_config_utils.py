@@ -75,6 +75,7 @@ def test_config_opts_accounted_for_in_tests():
     assert set(known_user_config_opts) == kwds
     kwds = _get_cls_kwds(ManagerEndpointConfig)
     kwds.remove("multi_user")  # special case deprecated argument
+    kwds.remove("force_mu_allow_same_user")  # special case deprecated argument
     assert set(known_manager_config_opts) == kwds
 
 
