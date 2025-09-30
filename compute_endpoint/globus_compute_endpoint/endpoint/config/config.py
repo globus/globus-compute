@@ -110,18 +110,21 @@ class BaseConfig:
             )
 
     def __repr__(self) -> str:
+        deprecated = {
+            # remove after Aug 2025
+            "executors",
+            # remove after Apr 2026
+            "multi_user",
+            # remove after Apr 2026
+            "force_mu_allow_same_user",
+        }
+
         kwds: dict[str, t.Any] = {}
         for cls in type(self).__mro__:
             fargspec = inspect.getfullargspec(cls.__init__)  # type: ignore[misc]
             kwdefs = fargspec.kwonlydefaults
             for kw in fargspec.kwonlyargs:
-                if kw == "executors":
-                    # special case; remove when deprecation complete and removed
-                    # circa Aug, 2025 (but no rush)
-                    continue
-                if kw == "multi_user":
-                    # special case; remove when deprecation complete and removed
-                    # circa Jan, 2026 (but no rush)
+                if kw in deprecated:
                     continue
                 curval = getattr(self, kw)
                 if kwdefs and curval != kwdefs.get(kw):
@@ -428,14 +431,13 @@ class ManagerEndpointConfig(BaseConfig):
         user-endpoint shuts down, the endpoint manager will hold on to the most recent
         start request for the user-endpoint for this grace period.
 
-    :param force_mu_allow_same_user:  If set, override the heuristic that determines
-        whether the UID running the manager endpoint may also run single-user endpoints
+    :param force_mu_allow_same_user:  DEPRECATED - previously, this overrode the
+        heuristic that determined whether the UID running a manager endpoint could
+        also run single-user endpoints.
 
-        Normally, the manager endpoint disallows starting user-endpoint processes
-        (UEPs) with the same UID as the parent process unless the UID has no
-        privileges.  In other words, ``root`` may not process tasks.  This flag is for
-        those niche setups that require the ``root`` user to process tasks.  Be very
-        careful if setting this flag.
+        Now, template capable endpoints run as the same user by default, unless an
+        identity mapping file is supplied. Note that privileged UIDs are still not
+        allowed to map to themselves.
 
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
     .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
@@ -455,15 +457,14 @@ class ManagerEndpointConfig(BaseConfig):
         identity_mapping_config_path: os.PathLike | str | None = None,
         audit_log_path: os.PathLike | str | None = None,
         pam: PamConfiguration | None = None,
-        force_mu_allow_same_user: bool = False,
         mu_child_ep_grace_period_s: float = 30.0,
+        force_mu_allow_same_user: bool | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.public = public is True
 
         # Identity mapping
-        self.force_mu_allow_same_user = force_mu_allow_same_user is True
         self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
 
         _tmp = user_config_template_path  # work with both mypy and flake8
@@ -479,6 +480,16 @@ class ManagerEndpointConfig(BaseConfig):
         self.audit_log_path = _tmp  # type: ignore[assignment]
 
         self.pam = pam or PamConfiguration(enable=False)
+
+        if force_mu_allow_same_user is not None:
+            warnings.warn(
+                "`force_mu_allow_same_user` is deprecated and will be removed in a"
+                " future release. Template-capable endpoints run as the same user by"
+                " default, unless an identity mapping file is supplied. Note that"
+                " privileged UIDs are still not allowed to map to themselves.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     @property
     def user_config_template_path(self) -> pathlib.Path | None:
