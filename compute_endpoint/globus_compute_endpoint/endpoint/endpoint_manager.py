@@ -177,19 +177,6 @@ class EndpointManager:
         privileged = is_privileged(self._mu_user)
 
         self._allow_same_user = not privileged
-        if config.force_mu_allow_same_user:
-            self._allow_same_user = True
-            _warn_str = privileged and "privileged process" or "unprivileged process"
-            msg = (
-                "Configuration item `force_mu_allow_same_user` set to `true`; this is"
-                " considered a very dangerous override -- please use with care,"
-                " especially if allowing this endpoint to be utilized by multiple"
-                " users."
-                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()}) {_warn_str}"
-            )
-            log.warning(msg)
-            if sys.stderr.isatty():
-                print(f"\033[31;1;40m{msg}\033[0m")  # Red bold on black
 
         if not reg_info:
             try:
