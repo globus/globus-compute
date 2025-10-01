@@ -643,6 +643,7 @@ def _do_start_endpoint(
     reg_info = {}
     config_str: str | None = None
     audit_fd: int | None = None
+    restart_fd: int | None = None
     fn_allow_list: list[str] | None | int = _no_fn_list_canary
     if sys.stdin and not (sys.stdin.closed or sys.stdin.isatty()):
         try:
@@ -659,6 +660,7 @@ def _do_start_endpoint(
             reg_info = stdin_data.get("amqp_creds", {})
             config_str = stdin_data.get("config")
             audit_fd = stdin_data.get("audit_fd")
+            restart_fd = stdin_data.get("restart_fd")
             fn_allow_list = stdin_data.get("allowed_functions", _no_fn_list_canary)
 
             del stdin_data  # clarity for intended scope
@@ -728,7 +730,10 @@ def _do_start_endpoint(
                 raise ClickException(
                     "multi-user endpoints are not supported on this system"
                 )
+
             epm = EndpointManager(ep_dir, endpoint_uuid, ep_config, reg_info)
+            if restart_fd:
+                epm._finish_hot_restart(restart_fd)
             epm.start()
         else:
             assert isinstance(ep_config, UserEndpointConfig)
