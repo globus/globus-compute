@@ -27,12 +27,14 @@ jobs:
         run: |
           cd compute_sdk
           tox -e mypy
-          tox -e pip-audit
+          # Temporary ignore see https://github.com/pypa/pip/issues/13607
+          tox -e pip-audit -- --ignore GHSA-4xh5-x5gv-qwph
       - name: mypy and pip-audit (endpoint)
         run: |
           cd compute_endpoint
           tox -e mypy
-          tox -e pip-audit
+          # Temporary ignore see https://github.com/pypa/pip/issues/13607
+          tox -e pip-audit -- --ignore GHSA-4xh5-x5gv-qwph
 
   # ensure docs can build, imitating the RTD build as best we can
   check-docs:
