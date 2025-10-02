@@ -10,7 +10,10 @@ from collections import OrderedDict
 
 import dill
 from globus_compute_sdk.errors import DeserializationError, SerializationError
-from globus_compute_sdk.serialize.base import SerializationStrategy
+from globus_compute_sdk.serialize.base import (
+    ComboSerializationStrategy,
+    SerializationStrategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -405,6 +408,56 @@ class CombinedCode(SerializationStrategy):
                 else:
                     raise DeserializationError(f"Invalid serialization id {serial_id}")
         raise DeserializationError(f"Deserialization failed after {count} tries")
+
+
+class AllCodeStrategies(ComboSerializationStrategy):
+    """Attempts to serialize the function using each of the other code strategies:
+
+    - :class:`PureSourceTextInspect`
+    - :class:`PureSourceDill`
+    - :class:`DillCode`
+
+    The serialized results from each sub-strategy are combined into a single payload.
+    When deserializing, it will try each sub-strategy in order until one succeeds.
+
+    Use this strategy when maximum compatibility is needed across different Python
+    environments, and when payload size and serialization time are not critical.
+
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ✅
+          - ✅
+          - ⚠️
+          - ✅
+    """
+
+    identifier = "12\n"  #:
+    for_code = True  #:
+    strategies = [PureSourceTextInspect, PureSourceDill, DillCode]
+
+
+class AllDataStrategies(ComboSerializationStrategy):
+    """Attempts to serialize Python data using each of the other data strategies:
+
+    - :class:`JSONData`
+    - :class:`DillDataBase64`
+
+    The serialized results from each sub-strategy are combined into a single payload.
+    When deserializing, it will try each sub-strategy in order until one succeeds.
+
+    Use this strategy when maximum compatibility is needed across different Python
+    environments, and when payload size and serialization time are not critical.
+    """
+
+    identifier = "13\n"  #:
+    for_code = False  #:
+    strategies = [JSONData, DillDataBase64]
 
 
 SELECTABLE_STRATEGIES = [

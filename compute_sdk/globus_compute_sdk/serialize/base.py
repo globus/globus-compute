@@ -1,7 +1,10 @@
+import logging
 import typing as t
 from abc import ABC, abstractmethod
 
-from globus_compute_sdk.errors import DeserializationError
+from globus_compute_sdk.errors import DeserializationError, SerializationError
+
+logger = logging.getLogger(__name__)
 
 # 2 unique characters and a newline
 IDENTIFIER_LENGTH = 3
@@ -17,6 +20,8 @@ class SerializationStrategy(ABC):
 
     def __init_subclass__(cls):
         super().__init_subclass__()
+        if not hasattr(cls, "identifier"):
+            return
         if len(cls.identifier) != IDENTIFIER_LENGTH:
             raise ValueError(f"Identifiers must be {IDENTIFIER_LENGTH} characters long")
         if cls.identifier[-1] != "\n":
@@ -98,3 +103,66 @@ class SerializationStrategy(ABC):
                 f"Buffer does not start with identifier:{self.identifier}"
             )
         return payload
+
+
+class ComboSerializationStrategy(SerializationStrategy, ABC):
+    strategies: t.ClassVar[list[t.Type[SerializationStrategy]]]
+    _separator = "|"  # Will never appear in a base64 string
+
+    def serialize(self, data: t.Any):
+        ":meta private:"
+        chunks, errors = [], []
+        for strategy_cls in self.strategies:
+            strategy: SerializationStrategy = self.get_cached_by_class(strategy_cls)
+
+            try:
+                serialized = strategy.serialize(data)
+            except Exception as e:
+                error_msg = f"{strategy_cls.__name__}: {e}"
+                errors.append(error_msg)
+                logger.debug(f"Failed to serialize with {error_msg}")
+                continue
+
+            chunks.append(serialized)
+
+        if not chunks:
+            errors_str = "\n* ".join(errors) if errors else "unknown"
+            raise SerializationError(f"\n\nSerialization errors:\n* {errors_str}")
+
+        return self.identifier + self._separator.join(chunks)
+
+    def deserialize(self, payload: str):
+        ":meta private:"
+        chomped = self.chomp(payload)
+        chunks = chomped.split(self._separator)
+        errors = []
+        for chunk in chunks:
+            try:
+                chunk_id, _ = chunk.split("\n", 1)
+            except ValueError:
+                suffix = "..." if len(chunk) > 50 else ""
+                error_msg = (
+                    f"Malformed data (no newline separator): {chunk[:50]}{suffix}"
+                )
+                errors.append(error_msg)
+                logger.debug(error_msg)
+                continue
+
+            strategy = self.get_cached_by_id(chunk_id + "\n")
+            if strategy is None:
+                error_msg = f"Invalid strategy identifier: {chunk_id}"
+                errors.append(error_msg)
+                logger.debug(error_msg)
+                continue
+
+            try:
+                return strategy.deserialize(chunk)
+            except Exception as e:
+                strategy_name = type(strategy).__name__
+                error_msg = f"{strategy_name}: {e}"
+                errors.append(error_msg)
+                logger.debug(f"Failed to deserialize with {error_msg}")
+                continue
+
+        errors_str = "\n* ".join(errors) if errors else "unknown"
+        raise DeserializationError(f"\n\nDeserialization errors:\n* {errors_str}")
