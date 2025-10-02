@@ -344,18 +344,19 @@ sent over the wire. Internally, :class:`~globus_compute_sdk.serialize.ComputeSer
 and arguments to strings) and deserializing (converting well-formatted strings back into
 function code and arguments).
 
-The default strategies are :class:`~globus_compute_sdk.serialize.DillCode` for function code and :class:`~globus_compute_sdk.serialize.DillDataBase64` for
-function ``*args`` and ``**kwargs``, which are both wrappers around |dill|_. To choose
-another serializer, use the ``serializer`` member of the Compute :class:`~globus_compute_sdk.Executor`:
+The default strategies are :class:`~globus_compute_sdk.serialize.AllCodeStrategies` for function code and
+:class:`~globus_compute_sdk.serialize.AllDataStrategies` for function ``*args`` and ``**kwargs``, which combine the results
+from multiple sub-strategies into a single payload. To select a specific, non-combination strategy, use the ``serializer``
+attribute of the Compute :class:`~globus_compute_sdk.Executor`:
 
 .. code:: python
 
   from globus_compute_sdk import Executor
-  from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode, JSONData
+  from globus_compute_sdk.serialize import ComputeSerializer, PureSourceTextInspect, JSONData
 
   with Executor('<your-endpoint-id>') as gcx:
     gcx.serializer = ComputeSerializer(
-      strategy_code=CombinedCode(), strategy_data=JSONData()
+      strategy_code=PureSourceTextInspect(), strategy_data=JSONData()
     )
 
 :doc:`See here for a up-to-date list of serialization strategies. <../reference/serialization_strategies>`

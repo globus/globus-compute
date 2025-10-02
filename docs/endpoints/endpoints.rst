@@ -697,7 +697,7 @@ the user who submitted that payload:
    #   Code serializer DillCode disabled by current configuration.
    #   The current configuration requires the *function* to be serialized with one of the allowed Code classes:
    #
-   #       Allowed serializers: CombinedCode, JSONData
+   #       Allowed serializers: PureSourceTextInspect, JSONData
 
 .. tip:: For an up-to-date list of all available serialization strategies, see
    the :doc:`serialization strategy reference. </reference/serialization_strategies>`
