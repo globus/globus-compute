@@ -11,6 +11,21 @@ New Functionality
   As with :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, it tries the
   simpler strategy (:class:`~globus_compute_sdk.serialize.JSONData`) first.
 
+Deprecated
+^^^^^^^^^^
+
+- Marked the following serialization strategies as deprecated:
+
+  - :class:`~globus_compute_sdk.serialize.DillCodeSource` - Identical to
+    :class:`~globus_compute_sdk.serialize.PureSourceDill`, but unnecessarily runs
+    ``dill.dumps()`` on the source code string.
+  - :class:`~globus_compute_sdk.serialize.DillCodeTextInspect` - Identical to
+    :class:`~globus_compute_sdk.serialize.PureSourceTextInspect`, but unnecessarily runs
+    ``dill.dumps()`` on the source code string.
+  - :class:`~globus_compute_sdk.serialize.CombinedCode` - Replaced by
+    :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, which does not include
+    the deprecated strategies above.
+
 Changed
 ^^^^^^^
 
