@@ -1,0 +1,12 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Created the :class:`~globus_compute_sdk.serialize.AllCodeStrategies` serialization
+  strategy to replace :class:`~globus_compute_sdk.serialize.CombinedCode`. This new
+  combination strategy attempts each sub-strategy on a given Python function in a
+  specific order to minimize deserialization issues.
+
+- Created the :class:`~globus_compute_sdk.serialize.AllDataStrategies` serialization
+  strategy to serialize Python objects by attempting multiple strategies in sequence.
+  As with :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, it tries the
+  simpler strategy (:class:`~globus_compute_sdk.serialize.JSONData`) first.
