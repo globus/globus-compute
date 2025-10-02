@@ -69,6 +69,10 @@ class DillCodeSource(SerializationStrategy):
     Extracts a function's body via |dill.getsource|_, serializes it
     with |dill.dumps|_, then encodes it via base 64.
 
+    .. warning::
+
+       Deprecated since version ``4.0.0``; use :class:`PureSourceDill` instead.
+
     .. list-table:: Supports
         :header-rows: 1
         :align: center
@@ -109,6 +113,10 @@ class DillCodeTextInspect(SerializationStrategy):
     """
     Extracts a function's body via :func:`inspect.getsource`, serializes it
     with |dill.dumps|_, then encodes it via base 64.
+
+    .. warning::
+
+       Deprecated since version ``4.0.0``; use :class:`PureSourceTextInspect` instead.
 
     .. list-table:: Supports
         :header-rows: 1
@@ -315,6 +323,10 @@ class CombinedCode(SerializationStrategy):
     each sub-strategy in order until one successfully deserializes its part of the
     payload. Intended for maximum compatibility, but is slower than using a single
     strategy and generates larger payloads.
+
+    .. warning::
+
+       Deprecated since version ``4.0.0``; use :class:`AllCodeStrategies` instead.
 
     .. list-table:: Supports
         :header-rows: 1
