@@ -4,6 +4,7 @@ import random
 import pytest
 from globus_compute_common import messagepack
 from globus_compute_endpoint.engines import GCFuture, GlobusMPIEngine
+from globus_compute_endpoint.engines.helper import execute_task
 from globus_compute_sdk.sdk.mpi_function import MPIFunction
 from globus_compute_sdk.sdk.shell_function import ShellResult
 from parsl.executors.errors import InvalidResourceSpecification
@@ -55,16 +56,28 @@ def test_env_vars(engine_runner, nodeslist, serde, task_uuid, ez_pack_task):
     assert inner_result["PARSL_MPI_PREFIX"].startswith("mpiexec")
 
 
-def test_mpi_res_spec(engine_runner, nodeslist):
+def test_mpi_res_spec(
+    tmp_path, engine_runner, nodeslist, ez_pack_task, serde, task_uuid
+):
     """Test passing valid MPI Resource spec to mpi enabled engine"""
-    engine = engine_runner(GlobusMPIEngine)
+    engine: GlobusMPIEngine = engine_runner(GlobusMPIEngine)
+    task_bytes = ez_pack_task(get_env_vars)
 
     for i in range(1, len(nodeslist) + 1):
         res_spec = {"num_nodes": i, "num_ranks": random.randint(1, 8)}
 
-        future = engine._submit(get_env_vars, resource_specification=res_spec)
+        future = engine._submit(
+            res_spec,
+            execute_task,
+            task_bytes,
+            args=(task_uuid,),
+            kwargs={"run_dir": tmp_path},
+        )
         assert isinstance(future, concurrent.futures.Future)
-        env_vars = future.result()
+        packed_result = future.result()
+        serde_result = messagepack.unpack(packed_result)
+        env_vars = serde.deserialize(serde_result.data)
+
         provisioned_nodes = env_vars["PARSL_MPI_NODELIST"].strip().split(",")
 
         assert len(provisioned_nodes) == res_spec["num_nodes"]
@@ -75,20 +88,19 @@ def test_mpi_res_spec(engine_runner, nodeslist):
         assert env_vars["PARSL_MPI_PREFIX"].startswith("mpiexec")
 
 
-def test_no_mpi_res_spec(engine_runner):
+def test_no_mpi_res_spec(engine_runner, ez_pack_task):
     """Test passing valid MPI Resource spec to mpi enabled engine"""
     engine = engine_runner(GlobusMPIEngine)
 
     res_spec = None
     with pytest.raises(AttributeError):
-        engine._submit(get_env_vars, resource_specification=res_spec)
+        engine.submit(res_spec, execute_task, ez_pack_task(get_env_vars))
 
 
-def test_bad_mpi_res_spec(engine_runner):
+def test_bad_mpi_res_spec(engine_runner, ez_pack_task):
     """Test passing valid MPI Resource spec to mpi enabled engine"""
     engine = engine_runner(GlobusMPIEngine)
 
     res_spec = {"FOO": "BAR"}
-
     with pytest.raises(InvalidResourceSpecification):
-        engine._submit(get_env_vars, resource_specification=res_spec)
+        engine._submit(res_spec, execute_task, ez_pack_task(get_env_vars))

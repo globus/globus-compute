@@ -132,19 +132,6 @@ def test_executor_id_bookkeeping(task_uuid, max_fails):
     (ThreadPoolEngine, ProcessPoolEngine, GlobusComputeEngine, GlobusMPIEngine),
 )
 def test_engines_executor_id(ez_pack_task, task_uuid, EngineClass):
-    if EngineClass in (GlobusComputeEngine, GlobusMPIEngine):
-        with mock.patch.object(EngineClass, "_ExecutorClass") as mock_ex:
-            mock_ex.__name__ = "ClassName"
-            mock_ex.return_value = mock.Mock(launch_cmd="")
-            engine = EngineClass(address="::1")
-            engine._engine_ready = True
-    else:
-        engine = EngineClass(max_workers=1)
-        engine.executor = mock.Mock(spec=EngineClass)
-        engine._engine_ready = True
-
-    ex_task_id = random.randint(1, 1_1000)
-
     def mock_ex_submit(*a, **k):
         f = Future()
         f.set_result(None)
@@ -152,7 +139,19 @@ def test_engines_executor_id(ez_pack_task, task_uuid, EngineClass):
         f.executor_task_id = ex_task_id
         return f
 
-    engine.executor.submit = mock_ex_submit
+    if EngineClass in (GlobusComputeEngine, GlobusMPIEngine):
+        with mock.patch.object(EngineClass, "_ExecutorClass") as mock_ex:
+            mock_ex.__name__ = "ClassName"
+            mock_ex.return_value = mock.Mock(launch_cmd="")
+            engine = EngineClass(address="::1")
+        engine.executor.submit_payload = mock_ex_submit
+    else:
+        engine = EngineClass(max_workers=1)
+        engine.executor = mock.Mock(spec=EngineClass)
+        engine.executor.submit = mock_ex_submit
+
+    engine._engine_ready = True
+    ex_task_id = random.randint(1, 11_000)
 
     f = GCFuture(task_uuid)
     engine.submit(f, b"task bytes", {})
@@ -323,14 +322,14 @@ def test_gcengine_rejects_mpi_mode(randomstring):
     assert "is not supported" in str(pyt_exc_2)
 
 
-def test_gcengine_rejects_resource_specification(task_uuid, gce):
+def test_gcengine_validates_resource_spec(task_uuid, gce):
     gce._engine_ready = True
     f = GCFuture(task_uuid)
     gce.submit(f, packed_task=b"packed_task", resource_specification={"foo": "bar"})
     r = messagepack.unpack(f.result())
     assert isinstance(r, Result)
     assert r.is_error
-    assert "is not supported" in r.data
+    assert "parsl.executors.errors.InvalidResourceSpecification" in r.data
 
 
 def test_gcmpiengine_default_executor(randomstring):
@@ -361,8 +360,8 @@ def test_gcmpiengine_accepts_resource_specification(task_uuid, randomstring):
         f = GCFuture(task_uuid)
         engine.submit(f, b"some task", resource_specification=spec)
 
-    assert engine.executor.submit.called, "Verify test: correct internal method invoked"
+    assert engine.executor.submit_payload.called, "Verify: uses expected internal meth"
     engine.shutdown()
 
-    a, _k = engine.executor.submit.call_args
-    assert spec in a
+    (ctxt, *a), _k = engine.executor.submit_payload.call_args
+    assert spec == ctxt["resource_spec"]

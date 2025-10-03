@@ -6,6 +6,7 @@ from unittest import mock
 import parsl
 import pytest
 from globus_compute_endpoint.engines import GCFuture, GlobusComputeEngine
+from globus_compute_endpoint.engines.helper import execute_task
 
 _MOCK_BASE = "globus_compute_endpoint.engines.globus_compute."
 this_py_version = platform.python_version()
@@ -160,6 +161,7 @@ def test_status_poller_started_late(tmp_path, htex, mock_jsp, ep_uuid):
     assert gce.job_status_poller is not None
     a, _ = gce.job_status_poller.add_executors.call_args
     assert a[0] == [htex], "Expect executor to be polled"
+    gce.shutdown()
 
 
 def test_sets_task_id(tmp_path, mock_htex, endpoint_uuid, task_uuid):
@@ -169,3 +171,29 @@ def test_sets_task_id(tmp_path, mock_htex, endpoint_uuid, task_uuid):
     eng.submit(f, b"bytes", {})
     assert f.executor_task_id is not None
     eng.shutdown()
+
+
+@pytest.mark.parametrize("rspec", ({}, {"num_nodes": 2}))
+def test_submit_adds_task_context(tmp_path, mock_htex, endpoint_uuid, task_uuid, rspec):
+    f = GCFuture(task_uuid)
+    task_bytes = b"some bytes"
+    eng = GlobusComputeEngine(executor=mock_htex)
+    eng.start(endpoint_id=endpoint_uuid, run_dir=str(tmp_path))
+    eng.submit(f, task_bytes, rspec)
+    eng.shutdown()
+
+    exp_import_path = f"{execute_task.__module__}.{execute_task.__name__}"
+    assert mock_htex.submit_payload.called
+
+    (ctxt, pld), _ = mock_htex.submit_payload.call_args
+    task_ctxt = ctxt["task_executor"]
+
+    assert pld == task_bytes
+    assert task_ctxt["f"] == exp_import_path, "Dynamically imported by Parsl"
+    assert "a" in task_ctxt, "Verify existence; other (int) tests verify content"
+    assert "k" in task_ctxt, "Verify existence; other (int) tests verify content"
+
+    if rspec:
+        assert ctxt["resource_spec"] == rspec
+    else:
+        assert "resource_spec" not in ctxt

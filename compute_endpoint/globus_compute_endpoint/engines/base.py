@@ -362,8 +362,8 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
     @abstractmethod
     def _submit(
         self,
-        func: t.Callable,
         resource_specification: dict,
+        func: t.Callable,
         *args: t.Any,
         **kwargs: t.Any,
     ) -> GCExecutorFuture:
@@ -393,18 +393,23 @@ class GlobusComputeEngineBase(ABC, RepresentationMixin):
         self._ensure_ready()
         task_f.bind("executor_task_id", self._update_executor_task_id)
         task_f.add_done_callback(self._clear_task)  # type: ignore[arg-type]
+        task_deserializers = tuple(
+            f"{c.__module__}.{c.__name__}"
+            for c in self.serde.allowed_deserializer_types
+        )
 
         submission_partial = functools.partial(
             self._submit,
-            execute_task,
             resource_specification,
-            task_f.gc_task_id,
+            execute_task,
             packed_task,
-            self.endpoint_id,
-            run_dir=self.working_dir,
-            run_in_sandbox=self.run_in_sandbox,
-            serde=self.serde,
-            result_serializers=result_serializers,
+            args=(task_f.gc_task_id, self.endpoint_id),
+            kwargs={
+                "run_dir": self.working_dir,
+                "run_in_sandbox": self.run_in_sandbox,
+                "task_deserializers": task_deserializers,
+                "result_serializers": result_serializers,
+            },
         )
         self._invoke_submission(
             task_f, submission_partial, retry_count=self.max_retries_on_system_failure

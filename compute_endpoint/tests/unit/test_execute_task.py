@@ -5,14 +5,32 @@ from unittest import mock
 
 import pytest
 from globus_compute_common import messagepack
+from globus_compute_common.messagepack.message_types import TaskCancel
 from globus_compute_endpoint.engines.helper import _RESULT_SIZE_LIMIT, execute_task
 from globus_compute_sdk.errors import MaxResultSizeExceeded
-from globus_compute_sdk.serialize import CombinedCode, JSONData, SerializationStrategy
-from tests.utils import divide
+from globus_compute_sdk.serialize import (
+    CombinedCode,
+    ComputeSerializer,
+    JSONData,
+    SerializationStrategy,
+)
+from globus_compute_sdk.serialize.concretes import SELECTABLE_CODE_STRATEGIES
+from tests.utils import create_task_packer, divide
 
 logger = logging.getLogger(__name__)
 
 _MOCK_BASE = "globus_compute_endpoint.engines.helper."
+
+
+@pytest.fixture
+def mock_log():
+    with mock.patch(f"{_MOCK_BASE}log") as m:
+        yield m
+
+
+@pytest.fixture
+def task_10_2(ez_pack_task):
+    return ez_pack_task(divide, 10, 2)
 
 
 @pytest.fixture
@@ -51,13 +69,14 @@ def test_bad_run_dir(endpoint_uuid, task_uuid, run_dir):
         execute_task(task_uuid, b"", endpoint_uuid, run_dir=None)
 
 
-def test_happy_path(serde, task_uuid, ez_pack_task, execute_task_runner):
+def test_happy_path(serde, caplog, task_uuid, ez_pack_task, execute_task_runner):
     out = random.randint(1, 100_000)
     divisor = random.randint(1, 100_000)
 
     task_bytes = ez_pack_task(divide, divisor * out, divisor)
 
-    packed_result = execute_task_runner(task_bytes)
+    with caplog.at_level(logging.DEBUG):
+        packed_result = execute_task_runner(task_bytes)
     assert isinstance(packed_result, bytes)
 
     result = messagepack.unpack(packed_result)
@@ -70,10 +89,21 @@ def test_happy_path(serde, task_uuid, ez_pack_task, execute_task_runner):
     assert "endpoint_id" in result.details
     assert serde.deserialize(result.data) == out
 
+    log_msgs = "\n".join(r.msg % r.args for r in caplog.records)
+    assert "Preparing to execute" in log_msgs, "Expect log clue of progress"
+    assert "Unpacking" in log_msgs, "Expect log clue of progress"
+    assert "Deserializing function" in log_msgs, "Expect log to clue of progress"
+    assert "Invoking task" in log_msgs, "Expect log clue of progress"
+    assert f"func name: {divide.__name__}" in log_msgs
+    assert "Task function complete" in log_msgs, "Expect log clue of progress"
+    assert "Execution completed" in log_msgs, "Expect log clue of progress"
+    assert "Task processing completed in" in log_msgs, "Expect log clue of progress"
+    assert len(caplog.records) == 7, "Time to update test?"
+    assert log_msgs.count(str(task_uuid)) == len(caplog.records), "Expect id prefixed"
 
-def test_sandbox(ez_pack_task, execute_task_runner, task_uuid, tmp_path):
-    task_bytes = ez_pack_task(divide, 10, 2)
-    packed_result = execute_task_runner(task_bytes, run_in_sandbox=True)
+
+def test_sandbox(task_10_2, execute_task_runner, task_uuid, tmp_path):
+    packed_result = execute_task_runner(task_10_2, run_in_sandbox=True)
     result = messagepack.unpack(packed_result)
     assert result.task_id == task_uuid
     assert result.error_details is None, "Verify test setup: execution successful"
@@ -83,13 +113,12 @@ def test_sandbox(ez_pack_task, execute_task_runner, task_uuid, tmp_path):
     assert os.getcwd() == str(exp_dir), "Expect sandbox dir entered"
 
 
-def test_nested_run_dir(ez_pack_task, task_uuid, tmp_path):
-    task_bytes = ez_pack_task(divide, 10, 2)
+def test_nested_run_dir(task_10_2, task_uuid, tmp_path):
     nested_root = tmp_path / "a/"
     nested_path = nested_root / "b/c/d"
     assert not nested_root.exists(), "Verify test setup"
 
-    packed_result = execute_task(task_uuid, task_bytes, run_dir=nested_path)
+    packed_result = execute_task(task_10_2, task_uuid, run_dir=nested_path)
 
     result = messagepack.unpack(packed_result)
     assert result.error_details is None, "Verify test setup: execution successful"
@@ -98,42 +127,40 @@ def test_nested_run_dir(ez_pack_task, task_uuid, tmp_path):
 
 
 @pytest.mark.parametrize("size_limit", (128, 256, 1024, 4096, _RESULT_SIZE_LIMIT))
-def test_result_size_limit(serde, ez_pack_task, execute_task_runner, size_limit):
-    task_bytes = ez_pack_task(divide, 10, 2)
+def test_result_size_limit(serde, task_10_2, execute_task_runner, size_limit):
     exp_data = f"{MaxResultSizeExceeded.__name__}({size_limit + 1}, {size_limit})"
     res_data_good = "a" * size_limit
     res_data_bad = "a" * (size_limit + 1)
 
-    with mock.patch(f"{_MOCK_BASE}_call_user_function") as mock_callfn:
+    with mock.patch(f"{_MOCK_BASE}ComputeSerializer.serialize_from_list") as mock_ser:
         with mock.patch(f"{_MOCK_BASE}log.exception"):  # silence tests
-            mock_callfn.return_value = res_data_good
-            res_bytes = execute_task_runner(task_bytes, result_size_limit=size_limit)
+            mock_ser.return_value = res_data_good
+            res_bytes = execute_task_runner(task_10_2, result_size_limit=size_limit)
             result = messagepack.unpack(res_bytes)
             assert result.data == res_data_good
 
-            mock_callfn.return_value = res_data_bad
-            res_bytes = execute_task_runner(task_bytes, result_size_limit=size_limit)
+            mock_ser.return_value = res_data_bad
+            res_bytes = execute_task_runner(task_10_2, result_size_limit=size_limit)
             result = messagepack.unpack(res_bytes)
             assert exp_data == result.data
             assert result.error_details.code == "MaxResultSizeExceeded"
 
 
-def test_default_result_size_limit(ez_pack_task, execute_task_runner):
-    task_bytes = ez_pack_task(divide, 10, 2)
+def test_default_result_size_limit(task_10_2, execute_task_runner):
     default = _RESULT_SIZE_LIMIT
     exp_data = f"{MaxResultSizeExceeded.__name__}({default + 1}, {default})"
     res_data_good = "a" * default
     res_data_bad = "a" * (default + 1)
 
-    with mock.patch(f"{_MOCK_BASE}_call_user_function") as mock_callfn:
+    with mock.patch(f"{_MOCK_BASE}ComputeSerializer.serialize_from_list") as mock_ser:
         with mock.patch(f"{_MOCK_BASE}log.exception"):  # silence tests
-            mock_callfn.return_value = res_data_good
-            res_bytes = execute_task_runner(task_bytes)
+            mock_ser.return_value = res_data_good
+            res_bytes = execute_task_runner(task_10_2)
             result = messagepack.unpack(res_bytes)
             assert result.data == res_data_good
 
-            mock_callfn.return_value = res_data_bad
-            res_bytes = execute_task_runner(task_bytes)
+            mock_ser.return_value = res_data_bad
+            res_bytes = execute_task_runner(task_10_2)
             result = messagepack.unpack(res_bytes)
             assert exp_data == result.data
             assert result.error_details.code == "MaxResultSizeExceeded"
@@ -146,11 +173,10 @@ def test_invalid_result_size_limit(size_limit):
     assert "must be at least" in str(pyt_e.value)
 
 
-def test_execute_task_with_exception(ez_pack_task, execute_task_runner):
+def test_task_excepts(ez_pack_task, execute_task_runner, mock_log):
     task_bytes = ez_pack_task(divide, 10, 0)
 
-    with mock.patch(f"{_MOCK_BASE}log") as mock_log:
-        packed_result = execute_task_runner(task_bytes)
+    packed_result = execute_task_runner(task_bytes)
 
     assert mock_log.exception.called
     a, _k = mock_log.exception.call_args
@@ -167,25 +193,49 @@ def test_execute_task_with_exception(ez_pack_task, execute_task_runner):
     assert "ZeroDivisionError" in result.data
 
 
-def test_execute_task_timeout(execute_task_runner, task_uuid, ez_pack_task):
+def test_times_out(execute_task_runner, task_uuid, ez_pack_task):
     task_bytes = ez_pack_task(sleeper, 1)
 
-    with mock.patch("globus_compute_endpoint.engines.helper.log") as mock_log:
-        with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.01"}):
+    with mock.patch("globus_compute_endpoint.engines.helper.log") as helper_log:
+        with mock.patch.dict(os.environ, {"GC_TASK_TIMEOUT": "0.001"}):
             packed_result = execute_task_runner(task_bytes)
 
     result = messagepack.unpack(packed_result)
     assert isinstance(result, messagepack.message_types.Result)
     assert result.task_id == task_uuid
     assert "AppTimeout" in result.data
-    assert mock_log.exception.called
+    assert helper_log.exception.called
 
 
-def test_execute_task_result_serializers(ez_pack_task, execute_task_runner, task_uuid):
-    task_bytes = ez_pack_task(divide, 10, 2)
+@pytest.mark.parametrize("ser", SELECTABLE_CODE_STRATEGIES)
+@pytest.mark.parametrize("des", SELECTABLE_CODE_STRATEGIES)
+def test_deserializers_enforced(mock_log, execute_task_runner, task_uuid, ser, des):
+    if ser is des:  # Testing the *restriction* / "unhappy path"
+        return
+
+    cser = ComputeSerializer(ser())
+    pack_task = create_task_packer(cser, task_uuid)
+
+    task_bytes = pack_task(divide, 10, 2)
 
     packed_result = execute_task_runner(
-        task_bytes, result_serializers=["globus_compute_sdk.serialize.JSONData"]
+        task_bytes,
+        task_deserializers=[
+            f"{des.__module__}.{des.__qualname__}",
+            "globus_compute_sdk.serialize.JSONData",
+        ],
+    )
+
+    result = messagepack.unpack(packed_result)
+    assert isinstance(result, messagepack.message_types.Result)
+    assert result.task_id == task_uuid
+    assert result.error_details.code == "RemoteExecutionError"
+    assert f"{type(cser.code_serializer).__name__} disabled by" in result.data
+
+
+def test_result_serializers(task_10_2, execute_task_runner, task_uuid):
+    packed_result = execute_task_runner(
+        task_10_2, result_serializers=["globus_compute_sdk.serialize.JSONData"]
     )
 
     result = messagepack.unpack(packed_result)
@@ -199,13 +249,11 @@ def test_execute_task_result_serializers(ez_pack_task, execute_task_runner, task
     assert res_data == 5.0
 
 
-def test_execute_task_bad_result_serializer_list(
-    ez_pack_task, execute_task_runner, task_uuid, unknown_strategy
+def test_bad_result_serializer_list(
+    task_10_2, execute_task_runner, task_uuid, unknown_strategy
 ):
-    task_bytes = ez_pack_task(divide, 10, 2)
-
     packed_result = execute_task_runner(
-        task_bytes,
+        task_10_2,
         result_serializers=["not a strategy", unknown_strategy, CombinedCode],
     )
 
@@ -224,3 +272,15 @@ def test_execute_task_bad_result_serializer_list(
         "CombinedCode is a code serialization strategy, expected a data strategy."
         in exc_str
     )
+
+
+def test_not_a_task_handled_gracefully(tmp_path, mock_log, task_uuid):
+    task_bytes = messagepack.pack(TaskCancel(task_id=task_uuid))
+    raw = execute_task(task_bytes, task_uuid, run_dir=tmp_path)
+    res = messagepack.unpack(raw)
+
+    assert res.task_id == task_uuid, "Sanity check"
+    assert "Non Task-type message" in res.data
+    assert TaskCancel.__name__ in res.data
+    assert f"(from: [{len(task_bytes)} bytes]" in res.data, "Expect size hint"
+    assert f"0x{task_bytes[:8].hex()}..." in res.data, "Ellipsis; don't explode exc"
