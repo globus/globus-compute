@@ -25,19 +25,20 @@ _RESULT_SIZE_LIMIT = 10 * 1024 * 1024  # 10 MiB
 
 
 def execute_task(
-    task_id: uuid.UUID,
     task_body: bytes,
+    task_id: uuid.UUID,
     endpoint_id: uuid.UUID | None = None,
     *,
     run_dir: str | os.PathLike,
     result_size_limit: int = _RESULT_SIZE_LIMIT,
     run_in_sandbox: bool = False,
-    serde: ComputeSerializer = ComputeSerializer(),
+    task_deserializers: list[str] | None = None,
     result_serializers: list[str] | None = None,
 ) -> bytes:
     """Execute task is designed to enable any executor to execute a Task payload
     and return a Result payload, where the payload follows the globus-compute protocols
     This method is placed here to make serialization easy for executor classes
+
     Parameters
     ----------
     task_id: uuid string
@@ -46,7 +47,8 @@ def execute_task(
     result_size_limit: result size in bytes
     run_dir: directory to run function in
     run_in_sandbox: if enabled run task under run_dir/<task_uuid>
-    serde: serializer for deserializing user submissions and serializing results
+    task_deserializers: list of import paths to serialization strategies
+    result_serializers: list of import paths to serialization strategies
 
     Returns
     -------
@@ -56,12 +58,20 @@ def execute_task(
         timestamp=time.time_ns(), state=TaskState.EXEC_START, actor=ActorName.WORKER
     )
 
+    serde = ComputeSerializer(allowed_deserializer_types=task_deserializers)
     result_message: dict[
         str,
         uuid.UUID | str | tuple[str, str] | list[TaskTransition] | dict[str, str],
     ]
 
     task_id_str = str(task_id)
+
+    def prefix(logf, fmt, *a, **k):
+        k["stacklevel"] = k.get("stacklevel", 1) + 1
+        fmt = f"{task_id_str}: {fmt}"
+        logf(fmt, *a, **k)
+
+    prefix(log.info, "Preparing to execute task")
     os.environ.pop("GC_TASK_SANDBOX_DIR", None)
     os.environ["GC_TASK_UUID"] = task_id_str
 
@@ -84,19 +94,44 @@ def execute_task(
 
     env_details = get_env_details()
     try:
-        _task, task_buffer = _unpack_messagebody(task_body)
-        log.debug("executing task task_id='%s'", task_id)
-        result = _call_user_function(task_buffer, serde, result_serializers or [])
+        prefix(log.debug, "Unpacking")
+        task = messagepack.unpack(task_body)
+        if not isinstance(task, Task):
+            msg = f"[{len(task_body)} bytes] 0x{task_body[:8].hex()}..."
+            raise CouldNotExecuteUserTaskError(
+                f"Non Task-type message received: {type(task).__name__} (from: {msg})"
+            )
+
+        prefix(log.debug, "Deserializing function and arguments")
+        f, f_a, f_k = serde.unpack_and_deserialize(task.task_buffer)
+
+        gc_task_timeout = max(0.0, float(os.environ.get("GC_TASK_TIMEOUT", 0.0)))
+        if gc_task_timeout > 0.0:
+            prefix(
+                log.debug, "Set task timeout to GC_TASK_TIMEOUT=%s (s)", gc_task_timeout
+            )
+            f = timeout(f, gc_task_timeout)
+
+        prefix(
+            log.debug,
+            "Invoking task (func name: %s, num args: %d, num kwargs: %d)",
+            f.__name__,
+            len(f_a),
+            len(f_k),
+        )
+        raw_result = f(*f_a, **f_k)
+        prefix(log.debug, "Task function complete; serializing result")
+        result = serde.serialize_from_list(raw_result, result_serializers or ())
 
         res_len = len(result)
         if res_len > result_size_limit:
             raise MaxResultSizeExceeded(res_len, result_size_limit)
 
-        log.debug("Execution completed without exception")
         result_message = dict(task_id=task_id, data=result)
+        prefix(log.debug, "Execution completed without exception")
 
     except Exception:
-        log.exception("Caught an exception while executing user function")
+        prefix(log.exception, "Caught an exception while executing user function")
         code, user_message = get_result_error_details()
         error_details = {"code": code, "user_message": user_message}
         result_message = dict(
@@ -117,52 +152,10 @@ def execute_task(
 
     result_message["task_statuses"] = [exec_start, exec_end]
 
-    log.debug(
-        "task %s completed in %d ns",
-        task_id,
+    prefix(
+        log.info,
+        "Task processing completed in %d ns",
         (exec_end.timestamp - exec_start.timestamp),
     )
 
     return messagepack.pack(Result(**result_message))
-
-
-def _unpack_messagebody(message: bytes) -> tuple[Task, str]:
-    """Unpack messagebody as a messagepack message with
-    some legacy handling
-    Parameters
-    ----------
-    message: messagepack'ed message body
-    Returns
-    -------
-    tuple(task, task_buffer)
-    """
-    task = messagepack.unpack(message)
-    if not isinstance(task, messagepack.message_types.Task):
-        raise CouldNotExecuteUserTaskError(
-            f"wrong type of message in worker: {type(task)}"
-        )
-    return task, task.task_buffer
-
-
-def _call_user_function(
-    task_buffer: str, serde: ComputeSerializer, result_serializers: list[str]
-) -> str:
-    """Deserialize the buffer and execute the task.
-    Parameters
-    ----------
-    task_buffer: serialized buffer of (fn, args, kwargs)
-    serde: serializer for the buffers
-    result_serializers: list of serializers to use for the result
-    Returns
-    -------
-    Returns serialized result or throws exception.
-    """
-    GC_TASK_TIMEOUT = max(0.0, float(os.environ.get("GC_TASK_TIMEOUT", 0.0)))
-    f, args, kwargs = serde.unpack_and_deserialize(task_buffer)
-    if GC_TASK_TIMEOUT > 0.0:
-        log.debug(f"Setting task timeout to GC_TASK_TIMEOUT={GC_TASK_TIMEOUT}s")
-        f = timeout(f, GC_TASK_TIMEOUT)
-
-    result = f(*args, **kwargs)
-
-    return serde.serialize_from_list(result, result_serializers)

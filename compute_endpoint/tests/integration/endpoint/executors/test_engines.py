@@ -48,7 +48,7 @@ def test_engine_submit(engine_type: GlobusComputeEngineBase, engine_runner):
 
     param = random.randint(1, 100)
     resource_spec: dict = {}
-    future = engine._submit(double, resource_spec, param)
+    future = engine._submit(resource_spec, double, param)
     assert isinstance(future, concurrent.futures.Future)
 
     # 5-seconds is nominally "overkill," but gc on CI appears to need (at least) >1s

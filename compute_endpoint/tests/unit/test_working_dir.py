@@ -109,10 +109,10 @@ def test_submit_pass(tmp_path, task_uuid, mock_gcengine):
         task_f=GCFuture(task_uuid), packed_task=b"SomeBytes", resource_specification={}
     )
 
-    mock_gcengine.executor.submit.assert_called()
+    mock_gcengine.executor.submit_payload.assert_called()
     flag = False
-    for call in mock_gcengine.executor.submit.call_args_list:
-        args, kwargs = call
+    for (ctxt, _pld), _ in mock_gcengine.executor.submit_payload.call_args_list:
+        kwargs = ctxt["task_executor"]["k"]
         assert "run_dir" in kwargs
         assert kwargs["run_dir"] == os.path.join(tmp_path, "tasks_working_dir")
         flag = True
@@ -124,7 +124,7 @@ def test_execute_task_working_dir(
 ):
     assert os.getcwd() != str(tmp_path)
     task_bytes = ez_pack_task(get_cwd)
-    packed_result = execute_task(task_uuid, task_bytes, endpoint_uuid, run_dir=tmp_path)
+    packed_result = execute_task(task_bytes, task_uuid, endpoint_uuid, run_dir=tmp_path)
 
     message = messagepack.unpack(packed_result)
     assert message.task_id == task_uuid
@@ -140,8 +140,8 @@ def test_sandbox(tmp_path, reset_cwd, serde, endpoint_uuid, task_uuid, ez_pack_t
 
     task_bytes = ez_pack_task(get_cwd)
     packed_result = execute_task(
-        task_uuid,
         task_bytes,
+        task_uuid,
         endpoint_uuid,
         run_dir=tmp_path,
         run_in_sandbox=True,

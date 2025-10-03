@@ -87,15 +87,21 @@ class ThreadPoolEngine(GlobusComputeEngineBase):
 
     def _submit(
         self,
-        func: t.Callable,
         resource_specification: t.Dict,
-        *args: t.Any,
-        **kwargs: t.Any,
+        func: t.Callable,
+        packed_task: bytes,
+        args: tuple[t.Any, ...] = (),
+        kwargs: dict | None = None,
     ) -> GCExecutorFuture:
-        """``resource_specification`` is not applicable to the ThreadPoolEngine"""
+        if resource_specification:
+            raise ValueError(
+                f"resource_specification is not supported on {type(self).__name__}."
+                "  For MPI apps, use GlobusMPIEngine."
+            )
 
         self._task_counter += 1
-        f = t.cast(GCExecutorFuture, self.executor.submit(func, *args, **kwargs))
+        _f = self.executor.submit(func, packed_task, *args, **(kwargs or {}))
+        f = t.cast(GCExecutorFuture, _f)
         f.executor_task_id = self._task_counter
         return f
 

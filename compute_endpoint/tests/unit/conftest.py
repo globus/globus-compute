@@ -103,7 +103,7 @@ def get_random_of_datatype():
 
 @pytest.fixture
 def execute_task_runner(task_uuid, tmp_path):
-    return functools.partial(execute_task, task_uuid, run_dir=tmp_path)
+    return functools.partial(execute_task, task_id=task_uuid, run_dir=tmp_path)
 
 
 @pytest.fixture
