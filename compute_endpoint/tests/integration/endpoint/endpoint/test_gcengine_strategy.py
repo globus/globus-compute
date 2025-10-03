@@ -68,7 +68,7 @@ def test_engine_submit_init_0(gc_engine_scaling):
     # Run a function to trigger scale_out and confirm via breakdown
     param = random.randint(1, 100)
     resource_spec = {}
-    future = engine._submit(double, resource_spec, param)
+    future = engine._submit(resource_spec, double, param)
     assert isinstance(future, concurrent.futures.Future)
     assert future.result() == param * 2
 
@@ -94,7 +94,7 @@ def test_engine_no_scaling(gc_engine_non_scaling):
     # Run a function to trigger scale_out and confirm via breakdown
     param = random.randint(1, 100)
     resource_spec = {}
-    future = engine._submit(double, resource_spec, param)
+    future = engine._submit(resource_spec, double, param)
     assert isinstance(future, concurrent.futures.Future)
     assert future.result() == param * 2
 
