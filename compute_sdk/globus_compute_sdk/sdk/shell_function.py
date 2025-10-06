@@ -77,6 +77,7 @@ class ShellFunction:
         walltime: t.Optional[float] = None,
         snippet_lines=1000,
         name: t.Optional[str] = None,
+        return_dict: bool = False,
     ):
         """Initialize a ShellFunction
 
@@ -103,6 +104,10 @@ class ShellFunction:
         name: str | None
             Name used to register function. Defaults to class name ShellFunction
             if not set.
+
+        return_dict: bool
+            Indicates whether the function will return a JSON-compatible dict (`True`),
+            or a `ShellResult` object (`False`).
         """
         self.cmd = cmd
         self.stdout = stdout
@@ -115,6 +120,8 @@ class ShellFunction:
         name = name or type(self).__name__
         assert isinstance(name, str)
         self.__name__ = self.valid_function_name(name)
+
+        self.return_dict = return_dict
 
     def __str__(self) -> str:
         parts = []
@@ -187,7 +194,7 @@ class ShellFunction:
     def execute_cmd_line(
         self,
         cmd: str,
-    ) -> ShellResult:
+    ) -> t.Union[ShellResult, dict]:
         import os
         import subprocess
         import tempfile
@@ -258,18 +265,21 @@ class ShellFunction:
                 std_out, std_err
             )
 
-        return ShellResult(
-            cmd,
-            stdout_snippet,
-            stderr_snippet,
-            returncode,
-            exception_name=exception_name,
-        )
+        result = {
+            "cmd": cmd,
+            "stdout": stdout_snippet,
+            "stderr": stderr_snippet,
+            "returncode": returncode,
+            "exception_name": exception_name,
+        }
+        if self.return_dict:
+            return result
+        return ShellResult(**result)  # type: ignore[arg-type]
 
     def __call__(
         self,
         **kwargs,
-    ) -> ShellResult:
+    ) -> t.Union[ShellResult, dict]:
         """This method is passed from an executor to an endpoint to execute the
         ShellFunction :
 
@@ -291,6 +301,8 @@ class ShellFunction:
         ShellResult: ShellResult
            Shell result object that encapsulates outputs from
            command execution
+        dict
+            Shell result data as a JSON-compatible dict
         """
         cmd_line = self.cmd.format(**kwargs)
         return self.execute_cmd_line(cmd_line)

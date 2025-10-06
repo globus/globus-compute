@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import uuid
@@ -196,6 +197,22 @@ def test_repeated_invocation(run_in_tmp_dir):
 
         assert prev not in result.stdout, "Output from previous invocation present"
         prev = target
+
+
+def test_shell_function_return_dict(run_in_tmp_dir, monkeypatch):
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
+
+    output = "Hello"
+    func = ShellFunction(f"echo '{output}'", return_dict=True)
+    res = func()
+
+    assert isinstance(res, dict)
+    assert output in res["stdout"]
+    try:
+        s = json.dumps(res)
+        json.loads(s)
+    except (TypeError, ValueError) as e:
+        pytest.fail(f"Result is not JSON-serializable: {e}")
 
 
 def test_timeout(run_in_tmp_dir):

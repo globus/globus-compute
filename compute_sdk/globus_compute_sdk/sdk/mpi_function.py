@@ -1,3 +1,5 @@
+import typing as t
+
 from .shell_function import ShellFunction, ShellResult
 
 
@@ -9,7 +11,7 @@ class MPIFunction(ShellFunction):
     def __call__(
         self,
         **kwargs,
-    ) -> ShellResult:
+    ) -> t.Union[ShellResult, dict]:
         """This method is passed from an executor to an endpoint to execute the
         MPIFunction :
 
@@ -33,6 +35,8 @@ class MPIFunction(ShellFunction):
         ShellResult: ShellResult
             Shell result object that encapsulates outputs from
             command execution
+        dict
+            Shell result data as a JSON-compatible dict
         """
         cmd_line = "$PARSL_MPI_PREFIX " + self.cmd.format(**kwargs)
         return self.execute_cmd_line(cmd_line)

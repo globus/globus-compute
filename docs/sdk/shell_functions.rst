@@ -51,6 +51,22 @@ available through the |ShellResult|_:
 * ``stderr``: A snippet of upto the last 1K lines captures form the stderr stream
 * ``cmd``: The formatted command string executed on the endpoint
 
+To return a JSON-compatible dict instead of a |ShellResult|_ object, set the ``return_dict`` argument to
+``True`` when instantiating a |ShellFunction|_:
+
+.. code-block:: python
+   :emphasize-lines: 3, 8
+
+    from globus_compute_sdk import Executor, ShellFunction
+
+    func = ShellFunction("echo '{message}'", return_dict=True)
+    with Executor(endpoint_id="...") as ex:
+        for msg in ("hello", "hola", "bonjour"):
+            fut = ex.submit(func, message=msg)
+            res = future.result()
+            assert isinstance(res, dict)
+            assert msg in res["stdout"]
+
 .. note::
     Bear in mind that the snippet lines count toward the 10 MiB payload size limit.  The
     number of lines captured from ``stdout`` and ``stderr`` can be modified by setting
