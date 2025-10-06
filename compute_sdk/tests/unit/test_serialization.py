@@ -1,4 +1,5 @@
 import inspect
+import json
 import random
 import sys
 import typing as t
@@ -146,6 +147,30 @@ def test_base64_data():
     args, kwargs = jb.deserialize(py37_serial_data)
     assert args[0] == 2
     assert kwargs["y"] == 10
+
+
+def test_json_data():
+    strategy = concretes.JSONData()
+    data = {"foo": "bar"}
+    serialized = strategy.serialize(data)
+    deserialized = strategy.deserialize(serialized)
+    assert deserialized == data
+
+
+def test_json_data_handles_legacy_serialization():
+    strategy = concretes.JSONData()
+    data = {"foo": "bar"}
+
+    # Before SDK version 4.0.0, the JSONData strategy did not encode
+    # the data with base64
+    legacy_serialized = concretes.JSONData.identifier + json.dumps(data)
+    legacy_deserialized = strategy.deserialize(legacy_serialized)
+
+    strategy = concretes.JSONData()
+    serialized = strategy.serialize(data)
+    deserialized = strategy.deserialize(serialized)
+
+    assert deserialized == legacy_deserialized
 
 
 def test_pickle_deserialize():
