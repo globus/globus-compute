@@ -1,3 +1,4 @@
+import base64
 import inspect
 import json
 import random
@@ -507,6 +508,17 @@ def test_all_code_strategies_individually(
     assert func(n1, n2) == foo(n1, n2)
 
 
+@pytest.mark.parametrize(
+    "sub_strategy_cls", list(concretes.AllCodeStrategies.strategies)
+)
+def test_all_code_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
+    sub_strategy = sub_strategy_cls()
+    serialized = sub_strategy.serialize(foo)
+    chomped = sub_strategy.chomp(serialized)
+    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
+    base64.b64decode(cleaned, validate=True)
+
+
 def test_all_data_strategies():
     d1 = "data"
     all_data = concretes.AllDataStrategies()
@@ -539,6 +551,17 @@ def test_all_data_strategies_individually(
     d2 = all_data.deserialize(serialized)
 
     assert d1 == d2
+
+
+@pytest.mark.parametrize(
+    "sub_strategy_cls", list(concretes.AllDataStrategies.strategies)
+)
+def test_all_data_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
+    sub_strategy = sub_strategy_cls()
+    serialized = sub_strategy.serialize("data")
+    chomped = sub_strategy.chomp(serialized)
+    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
+    base64.b64decode(cleaned, validate=True)
 
 
 @pytest.mark.parametrize(
