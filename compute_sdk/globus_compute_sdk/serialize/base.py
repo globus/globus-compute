@@ -106,6 +106,13 @@ class SerializationStrategy(ABC):
 
 
 class ComboSerializationStrategy(SerializationStrategy, ABC):
+    """Combines serialized results from multiple strategies into a single payload.
+
+    .. important::
+        All sub-strategies must base64-encode their serialized data before prefixing
+        it with a strategy identifier to avoid delimiter conflicts when deserializing.
+    """
+
     strategies: t.ClassVar[list[t.Type[SerializationStrategy]]]
     _separator = "|"  # Will never appear in a base64 string
 
