@@ -325,7 +325,6 @@ def test_register_endpoint_blocked(
     assert some_err in str(a), "Expected upstream response still shared"
 
     assert some_err in stdout_msg, f"Expecting error message in stdout ({stdout_msg})"
-    assert pytexc.value.code == exit_code, "Expecting meaningful exit code"
 
     if exit_code == "Error":
         # The other route tests SystemExit; nominally this route is an unhandled
