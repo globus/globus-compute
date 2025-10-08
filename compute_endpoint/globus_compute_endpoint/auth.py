@@ -16,5 +16,3 @@ def get_globus_app_with_scopes() -> GlobusApp:
         }
     )
     return app
-
-
