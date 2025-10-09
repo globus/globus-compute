@@ -835,9 +835,17 @@ class Endpoint:
         ep_statuses = {}
 
         for ep_path in Endpoint._get_ep_dirs(pathlib.Path(funcx_conf_dir)):
+            try:
+                ep_id = Endpoint.get_endpoint_id(ep_path)
+            except Exception as e:
+                t = type(e).__name__
+                log.warning(f"Failed to read endpoint id: [{t}] {e} ({ep_path})")
+                del t, e
+                ep_id = "[failed to read endpoint id]"
+
             ep_status = {
                 "status": "Initialized",
-                "id": Endpoint.get_endpoint_id(ep_path),
+                "id": ep_id,
             }
             ep_statuses[ep_path.name] = ep_status
             if not ep_status["id"]:
