@@ -85,13 +85,18 @@ def mock_command_ensure(gc_dir):
 
 
 @pytest.fixture
-def mock_cli_state(gc_dir, mock_command_ensure, ep_name):
-    with mock.patch(f"{_MOCK_BASE}Endpoint") as mock_ep:
+def mock_ep(gc_dir, ep_name):
+    with mock.patch(f"{_MOCK_BASE}Endpoint") as m:
         ep_dir = gc_dir / ep_name
-        mock_ep.get_endpoint_by_name_or_uuid.return_value = ep_dir
-        mock_ep.pid_path.return_value = ep_dir / "daemon.pid"
-        mock_ep.return_value = mock_ep
-        yield mock_ep, mock_command_ensure
+        m.get_endpoint_by_name_or_uuid.return_value = ep_dir
+        m.pid_path.return_value = ep_dir / "daemon.pid"
+        m.return_value = m
+        yield m
+
+
+@pytest.fixture
+def mock_cli_state(mock_ep, mock_command_ensure):
+    yield mock_ep, mock_command_ensure
 
 
 @pytest.fixture
@@ -1210,7 +1215,7 @@ def test_configure_ha_ep_requirements(
 def test_delete_endpoint_local(
     mocker,
     run_line,
-    mock_cli_state,
+    mock_ep,
     make_endpoint_dir,
     ep_name,
     delete_cmd,
@@ -1218,25 +1223,19 @@ def test_delete_endpoint_local(
     exit_code,
     delete_done,
 ):
-    mock_ep_cls = mocker.patch(f"{_MOCK_BASE}Endpoint")
     mocker.patch(f"{_MOCK_BASE}get_config")
     ep_info = str(uuid.uuid4()) if use_uuid else ep_name
     make_endpoint_dir(ep_uuid=ep_info if use_uuid else None)
     run_line(delete_cmd.format(ep_info=ep_info), assert_exit_code=exit_code)
-    assert delete_done == bool(mock_ep_cls.delete_endpoint.called)
+    assert delete_done == bool(mock_ep.delete_endpoint.called)
 
 
-def test_delete_endpoint_local_uuid(
-    mocker,
-    run_line,
-    mock_cli_state,
-):
-    mock_ep_cls = mocker.patch(f"{_MOCK_BASE}Endpoint")
-    mock_ep_cls.get_endpoint_dir_by_uuid.return_value = None
+def test_delete_endpoint_local_uuid(mocker, run_line, mock_ep):
+    mock_ep.get_endpoint_dir_by_uuid.return_value = None
     mocker.patch(f"{_MOCK_BASE}get_config")
     mocker.patch("click.confirm").return_value = True
     run_line(f"delete {uuid.uuid4()}", assert_exit_code=1)
-    assert not mock_ep_cls.delete_endpoint.called
+    assert not mock_ep.delete_endpoint.called
 
 
 @pytest.mark.parametrize(
@@ -1249,15 +1248,9 @@ def test_delete_endpoint_local_uuid(
     ],
 )
 def test_delete_endpoint_no_local_config(
-    mocker,
-    run_line,
-    mock_cli_state,
-    make_endpoint_dir,
-    delete_args,
-    err_msg,
+    run_line, mock_ep, make_endpoint_dir, delete_args, err_msg
 ):
-    mock_ep_cls = mocker.patch(f"{_MOCK_BASE}Endpoint")
     line = f"delete --yes {delete_args}"
     result = run_line(line, assert_exit_code=1)
-    assert not mock_ep_cls.delete_endpoint.called
+    assert not mock_ep.delete_endpoint.called
     assert err_msg in result.stderr
