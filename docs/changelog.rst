@@ -3,6 +3,58 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.16.0:
+
+globus-compute-sdk & globus-compute-endpoint v3.16.0
+----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added new ``Client`` and ``Executor`` methods to enable registering arbitrary Python
+  source code:
+
+  - :meth:`Client.register_source_code <globus_compute_sdk.Client.register_source_code>`
+  - :meth:`Executor.register_source_code <globus_compute_sdk.Executor.register_source_code>`
+
+  The standard ``.register_function()`` methods expect callable function objects,
+  which they then serialize using the specified code serialization strategy. In
+  contrast, the ``.register_source_code()`` methods enable the user to directly
+  provide an arbitrary source code string and entrypoint function name, which are
+  then serialized using the :class:`globus_compute_sdk.serialize.PureSourceTextInspect`
+  strategy:
+
+  .. code-block:: python
+
+    from globus_compute_sdk import Client, Executor
+
+    source = 'def hello(name: str):\n    return f"Hello, {name}!"\n'
+    function_name = "hello"
+
+    client = Client(...)
+    func_id = client.register_source_code(source, function_name)
+
+    # or
+
+    executor = Executor(...)
+    func_id = executor.register_source_code(source, function_name)
+
+Bug Fixes
+^^^^^^^^^
+
+- Fixed deserialization bug in ``CombinedCode`` strategy when utilizing pure source
+  code sub-strategies
+  (i.e., :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` and
+  :class:`~globus_compute_sdk.serialize.PureSourceDill`).
+
+Changed
+^^^^^^^
+
+- :class:`~globus_compute_sdk.serialize.PureSourceTextInspect` and
+  :class:`~globus_compute_sdk.serialize.PureSourceDill`  strategies now encode function
+  source code text using base64 encoding. Existing registered functions remain fully
+  compatible and will deserialize properly.
+
 .. _changelog-3.15.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.15.0
