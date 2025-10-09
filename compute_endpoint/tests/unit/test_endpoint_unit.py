@@ -354,6 +354,24 @@ def test_list_endpoints_no_id_yet(mock_ep_get, table_buf, randomstring):
     assert "| Endpoint ID |" in table_buf.getvalue(), "Expect col shrinks to size"
 
 
+def test_list_endpoints_invalid_id(table_buf, caplog):
+    with mock.patch.object(Endpoint, "get_endpoint_id") as mock_get:
+        with mock.patch.object(Endpoint, "_get_ep_dirs") as mock_ls:
+            mock_ls.return_value = list(map(pathlib.Path, ("a", "problem_file", "c")))
+            mock_get.side_effect = ("some_id", MemoryError("doh"), "other_id")
+
+            Endpoint.print_endpoint_table()
+
+    _, level, msg = caplog.record_tuples[0]
+    assert logging.WARNING == level
+    assert "problem_file" in msg, "Expect problem file in warning"
+    assert "Failed to read" in msg
+
+    assert "some_id" in table_buf.getvalue()
+    assert "other_id" in table_buf.getvalue()
+    assert "[failed to read endpoint id]" in table_buf.getvalue(), "expect fail grace"
+
+
 @pytest.mark.parametrize("term_size", ((30, 5), (50, 5), (67, 5), (72, 5), (120, 5)))
 def test_list_endpoints_long_names_wrapped(
     mock_ep_get, table_buf, mocker, term_size, randomstring
