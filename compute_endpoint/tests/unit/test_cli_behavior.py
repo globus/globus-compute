@@ -721,10 +721,11 @@ def test_name_or_uuid_decorator(tmp_path, mocker, run_line, name, uuid):
         (str(uuid.uuid4()), "no endpoint configuration on this machine with ID"),
     ],
 )
-def test_get_endpoint_by_name_or_uuid_error_message(run_line, data):
+def test_get_endpoint_by_name_or_uuid_error_message(tmp_path, run_line, data):
     value, error = data
 
-    result = run_line(f"start {value}", assert_exit_code=1)
+    with mock.patch(f"{_MOCK_BASE}get_config_dir", return_value=tmp_path):
+        result = run_line(f"start {value}", assert_exit_code=1)
 
     assert error in result.stderr
 
