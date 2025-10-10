@@ -520,11 +520,9 @@ def test_config_yaml_display_none(run_line, mock_command_ensure, display_name):
     run_line(config_cmd)
 
     conf_dict = dict(yaml.safe_load(conf.read_text()))
-    conf_dict["engine"]["address"] = "::1"  # avoid unnecessary DNS lookup
     conf = load_config_yaml(yaml.safe_dump(conf_dict))
 
     assert conf.display_name is None, conf.display_name
-    conf.engine.shutdown()
 
 
 def test_start_ep_incorrect_config_yaml(
@@ -580,37 +578,6 @@ def test_start_ep_umask_set_restrictive(run_line, make_endpoint_dir, ep_name, mo
     make_endpoint_dir()
     run_line(f"start {ep_name}")
     assert os.umask(orig_umask) == 0o077
-
-
-def test_single_user_requires_engine_configured(mock_command_ensure, ep_name, run_line):
-    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
-    ep_dir.mkdir(parents=True)
-    data = {"config": ""}
-
-    config = {}
-    data["config"] = yaml.safe_dump(config)
-    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
-    assert "validation error" in rc.stderr
-    assert "engine\n  field required" in rc.stderr
-
-    config = {"multi_user": False}
-    data["config"] = yaml.safe_dump(config)
-    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
-    assert "validation error" in rc.stderr
-    assert "engine\n  field required" in rc.stderr
-
-
-def test_multi_user_config_enforces_no_engine(mock_command_ensure, ep_name, run_line):
-    ep_dir = mock_command_ensure.endpoint_config_dir / ep_name
-    ep_dir.mkdir(parents=True)
-    data = {"config": ""}
-
-    config = {"engine": {"type": "ThreadPoolEngine"}, "multi_user": True}
-    data["config"] = yaml.safe_dump(config)
-    rc = run_line(f"start {ep_name}", stdin=json.dumps(data), assert_exit_code=1)
-
-    assert "validation error" in rc.stderr, (rc.stdout, rc.stderr)
-    assert "engine\n" in rc.stderr, (rc.stdout, rc.stderr)
 
 
 @pytest.mark.parametrize("use_uuid", (True, False))

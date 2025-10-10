@@ -1,30 +1,24 @@
 Dynamic Container Configuration
 *******************************
 
-This tutorial demonstrates how to leverage a multi-user endpoint to enable dynamic
-container configuration at the point of task submission.
+This tutorial demonstrates how to enable dynamic container configuration at the
+point of task submission.
 
 For general information on how to specify container environments in an endpoint
-configuration, see :ref:`Containerized Environments <containerized-environments>`.
-
-.. note::
-
-   A multi-user endpoint functionally becomes a single-user "template-able" endpoint
-   when deployed as a non-privileged user. See :ref:`endpoints_templating_configuration`
-   for more information.
+configuration, see :ref:`Containerized Environments
+<containerized-environments>`.
 
 
-Configure a Multi-User Endpoint
-===============================
+Configure an Endpoint
+=====================
 
-If you are starting from scratch, you will need to initialize a multi-user endpoint with
-the ``--multi-user`` flag. See :ref:`Multi-User Configuration <multi-user-configuration>`
-for more information.
+If you are starting from scratch, you will need to initialize an endpoint with
+the ``configure`` subcommand:
 
 
 .. code-block:: console
 
-   $ globus-compute-endpoint configure --multi-user my-mep
+   $ globus-compute-endpoint configure my-ep
 
 
 Modify the Configuration Template
@@ -36,7 +30,8 @@ See :ref:`Containerized Environments <containerized-environments>` for more
 information on supported container fields.
 
 .. code-block:: yaml+jinja
-   :caption: Example :ref:`user_config_template.yaml.j2 <user-config-template-yaml-j2>`
+   :caption: Example :ref:`user_config_template.yaml.j2
+     <user-config-template-yaml-j2>`
    :emphasize-lines: 4-6
 
    display_name: My Containerized Endpoint
@@ -59,8 +54,9 @@ information on supported container fields.
 Modify the Configuration Schema
 -------------------------------
 
-Optionally, we can modify the configuration JSON schema to validate the user-provided
-values. For example, we might ensure that the container type is a valid option.
+Optionally, we can modify the configuration JSON schema to validate the
+user-provided values.  For example, we might ensure that the container type is a
+valid option.
 
 .. code-block:: json
    :caption: Example :ref:`user_config_schema.json <user-config-schema-json>`
@@ -94,9 +90,10 @@ Once the endpoint is configured, we can start it up.
 
 .. code-block:: console
 
-   $ globus-compute-endpoint start my-mep
+   $ globus-compute-endpoint start my-ep
 
-Take note of the endpoint ID emitted to the console; we will use it later in the tutorial.
+Take note of the endpoint ID emitted to the console; we will use it later in the
+tutorial.
 
 
 Build a Container Image
@@ -126,14 +123,14 @@ For this tutorial, we will build two images with different endpoint versions.
 Submit Tasks from the SDK
 =========================
 
-We will submit tasks to the endpoint with the |Executor|_ from the SDK. Specifically,
-we will utilize the ``user_endpoint_config`` argument and attribute to define values
-for the user endpoint configuration template.
+We will submit tasks to the endpoint with the |Executor|_ from the SDK.
+Specifically, we will utilize the ``user_endpoint_config`` argument and
+attribute to define values for the user endpoint configuration template.
 
-In the example below, we submit the ``get_endpoint_pkg_version()`` function multiple
-times to the endpoint that we previously configured. This function returns the version
-of the ``globus-compute-endpoint`` package installed in the container, which will vary
-depending on the ``container_uri`` specified.
+In the example below, we submit the ``get_endpoint_pkg_version()`` function
+multiple times to the endpoint that we previously configured.  This function
+returns the version of the ``globus-compute-endpoint`` package installed in the
+container, which will vary depending on the ``container_uri`` specified.
 
 .. code-block:: python
    :emphasize-lines: 10-14, 18, 23

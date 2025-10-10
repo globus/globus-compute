@@ -114,17 +114,12 @@ def identity_map_path(conf_dir):
 
 @pytest.fixture
 def mock_conf(identity_map_path):
-    yield ManagerEndpointConfig(multi_user=True)
+    yield ManagerEndpointConfig()
 
 
 @pytest.fixture
 def mock_conf_root(identity_map_path):
-    to_mock = "globus_compute_endpoint.endpoint.config.config.is_privileged"
-    with mock.patch(to_mock) as m:
-        m.return_value = True
-        yield ManagerEndpointConfig(
-            multi_user=True, identity_mapping_config_path=identity_map_path
-        )
+    yield ManagerEndpointConfig(identity_mapping_config_path=identity_map_path)
 
 
 @pytest.fixture(autouse=True)
@@ -443,7 +438,7 @@ def mock_ctl():
         yield m
 
 
-@pytest.mark.parametrize("env", [None, "blar", "local", "production"])
+@pytest.mark.parametrize("env", (None, "blar", "local", "production"))
 def test_sets_process_title(
     randomstring, conf_dir, mock_conf, mock_client, mock_setproctitle, env
 ):
@@ -459,7 +454,7 @@ def test_sets_process_title(
     assert a[0].startswith(
         "Globus Compute Endpoint"
     ), "Expect easily identifiable process name"
-    assert "*(" in a[0], "Expected asterisk as subtle clue of 'multi-user'"
+    assert "*(" in a[0], "Expected asterisk as subtle clue of 'manager process'"
     assert f"{ep_uuid}, {conf_dir.name}" in a[0], "Can find process by conf"
 
     if env:
@@ -567,7 +562,7 @@ def test_sets_user_config_template_and_schema_path(
     if custom_schema_path:
         schema_path = conf_dir / "my_schema.json"
 
-    template_path.write_text("multi_user: true")
+    template_path.touch()
     schema_path.write_text("{}")
 
     mock_conf.user_config_template_path = template_path
@@ -623,15 +618,14 @@ def test_sends_data_during_registration(
 
     for key in (
         "type",
-        "multi_user",
         "environment",
     ):
         assert key in k["metadata"]["config"]
 
     assert k["public"] is mock_conf.public
     assert k["multi_user"] is privs
-    assert k["metadata"]["config"]["multi_user"] is True
     assert k["metadata"]["endpoint_config"] == mock_conf.source_content
+    assert "engine" not in k["metadata"]["config"]
 
 
 def test_handles_network_error_scriptably(
@@ -952,23 +946,13 @@ def test_emits_endpoint_id_if_isatty(mocker, mock_log, epmanager_as_root):
     assert not mock_sys.stderr.write.called
 
 
-def test_as_root_and_no_identity_mapper_configuration_fails(
-    mocker, mock_log, mock_client, conf_dir, mock_conf
+def test_as_root_and_no_identity_mapper_configuration_allowed(
+    mocker, mock_client, conf_dir, mock_conf
 ):
-    mock_print = mocker.patch(f"{_MOCK_BASE}print")
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=True)
-
     ep_uuid, _ = mock_client
     mock_conf.identity_mapping_config_path = None
-    with pytest.raises(SystemExit) as pyt_exc:
-        EndpointManager(conf_dir, ep_uuid, mock_conf)
-
-    assert pyt_exc.value.code == os.EX_OSFILE
-    assert mock_log.error.called
-    assert mock_print.called
-    for a in (mock_log.error.call_args[0][0], mock_print.call_args[0][0]):
-        assert "No identity mapping file specified" in a
-        assert "identity_mapping_config_path" in a, "Expected required config item"
+    EndpointManager(conf_dir, ep_uuid, mock_conf)
 
 
 def test_no_identity_mapper_if_unprivileged(
@@ -1007,6 +991,7 @@ def test_quits_if_not_privileged_and_no_identity_set(
     mocker, mock_log, mock_client, mock_auth_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
+    em.identity_mapper = None
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
     mock_auth_client.userinfo.return_value = {"identity_set": []}
     assert em._time_to_stop is False, "Verify test setup"
@@ -1022,6 +1007,7 @@ def test_clean_exit_on_identity_collection_error(
     mocker, mock_log, mock_client, mock_auth_client, epmanager_as_root
 ):
     *_, em = epmanager_as_root
+    em.identity_mapper = None
     mocker.patch(f"{_MOCK_BASE}is_privileged", return_value=False)
     mock_auth_client.userinfo.return_value = {"not_identity_set": None}
     assert em._time_to_stop is False, "Verify test setup"
@@ -1700,7 +1686,7 @@ def test_handles_failed_command(
     assert pld["globus_username"] in k["user_ident"]
 
 
-@pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGINT, signal.SIGQUIT])
+@pytest.mark.parametrize("sig", (signal.SIGTERM, signal.SIGINT, signal.SIGQUIT))
 def test_handles_shutdown_signal(successful_exec_from_mocked_root, sig, reset_signals):
     mock_os, *_, em = successful_exec_from_mocked_root
 
@@ -2076,56 +2062,6 @@ def test_run_as_same_user_enabled_if_not_admin(
     assert em._allow_same_user is True, "If not privileged, can only runas same user"
 
 
-@pytest.mark.parametrize("isatty", (True, False))
-def test_run_as_same_user_forced_warns(
-    mocker, isatty, conf_dir, mock_conf, mock_client, randomstring
-):
-    # spot-check a couple of capabilities: if set, then same user is *disallowed*
-    ep_uuid, mock_gcc = mock_client
-
-    mocker.patch(f"{_MOCK_BASE}pwd")
-    mock_os = mocker.patch(f"{_MOCK_BASE}os")
-    mock_os.stderr.isatty.return_value = isatty
-    mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
-    mocker.patch(f"{_MOCK_BASE}print")
-
-    _test_mock_base = "globus_compute_endpoint.endpoint.utils."
-    mocker.patch(f"{_test_mock_base}_pwd")
-    mock_prctl = mocker.patch(f"{_test_mock_base}_pyprctl")
-
-    mock_prctl.CapState.get_current.return_value.effective = {pyprctl.Cap.SYS_ADMIN}
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
-    assert em._allow_same_user is False, "Verify test setup"
-    assert not any(
-        "force_mu_allow_same_user" in a[0] for a, _ in mock_warn.call_args_list
-    ), "Verify test setup"
-
-    mock_uid, mock_gid = randomstring(), randomstring()
-    mock_os.getuid.return_value = mock_uid
-    mock_os.getgid.return_value = mock_gid
-    mock_conf.force_mu_allow_same_user = True
-    mock_warn.reset_mock()
-    em = EndpointManager(conf_dir, ep_uuid, mock_conf)
-    assert em._allow_same_user is True
-    assert mock_warn.called
-
-    a, _k = mock_warn.call_args
-    a = next(
-        a[0] for a, _ in mock_warn.call_args_list if "force_mu_allow_same_user" in a[0]
-    )
-    assert "`force_mu_allow_same_user` set to `true`" in a
-    assert "very dangerous override" in a
-    assert "Endpoint (UID, GID):" in a, "Expect process UID, GID in warning"
-    assert f"({mock_uid}, {mock_gid})" in a, "Expect process UID, GID in warning"
-    if isatty:
-        a = next(a[0] for a, _ in mock_warn.call_args_list if "dangerous" in a[0])
-        assert a is not None, "Superfluous assert: ensure warning printed for human eye"
-        assert "`force_mu_allow_same_user` set to `true`" in a
-        assert "very dangerous override" in a
-        assert "Endpoint (UID, GID):" in a, "Expect process UID, GID in warning"
-        assert f"({mock_uid}, {mock_gid})" in a, "Expect process UID, GID in warning"
-
-
 def test_run_as_same_user_fails_if_admin(successful_exec_from_mocked_root):
     *_, em = successful_exec_from_mocked_root
 
@@ -2139,6 +2075,7 @@ def test_run_as_same_user_fails_if_admin(successful_exec_from_mocked_root):
     assert "UID is same as" in e_str
     assert "using a non-root user" in e_str, "Expected suggested fix"
     assert "removing privileges" in e_str, "Expected suggested fix"
+    assert "removing the identity mapping" in e_str, "Expected suggested fix"
     assert "\n  MU Process UID: 0 (root)" in e_str
     assert "\n  Requested UID:  0" in e_str
     assert f"\n  Via identity:   {mpi.matched_identity}" in e_str

@@ -24,15 +24,12 @@ def config_dict():
 
 
 @pytest.fixture
-def config_dict_mu(fs):
+def config_dict_mep(fs):
     p = pathlib.Path("/some/dir")
     p.mkdir(parents=True)
     idc = p / "idconf.json"
     idc.write_text("[]")
-    return {
-        "identity_mapping_config_path": idc,
-        "multi_user": True,
-    }
+    return {"identity_mapping_config_path": idc}
 
 
 @pytest.fixture
@@ -99,6 +96,17 @@ def test_config_model_enforces_engine(config_dict):
     assert "engine\n  field required" in str(pyt_exc.value)
 
 
+def test_manager_config_model_rejects_engine(config_dict_mep):
+    config_dict_mep["engine"] = {
+        "type": "GlobusComputeEngine",
+        "address": "localhost",
+    }
+    with pytest.raises(ValidationError) as pyt_exc:
+        ManagerEndpointConfigModel(**config_dict_mep)
+
+    assert "engine\n  extra fields not permitted" in str(pyt_exc.value)
+
+
 @pytest.mark.parametrize(
     "field",
     (
@@ -107,58 +115,37 @@ def test_config_model_enforces_engine(config_dict):
         "user_config_schema_path",
     ),
 )
-def test_mu_config_verifies_path_like_fields(config_dict_mu, field: str):
+def test_mep_config_verifies_path_like_fields(config_dict_mep, field: str):
     conf_p = pathlib.Path("/some/path/not exists file")
-    config_dict_mu[field] = conf_p
+    config_dict_mep[field] = conf_p
     with pytest.raises(ValidationError) as pyt_e:
-        ManagerEndpointConfigModel(**config_dict_mu)
+        ManagerEndpointConfigModel(**config_dict_mep)
 
     e_str = str(pyt_e.value)
     assert "does not exist" in e_str
     assert str(conf_p) in e_str, "expect location in exc to help human out"
 
-    del config_dict_mu[field]
+    del config_dict_mep[field]
     ManagerEndpointConfigModel(
-        **config_dict_mu
+        **config_dict_mep
     )  # doesn't raise; conditional validation
 
 
-def test_mu_config_warns_idmapping_ignored(mock_log, config_dict_mu):
-    config_dict_mu["identity_mapping_config_path"] = "not exists file"
-    ManagerEndpointConfig(**config_dict_mu)
+def test_mep_config_privileged_verifies_idmapping(config_dict_mep):
+    p = config_dict_mep["identity_mapping_config_path"]
+    ManagerEndpointConfig(**config_dict_mep)  # Verify for test: doesn't raise!
 
-    a, _k = mock_log.warning.call_args
-    assert "Identity mapping specified" in a[0]
-    assert "is not privileged" in a[0]
+    p.unlink(missing_ok=True)
+    with pytest.raises(ValueError) as pyt_e:
+        ManagerEndpointConfig(**config_dict_mep)
 
-
-def test_mu_config_privileged_requires_idmapping(config_dict_mu):
-    del config_dict_mu["identity_mapping_config_path"]
-    with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
-        with pytest.raises(ValueError) as pyt_e:
-            ManagerEndpointConfig(**config_dict_mu)
-
-    assert "identity mapping" in str(pyt_e).lower()
-    assert "required" in str(pyt_e).lower()
-    assert "Hint: identity_mapping_config_path" in str(pyt_e), "Expect config item hint"
-
-
-def test_mu_config_privileged_verifies_idmapping(config_dict_mu):
-    p = config_dict_mu["identity_mapping_config_path"]
-    with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
-        ManagerEndpointConfig(**config_dict_mu)  # Verify for test: doesn't raise!
-
-        p.unlink(missing_ok=True)
-        with pytest.raises(ValueError) as pyt_e:
-            ManagerEndpointConfig(**config_dict_mu)
-
-        assert "not found" in str(pyt_e)
-        assert str(p) in str(pyt_e), "Expect invalid path shared"
+    assert "not found" in str(pyt_e)
+    assert str(p) in str(pyt_e), "Expect invalid path shared"
 
 
 @pytest.mark.parametrize("public", (None, True, False, "a", 1))
-def test_mu_public(public: t.Any):
-    c = ManagerEndpointConfig(multi_user=True, public=public)
+def test_mep_public(public: t.Any):
+    c = ManagerEndpointConfig(public=public)
     assert c.public is (public is True)
 
 
@@ -189,10 +176,10 @@ def test_provider_container_compatibility(
 
 def test_configs_repr_default_kwargs():
     assert repr(UserEndpointConfig()) == "UserEndpointConfig()"
-    defs = f"multi_user=True, pam={PamConfiguration(enable=False)!r}"
+    defs = f"pam={PamConfiguration(enable=False)!r}"
     assert (
         repr(ManagerEndpointConfig()) == f"ManagerEndpointConfig({defs})"
-    ), "mu is on base"
+    ), "mep is on base"
 
 
 @pytest.mark.parametrize("kw,cls", known_user_config_opts.items())
@@ -207,8 +194,8 @@ def test_userconfig_repr_nondefault_kwargs(
 
     repr_c = repr(UserEndpointConfig(**kwds))
 
-    if kw in ["multi_user", "high_assurance"]:
-        assert f"{kw}={repr(val)}" not in repr_c, "Multi-user and HA *off* by default"
+    if kw == "high_assurance":
+        assert f"{kw}={repr(val)}" not in repr_c, "HA *off* by default"
     else:
         assert f"{kw}={repr(val)}" in repr_c
 
@@ -221,11 +208,7 @@ def test_managerconfig_repr_nondefault_kwargs(
     if cls == os.PathLike:
         val = pathlib.Path(val)
 
-    if kw == "identity_mapping_config_path":
-        with mock.patch(f"{_MOCK_BASE}config.is_privileged", return_value=True):
-            repr_c = repr(ManagerEndpointConfig(**{kw: val}))
-    else:
-        repr_c = repr(ManagerEndpointConfig(**{kw: val}))
+    repr_c = repr(ManagerEndpointConfig(**{kw: val}))
 
     assert f"{kw}={repr(val)}" in repr_c
 
@@ -245,3 +228,12 @@ def test_engine_model_objects_allow_extra():
         }
     }
     UserEndpointConfigModel(**config_dict).engine.shutdown()
+
+
+@pytest.mark.parametrize("multi_user", (True, False))
+@pytest.mark.parametrize("config_class", (UserEndpointConfig, ManagerEndpointConfig))
+def test_multi_user_deprecated(multi_user, config_class):
+    with pytest.deprecated_call() as pyt_warns:
+        config_class(multi_user=multi_user)
+
+    assert "multi_user" in str(pyt_warns.list[0].message)

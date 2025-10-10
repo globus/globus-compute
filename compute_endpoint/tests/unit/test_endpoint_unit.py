@@ -18,8 +18,12 @@ from unittest import mock
 
 import pytest
 import requests
+import yaml
 from globus_compute_endpoint.endpoint import endpoint
-from globus_compute_endpoint.endpoint.config import UserEndpointConfig
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.engines import (
@@ -70,6 +74,12 @@ def mock_launch():
 
 
 @pytest.fixture
+def mock_get_config():
+    with mock.patch(f"{_mock_base}get_config") as m:
+        yield m
+
+
+@pytest.fixture
 def conf():
     _conf = UserEndpointConfig(engine=ThreadPoolEngine)
     _conf.source_content = "# test source content"
@@ -102,6 +112,14 @@ def mock_ep_get():
     with mock.patch.object(Endpoint, "get_endpoints") as m:
         m.return_value = {}
         yield m
+
+
+@pytest.fixture
+def mock_ep_dir(fs, mock_ep_data, mock_get_config):
+    ep, ep_dir, *_, conf = mock_ep_data
+    mock_get_config.return_value = conf
+    ep._config_file_path(ep_dir).write_text(conf.source_content)
+    yield ep, ep_dir
 
 
 @pytest.fixture
@@ -479,7 +497,7 @@ def test_endpoint_get_metadata(mocker, engine_cls):
         assert config["engine"]["executor"]["provider"]["type"] == "LocalProvider"
 
 
-@pytest.mark.parametrize("env", [None, "blar", "local", "production"])
+@pytest.mark.parametrize("env", (None, "blar", "local", "production"))
 def test_endpoint_sets_process_title(
     randomstring, mock_ep_data, env, mock_reg_info, ep_uuid
 ):
@@ -526,35 +544,19 @@ def test_endpoint_respects_port(mock_ep_data, port, mock_reg_info, ep_uuid):
         assert a == (exp_url, port)
 
 
-def test_endpoint_sets_owner_only_access(tmp_path, umask):
-    umask(0)
+@pytest.mark.parametrize("mask", [0, 511] + random.sample(range(1, 511), 5))
+@pytest.mark.parametrize("idmap", (False, True))
+def test_endpoint_sets_owner_only_access(tmp_path, umask, mask, idmap):
+    umask(mask)  # no umask; default to 777 permissions
     ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
+    Endpoint.init_endpoint_dir(ep_dir, id_mapping=idmap)
 
-    assert ep_dir.stat().st_mode & 0o777 == 0o700, "Expected user-only access"
-
-
-def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
-    umask(0o777)  # No access whatsoever
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
-
-    assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
-    ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
-
-
-def test_mu_endpoint_user_ep_yamls_world_readable(tmp_path):
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
-
-    user_tmpl_path = Endpoint.user_config_template_path(ep_dir)
-    user_env_path = Endpoint._user_environment_path(ep_dir)
-
-    assert user_env_path != user_tmpl_path, "Dev typo while developing"
-    for p in (user_tmpl_path, user_env_path):
-        assert p.exists()
-        assert p.stat().st_mode & 0o444 == 0o444, "Minimum world readable"
-    assert ep_dir.stat().st_mode & 0o111 == 0o111, "Minimum world executable"
+    assert ep_dir.stat().st_mode & 0o777 == 0o700, f"Expect POSIX restricted: {ep_dir}/"
+    for p in ep_dir.iterdir():
+        if idmap and p.name.endswith(".j2"):
+            assert p.stat().st_mode & 0o777 == 0o644, f"Expect sharable: {p}"
+            continue
+        assert p.stat().st_mode & 0o777 == 0o600, f"Expect owner-only access: {p}"
 
 
 def test_always_prints_endpoint_id_to_terminal(
@@ -704,7 +706,7 @@ def test_get_endpoint_dir_by_uuid(tmp_path, name, uuid, exists):
     assert exists is (result is not None)
 
 
-@pytest.mark.parametrize("json_exists", [True, False])
+@pytest.mark.parametrize("json_exists", (True, False))
 def test_get_endpoint_id(tmp_path: pathlib.Path, json_exists: bool, ep_uuid):
     if json_exists:
         ep_json = tmp_path / "endpoint.json"
@@ -857,7 +859,7 @@ def test_update_config_file_retains_order(fs):
     Endpoint.update_config_file(
         original_path,
         target_path,
-        multi_user=False,
+        id_mapping=False,
         high_assurance=False,
         display_name=None,
         auth_policy=None,
@@ -866,3 +868,131 @@ def test_update_config_file_retains_order(fs):
 
     target_config = target_path.read_text()
     assert original_config == target_config
+
+
+@pytest.mark.parametrize(
+    "config_keys",
+    (
+        (
+            "admins",
+            "display_name",
+            "allowed_functions",
+            "authentication_policy",
+            "subscription_id",
+            "debug",
+            "amqp_port",
+            "heartbeat_period",
+        ),
+        (
+            "admins",
+            "display_name",
+            "allowed_functions",
+            "authentication_policy",
+            "subscription_id",
+        ),
+        ("foo", "bar", "baz"),
+        ("debug", "amqp_port", "heartbeat_period"),
+        ("admins", "foo", "debug", "bar"),
+    ),
+)
+def test_migrate_to_template_capable_success(
+    fs, mock_ep_data, mock_get_config, config_keys
+):
+    ep, ep_dir, *_ = mock_ep_data
+    config_dict = {k: "some value" for k in config_keys}
+    mock_get_config.return_value = SimpleNamespace(
+        source_content=yaml.dump(config_dict)
+    )
+    ep._config_file_path(ep_dir).write_text(yaml.safe_dump(config_dict))
+
+    ep.migrate_to_template_capable(ep_dir)
+
+    assert ep._config_file_path(ep_dir).exists()
+    assert ep.user_config_template_path(ep_dir).exists()
+
+    new_conf = yaml.safe_load(ep._config_file_path(ep_dir).open())
+    for k in new_conf:
+        assert k in config_dict
+
+    new_templ = yaml.safe_load(ep.user_config_template_path(ep_dir).open())
+    for k in new_templ:
+        assert k in config_dict
+
+    config_only_keys = {
+        "admins",
+        "display_name",
+        "allowed_functions",
+        "authentication_policy",
+        "subscription_id",
+    }
+
+    shared_keys = {
+        "debug",
+        "amqp_port",
+        "heartbeat_period",
+    }
+
+    for k in config_dict:
+        assert k in new_conf or k in new_templ
+        if k in config_only_keys:
+            assert k in new_conf
+            assert k not in new_templ
+            v = new_conf[k]
+        elif k in shared_keys:
+            assert k in new_conf
+            assert k in new_templ
+            v = new_conf[k]
+            assert v == new_templ[k]
+        else:
+            assert k not in new_conf
+            assert k in new_templ
+            v = new_templ[k]
+        assert v == config_dict[k]
+
+
+def test_migrate_to_template_capable_already_template_capable(mock_get_config):
+    mock_config_path = pathlib.Path("some/config/dir")
+    mock_get_config.return_value = mock.Mock(spec=ManagerEndpointConfig)
+
+    with pytest.raises(ValueError) as pyt_exc:
+        Endpoint.migrate_to_template_capable(mock_config_path)
+
+    assert mock_config_path.name in str(pyt_exc)
+    assert "already template capable" in str(pyt_exc)
+
+
+def test_migrate_to_template_capable_endpoint_running(mock_ep_dir, mocker):
+    _, ep_dir = mock_ep_dir
+    mocker.patch(f"{_mock_base}Endpoint.check_pidfile").return_value = {"active": True}
+
+    with pytest.raises(ValueError) as pyt_exc:
+        Endpoint.migrate_to_template_capable(ep_dir)
+
+    assert ep_dir.name in str(pyt_exc)
+    assert "currently running" in str(pyt_exc)
+
+
+def test_migrate_to_template_capable_backs_up(mock_ep_dir):
+    ep, ep_dir = mock_ep_dir
+
+    ep.migrate_to_template_capable(ep_dir)
+
+    config_backup = ep._config_file_path(ep_dir)
+    config_backup = config_backup.with_name(config_backup.name + ".backup")
+
+    assert config_backup.exists()
+
+
+def test_migrate_to_template_capable_backup_exists(mock_ep_dir):
+    ep, ep_dir = mock_ep_dir
+
+    backup_path = ep._config_file_path(ep_dir)
+    backup_path = backup_path.with_name(backup_path.name + ".backup")
+    backup_path.touch()
+
+    with pytest.raises(FileExistsError) as pyt_exc:
+        ep.migrate_to_template_capable(ep_dir)
+
+    assert backup_path.name in str(pyt_exc)
+    assert "back up" in str(pyt_exc)
+    assert "already exists" in str(pyt_exc)

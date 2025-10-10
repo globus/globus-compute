@@ -1,4 +1,6 @@
+import base64
 import inspect
+import json
 import random
 import sys
 import typing as t
@@ -14,12 +16,17 @@ from globus_compute_sdk.errors import (
     SerdeError,
     SerializationError,
 )
-from globus_compute_sdk.serialize.base import IDENTIFIER_LENGTH, SerializationStrategy
+from globus_compute_sdk.serialize.base import (
+    IDENTIFIER_LENGTH,
+    ComboSerializationStrategy,
+    SerializationStrategy,
+)
 from globus_compute_sdk.serialize.facade import (
     ComputeSerializer,
     ValidatedStrategylike,
     validate_strategylike,
 )
+from pytest_mock import MockerFixture
 
 if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
@@ -141,6 +148,30 @@ def test_base64_data():
     args, kwargs = jb.deserialize(py37_serial_data)
     assert args[0] == 2
     assert kwargs["y"] == 10
+
+
+def test_json_data():
+    strategy = concretes.JSONData()
+    data = {"foo": "bar"}
+    serialized = strategy.serialize(data)
+    deserialized = strategy.deserialize(serialized)
+    assert deserialized == data
+
+
+def test_json_data_handles_legacy_serialization():
+    strategy = concretes.JSONData()
+    data = {"foo": "bar"}
+
+    # Before SDK version 4.0.0, the JSONData strategy did not encode
+    # the data with base64
+    legacy_serialized = concretes.JSONData.identifier + json.dumps(data)
+    legacy_deserialized = strategy.deserialize(legacy_serialized)
+
+    strategy = concretes.JSONData()
+    serialized = strategy.serialize(data)
+    deserialized = strategy.deserialize(serialized)
+
+    assert deserialized == legacy_deserialized
 
 
 def test_pickle_deserialize():
@@ -317,9 +348,226 @@ def test_overall():
 
 
 @pytest.mark.parametrize(
+    "strategy_cls, data",
+    [(concretes.AllCodeStrategies, foo), (concretes.AllDataStrategies, "data")],
+)
+def test_combo_strategy_serialize_fail(
+    strategy_cls: t.Type[ComboSerializationStrategy], data: t.Any, mocker: MockerFixture
+):
+    strategy = strategy_cls()
+    for s in strategy.strategies:
+        mocker.patch.object(s, "serialize", side_effect=Exception("Bad boy!"))
+
+    with pytest.raises(SerializationError) as e_info:
+        strategy.serialize(data)
+
+    assert "Serialization failed" in str(e_info.value)
+    for s in strategy.strategies:
+        assert s.__name__ in str(e_info.value)
+
+
+@pytest.mark.parametrize(
+    "strategy_cls, data",
+    [(concretes.AllCodeStrategies, foo), (concretes.AllDataStrategies, "data")],
+)
+def test_combo_strategy_serialize_log_failures(
+    strategy_cls: t.Type[ComboSerializationStrategy], data: t.Any, mocker: MockerFixture
+):
+    strategy = strategy_cls()
+    sub_strategy_cls = strategy.strategies[
+        random.randint(0, len(strategy.strategies) - 1)
+    ]
+    mocker.patch.object(
+        sub_strategy_cls, "serialize", side_effect=Exception("Bad boy!")
+    )
+    mock_log = mocker.patch("globus_compute_sdk.serialize.base.logger")
+
+    # This should succeed
+    strategy.serialize(data)
+
+    a, _ = mock_log.debug.call_args
+    assert f"Failed to serialize with {sub_strategy_cls.__name__}" in a[0]
+
+
+@pytest.mark.parametrize(
+    "strategy_cls, data",
+    [(concretes.AllCodeStrategies, foo), (concretes.AllDataStrategies, "data")],
+)
+def test_combo_strategy_deserialize_fail(
+    strategy_cls: t.Type[ComboSerializationStrategy], data: t.Any, mocker: MockerFixture
+):
+    strategy = strategy_cls()
+    for s in strategy.strategies:
+        mocker.patch.object(s, "deserialize", side_effect=Exception("Bad boy!"))
+
+    serialized = strategy.serialize(data)
+    with pytest.raises(DeserializationError) as e_info:
+        strategy.deserialize(serialized)
+
+    assert "Deserialization failed" in str(e_info.value)
+    for s in strategy.strategies:
+        assert s.__name__ in str(e_info.value)
+
+
+@pytest.mark.parametrize(
+    "strategy_cls, data",
+    [(concretes.AllCodeStrategies, foo), (concretes.AllDataStrategies, "data")],
+)
+def test_combo_strategy_deserialize_log_failures(
+    strategy_cls: t.Type[ComboSerializationStrategy], data: t.Any, mocker: MockerFixture
+):
+    strategy = strategy_cls()
+    sub_strategy_cls = strategy.strategies[0]
+    mocker.patch.object(
+        sub_strategy_cls, "deserialize", side_effect=Exception("Bad boy!")
+    )
+    mock_log = mocker.patch("globus_compute_sdk.serialize.base.logger")
+
+    # This should succeed
+    serialized = strategy.serialize(data)
+    strategy.deserialize(serialized)
+
+    a, _ = mock_log.debug.call_args
+    assert f"Failed to deserialize with {sub_strategy_cls.__name__}" in a[0]
+
+
+@pytest.mark.parametrize(
+    "strategy_cls, data",
+    [(concretes.AllCodeStrategies, foo), (concretes.AllDataStrategies, "data")],
+)
+def test_combo_strategy_deserialize_invalid_strategy(
+    strategy_cls: t.Type[ComboSerializationStrategy], data: t.Any, mocker: MockerFixture
+):
+    strategy = strategy_cls()
+    invalid_id = "BAD\n"
+    for s in strategy.strategies:
+        mocker.patch.object(s, "serialize", return_value=invalid_id)
+
+    serialized = strategy.serialize(data)
+    with pytest.raises(DeserializationError) as e_info:
+        strategy.deserialize(serialized)
+
+    assert "Invalid strategy identifier" in str(e_info.value)
+    assert invalid_id.strip() in str(e_info.value)
+
+
+@pytest.mark.parametrize(
+    "strategy_cls, data",
+    [(concretes.AllCodeStrategies, foo), (concretes.AllDataStrategies, "data")],
+)
+def test_combo_strategy_deserialize_malformed_identifier(
+    strategy_cls: t.Type[ComboSerializationStrategy], data: t.Any, mocker: MockerFixture
+):
+    strategy = strategy_cls()
+    malformed_id = "NO_NEWLINE"
+    data = f"{malformed_id}{'a' * 100}"
+    for s in strategy.strategies:
+        mocker.patch.object(s, "serialize", return_value=data)
+
+    serialized = strategy.serialize(foo)
+    with pytest.raises(DeserializationError) as e_info:
+        strategy.deserialize(serialized)
+
+    assert "Malformed data (no newline separator)" in str(e_info.value)
+    assert data[:50] in str(e_info.value)
+
+
+def test_all_code_strategies():
+    all_code = concretes.AllCodeStrategies()
+    serialized = all_code.serialize(foo)
+
+    chomped = all_code.chomp(serialized)
+    chunks = chomped.split(all_code._separator)
+    assert len(chunks) == len(all_code.strategies)
+
+    func = all_code.deserialize(serialized)
+
+    assert callable(func)
+    n1, n2 = random.randint(1, 100), random.randint(1, 100)
+    assert func(n1, n2) == foo(n1, n2)
+
+
+@pytest.mark.parametrize("strategy", list(concretes.AllCodeStrategies.strategies))
+def test_all_code_strategies_individually(
+    strategy: SerializationStrategy, mocker: MockerFixture
+):
+    # Ensure we isolate each sub-strategy
+    # Otherwise, the test will pass if any sub-strategy works
+    mocker.patch.object(
+        concretes.AllCodeStrategies,
+        "strategies",
+        [strategy],
+    )
+
+    all_code = concretes.AllCodeStrategies()
+    serialized = all_code.serialize(foo)
+    func = all_code.deserialize(serialized)
+
+    assert callable(func)
+    n1, n2 = random.randint(1, 100), random.randint(1, 100)
+    assert func(n1, n2) == foo(n1, n2)
+
+
+@pytest.mark.parametrize(
+    "sub_strategy_cls", list(concretes.AllCodeStrategies.strategies)
+)
+def test_all_code_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
+    sub_strategy = sub_strategy_cls()
+    serialized = sub_strategy.serialize(foo)
+    chomped = sub_strategy.chomp(serialized)
+    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
+    base64.b64decode(cleaned, validate=True)
+
+
+def test_all_data_strategies():
+    d1 = "data"
+    all_data = concretes.AllDataStrategies()
+    serialized = all_data.serialize(d1)
+
+    chomped = all_data.chomp(serialized)
+    chunks = chomped.split(all_data._separator)
+    assert len(chunks) == len(all_data.strategies)
+
+    d2 = all_data.deserialize(serialized)
+
+    assert d1 == d2
+
+
+@pytest.mark.parametrize("strategy", list(concretes.AllDataStrategies.strategies))
+def test_all_data_strategies_individually(
+    strategy: SerializationStrategy, mocker: MockerFixture
+):
+    # Ensure we isolate each sub-strategy
+    # Otherwise, the test will pass if any sub-strategy works
+    mocker.patch.object(
+        concretes.AllDataStrategies,
+        "strategies",
+        [strategy],
+    )
+
+    d1 = "data"
+    all_data = concretes.AllDataStrategies()
+    serialized = all_data.serialize(d1)
+    d2 = all_data.deserialize(serialized)
+
+    assert d1 == d2
+
+
+@pytest.mark.parametrize(
+    "sub_strategy_cls", list(concretes.AllDataStrategies.strategies)
+)
+def test_all_data_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
+    sub_strategy = sub_strategy_cls()
+    serialized = sub_strategy.serialize("data")
+    chomped = sub_strategy.chomp(serialized)
+    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
+    base64.b64decode(cleaned, validate=True)
+
+
+@pytest.mark.parametrize(
     "strategy", list(concretes.CombinedCode._chunk_strategies.values())
 )
-def test_combined_strategies(strategy: SerializationStrategy, mocker):
+def test_combined_strategies(strategy: SerializationStrategy, mocker: MockerFixture):
     # Ensure we isolate each sub-strategy
     # Otherwise, the test will pass if any sub-strategy works
     mocker.patch.object(

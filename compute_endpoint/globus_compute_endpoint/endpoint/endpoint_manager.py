@@ -180,19 +180,6 @@ class EndpointManager:
         privileged = is_privileged(self._mu_user)
 
         self._allow_same_user = not privileged
-        if config.force_mu_allow_same_user:
-            self._allow_same_user = True
-            _warn_str = privileged and "privileged process" or "unprivileged process"
-            msg = (
-                "Configuration item `force_mu_allow_same_user` set to `true`; this is"
-                " considered a very dangerous override -- please use with care,"
-                " especially if allowing this endpoint to be utilized by multiple"
-                " users."
-                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()}) {_warn_str}"
-            )
-            log.warning(msg)
-            if sys.stderr.isatty():
-                print(f"\033[31;1;40m{msg}\033[0m")  # Red bold on black
 
         if not reg_info:
             try:
@@ -236,7 +223,7 @@ class EndpointManager:
                     sys.exit(os.EX_DATAERR)
                 raise
             except NetworkError as e:
-                log.exception("Network error while registering multi-user endpoint")
+                log.exception("Network error while registering manager endpoint")
                 log.critical(f"Network failure; unable to register endpoint: {e}")
                 sys.exit(os.EX_TEMPFAIL)
 
@@ -267,16 +254,7 @@ class EndpointManager:
                     f"\n    (ignored) '{config.identity_mapping_config_path}'"
                 )
                 log.warning(msg)
-        else:
-            if not config.identity_mapping_config_path:
-                msg = (
-                    "No identity mapping file specified; please specify"
-                    " identity_mapping_config_path"
-                )
-                log.error(msg)
-                print(msg, file=sys.stderr)
-                sys.exit(os.EX_OSFILE)
-
+        elif config.identity_mapping_config_path:
             # Only map identities if possibility of *changing* uid; otherwise
             # we enforce that the identity of UEPs must match the
             # parent-process' authorization -- we do not want to allow an open
@@ -335,7 +313,7 @@ class EndpointManager:
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
 
-        # * == "multi-user"; not important until it is, so let it be subtle
+        # * == "manager endpoint"; not important until it is, so let it be subtle
         ptitle = f"Globus Compute Endpoint *({endpoint_uuid}, {conf_dir.name})"
         if config.environment:
             ptitle += f" - {config.environment}"
@@ -623,7 +601,7 @@ class EndpointManager:
 
     def _event_loop(self):
         parent_identities: set[str] = set()
-        if not is_privileged():
+        if not (is_privileged() and self.identity_mapper):
 
             def _get_globus_identities():
                 client_options = {
@@ -1029,15 +1007,17 @@ class EndpointManager:
         udir, uid, gid = user_record.pw_dir, user_record.pw_uid, user_record.pw_gid
         uname = user_record.pw_name
 
-        if not self._allow_same_user:
+        if self.identity_mapper and not self._allow_same_user:
             p_uname = self._mu_user.pw_name
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
-                    "Requested UID is same as multi-user UID, but configuration"
-                    " has not been marked to allow the multi-user UID to process"
-                    " tasks.  To allow the multi-user UID to also run single-user"
-                    " endpoints, consider using a non-root user or removing privileges"
-                    " from the UID."
+                    "Requested UID is same as Manager Endpoint UID on a user-mapped"
+                    " Manager Endpoint. To allow the same UID to run tasks, consider:"
+                    "\n * using a non-root user,"
+                    "\n * removing privileges from the UID, or"
+                    "\n * removing the identity mapping configuration file"
+                    f" ({self.identity_mapper.config_path})."
+                    "\n\nDetails:"
                     f"\n  MU Process UID: {self._mu_user.pw_uid} ({p_uname})"
                     f"\n  Requested UID:  {uid} ({uname})"
                     f"\n  Via identity:   {ident.matched_identity}",
@@ -1165,10 +1145,9 @@ class EndpointManager:
 
             orig_uid, orig_gid = os.getuid(), os.getgid()
             if (orig_uid, orig_gid) != (uid, gid):
-                # For multi-user systems, this is the expected path.  But for those
-                # who run the multi-user setup as a non-privileged user, there is
-                # no need to change the user: they're already executing _as that
-                # uid_!
+                # For template-only uses, there is no need to change the user.  But
+                # for administrative installs, this is the expected path -- become the
+                # identity-mapped user before doing anything else.
 
                 with self.do_host_auth(uname):
                     log.debug("Setting process group for %s to %s", pid, gid)

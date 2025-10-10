@@ -26,6 +26,7 @@ from globus_compute_endpoint.endpoint.config import (
 from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.utils import (
+    is_privileged,
     send_endpoint_startup_failure_to_amqp,
     user_input_select,
 )
@@ -39,7 +40,14 @@ from globus_compute_sdk.sdk.utils.gare import gare_handler
 from globus_sdk import MISSING, AuthClient, GlobusAPIError, MissingType
 
 try:
-    from globus_compute_endpoint.endpoint.endpoint_manager import EndpointManager
+    from globus_compute_endpoint.endpoint.endpoint_manager import (
+        EndpointManager,
+        _import_pam,
+        _import_pyprctl,
+    )
+
+    _import_pyprctl()
+    _import_pam()
 except ImportError as _e:
     _has_multi_user = False
     if "--debug" in sys.argv and sys.stderr.isatty():
@@ -285,9 +293,14 @@ def version_command():
 @click.option("--endpoint-config", default=None, help="a template config to use")
 @click.option(
     "--multi-user",
-    is_flag=True,
-    default=False,
-    help="Configure endpoint as multi-user capable",
+    type=click.BOOL,
+    is_flag=False,
+    default=None,
+    help=(
+        "If true, configure endpoint with multi-user support; if false, configure"
+        " without multi-user support.  If not set (the default), choose multi-user"
+        " support based on configuring user's POSIX capability set."
+    ),
 )
 @click.option(
     "--high-assurance",
@@ -363,7 +376,7 @@ def configure_endpoint(
     *,
     name: str,
     endpoint_config: str | None,
-    multi_user: bool,
+    multi_user: bool | None,
     high_assurance: bool,
     display_name: str | None,
     auth_policy: str | None,
@@ -381,13 +394,18 @@ def configure_endpoint(
     Drops a config.yaml template into the Globus Compute configs directory.
     The template usually goes to ~/.globus_compute/<ENDPOINT_NAME>/config.yaml
     """
+    if not _has_multi_user:
+        raise ClickException(
+            "Unable to configure new endpoints; Manager Endpoint Processes are not"
+            " supported on this system"
+        )
+
     try:
         Endpoint.validate_endpoint_name(name)
     except ValueError as e:
         raise ClickException(str(e))
 
-    if multi_user and not _has_multi_user:
-        raise ClickException("multi-user endpoints are not supported on this system")
+    id_mapping = is_privileged() if multi_user is None else multi_user
 
     create_policy = (
         auth_policy_project_id is not None
@@ -446,7 +464,7 @@ def configure_endpoint(
     Endpoint.configure_endpoint(
         ep_dir,
         endpoint_config,
-        multi_user,
+        id_mapping,
         high_assurance,
         display_name,
         auth_policy,
@@ -732,6 +750,12 @@ def _do_start_endpoint(
             epm.start()
         else:
             assert isinstance(ep_config, UserEndpointConfig)
+
+            print(
+                "This endpoint is not template capable. To add that capability, run:"
+                f"\n\n\t$ globus-compute-endpoint migrate-to-template-capable {ep_dir.name}\n"  # noqa: E501
+            )
+
             if die_with_parent:
                 # The endpoint cannot die with its parent if it doesn't have one :)
                 ep_config.detach_endpoint = False
@@ -1005,6 +1029,34 @@ def enable_on_boot_cmd(ep_dir: pathlib.Path):
 @name_or_uuid_arg
 def disable_on_boot_cmd(ep_dir: pathlib.Path):
     disable_on_boot(ep_dir)
+
+
+@app.command(
+    "migrate-to-template-capable",
+    help="Add configuration templating to an existing endpoint",
+)
+@click.option(
+    "--yes",
+    is_flag=True,
+    default=False,
+    help="Do not ask for confirmation to migrate the endpoint.",
+)
+@name_or_uuid_arg
+def migrate_to_template_capable(ep_dir: pathlib.Path, yes: bool):
+    """Migrate an endpoint to be template capable"""
+    if not yes:
+        click.confirm(
+            f"> Are you sure you want to migrate endpoint '{ep_dir.name}' to be"
+            " template capable? This is a one-way operation.",
+            abort=True,
+        )
+
+    try:
+        Endpoint.migrate_to_template_capable(ep_dir)
+    except Exception as e:
+        raise ClickException(f"Failed to migrate endpoint: {e}")
+    else:
+        log.info(f"Endpoint {ep_dir.name} successfully migrated to template capable.")
 
 
 def cli_run():

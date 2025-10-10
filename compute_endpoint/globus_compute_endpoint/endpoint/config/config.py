@@ -15,7 +15,6 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_uuid,
 )
 
-from ..utils import is_privileged
 from .pam import PamConfiguration
 
 MINIMUM_HEARTBEAT: float = 5.0
@@ -24,9 +23,6 @@ log = logging.getLogger(__name__)
 
 class BaseConfig:
     """
-    :param multi_user: If true, the endpoint will spawn child endpoint processes based
-        upon a configuration template.
-
     :param display_name: The display name for the endpoint.  If ``None``, defaults to
         the endpoint name (i.e., the directory name in ``~/.globus_compute/``)
 
@@ -61,12 +57,15 @@ class BaseConfig:
     :param admins: A list of Globus Auth identity IDs that have administrative access
         to the endpoint, in addition to the owner. This field requires an active
         Globus subscription (i.e., ``subscription_id``).
+
+    :param multi_user: DEPRECATED - previously, this controlled whether an endpoint
+        would instantiate child endpoint processes.  The ``engine`` field is now used
+        for this purpose.
     """
 
     def __init__(
         self,
         *,
-        multi_user: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
         allowed_functions: t.Iterable[UUID_LIKE_T] | None = None,
@@ -78,11 +77,11 @@ class BaseConfig:
         local_compute_services: bool = False,
         debug: bool = False,
         admins: t.Iterable[UUID_LIKE_T] | None = None,
+        multi_user: bool | None = None,
     ):
         # Misc
         self.display_name = display_name
         self.debug = debug is True
-        self.multi_user = multi_user is True
         self.high_assurance = high_assurance is True
 
         # Connection info and tuning
@@ -100,15 +99,31 @@ class BaseConfig:
         # Used to store the raw content of the YAML or Python config file
         self.source_content: str | None = None
 
+        if multi_user is not None:
+            warnings.warn(
+                "`multi_user` is deprecated and will be removed in a future release."
+                " If you want this endpoint to spawn child processes, ensure there is"
+                " no `engine` field in its config.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
     def __repr__(self) -> str:
+        deprecated = {
+            # remove after Aug 2025
+            "executors",
+            # remove after Apr 2026
+            "multi_user",
+            # remove after Apr 2026
+            "force_mu_allow_same_user",
+        }
+
         kwds: dict[str, t.Any] = {}
         for cls in type(self).__mro__:
             fargspec = inspect.getfullargspec(cls.__init__)  # type: ignore[misc]
             kwdefs = fargspec.kwonlydefaults
             for kw in fargspec.kwonlyargs:
-                if kw == "executors":
-                    # special case; remove when deprecation complete and removed
-                    # circa Aug, 2025 (but no rush)
+                if kw in deprecated:
                     continue
                 curval = getattr(self, kw)
                 if kwdefs and curval != kwdefs.get(kw):
@@ -260,7 +275,6 @@ class UserEndpointConfig(BaseConfig):
         stderr: str = "./endpoint.log",
         **kwargs,
     ) -> None:
-        kwargs["multi_user"] = False
         super().__init__(**kwargs)
 
         if executors and engine:
@@ -340,16 +354,26 @@ class ManagerEndpointConfig(BaseConfig):
     """Holds the configuration items for an endpoint manager.
 
     Typically, one does not instantiate this configuration directly, but specifies
-    the relevant options in the endpoint's ``config.yaml`` file.  For example, to
-    specify an endpoint as multi-user (this class) the YAML config might be just 1
-    line:
+    the relevant options in the endpoint's ``config.yaml`` file.  In fact, the way that
+    Compute internally determines which ``*EndpointConfig`` class is instantiated is
+    whether there is an ``engine`` block in its ``config.yaml`` file:
 
     .. code-block:: yaml
-       :caption: ``config.yaml``
+       :caption: ``config.yaml`` for Managers
 
-       multi_user: true
+       # this file left empty; with no engine block, Compute interprets this
+       # as a manager endpoint
 
-    Note that for multi-user endpoints that will not be run with privileges, identity
+    .. code-block:: yaml
+       :caption: ``config.yaml`` for task-processing endpoints (i.e., non-Managers)
+
+       engine:
+         ...
+
+       # with an engine block, Compute will instantiate a task-processing endpoint
+       # (i.e., a user-endpoint process, or UEP)
+
+    Note that for manager endpoints that will not be run with privileges, identity
     mapping is disabled (hence not specified above).  Conversely, if the process will
     have elevated privileges (e.g., run by ``root`` user or has |setuid(2)|_
     privileges) then identity mapping is required:
@@ -358,14 +382,13 @@ class ManagerEndpointConfig(BaseConfig):
        :caption: ``config.yaml`` (for a ``root``-owned process)
 
        display_name: Debug queue, 1-block max
-       multi_user: true
        identity_mapping_config_path: /path/to/this/idmap_conf.json
 
     Please see the |BaseConfig| class for a list of options that both
     |ManagerEndpointConfig| and |UserEndpointConfig| classes share.
 
-    :param public: Whether all users can discover the multi-user endpoint via the
-        `Globus Compute web user interface <https://app.globus.org/compute>`_ and API.
+    :param public: Whether all users can discover this endpoint via the `Globus
+        Compute web user interface <https://app.globus.org/compute>`_ and API.
 
         .. warning::
 
@@ -407,15 +430,13 @@ class ManagerEndpointConfig(BaseConfig):
         user-endpoint shuts down, the endpoint manager will hold on to the most recent
         start request for the user-endpoint for this grace period.
 
-    :param force_mu_allow_same_user:  If set, override the heuristic that determines
-        whether the UID running the multi-user endpoint may also run single-user
-        endpoints.
+    :param force_mu_allow_same_user:  DEPRECATED - previously, this overrode the
+        heuristic that determined whether the UID running a manager endpoint could
+        also run single-user endpoints.
 
-        Normally, the multi-user endpoint disallows starting single-user endpoints with
-        the same UID as the parent process unless the UID has no privileges.  In other
-        words, ``root`` may not process tasks.  This flag is for those niche setups that
-        require the ``root`` user to process tasks.  Be very careful if setting this
-        flag.
+        Now, template capable endpoints run as the same user by default, unless an
+        identity mapping file is supplied. Note that privileged UIDs are still not
+        allowed to map to themselves.
 
     .. |BaseConfig| replace:: :class:`BaseConfig <globus_compute_endpoint.endpoint.config.config.BaseConfig>`
     .. |ManagerEndpointConfig| replace:: :class:`ManagerEndpointConfig <globus_compute_endpoint.endpoint.config.config.ManagerEndpointConfig>`
@@ -435,16 +456,14 @@ class ManagerEndpointConfig(BaseConfig):
         identity_mapping_config_path: os.PathLike | str | None = None,
         audit_log_path: os.PathLike | str | None = None,
         pam: PamConfiguration | None = None,
-        force_mu_allow_same_user: bool = False,
         mu_child_ep_grace_period_s: float = 30.0,
+        force_mu_allow_same_user: bool | None = None,
         **kwargs,
     ):
-        kwargs["multi_user"] = True
         super().__init__(**kwargs)
         self.public = public is True
 
         # Identity mapping
-        self.force_mu_allow_same_user = force_mu_allow_same_user is True
         self.mu_child_ep_grace_period_s = mu_child_ep_grace_period_s
 
         _tmp = user_config_template_path  # work with both mypy and flake8
@@ -460,6 +479,16 @@ class ManagerEndpointConfig(BaseConfig):
         self.audit_log_path = _tmp  # type: ignore[assignment]
 
         self.pam = pam or PamConfiguration(enable=False)
+
+        if force_mu_allow_same_user is not None:
+            warnings.warn(
+                "`force_mu_allow_same_user` is deprecated and will be removed in a"
+                " future release. Template-capable endpoints run as the same user by"
+                " default, unless an identity mapping file is supplied. Note that"
+                " privileged UIDs are still not allowed to map to themselves.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     @property
     def user_config_template_path(self) -> pathlib.Path | None:
@@ -483,24 +512,13 @@ class ManagerEndpointConfig(BaseConfig):
 
     @identity_mapping_config_path.setter
     def identity_mapping_config_path(self, val: os.PathLike | str | None):
-        self._identity_mapping_config_path: pathlib.Path | None
-        if is_privileged():
-            if not val:
-                raise ValueError(
-                    "Identity mapping required.  (Hint: identity_mapping_config_path)"
-                )
-
-            _p = pathlib.Path(val)
-            if not _p.exists():
-                raise ValueError(f"Identity mapping config path not found ({_p})")
-            self._identity_mapping_config_path = _p
-        else:
-            self._identity_mapping_config_path = None
-            if val:
-                log.warning(
-                    "Identity mapping specified, but process is not privileged;"
-                    " ignoring identity mapping configuration."
-                )
+        self._identity_mapping_config_path: pathlib.Path | None = None
+        if not val:
+            return
+        _p = pathlib.Path(val)
+        if not _p.exists():
+            raise ValueError(f"Identity mapping config path not found ({_p})")
+        self._identity_mapping_config_path = _p
 
     @property
     def audit_log_path(self) -> pathlib.Path | None:
