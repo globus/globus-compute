@@ -72,6 +72,7 @@ def mock_general_reports(mocker, mock_gc_home, mock_endpoint_config_dir_data):
         [
             "whoami",
             "uname -a",
+            f"du -sh {home_dir}/*",
             cat(
                 [
                     f"{home_dir}/*/*.yaml",
@@ -84,6 +85,7 @@ def mock_general_reports(mocker, mock_gc_home, mock_endpoint_config_dir_data):
         [
             ["whoami", getpass.getuser()],
             ["uname", platform.uname()[0]],
+            [["du", "-sh", ""], ""],
             [["cat", "/config.yaml", "/endpoint.log"], ""],
         ],
     ]
