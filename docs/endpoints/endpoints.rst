@@ -710,7 +710,7 @@ template, which accepts a list of fully-qualified import paths to
    engine:
       type: GlobusComputeEngine
       allowed_serializers:
-         - globus_compute_sdk.serialize.CombinedCode
+         - globus_compute_sdk.serialize.PureSourceTextInspect
          - globus_compute_sdk.serialize.JSONData
       ...
 
