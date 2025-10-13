@@ -7,10 +7,8 @@ package (DEB and RPM).
 Operating System Support
 ========================
 
-Currently, the Globus Compute Endpoint is only supported on Linux.  While some
-have reported success running Compute endpoints on macOS, we do not currently
-support it.  If running on a non-Linux host OS is necessary, consider doing so
-in a container running Linux.
+Currently, the Globus Compute Endpoint is only supported on Linux. If running on
+a non-Linux host OS is necessary, consider doing so in a container running Linux.
 
 .. note::
 
@@ -34,7 +32,7 @@ library isolation|_:
 
 .. code-block:: console
 
-   $ python3 -m pipx install globus-compute-endpoint
+   $ python3 -m pipx install --include-deps globus-compute-endpoint
 
 
 .. _repo-based-installation:
