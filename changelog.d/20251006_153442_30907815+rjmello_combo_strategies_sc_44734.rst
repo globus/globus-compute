@@ -25,10 +25,3 @@ Deprecated
   - :class:`~globus_compute_sdk.serialize.CombinedCode` - Replaced by
     :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, which does not include
     the deprecated strategies above.
-
-Changed
-^^^^^^^
-
-- Changed the default code serialization strategy to
-  :class:`~globus_compute_sdk.serialize.AllCodeStrategies` and the default data
-  serialization strategy to :class:`~globus_compute_sdk.serialize.AllDataStrategies`.
