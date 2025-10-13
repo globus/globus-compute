@@ -81,13 +81,13 @@ SERDE_TASK_EXECUTION_FAILED_HELP_MESSAGE = """
 
 This appears to be an error with serialization. If it is, using a different
 serialization strategy from globus_compute_sdk.serialize might resolve the issue. For
-example, to use globus_compute_sdk.serialize.CombinedCode:
+example, to use globus_compute_sdk.serialize.AllCodeStrategies:
 
   from globus_compute_sdk import Executor
-  from globus_compute_sdk.serialize import ComputeSerializer, CombinedCode
+  from globus_compute_sdk.serialize import ComputeSerializer, AllCodeStrategies
 
   with Executor('<your-endpoint-id>') as gcx:
-    gcx.serializer = ComputeSerializer(strategy_code=CombinedCode())
+    gcx.serializer = ComputeSerializer(strategy_code=AllCodeStrategies())
 
 For more information, see:
     https://globus-compute.readthedocs.io/en/latest/sdk.html#specifying-a-serialization-strategy
