@@ -20,6 +20,7 @@ from globus_compute_sdk.serialize.concretes import (
     DEFAULT_STRATEGY_DATA,
     SELECTABLE_STRATEGIES,
 )
+from globus_compute_sdk.serialize.utils import pack_buffers, unpack_buffers
 
 if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
@@ -249,12 +250,7 @@ class ComputeSerializer:
 
         :param buffers: A list of serialized buffers, as produced by :func:`serialize`.
         """
-        packed = ""
-        for buf in buffers:
-            s_length = str(len(buf)) + "\n"
-            packed += s_length + buf
-
-        return packed
+        return pack_buffers(buffers)
 
     @staticmethod
     def unpack_buffers(packed_buffer: str) -> list[str]:
@@ -265,14 +261,7 @@ class ComputeSerializer:
         :param packed_buffer: A packed buffer string as produced by
             :func:`pack_buffers`.
         """
-        unpacked = []
-        while packed_buffer:
-            s_length, buf = packed_buffer.split("\n", 1)
-            i_length = int(s_length)
-            current, packed_buffer = buf[:i_length], buf[i_length:]
-            unpacked.extend([current])
-
-        return unpacked
+        return unpack_buffers(packed_buffer)
 
     def unpack_and_deserialize(self, packed_buffer: str) -> list[t.Any]:
         """

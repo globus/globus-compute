@@ -56,17 +56,11 @@ class JSONData(SerializationStrategy):
     def serialize(self, data: t.Any) -> str:
         ":meta private:"
         dumped = json.dumps(data)
-        encoded = codecs.encode(dumped.encode(), "base64").decode()
-        return self.identifier + encoded
+        return self.identifier + dumped
 
     def deserialize(self, payload: str) -> t.Any:
         ":meta private:"
         chomped = self.chomp(payload)
-        try:
-            chomped = codecs.decode(chomped.encode(), "base64").decode()
-        except Exception:
-            # Older versions do not use bas64 encoding
-            pass
         data = json.loads(chomped)
         return data
 
