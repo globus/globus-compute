@@ -3,6 +3,18 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-3.16.1:
+
+globus-compute-sdk & globus-compute-endpoint v3.16.1
+----------------------------------------------------
+
+Bug Fixes
+^^^^^^^^^
+
+- Reverted changes to multiple serialization strategies that caused backward compatibility
+  issues with endpoints running versions prior to `3.16.0
+  <https://github.com/globus/globus-compute/releases/tag/3.16.0>`_.
+
 .. _changelog-3.16.0:
 
 globus-compute-sdk & globus-compute-endpoint v3.16.0
