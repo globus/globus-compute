@@ -1,6 +1,4 @@
-import base64
 import inspect
-import json
 import random
 import sys
 import typing as t
@@ -26,6 +24,7 @@ from globus_compute_sdk.serialize.facade import (
     ValidatedStrategylike,
     validate_strategylike,
 )
+from globus_compute_sdk.serialize.utils import pack_buffers, unpack_buffers
 from pytest_mock import MockerFixture
 
 if sys.version_info < (3, 11):
@@ -156,22 +155,6 @@ def test_json_data():
     serialized = strategy.serialize(data)
     deserialized = strategy.deserialize(serialized)
     assert deserialized == data
-
-
-def test_json_data_handles_legacy_serialization():
-    strategy = concretes.JSONData()
-    data = {"foo": "bar"}
-
-    # Before SDK version 4.0.0, the JSONData strategy did not encode
-    # the data with base64
-    legacy_serialized = concretes.JSONData.identifier + json.dumps(data)
-    legacy_deserialized = strategy.deserialize(legacy_serialized)
-
-    strategy = concretes.JSONData()
-    serialized = strategy.serialize(data)
-    deserialized = strategy.deserialize(serialized)
-
-    assert deserialized == legacy_deserialized
 
 
 def test_pickle_deserialize():
@@ -451,8 +434,8 @@ def test_all_code_strategies():
     serialized = all_code.serialize(foo)
 
     chomped = all_code.chomp(serialized)
-    chunks = chomped.split(all_code._separator)
-    assert len(chunks) == len(all_code.strategies)
+    buffers = unpack_buffers(chomped)
+    assert len(buffers) == len(all_code.strategies)
 
     func = all_code.deserialize(serialized)
 
@@ -482,25 +465,14 @@ def test_all_code_strategies_individually(
     assert func(n1, n2) == foo(n1, n2)
 
 
-@pytest.mark.parametrize(
-    "sub_strategy_cls", list(concretes.AllCodeStrategies.strategies)
-)
-def test_all_code_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
-    sub_strategy = sub_strategy_cls()
-    serialized = sub_strategy.serialize(foo)
-    chomped = sub_strategy.chomp(serialized)
-    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
-    base64.b64decode(cleaned, validate=True)
-
-
 def test_all_data_strategies():
     d1 = "data"
     all_data = concretes.AllDataStrategies()
     serialized = all_data.serialize(d1)
 
     chomped = all_data.chomp(serialized)
-    chunks = chomped.split(all_data._separator)
-    assert len(chunks) == len(all_data.strategies)
+    buffers = unpack_buffers(chomped)
+    assert len(buffers) == len(all_data.strategies)
 
     d2 = all_data.deserialize(serialized)
 
@@ -525,17 +497,6 @@ def test_all_data_strategies_individually(
     d2 = all_data.deserialize(serialized)
 
     assert d1 == d2
-
-
-@pytest.mark.parametrize(
-    "sub_strategy_cls", list(concretes.AllDataStrategies.strategies)
-)
-def test_all_data_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
-    sub_strategy = sub_strategy_cls()
-    serialized = sub_strategy.serialize("data")
-    chomped = sub_strategy.chomp(serialized)
-    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
-    base64.b64decode(cleaned, validate=True)
 
 
 @pytest.mark.parametrize(
@@ -1115,3 +1076,68 @@ def test_serialize_from_list_enforces_for_code(data, strategies):
         exp_msg = "is a code serialization strategy, expected a data strategy"
 
     assert all(exp_msg in str(e) for e in excgroup.exceptions)
+
+
+@pytest.mark.parametrize(
+    "buffers,expected",
+    [
+        ([], ""),
+        (["hello"], "5\nhello"),
+        (["hello", "world"], "5\nhello5\nworld"),
+        ([""], "0\n"),
+        (["hello\nworld"], "11\nhello\nworld"),
+        (["5\nhello"], "7\n5\nhello"),  # buffer that looks like format
+    ],
+)
+def test_pack_buffers(buffers: str, expected: str):
+    """Test pack_buffers with various inputs."""
+    assert pack_buffers(buffers) == expected
+
+
+@pytest.mark.parametrize(
+    "packed,expected",
+    [
+        ("", []),
+        ("5\nhello", ["hello"]),
+        ("5\nhello5\nworld", ["hello", "world"]),
+        ("0\n", [""]),
+        ("11\nhello\nworld", ["hello\nworld"]),
+        ("7\n5\nhello", ["5\nhello"]),
+    ],
+)
+def test_unpack_buffers(packed: str, expected: list[str]):
+    """Test unpack_buffers with various inputs."""
+    assert unpack_buffers(packed) == expected
+
+
+@pytest.mark.parametrize(
+    "packed,error_msg",
+    [
+        ("5", "Missing newline delimiter"),
+        ("abc\nhello", "Invalid length delimiter"),
+        ("-1\nhello", "Length delimiter must be non-negative"),
+        ("10\nhello", "Truncated buffer"),
+    ],
+)
+def test_unpack_buffers_errors(packed: str, error_msg: str):
+    """Test unpack_buffers raises appropriate errors."""
+    with pytest.raises(ValueError, match=error_msg):
+        unpack_buffers(packed)
+
+
+@pytest.mark.parametrize(
+    "buffers",
+    [
+        [],
+        ["hello"],
+        ["hello", "world"],
+        ["", "nonempty", ""],
+        ["hello\nworld"],
+        ["5\nhello", "looks\nlike\nformat"],
+    ],
+)
+def test_pack_unpack_round_trip(buffers: list[str]):
+    """Test that unpack(pack(x)) == x."""
+    packed = pack_buffers(buffers)
+    unpacked = unpack_buffers(packed)
+    assert unpacked == buffers
