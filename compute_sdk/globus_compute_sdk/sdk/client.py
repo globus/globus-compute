@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import codecs
 import functools
 import json
 import logging
@@ -921,8 +920,7 @@ class Client:
         # Simulate PureSourceTextInspect strategy
         serde_iden = PureSourceTextInspect.identifier
         serde_sep = PureSourceTextInspect._separator
-        source_data = f"{function_name}{serde_sep}{source}"
-        serialized = serde_iden + codecs.encode(source_data.encode(), "base64").decode()
+        serialized = f"{serde_iden}{function_name}{serde_sep}{source}"
         packed = ComputeSerializer.pack_buffers([serialized])
 
         if metadata:
