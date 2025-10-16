@@ -1,3 +1,4 @@
+import resource
 import sys
 import uuid
 from collections import namedtuple
@@ -7,6 +8,7 @@ import pika
 import pytest
 from globus_compute_endpoint.endpoint.utils import (
     _redact_url_creds,
+    close_all_fds,
     is_privileged,
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
@@ -152,3 +154,28 @@ def test_cmd_send_failure_publishes_message(mock_mq_chan, randomstring, err_msg)
 
     assert uep_uuid.encode() in k["body"]
     assert err_msg.encode() in k["body"]
+
+
+@pytest.mark.parametrize("preserve", ((15, 16), (3, 5, 6, 11), ()))
+def test_all_files_closed(preserve):
+    _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+    with mock.patch(f"{_MOCK_BASE}_os.closerange") as mock_call:
+        close_all_fds(preserve)
+
+    not_closed_fds = set()
+    closed_ranges = set()
+    closed_lows = set()
+    closed_highs = set()
+    for (low, high), _ in mock_call.call_args_list:
+        closed_lows.add(low)
+        closed_highs.add(high)
+        closed_ranges.add(range(low, high))
+        not_closed_fds.add(high)
+
+    for fd in preserve:
+        for closed_range in closed_ranges:
+            assert fd not in closed_range
+
+    assert any(0 in r for r in closed_ranges), "Expect all but preserved closed"
+    assert any(hard_no in r for r in closed_ranges), "Expect all but preserved closed"

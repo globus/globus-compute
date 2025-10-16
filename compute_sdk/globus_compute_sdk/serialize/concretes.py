@@ -10,7 +10,10 @@ from collections import OrderedDict
 
 import dill
 from globus_compute_sdk.errors import DeserializationError, SerializationError
-from globus_compute_sdk.serialize.base import SerializationStrategy
+from globus_compute_sdk.serialize.base import (
+    ComboSerializationStrategy,
+    SerializationStrategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +55,18 @@ class JSONData(SerializationStrategy):
 
     def serialize(self, data: t.Any) -> str:
         ":meta private:"
-        return self.identifier + json.dumps(data)
+        dumped = json.dumps(data)
+        encoded = codecs.encode(dumped.encode(), "base64").decode()
+        return self.identifier + encoded
 
     def deserialize(self, payload: str) -> t.Any:
         ":meta private:"
         chomped = self.chomp(payload)
+        try:
+            chomped = codecs.decode(chomped.encode(), "base64").decode()
+        except Exception:
+            # Older versions do not use bas64 encoding
+            pass
         data = json.loads(chomped)
         return data
 
@@ -65,6 +75,10 @@ class DillCodeSource(SerializationStrategy):
     """
     Extracts a function's body via |dill.getsource|_, serializes it
     with |dill.dumps|_, then encodes it via base 64.
+
+    .. warning::
+
+       Deprecated since version ``4.0.0``; use :class:`PureSourceDill` instead.
 
     .. list-table:: Supports
         :header-rows: 1
@@ -106,6 +120,10 @@ class DillCodeTextInspect(SerializationStrategy):
     """
     Extracts a function's body via :func:`inspect.getsource`, serializes it
     with |dill.dumps|_, then encodes it via base 64.
+
+    .. warning::
+
+       Deprecated since version ``4.0.0``; use :class:`PureSourceTextInspect` instead.
 
     .. list-table:: Supports
         :header-rows: 1
@@ -301,6 +319,10 @@ class CombinedCode(SerializationStrategy):
     payload. Intended for maximum compatibility, but is slower than using a single
     strategy and generates larger payloads.
 
+    .. warning::
+
+       Deprecated since version ``4.0.0``; use :class:`AllCodeStrategies` instead.
+
     .. list-table:: Supports
         :header-rows: 1
         :align: center
@@ -395,6 +417,56 @@ class CombinedCode(SerializationStrategy):
         raise DeserializationError(f"Deserialization failed after {count} tries")
 
 
+class AllCodeStrategies(ComboSerializationStrategy):
+    """Attempts to serialize the function using each of the other code strategies:
+
+    - :class:`PureSourceTextInspect`
+    - :class:`PureSourceDill`
+    - :class:`DillCode`
+
+    The serialized results from each sub-strategy are combined into a single payload.
+    When deserializing, it will try each sub-strategy in order until one succeeds.
+
+    Use this strategy when maximum compatibility is needed across different Python
+    environments, and when payload size and serialization time are not critical.
+
+    .. list-table:: Supports
+        :header-rows: 1
+        :align: center
+
+        * - Functions defined in Python interpreter
+          - Code from notebooks
+          - Interop between mismatched Python versions
+          - Decorated functions
+        * - ✅
+          - ✅
+          - ⚠️
+          - ✅
+    """
+
+    identifier = "12\n"  #:
+    for_code = True  #:
+    strategies = [PureSourceTextInspect, PureSourceDill, DillCode]
+
+
+class AllDataStrategies(ComboSerializationStrategy):
+    """Attempts to serialize Python data using each of the other data strategies:
+
+    - :class:`JSONData`
+    - :class:`DillDataBase64`
+
+    The serialized results from each sub-strategy are combined into a single payload.
+    When deserializing, it will try each sub-strategy in order until one succeeds.
+
+    Use this strategy when maximum compatibility is needed across different Python
+    environments, and when payload size and serialization time are not critical.
+    """
+
+    identifier = "13\n"  #:
+    for_code = False  #:
+    strategies = [JSONData, DillDataBase64]
+
+
 SELECTABLE_STRATEGIES = [
     t.__class__
     for t in SerializationStrategy._CACHE.values()
@@ -403,7 +475,7 @@ SELECTABLE_STRATEGIES = [
 
 #: The *code* serialization strategy used by :class:`ComputeSerializer`
 #: when one is not specified.
-DEFAULT_STRATEGY_CODE = SerializationStrategy.get_cached_by_class(DillCode)
+DEFAULT_STRATEGY_CODE = SerializationStrategy.get_cached_by_class(AllCodeStrategies)
 #: The *data* serialization strategy used by :class:`ComputeSerializer`
 #: when one is not specified.
-DEFAULT_STRATEGY_DATA = SerializationStrategy.get_cached_by_class(DillDataBase64)
+DEFAULT_STRATEGY_DATA = SerializationStrategy.get_cached_by_class(AllDataStrategies)

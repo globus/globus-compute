@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import gc
 import io
 import json
 import logging
@@ -25,7 +26,6 @@ from contextlib import contextmanager
 from datetime import datetime
 from http import HTTPStatus
 
-import globus_compute_sdk as GC
 import setproctitle
 import yaml
 from cachetools import TTLCache
@@ -53,11 +53,14 @@ from globus_compute_endpoint.endpoint.rabbit_mq import (
 )
 from globus_compute_endpoint.endpoint.utils import (
     _redact_url_creds,
+    close_all_fds,
     is_privileged,
     send_endpoint_startup_failure_to_amqp,
     update_url_port,
 )
+from globus_compute_sdk import Client
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
+from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_sdk import GlobusAPIError, NetworkError
 
 if t.TYPE_CHECKING:
@@ -177,23 +180,10 @@ class EndpointManager:
         privileged = is_privileged(self._mu_user)
 
         self._allow_same_user = not privileged
-        if config.force_mu_allow_same_user:
-            self._allow_same_user = True
-            _warn_str = privileged and "privileged process" or "unprivileged process"
-            msg = (
-                "Configuration item `force_mu_allow_same_user` set to `true`; this is"
-                " considered a very dangerous override -- please use with care,"
-                " especially if allowing this endpoint to be utilized by multiple"
-                " users."
-                f"\n  Endpoint (UID, GID): ({os.getuid()}, {os.getgid()}) {_warn_str}"
-            )
-            log.warning(msg)
-            if sys.stderr.isatty():
-                print(f"\033[31;1;40m{msg}\033[0m")  # Red bold on black
 
         if not reg_info:
             try:
-                gcc = GC.Client(
+                gcc = Client(
                     local_compute_services=config.local_compute_services,
                     environment=config.environment,
                     app=get_globus_app_with_scopes(),
@@ -233,7 +223,7 @@ class EndpointManager:
                     sys.exit(os.EX_DATAERR)
                 raise
             except NetworkError as e:
-                log.exception("Network error while registering multi-user endpoint")
+                log.exception("Network error while registering manager endpoint")
                 log.critical(f"Network failure; unable to register endpoint: {e}")
                 sys.exit(os.EX_TEMPFAIL)
 
@@ -264,16 +254,7 @@ class EndpointManager:
                     f"\n    (ignored) '{config.identity_mapping_config_path}'"
                 )
                 log.warning(msg)
-        else:
-            if not config.identity_mapping_config_path:
-                msg = (
-                    "No identity mapping file specified; please specify"
-                    " identity_mapping_config_path"
-                )
-                log.error(msg)
-                print(msg, file=sys.stderr)
-                sys.exit(os.EX_OSFILE)
-
+        elif config.identity_mapping_config_path:
             # Only map identities if possibility of *changing* uid; otherwise
             # we enforce that the identity of UEPs must match the
             # parent-process' authorization -- we do not want to allow an open
@@ -332,7 +313,7 @@ class EndpointManager:
         json_file.write_text(json.dumps(ep_info))
         log.debug(f"Registration info written to {json_file}")
 
-        # * == "multi-user"; not important until it is, so let it be subtle
+        # * == "manager endpoint"; not important until it is, so let it be subtle
         ptitle = f"Globus Compute Endpoint *({endpoint_uuid}, {conf_dir.name})"
         if config.environment:
             ptitle += f" - {config.environment}"
@@ -620,36 +601,48 @@ class EndpointManager:
 
     def _event_loop(self):
         parent_identities: set[str] = set()
-        if not is_privileged():
-            client_options = {
-                "local_compute_services": self._config.local_compute_services,
-                "environment": self._config.environment,
-                "app": get_globus_app_with_scopes(),
-            }
-            log.debug("Ascertaining user identity set (%s)", client_options)
+        if not (is_privileged() and self.identity_mapper):
 
-            gcc = GC.Client(**client_options)
-            ac = ComputeAuthClient(app=gcc.app)
-            try:
-                userinfo = ac.userinfo()
-                ids = userinfo["identity_set"]
-                parent_identities.update(ident["sub"] for ident in ids)
-                log.debug(
-                    "User-endpoint start requests are valid from identities: %s",
-                    parent_identities,
-                )
-                del gcc, client_options, ids
-                if not parent_identities:
-                    # Not a privileged user -- we require at least one identity
-                    # against which to match start endpoint requests.
-                    raise LookupError("No authorized identities found")
+            def _get_globus_identities():
+                client_options = {
+                    "local_compute_services": self._config.local_compute_services,
+                    "environment": self._config.environment,
+                    "app": get_globus_app_with_scopes(),
+                }
+                log.debug("Ascertaining user identity set (%s)", client_options)
 
-            except Exception as exc:
-                msg = "Failed to determine identity set; try `whoami` command?"
-                log.error(f"({type(exc).__name__}) {exc}\n    {msg}")
-                log.debug("Stopping; failed to determine identities", exc_info=exc)
-                self._time_to_stop = True
-                return
+                gcc = Client(**client_options)
+                ac = ComputeAuthClient(app=gcc.app)
+                idents: set[str] = set()
+                try:
+                    userinfo = ac.userinfo()
+                    ids = userinfo["identity_set"]
+                    idents.update(ident["sub"] for ident in ids)
+                    log.debug(
+                        "User-endpoint start requests are valid from identities: %s",
+                        idents,
+                    )
+                    if not idents:
+                        # Not a privileged user -- we require at least one identity
+                        # against which to match start endpoint requests.
+                        raise LookupError("No authorized identities found")
+
+                except Exception as exc:
+                    msg = "Failed to determine identity set; try `whoami` command?"
+                    log.error(f"({type(exc).__name__}) {exc}\n    {msg}")
+                    log.debug("Stopping; failed to determine identities", exc_info=exc)
+                    self._time_to_stop = True
+
+                return idents
+
+            parent_identities.update(_get_globus_identities())
+            del _get_globus_identities
+
+        # Hopefully avoid apparent __del__-time spurious log messages after fork();
+        # urllib3 connectionpool don't like us closing fds ahead of it, but we don't
+        # have an avenue to tell it explicitly let go of them.  So, have Python do it
+        # via the collector.
+        gc.collect()
 
         last_heartbeat = 0.0
         valid_method_name_re = re.compile(r"^cmd_[A-Za-z][0-9A-Za-z_]{0,99}$")
@@ -1014,15 +1007,17 @@ class EndpointManager:
         udir, uid, gid = user_record.pw_dir, user_record.pw_uid, user_record.pw_gid
         uname = user_record.pw_name
 
-        if not self._allow_same_user:
+        if self.identity_mapper and not self._allow_same_user:
             p_uname = self._mu_user.pw_name
             if uname == p_uname or uid == os.getuid():
                 raise InvalidUserError(
-                    "Requested UID is same as multi-user UID, but configuration"
-                    " has not been marked to allow the multi-user UID to process"
-                    " tasks.  To allow the multi-user UID to also run single-user"
-                    " endpoints, consider using a non-root user or removing privileges"
-                    " from the UID."
+                    "Requested UID is same as Manager Endpoint UID on a user-mapped"
+                    " Manager Endpoint. To allow the same UID to run tasks, consider:"
+                    "\n * using a non-root user,"
+                    "\n * removing privileges from the UID, or"
+                    "\n * removing the identity mapping configuration file"
+                    f" ({self.identity_mapper.config_path})."
+                    "\n\nDetails:"
                     f"\n  MU Process UID: {self._mu_user.pw_uid} ({p_uname})"
                     f"\n  Requested UID:  {uid} ({uname})"
                     f"\n  Via identity:   {ident.matched_identity}",
@@ -1072,12 +1067,19 @@ class EndpointManager:
 
         # Reminder: from this point on, we are now the *child* process.
         pid = os.getpid()
-        if audit_w:
-            os.close(audit_r)
-        del audit_r
+
+        os.environ.clear()
+        env = os.environ  # shorthand going forward
 
         exit_code = 70
         try:
+            # only keep the stdio streams and audit.  We perform this operation
+            # just before exec() as well, but no sense in keeping any parent fds
+            # open for longer than necessary.
+            close_all_fds(preserve_fds=[0, 1, 2, audit_w])
+
+            os.chdir("/")  # always succeeds, so start from known place
+
             # in the child process; no need to load this in MUEP space
             import shutil
             from multiprocessing.process import current_process
@@ -1100,7 +1102,7 @@ class EndpointManager:
 
             pybindir = pathlib.Path(sys.executable).parent
             default_path = ("/usr/local/bin", "/usr/bin", "/bin", pybindir)
-            env: dict[str, str] = {"PATH": ":".join(map(str, default_path))}
+            env.update({"PATH": ":".join(map(str, default_path))})
             env_path = self.conf_dir / "user_environment.yaml"
             try:
                 log.debug("Load default environment variables from: %s", env_path)
@@ -1132,8 +1134,6 @@ class EndpointManager:
                     e,
                 )
             user_home = {"HOME": udir, "USER": uname}
-            env.update(user_home)
-            os.environ.update(user_home)
 
             if not os.path.isdir(udir):
                 udir = "/"
@@ -1145,10 +1145,9 @@ class EndpointManager:
 
             orig_uid, orig_gid = os.getuid(), os.getgid()
             if (orig_uid, orig_gid) != (uid, gid):
-                # For multi-user systems, this is the expected path.  But for those
-                # who run the multi-user setup as a non-privileged user, there is
-                # no need to change the user: they're already executing _as that
-                # uid_!
+                # For template-only uses, there is no need to change the user.  But
+                # for administrative installs, this is the expected path -- become the
+                # identity-mapped user before doing anything else.
 
                 with self.do_host_auth(uname):
                     log.debug("Setting process group for %s to %s", pid, gid)
@@ -1182,6 +1181,17 @@ class EndpointManager:
 
                 exit_code += 1
 
+            # Reminder: we are now the UID that will run the UEP.
+            env.update(user_home)
+
+            os.setsid()
+            exit_code += 1
+
+            umask = 0o077  # Let child process set less restrictive, if desired
+            log.debug("Setting process umask for %s to 0o%04o (%s)", pid, umask, uname)
+            os.umask(umask)
+            exit_code += 1
+
             # some Q&D verification for admin debugging purposes
             if not shutil.which(proc_args[0], path=env["PATH"]):
                 log.warning(
@@ -1192,29 +1202,17 @@ class EndpointManager:
                     f"\n  (pid: {pid}, user: {uname}, {ep_name})"
                 )
 
-            os.setsid()
-            exit_code += 1
-
-            umask = 0o077  # Let child process set less restrictive, if desired
-            log.debug("Setting process umask for %s to 0o%04o (%s)", pid, umask, uname)
-            os.umask(umask)
-            exit_code += 1
-
             log.debug("Changing directory to '%s'", wd)
+            env["PWD"] = wd
             os.chdir(wd)
             exit_code += 1
-
-            os.environ["PWD"] = wd
-            os.environ["CWD"] = wd
-            env["PWD"] = wd
-            env["CWD"] = wd
 
             # in case "something gets stuck," let cmdline show it
             args_title = " ".join(proc_args)
             startup_proc_title = f"Endpoint starting up for {uname} [{args_title}]"
             setproctitle.setproctitle(startup_proc_title)
 
-            gc_dir: pathlib.Path = GC.sdk.compute_dir.ensure_compute_dir()
+            gc_dir: pathlib.Path = ensure_compute_dir()
             ep_dir = gc_dir / ep_name
             ep_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
             ep_log = ep_dir / "endpoint.log"
@@ -1327,21 +1325,10 @@ class EndpointManager:
                 # intentional side effect: close handle
                 stdin_pipe.write(stdin_data)
 
+            # all parent process fds are long-since closed; for good measure,
+            # ensure any interim fds are also closed.
             exit_code += 1
-            _soft_no, hard_no = resource.getrlimit(resource.RLIMIT_NOFILE)
-            fd_low = 3
-
-            # Save closerange until last so that we can still get logs written
-            # to the endpoint.log.  Meanwhile, use the exit_code as a
-            # last-ditch attempt at sharing "what went wrong where" to the
-            # parent process.
-            exit_code += 1
-            if fd_low < audit_w:
-                os.closerange(fd_low, audit_w)
-                fd_low = audit_w + 1
-            elif fd_low == audit_w:
-                fd_low += 1
-            os.closerange(fd_low, hard_no)
+            close_all_fds(preserve_fds=[0, 1, 2, audit_w])
 
             exit_code += 1
             os.execvpe(proc_args[0], args=proc_args, env=env)

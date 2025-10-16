@@ -3,6 +3,7 @@ from __future__ import annotations
 import os as _os
 import pwd as _pwd
 import re as _re
+import resource as _resource
 import sys
 import typing as t
 import urllib.parse
@@ -98,6 +99,17 @@ def _redact_url_creds(raw: _T, redact_user=True, repl="***", count=0) -> _T:
     if isinstance(raw, str):
         return _url_user_pass_re.sub(repl=repl, string=raw, count=count)
     return _urlb_user_pass_re.sub(repl=repl.encode(), string=raw, count=count)
+
+
+def close_all_fds(preserve_fds: t.Iterable[int] = ()) -> None:
+    _soft_no, hard_no = _resource.getrlimit(_resource.RLIMIT_NOFILE)
+    fd_low = 0
+
+    for preserve_fd in sorted(preserve_fds):
+        if fd_low < preserve_fd:
+            _os.closerange(fd_low, preserve_fd)
+        fd_low = preserve_fd + 1
+    _os.closerange(fd_low, hard_no + 1)
 
 
 def is_privileged(posix_user=None, user_privs_only=False) -> bool:

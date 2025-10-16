@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import uuid
@@ -143,10 +144,10 @@ def test_shell_function_repr(name, walltime, sout, serr, lines):
     assert f"cmd={cmd!r}" in s
 
 
-def test_shell_function_no_stdfile(run_in_tmp_dir):
+def test_shell_function_no_stdfile(run_in_tmp_dir, monkeypatch):
     """Confirm that stdout/err snippet is reported after successful run"""
 
-    os.environ["GC_TASK_SANDBOX_DIR"] = f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
     bf = ShellFunction("echo 'Hello'")
     bf_result = bf()
 
@@ -158,10 +159,10 @@ def test_shell_function_no_stdfile(run_in_tmp_dir):
     assert "exit code: 0" in str(bf_result)
 
 
-def test_shell_function_with_stdfile(run_in_tmp_dir):
+def test_shell_function_with_stdfile(run_in_tmp_dir, monkeypatch):
     """Confirm that stdout/err snippet to relative stdout and abs err paths"""
 
-    os.environ["GC_TASK_SANDBOX_DIR"] = f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
     bf = ShellFunction(
         "echo 'Hello'", stdout="foo.out", stderr=f"{run_in_tmp_dir}/foo.err"
     )
@@ -176,10 +177,10 @@ def test_shell_function_with_stdfile(run_in_tmp_dir):
     assert os.path.exists(f"{run_in_tmp_dir}/foo.err")
 
 
-def test_repeated_invocation(run_in_tmp_dir):
+def test_repeated_invocation(run_in_tmp_dir, monkeypatch):
     """Confirm that stdout/err snippet is isolated between repeated runs"""
 
-    os.environ["GC_TASK_SANDBOX_DIR"] = f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
     cmd = "pwd; echo 'Hello {target}'; echo 'Bye {target}' 1>&2"
     bf = ShellFunction(cmd)
 
@@ -187,7 +188,9 @@ def test_repeated_invocation(run_in_tmp_dir):
 
     for i in range(1, 3):
         target = f"world_{i}"
-        os.environ["GC_TASK_SANDBOX_DIR"] = f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+        monkeypatch.setenv(
+            "GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+        )
         result = bf(target=target)
 
         assert f"Hello {target}" in result.stdout
@@ -198,9 +201,25 @@ def test_repeated_invocation(run_in_tmp_dir):
         prev = target
 
 
-def test_timeout(run_in_tmp_dir):
+def test_shell_function_return_dict(run_in_tmp_dir, monkeypatch):
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
+
+    output = "Hello"
+    func = ShellFunction(f"echo '{output}'", return_dict=True)
+    res = func()
+
+    assert isinstance(res, dict)
+    assert output in res["stdout"]
+    try:
+        s = json.dumps(res)
+        json.loads(s)
+    except (TypeError, ValueError) as e:
+        pytest.fail(f"Result is not JSON-serializable: {e}")
+
+
+def test_timeout(run_in_tmp_dir, monkeypatch):
     """Test for timeout returning correct returncode"""
-    os.environ["GC_TASK_SANDBOX_DIR"] = f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
     bf = ShellFunction("sleep 5; echo Fail", walltime=0.1)
 
     result_obj = bf()
@@ -209,9 +228,9 @@ def test_timeout(run_in_tmp_dir):
     assert "Fail" not in result_obj.stdout
 
 
-def test_snippet_capture_on_walltime_fail(run_in_tmp_dir):
+def test_snippet_capture_on_walltime_fail(run_in_tmp_dir, monkeypatch):
     """Confirm that stdout/err snippet on walltime fail"""
-    os.environ["GC_TASK_SANDBOX_DIR"] = f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
     cmd = "echo 'Hello'; sleep 5"
     bf = ShellFunction(cmd, walltime=0.1)
 
@@ -222,9 +241,9 @@ def test_snippet_capture_on_walltime_fail(run_in_tmp_dir):
     assert not result.stderr
 
 
-def test_fail(run_in_tmp_dir):
+def test_fail(run_in_tmp_dir, monkeypatch):
     """Confirm failed cmd behavior"""
-    os.environ["GC_TASK_SANDBOX_DIR"] = f"{run_in_tmp_dir}/{str(uuid.uuid4())}"
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", f"{run_in_tmp_dir}/{str(uuid.uuid4())}")
     cmd = "echo 'hi'; cat /non_existent"
     bf = ShellFunction(cmd, walltime=0.1)
 
@@ -236,9 +255,9 @@ def test_fail(run_in_tmp_dir):
     assert "No such file or directory" in result.stderr
 
 
-def test_bad_run_dir():
+def test_bad_run_dir(monkeypatch):
     """Confirm that error on bad sandbox dir"""
-    os.environ["GC_TASK_SANDBOX_DIR"] = "/NONEXISTENT"
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", "/NONEXISTENT")
     bf = ShellFunction("pwd")
 
     with pytest.raises(OSError):
@@ -248,20 +267,17 @@ def test_bad_run_dir():
 def test_sandbox_warning_with_missing_env_vars(run_in_tmp_dir):
     """Confirm that stderr brings back warning of sandboxing
     not working on older EPs"""
-    os.environ.pop("GC_TASK_UUID", None)
-    os.environ.pop("GC_TASK_SANDBOX_DIR", None)
     bf = ShellFunction("pwd")
 
     result = bf()
     assert "WARNING: Task sandboxing will not work" in result.stderr
 
 
-def test_skip_redundant_sandbox(run_in_tmp_dir):
+def test_skip_redundant_sandbox(run_in_tmp_dir, monkeypatch):
     """Confirm that sandbox is not created if executor is set to create sandbox"""
     task_id = str(uuid.uuid4())
-
-    os.environ["GC_TASK_SANDBOX_DIR"] = run_in_tmp_dir.name
-    os.environ["GC_TASK_UUID"] = task_id
+    monkeypatch.setenv("GC_TASK_SANDBOX_DIR", run_in_tmp_dir.name)
+    monkeypatch.setenv("GC_TASK_UUID", task_id)
     bf = ShellFunction("pwd")
 
     result = bf()
@@ -274,8 +290,6 @@ def test_backward_compat(run_in_tmp_dir):
     sandbox or task UUID exported"""
     task_id = str(uuid.uuid4())
 
-    os.environ.pop("GC_TASK_SANDBOX_DIR", None)
-    os.environ.pop("GC_TASK_UUID", None)
     bf = ShellFunction("pwd")
 
     result = bf()
@@ -286,12 +300,10 @@ def test_backward_compat(run_in_tmp_dir):
         assert std_file.split(".")[-1] in ["stdout", "stderr"]
 
 
-def test_stdout_naming(run_in_tmp_dir):
+def test_stdout_naming(run_in_tmp_dir, monkeypatch):
     """Confirm stdout/err paths are prefixed with task_uuid"""
     task_id = str(uuid.uuid4())
-
-    os.environ.pop("GC_TASK_SANDBOX_DIR", None)
-    os.environ["GC_TASK_UUID"] = task_id
+    monkeypatch.setenv("GC_TASK_UUID", task_id)
     bf = ShellFunction("pwd")
 
     result = bf()
@@ -304,12 +316,10 @@ def test_stdout_naming(run_in_tmp_dir):
         assert std_file.split(".")[0] == task_id
 
 
-def test_bad_walltime(run_in_tmp_dir):
+def test_bad_walltime(run_in_tmp_dir, monkeypatch):
     """BashFunction should raise an error on negative walltime"""
     task_id = str(uuid.uuid4())
-
-    os.environ.pop("GC_TASK_SANDBOX_DIR", None)
-    os.environ["GC_TASK_UUID"] = task_id
+    monkeypatch.setenv("GC_TASK_UUID", task_id)
     with pytest.raises(AssertionError):
         ShellFunction("pwd", walltime=-1)
 

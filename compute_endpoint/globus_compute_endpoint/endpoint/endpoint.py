@@ -24,8 +24,12 @@ import texttable
 import yaml
 from globus_compute_endpoint import __version__
 from globus_compute_endpoint.auth import get_globus_app_with_scopes
-from globus_compute_endpoint.endpoint.config import BaseConfig, UserEndpointConfig
-from globus_compute_endpoint.endpoint.config.utils import serialize_config
+from globus_compute_endpoint.endpoint.config import (
+    BaseConfig,
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
+from globus_compute_endpoint.endpoint.config.utils import get_config, serialize_config
 from globus_compute_endpoint.endpoint.interchange import EndpointInterchange
 from globus_compute_endpoint.endpoint.result_store import ResultStore
 from globus_compute_endpoint.endpoint.utils import _redact_url_creds, update_url_port
@@ -86,7 +90,7 @@ class Endpoint:
     def update_config_file(
         original_path: pathlib.Path,
         target_path: pathlib.Path,
-        multi_user: bool,
+        id_mapping: bool,
         high_assurance: bool,
         display_name: str | None,
         auth_policy: str | None,
@@ -94,13 +98,12 @@ class Endpoint:
     ):
         config_text = original_path.read_text()
         config_dict = yaml.safe_load(config_text)
+        config_dict.pop("engine", None)
 
         if display_name:
             config_dict["display_name"] = display_name
 
-        if multi_user:
-            config_dict["multi_user"] = multi_user
-            config_dict.pop("engine", None)
+        if id_mapping:
             config_dict["identity_mapping_config_path"] = str(
                 Endpoint._example_identity_mapping_configuration_path(
                     target_path.parent
@@ -112,9 +115,8 @@ class Endpoint:
 
         if high_assurance:
             config_dict["high_assurance"] = high_assurance
-            if multi_user:
-                audit_path = Endpoint._audit_log_path(target_path.parent)
-                config_dict["audit_log_path"] = str(audit_path)
+            audit_path = Endpoint._audit_log_path(target_path.parent)
+            config_dict["audit_log_path"] = str(audit_path)
 
         if subscription_id:
             config_dict["subscription_id"] = subscription_id
@@ -126,7 +128,7 @@ class Endpoint:
     def init_endpoint_dir(
         endpoint_dir: pathlib.Path,
         endpoint_config: pathlib.Path | None = None,
-        multi_user: bool = False,
+        id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
         auth_policy: str | None = None,
@@ -137,14 +139,13 @@ class Endpoint:
         :param endpoint_dir: Path to the endpoint configuration dir
         :param endpoint_config: Path to a config file to be used instead of
             the Globus Compute default config file
-        :param multi_user: Whether the endpoint is a multi-user endpoint
+        :param id_mapping: Whether the endpoint will map users
         :param display_name: A display name to use, if desired
         :param auth_policy: Globus authentication policy
         :param subscription_id: Subscription ID to associate endpoint with
         """
         log.debug(f"Creating endpoint dir {endpoint_dir}")
         user_umask = os.umask(0o0077)
-        os.umask(0o0077 | (user_umask & 0o0400))  # honor only the UR bit for dirs
         try:
             # pathlib.Path does not handle unusual umasks (e.g., 0o0111) so well
             # in the parents=True case, so temporarily change it.  This is nominally
@@ -161,43 +162,36 @@ class Endpoint:
             Endpoint.update_config_file(
                 endpoint_config,
                 config_target_path,
-                multi_user,
+                id_mapping,
                 high_assurance,
                 display_name,
                 auth_policy,
                 subscription_id,
             )
 
-            if multi_user:
-                # template must be readable by user-endpoint processes (see
-                # endpoint_manager.py)
-                owner_only = 0o0600
-                world_readable = 0o0644 & ((0o0777 - user_umask) | 0o0444)
-                world_executable = 0o0711 & ((0o0777 - user_umask) | 0o0111)
-                endpoint_dir.chmod(world_executable)
+            owner_only = 0o0600
+            world_readable = 0o0644
 
-                src_user_tmpl_path = package_dir / "config/user_config_template.yaml.j2"
-                src_user_schem_path = package_dir / "config/user_config_schema.json"
-                src_user_env_path = package_dir / "config/user_environment.yaml"
-                src_example_idmap_path = (
-                    package_dir / "config/example_identity_mapping_config.json"
-                )
-                dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
-                dst_user_schem_path = Endpoint.user_config_schema_path(endpoint_dir)
-                dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
-                dst_idmap_conf_path = (
-                    Endpoint._example_identity_mapping_configuration_path(endpoint_dir)
-                )
+            dst_user_tmpl_path = Endpoint.user_config_template_path(endpoint_dir)
+            dst_user_schem_path = Endpoint.user_config_schema_path(endpoint_dir)
+            dst_user_env_path = Endpoint._user_environment_path(endpoint_dir)
+            dst_idmap_conf_path = Endpoint._example_identity_mapping_configuration_path(
+                endpoint_dir
+            )
 
-                shutil.copy(src_user_tmpl_path, dst_user_tmpl_path)
-                shutil.copy(src_user_schem_path, dst_user_schem_path)
-                shutil.copy(src_user_env_path, dst_user_env_path)
-                shutil.copy(src_example_idmap_path, dst_idmap_conf_path)
+            _src_conf_dir = package_dir / "config"
+            src_user_tmpl_path = _src_conf_dir / dst_user_tmpl_path.name
+            src_user_schem_path = _src_conf_dir / dst_user_schem_path.name
+            src_user_env_path = _src_conf_dir / dst_user_env_path.name
+            src_example_idmap_path = _src_conf_dir / dst_idmap_conf_path.name
 
-                dst_user_tmpl_path.chmod(world_readable)
-                dst_user_schem_path.chmod(world_readable)
-                dst_user_env_path.chmod(world_readable)
+            shutil.copyfile(src_user_tmpl_path, dst_user_tmpl_path)
+            shutil.copyfile(src_user_schem_path, dst_user_schem_path)
+            shutil.copyfile(src_user_env_path, dst_user_env_path)
+            if id_mapping:
+                shutil.copyfile(src_example_idmap_path, dst_idmap_conf_path)
                 dst_idmap_conf_path.chmod(owner_only)
+                dst_user_tmpl_path.chmod(world_readable)
 
         finally:
             os.umask(user_umask)
@@ -206,7 +200,7 @@ class Endpoint:
     def configure_endpoint(
         conf_dir: pathlib.Path,
         endpoint_config: str | None,
-        multi_user: bool = False,
+        id_mapping: bool = False,
         high_assurance: bool = False,
         display_name: str | None = None,
         auth_policy: str | None = None,
@@ -222,39 +216,86 @@ class Endpoint:
         Endpoint.init_endpoint_dir(
             conf_dir,
             templ_conf_path,
-            multi_user,
+            id_mapping,
             high_assurance,
             display_name,
             auth_policy,
             subscription_id,
         )
+
         config_path = Endpoint._config_file_path(conf_dir)
-        if multi_user:
-            user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
-            user_conf_schema_path = Endpoint.user_config_schema_path(conf_dir)
-            user_env_path = Endpoint._user_environment_path(conf_dir)
+        user_conf_tmpl_path = Endpoint.user_config_template_path(conf_dir)
+        user_conf_schema_path = Endpoint.user_config_schema_path(conf_dir)
+        user_env_path = Endpoint._user_environment_path(conf_dir)
+
+        print(
+            f"Created profile for endpoint named <{ep_name}>\n"
+            f"\n\tConfiguration file: {config_path}"
+        )
+
+        if id_mapping:
             idmap_ex_conf_path = Endpoint._example_identity_mapping_configuration_path(
                 conf_dir
             )
+            print(f"\n\tExample identity mapping configuration: {idmap_ex_conf_path}")
 
-            print(f"Created multi-user profile for endpoint named <{ep_name}>")
-            print(
-                f"\n\tConfiguration file: {config_path}\n"
-                f"\n\tExample identity mapping configuration: {idmap_ex_conf_path}\n"
-                f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
-                f"\n\tUser endpoint configuration schema: {user_conf_schema_path}"
-                f"\n\tUser endpoint environment variables: {user_env_path}"
-                "\n\nUse the `start` subcommand to run it:\n"
-                f"\n\t$ globus-compute-endpoint start {ep_name}"
-            )
+        print(
+            f"\n\tUser endpoint configuration template: {user_conf_tmpl_path}"
+            f"\n\tUser endpoint configuration schema: {user_conf_schema_path}"
+            f"\n\tUser endpoint environment variables: {user_env_path}\n"
+            "\nUse the `start` subcommand to run it:\n"
+            f"\n\t$ globus-compute-endpoint start {ep_name}"
+        )
 
-        else:
-            print(f"Created profile for endpoint named <{ep_name}>")
-            print(
-                f"\n\tConfiguration file: {config_path}\n"
-                "\nUse the `start` subcommand to run it:\n"
-                f"\n\t$ globus-compute-endpoint start {ep_name}"
+    @staticmethod
+    def migrate_to_template_capable(conf_dir: pathlib.Path):
+        og_config_obj = get_config(conf_dir)
+        if isinstance(og_config_obj, ManagerEndpointConfig):
+            raise ValueError(f"Endpoint '{conf_dir.name}' is already template capable.")
+
+        if Endpoint.check_pidfile(conf_dir)["active"]:
+            raise ValueError(f"Endpoint '{conf_dir.name}' is currently running.")
+
+        assert og_config_obj.source_content is not None
+        og_config_dict = yaml.safe_load(og_config_obj.source_content)
+
+        mep_config_path = Endpoint._config_file_path(conf_dir)
+        mep_config_keys = {
+            "admins",
+            "display_name",
+            "allowed_functions",
+            "authentication_policy",
+            "subscription_id",
+        }
+        uep_template_path = Endpoint.user_config_template_path(conf_dir)
+        uep_template_keys: set[str] = set(og_config_dict) - mep_config_keys
+        shared_keys = {
+            "debug",
+            "amqp_port",
+            "heartbeat_period",
+            # internal usage:
+            "local_compute_services",
+            "environment",
+        }
+
+        mep_config_backup_path = mep_config_path.with_name(
+            f"{mep_config_path.name}.backup"
+        )
+        if mep_config_backup_path.exists():
+            raise FileExistsError(
+                f"Tried to back up '{mep_config_path}' to '{mep_config_backup_path}',"
+                " but the latter already exists."
             )
+        mep_config_path.rename(mep_config_backup_path)
+
+        for keys, dest in [
+            (mep_config_keys, mep_config_path),
+            (uep_template_keys, uep_template_path),
+        ]:
+            config_dict = {
+                k: og_config_dict[k] for k in keys | shared_keys if k in og_config_dict
+            }
+            dest.write_text(yaml.safe_dump(config_dict, sort_keys=False))
 
     @staticmethod
     def validate_endpoint_name(path_name: str) -> None:
@@ -835,9 +876,17 @@ class Endpoint:
         ep_statuses = {}
 
         for ep_path in Endpoint._get_ep_dirs(pathlib.Path(funcx_conf_dir)):
+            try:
+                ep_id = Endpoint.get_endpoint_id(ep_path)
+            except Exception as e:
+                t = type(e).__name__
+                log.warning(f"Failed to read endpoint id: [{t}] {e} ({ep_path})")
+                del t, e
+                ep_id = "[failed to read endpoint id]"
+
             ep_status = {
                 "status": "Initialized",
-                "id": Endpoint.get_endpoint_id(ep_path),
+                "id": ep_id,
             }
             ep_statuses[ep_path.name] = ep_status
             if not ep_status["id"]:

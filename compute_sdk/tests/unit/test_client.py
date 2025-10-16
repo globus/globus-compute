@@ -32,7 +32,10 @@ from globus_compute_sdk.serialize import (
     DillCode,
     PureSourceTextInspect,
 )
-from globus_compute_sdk.serialize.concretes import SELECTABLE_STRATEGIES
+from globus_compute_sdk.serialize.concretes import (
+    DEFAULT_STRATEGY_CODE,
+    SELECTABLE_STRATEGIES,
+)
 from globus_sdk import ComputeClientV2, ComputeClientV3, GlobusAPIError, UserApp
 from globus_sdk import __version__ as __version_globus__
 from globus_sdk.authorizers import GlobusAuthorizer
@@ -44,7 +47,7 @@ _MOCK_BASE = "globus_compute_sdk.sdk.client."
 fnmetadata = FunctionRegistrationMetadata(
     python_version=get_py_version_str(),
     sdk_version=__version__,
-    serde_identifier="01",  # serializer default, which is currently DillCode
+    serde_identifier=DEFAULT_STRATEGY_CODE.identifier.strip(),
 )
 
 client_api_reqs = {

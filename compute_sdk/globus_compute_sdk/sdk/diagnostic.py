@@ -182,8 +182,10 @@ def if_supported_on_os(cmd: str):
         BY_PLATFORM = {
             "ip": ["linux"],
             "lshw": ["linux"],
+            "quota": ["linux"],
             "df": ["linux", "darwin"],
             "sysctl": ["linux", "darwin"],
+            "du": ["linux", "darwin"],
             #  netstat may be slow on macOS, better to exclude it
             "netstat": ["linux", "win32"],
         }
@@ -249,30 +251,36 @@ def connection_tests():
     ]
 
 
-def general_commands_list():
+def general_commands_list(gc_base: Path):
     """
     General diagnostic commands
     Excludes endpoint hardware reports and sending tasks to endpoints
     """
 
+    du_cmd = None
+    if if_supported_on_os("du"):
+        dirs = " ".join(glob.glob(f"{gc_base}/*"))
+        # Shorten the display name so it's more obvious what it's doing
+        du_cmd = (f"du -sh {dirs} | sort -rh", f"du -sh {gc_base}/*")
+
     return [
         "uname -a",
         os_info_cmd(),
         "whoami",
+        du_cmd,
         "pip freeze",
         print_openssl_version,
         ifconfig_wrapper(),
         if_supported_on_os("ip addr"),
         if_supported_on_os("ip route"),
         if_supported_on_os("netstat -r"),
+        if_supported_on_os("quota -vs"),
     ]
 
 
 def get_diagnostic_commands(log_bytes: int, config_dir: str | None = None):
 
     commands = filter_by_os(hardware_commands_list())
-    commands.extend(general_commands_list())
-    commands.extend(connection_tests())
 
     gc_base_dir = ensure_compute_dir()
     if config_dir:
@@ -284,6 +292,9 @@ def get_diagnostic_commands(log_bytes: int, config_dir: str | None = None):
                 f"{specified_path.absolute()} is not a valid directory", file=sys.stderr
             )
             sys.exit(os.EX_NOINPUT)
+
+    commands.extend(general_commands_list(gc_base_dir))
+    commands.extend(connection_tests())
 
     # Run endpoint related diagnostics when it is installed
     ep_install_dir = print_endpoint_install_dir()
@@ -421,6 +432,12 @@ def run_all_diags_wrapper(
         elif callable(cmd):
             display_name = getattr(cmd, "display_name", f"{cmd.__name__}()")
             display_name = f"python:{display_name}"
+        elif isinstance(cmd, tuple):
+            # A (cmd, display_name) pair to make it easier to add a caption
+            if len(cmd) != 2 and not isinstance(cmd[1], str):
+                print(f"Ignoring invalid diagnostic {cmd}")
+                continue
+            cmd, display_name = cmd
         else:
             display_name = str(cmd)
 

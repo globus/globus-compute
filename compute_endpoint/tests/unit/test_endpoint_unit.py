@@ -18,8 +18,12 @@ from unittest import mock
 
 import pytest
 import requests
+import yaml
 from globus_compute_endpoint.endpoint import endpoint
-from globus_compute_endpoint.endpoint.config import UserEndpointConfig
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
 from globus_compute_endpoint.endpoint.config.utils import serialize_config
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.engines import (
@@ -70,6 +74,12 @@ def mock_launch():
 
 
 @pytest.fixture
+def mock_get_config():
+    with mock.patch(f"{_mock_base}get_config") as m:
+        yield m
+
+
+@pytest.fixture
 def conf():
     _conf = UserEndpointConfig(engine=ThreadPoolEngine)
     _conf.source_content = "# test source content"
@@ -88,15 +98,28 @@ def mock_ep_data(fs, conf):
 
 
 @pytest.fixture
-def mock_ep_buf():
+def table_buf():
     buf = io.StringIO()
-    Endpoint.get_endpoints = mock.Mock()
-    Endpoint.get_endpoints.return_value = {}
-
-    Endpoint.print_endpoint_table = functools.partial(
+    partial_print = functools.partial(
         Endpoint.print_endpoint_table, conf_dir="unused", ofile=buf
     )
-    yield buf
+    with mock.patch.object(Endpoint, "print_endpoint_table", partial_print):
+        yield buf
+
+
+@pytest.fixture
+def mock_ep_get():
+    with mock.patch.object(Endpoint, "get_endpoints") as m:
+        m.return_value = {}
+        yield m
+
+
+@pytest.fixture
+def mock_ep_dir(fs, mock_ep_data, mock_get_config):
+    ep, ep_dir, *_, conf = mock_ep_data
+    mock_get_config.return_value = conf
+    ep._config_file_path(ep_dir).write_text(conf.source_content)
+    yield ep, ep_dir
 
 
 @pytest.fixture
@@ -333,30 +356,44 @@ def test_register_endpoint_blocked(
         assert pytexc.value.http_status == status_code
 
 
-def test_list_endpoints_none_configured(mock_ep_buf):
-    buf = mock_ep_buf
+def test_list_endpoints_none_configured(mock_ep_get, table_buf):
     Endpoint.print_endpoint_table()
-    assert "No endpoints configured" in buf.getvalue()
-    assert "Hint:" in buf.getvalue()
-    assert "globus-compute-endpoint configure" in buf.getvalue()
+    assert "No endpoints configured" in table_buf.getvalue()
+    assert "Hint:" in table_buf.getvalue()
+    assert "globus-compute-endpoint configure" in table_buf.getvalue()
 
 
-def test_list_endpoints_no_id_yet(mock_ep_buf, randomstring):
-    buf = mock_ep_buf
-    expected_col_length = random.randint(2, 30)
-    Endpoint.get_endpoints.return_value = {
-        "default": {"status": randomstring(length=expected_col_length), "id": None}
-    }
+def test_list_endpoints_no_id_yet(mock_ep_get, table_buf, randomstring):
+    col_length = random.randint(2, 30)
+    get_data = {"default": {"status": randomstring(length=col_length), "id": None}}
+    mock_ep_get.return_value = get_data
     Endpoint.print_endpoint_table()
-    assert Endpoint.get_endpoints.return_value["default"]["status"] in buf.getvalue()
-    assert "| Endpoint ID |" in buf.getvalue(), "Expecting column shrinks to size"
+    assert get_data["default"]["status"] in table_buf.getvalue()
+    assert "| Endpoint ID |" in table_buf.getvalue(), "Expect col shrinks to size"
+
+
+def test_list_endpoints_invalid_id(table_buf, caplog):
+    with mock.patch.object(Endpoint, "get_endpoint_id") as mock_get:
+        with mock.patch.object(Endpoint, "_get_ep_dirs") as mock_ls:
+            mock_ls.return_value = list(map(pathlib.Path, ("a", "problem_file", "c")))
+            mock_get.side_effect = ("some_id", MemoryError("doh"), "other_id")
+
+            Endpoint.print_endpoint_table()
+
+    _, level, msg = caplog.record_tuples[0]
+    assert logging.WARNING == level
+    assert "problem_file" in msg, "Expect problem file in warning"
+    assert "Failed to read" in msg
+
+    assert "some_id" in table_buf.getvalue()
+    assert "other_id" in table_buf.getvalue()
+    assert "[failed to read endpoint id]" in table_buf.getvalue(), "expect fail grace"
 
 
 @pytest.mark.parametrize("term_size", ((30, 5), (50, 5), (67, 5), (72, 5), (120, 5)))
 def test_list_endpoints_long_names_wrapped(
-    mock_ep_buf, mocker, term_size, randomstring
+    mock_ep_get, table_buf, mocker, term_size, randomstring
 ):
-    buf = mock_ep_buf
     tsize = namedtuple("terminal_size", ["columns", "lines"])(*term_size)
     mock_shutil = mocker.patch("globus_compute_endpoint.endpoint.endpoint.shutil")
     mock_shutil.get_terminal_size.return_value = tsize
@@ -376,9 +413,9 @@ def test_list_endpoints_long_names_wrapped(
     Endpoint.print_endpoint_table()
 
     for ep_name, ep in expected_data.items():
-        assert ep["status"] in buf.getvalue(), "expected no wrapping of status"
-        assert str(ep["id"]) in buf.getvalue(), "expected no wrapping of id"
-        assert ep_name not in buf.getvalue(), "expected only name column is wrapped"
+        assert ep["status"] in table_buf.getvalue(), "expect status not wrapped"
+        assert str(ep["id"]) in table_buf.getvalue(), "expect id not wrapped"
+        assert ep_name not in table_buf.getvalue(), "expect only name column wrapped"
 
 
 @pytest.mark.parametrize(
@@ -460,7 +497,7 @@ def test_endpoint_get_metadata(mocker, engine_cls):
         assert config["engine"]["executor"]["provider"]["type"] == "LocalProvider"
 
 
-@pytest.mark.parametrize("env", [None, "blar", "local", "production"])
+@pytest.mark.parametrize("env", (None, "blar", "local", "production"))
 def test_endpoint_sets_process_title(
     randomstring, mock_ep_data, env, mock_reg_info, ep_uuid
 ):
@@ -507,35 +544,19 @@ def test_endpoint_respects_port(mock_ep_data, port, mock_reg_info, ep_uuid):
         assert a == (exp_url, port)
 
 
-def test_endpoint_sets_owner_only_access(tmp_path, umask):
-    umask(0)
+@pytest.mark.parametrize("mask", [0, 511] + random.sample(range(1, 511), 5))
+@pytest.mark.parametrize("idmap", (False, True))
+def test_endpoint_sets_owner_only_access(tmp_path, umask, mask, idmap):
+    umask(mask)  # no umask; default to 777 permissions
     ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
+    Endpoint.init_endpoint_dir(ep_dir, id_mapping=idmap)
 
-    assert ep_dir.stat().st_mode & 0o777 == 0o700, "Expected user-only access"
-
-
-def test_endpoint_config_handles_umask_gracefully(tmp_path, umask):
-    umask(0o777)  # No access whatsoever
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir)
-
-    assert ep_dir.stat().st_mode & 0o777 == 0o300, "Should honor user-read bit"
-    ep_dir.chmod(0o700)  # necessary for test to cleanup after itself
-
-
-def test_mu_endpoint_user_ep_yamls_world_readable(tmp_path):
-    ep_dir = tmp_path / "new_endpoint_dir"
-    Endpoint.init_endpoint_dir(ep_dir, multi_user=True)
-
-    user_tmpl_path = Endpoint.user_config_template_path(ep_dir)
-    user_env_path = Endpoint._user_environment_path(ep_dir)
-
-    assert user_env_path != user_tmpl_path, "Dev typo while developing"
-    for p in (user_tmpl_path, user_env_path):
-        assert p.exists()
-        assert p.stat().st_mode & 0o444 == 0o444, "Minimum world readable"
-    assert ep_dir.stat().st_mode & 0o111 == 0o111, "Minimum world executable"
+    assert ep_dir.stat().st_mode & 0o777 == 0o700, f"Expect POSIX restricted: {ep_dir}/"
+    for p in ep_dir.iterdir():
+        if idmap and p.name.endswith(".j2"):
+            assert p.stat().st_mode & 0o777 == 0o644, f"Expect sharable: {p}"
+            continue
+        assert p.stat().st_mode & 0o777 == 0o600, f"Expect owner-only access: {p}"
 
 
 def test_always_prints_endpoint_id_to_terminal(
@@ -685,7 +706,7 @@ def test_get_endpoint_dir_by_uuid(tmp_path, name, uuid, exists):
     assert exists is (result is not None)
 
 
-@pytest.mark.parametrize("json_exists", [True, False])
+@pytest.mark.parametrize("json_exists", (True, False))
 def test_get_endpoint_id(tmp_path: pathlib.Path, json_exists: bool, ep_uuid):
     if json_exists:
         ep_json = tmp_path / "endpoint.json"
@@ -838,7 +859,7 @@ def test_update_config_file_retains_order(fs):
     Endpoint.update_config_file(
         original_path,
         target_path,
-        multi_user=False,
+        id_mapping=False,
         high_assurance=False,
         display_name=None,
         auth_policy=None,
@@ -847,3 +868,131 @@ def test_update_config_file_retains_order(fs):
 
     target_config = target_path.read_text()
     assert original_config == target_config
+
+
+@pytest.mark.parametrize(
+    "config_keys",
+    (
+        (
+            "admins",
+            "display_name",
+            "allowed_functions",
+            "authentication_policy",
+            "subscription_id",
+            "debug",
+            "amqp_port",
+            "heartbeat_period",
+        ),
+        (
+            "admins",
+            "display_name",
+            "allowed_functions",
+            "authentication_policy",
+            "subscription_id",
+        ),
+        ("foo", "bar", "baz"),
+        ("debug", "amqp_port", "heartbeat_period"),
+        ("admins", "foo", "debug", "bar"),
+    ),
+)
+def test_migrate_to_template_capable_success(
+    fs, mock_ep_data, mock_get_config, config_keys
+):
+    ep, ep_dir, *_ = mock_ep_data
+    config_dict = {k: "some value" for k in config_keys}
+    mock_get_config.return_value = SimpleNamespace(
+        source_content=yaml.dump(config_dict)
+    )
+    ep._config_file_path(ep_dir).write_text(yaml.safe_dump(config_dict))
+
+    ep.migrate_to_template_capable(ep_dir)
+
+    assert ep._config_file_path(ep_dir).exists()
+    assert ep.user_config_template_path(ep_dir).exists()
+
+    new_conf = yaml.safe_load(ep._config_file_path(ep_dir).open())
+    for k in new_conf:
+        assert k in config_dict
+
+    new_templ = yaml.safe_load(ep.user_config_template_path(ep_dir).open())
+    for k in new_templ:
+        assert k in config_dict
+
+    config_only_keys = {
+        "admins",
+        "display_name",
+        "allowed_functions",
+        "authentication_policy",
+        "subscription_id",
+    }
+
+    shared_keys = {
+        "debug",
+        "amqp_port",
+        "heartbeat_period",
+    }
+
+    for k in config_dict:
+        assert k in new_conf or k in new_templ
+        if k in config_only_keys:
+            assert k in new_conf
+            assert k not in new_templ
+            v = new_conf[k]
+        elif k in shared_keys:
+            assert k in new_conf
+            assert k in new_templ
+            v = new_conf[k]
+            assert v == new_templ[k]
+        else:
+            assert k not in new_conf
+            assert k in new_templ
+            v = new_templ[k]
+        assert v == config_dict[k]
+
+
+def test_migrate_to_template_capable_already_template_capable(mock_get_config):
+    mock_config_path = pathlib.Path("some/config/dir")
+    mock_get_config.return_value = mock.Mock(spec=ManagerEndpointConfig)
+
+    with pytest.raises(ValueError) as pyt_exc:
+        Endpoint.migrate_to_template_capable(mock_config_path)
+
+    assert mock_config_path.name in str(pyt_exc)
+    assert "already template capable" in str(pyt_exc)
+
+
+def test_migrate_to_template_capable_endpoint_running(mock_ep_dir, mocker):
+    _, ep_dir = mock_ep_dir
+    mocker.patch(f"{_mock_base}Endpoint.check_pidfile").return_value = {"active": True}
+
+    with pytest.raises(ValueError) as pyt_exc:
+        Endpoint.migrate_to_template_capable(ep_dir)
+
+    assert ep_dir.name in str(pyt_exc)
+    assert "currently running" in str(pyt_exc)
+
+
+def test_migrate_to_template_capable_backs_up(mock_ep_dir):
+    ep, ep_dir = mock_ep_dir
+
+    ep.migrate_to_template_capable(ep_dir)
+
+    config_backup = ep._config_file_path(ep_dir)
+    config_backup = config_backup.with_name(config_backup.name + ".backup")
+
+    assert config_backup.exists()
+
+
+def test_migrate_to_template_capable_backup_exists(mock_ep_dir):
+    ep, ep_dir = mock_ep_dir
+
+    backup_path = ep._config_file_path(ep_dir)
+    backup_path = backup_path.with_name(backup_path.name + ".backup")
+    backup_path.touch()
+
+    with pytest.raises(FileExistsError) as pyt_exc:
+        ep.migrate_to_template_capable(ep_dir)
+
+    assert backup_path.name in str(pyt_exc)
+    assert "back up" in str(pyt_exc)
+    assert "already exists" in str(pyt_exc)

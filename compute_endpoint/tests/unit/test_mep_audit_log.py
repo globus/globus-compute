@@ -16,7 +16,7 @@ from globus_compute_endpoint.endpoint.endpoint_manager import (
 from tests.utils import try_assert
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.endpoint_manager."
-_GOOD_UNPRIVILEGED_EC = 85
+_GOOD_UNPRIVILEGED_EC = 84
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -44,6 +44,12 @@ def mock_log():
         yield m
 
 
+@pytest.fixture
+def mock_close_fds():
+    with mock.patch(f"{_MOCK_BASE}close_all_fds") as m:
+        yield m
+
+
 def conf_tmpl():
     return textwrap.dedent(
         """
@@ -60,7 +66,7 @@ def conf_tmpl():
 @pytest.fixture
 def conf(tmp_path):
     (tmp_path / "user_config_template.yaml.j2").write_text(conf_tmpl())
-    mec = ManagerEndpointConfig(multi_user=True, high_assurance=True)
+    mec = ManagerEndpointConfig(high_assurance=True)
     mec.audit_log_path = tmp_path / "audit.log"
     test_environ = {
         "HOME": str(tmp_path),
@@ -194,7 +200,9 @@ def test_audit_log_shutsdown_on_general_error(
     assert em._time_to_stop is True, "Expect shutdown, no matter the error"
 
 
-def test_audit_log_pipe_hookup(mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os):
+def test_audit_log_pipe_hookup(
+    mock_log, tmp_path, ep_uuid, conf, reg_info, mock_os, mock_close_fds
+):
     em = EndpointManager(tmp_path, ep_uuid, conf, reg_info)
 
     m = mock.Mock()

@@ -41,7 +41,6 @@ known_user_config_opts = {
     "stderr": str,
     "local_compute_services": True,
     "environment": str,
-    "multi_user": False,
     "high_assurance": False,
     "executors": None,
     "engine": None,
@@ -62,11 +61,9 @@ known_manager_config_opts = {
     "identity_mapping_config_path": os.PathLike,
     "audit_log_path": os.PathLike,
     "pam": PamConfiguration,
-    "force_mu_allow_same_user": True,
     "mu_child_ep_grace_period_s": float,
     "local_compute_services": True,
     "environment": str,
-    "multi_user": True,
     "high_assurance": True,
 }
 

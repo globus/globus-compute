@@ -1,11 +1,15 @@
-# This is the default user-template provided with newly-configured Multi-User
-# endpoints.  User endpoints generate a user-endpoint-specific configuration by
-# processing this YAML file as a Jinja template against user-provided
+# This is the default user-endpoint-process (UEP) template provided with
+# newly-configured endpoints.  Endpoints generate a UEP-specific configuration
+# by processing this YAML file as a Jinja template against SDK-provided (user)
 # variables -- please modify this template to suit your site's requirements.
 #
-# Optionally, you can define a JSON schema for the user-provided variables in a
-# file named `user_config_schema.json` within the same directory. The variables
-# will be validated against the schema before rendering this template.
+# As an optional security and user-debugging aid, consider also specifying a
+# JSON schema for the user-provided variables.  If `user_config_schema.json`
+# exists within the same directory, then before starting the UEP, the MEP will
+# validate the variables against the schema before rendering.  This provides
+# an administrative peace of mind that users cannot specify invalid arguments.
+# From a usability standpoint, however, it also can make invalid values
+# prominently visible to users.
 #
 # For more information, please see the `user_endpoint_config` in Globus Compute
 # SDK's Executor.
