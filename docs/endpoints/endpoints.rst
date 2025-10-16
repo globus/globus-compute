@@ -1284,6 +1284,55 @@ The workflow for a task sent to an endpoint roughly follows these steps:
    accepting the task, then send the task to the now-running user endpoint
    process.
 
+Troubleshooting
+===============
+
+If you are having issues starting an endpoint or submitting a task to Globus
+Compute, you can run self-diagnostics via the `globus-compute-diagnostic`
+script that is installed as part of the Globus Compute SDK.
+
+We recommend running the diagnostic on the same machine that the Globus Compute
+endpoint is running, so that it can gather log snippets from each of the installed
+endpoints.  If you are having trouble only when sending a task, you can run
+diagnostics from the submitting side (VM, laptop, etc) to confirm connectivity,
+preferably via the `-e ENDPOINT_UUID` option to send a simple sample task.
+
+Without parameters, the diagnostic will generate a .gz compressed file in the
+current directory named `globus_compute_diagnostic_YYYY-MM-DD-HH-mm-ssZ.txt.gz`
+with all test results (use `gunzip` to uncompress it).
+
+
+.. code-block:: console
+
+   $ globus-compute-diagnostic -h
+
+   usage: globus-compute-diagnostic [-h] [-p] [-k number] [-v] [-e ENDPOINT_UUID] [-c CONFIG_DIR]
+
+   Run diagnostics for Globus Compute
+
+   options:
+     -h, --help            show this help message and exit
+     -p, --print-only      Do not generate a Gzip-compressed file. Print diagnostic results to the console instead.
+     -k number, --log-kb number
+                           Specify the number of kilobytes (KB) to read from log files. Defaults to 1024 KB (1 MB)
+                           per file.
+     -v, --verbose         When writing diagnostic output to local compressed file, also print the name of each test
+                           to stdout as they are being run, to help monitor diagnostic progress.
+     -e ENDPOINT_UUID, --endpoint-uuid ENDPOINT_UUID
+                           Test an endpoint by registering a sample function and sending a task to it using the newly
+                           registered function. An endpoint UUID is required.
+     -c CONFIG_DIR, --config-dir CONFIG_DIR
+                           Gather endpoint configuration and log info from the specified parent directory instead of
+                           the default ~/.globus_compute or what is set in $GLOBUS_COMPUTE_USER_DIR
+
+   This utility gathers local hardware specifications, tests connectivity to the Globus Compute web services, and
+   collates portions of local Compute Endpoint log files, if present, to a local compressed file.
+
+
+For additional help with Globus Compute that is not addressed here, please
+reach out to our Team directly by submitting a
+[support ticket](https://www.globus.org/contact-us).
+
 
 .. |nbsp| unicode:: 0xA0
    :trim:
