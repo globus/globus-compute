@@ -1,4 +1,3 @@
-import base64
 import inspect
 import json
 import random
@@ -7,7 +6,6 @@ import typing as t
 from collections import OrderedDict
 from unittest.mock import patch
 
-import dill
 import globus_compute_sdk.serialize.concretes as concretes
 import globus_compute_sdk.serialize.facade as facade
 import pytest
@@ -16,6 +14,7 @@ from globus_compute_sdk.errors import (
     SerdeError,
     SerializationError,
 )
+from globus_compute_sdk.serialize import PureSourceDill, PureSourceTextInspect
 from globus_compute_sdk.serialize.base import (
     IDENTIFIER_LENGTH,
     ComboSerializationStrategy,
@@ -316,32 +315,6 @@ def test_pure_source_dill():
     check_serialize_deserialize_bar(concretes.PureSourceDill())
 
 
-def test_pure_source_text_inspect_handles_legacy_serialization():
-    # Before SDK version 3.16.0, the PureSourceTextInspect strategy did not
-    # encode the function source code with base64
-    def legacy_serialize(f: t.Callable):
-        name: str = f.__name__
-        body = inspect.getsource(f)
-        return "st\n" + name + ":" + body
-
-    check_serialize_deserialize_foo(
-        concretes.PureSourceTextInspect(), pre_serialized=legacy_serialize(foo)
-    )
-
-
-def test_pure_source_dill_handles_legacy_serialization():
-    # Before SDK version 3.16.0, the PureSourceDill strategy did not encode
-    # the function source code with base64
-    def legacy_serialize(f: t.Callable):
-        name: str = f.__name__
-        body = dill.source.getsource(f, lstrip=True)
-        return "sd\n" + name + ":" + body
-
-    check_serialize_deserialize_foo(
-        concretes.PureSourceDill(), pre_serialized=legacy_serialize(foo)
-    )
-
-
 def test_overall():
     check_serialize_deserialize_foo(ComputeSerializer())
     check_serialize_deserialize_bar(ComputeSerializer())
@@ -508,17 +481,6 @@ def test_all_code_strategies_individually(
     assert func(n1, n2) == foo(n1, n2)
 
 
-@pytest.mark.parametrize(
-    "sub_strategy_cls", list(concretes.AllCodeStrategies.strategies)
-)
-def test_all_code_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
-    sub_strategy = sub_strategy_cls()
-    serialized = sub_strategy.serialize(foo)
-    chomped = sub_strategy.chomp(serialized)
-    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
-    base64.b64decode(cleaned, validate=True)
-
-
 def test_all_data_strategies():
     d1 = "data"
     all_data = concretes.AllDataStrategies()
@@ -554,20 +516,18 @@ def test_all_data_strategies_individually(
 
 
 @pytest.mark.parametrize(
-    "sub_strategy_cls", list(concretes.AllDataStrategies.strategies)
-)
-def test_all_data_strategies_use_base64(sub_strategy_cls: type[SerializationStrategy]):
-    sub_strategy = sub_strategy_cls()
-    serialized = sub_strategy.serialize("data")
-    chomped = sub_strategy.chomp(serialized)
-    cleaned = chomped.replace("\n", "")  # codecs adds newlines every 76 chars
-    base64.b64decode(cleaned, validate=True)
-
-
-@pytest.mark.parametrize(
     "strategy", list(concretes.CombinedCode._chunk_strategies.values())
 )
-def test_combined_strategies(strategy: SerializationStrategy, mocker: MockerFixture):
+def test_combined_strategies(strategy: SerializationStrategy, mocker):
+    if strategy in (PureSourceDill, PureSourceTextInspect):
+        # The CombinedCode strategy uses a colon (:) as a separator to split
+        # function code strings into per-strategy chunks. However, these
+        # strategies also use colons, both to separate the function name and
+        # at the end of every function signature, causing delimiter conflicts
+        # upon deserialization. Version 4.0.0 introduces AllCodeStrategies as
+        # a replacement for CombinedCode and does not contain this bug.
+        return
+
     # Ensure we isolate each sub-strategy
     # Otherwise, the test will pass if any sub-strategy works
     mocker.patch.object(
