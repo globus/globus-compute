@@ -3,7 +3,7 @@ from packaging.version import Version
 
 # single source of truth for package version,
 # see https://packaging.python.org/en/latest/single_source_version/
-__version__ = "4.0.0a1"
+__version__ = "4.0.0a2"
 
 
 def compare_versions(
