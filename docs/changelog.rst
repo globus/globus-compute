@@ -3,6 +3,97 @@ Changelog
 
 .. scriv-insert-here
 
+.. _changelog-4.0.0:
+
+globus-compute-sdk & globus-compute-endpoint v4.0.0
+-----------------------------------------------------
+
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- With this release, we are moving from the existing "Multi-User Endpoint" /
+  "Single-User Endpoint" dichotomy to a unified model where every endpoint
+  supports configuration templates.
+
+- Existing endpoints that do not support configuration templates can be migrated using
+  the new ``migrate-to-template-capable`` command in the ``globus-compute-endpoint``
+  CLI.
+
+- Created the :class:`~globus_compute_sdk.serialize.AllCodeStrategies` serialization
+  strategy to replace :class:`~globus_compute_sdk.serialize.CombinedCode`. This new
+  combination strategy attempts each sub-strategy on a given Python function in a
+  specific order to minimize deserialization issues.
+
+- Created the :class:`~globus_compute_sdk.serialize.AllDataStrategies` serialization
+  strategy to serialize Python objects by attempting multiple strategies in sequence.
+  As with :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, it tries the
+  simpler strategy (:class:`~globus_compute_sdk.serialize.JSONData`) first.
+
+- Added a ``return_dict`` argument to the :class:`~globus_compute_sdk.ShellFunction`
+  class constructor that indicates whether to return a JSON-serializable dict
+  (``True``) or a :class:`~globus_compute_sdk.ShellResult` object (``False``).
+  The default is ``False``.
+
+  Example:
+
+  .. code-block:: python
+   :emphasize-lines: 3, 8
+
+    from globus_compute_sdk import Executor, ShellFunction
+
+    func = ShellFunction("echo '{message}'", return_dict=True)
+    with Executor(endpoint_id="...") as ex:
+        for msg in ("hello", "hola", "bonjour"):
+            fut = ex.submit(func, message=msg)
+            res = future.result()
+            assert isinstance(res, dict)
+            assert msg in res["stdout"]
+
+- The ``globus-compute-diagnostic`` command now also include a summary of disk usage
+  for each endpoint in the Globus Compute home directory (default ``~/.globus_compute``)
+
+Bug Fixes
+^^^^^^^^^
+
+- Clear environment immediately after ``fork()``, prior even to dropping
+  privileges.  (The environment was already cleared prior to ``exec()`` ing the
+  child UEP, but there's no sense in waiting during the pre-exec phase.)  For
+  the motivating behavior, ``GLOBUS_COMPUTE_USER_DIR`` will no longer be
+  transparently passed to the child process.  All UEP environment variables
+  must be set statically via the :ref:`user-environment-yaml` UEP configuration
+  file or using :ref:`pam`.
+
+Deprecated
+^^^^^^^^^^
+
+- As all endpoints are now template capable, the ``multi_user`` config option is now
+  deprecated.
+
+- The ``force_mu_allow_same_user`` config is now deprecated; instead, privileged
+  endpoints have the option of switching to non-privileged or disabling ID
+  mapping entirely.
+
+- Marked the following serialization strategies as deprecated:
+
+  - :class:`~globus_compute_sdk.serialize.DillCodeSource` - Identical to
+    :class:`~globus_compute_sdk.serialize.PureSourceDill`, but unnecessarily runs
+    ``dill.dumps()`` on the source code string.
+  - :class:`~globus_compute_sdk.serialize.DillCodeTextInspect` - Identical to
+    :class:`~globus_compute_sdk.serialize.PureSourceTextInspect`, but unnecessarily runs
+    ``dill.dumps()`` on the source code string.
+  - :class:`~globus_compute_sdk.serialize.CombinedCode` - Replaced by
+    :class:`~globus_compute_sdk.serialize.AllCodeStrategies`, which does not include
+    the deprecated strategies above.
+
+Changed
+^^^^^^^
+
+- When configuring an endpoint, the command line automatically decides whether to
+  initialize identity mapping based on whether or not the running user is privileged.
+  This can be overridden with the ``--multi-user`` flag -- set to ``true`` to force
+  multi-user support, or ``false`` to disable it.  (Note that the running user must
+  still be privileged for multi-user support.)
+
 .. _changelog-3.16.1:
 
 globus-compute-sdk & globus-compute-endpoint v3.16.1

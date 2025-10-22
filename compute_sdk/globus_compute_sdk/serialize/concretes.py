@@ -56,17 +56,11 @@ class JSONData(SerializationStrategy):
     def serialize(self, data: t.Any) -> str:
         ":meta private:"
         dumped = json.dumps(data)
-        encoded = codecs.encode(dumped.encode(), "base64").decode()
-        return self.identifier + encoded
+        return self.identifier + dumped
 
     def deserialize(self, payload: str) -> t.Any:
         ":meta private:"
         chomped = self.chomp(payload)
-        try:
-            chomped = codecs.decode(chomped.encode(), "base64").decode()
-        except Exception:
-            # Older versions do not use bas64 encoding
-            pass
         data = json.loads(chomped)
         return data
 
@@ -475,7 +469,7 @@ SELECTABLE_STRATEGIES = [
 
 #: The *code* serialization strategy used by :class:`ComputeSerializer`
 #: when one is not specified.
-DEFAULT_STRATEGY_CODE = SerializationStrategy.get_cached_by_class(AllCodeStrategies)
+DEFAULT_STRATEGY_CODE = SerializationStrategy.get_cached_by_class(DillCode)
 #: The *data* serialization strategy used by :class:`ComputeSerializer`
 #: when one is not specified.
-DEFAULT_STRATEGY_DATA = SerializationStrategy.get_cached_by_class(AllDataStrategies)
+DEFAULT_STRATEGY_DATA = SerializationStrategy.get_cached_by_class(DillDataBase64)

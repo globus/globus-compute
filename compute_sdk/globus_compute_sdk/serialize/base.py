@@ -3,6 +3,7 @@ import typing as t
 from abc import ABC, abstractmethod
 
 from globus_compute_sdk.errors import DeserializationError, SerializationError
+from globus_compute_sdk.serialize.utils import pack_buffers, unpack_buffers
 
 logger = logging.getLogger(__name__)
 
@@ -106,19 +107,13 @@ class SerializationStrategy(ABC):
 
 
 class ComboSerializationStrategy(SerializationStrategy, ABC):
-    """Combines serialized results from multiple strategies into a single payload.
-
-    .. important::
-        All sub-strategies must base64-encode their serialized data before prefixing
-        it with a strategy identifier to avoid delimiter conflicts when deserializing.
-    """
+    """Combines serialized results from multiple strategies into a single payload."""
 
     strategies: t.ClassVar[list[t.Type[SerializationStrategy]]]
-    _separator = "|"  # Will never appear in a base64 string
 
     def serialize(self, data: t.Any):
         ":meta private:"
-        chunks, errors = [], []
+        buffers, errors = [], []
         for strategy_cls in self.strategies:
             strategy: SerializationStrategy = self.get_cached_by_class(strategy_cls)
 
@@ -130,40 +125,41 @@ class ComboSerializationStrategy(SerializationStrategy, ABC):
                 logger.debug(f"Failed to serialize with {error_msg}")
                 continue
 
-            chunks.append(serialized)
+            buffers.append(serialized)
 
-        if not chunks:
+        if not buffers:
             errors_str = "\n* ".join(errors) if errors else "unknown"
             raise SerializationError(f"\n\nSerialization errors:\n* {errors_str}")
 
-        return self.identifier + self._separator.join(chunks)
+        packed = pack_buffers(buffers)
+        return self.identifier + packed
 
     def deserialize(self, payload: str):
         ":meta private:"
         chomped = self.chomp(payload)
-        chunks = chomped.split(self._separator)
+        buffers = unpack_buffers(chomped)
         errors = []
-        for chunk in chunks:
+        for buff in buffers:
             try:
-                chunk_id, _ = chunk.split("\n", 1)
+                s_id, _ = buff.split("\n", 1)
             except ValueError:
-                suffix = "..." if len(chunk) > 50 else ""
+                suffix = "..." if len(buff) > 50 else ""
                 error_msg = (
-                    f"Malformed data (no newline separator): {chunk[:50]}{suffix}"
+                    f"Malformed data (no newline separator): {buff[:50]}{suffix}"
                 )
                 errors.append(error_msg)
                 logger.debug(error_msg)
                 continue
 
-            strategy = self.get_cached_by_id(chunk_id + "\n")
+            strategy = self.get_cached_by_id(s_id + "\n")
             if strategy is None:
-                error_msg = f"Invalid strategy identifier: {chunk_id}"
+                error_msg = f"Invalid strategy identifier: {s_id}"
                 errors.append(error_msg)
                 logger.debug(error_msg)
                 continue
 
             try:
-                return strategy.deserialize(chunk)
+                return strategy.deserialize(buff)
             except Exception as e:
                 strategy_name = type(strategy).__name__
                 error_msg = f"{strategy_name}: {e}"
