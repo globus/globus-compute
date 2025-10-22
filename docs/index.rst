@@ -91,6 +91,7 @@ how to download and configure an endpoint for local (multi-process) execution:
    tutorials/index
    actionprovider
    reference/index
+   subscriptions
    limits
    changelog
    api_docs/index

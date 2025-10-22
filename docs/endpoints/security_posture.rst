@@ -103,6 +103,8 @@ behavior differences:
 Reference :ref:`High-Assurance <high-assurance>` for details.
 
 
+.. _multiple-ep-admins:
+
 Multiple Endpoint Administrators
 --------------------------------
 

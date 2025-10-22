@@ -931,6 +931,8 @@ available:
    Usage: globus-compute-endpoint configure [OPT...
 
 
+.. _ha-functions:
+
 High-Assurance Functions
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1000,6 +1002,8 @@ flow.
 
 Line 15 shows the standard disclaimer when working with an HA function.
 
+
+.. _audit-logging:
 
 Audit Logging
 ^^^^^^^^^^^^^
