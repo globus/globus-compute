@@ -208,7 +208,7 @@ def _sanitize_user_opts(data):
     """
     if isinstance(data, dict):
         return {k: _sanitize_user_opts(v) for k, v in data.items()}
-    elif isinstance(data, list):
+    elif isinstance(data, list) or isinstance(data, tuple):
         return [_sanitize_user_opts(v) for v in data]
     elif isinstance(data, str):
         return json.dumps(data)
