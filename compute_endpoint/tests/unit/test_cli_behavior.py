@@ -25,11 +25,15 @@ from globus_compute_endpoint.cli import (
     _AUTH_POLICY_DEFAULT_NAME,
     _do_login,
     _do_logout_endpoints,
+    _do_render_user_config,
     app,
     create_or_choose_auth_project,
     init_config_dir,
 )
-from globus_compute_endpoint.endpoint.config import UserEndpointConfig
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
@@ -110,7 +114,6 @@ def make_endpoint_dir(mock_command_ensure, ep_name):
             ep_json = ep_dir / "endpoint.json"
             ep_json.write_text(json.dumps({"endpoint_id": ep_uuid}))
         ep_config = Endpoint._config_file_path(ep_dir)
-        ep_template = Endpoint.user_config_template_path(ep_dir)
         ep_config.write_text(
             """
 display_name: null
@@ -118,11 +121,43 @@ engine:
     type: ThreadPoolEngine
             """.strip()
         )
+        return ep_dir
+
+    return func
+
+
+@pytest.fixture
+def make_manager_endpoint_dir(mock_command_ensure, ep_name):
+    def func(name=ep_name, ep_uuid=None):
+        ep_dir = mock_command_ensure.endpoint_config_dir / name
+        ep_dir.mkdir(parents=True, exist_ok=True)
+        if ep_uuid is not None:
+            ep_json = ep_dir / "endpoint.json"
+            ep_json.write_text(json.dumps({"endpoint_id": ep_uuid}))
+        ep_config = Endpoint._config_file_path(ep_dir)
+        ep_template = Endpoint.user_config_template_path(ep_dir)
+        ep_schema = Endpoint.user_config_schema_path(ep_dir)
+        ep_config.write_text(
+            """
+display_name: null
+            """.strip()
+        )
         ep_template.write_text(
             """
 heartbeat_period: {{ heartbeat }}
 engine:
     type: ThreadPoolEngine
+            """.strip()
+        )
+        ep_schema.write_text(
+            """
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "heartbeat": { "type": "number" }
+  }
+}
             """.strip()
         )
         return ep_dir
@@ -1174,3 +1209,133 @@ def test_delete_endpoint_no_local_config(
     result = run_line(line, assert_exit_code=1)
     assert not mock_ep.delete_endpoint.called
     assert err_msg in result.stderr
+
+
+def test_render_user_config_happy_path(
+    run_line, mocker, make_manager_endpoint_dir, ep_name, randomstring
+):
+    mock_render_result = randomstring()
+    mock_render = mocker.patch(
+        f"{_MOCK_BASE}render_config_user_template", return_value=mock_render_result
+    )
+    ep_dir = make_manager_endpoint_dir()
+
+    user_options = {"heartbeat": "some_value"}
+    user_options_path = ep_dir / "user_options.json"
+    user_options_path.write_text(json.dumps(user_options))
+
+    result = run_line(
+        f"render-user-config {ep_name} --user-options {user_options_path}",
+        assert_exit_code=0,
+    )
+
+    assert mock_render_result in result.stdout
+    mock_render.assert_called_once()
+    for _, v in mock_render.call_args.kwargs.items():
+        assert v is not None
+
+
+def test_render_user_config_calls__do_render(
+    run_line, mocker, ep_name, make_manager_endpoint_dir
+):
+    mock__do_render = mocker.patch(f"{_MOCK_BASE}_do_render_user_config")
+    make_manager_endpoint_dir()
+    run_line(f"render-user-config {ep_name}")
+    mock__do_render.assert_called_once()
+
+
+def test__do_render_user_config_no_user_options(mocker, mock_get_config):
+    mock_get_config.return_value = mocker.Mock(spec=ManagerEndpointConfig)
+    mock_render = mocker.patch(f"{_MOCK_BASE}render_config_user_template")
+    mock_stdin = mocker.patch(f"{_MOCK_BASE}sys").stdin
+    mock_stdin.closed = True
+
+    with pytest.raises(ClickException) as pyt_exc:
+        _do_render_user_config(
+            ep_dir=mocker.Mock(),
+            user_options=None,
+        )
+
+    assert "User options path not provided and stdin is not available" in str(pyt_exc)
+    assert not mock_render.called
+
+
+@pytest.mark.parametrize("tty", [True, False])
+def test__do_render_user_config_stdin(mocker, mock_get_config, tty, caplog):
+    mock_get_config.return_value = mocker.Mock(spec=ManagerEndpointConfig)
+    mocker.patch(f"{_MOCK_BASE}load_user_config_template")
+    mocker.patch(f"{_MOCK_BASE}load_user_config_schema")
+    mock_render = mocker.patch(f"{_MOCK_BASE}render_config_user_template")
+    mock_stdin = mocker.patch(f"{_MOCK_BASE}sys").stdin
+
+    user_options = {"some_option": "some_value"}
+    stdin_data = json.dumps(user_options)
+
+    mock_stdin.closed = False
+    mock_stdin.isatty.return_value = tty
+    mock_stdin.read.return_value = stdin_data
+
+    caplog.set_level(logging.INFO)
+
+    _do_render_user_config(
+        ep_dir=mocker.Mock(),
+        user_options=None,
+    )
+
+    if tty:
+        assert "Awaiting JSON user options object" in caplog.text
+
+    mock_render.assert_called_once()
+    assert mock_render.call_args.kwargs["user_opts"] == user_options
+
+
+def test__do_render_user_config_checks_template_capable(mock_get_config, mocker):
+    assert not isinstance(
+        mock_get_config.return_value, ManagerEndpointConfig
+    ), "test setup: not template capable"
+
+    with pytest.raises(ClickException) as pyt_exc:
+        _do_render_user_config(
+            ep_dir=mocker.Mock(),
+            user_options=None,
+        )
+
+    assert "not template capable" in str(pyt_exc)
+
+
+@pytest.mark.parametrize("template_filename", [None, "some_override.yaml.j2"])
+@pytest.mark.parametrize("schema_filename", [None, "some_override.json"])
+def test__do_render_user_config_correct_paths(
+    mocker, make_manager_endpoint_dir, template_filename, schema_filename
+):
+    ep_dir = make_manager_endpoint_dir()
+
+    template_path = (ep_dir / template_filename) if template_filename else None
+    schema_path = (ep_dir / schema_filename) if schema_filename else None
+
+    with (ep_dir / "config.yaml").open("a") as f:
+        if template_path:
+            f.write(f'\nuser_config_template_path: "{template_path}"\n')
+            template_path.touch()
+        if schema_path:
+            f.write(f'\nuser_config_schema_path: "{schema_path}"\n')
+            schema_path.touch()
+
+    mocker.patch(f"{_MOCK_BASE}render_config_user_template")
+    mock_load_template = mocker.patch(f"{_MOCK_BASE}load_user_config_template")
+    mock_load_schema = mocker.patch(f"{_MOCK_BASE}load_user_config_schema")
+
+    user_options_path = ep_dir / "user_options.json"
+    user_options_path.write_text(json.dumps({}))
+
+    _do_render_user_config(
+        ep_dir=ep_dir,
+        user_options=user_options_path,
+    )
+
+    mock_load_template.assert_called_once_with(
+        template_path or Endpoint.user_config_template_path(ep_dir)
+    )
+    mock_load_schema.assert_called_once_with(
+        schema_path or Endpoint.user_config_schema_path(ep_dir)
+    )
