@@ -5,12 +5,16 @@ import json
 import logging
 import os
 import pathlib
+import pwd
+import shutil
 import signal
 import sys
 import textwrap
 import threading
 import time
+import typing as t
 import uuid
+from dataclasses import asdict
 
 import click
 import lockfile
@@ -23,8 +27,15 @@ from globus_compute_endpoint.endpoint.config import (
     ManagerEndpointConfig,
     UserEndpointConfig,
 )
-from globus_compute_endpoint.endpoint.config.utils import get_config, load_config_yaml
+from globus_compute_endpoint.endpoint.config.utils import (
+    get_config,
+    load_config_yaml,
+    load_user_config_schema,
+    load_user_config_template,
+    render_config_user_template,
+)
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 from globus_compute_endpoint.endpoint.utils import (
     is_privileged,
     send_endpoint_startup_failure_to_amqp,
@@ -34,6 +45,7 @@ from globus_compute_endpoint.exception_handling import handle_auth_errors
 from globus_compute_endpoint.logging_config import setup_logging
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.whoami import print_whoami_info
+from globus_compute_sdk.sdk.batch import create_user_runtime
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
 from globus_compute_sdk.sdk.diagnostic import do_diagnostic_base
 from globus_compute_sdk.sdk.utils.gare import gare_handler
@@ -58,6 +70,20 @@ else:
     _has_multi_user = True
 
 log = logging.getLogger(__name__)
+
+
+class ClickExceptionWithContext(ClickException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+    def format_message(self) -> str:
+        msg = super().format_message()
+        if (e := self.__cause__) is not None:
+            msg += f"\n\t({type(e).__name__}) {e}"
+        return msg
+
+    def __str__(self) -> str:
+        return self.format_message()
 
 
 _AUTH_POLICY_DEFAULT_NAME = "Globus Compute Authentication Policy"
@@ -170,6 +196,10 @@ def get_ep_dir_by_name_or_uuid(ctx, param, value, require_local: bool = True):
                              If this is False, an unrecognized UUID is ok,
                              presumably used to interact with the web-service.
     """
+    if not value:
+        ctx.params["ep_dir"] = None
+        return
+
     conf_dir = get_config_dir()
     try:
         uuid.UUID(value)
@@ -1032,6 +1062,215 @@ def enable_on_boot_cmd(ep_dir: pathlib.Path):
 @name_or_uuid_arg
 def disable_on_boot_cmd(ep_dir: pathlib.Path):
     disable_on_boot(ep_dir)
+
+
+RENDER_USER_CONFIG_EPILOG = """
+Example invocations:
+
+  $ {prog} render-user-config -t my_template.yaml.j2 -s user_config_schema.json -o user_options.json
+
+  $ cat user_options.json | {prog} render-user-config -e my_endpoint -o -
+"""  # noqa: E501
+
+
+@app.command(
+    "render-user-config",
+    epilog=RENDER_USER_CONFIG_EPILOG.format(prog=sys.argv[0].rsplit("/", 1)[1]),
+    context_settings={"max_content_width": shutil.get_terminal_size().columns},
+)
+@click.option(
+    "--endpoint",
+    "-e",
+    callback=get_ep_dir_by_name_or_uuid,
+    help="Endpoint name or UUID to read template and files from",
+    expose_value=False,
+)
+@click.option(
+    "--template",
+    "-t",
+    type=click.File(),
+    help="YAML Jinja2 template to render",
+)
+@click.option(
+    "--user-options",
+    "-o",
+    type=click.File(),
+    help="JSON user options to render to the template",
+)
+@click.option(
+    "--user-schema",  # shorter than --user-config-schema to fit Click's help columns
+    "-s",
+    type=click.File(),
+    help="JSON schema to validate user options against",
+)
+@optgroup.group(
+    "Reserved Variables",
+    help="Users cannot set these normally; they are provided for admin convenience",
+)
+@optgroup.option(
+    "--parent-config",
+    type=click.File(),
+    help="YAML data to render to the 'parent_config' reserved variable",
+)
+@optgroup.option(
+    "--user-runtime",
+    type=click.File(),
+    help="JSON data to render to the 'user_runtime' reserved variable",
+)
+@optgroup.option(
+    "--mapped-identity",
+    type=click.File(),
+    help="JSON data to render to the 'mapped_identity' reserved variable",
+)
+def render_user_config(
+    ep_dir: pathlib.Path | None,
+    template: t.TextIO | None,
+    user_options: t.TextIO | None,
+    user_schema: t.TextIO | None,
+    parent_config: t.TextIO | None,
+    user_runtime: t.TextIO | None,
+    mapped_identity: t.TextIO | None,
+):
+    """
+    Render a user config template to stdout
+
+    When the --endpoint option is supplied, any files used in rendering are pulled from
+    that endpoint's config by default, but can still be manually overridden as needed.
+    Otherwise, any files of interest must be specified via the other options.
+
+    All file options also interpret the hyphen (-) as a switch to read from stdin.
+    """
+
+    _do_render_user_config(
+        parent_ep_dir=ep_dir,
+        template_file=template,
+        user_options_file=user_options,
+        user_schema_file=user_schema,
+        parent_config_file=parent_config,
+        user_runtime_file=user_runtime,
+        mapped_identity_file=mapped_identity,
+    )
+
+
+def _do_render_user_config(
+    parent_ep_dir: pathlib.Path | None,
+    template_file: t.TextIO | None,
+    user_options_file: t.TextIO | None,
+    user_schema_file: t.TextIO | None,
+    parent_config_file: t.TextIO | None,
+    user_runtime_file: t.TextIO | None,
+    mapped_identity_file: t.TextIO | None,
+):
+    stdin_files = [
+        f
+        for f in (
+            template_file,
+            user_options_file,
+            user_schema_file,
+            parent_config_file,
+            user_runtime_file,
+            mapped_identity_file,
+        )
+        if f == sys.stdin
+    ]
+    if len(stdin_files) > 1:
+        raise ClickException(
+            "At most one input may be read from stdin across all options."
+        )
+
+    if parent_ep_dir is None and template_file is None:
+        raise ClickException("Must provide at least one of --endpoint or --template.")
+
+    parent_config = ManagerEndpointConfig()
+    user_config_template: str
+    user_config_template_path: pathlib.Path
+    user_config_schema = {}
+
+    if parent_ep_dir is not None:
+        parent_config = get_config(parent_ep_dir)  # type: ignore[assignment]
+        if not isinstance(parent_config, ManagerEndpointConfig):
+            raise ClickException(
+                f"Endpoint {parent_ep_dir.name} does not support templating."
+            )
+
+        user_config_template_path = (
+            parent_config.user_config_template_path
+            or Endpoint.user_config_template_path(parent_ep_dir)
+        )
+        user_config_template = load_user_config_template(user_config_template_path)
+        _user_config_schema_path = (
+            parent_config.user_config_schema_path
+            or Endpoint.user_config_schema_path(parent_ep_dir)
+        )
+        user_config_schema = load_user_config_schema(_user_config_schema_path) or {}
+
+    if parent_config_file is not None:
+        try:
+            parent_config = load_config_yaml(
+                parent_config_file.read()
+            )  # type: ignore[assignment]
+        except Exception as e:
+            raise ClickExceptionWithContext(
+                f"Invalid parent config data in {parent_config_file.name}."
+            ) from e
+        if not isinstance(parent_config, ManagerEndpointConfig):
+            raise ClickException("Provided parent config does not support templating.")
+
+    if template_file is not None:
+        user_config_template = template_file.read()
+        user_config_template_path = pathlib.Path(template_file.name)
+
+    def _read_json_dict(file: t.TextIO, description: str) -> dict[str, t.Any]:
+        try:
+            data = json.load(file)
+        except json.JSONDecodeError as e:
+            raise ClickExceptionWithContext(
+                f"Invalid JSON in {file.name} for {description}."
+            ) from e
+        if not isinstance(data, dict):
+            raise ClickException(
+                f"Invalid {description} data in {file.name}: must be a JSON dictionary."
+            )
+        return data
+
+    if user_schema_file is not None:
+        user_config_schema = _read_json_dict(user_schema_file, "user schema")
+
+    if user_options_file is not None:
+        user_opts = _read_json_dict(user_options_file, "user options")
+    else:
+        user_opts = {}
+
+    if user_runtime_file is not None:
+        user_runtime = _read_json_dict(user_runtime_file, "user runtime")
+    else:
+        user_runtime = asdict(create_user_runtime())
+        # sanitization logic in render command expects only jsonable values
+        user_runtime = json.loads(json.dumps(user_runtime))
+
+    if mapped_identity_file is not None:
+        mapped_identity = MappedPosixIdentity(
+            **_read_json_dict(mapped_identity_file, "mapped identity")
+        )
+    else:
+        mapped_identity = MappedPosixIdentity(
+            local_user_record=pwd.getpwuid(os.getuid()),
+            matched_identity=uuid.UUID(int=0),
+            globus_identity_candidates=[],  # not used for rendering
+        )
+
+    rendered_config = render_config_user_template(
+        parent_config=parent_config,
+        user_config_template=user_config_template,
+        user_config_template_path=user_config_template_path,
+        mapped_identity=mapped_identity,
+        user_config_schema=user_config_schema,
+        user_opts=user_opts,
+        user_runtime=user_runtime,
+    )
+
+    log.info("Rendered user config:")
+    print(rendered_config)
 
 
 @app.command(

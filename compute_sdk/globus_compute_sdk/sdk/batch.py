@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import platform
+import sys
 import typing as t
 import uuid
 from collections import defaultdict
@@ -11,6 +13,8 @@ from globus_compute_sdk.sdk.utils.uuid_like import (
     as_uuid,
 )
 from globus_compute_sdk.serialize import ComputeSerializer
+from globus_compute_sdk.version import __version__
+from globus_sdk.version import __version__ as __version_globus__
 
 _default_serde = ComputeSerializer()
 
@@ -95,6 +99,29 @@ class UserRuntime:
         release: str
 
     platform: PlatformInfo
+
+
+def create_user_runtime() -> UserRuntime:
+    return UserRuntime(
+        globus_compute_sdk_version=__version__,
+        globus_sdk_version=__version_globus__,
+        python_version=sys.version,
+        python=UserRuntime.PythonInfo(
+            version=platform.python_version(),
+            version_tuple=sys.version_info[:3],
+            version_info=tuple(sys.version_info),  # type: ignore[arg-type]
+            compiler=platform.python_compiler(),
+            implementation=platform.python_implementation(),
+        ),
+        platform=UserRuntime.PlatformInfo(
+            architecture=platform.architecture(),
+            machine=platform.machine(),
+            node=platform.node(),
+            platform=platform.platform(),
+            processor=platform.processor(),
+            release=platform.release(),
+        ),
+    )
 
 
 class Batch:

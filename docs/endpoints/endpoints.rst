@@ -601,6 +601,12 @@ pulling out the configuration from the logs:
    $ sed -n "/Begin Compute/,/End Compute/p" ~/.globus_compute/uep.[...]/endpoint.log | less
 
 
+Testing Templates
+-----------------
+
+Iterating on template changes by restarting the endpoint and submitting a task can be very slow. As a result, the Compute Endpoint CLI includes a :ref:`tool for rendering config templates offline, without touching the endpoint lifecycle at all. <testing-templates>`
+
+
 Client Identities
 =================
 

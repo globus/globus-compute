@@ -13,6 +13,140 @@ which focuses on the unique features and peculiarities of Globus Compute
 configuration templates.
 
 
+.. _testing-templates:
+
+Testing Templates
+=================
+
+The Compute Endpoint CLI includes a tool, ``globus-compute-endpoint render-user-config``,
+which can be used to test the template rendering process without having to submit a
+task or even configure an endpoint.
+
+.. note::
+
+   For the most up-to-date documentation on available options, run
+   ``globus-compute-endpoint render-user-config --help``.
+
+In its simplest mode, calling the tool might look like this:
+
+.. code-block:: console
+   :caption: Example usage with local endpoint
+
+   $ globus-compute-endpoint render-user-config -e my_endpoint -o user_options.json
+
+   > Rendered user config:
+   engine:
+      type: GlobusComputeEngine
+      provider:
+         type: LocalProvider
+         worker_init: "echo 'hello world'"
+
+.. code-block:: yaml+jinja
+   :caption: ``~/.globus_compute/my_endpoint/user_config_template.yaml.j2``
+
+   engine:
+      type: GlobusComputeEngine
+      provider:
+         type: LocalProvider
+         worker_init: {{ worker_init }}
+
+.. code-block:: json
+   :caption: ``user_options.json``
+
+   { "worker_init": "echo 'hello world'" }
+
+The ``-e`` option, short for ``--endpoint``, takes a local endpoint name/UUID, and the
+``-o`` option, short for ``--user-options``, takes a filename pointing to JSON data.
+Here, the tool reads the endpoint's config, renders the associated template with any
+values in ``user_options.json`` included, and outputs the rendered template to ``stdout``.
+
+Alternatively, the render tool can be pointed directly to the template file, along with
+any other files it might need:
+
+.. code-block:: console
+   :caption: Example "offline" usage without an endpoint
+
+   $ cat user_options.json | globus-compute-endpoint render-user-config \
+      --template user_config_template.yaml.j2 \
+      --user-options-file - \
+      <other options...>
+
+This applies the same rendering logic and also outputs the final value to ``stdout`` as
+before - the main difference is that this approach does not require a pre-configured
+endpoint. Note that the ``-`` argument used here for ``--user-options-file`` indicates
+that the file should be read from ``stdin``, which works with any other file-based
+options as well.
+
+These approaches can also be mixed. Whenever the ``--endpoint`` option is present, file
+paths are pulled from the endpoint's config by default, but any file paths supplied as
+options take precedence. This makes it easy to A/B test changes without modifying files
+in production.
+
+Testing Reserved Variables
+--------------------------
+
+When rendering :ref:`reserved variables <reserved-template-variables>`, the render tool
+makes reasonable guesses and supplies dummy data. In cases where admins want more
+control, they can specify the value(s) to render to any reserved variable:
+
+.. code-block:: console
+   :caption: Custom ``user_runtime``
+
+   $ globus-compute-endpoint render-user-config -e template-snippet.yaml.j2 \
+      --user-runtime my-custom-user-runtime.json
+
+   > Rendered user config:
+   worker_init: |
+      echo 'Globus Compute SDK version: "arbitrary value"'
+      echo 'foo: "bar"'
+
+.. code-block:: yaml+jinja
+   :caption: ``template-snippet.yaml.j2``
+
+   worker_init: |
+      echo 'Globus Compute SDK version: {{ user_runtime.globus_compute_sdk_version }}'
+      echo 'foo: {{ user_runtime.foo }}'
+
+.. code-block:: json
+   :caption: ``my-custom-user-runtime.json``
+
+   {
+      "globus_compute_sdk_version": "arbitrary value",
+      "foo": "bar"
+   }
+
+Validating YAML Syntax
+----------------------
+
+When working with Jinja (or any templating engine for that matter), it's easy to
+accidentally produce syntactically invalid output. Since the render tool outputs the
+rendered config to ``stdout`` and all other information to ``stderr``, admins can pipe
+to another tool for handling validation:
+
+.. code-block:: console
+   :caption: Using ``yq`` for validation
+   :emphasize-lines: 3
+
+   $ globus-compute-endpoint render-user-config \
+      -t bad-template.yaml.j2 \
+      | yq - >/dev/null
+
+   > Rendered user config:
+   Error: bad file '-': yaml: line 2: mapping values are not allowed in this context
+
+.. code-block:: yaml+jinja
+   :caption: ``bad-template.yaml.j2``
+
+   engine: there shouldn't be any text here!
+      type: GlobusComputeEngine
+
+This example leverages `yq`__ to validate the rendered YAML, which prints syntax errors
+to ``stderr``. Specifically, this invocation takes its input from ``stdin`` with the
+``-`` argument, and silences its output (usually just the input YAML repeated) by
+redirecting to ``/dev/null``.
+
+.. __: https://mikefarah.gitbook.io/yq
+
 User Input Security
 ===================
 
