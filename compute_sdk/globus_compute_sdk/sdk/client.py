@@ -4,7 +4,6 @@ import functools
 import json
 import logging
 import platform
-import sys
 import threading
 import typing as t
 import warnings
@@ -32,11 +31,10 @@ from globus_compute_sdk.serialize import (
 )
 from globus_compute_sdk.version import __version__, compare_versions
 from globus_sdk.gare import GlobusAuthorizationParameters
-from globus_sdk.version import __version__ as __version_globus__
 
 from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app
-from .batch import Batch, UserRuntime
+from .batch import Batch, create_user_runtime
 from .login_manager import LoginManagerProtocol
 from .utils import get_env_var_with_deprecation
 from .web_client import WebClient
@@ -548,26 +546,7 @@ class Client:
             create_websocket_queue,
             result_serializers=result_serializers,
             serializer=self.fx_serializer,
-            user_runtime=UserRuntime(
-                globus_compute_sdk_version=__version__,
-                globus_sdk_version=__version_globus__,
-                python_version=sys.version,
-                python=UserRuntime.PythonInfo(
-                    version=platform.python_version(),
-                    version_tuple=sys.version_info[:3],
-                    version_info=tuple(sys.version_info),  # type: ignore[arg-type]
-                    compiler=platform.python_compiler(),
-                    implementation=platform.python_implementation(),
-                ),
-                platform=UserRuntime.PlatformInfo(
-                    architecture=platform.architecture(),
-                    machine=platform.machine(),
-                    node=platform.node(),
-                    platform=platform.platform(),
-                    processor=platform.processor(),
-                    release=platform.release(),
-                ),
-            ),
+            user_runtime=create_user_runtime(),
         )
 
     @_client_gares_handler

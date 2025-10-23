@@ -1,0 +1,7 @@
+New Functionality
+^^^^^^^^^^^^^^^^^
+
+- Added the ``render-user-config`` command to the endpoint CLI, which renders a given
+    endpoint's user config template to stdout. This allows admins to validate
+    configuration templates without needing to restart or interact with running
+    endpoint processes.

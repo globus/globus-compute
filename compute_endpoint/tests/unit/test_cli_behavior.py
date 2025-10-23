@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import io
 import json
 import logging
@@ -18,20 +19,27 @@ import globus_sdk
 import pytest
 import yaml
 from click import ClickException
+from click import File as ClickFile
 from click.testing import CliRunner
 from globus_compute_endpoint import cli
 from globus_compute_endpoint.cli import (
     _AUTH_POLICY_DEFAULT_DESC,
     _AUTH_POLICY_DEFAULT_NAME,
+    ClickExceptionWithContext,
     _do_login,
     _do_logout_endpoints,
+    _do_render_user_config,
     app,
     create_or_choose_auth_project,
     init_config_dir,
 )
-from globus_compute_endpoint.endpoint.config import UserEndpointConfig
+from globus_compute_endpoint.endpoint.config import (
+    ManagerEndpointConfig,
+    UserEndpointConfig,
+)
 from globus_compute_endpoint.endpoint.config.utils import load_config_yaml
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
+from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.auth.globus_app import UserApp
 from globus_compute_sdk.sdk.compute_dir import ensure_compute_dir
@@ -94,10 +102,24 @@ def mock_ep(gc_dir, ep_name):
 
 
 @pytest.fixture
+def mock_load_config_yaml():
+    conf = UserEndpointConfig()
+    with mock.patch(f"{_MOCK_BASE}load_config_yaml") as m:
+        m.return_value = conf
+        yield m
+
+
+@pytest.fixture
 def mock_get_config():
     conf = UserEndpointConfig()
     with mock.patch(f"{_MOCK_BASE}get_config") as m:
         m.return_value = conf
+        yield m
+
+
+@pytest.fixture
+def mock_render_config_user_template():
+    with mock.patch(f"{_MOCK_BASE}render_config_user_template") as m:
         yield m
 
 
@@ -110,7 +132,6 @@ def make_endpoint_dir(mock_command_ensure, ep_name):
             ep_json = ep_dir / "endpoint.json"
             ep_json.write_text(json.dumps({"endpoint_id": ep_uuid}))
         ep_config = Endpoint._config_file_path(ep_dir)
-        ep_template = Endpoint.user_config_template_path(ep_dir)
         ep_config.write_text(
             """
 display_name: null
@@ -118,11 +139,43 @@ engine:
     type: ThreadPoolEngine
             """.strip()
         )
+        return ep_dir
+
+    return func
+
+
+@pytest.fixture
+def make_manager_endpoint_dir(mock_command_ensure, ep_name):
+    def func(name=ep_name, ep_uuid=None):
+        ep_dir = mock_command_ensure.endpoint_config_dir / name
+        ep_dir.mkdir(parents=True, exist_ok=True)
+        if ep_uuid is not None:
+            ep_json = ep_dir / "endpoint.json"
+            ep_json.write_text(json.dumps({"endpoint_id": ep_uuid}))
+        ep_config = Endpoint._config_file_path(ep_dir)
+        ep_template = Endpoint.user_config_template_path(ep_dir)
+        ep_schema = Endpoint.user_config_schema_path(ep_dir)
+        ep_config.write_text(
+            """
+display_name: null
+            """.strip()
+        )
         ep_template.write_text(
             """
 heartbeat_period: {{ heartbeat }}
 engine:
     type: ThreadPoolEngine
+            """.strip()
+        )
+        ep_schema.write_text(
+            """
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "heartbeat": { "type": "number" }
+  }
+}
             """.strip()
         )
         return ep_dir
@@ -152,6 +205,22 @@ def run_line(cli_runner):
         return result
 
     return func
+
+
+@pytest.mark.parametrize(
+    "cause", [None, Exception("boom"), ClickException("click boom")]
+)
+def test_click_exception_with_context(cause, randomstring):
+    message = randomstring()
+    with pytest.raises(ClickExceptionWithContext) as pyt_exc:
+        raise ClickExceptionWithContext(message) from cause
+
+    if cause is not None:
+        exc = pyt_exc.value
+        assert exc.__cause__ is cause
+        assert message in str(exc)
+        assert type(cause).__name__ in str(exc)
+        assert str(cause) in str(exc)
 
 
 @pytest.mark.parametrize("dir_exists", [True, False])
@@ -1178,3 +1247,305 @@ def test_delete_endpoint_no_local_config(
     result = run_line(line, assert_exit_code=1)
     assert not mock_ep.delete_endpoint.called
     assert err_msg in result.stderr
+
+
+def test_render_user_config_happy_path(
+    run_line,
+    mock_render_config_user_template,
+    make_manager_endpoint_dir,
+    ep_name,
+    randomstring,
+):
+    mock_render_result = randomstring()
+    mock_render_config_user_template.return_value = mock_render_result
+    ep_dir = make_manager_endpoint_dir()
+
+    user_options = {"heartbeat": "some_value"}
+    user_options_path = ep_dir / "user_options.json"
+    user_options_path.write_text(json.dumps(user_options))
+
+    result = run_line(
+        f"render-user-config -e {ep_name} --user-options {user_options_path}",
+        assert_exit_code=0,
+    )
+
+    assert mock_render_result in result.stdout
+    mock_render_config_user_template.assert_called_once()
+    for _, v in mock_render_config_user_template.call_args.kwargs.items():
+        assert v is not None
+
+
+@pytest.mark.parametrize(
+    "option,contents",
+    [
+        pytest.param("--template", "template: value\n", id="template"),
+        pytest.param("--user-options", '{"foo": "bar"}', id="user-options"),
+        pytest.param("--user-schema", '{"type": "object"}', id="user-schema"),
+        pytest.param("--parent-config", "display_name: parent\n", id="parent-config"),
+        pytest.param("--user-runtime", '{"runtime": "val"}', id="user-runtime"),
+        pytest.param(
+            "--mapped-identity",
+            '{"local_user_record": null, "matched_identity": null, "globus_identity_candidates": null}',  # noqa: E501
+            id="mapped-identity",
+        ),
+    ],
+)
+def test_render_user_config_file_options(
+    run_line,
+    make_manager_endpoint_dir,
+    mock_render_config_user_template,
+    randomstring,
+    option,
+    contents,
+):
+    ep_dir = make_manager_endpoint_dir()
+
+    file_path = ep_dir / randomstring()
+    file_path.write_text(contents)
+
+    def fake_render_config_user_template(**kwargs):
+        out = ""
+        for v in kwargs.values():
+            if isinstance(v, dict):
+                out += json.dumps(v)
+            elif isinstance(v, str):
+                out += v
+            elif isinstance(v, ManagerEndpointConfig):
+                out += yaml.safe_dump({"display_name": v.display_name})
+            elif isinstance(v, MappedPosixIdentity):
+                out += json.dumps(
+                    {
+                        "local_user_record": v.local_user_record,
+                        "matched_identity": (
+                            str(v.matched_identity) if v.matched_identity else None
+                        ),
+                        "globus_identity_candidates": v.globus_identity_candidates,
+                    }
+                )
+        return out
+
+    mock_render_config_user_template.side_effect = fake_render_config_user_template
+
+    result = run_line(
+        f"render-user-config -e {ep_dir.name} {option} {file_path}",
+        assert_exit_code=0,
+    )
+
+    assert contents in result.stdout
+
+
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        param.name
+        for param in cli.render_user_config.params
+        if isinstance(param.type, ClickFile)
+    ],
+)
+def test_render_user_config_stdin(run_line, mocker, randomstring, parameter):
+    mock__do_render = mocker.patch(f"{_MOCK_BASE}_do_render_user_config")
+    stdin_text = randomstring()
+    option = parameter.replace("_", "-")
+
+    run_line(f"render-user-config --{option} -", stdin=stdin_text)
+
+    mock__do_render.assert_called_once()
+    call_args = mock__do_render.call_args.kwargs
+    assert call_args[parameter + "_file"].read() == stdin_text
+
+
+@pytest.mark.parametrize(
+    "option",
+    [
+        param.name.replace("_", "-")
+        for param in cli.render_user_config.params
+        if isinstance(param.type, ClickFile)
+        and param.name is not None
+        and param.name not in {"template"}
+    ],
+)
+def test_render_user_config_file_option_malformed(
+    run_line,
+    make_manager_endpoint_dir,
+    randomstring,
+    option,
+):
+    ep_dir = make_manager_endpoint_dir()
+
+    file_path = ep_dir / randomstring()
+    file_path.write_text(randomstring())  # malformed content
+
+    result = run_line(
+        f"render-user-config -e {ep_dir.name} --{option} {file_path}",
+        assert_exit_code=1,
+    )
+
+    assert "Invalid" in result.stderr
+    assert option.replace("-", " ") in result.stderr
+
+
+def test_render_user_config_calls__do_render(run_line, mocker):
+    mock__do_render = mocker.patch(f"{_MOCK_BASE}_do_render_user_config")
+    run_line("render-user-config")
+    mock__do_render.assert_called_once()
+
+
+def test__do_render_user_config_stdin_at_most_once():
+    file_params = [
+        p
+        for p in inspect.signature(_do_render_user_config).parameters
+        if p.endswith("_file")
+    ]
+    num_stdin_files = random.randint(2, len(file_params))
+    stdin_file_params = random.sample(file_params, num_stdin_files)
+
+    kwargs = {p: sys.stdin if p in stdin_file_params else None for p in file_params}
+
+    with pytest.raises(
+        ClickException, match="At most one input may be read from stdin"
+    ):
+        _do_render_user_config(parent_ep_dir=None, **kwargs)
+
+
+def test__do_render_user_config_needs_endpoint_or_template():
+    with pytest.raises(
+        ClickException, match="at least one of --endpoint or --template"
+    ):
+        _do_render_user_config(
+            parent_ep_dir=None,
+            template_file=None,
+            user_options_file=None,
+            user_schema_file=None,
+            parent_config_file=None,
+            user_runtime_file=None,
+            mapped_identity_file=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "parent_ep_dir,parent_config_file",
+    [
+        pytest.param(pathlib.Path("/some/path"), None, id="parent_ep_dir"),
+        pytest.param(None, io.StringIO(""), id="parent_config_file"),
+    ],
+)
+def test__do_render_user_config_checks_template_capable(
+    mock_load_config_yaml, mock_get_config, parent_ep_dir, parent_config_file
+):
+    e = "test setup: mocked config should never be template capable"
+    assert not isinstance(mock_get_config.return_value, ManagerEndpointConfig), e
+    assert not isinstance(mock_load_config_yaml.return_value, ManagerEndpointConfig), e
+
+    with pytest.raises(ClickException, match="does not support templating"):
+        _do_render_user_config(
+            parent_ep_dir=parent_ep_dir,
+            parent_config_file=parent_config_file,
+            template_file=mock.Mock(),
+            user_options_file=None,
+            user_schema_file=None,
+            user_runtime_file=None,
+            mapped_identity_file=None,
+        )
+
+
+@pytest.mark.parametrize("template_filename", [None, "template.yaml.j2"])
+@pytest.mark.parametrize("schema_filename", [None, "schema.json"])
+def test__do_render_user_config_gets_paths_from_parent_ep(
+    mocker, make_manager_endpoint_dir, template_filename, schema_filename
+):
+    ep_dir: pathlib.Path = make_manager_endpoint_dir()
+
+    template_path = (ep_dir / template_filename) if template_filename else None
+    schema_path = (ep_dir / schema_filename) if schema_filename else None
+
+    with (ep_dir / "config.yaml").open("a") as f:
+        if template_path:
+            f.write(f'\nuser_config_template_path: "{template_path}"\n')
+            template_path.touch()
+        if schema_path:
+            f.write(f'\nuser_config_schema_path: "{schema_path}"\n')
+            schema_path.touch()
+
+    mocker.patch(f"{_MOCK_BASE}render_config_user_template")
+    mock_load_template = mocker.patch(f"{_MOCK_BASE}load_user_config_template")
+    mock_load_schema = mocker.patch(f"{_MOCK_BASE}load_user_config_schema")
+
+    user_options_path = ep_dir / "user_options.json"
+    user_options_path.write_text(json.dumps({}))
+
+    _do_render_user_config(
+        parent_ep_dir=ep_dir,
+        template_file=None,
+        user_options_file=user_options_path.open("r"),
+        user_schema_file=None,
+        parent_config_file=None,
+        user_runtime_file=None,
+        mapped_identity_file=None,
+    )
+
+    mock_load_template.assert_called_once_with(
+        template_path or Endpoint.user_config_template_path(ep_dir)
+    )
+    mock_load_schema.assert_called_once_with(
+        schema_path or Endpoint.user_config_schema_path(ep_dir)
+    )
+
+
+@pytest.mark.parametrize("template_from", ["config", "param"])
+@pytest.mark.parametrize("schema_from", ["config", "param"])
+def test__do_render_user_config_parent_ep_overrides(
+    mock_render_config_user_template,
+    make_manager_endpoint_dir,
+    template_from,
+    schema_from,
+):
+    ep_dir: pathlib.Path = make_manager_endpoint_dir()
+
+    template_config_path = ep_dir / "template.config"
+    template_param_path = ep_dir / "template.param"
+    schema_config_path = ep_dir / "schema.config"
+    schema_param_path = ep_dir / "schema.param"
+
+    template_config = "template from config"
+    template_param = "template from param"
+    schema_config = {"schema": "from config"}
+    schema_param = {"schema": "from param"}
+
+    template_config_path.write_text(template_config)
+    template_param_path.write_text(template_param)
+    schema_config_path.write_text(json.dumps(schema_config))
+    schema_param_path.write_text(json.dumps(schema_param))
+
+    with (ep_dir / "config.yaml").open("a") as f:
+        f.write(
+            f'\nuser_config_template_path: "{template_config_path}"\n'
+            f'\nuser_config_schema_path: "{schema_config_path}"\n'
+        )
+
+    template_file = {
+        "config": None,
+        "param": template_param_path.open("r"),
+    }.get(template_from)
+    schema_file = {
+        "config": None,
+        "param": schema_param_path.open("r"),
+    }.get(schema_from)
+
+    _do_render_user_config(
+        parent_ep_dir=ep_dir,
+        template_file=template_file,
+        user_schema_file=schema_file,
+        user_options_file=None,
+        parent_config_file=None,
+        user_runtime_file=None,
+        mapped_identity_file=None,
+    )
+
+    mock_render_config_user_template.assert_called_once()
+    mock_render_kwargs = mock_render_config_user_template.call_args.kwargs
+    assert mock_render_kwargs["user_config_template"] == (
+        template_param if template_from == "param" else template_config
+    )
+    assert mock_render_kwargs["user_config_schema"] == (
+        schema_param if schema_from == "param" else schema_config
+    )
