@@ -11,7 +11,7 @@ import sys
 import time
 import typing as t
 import uuid
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
 import globus_sdk
@@ -253,6 +253,18 @@ def test_start_endpoint_stale(mock_ep, make_endpoint_dir, ep_name):
     assert "Previous endpoint instance" in serr, "Expect 'who' in warning"
     assert "failed to shutdown cleanly" in serr, "Expect 'what' in warning"
     assert "Removing PID file" in serr, "Expect action taken in warning"
+
+
+@pytest.mark.parametrize("is_uep", (False, True))
+def test_start_non_template_emits_upgrade_message(mock_ep, make_endpoint_dir, is_uep):
+    ep_dir = make_endpoint_dir()
+    f = io.StringIO()
+    with redirect_stdout(f):
+        cli._do_start_endpoint(
+            ep_dir=ep_dir, endpoint_uuid=None, die_with_parent=is_uep
+        )
+
+    assert ("migrate-to-template-capable" in f.getvalue()) is not is_uep
 
 
 @pytest.mark.parametrize("cli_cmd", ["configure"])
