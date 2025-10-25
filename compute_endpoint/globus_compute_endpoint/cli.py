@@ -751,15 +751,18 @@ def _do_start_endpoint(
         else:
             assert isinstance(ep_config, UserEndpointConfig)
 
-            print(
-                "This endpoint is not template capable. To add that capability, run:"
-                f"\n\n\t$ globus-compute-endpoint migrate-to-template-capable {ep_dir.name}\n"  # noqa: E501
-            )
-
             if die_with_parent:
                 # The endpoint cannot die with its parent if it doesn't have one :)
                 ep_config.detach_endpoint = False
                 log.debug("The --die-with-parent flag has set detach_endpoint to False")
+            else:
+                bname = os.path.basename(sys.argv[0])
+                print(
+                    "\nThis endpoint is not template capable.  To add that capability,"
+                    " run:\n\n"
+                    f"    $ {bname} migrate-to-template-capable {ep_dir.name}\n",
+                    flush=True,
+                )
 
             get_cli_endpoint(ep_config).start_endpoint(
                 ep_dir,
