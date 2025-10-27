@@ -20,6 +20,7 @@ from globus_compute_endpoint.endpoint.config import (
 from globus_compute_endpoint.endpoint.config.utils import (
     RESERVED_USER_CONFIG_TEMPLATE_VARIABLES,
     _validate_user_opts,
+    get_config,
     load_config_yaml,
     load_user_config_schema,
     load_user_config_template,
@@ -27,6 +28,7 @@ from globus_compute_endpoint.endpoint.config.utils import (
 )
 from globus_compute_endpoint.endpoint.endpoint import Endpoint
 from globus_compute_endpoint.endpoint.identity_mapper import MappedPosixIdentity
+from tests.conftest import randomstring_impl
 from tests.unit.conftest import known_manager_config_opts, known_user_config_opts
 
 _MOCK_BASE = "globus_compute_endpoint.endpoint.config.utils."
@@ -494,6 +496,28 @@ def test_validate_user_opts_reserved_words(
 
     assert reserved_word in str(pyt_exc)
     assert "reserved" in str(pyt_exc)
+
+
+@pytest.mark.parametrize("conftext", ("display_name: test-name", "", None))
+def test_get_config_missing_ok(fs, conftext):
+    conf_dir = pathlib.Path("/")
+    if conftext is not None:
+        (conf_dir / "config.yaml").write_text(conftext)
+
+    conf = get_config(conf_dir)  # basically, not exploding is the test
+    assert conftext and conf.display_name == "test-name" or conf.display_name is None
+
+
+@pytest.mark.parametrize("dirname", (randomstring_impl(),))
+def test_get_config_dir_not_exist(fs, dirname):
+    conf_dir = pathlib.Path(f"/{dirname}")
+
+    with pytest.raises(ClickException) as pyt_e:
+        get_config(conf_dir)
+
+    assert str(conf_dir / "config.yaml") in str(pyt_e.value)
+    assert f"Endpoint '{dirname}' is not configured" in str(pyt_e.value), "Expect what"
+    assert "Please create" in str(pyt_e.value), "Expect suggested action"
 
 
 @pytest.mark.parametrize(
