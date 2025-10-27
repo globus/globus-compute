@@ -200,14 +200,6 @@ def test_init_config_dir_permission_error(fs):
     assert "Permission denied" in str(exc)
 
 
-def test_start_ep_corrupt(run_line, mock_command_ensure, make_endpoint_dir, ep_name):
-    make_endpoint_dir()
-    conf = mock_command_ensure.endpoint_config_dir / ep_name / "config.yaml"
-    conf.unlink()
-    res = run_line(f"start {ep_name}", assert_exit_code=1)
-    assert "corrupted?" in res.stderr
-
-
 def test_start_endpoint_no_such_ep(run_line, mock_ep, ep_name):
     res = run_line(f"start {ep_name}", assert_exit_code=1)
     mock_ep.start_endpoint.assert_not_called()

@@ -84,7 +84,7 @@ def _load_config_py(
 
 def load_config_yaml(config_str: str) -> UserEndpointConfig | ManagerEndpointConfig:
     try:
-        config_dict = dict(yaml.safe_load(config_str))
+        config_dict = dict(yaml.safe_load(config_str) or {})
     except Exception as err:
         raise ClickException(f"Invalid config syntax: {str(err)}") from err
 
@@ -143,13 +143,7 @@ def get_config(
     except FileNotFoundError as err:
         endpoint_name = endpoint_dir.name
 
-        if endpoint_dir.exists():
-            msg = (
-                f"{err}"
-                "\n\nUnable to find required configuration file; has the configuration"
-                "\ndirectory been corrupted?"
-            )
-        else:
+        if not endpoint_dir.exists():
             configure_command = "globus-compute-endpoint configure"
             if endpoint_name != "default":
                 configure_command += f" {endpoint_name}"
@@ -161,7 +155,11 @@ def get_config(
                 "\n2. Update the configuration"
                 "\n3. Try again\n"
             )
-        raise ClickException(msg) from err
+
+            raise ClickException(msg) from err
+
+        # It's not incorrect to have no `config.yaml`; interpret as empty string
+        config_str = ""
 
     return load_config_yaml(config_str)
 
