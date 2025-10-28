@@ -354,6 +354,7 @@ environment for each worker.  In general, there are two approaches:
    ``globus-compute-endpoint`` module version on the worker environment and on
    the endpoint interchange.
 
+
 Python-Based Environments
 -------------------------
 
@@ -367,6 +368,11 @@ Python‑based environment management uses the |worker_init|_ config option:
        worker_init: |
          conda activate my-conda-env  # or venv, or virtualenv, or ...
          source /some/other/config
+
+.. hint::
+   See the :doc:`../tutorials/dynamic_python_environments` tutorial for instructions on how
+   to dynamically change the worker's environment based on the Python version of the submitting
+   user.
 
 Though the exact behavior of ``worker_init`` depends on the specific
 |Provider|_, this is run in the same process as the worker, allowing environment
@@ -400,6 +406,7 @@ Similarly, artifacts created by ``endpoint_setup`` may be cleaned up with
 
    endpoint_teardown: |
      conda remove -n my-conda-env --all
+
 
 .. _containerized-environments:
 
@@ -480,53 +487,6 @@ The Docker YAML example from above could be approached via ``custom`` and the
 
 .. |Provider| replace:: ``ExecutionProvider``
 .. _Provider: https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.base.ExecutionProvider.html
-
-
-.. _configure-multiple-python-versions:
-
-Support Multiple Python Versions
-================================
-
-Due to issues with cross-version serialization, we recommend :ref:`keeping the
-Python version running on Endpoint workers in sync <avoiding-serde-errors>` with
-the version that functions are first submitted from.  However, this can be
-limiting for workflows where admins have little control over their user's SDK
-environments, such as locally run Jupyter notebooks.  This can sometimes be
-alleviated with :ref:`an alternate serialization strategy
-<specifying-serde-strategy>` (e.g.
-:class:`~globus_compute_sdk.serialize.JSONData`, which doesn't rely on
-bytecode), but not all serialization strategies work in all environments.  A
-more robust workaround is to use the ``user_runtime`` config template variable
-to detect what Python version was used to submit the task.
-
-Suppose an admin wants to accept the four most recent Python versions
-(3.11-3.14).  Using `conda`_, they can create an environment for each Python
-version they want to support, and launch workers with the correct environment
-depending on the user's Python version.  A config template for that might look
-like:
-
-.. code-block:: yaml+jinja
-   :caption: ``user_config_template.yaml.j2``
-
-   engine:
-     type: GlobusComputeEngine
-     provider:
-        type: LocalProvider
-     {% if '3.14' in user_runtime.python_version %}
-        worker_init: conda activate py313
-     {% if '3.13' in user_runtime.python_version %}
-        worker_init: conda activate py313
-     {% elif '3.12' in user_runtime.python_version %}
-        worker_init: conda activate py312
-     {% else %}
-        worker_init: conda activate py311
-     {% endif %}
-
-This requires that there are conda environments named ``py314``, ``py313``,
-``py312``, and ``py311`` with the appropriate Python versions installed.
-
-For more information on what the template knows about the user's runtime
-environment, see :ref:`reserved-template-variables`.
 
 
 Advanced Environment Customization
