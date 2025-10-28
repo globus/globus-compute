@@ -59,7 +59,7 @@ via the ``configure`` subcommand:
 .. code-block:: console
 
    $ globus-compute-endpoint configure my_endpoint
-   Created multi-user profile for endpoint named <my_endpoint>
+   Created profile for endpoint named <my_endpoint>
 
        Configuration file: /home/user/.globus_compute/my_endpoint/config.yaml
 
