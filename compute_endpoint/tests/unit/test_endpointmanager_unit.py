@@ -1831,6 +1831,8 @@ def test_warns_if_executable_not_found(
     assert "Unable to find executable" in a[0], "Expected precise problem in warning"
     assert "(not found):" in a[0]
     assert "globus-compute-endpoint" in a[0], "Share the precise thing not-found"
+    assert "common reason for this error" in a[0], "Expect suggested core reason"
+    assert "root-only accessible location" in a[0], "Expect suggested core reason"
     assert expected_env["PATH"] in a[0]
 
     assert mock_log.error.called
