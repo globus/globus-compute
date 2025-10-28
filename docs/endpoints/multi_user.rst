@@ -144,7 +144,7 @@ properly generate the :ref:`multi-user-config-yaml` and
 .. code-block:: console
 
    # globus-compute-endpoint configure my_mu_ep
-   Created multi-user profile for endpoint named <my_mu_ep>
+   Created profile for endpoint named <my_mu_ep>
 
        Configuration file: /root/.globus_compute/my_mu_ep/config.yaml
 
