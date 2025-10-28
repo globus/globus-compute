@@ -1091,9 +1091,9 @@ class EndpointManager:
 
             from globus_compute_endpoint.logging_config import LOG_TS_FMT, setup_logging
 
-            # after dropping privileges, any log.* calls may not be able to access
-            # the parent's logging file.  We'll rely on stderr in that case, and fall
-            # back to the exit_code in the worst case.
+            # We've closed all files (beyond std*), so log.* calls are not able to
+            # access the parent's logs directly.  Now rely on stderr (not yet separated)
+            # and fall back to the exit_code in the worst case.
             setup_logging(logfile=None, debug=log.getEffectiveLevel() <= logging.DEBUG)
 
             # load prior to dropping privileges
@@ -1106,32 +1106,26 @@ class EndpointManager:
             env_path = self.conf_dir / "user_environment.yaml"
             try:
                 log.debug("Load default environment variables from: %s", env_path)
-                env_text = env_path.read_text()
-                if not env_text:
-                    raise ValueError("empty file")
-                env_data = yaml.safe_load(env_text)
-                if env_data:
-                    env.update({k: str(v) for k, v in env_data.items()})
-            except FileNotFoundError:
-                log.warning(
-                    "No user environment variable file found at %s.  Using default: %s",
-                    env_path,
-                    env,
-                )
-            except ValueError:
-                log.warning(
-                    "User environment variable file at %s is empty.  Using default: %s",
-                    env_path,
-                    env,
-                )
+                if env_path.exists():
+                    env_text = env_path.read_text().strip()
+                    env_data = yaml.safe_load(env_text)
+                    if env_data:
+                        os.environ.update({k: str(v) for k, v in env_data.items()})
+                    else:
+                        log.warning(
+                            "Environment file read, but no variables parsed."
+                            "  (Uncomment a line?  Editor buffer saved?)"
+                            f"\n  Environment file: {env_path}"
+                        )
+                    del env_data, env_text
             except Exception as e:
                 log.warning(
-                    "Failed to parse user environment variables from %s.  Using "
-                    "default: %s\n  --- Exception ---\n(%s) %s",
-                    env_path,
-                    env,
-                    type(e).__name__,
-                    e,
+                    "Using only default environment variables as no variables read"
+                    " from environment file.  Is it a valid YAML file?  (Hint: the"
+                    " `yq` command line utility may be helpful.)"
+                    f"\n Default environment: {dict(env)}"
+                    f"\n    Environment file: {env_path}"
+                    f"\n           Exception: [{type(e).__name__}] {e}"
                 )
             user_home = {"HOME": udir, "USER": uname}
 
