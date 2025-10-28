@@ -127,7 +127,7 @@ We will submit tasks to the endpoint with the |Executor|_ from the SDK.
 Specifically, we will utilize the ``user_endpoint_config`` argument and
 attribute to define values for the user endpoint configuration template.
 
-In the example below, we submit the ``get_endpoint_pkg_version()`` function
+In the example below, we submit the ``get_endpoint_version()`` function
 multiple times to the endpoint that we previously configured.  This function
 returns the version of the ``globus-compute-endpoint`` package installed in the
 container, which will vary depending on the ``container_uri`` specified.
@@ -138,7 +138,7 @@ container, which will vary depending on the ``container_uri`` specified.
    from globus_compute_sdk import Executor
 
 
-   def get_endpoint_pkg_version():
+   def get_endpoint_version():
       import globus_compute_endpoint
       return globus_compute_endpoint.__version__
 
