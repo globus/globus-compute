@@ -1187,13 +1187,15 @@ class EndpointManager:
             exit_code += 1
 
             # some Q&D verification for admin debugging purposes
-            if not shutil.which(proc_args[0], path=env["PATH"]):
+            if not shutil.which(proc_args[0]):
                 log.warning(
                     "Unable to find executable."
                     f"\n  Executable (not found): {proc_args[0]}"
-                    f'\n  Path: "{env["PATH"]}"'
+                    f'\n  Path: "{os.environ.get("PATH")}"'
                     f"\n\n  Will attempt exec anyway -- WARNING - it will likely fail."
                     f"\n  (pid: {pid}, user: {uname}, {ep_name})"
+                    f"\n\nA common reason for this error is permissions; is the virtual"
+                    " environment in a root-only accessible location, like /root/?"
                 )
 
             log.debug("Changing directory to '%s'", wd)
