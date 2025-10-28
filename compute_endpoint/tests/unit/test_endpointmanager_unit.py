@@ -1760,10 +1760,23 @@ def test_loads_user_environment(successful_exec_from_mocked_root, randomstring):
     assert env[sentinel_key] == expected_env[sentinel_key]
 
 
+def test_warns_if_environment_file_empty(successful_exec_from_mocked_root, caplog):
+    _, conf_dir, *_, em = successful_exec_from_mocked_root
+
+    conf_path = conf_dir / "user_environment.yaml"
+    conf_path.write_text("")
+    with pytest.raises(SystemExit) as pyexc:
+        em._event_loop()
+
+    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
+    assert "Environment file read, but no variables parsed." in caplog.text
+    assert f"\n  Environment file: {conf_path}" in caplog.text, "Expect path to env"
+
+
 def test_handles_invalid_user_environment_file_gracefully(
     successful_exec_from_mocked_root, mocker
 ):
-    _mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
+    mock_os, conf_dir, *_, em = successful_exec_from_mocked_root
     mock_warn = mocker.patch(f"{_MOCK_BASE}log.warning")
 
     env_path = conf_dir / "user_environment.yaml"
@@ -1771,10 +1784,14 @@ def test_handles_invalid_user_environment_file_gracefully(
     with pytest.raises(SystemExit) as pyexc:
         em._event_loop()
     assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
-    a, k = mock_warn.call_args_list[0]
-    assert "Failed to parse user environment variables" in a[0]
-    assert env_path in a, "Expected pointer to problem file in warning"
-    assert "ScannerError" in a, "Expected exception name in warning"
+    (msg,), k = mock_warn.call_args_list[0]
+    assert "Using only default environment" in msg, "Expect action taken"
+    assert "no variables read from environment file." in msg, "Expect problem"
+    assert "Is it a valid YAML file?" in msg, "Expect suggested reason"
+    assert str(env_path) in msg, "Expect problem file shared"
+    assert "ScannerError" in msg, "Expect underlying exception shared"
+    assert "Default environment:" in msg
+    assert str({"PATH": None})[:7] in msg
 
 
 def test_environment_default_path_set_if_not_specified(
@@ -1791,30 +1808,6 @@ def test_environment_default_path_set_if_not_specified(
     a, k = mock_os.execvpe.call_args
     env = k["env"]
     assert "PATH" in env, "Expected PATH is always set"
-
-
-def test_warns_if_environment_file_not_found(successful_exec_from_mocked_root, caplog):
-    _, conf_dir, *_, em = successful_exec_from_mocked_root
-
-    conf_path = conf_dir / "user_environment.yaml"
-    conf_path.unlink(missing_ok=True)
-    with pytest.raises(SystemExit) as pyexc:
-        em._event_loop()
-
-    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
-    assert f"No user environment variable file found at {conf_path}" in caplog.text
-
-
-def test_warns_if_environment_file_empty(successful_exec_from_mocked_root, caplog):
-    _, conf_dir, *_, em = successful_exec_from_mocked_root
-
-    conf_path = conf_dir / "user_environment.yaml"
-    conf_path.write_text("")
-    with pytest.raises(SystemExit) as pyexc:
-        em._event_loop()
-
-    assert pyexc.value.code == _GOOD_EC, "Q&D: verify we exec'ed, based on '+= 1'"
-    assert f"User environment variable file at {conf_path} is empty" in caplog.text
 
 
 def test_warns_if_executable_not_found(
