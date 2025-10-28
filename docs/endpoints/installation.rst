@@ -82,8 +82,8 @@ is supported on any `Python version that is not EOL`_, the Compute agent
 packages are built against Globus' Python.  As the Python version has
 implications for :ref:`function and data serialization consistency
 <avoiding-serde-errors>`, administrators may want to consider supporting
-:ref:`multiple Python versions in the configuration template
-<configure-multiple-python-versions>`.
+:doc:`multiple Python versions in the configuration template
+<../tutorials/dynamic_python_environments>`.
 
 .. _Python version that is not EOL: https://devguide.python.org/versions/
 
