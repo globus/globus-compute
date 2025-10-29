@@ -1,7 +1,7 @@
 import concurrent.futures
+import importlib
 import random
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 import pytest
@@ -20,23 +20,32 @@ class MockHTEX:
         self._task_counter = 0
         self.fail_count = fail_count
         self.monitoring_messages = mock.Mock()
-        self.ex = ThreadPoolExecutor()
 
-    def submit(self, func, _resource_spec, *args, **kwargs):
-        """Inject failures and match Threadpool and HTEX submit signatures"""
+    def validate_resource_spec(self, *a, **k):
+        pass
+
+    def submit_payload(self, ctxt, task_bytes: bytes):
         if self.fail_count > 0:
             self.fail_count -= 1
             future = concurrent.futures.Future()
             future.set_exception(ManagerLost(b"DEAD", "Faking Manager death!"))
         else:
-            future = self.ex.submit(func, *args, **kwargs)
+            exec_imp = ctxt["task_executor"]
+            imp, a, k = exec_imp["f"], exec_imp["a"], exec_imp["k"]
+            imp: str
+            mod_path, _, fname = imp.rpartition(".")
+            mod = importlib.import_module(mod_path)
+            f = getattr(mod, fname)
+            future = concurrent.futures.Future()
+            future.set_result(f(task_bytes, *a, **k))
+
         self._task_counter += 1
         future.parsl_executor_task_id = self._task_counter  # match what Parsl does
 
         return future
 
     def shutdown(self):
-        return self.ex.shutdown()
+        pass
 
 
 @pytest.fixture
