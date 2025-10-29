@@ -11,6 +11,7 @@ import typing as t
 import warnings
 
 import globus_sdk
+from globus_sdk import Scope
 from globus_compute_common.sdk_version_sharing import user_agent_substring
 from globus_compute_sdk.sdk._environments import get_web_service_url, remove_url_path
 from globus_compute_sdk.sdk.utils.uuid_like import UUID_LIKE_T
@@ -128,7 +129,7 @@ class WebClient(globus_sdk.BaseClient):
     error_class = globus_sdk.GlobusAPIError
 
     scopes = globus_sdk.scopes.ComputeScopes
-    default_scope_requirements = [globus_sdk.scopes.ComputeScopes]
+    default_scope_requirements = [Scope(globus_sdk.scopes.ComputeScopes.all)]
 
     def __init__(
         self,
