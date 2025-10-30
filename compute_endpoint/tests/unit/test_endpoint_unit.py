@@ -870,6 +870,27 @@ def test_update_config_file_retains_order(fs):
     assert original_config == target_config
 
 
+def test_update_config_file_empty_comment(fs):
+    target_path = pathlib.Path("target_config.yaml")
+    original_path = pathlib.Path("original_config.yaml")
+
+    original_config = "engine:\n  abc: 123\n"
+    original_path.write_text(original_config)
+    Endpoint.update_config_file(
+        original_path,
+        target_path,
+        id_mapping=False,
+        high_assurance=False,
+        display_name=None,
+        auth_policy=None,
+        subscription_id=None,
+    )
+
+    target_config = target_path.read_text().strip()
+    assert target_config.startswith("#")
+    assert "is currently empty" in target_config
+
+
 @pytest.mark.parametrize(
     "config_keys",
     (

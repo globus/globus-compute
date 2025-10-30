@@ -121,7 +121,11 @@ class Endpoint:
         if subscription_id:
             config_dict["subscription_id"] = subscription_id
 
-        config_text = yaml.safe_dump(config_dict, sort_keys=False)
+        # Empty file yields '{}' which is valid but may be unclear as to format
+        config_text = "# The generated config file is currently empty\n"
+        if config_dict:
+            config_text = yaml.safe_dump(config_dict, sort_keys=False)
+
         target_path.write_text(config_text)
 
     @staticmethod
