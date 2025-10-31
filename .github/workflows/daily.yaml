@@ -32,24 +32,3 @@ jobs:
         source .venv/bin/activate
         cd smoke_tests
         make staging
-
-  slack-notify:
-    needs:
-      - smoke-test-staging
-    if: always()
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '${{ env.TARGET_PYTHON_VERSION }}'
-      - run: python -m pip install --upgrade requests
-      - name: notify slack
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CHANNEL: '#commits'
-          SLACK_MESSAGE_TITLE: 'Daily Smoke Tests on Staging'
-          SLACK_FAILURE_MESSAGE: 'Daily test failed on staging'
-        run: ./.github/_support/github-slack-notify.py ${{ needs.smoke-test-staging.result }}

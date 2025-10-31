@@ -29,13 +29,3 @@ jobs:
       run: |
         cd smoke_tests
         make prod
-
-  slack-notify:
-    needs: [smoke-test]
-    if: always()
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-      - run: python -m pip install -U requests
