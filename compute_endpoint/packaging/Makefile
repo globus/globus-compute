@@ -4,7 +4,7 @@
 # invoke /bin/sh in the same manner as other platforms.
 PYTHON3 := $$("$(SHELL)" -c "command -v /opt/globus-python/bin/python3")
 
-PY_FULL_VERSION := $$("$(PYTHON3)" -c "import sys; print('{}.{}.{}'.format(*sys.version_info))")
+PY_FULL_VERSION := $$("$(PYTHON3)" -c "import platform; print(platform.python_version())")
 PY_MAJOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f1 )
 PY_MINOR_VERSION := $(shell echo -n $(PY_FULL_VERSION) | cut -d . -f2 )
 PY_VERSION := $(PY_MAJOR_VERSION)$(PY_MINOR_VERSION)

@@ -38,7 +38,7 @@ from .auth.auth_client import ComputeAuthClient
 from .auth.globus_app import get_globus_app
 from .batch import Batch, UserRuntime
 from .login_manager import LoginManagerProtocol
-from .utils import get_env_var_with_deprecation, get_py_version_str
+from .utils import get_env_var_with_deprecation
 from .web_client import WebClient
 
 logger = logging.getLogger(__name__)
@@ -928,7 +928,7 @@ class Client:
             reg_meta = FunctionRegistrationMetadata(**metadata)
         else:
             reg_meta = FunctionRegistrationMetadata(
-                python_version=get_py_version_str(),
+                python_version=platform.python_version(),
                 sdk_version=__version__,
                 serde_identifier=serde_iden.strip(),
             )
