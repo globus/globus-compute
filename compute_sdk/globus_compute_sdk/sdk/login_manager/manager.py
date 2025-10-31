@@ -154,7 +154,7 @@ class LoginManager:
                     scopes=scopes,
                     access_token=access_token,
                     expires_at=expires_at,
-                    on_refresh=self._token_storage.on_refresh,
+                    on_refresh=self._token_storage.store
                 )
         else:
             if tokens is None:
