@@ -21,7 +21,7 @@ from globus_compute_sdk.errors import TaskExecutionFailed
 from globus_compute_sdk.sdk.auth.auth_client import ComputeAuthClient
 from globus_compute_sdk.sdk.client import _client_gares_handler, _ComputeWebClient
 from globus_compute_sdk.sdk.login_manager import LoginManager
-from globus_compute_sdk.sdk.utils import get_env_details, get_py_version_str
+from globus_compute_sdk.sdk.utils import get_env_details
 from globus_compute_sdk.sdk.web_client import (
     FunctionRegistrationData,
     FunctionRegistrationMetadata,
@@ -45,7 +45,7 @@ _MOCK_BASE = "globus_compute_sdk.sdk.client."
 
 
 fnmetadata = FunctionRegistrationMetadata(
-    python_version=get_py_version_str(),
+    python_version=platform.python_version(),
     sdk_version=__version__,
     serde_identifier=DEFAULT_STRATEGY_CODE.identifier.strip(),
 )
@@ -448,7 +448,7 @@ def test_register_function(gcc: gc.Client, serde: ComputeSerializer):
     (data,), _ = gcc._compute_web_client.v3.register_function.call_args
 
     metadata = {
-        "python_version": "{}.{}.{}".format(*sys.version_info),
+        "python_version": platform.python_version(),
         "sdk_version": __version__,
         "serde_identifier": serde.code_serializer.identifier.strip(),
     }
@@ -557,7 +557,7 @@ def test_function_registration_data_data_function(serde):
     expected_code = serde.pack_buffers([serde.serialize(funk)])
     assert frd.function_name == "funk"
     assert frd.function_code == expected_code
-    assert frd.metadata.python_version == get_py_version_str()
+    assert frd.metadata.python_version == platform.python_version()
     assert frd.metadata.sdk_version == __version__
     assert frd.metadata.serde_identifier == serde.code_serializer.identifier.strip()
 
