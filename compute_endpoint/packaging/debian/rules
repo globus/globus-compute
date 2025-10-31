@@ -16,7 +16,7 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 name := @PACKAGE_NAME@
 package_executable := @PIP_NAME@
-VIRTUAL_ENV := /opt/$(name)/venv-py39
+VIRTUAL_ENV := /opt/$(name)/@VIRTUALENV@
 TMP_BUILD_DIR := debian/$(name)-tmp
 TMP_VIRTUAL_ENV := $(TMP_BUILD_DIR)$(VIRTUAL_ENV)
 DEST_ROOT := debian/$(name)
@@ -29,7 +29,8 @@ _unitdir=/lib/systemd/system
 
 .PHONY: override_dh_auto_configure
 override_dh_auto_configure:
-	$(PYTHON3) -mvenv $${PWD}/$(TMP_VIRTUAL_ENV)
+	$(PYTHON3) -mvenv "$${PWD}/$(TMP_VIRTUAL_ENV)"
+	rm -f "$${PWD}/$(TMP_VIRTUAL_ENV)/.gitignore"  # "Lovely" Python 3.13 addition
 	. "$${PWD}/$(TMP_VIRTUAL_ENV)/bin/activate"; \
 	set -x; \
 	python -mpip install --no-index --no-cache-dir -I --compile -U prereqs/pip-*.whl; \
@@ -45,8 +46,10 @@ override_dh_shlibdeps:    # empty == we're ignoring it for our purposes.
 .PHONY: override_dh_auto_install
 override_dh_auto_install:
 	set -ex; \
+	$(PYTHON3) -mvenv "$${PWD}/$(TMP_VIRTUAL_ENV)"
+	rm -f "$${PWD}/$(TMP_VIRTUAL_ENV)/.gitignore"  # "Lovely" Python 3.13 addition
+	set -ex; \
 	. "$(TMP_VIRTUAL_ENV)/bin/activate"; \
-	$(PYTHON3) -mvenv $${PWD}/$(TMP_VIRTUAL_ENV) ; \
 	install -d -m 755 \
 	  "$(DEST_VIRTUAL_ENV)" \
 	  "$(DEST_ROOT)$(_sbindir)" \

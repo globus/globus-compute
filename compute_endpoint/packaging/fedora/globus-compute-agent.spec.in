@@ -1,13 +1,14 @@
 Name:           @PACKAGE_NAME@
-%define         _build_id_links         none
-%global         debug_package           %{nil}
-%global         version                 @PACKAGE_VERSION@
-%global         pythonversion           py39
-%global         VIRTUAL_ENV             /opt/%{name}/venv-%{pythonversion}
-%global         src_dir                 %{_sourcedir}/%{name}
-%global         package_executable      @PIP_NAME@
-%global         globus_python3_version  3.9
-%global         __python                /opt/globus-python/bin/python3
+%define         _build_id_links              none
+%global         debug_package                %{nil}
+%global         version                      @PACKAGE_VERSION@
+%global         pythonversion                py313
+%global         VIRTUAL_ENV                  /opt/%{name}/venv-%{pythonversion}
+%global         src_dir                      %{_sourcedir}/%{name}
+%global         package_executable           @PIP_NAME@
+%global         globus_python3_version       3.13
+%global         globus_python3_version_next  3.14
+%global         __python                     /opt/globus-python/bin/python3
 
 # We don't put our bits in the standard locations, so python_provides generation
 # is not useful (and super slow anyway!)
@@ -27,7 +28,7 @@ Vendor:         %{?vendor}%{!?vendor:Unknown}
 Summary:        Globus Compute Endpoint agent for system-level installs
 
 Conflicts:      %{name} < %{version}
-Requires:       globus-python >= %{globus_python3_version}
+Requires:       globus-python >= %{globus_python3_version}, globus-python < %{globus_python3_version_next}
 Requires(pre):  /usr/sbin/useradd, /usr/bin/getent
 Requires(postun): /usr/sbin/userdel
 
@@ -54,6 +55,7 @@ want to install the `@PIP_NAME@` directly from PyPI.
 
 rm -rf "%{DEST_VIRTUAL_ENV}"
 %__python -mvenv "%{DEST_VIRTUAL_ENV}"
+rm -f "%{DEST_VIRTUAL_ENV}/.gitignore"  # Python 3.13 adds this to new venvs (!!!)
 
 %build
 . "%{DEST_VIRTUAL_ENV}/bin/activate"
